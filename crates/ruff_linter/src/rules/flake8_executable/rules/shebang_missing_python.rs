@@ -1,8 +1,9 @@
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::Violation;
+use crate::checkers::ast::LintContext;
 use crate::comments::shebang::ShebangDirective;
 
 /// ## What it does
@@ -31,6 +32,7 @@ use crate::comments::shebang::ShebangDirective;
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.229")]
 pub(crate) struct ShebangMissingPython;
 
 impl Violation for ShebangMissingPython {
@@ -44,10 +46,16 @@ impl Violation for ShebangMissingPython {
 pub(crate) fn shebang_missing_python(
     range: TextRange,
     shebang: &ShebangDirective,
-) -> Option<Diagnostic> {
-    if shebang.contains("python") || shebang.contains("pytest") || shebang.contains("uv run") {
-        return None;
+    context: &LintContext,
+) {
+    if shebang.contains("python")
+        || shebang.contains("pytest")
+        || shebang.contains("uv run")
+        || shebang.contains("uvx")
+        || shebang.contains("uv tool run")
+    {
+        return;
     }
 
-    Some(Diagnostic::new(ShebangMissingPython, range))
+    context.report_diagnostic_if_enabled(ShebangMissingPython, range);
 }

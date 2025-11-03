@@ -1,11 +1,11 @@
-use ruff_formatter::{write, FormatContext};
+use ruff_formatter::{FormatContext, write};
 use ruff_python_ast::{ArgOrKeyword, Arguments, Expr, StringFlags, StringLike};
 use ruff_python_trivia::{PythonWhitespace, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::expression::expr_generator::GeneratorExpParentheses;
 use crate::expression::is_expression_huggable;
-use crate::expression::parentheses::{empty_parenthesized, parenthesized, Parentheses};
+use crate::expression::parentheses::{Parentheses, empty_parenthesized, parenthesized};
 use crate::other::commas;
 use crate::prelude::*;
 use crate::string::StringLikeExtensions;
@@ -19,6 +19,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             range,
             args,
             keywords,
+            node_index: _,
         } = item;
         // We have a case with `f()` without any argument, which is a special case because we can
         // have a comment with no node attachment inside:

@@ -1,0 +1,443 @@
+---
+source: crates/ruff_linter/src/rules/perflint/mod.rs
+---
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+ --> PERF403.py:5:9
+  |
+3 |     result = {}
+4 |     for idx, name in enumerate(fruit):
+5 |         result[idx] = name  # PERF403
+  |         ^^^^^^^^^^^^^^^^^^
+  |
+help: Replace for loop with dict comprehension
+1 | def foo():
+2 |     fruit = ["apple", "pear", "orange"]
+  -     result = {}
+  -     for idx, name in enumerate(fruit):
+  -         result[idx] = name  # PERF403
+3 +     result = {idx: name for idx, name in enumerate(fruit)}  # PERF403
+4 | 
+5 | 
+6 | def foo():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+  --> PERF403.py:13:13
+   |
+11 |     for idx, name in enumerate(fruit):
+12 |         if idx % 2:
+13 |             result[idx] = name  # PERF403
+   |             ^^^^^^^^^^^^^^^^^^
+   |
+help: Replace for loop with dict comprehension
+7  | 
+8  | def foo():
+9  |     fruit = ["apple", "pear", "orange"]
+   -     result = {}
+   -     for idx, name in enumerate(fruit):
+   -         if idx % 2:
+   -             result[idx] = name  # PERF403
+10 +     result = {idx: name for idx, name in enumerate(fruit) if idx % 2}  # PERF403
+11 | 
+12 | 
+13 | def foo():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+  --> PERF403.py:33:13
+   |
+31 |     for idx, name in enumerate(fruit):
+32 |         if idx % 2:
+33 |             result[idx] = name  # PERF403
+   |             ^^^^^^^^^^^^^^^^^^
+   |
+help: Replace for loop with dict comprehension
+26 | 
+27 | 
+28 | def foo():
+   -     result = {}
+29 |     fruit = ["apple", "pear", "orange"]
+   -     for idx, name in enumerate(fruit):
+   -         if idx % 2:
+   -             result[idx] = name  # PERF403
+30 +     result = {idx: name for idx, name in enumerate(fruit) if idx % 2}  # PERF403
+31 | 
+32 | 
+33 | def foo():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use `dict.update` instead of a for-loop
+  --> PERF403.py:63:13
+   |
+61 |     for idx, name in enumerate(fruit):
+62 |         if idx % 2:
+63 |             result[idx] = name  # PERF403
+   |             ^^^^^^^^^^^^^^^^^^
+   |
+help: Replace for loop with `dict.update`
+58 | def foo():
+59 |     result = {1: "banana"}
+60 |     fruit = ["apple", "pear", "orange"]
+   -     for idx, name in enumerate(fruit):
+   -         if idx % 2:
+   -             result[idx] = name  # PERF403
+61 +     result.update({idx: name for idx, name in enumerate(fruit) if idx % 2})  # PERF403
+62 | 
+63 | 
+64 | def foo():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+  --> PERF403.py:78:9
+   |
+76 |     result = {}
+77 |     for name in fruit:
+78 |         result[name] = name  # PERF403
+   |         ^^^^^^^^^^^^^^^^^^^
+   |
+help: Replace for loop with dict comprehension
+73 | 
+74 | def foo():
+75 |     fruit = ["apple", "pear", "orange"]
+   -     result = {}
+   -     for name in fruit:
+   -         result[name] = name  # PERF403
+76 +     result = {name: name for name in fruit}  # PERF403
+77 | 
+78 | 
+79 | def foo():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+  --> PERF403.py:85:9
+   |
+83 |     result = {}
+84 |     for idx, name in enumerate(fruit):
+85 |         result[name] = idx  # PERF403
+   |         ^^^^^^^^^^^^^^^^^^
+   |
+help: Replace for loop with dict comprehension
+80 | 
+81 | def foo():
+82 |     fruit = ["apple", "pear", "orange"]
+   -     result = {}
+   -     for idx, name in enumerate(fruit):
+   -         result[name] = idx  # PERF403
+83 +     result = {name: idx for idx, name in enumerate(fruit)}  # PERF403
+84 | 
+85 | 
+86 | def foo():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+  --> PERF403.py:94:9
+   |
+92 |     result = SneakyDict()
+93 |     for idx, name in enumerate(fruit):
+94 |         result[name] = idx  # PERF403
+   |         ^^^^^^^^^^^^^^^^^^
+   |
+help: Replace for loop with dict comprehension
+89 |     from builtins import dict as SneakyDict
+90 | 
+91 |     fruit = ["apple", "pear", "orange"]
+   -     result = SneakyDict()
+   -     for idx, name in enumerate(fruit):
+   -         result[name] = idx  # PERF403
+92 +     result = {name: idx for idx, name in enumerate(fruit)}  # PERF403
+93 | 
+94 | 
+95 | def foo():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:106:9
+    |
+104 |       ):
+105 |           # comment 3
+106 | /         result[
+107 | |             name  # comment 4
+108 | |         ] = idx  # PERF403
+    | |_______________^
+    |
+help: Replace for loop with dict comprehension
+96  | 
+97  | def foo():
+98  |     fruit = ["apple", "pear", "orange"]
+    -     result: dict[str, int] = {
+    -         # comment 1
+    -     }
+    -     for idx, name in enumerate(
+99  +     # comment 1
+100 +     # comment 3
+101 +     # comment 4
+102 +     result: dict[str, int] = {name: idx for idx, name in enumerate(
+103 |         fruit  # comment 2
+    -     ):
+    -         # comment 3
+    -         result[
+    -             name  # comment 4
+    -         ] = idx  # PERF403
+104 +     )}  # PERF403
+105 | 
+106 | 
+107 | def foo():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:115:9
+    |
+113 |     a = 1; result = {}; b = 2
+114 |     for idx, name in enumerate(fruit):
+115 |         result[name] = idx  # PERF403
+    |         ^^^^^^^^^^^^^^^^^^
+    |
+help: Replace for loop with dict comprehension
+110 | 
+111 | def foo():
+112 |     fruit = ["apple", "pear", "orange"]
+    -     a = 1; result = {}; b = 2
+    -     for idx, name in enumerate(fruit):
+    -         result[name] = idx  # PERF403
+113 +     a = 1; b = 2
+114 +     result = {name: idx for idx, name in enumerate(fruit)}  # PERF403
+115 | 
+116 | 
+117 | def foo():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use `dict.update` instead of a for-loop
+   --> PERF403.py:122:9
+    |
+120 |     result = {"kiwi": 3}
+121 |     for idx, name in enumerate(fruit):
+122 |         result[name] = idx  # PERF403
+    |         ^^^^^^^^^^^^^^^^^^
+    |
+help: Replace for loop with `dict.update`
+118 | def foo():
+119 |     fruit = ["apple", "pear", "orange"]
+120 |     result = {"kiwi": 3}
+    -     for idx, name in enumerate(fruit):
+    -         result[name] = idx  # PERF403
+121 +     result.update({name: idx for idx, name in enumerate(fruit)})  # PERF403
+122 | 
+123 | 
+124 | def foo():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use `dict.update` instead of a for-loop
+   --> PERF403.py:129:9
+    |
+127 |     (_, result) = (None, {"kiwi": 3})
+128 |     for idx, name in enumerate(fruit):
+129 |         result[name] = idx  # PERF403
+    |         ^^^^^^^^^^^^^^^^^^
+    |
+help: Replace for loop with `dict.update`
+125 | def foo():
+126 |     fruit = ["apple", "pear", "orange"]
+127 |     (_, result) = (None, {"kiwi": 3})
+    -     for idx, name in enumerate(fruit):
+    -         result[name] = idx  # PERF403
+128 +     result.update({name: idx for idx, name in enumerate(fruit)})  # PERF403
+129 | 
+130 | 
+131 | def foo():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use `dict.update` instead of a for-loop
+   --> PERF403.py:137:9
+    |
+135 |     print(len(result))
+136 |     for idx, name in enumerate(fruit):
+137 |         result[name] = idx  # PERF403
+    |         ^^^^^^^^^^^^^^^^^^
+    |
+help: Replace for loop with `dict.update`
+133 |     fruit = ["apple", "pear", "orange"]
+134 |     result = {}
+135 |     print(len(result))
+    -     for idx, name in enumerate(fruit):
+    -         result[name] = idx  # PERF403
+136 +     result.update({name: idx for idx, name in enumerate(fruit)})  # PERF403
+137 | 
+138 | 
+139 | def foo():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:145:13
+    |
+143 |     for idx, name in enumerate(fruit):
+144 |         if last_idx := idx % 3:
+145 |             result[name] = idx  # PERF403
+    |             ^^^^^^^^^^^^^^^^^^
+    |
+help: Replace for loop with dict comprehension
+139 | 
+140 | def foo():
+141 |     fruit = ["apple", "pear", "orange"]
+    -     result = {}
+    -     for idx, name in enumerate(fruit):
+    -         if last_idx := idx % 3:
+    -             result[name] = idx  # PERF403
+142 +     result = {name: idx for idx, name in enumerate(fruit) if (last_idx := idx % 3)}  # PERF403
+143 | 
+144 | 
+145 | def foo():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:153:9
+    |
+151 |     result = {}
+152 |     for idx, name in indices, fruit:
+153 |         result[name] = idx  # PERF403
+    |         ^^^^^^^^^^^^^^^^^^
+    |
+help: Replace for loop with dict comprehension
+148 | def foo():
+149 |     fruit = ["apple", "pear", "orange"]
+150 |     indices = [0, 1, 2]
+    -     result = {}
+    -     for idx, name in indices, fruit:
+    -         result[name] = idx  # PERF403
+151 +     result = {name: idx for idx, name in (indices, fruit)}  # PERF403
+152 | 
+153 | 
+154 | def foo():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:162:13
+    |
+160 |     for k, v in src:
+161 |         if True if True else False:
+162 |             dst[k] = v
+    |             ^^^^^^^^^^
+163 |
+164 |     for k, v in src:
+    |
+help: Replace for loop with dict comprehension
+155 | 
+156 | def foo():
+157 |     src = (("x", 1),)
+    -     dst = {}
+158 | 
+    -     for k, v in src:
+    -         if True if True else False:
+    -             dst[k] = v
+159 +     dst = {k: v for k, v in src if (True if True else False)}
+160 | 
+161 |     for k, v in src:
+162 |         if lambda: 0:
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use `dict.update` instead of a for-loop
+   --> PERF403.py:166:13
+    |
+164 |     for k, v in src:
+165 |         if lambda: 0:
+166 |             dst[k] = v
+    |             ^^^^^^^^^^
+167 |
+168 | # https://github.com/astral-sh/ruff/issues/18859
+    |
+help: Replace for loop with `dict.update`
+161 |         if True if True else False:
+162 |             dst[k] = v
+163 | 
+    -     for k, v in src:
+    -         if lambda: 0:
+    -             dst[k] = v
+164 +     dst.update({k: v for k, v in src if (lambda: 0)})
+165 | 
+166 | # https://github.com/astral-sh/ruff/issues/18859
+167 | def foo():
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:172:9
+    |
+170 |     v = {}
+171 |     for o,(x,)in():
+172 |         v[x,]=o
+    |         ^^^^^^^
+    |
+help: Replace for loop with dict comprehension
+167 | 
+168 | # https://github.com/astral-sh/ruff/issues/18859
+169 | def foo():
+    -     v = {}
+    -     for o,(x,)in():
+    -         v[x,]=o
+170 +     v = {(x,): o for o,(x,) in ()}
+171 | 
+172 | 
+173 | # https://github.com/astral-sh/ruff/issues/19005
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:200:9
+    |
+198 |     v = {}
+199 |     for o, (x,) in ["ox"]:
+200 |         v[x,] = o
+    |         ^^^^^^^^^
+201 |     return v
+    |
+help: Replace for loop with dict comprehension
+195 | 
+196 | 
+197 | def issue_19153_1():
+    -     v = {}
+    -     for o, (x,) in ["ox"]:
+    -         v[x,] = o
+198 +     v = {(x,): o for o, (x,) in ["ox"]}
+199 |     return v
+200 | 
+201 | 
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:207:9
+    |
+205 |     v = {}
+206 |     for (o, p), x in [("op", "x")]:
+207 |         v[x] = o, p
+    |         ^^^^^^^^^^^
+208 |     return v
+    |
+help: Replace for loop with dict comprehension
+202 | 
+203 | 
+204 | def issue_19153_2():
+    -     v = {}
+    -     for (o, p), x in [("op", "x")]:
+    -         v[x] = o, p
+205 +     v = {x: (o, p) for (o, p), x in [("op", "x")]}
+206 |     return v
+207 | 
+208 | 
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:214:9
+    |
+212 |     v = {}
+213 |     for o, (x,) in ["ox"]: 
+214 |         v[(x,)] = o 
+    |         ^^^^^^^^^^^
+215 |     return v
+    |
+help: Replace for loop with dict comprehension
+209 | 
+210 | 
+211 | def issue_19153_3():
+    -     v = {}
+    -     for o, (x,) in ["ox"]: 
+    -         v[(x,)] = o 
+212 +     v = {(x,): o for o, (x,) in ["ox"]} 
+213 |     return v
+note: This is an unsafe fix and may change runtime behavior

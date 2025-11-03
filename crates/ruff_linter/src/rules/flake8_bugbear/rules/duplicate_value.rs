@@ -1,15 +1,15 @@
 use anyhow::{Context, Result};
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_python_ast::comparable::HashableExpr;
 use ruff_python_ast::Expr;
+use ruff_python_ast::comparable::HashableExpr;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for set literals that contain duplicate items.
@@ -29,6 +29,7 @@ use crate::checkers::ast::Checker;
 /// {1, 2, 3}
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct DuplicateValue {
     value: String,
     existing: String,
@@ -60,7 +61,7 @@ pub(crate) fn duplicate_value(checker: &Checker, set: &ast::ExprSet) {
     for (index, value) in set.iter().enumerate() {
         if value.is_literal_expr() {
             if let Some(existing) = seen_values.insert(HashableExpr::from(value), value) {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     DuplicateValue {
                         value: checker.generator().expr(value),
                         existing: checker.generator().expr(existing),
@@ -71,10 +72,8 @@ pub(crate) fn duplicate_value(checker: &Checker, set: &ast::ExprSet) {
                 diagnostic.try_set_fix(|| {
                     remove_member(set, index, checker.locator().contents()).map(Fix::safe_edit)
                 });
-
-                checker.report_diagnostic(diagnostic);
             }
-        };
+        }
     }
 }
 

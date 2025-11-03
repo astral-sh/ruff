@@ -1,0 +1,69 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/read_from_debug.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..32,
+        body: [
+            If(
+                StmtIf {
+                    node_index: NodeIndex(None),
+                    range: 0..17,
+                    test: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 3..12,
+                            id: Name("__debug__"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 14..17,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 14..17,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    node_index: NodeIndex(None),
+                    range: 18..31,
+                    targets: [
+                        Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 18..19,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 22..31,
+                            id: Name("__debug__"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

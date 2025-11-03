@@ -1,0 +1,705 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:14:1
+   |
+12 | # Errors
+13 | ## Test split called directly on string literal
+14 | "1,2,3".split(",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^
+15 | "1,2,3".split(",")[-1]  # [missing-maxsplit-arg]
+16 | "1,2,3".rsplit(",")[0]  # [missing-maxsplit-arg]
+   |
+help: Pass `maxsplit=1` into `str.split()`
+11 | 
+12 | # Errors
+13 | ## Test split called directly on string literal
+   - "1,2,3".split(",")[0]  # [missing-maxsplit-arg]
+14 + "1,2,3".split(",", maxsplit=1)[0]  # [missing-maxsplit-arg]
+15 | "1,2,3".split(",")[-1]  # [missing-maxsplit-arg]
+16 | "1,2,3".rsplit(",")[0]  # [missing-maxsplit-arg]
+17 | "1,2,3".rsplit(",")[-1]  # [missing-maxsplit-arg]
+
+PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:15:1
+   |
+13 | ## Test split called directly on string literal
+14 | "1,2,3".split(",")[0]  # [missing-maxsplit-arg]
+15 | "1,2,3".split(",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^
+16 | "1,2,3".rsplit(",")[0]  # [missing-maxsplit-arg]
+17 | "1,2,3".rsplit(",")[-1]  # [missing-maxsplit-arg]
+   |
+help: Use `str.rsplit()` and pass `maxsplit=1`
+12 | # Errors
+13 | ## Test split called directly on string literal
+14 | "1,2,3".split(",")[0]  # [missing-maxsplit-arg]
+   - "1,2,3".split(",")[-1]  # [missing-maxsplit-arg]
+15 + "1,2,3".rsplit(",", maxsplit=1)[-1]  # [missing-maxsplit-arg]
+16 | "1,2,3".rsplit(",")[0]  # [missing-maxsplit-arg]
+17 | "1,2,3".rsplit(",")[-1]  # [missing-maxsplit-arg]
+18 | 
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:16:1
+   |
+14 | "1,2,3".split(",")[0]  # [missing-maxsplit-arg]
+15 | "1,2,3".split(",")[-1]  # [missing-maxsplit-arg]
+16 | "1,2,3".rsplit(",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^
+17 | "1,2,3".rsplit(",")[-1]  # [missing-maxsplit-arg]
+   |
+help: Use `str.split()` and pass `maxsplit=1`
+13 | ## Test split called directly on string literal
+14 | "1,2,3".split(",")[0]  # [missing-maxsplit-arg]
+15 | "1,2,3".split(",")[-1]  # [missing-maxsplit-arg]
+   - "1,2,3".rsplit(",")[0]  # [missing-maxsplit-arg]
+16 + "1,2,3".split(",", maxsplit=1)[0]  # [missing-maxsplit-arg]
+17 | "1,2,3".rsplit(",")[-1]  # [missing-maxsplit-arg]
+18 | 
+19 | ## Test split called on string variable
+
+PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:17:1
+   |
+15 | "1,2,3".split(",")[-1]  # [missing-maxsplit-arg]
+16 | "1,2,3".rsplit(",")[0]  # [missing-maxsplit-arg]
+17 | "1,2,3".rsplit(",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+18 |
+19 | ## Test split called on string variable
+   |
+help: Pass `maxsplit=1` into `str.rsplit()`
+14 | "1,2,3".split(",")[0]  # [missing-maxsplit-arg]
+15 | "1,2,3".split(",")[-1]  # [missing-maxsplit-arg]
+16 | "1,2,3".rsplit(",")[0]  # [missing-maxsplit-arg]
+   - "1,2,3".rsplit(",")[-1]  # [missing-maxsplit-arg]
+17 + "1,2,3".rsplit(",", maxsplit=1)[-1]  # [missing-maxsplit-arg]
+18 | 
+19 | ## Test split called on string variable
+20 | SEQ.split(",")[0]  # [missing-maxsplit-arg]
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:20:1
+   |
+19 | ## Test split called on string variable
+20 | SEQ.split(",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^
+21 | SEQ.split(",")[-1]  # [missing-maxsplit-arg]
+22 | SEQ.rsplit(",")[0]  # [missing-maxsplit-arg]
+   |
+help: Pass `maxsplit=1` into `str.split()`
+17 | "1,2,3".rsplit(",")[-1]  # [missing-maxsplit-arg]
+18 | 
+19 | ## Test split called on string variable
+   - SEQ.split(",")[0]  # [missing-maxsplit-arg]
+20 + SEQ.split(",", maxsplit=1)[0]  # [missing-maxsplit-arg]
+21 | SEQ.split(",")[-1]  # [missing-maxsplit-arg]
+22 | SEQ.rsplit(",")[0]  # [missing-maxsplit-arg]
+23 | SEQ.rsplit(",")[-1]  # [missing-maxsplit-arg]
+
+PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:21:1
+   |
+19 | ## Test split called on string variable
+20 | SEQ.split(",")[0]  # [missing-maxsplit-arg]
+21 | SEQ.split(",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^
+22 | SEQ.rsplit(",")[0]  # [missing-maxsplit-arg]
+23 | SEQ.rsplit(",")[-1]  # [missing-maxsplit-arg]
+   |
+help: Use `str.rsplit()` and pass `maxsplit=1`
+18 | 
+19 | ## Test split called on string variable
+20 | SEQ.split(",")[0]  # [missing-maxsplit-arg]
+   - SEQ.split(",")[-1]  # [missing-maxsplit-arg]
+21 + SEQ.rsplit(",", maxsplit=1)[-1]  # [missing-maxsplit-arg]
+22 | SEQ.rsplit(",")[0]  # [missing-maxsplit-arg]
+23 | SEQ.rsplit(",")[-1]  # [missing-maxsplit-arg]
+24 | 
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:22:1
+   |
+20 | SEQ.split(",")[0]  # [missing-maxsplit-arg]
+21 | SEQ.split(",")[-1]  # [missing-maxsplit-arg]
+22 | SEQ.rsplit(",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^
+23 | SEQ.rsplit(",")[-1]  # [missing-maxsplit-arg]
+   |
+help: Use `str.split()` and pass `maxsplit=1`
+19 | ## Test split called on string variable
+20 | SEQ.split(",")[0]  # [missing-maxsplit-arg]
+21 | SEQ.split(",")[-1]  # [missing-maxsplit-arg]
+   - SEQ.rsplit(",")[0]  # [missing-maxsplit-arg]
+22 + SEQ.split(",", maxsplit=1)[0]  # [missing-maxsplit-arg]
+23 | SEQ.rsplit(",")[-1]  # [missing-maxsplit-arg]
+24 | 
+25 | ## Test split called on class attribute
+
+PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:23:1
+   |
+21 | SEQ.split(",")[-1]  # [missing-maxsplit-arg]
+22 | SEQ.rsplit(",")[0]  # [missing-maxsplit-arg]
+23 | SEQ.rsplit(",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^
+24 |
+25 | ## Test split called on class attribute
+   |
+help: Pass `maxsplit=1` into `str.rsplit()`
+20 | SEQ.split(",")[0]  # [missing-maxsplit-arg]
+21 | SEQ.split(",")[-1]  # [missing-maxsplit-arg]
+22 | SEQ.rsplit(",")[0]  # [missing-maxsplit-arg]
+   - SEQ.rsplit(",")[-1]  # [missing-maxsplit-arg]
+23 + SEQ.rsplit(",", maxsplit=1)[-1]  # [missing-maxsplit-arg]
+24 | 
+25 | ## Test split called on class attribute
+26 | Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:26:1
+   |
+25 | ## Test split called on class attribute
+26 | Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+27 | Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
+28 | Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
+   |
+help: Pass `maxsplit=1` into `str.split()`
+23 | SEQ.rsplit(",")[-1]  # [missing-maxsplit-arg]
+24 | 
+25 | ## Test split called on class attribute
+   - Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
+26 + Foo.class_str.split(",", maxsplit=1)[0]  # [missing-maxsplit-arg]
+27 | Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
+28 | Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
+29 | Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
+
+PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:27:1
+   |
+25 | ## Test split called on class attribute
+26 | Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
+27 | Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+28 | Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
+29 | Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
+   |
+help: Use `str.rsplit()` and pass `maxsplit=1`
+24 | 
+25 | ## Test split called on class attribute
+26 | Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
+   - Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
+27 + Foo.class_str.rsplit(",", maxsplit=1)[-1]  # [missing-maxsplit-arg]
+28 | Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
+29 | Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
+30 | 
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:28:1
+   |
+26 | Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
+27 | Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
+28 | Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+29 | Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
+   |
+help: Use `str.split()` and pass `maxsplit=1`
+25 | ## Test split called on class attribute
+26 | Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
+27 | Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
+   - Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
+28 + Foo.class_str.split(",", maxsplit=1)[0]  # [missing-maxsplit-arg]
+29 | Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
+30 | 
+31 | ## Test split called on sliced string
+
+PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:29:1
+   |
+27 | Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
+28 | Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
+29 | Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+30 |
+31 | ## Test split called on sliced string
+   |
+help: Pass `maxsplit=1` into `str.rsplit()`
+26 | Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
+27 | Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
+28 | Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
+   - Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
+29 + Foo.class_str.rsplit(",", maxsplit=1)[-1]  # [missing-maxsplit-arg]
+30 | 
+31 | ## Test split called on sliced string
+32 | "1,2,3"[::-1].split(",")[0]  # [missing-maxsplit-arg]
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:32:1
+   |
+31 | ## Test split called on sliced string
+32 | "1,2,3"[::-1].split(",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+33 | "1,2,3"[::-1][::-1].split(",")[0]  # [missing-maxsplit-arg]
+34 | SEQ[:3].split(",")[0]  # [missing-maxsplit-arg]
+   |
+help: Pass `maxsplit=1` into `str.split()`
+29 | Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
+30 | 
+31 | ## Test split called on sliced string
+   - "1,2,3"[::-1].split(",")[0]  # [missing-maxsplit-arg]
+32 + "1,2,3"[::-1].split(",", maxsplit=1)[0]  # [missing-maxsplit-arg]
+33 | "1,2,3"[::-1][::-1].split(",")[0]  # [missing-maxsplit-arg]
+34 | SEQ[:3].split(",")[0]  # [missing-maxsplit-arg]
+35 | Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:33:1
+   |
+31 | ## Test split called on sliced string
+32 | "1,2,3"[::-1].split(",")[0]  # [missing-maxsplit-arg]
+33 | "1,2,3"[::-1][::-1].split(",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+34 | SEQ[:3].split(",")[0]  # [missing-maxsplit-arg]
+35 | Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
+   |
+help: Pass `maxsplit=1` into `str.split()`
+30 | 
+31 | ## Test split called on sliced string
+32 | "1,2,3"[::-1].split(",")[0]  # [missing-maxsplit-arg]
+   - "1,2,3"[::-1][::-1].split(",")[0]  # [missing-maxsplit-arg]
+33 + "1,2,3"[::-1][::-1].split(",", maxsplit=1)[0]  # [missing-maxsplit-arg]
+34 | SEQ[:3].split(",")[0]  # [missing-maxsplit-arg]
+35 | Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
+36 | "1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:34:1
+   |
+32 | "1,2,3"[::-1].split(",")[0]  # [missing-maxsplit-arg]
+33 | "1,2,3"[::-1][::-1].split(",")[0]  # [missing-maxsplit-arg]
+34 | SEQ[:3].split(",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^
+35 | Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
+36 | "1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
+   |
+help: Pass `maxsplit=1` into `str.split()`
+31 | ## Test split called on sliced string
+32 | "1,2,3"[::-1].split(",")[0]  # [missing-maxsplit-arg]
+33 | "1,2,3"[::-1][::-1].split(",")[0]  # [missing-maxsplit-arg]
+   - SEQ[:3].split(",")[0]  # [missing-maxsplit-arg]
+34 + SEQ[:3].split(",", maxsplit=1)[0]  # [missing-maxsplit-arg]
+35 | Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
+36 | "1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
+37 | SEQ[:3].rsplit(",")[0]  # [missing-maxsplit-arg]
+
+PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:35:1
+   |
+33 | "1,2,3"[::-1][::-1].split(",")[0]  # [missing-maxsplit-arg]
+34 | SEQ[:3].split(",")[0]  # [missing-maxsplit-arg]
+35 | Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+36 | "1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
+37 | SEQ[:3].rsplit(",")[0]  # [missing-maxsplit-arg]
+   |
+help: Use `str.rsplit()` and pass `maxsplit=1`
+32 | "1,2,3"[::-1].split(",")[0]  # [missing-maxsplit-arg]
+33 | "1,2,3"[::-1][::-1].split(",")[0]  # [missing-maxsplit-arg]
+34 | SEQ[:3].split(",")[0]  # [missing-maxsplit-arg]
+   - Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
+35 + Foo.class_str[1:3].rsplit(",", maxsplit=1)[-1]  # [missing-maxsplit-arg]
+36 | "1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
+37 | SEQ[:3].rsplit(",")[0]  # [missing-maxsplit-arg]
+38 | Foo.class_str[1:3].rsplit(",")[-1]  # [missing-maxsplit-arg]
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:36:1
+   |
+34 | SEQ[:3].split(",")[0]  # [missing-maxsplit-arg]
+35 | Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
+36 | "1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+37 | SEQ[:3].rsplit(",")[0]  # [missing-maxsplit-arg]
+38 | Foo.class_str[1:3].rsplit(",")[-1]  # [missing-maxsplit-arg]
+   |
+help: Use `str.split()` and pass `maxsplit=1`
+33 | "1,2,3"[::-1][::-1].split(",")[0]  # [missing-maxsplit-arg]
+34 | SEQ[:3].split(",")[0]  # [missing-maxsplit-arg]
+35 | Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
+   - "1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
+36 + "1,2,3"[::-1].split(",", maxsplit=1)[0]  # [missing-maxsplit-arg]
+37 | SEQ[:3].rsplit(",")[0]  # [missing-maxsplit-arg]
+38 | Foo.class_str[1:3].rsplit(",")[-1]  # [missing-maxsplit-arg]
+39 | 
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:37:1
+   |
+35 | Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
+36 | "1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
+37 | SEQ[:3].rsplit(",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^
+38 | Foo.class_str[1:3].rsplit(",")[-1]  # [missing-maxsplit-arg]
+   |
+help: Use `str.split()` and pass `maxsplit=1`
+34 | SEQ[:3].split(",")[0]  # [missing-maxsplit-arg]
+35 | Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
+36 | "1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
+   - SEQ[:3].rsplit(",")[0]  # [missing-maxsplit-arg]
+37 + SEQ[:3].split(",", maxsplit=1)[0]  # [missing-maxsplit-arg]
+38 | Foo.class_str[1:3].rsplit(",")[-1]  # [missing-maxsplit-arg]
+39 | 
+40 | ## Test sep given as named argument
+
+PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:38:1
+   |
+36 | "1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
+37 | SEQ[:3].rsplit(",")[0]  # [missing-maxsplit-arg]
+38 | Foo.class_str[1:3].rsplit(",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+39 |
+40 | ## Test sep given as named argument
+   |
+help: Pass `maxsplit=1` into `str.rsplit()`
+35 | Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
+36 | "1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
+37 | SEQ[:3].rsplit(",")[0]  # [missing-maxsplit-arg]
+   - Foo.class_str[1:3].rsplit(",")[-1]  # [missing-maxsplit-arg]
+38 + Foo.class_str[1:3].rsplit(",", maxsplit=1)[-1]  # [missing-maxsplit-arg]
+39 | 
+40 | ## Test sep given as named argument
+41 | "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:41:1
+   |
+40 | ## Test sep given as named argument
+41 | "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+42 | "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
+43 | "1,2,3".rsplit(sep=",")[0]  # [missing-maxsplit-arg]
+   |
+help: Pass `maxsplit=1` into `str.split()`
+38 | Foo.class_str[1:3].rsplit(",")[-1]  # [missing-maxsplit-arg]
+39 | 
+40 | ## Test sep given as named argument
+   - "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
+41 + "1,2,3".split(maxsplit=1, sep=",")[0]  # [missing-maxsplit-arg]
+42 | "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
+43 | "1,2,3".rsplit(sep=",")[0]  # [missing-maxsplit-arg]
+44 | "1,2,3".rsplit(sep=",")[-1]  # [missing-maxsplit-arg]
+
+PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:42:1
+   |
+40 | ## Test sep given as named argument
+41 | "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
+42 | "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+43 | "1,2,3".rsplit(sep=",")[0]  # [missing-maxsplit-arg]
+44 | "1,2,3".rsplit(sep=",")[-1]  # [missing-maxsplit-arg]
+   |
+help: Use `str.rsplit()` and pass `maxsplit=1`
+39 | 
+40 | ## Test sep given as named argument
+41 | "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
+   - "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
+42 + "1,2,3".rsplit(maxsplit=1, sep=",")[-1]  # [missing-maxsplit-arg]
+43 | "1,2,3".rsplit(sep=",")[0]  # [missing-maxsplit-arg]
+44 | "1,2,3".rsplit(sep=",")[-1]  # [missing-maxsplit-arg]
+45 | 
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:43:1
+   |
+41 | "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
+42 | "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
+43 | "1,2,3".rsplit(sep=",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+44 | "1,2,3".rsplit(sep=",")[-1]  # [missing-maxsplit-arg]
+   |
+help: Use `str.split()` and pass `maxsplit=1`
+40 | ## Test sep given as named argument
+41 | "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
+42 | "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
+   - "1,2,3".rsplit(sep=",")[0]  # [missing-maxsplit-arg]
+43 + "1,2,3".split(maxsplit=1, sep=",")[0]  # [missing-maxsplit-arg]
+44 | "1,2,3".rsplit(sep=",")[-1]  # [missing-maxsplit-arg]
+45 | 
+46 | ## Special cases
+
+PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:44:1
+   |
+42 | "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
+43 | "1,2,3".rsplit(sep=",")[0]  # [missing-maxsplit-arg]
+44 | "1,2,3".rsplit(sep=",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+45 |
+46 | ## Special cases
+   |
+help: Pass `maxsplit=1` into `str.rsplit()`
+41 | "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
+42 | "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
+43 | "1,2,3".rsplit(sep=",")[0]  # [missing-maxsplit-arg]
+   - "1,2,3".rsplit(sep=",")[-1]  # [missing-maxsplit-arg]
+44 + "1,2,3".rsplit(maxsplit=1, sep=",")[-1]  # [missing-maxsplit-arg]
+45 | 
+46 | ## Special cases
+47 | "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:47:1
+   |
+46 | ## Special cases
+47 | "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^
+48 | "1,2,3".split("split")[-1]  # [missing-maxsplit-arg]
+49 | "1,2,3".rsplit("rsplit")[0]  # [missing-maxsplit-arg]
+   |
+help: Pass `maxsplit=1` into `str.split()`
+44 | "1,2,3".rsplit(sep=",")[-1]  # [missing-maxsplit-arg]
+45 | 
+46 | ## Special cases
+   - "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
+47 + "1,2,3".split("\n", maxsplit=1)[0]  # [missing-maxsplit-arg]
+48 | "1,2,3".split("split")[-1]  # [missing-maxsplit-arg]
+49 | "1,2,3".rsplit("rsplit")[0]  # [missing-maxsplit-arg]
+50 | 
+
+PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:48:1
+   |
+46 | ## Special cases
+47 | "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
+48 | "1,2,3".split("split")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+49 | "1,2,3".rsplit("rsplit")[0]  # [missing-maxsplit-arg]
+   |
+help: Use `str.rsplit()` and pass `maxsplit=1`
+45 | 
+46 | ## Special cases
+47 | "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
+   - "1,2,3".split("split")[-1]  # [missing-maxsplit-arg]
+48 + "1,2,3".rsplit("split", maxsplit=1)[-1]  # [missing-maxsplit-arg]
+49 | "1,2,3".rsplit("rsplit")[0]  # [missing-maxsplit-arg]
+50 | 
+51 | ## Test class attribute named split
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:49:1
+   |
+47 | "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
+48 | "1,2,3".split("split")[-1]  # [missing-maxsplit-arg]
+49 | "1,2,3".rsplit("rsplit")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+50 |
+51 | ## Test class attribute named split
+   |
+help: Use `str.split()` and pass `maxsplit=1`
+46 | ## Special cases
+47 | "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
+48 | "1,2,3".split("split")[-1]  # [missing-maxsplit-arg]
+   - "1,2,3".rsplit("rsplit")[0]  # [missing-maxsplit-arg]
+49 + "1,2,3".split("rsplit", maxsplit=1)[0]  # [missing-maxsplit-arg]
+50 | 
+51 | ## Test class attribute named split
+52 | Bar.split.split(",")[0]  # [missing-maxsplit-arg]
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:52:1
+   |
+51 | ## Test class attribute named split
+52 | Bar.split.split(",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+53 | Bar.split.split(",")[-1]  # [missing-maxsplit-arg]
+54 | Bar.split.rsplit(",")[0]  # [missing-maxsplit-arg]
+   |
+help: Pass `maxsplit=1` into `str.split()`
+49 | "1,2,3".rsplit("rsplit")[0]  # [missing-maxsplit-arg]
+50 | 
+51 | ## Test class attribute named split
+   - Bar.split.split(",")[0]  # [missing-maxsplit-arg]
+52 + Bar.split.split(",", maxsplit=1)[0]  # [missing-maxsplit-arg]
+53 | Bar.split.split(",")[-1]  # [missing-maxsplit-arg]
+54 | Bar.split.rsplit(",")[0]  # [missing-maxsplit-arg]
+55 | Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
+
+PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:53:1
+   |
+51 | ## Test class attribute named split
+52 | Bar.split.split(",")[0]  # [missing-maxsplit-arg]
+53 | Bar.split.split(",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
+54 | Bar.split.rsplit(",")[0]  # [missing-maxsplit-arg]
+55 | Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
+   |
+help: Use `str.rsplit()` and pass `maxsplit=1`
+50 | 
+51 | ## Test class attribute named split
+52 | Bar.split.split(",")[0]  # [missing-maxsplit-arg]
+   - Bar.split.split(",")[-1]  # [missing-maxsplit-arg]
+53 + Bar.split.rsplit(",", maxsplit=1)[-1]  # [missing-maxsplit-arg]
+54 | Bar.split.rsplit(",")[0]  # [missing-maxsplit-arg]
+55 | Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
+56 | 
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:54:1
+   |
+52 | Bar.split.split(",")[0]  # [missing-maxsplit-arg]
+53 | Bar.split.split(",")[-1]  # [missing-maxsplit-arg]
+54 | Bar.split.rsplit(",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
+55 | Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
+   |
+help: Use `str.split()` and pass `maxsplit=1`
+51 | ## Test class attribute named split
+52 | Bar.split.split(",")[0]  # [missing-maxsplit-arg]
+53 | Bar.split.split(",")[-1]  # [missing-maxsplit-arg]
+   - Bar.split.rsplit(",")[0]  # [missing-maxsplit-arg]
+54 + Bar.split.split(",", maxsplit=1)[0]  # [missing-maxsplit-arg]
+55 | Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
+56 | 
+57 | ## Test unpacked dict literal kwargs 
+
+PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:55:1
+   |
+53 | Bar.split.split(",")[-1]  # [missing-maxsplit-arg]
+54 | Bar.split.rsplit(",")[0]  # [missing-maxsplit-arg]
+55 | Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+56 |
+57 | ## Test unpacked dict literal kwargs 
+   |
+help: Pass `maxsplit=1` into `str.rsplit()`
+52 | Bar.split.split(",")[0]  # [missing-maxsplit-arg]
+53 | Bar.split.split(",")[-1]  # [missing-maxsplit-arg]
+54 | Bar.split.rsplit(",")[0]  # [missing-maxsplit-arg]
+   - Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
+55 + Bar.split.rsplit(",", maxsplit=1)[-1]  # [missing-maxsplit-arg]
+56 | 
+57 | ## Test unpacked dict literal kwargs 
+58 | "1,2,3".split(**{"sep": ","})[0]  # [missing-maxsplit-arg]
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+  --> missing_maxsplit_arg.py:58:1
+   |
+57 | ## Test unpacked dict literal kwargs 
+58 | "1,2,3".split(**{"sep": ","})[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Pass `maxsplit=1` into `str.split()`
+55 | Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
+56 | 
+57 | ## Test unpacked dict literal kwargs 
+   - "1,2,3".split(**{"sep": ","})[0]  # [missing-maxsplit-arg]
+58 + "1,2,3".split(maxsplit=1, **{"sep": ","})[0]  # [missing-maxsplit-arg]
+59 | 
+60 | 
+61 | # OK
+note: This is an unsafe fix and may change runtime behavior
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+   --> missing_maxsplit_arg.py:179:1
+    |
+177 | # Errors
+178 | kwargs_without_maxsplit = {"seq": ","}
+179 | "1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+180 | # OK
+181 | kwargs_with_maxsplit = {"maxsplit": 1}
+    |
+help: Pass `maxsplit=1` into `str.split()`
+176 | ## TODO: These require the ability to resolve a dict variable name to a value
+177 | # Errors
+178 | kwargs_without_maxsplit = {"seq": ","}
+    - "1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
+179 + "1,2,3".split(maxsplit=1, **kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
+180 | # OK
+181 | kwargs_with_maxsplit = {"maxsplit": 1}
+182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
+note: This is an unsafe fix and may change runtime behavior
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+   --> missing_maxsplit_arg.py:182:1
+    |
+180 | # OK
+181 | kwargs_with_maxsplit = {"maxsplit": 1}
+182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
+184 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
+    |
+help: Pass `maxsplit=1` into `str.split()`
+179 | "1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
+180 | # OK
+181 | kwargs_with_maxsplit = {"maxsplit": 1}
+    - "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
+182 + "1,2,3".split(",", maxsplit=1, **kwargs_with_maxsplit)[0]  # TODO: false positive
+183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
+184 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
+185 | 
+note: This is an unsafe fix and may change runtime behavior
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+   --> missing_maxsplit_arg.py:184:1
+    |
+182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
+183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
+184 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Pass `maxsplit=1` into `str.split()`
+181 | kwargs_with_maxsplit = {"maxsplit": 1}
+182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
+183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
+    - "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
+184 + "1,2,3".split(maxsplit=1, **kwargs_with_maxsplit)[0]  # TODO: false positive
+185 | 
+186 | 
+187 | ## Test unpacked list literal args (starred expressions)
+note: This is an unsafe fix and may change runtime behavior
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+   --> missing_maxsplit_arg.py:189:1
+    |
+187 | ## Test unpacked list literal args (starred expressions)
+188 | # Errors
+189 | "1,2,3".split(",", *[-1])[0]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+190 |
+191 | ## Test unpacked list variable args
+    |
+help: Pass `maxsplit=1` into `str.split()`
+186 | 
+187 | ## Test unpacked list literal args (starred expressions)
+188 | # Errors
+    - "1,2,3".split(",", *[-1])[0]
+189 + "1,2,3".split(",", *[-1], maxsplit=1)[0]
+190 | 
+191 | ## Test unpacked list variable args
+192 | # Errors
+note: This is an unsafe fix and may change runtime behavior
+
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+   --> missing_maxsplit_arg.py:194:1
+    |
+192 | # Errors
+193 | args_list = [-1]
+194 | "1,2,3".split(",", *args_list)[0]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Pass `maxsplit=1` into `str.split()`
+191 | ## Test unpacked list variable args
+192 | # Errors
+193 | args_list = [-1]
+    - "1,2,3".split(",", *args_list)[0]
+194 + "1,2,3".split(",", *args_list, maxsplit=1)[0]
+note: This is an unsafe fix and may change runtime behavior

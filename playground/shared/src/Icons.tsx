@@ -23,11 +23,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE
 
-export function File() {
+export function File({
+  width = 24,
+  height = 24,
+}: {
+  width?: number;
+  height?: number;
+}) {
   return (
     <svg
-      width="24"
-      height="24"
+      width={width}
+      height={height}
       viewBox="0 0 16 16"
       xmlns="http://www.w3.org/2000/svg"
     >
@@ -35,6 +41,31 @@ export function File() {
         fillRule="evenodd"
         clipRule="evenodd"
         d="M10.57 1.14L13.85 4.44L14 4.8V14.5L13.5 15H2.5L2 14.5V1.5L2.5 1H10.22L10.57 1.14ZM10 5H13L10 2V5ZM3 2V14H13V6H9.5L9 5.5V2H3ZM5.062 9.533L6.879 7.705L6.17 7L4 9.179V9.886L6.171 12.06L6.878 11.353L5.062 9.533ZM8.8 7.714L9.5 7.005L11.689 9.18V9.889L9.5 12.062L8.795 11.353L10.626 9.533L8.8 7.714Z"
+      />
+    </svg>
+  );
+}
+
+export function Run({
+  width = 24,
+  height = 24,
+}: {
+  width?: number;
+  height?: number;
+}) {
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox="0 0 16 16"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M4.00024 2V14.4805L12.9149 8.24024L4.00024 2ZM11.1812 8.24024L4.99524 12.5684V3.91209L11.1812 8.24024Z"
+        fill="#ffffff"
       />
     </svg>
   );
@@ -124,6 +155,7 @@ export function FormatterIR() {
     </svg>
   );
 }
+
 export function Comments() {
   return (
     <svg
@@ -174,7 +206,6 @@ export function Close() {
 }
 
 // https://github.com/material-extensions/vscode-material-icon-theme/blob/main/icons/python.svg
-// or use https://github.com/vscode-icons/vscode-icons/blob/master/icons/file_type_python.svg?short_path=677f216
 export function Python({
   height = 24,
   width = 24,
@@ -197,6 +228,55 @@ export function Python({
         fill="#fdd835"
         d="M17.959 7v2.68a2.85 2.85 0 0 1-2.85 2.859H9.86A2.85 2.85 0 0 0 7 15.389v3.75a2.86 2.86 0 0 0 2.86 2.86h4.28A2.86 2.86 0 0 0 17 19.14v-1.68h-4.291c-.39 0-.709-.57-.709-.96h7.14A2.86 2.86 0 0 0 22 13.64V9.86A2.86 2.86 0 0 0 19.14 7zM8.32 11.513l-.004.004c.012-.002.025-.001.038-.004zm6.54 7.276c.39 0 .71.3.71.89a.71.71 0 0 1-.71.71c-.4 0-.72-.12-.72-.71s.32-.89.72-.89z"
       />
+    </svg>
+  );
+}
+
+/** https://github.com/material-extensions/vscode-material-icon-theme/blob/main/icons/json.svg */
+export function Json({
+  height = 24,
+  width = 24,
+}: {
+  height?: number;
+  width?: number;
+}) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 -960 960 960"
+      width={width}
+      height={height}
+    >
+      <path
+        fill="#f9a825"
+        d="M560-160v-80h120q17 0 28.5-11.5T720-280v-80q0-38 22-69t58-44v-14q-36-13-58-44t-22-69v-80q0-17-11.5-28.5T680-720H560v-80h120q50 0 85 35t35 85v80q0 17 11.5 28.5T840-560h40v160h-40q-17 0-28.5 11.5T800-360v80q0 50-35 85t-85 35zm-280 0q-50 0-85-35t-35-85v-80q0-17-11.5-28.5T120-400H80v-160h40q17 0 28.5-11.5T160-600v-80q0-50 35-85t85-35h120v80H280q-17 0-28.5 11.5T240-680v80q0 38-22 69t-58 44v14q36 13 58 44t22 69v80q0 17 11.5 28.5T280-240h120v80z"
+      />
+    </svg>
+  );
+}
+
+/** https://github.com/material-extensions/vscode-material-icon-theme/blob/main/icons/jupyter.svg **/
+export function Jupyter({
+  height = 24,
+  width = 24,
+}: {
+  height?: number;
+  width?: number;
+}) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 32 32"
+      width={width}
+      height={height}
+    >
+      <path
+        fill="#f57c00"
+        d="M6.2 18a22.7 22.7 0 0 0 9.8 2 22.7 22.7 0 0 0 9.8-2 10.002 10.002 0 0 1-19.6 0m19.6-4a22.7 22.7 0 0 0-9.8-2 22.7 22.7 0 0 0-9.8 2 10.002 10.002 0 0 1 19.6 0"
+      />
+      <circle cx="27" cy="5" r="3" fill="#757575" />
+      <circle cx="5" cy="27" r="3" fill="#9e9e9e" />
+      <circle cx="5" cy="5" r="3" fill="#616161" />
     </svg>
   );
 }

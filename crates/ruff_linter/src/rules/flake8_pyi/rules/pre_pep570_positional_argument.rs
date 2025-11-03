@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_python_semantic::analyze::function_type;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use ruff_python_ast::PythonVersion;
 
@@ -40,6 +40,7 @@ use ruff_python_ast::PythonVersion;
 /// [PEP 484]: https://peps.python.org/pep-0484/#positional-only-arguments
 /// [PEP 570]: https://peps.python.org/pep-0570
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct Pep484StylePositionalOnlyParameter;
 
 impl Violation for Pep484StylePositionalOnlyParameter {
@@ -75,8 +76,8 @@ pub(crate) fn pep_484_positional_parameter(checker: &Checker, function_def: &ast
         &function_def.decorator_list,
         scope,
         semantic,
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
 
     // If the method has a `self` or `cls` argument, skip it.
@@ -85,19 +86,9 @@ pub(crate) fn pep_484_positional_parameter(checker: &Checker, function_def: &ast
         function_type::FunctionType::Method | function_type::FunctionType::ClassMethod
     ));
 
-    if let Some(arg) = function_def.parameters.args.get(skip) {
-        if is_old_style_positional_only(arg) {
-            checker.report_diagnostic(Diagnostic::new(
-                Pep484StylePositionalOnlyParameter,
-                arg.identifier(),
-            ));
+    if let Some(param) = function_def.parameters.args.get(skip) {
+        if param.uses_pep_484_positional_only_convention() {
+            checker.report_diagnostic(Pep484StylePositionalOnlyParameter, param.identifier());
         }
     }
-}
-
-/// Returns `true` if the [`ParameterWithDefault`] is an old-style positional-only parameter (i.e.,
-/// its name starts with `__` and does not end with `__`).
-fn is_old_style_positional_only(param: &ParameterWithDefault) -> bool {
-    let arg_name = param.name();
-    arg_name.starts_with("__") && !arg_name.ends_with("__")
 }

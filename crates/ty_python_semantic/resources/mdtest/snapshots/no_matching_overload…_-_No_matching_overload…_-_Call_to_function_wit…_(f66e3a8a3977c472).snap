@@ -1,0 +1,230 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: no_matching_overload.md - No matching overload diagnostics - Call to function with too many unmatched overloads
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/no_matching_overload.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+  1 | from typing import overload
+  2 | 
+  3 | class Foo: ...
+  4 | 
+  5 | @overload
+  6 | def foo(a: int, b: int, c: int): ...
+  7 | @overload
+  8 | def foo(a: str, b: int, c: int): ...
+  9 | @overload
+ 10 | def foo(a: int, b: str, c: int): ...
+ 11 | @overload
+ 12 | def foo(a: int, b: int, c: str): ...
+ 13 | @overload
+ 14 | def foo(a: str, b: str, c: int): ...
+ 15 | @overload
+ 16 | def foo(a: int, b: str, c: str): ...
+ 17 | @overload
+ 18 | def foo(a: str, b: str, c: str): ...
+ 19 | @overload
+ 20 | def foo(a: int, b: int, c: int): ...
+ 21 | @overload
+ 22 | def foo(a: float, b: int, c: int): ...
+ 23 | @overload
+ 24 | def foo(a: int, b: float, c: int): ...
+ 25 | @overload
+ 26 | def foo(a: int, b: int, c: float): ...
+ 27 | @overload
+ 28 | def foo(a: float, b: float, c: int): ...
+ 29 | @overload
+ 30 | def foo(a: int, b: float, c: float): ...
+ 31 | @overload
+ 32 | def foo(a: float, b: float, c: float): ...
+ 33 | @overload
+ 34 | def foo(a: str, b: str, c: str): ...
+ 35 | @overload
+ 36 | def foo(a: float, b: str, c: str): ...
+ 37 | @overload
+ 38 | def foo(a: str, b: float, c: str): ...
+ 39 | @overload
+ 40 | def foo(a: str, b: str, c: float): ...
+ 41 | @overload
+ 42 | def foo(a: float, b: float, c: str): ...
+ 43 | @overload
+ 44 | def foo(a: str, b: float, c: float): ...
+ 45 | @overload
+ 46 | def foo(a: float, b: float, c: float): ...
+ 47 | @overload
+ 48 | def foo(a: list[int], b: list[int], c: list[int]): ...
+ 49 | @overload
+ 50 | def foo(a: list[str], b: list[int], c: list[int]): ...
+ 51 | @overload
+ 52 | def foo(a: list[int], b: list[str], c: list[int]): ...
+ 53 | @overload
+ 54 | def foo(a: list[int], b: list[int], c: list[str]): ...
+ 55 | @overload
+ 56 | def foo(a: list[str], b: list[str], c: list[int]): ...
+ 57 | @overload
+ 58 | def foo(a: list[int], b: list[str], c: list[str]): ...
+ 59 | @overload
+ 60 | def foo(a: list[str], b: list[str], c: list[str]): ...
+ 61 | @overload
+ 62 | def foo(a: list[int], b: list[int], c: list[int]): ...
+ 63 | @overload
+ 64 | def foo(a: list[float], b: list[int], c: list[int]): ...
+ 65 | @overload
+ 66 | def foo(a: list[int], b: list[float], c: list[int]): ...
+ 67 | @overload
+ 68 | def foo(a: list[int], b: list[int], c: list[float]): ...
+ 69 | @overload
+ 70 | def foo(a: list[float], b: list[float], c: list[int]): ...
+ 71 | @overload
+ 72 | def foo(a: list[int], b: list[float], c: list[float]): ...
+ 73 | @overload
+ 74 | def foo(a: list[float], b: list[float], c: list[float]): ...
+ 75 | @overload
+ 76 | def foo(a: list[str], b: list[str], c: list[str]): ...
+ 77 | @overload
+ 78 | def foo(a: list[float], b: list[str], c: list[str]): ...
+ 79 | @overload
+ 80 | def foo(a: list[str], b: list[float], c: list[str]): ...
+ 81 | @overload
+ 82 | def foo(a: list[str], b: list[str], c: list[float]): ...
+ 83 | @overload
+ 84 | def foo(a: list[float], b: list[float], c: list[str]): ...
+ 85 | @overload
+ 86 | def foo(a: list[str], b: list[float], c: list[float]): ...
+ 87 | @overload
+ 88 | def foo(a: list[float], b: list[float], c: list[float]): ...
+ 89 | @overload
+ 90 | def foo(a: bool, b: bool, c: bool): ...
+ 91 | @overload
+ 92 | def foo(a: str, b: bool, c: bool): ...
+ 93 | @overload
+ 94 | def foo(a: bool, b: str, c: bool): ...
+ 95 | @overload
+ 96 | def foo(a: bool, b: bool, c: str): ...
+ 97 | @overload
+ 98 | def foo(a: str, b: str, c: bool): ...
+ 99 | @overload
+100 | def foo(a: bool, b: str, c: str): ...
+101 | @overload
+102 | def foo(a: str, b: str, c: str): ...
+103 | @overload
+104 | def foo(a: int, b: int, c: int): ...
+105 | @overload
+106 | def foo(a: bool, b: int, c: int): ...
+107 | @overload
+108 | def foo(a: int, b: bool, c: int): ...
+109 | @overload
+110 | def foo(a: int, b: int, c: bool): ...
+111 | @overload
+112 | def foo(a: bool, b: bool, c: int): ...
+113 | @overload
+114 | def foo(a: int, b: bool, c: bool): ...
+115 | @overload
+116 | def foo(a: str, b: str, c: str): ...
+117 | @overload
+118 | def foo(a: float, b: bool, c: bool): ...
+119 | @overload
+120 | def foo(a: bool, b: float, c: bool): ...
+121 | @overload
+122 | def foo(a: bool, b: bool, c: float): ...
+123 | @overload
+124 | def foo(a: float, b: float, c: bool): ...
+125 | @overload
+126 | def foo(a: bool, b: float, c: float): ...
+127 | def foo(a, b, c): ...
+128 | 
+129 | foo(Foo(), Foo())  # error: [no-matching-overload]
+```
+
+# Diagnostics
+
+```
+error[no-matching-overload]: No overload of function `foo` matches arguments
+   --> src/mdtest_snippet.py:129:1
+    |
+127 | def foo(a, b, c): ...
+128 |
+129 | foo(Foo(), Foo())  # error: [no-matching-overload]
+    | ^^^^^^^^^^^^^^^^^
+    |
+info: First overload defined here
+ --> src/mdtest_snippet.py:6:5
+  |
+5 | @overload
+6 | def foo(a: int, b: int, c: int): ...
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+7 | @overload
+8 | def foo(a: str, b: int, c: int): ...
+  |
+info: Possible overloads for function `foo`:
+info:   (a: int, b: int, c: int) -> Unknown
+info:   (a: str, b: int, c: int) -> Unknown
+info:   (a: int, b: str, c: int) -> Unknown
+info:   (a: int, b: int, c: str) -> Unknown
+info:   (a: str, b: str, c: int) -> Unknown
+info:   (a: int, b: str, c: str) -> Unknown
+info:   (a: str, b: str, c: str) -> Unknown
+info:   (a: int, b: int, c: int) -> Unknown
+info:   (a: int | float, b: int, c: int) -> Unknown
+info:   (a: int, b: int | float, c: int) -> Unknown
+info:   (a: int, b: int, c: int | float) -> Unknown
+info:   (a: int | float, b: int | float, c: int) -> Unknown
+info:   (a: int, b: int | float, c: int | float) -> Unknown
+info:   (a: int | float, b: int | float, c: int | float) -> Unknown
+info:   (a: str, b: str, c: str) -> Unknown
+info:   (a: int | float, b: str, c: str) -> Unknown
+info:   (a: str, b: int | float, c: str) -> Unknown
+info:   (a: str, b: str, c: int | float) -> Unknown
+info:   (a: int | float, b: int | float, c: str) -> Unknown
+info:   (a: str, b: int | float, c: int | float) -> Unknown
+info:   (a: int | float, b: int | float, c: int | float) -> Unknown
+info:   (a: list[int], b: list[int], c: list[int]) -> Unknown
+info:   (a: list[str], b: list[int], c: list[int]) -> Unknown
+info:   (a: list[int], b: list[str], c: list[int]) -> Unknown
+info:   (a: list[int], b: list[int], c: list[str]) -> Unknown
+info:   (a: list[str], b: list[str], c: list[int]) -> Unknown
+info:   (a: list[int], b: list[str], c: list[str]) -> Unknown
+info:   (a: list[str], b: list[str], c: list[str]) -> Unknown
+info:   (a: list[int], b: list[int], c: list[int]) -> Unknown
+info:   (a: list[int | float], b: list[int], c: list[int]) -> Unknown
+info:   (a: list[int], b: list[int | float], c: list[int]) -> Unknown
+info:   (a: list[int], b: list[int], c: list[int | float]) -> Unknown
+info:   (a: list[int | float], b: list[int | float], c: list[int]) -> Unknown
+info:   (a: list[int], b: list[int | float], c: list[int | float]) -> Unknown
+info:   (a: list[int | float], b: list[int | float], c: list[int | float]) -> Unknown
+info:   (a: list[str], b: list[str], c: list[str]) -> Unknown
+info:   (a: list[int | float], b: list[str], c: list[str]) -> Unknown
+info:   (a: list[str], b: list[int | float], c: list[str]) -> Unknown
+info:   (a: list[str], b: list[str], c: list[int | float]) -> Unknown
+info:   (a: list[int | float], b: list[int | float], c: list[str]) -> Unknown
+info:   (a: list[str], b: list[int | float], c: list[int | float]) -> Unknown
+info:   (a: list[int | float], b: list[int | float], c: list[int | float]) -> Unknown
+info:   (a: bool, b: bool, c: bool) -> Unknown
+info:   (a: str, b: bool, c: bool) -> Unknown
+info:   (a: bool, b: str, c: bool) -> Unknown
+info:   (a: bool, b: bool, c: str) -> Unknown
+info:   (a: str, b: str, c: bool) -> Unknown
+info:   (a: bool, b: str, c: str) -> Unknown
+info:   (a: str, b: str, c: str) -> Unknown
+info:   (a: int, b: int, c: int) -> Unknown
+info: ... omitted 11 overloads
+info: Overload implementation defined here
+   --> src/mdtest_snippet.py:127:5
+    |
+125 | @overload
+126 | def foo(a: bool, b: float, c: float): ...
+127 | def foo(a, b, c): ...
+    |     ^^^^^^^^^^^^
+128 |
+129 | foo(Foo(), Foo())  # error: [no-matching-overload]
+    |
+info: rule `no-matching-overload` is enabled by default
+
+```

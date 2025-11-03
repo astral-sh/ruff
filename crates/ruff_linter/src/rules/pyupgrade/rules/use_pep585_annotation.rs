@@ -1,13 +1,13 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_semantic::analyze::typing::ModuleMember;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does
@@ -55,6 +55,7 @@ use ruff_python_ast::PythonVersion;
 ///
 /// [PEP 585]: https://peps.python.org/pep-0585/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct NonPEP585Annotation {
     from: String,
     to: String,
@@ -80,7 +81,7 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
     let Some(from) = UnqualifiedName::from_expr(expr) else {
         return;
     };
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         NonPEP585Annotation {
             from: from.to_string(),
             to: replacement.to_string(),
@@ -132,5 +133,4 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
             }
         }
     }
-    checker.report_diagnostic(diagnostic);
 }

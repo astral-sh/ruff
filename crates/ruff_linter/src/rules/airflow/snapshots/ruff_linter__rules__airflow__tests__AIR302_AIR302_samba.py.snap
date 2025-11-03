@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR302 [*] `airflow.hooks.samba_hook.SambaHook` is moved into `samba` provider in Airflow 3.0;
+ --> AIR302_samba.py:5:1
+  |
+3 | from airflow.hooks.samba_hook import SambaHook
+4 |
+5 | SambaHook()
+  | ^^^^^^^^^
+  |
+help: Install `apache-airflow-providers-samba>=1.0.0` and use `SambaHook` from `airflow.providers.samba.hooks.samba` instead.
+1 | from __future__ import annotations
+2 | 
+  - from airflow.hooks.samba_hook import SambaHook
+3 + from airflow.providers.samba.hooks.samba import SambaHook
+4 | 
+5 | SambaHook()
+note: This is an unsafe fix and may change runtime behavior

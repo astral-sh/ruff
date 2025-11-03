@@ -3,8 +3,10 @@ fail_fast: false
 exclude: |
   (?x)^(
     .github/workflows/release.yml|
-    crates/red_knot_vendored/vendor/.*|
-    crates/red_knot_project/resources/.*|
+    crates/ty_vendored/vendor/.*|
+    crates/ty_project/resources/.*|
+    crates/ty_python_semantic/resources/corpus/.*|
+    crates/ty/docs/(configuration|rules|cli|environment).md|
     crates/ruff_benchmark/resources/.*|
     crates/ruff_linter/resources/.*|
     crates/ruff_linter/src/rules/.*/snapshots/.*|
@@ -14,12 +16,18 @@ exclude: |
     crates/ruff_python_formatter/resources/.*|
     crates/ruff_python_formatter/tests/snapshots/.*|
     crates/ruff_python_resolver/resources/.*|
-    crates/ruff_python_resolver/tests/snapshots/.*
+    crates/ruff_python_resolver/tests/snapshots/.*|
+    crates/ty_completion_eval/truth/.*
   )$
 
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+
   - repo: https://github.com/abravalheri/validate-pyproject
-    rev: v0.24
+    rev: v0.24.1
     hooks:
       - id: validate-pyproject
 
@@ -27,6 +35,7 @@ repos:
     rev: 0.7.22
     hooks:
       - id: mdformat
+        language: python # means renovate will also update `additional_dependencies`
         additional_dependencies:
           - mdformat-mkdocs==4.0.0
           - mdformat-footnote==0.1.1
@@ -37,7 +46,7 @@ repos:
           )$
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.44.0
+    rev: v0.45.0
     hooks:
       - id: markdownlint-fix
         exclude: |
@@ -50,6 +59,7 @@ repos:
     rev: 1.19.1
     hooks:
       - id: blacken-docs
+        language: python # means renovate will also update `additional_dependencies`
         args: ["--pyi", "--line-length", "130"]
         files: '^crates/.*/resources/mdtest/.*\.md'
         exclude: |
@@ -60,7 +70,7 @@ repos:
           - black==25.1.0
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.30.2
+    rev: v1.34.0
     hooks:
       - id: typos
 
@@ -74,30 +84,30 @@ repos:
         pass_filenames: false # This makes it a lot faster
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.0
+    rev: v0.12.7
     hooks:
       - id: ruff-format
-      - id: ruff
+      - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix]
         types_or: [python, pyi]
         require_serial: true
 
   # Prettier
   - repo: https://github.com/rbubley/mirrors-prettier
-    rev: v3.5.3
+    rev: v3.6.2
     hooks:
       - id: prettier
         types: [yaml]
 
   # zizmor detects security vulnerabilities in GitHub Actions workflows.
   # Additional configuration for the tool is found in `.github/zizmor.yml`
-  - repo: https://github.com/woodruffw/zizmor-pre-commit
-    rev: v1.5.1
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.16.0
     hooks:
       - id: zizmor
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.31.3
+    rev: 0.33.2
     hooks:
       - id: check-github-workflows
 
@@ -120,6 +130,11 @@ repos:
           # and checks these with shellcheck. This is arguably its most useful feature,
           # but the integration only works if shellcheck is installed
           - "github.com/wasilibs/go-shellcheck/cmd/shellcheck@v0.10.0"
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
 
 ci:
   skip: [cargo-fmt, dev-generate-all]

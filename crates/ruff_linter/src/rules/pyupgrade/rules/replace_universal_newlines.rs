@@ -1,11 +1,11 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::fix::edits::{remove_argument, Parentheses};
+use crate::fix::edits::{Parentheses, remove_argument};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `subprocess.run` that set the `universal_newlines`
@@ -35,6 +35,7 @@ use crate::fix::edits::{remove_argument, Parentheses};
 /// - [Python 3.7 release notes](https://docs.python.org/3/whatsnew/3.7.html#subprocess)
 /// - [Python documentation: `subprocess.run`](https://docs.python.org/3/library/subprocess.html#subprocess.run)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.196")]
 pub(crate) struct ReplaceUniversalNewlines;
 
 impl AlwaysFixableViolation for ReplaceUniversalNewlines {
@@ -67,7 +68,8 @@ pub(crate) fn replace_universal_newlines(checker: &Checker, call: &ast::ExprCall
             return;
         };
 
-        let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, arg.range());
+        let mut diagnostic = checker.report_diagnostic(ReplaceUniversalNewlines, arg.range());
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
 
         if call.arguments.find_keyword("text").is_some() {
             diagnostic.try_set_fix(|| {
@@ -76,6 +78,7 @@ pub(crate) fn replace_universal_newlines(checker: &Checker, call: &ast::ExprCall
                     &call.arguments,
                     Parentheses::Preserve,
                     checker.locator().contents(),
+                    checker.comment_ranges(),
                 )
                 .map(Fix::safe_edit)
             });
@@ -85,6 +88,5 @@ pub(crate) fn replace_universal_newlines(checker: &Checker, call: &ast::ExprCall
                 arg.range(),
             )));
         }
-        checker.report_diagnostic(diagnostic);
     }
 }

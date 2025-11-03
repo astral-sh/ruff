@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr, Int};
 use ruff_text_size::Ranged;
 
+use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{checkers::ast::Checker, importer::ImportRequest};
 
 /// ## What it does
@@ -29,9 +29,18 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 /// pairwise(letters)  # ("A", "B"), ("B", "C"), ("C", "D")
 /// ```
 ///
+/// ## Fix safety
+///
+/// The fix is always marked unsafe because it assumes that slicing an object
+/// (e.g., `obj[1:]`) produces a value with the same type and iteration behavior
+/// as the original object, which is not guaranteed for user-defined types that
+/// override `__getitem__` without properly handling slices. Moreover, the fix
+/// could delete comments.
+///
 /// ## References
 /// - [Python documentation: `itertools.pairwise`](https://docs.python.org/3/library/itertools.html#itertools.pairwise)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.257")]
 pub(crate) struct ZipInsteadOfPairwise;
 
 impl Violation for ZipInsteadOfPairwise {
@@ -86,6 +95,7 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
         let Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: ast::Number::Int(int),
             range: _,
+            node_index: _,
         }) = lower.as_ref()
         else {
             return None;
@@ -152,7 +162,7 @@ pub(crate) fn zip_instead_of_pairwise(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(ZipInsteadOfPairwise, func.range());
+    let mut diagnostic = checker.report_diagnostic(ZipInsteadOfPairwise, func.range());
 
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
@@ -164,6 +174,4 @@ pub(crate) fn zip_instead_of_pairwise(checker: &Checker, call: &ast::ExprCall) {
             Edit::range_replacement(format!("{binding}({})", first_arg_info.id), call.range());
         Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
     });
-
-    checker.report_diagnostic(diagnostic);
 }

@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::analyze::visibility::{self, Visibility::Public};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -83,6 +83,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.pylint.max-public-methods`
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.290")]
 pub(crate) struct TooManyPublicMethods {
     methods: usize,
     max_methods: usize,
@@ -99,7 +100,7 @@ impl Violation for TooManyPublicMethods {
     }
 }
 
-/// R0904
+/// PLR0904
 pub(crate) fn too_many_public_methods(
     checker: &Checker,
     class_def: &ast::StmtClassDef,
@@ -121,12 +122,12 @@ pub(crate) fn too_many_public_methods(
         .count();
 
     if methods > max_methods {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             TooManyPublicMethods {
                 methods,
                 max_methods,
             },
             class_def.range(),
-        ));
+        );
     }
 }

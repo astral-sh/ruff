@@ -1,5 +1,5 @@
 **.md
 ruff/dist
 ruff/ruff_wasm
-knot/dist
-knot/red_knot_wasm
+ty/dist
+ty/ty_wasm

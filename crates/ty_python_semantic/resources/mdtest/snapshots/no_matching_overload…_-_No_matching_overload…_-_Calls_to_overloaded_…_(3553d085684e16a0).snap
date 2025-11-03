@@ -1,0 +1,61 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: no_matching_overload.md - No matching overload diagnostics - Calls to overloaded functions
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/no_matching_overload.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import overload
+ 2 | 
+ 3 | @overload
+ 4 | def f(x: int) -> int: ...
+ 5 | @overload
+ 6 | def f(x: str) -> str: ...
+ 7 | def f(x: int | str) -> int | str:
+ 8 |     return x
+ 9 | 
+10 | f(b"foo")  # error: [no-matching-overload]
+```
+
+# Diagnostics
+
+```
+error[no-matching-overload]: No overload of function `f` matches arguments
+  --> src/mdtest_snippet.py:10:1
+   |
+ 8 |     return x
+ 9 |
+10 | f(b"foo")  # error: [no-matching-overload]
+   | ^^^^^^^^^
+   |
+info: First overload defined here
+ --> src/mdtest_snippet.py:4:5
+  |
+3 | @overload
+4 | def f(x: int) -> int: ...
+  |     ^^^^^^^^^^^^^^^^
+5 | @overload
+6 | def f(x: str) -> str: ...
+  |
+info: Possible overloads for function `f`:
+info:   (x: int) -> int
+info:   (x: str) -> str
+info: Overload implementation defined here
+ --> src/mdtest_snippet.py:7:5
+  |
+5 | @overload
+6 | def f(x: str) -> str: ...
+7 | def f(x: int | str) -> int | str:
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+8 |     return x
+  |
+info: rule `no-matching-overload` is enabled by default
+
+```

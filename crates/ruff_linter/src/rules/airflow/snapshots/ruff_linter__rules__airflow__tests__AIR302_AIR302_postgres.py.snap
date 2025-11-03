@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR302 [*] `airflow.hooks.postgres_hook.PostgresHook` is moved into `postgres` provider in Airflow 3.0;
+ --> AIR302_postgres.py:6:1
+  |
+4 | from airflow.operators.postgres_operator import Mapping
+5 |
+6 | PostgresHook()
+  | ^^^^^^^^^^^^
+7 | Mapping()
+  |
+help: Install `apache-airflow-providers-postgres>=1.0.0` and use `PostgresHook` from `airflow.providers.postgres.hooks.postgres` instead.
+1 | from __future__ import annotations
+2 | 
+  - from airflow.hooks.postgres_hook import PostgresHook
+3 | from airflow.operators.postgres_operator import Mapping
+4 + from airflow.providers.postgres.hooks.postgres import PostgresHook
+5 | 
+6 | PostgresHook()
+7 | Mapping()
+note: This is an unsafe fix and may change runtime behavior

@@ -1,11 +1,10 @@
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::{AlwaysFixableViolation, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::fix::edits::{remove_argument, Parentheses};
+use crate::fix::edits::{Parentheses, remove_argument};
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for `range` calls with an unnecessary `start` argument.
@@ -28,6 +27,7 @@ use crate::fix::edits::{remove_argument, Parentheses};
 /// ## References
 /// - [Python documentation: `range`](https://docs.python.org/3/library/stdtypes.html#range)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.286")]
 pub(crate) struct UnnecessaryRangeStart;
 
 impl AlwaysFixableViolation for UnnecessaryRangeStart {
@@ -63,22 +63,22 @@ pub(crate) fn unnecessary_range_start(checker: &Checker, call: &ast::ExprCall) {
     };
     if *value != 0 {
         return;
-    };
+    }
 
     // Verify that the call is to the `range` builtin.
     if !checker.semantic().match_builtin_expr(&call.func, "range") {
         return;
-    };
+    }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryRangeStart, start.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryRangeStart, start.range());
     diagnostic.try_set_fix(|| {
         remove_argument(
             &start,
             &call.arguments,
             Parentheses::Preserve,
             checker.locator().contents(),
+            checker.comment_ranges(),
         )
         .map(Fix::safe_edit)
     });
-    checker.report_diagnostic(diagnostic);
 }

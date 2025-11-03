@@ -4,7 +4,7 @@ use crate::comments::format::{
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parentheses, Parenthesize};
 use crate::prelude::*;
-use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
+use crate::statement::clause::{ClauseHeader, clause_body, clause_header};
 use crate::statement::stmt_class_def::FormatDecorators;
 use crate::statement::suite::SuiteKind;
 use ruff_formatter::write;
@@ -93,6 +93,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
 fn format_function_header(f: &mut PyFormatter, item: &StmtFunctionDef) -> FormatResult<()> {
     let StmtFunctionDef {
         range: _,
+        node_index: _,
         is_async,
         decorator_list: _,
         name,

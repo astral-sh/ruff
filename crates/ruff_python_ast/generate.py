@@ -15,7 +15,7 @@ from typing import Any
 import tomllib
 
 # Types that require `crate::`. We can slowly remove these types as we move them to generate scripts.
-types_requiring_create_prefix = [
+types_requiring_crate_prefix = {
     "IpyEscapeKind",
     "ExprContext",
     "Identifier",
@@ -23,6 +23,7 @@ types_requiring_create_prefix = [
     "BytesLiteralValue",
     "StringLiteralValue",
     "FStringValue",
+    "TStringValue",
     "Arguments",
     "CmpOp",
     "Comprehension",
@@ -33,12 +34,30 @@ types_requiring_create_prefix = [
     "Decorator",
     "TypeParams",
     "Parameters",
-    "Arguments",
     "ElifElseClause",
     "WithItem",
     "MatchCase",
     "Alias",
-]
+    "Singleton",
+    "PatternArguments",
+}
+
+
+@dataclass
+class VisitorInfo:
+    name: str
+    accepts_sequence: bool = False
+
+
+# Map of AST node types to their corresponding visitor information.
+# Only visitors that are different from the default `visit_*` method are included.
+# These visitors either have a different name or accept a sequence of items.
+type_to_visitor_function: dict[str, VisitorInfo] = {
+    "TypeParams": VisitorInfo("visit_type_params", True),
+    "Parameters": VisitorInfo("visit_parameters", True),
+    "Stmt": VisitorInfo("visit_body", True),
+    "Arguments": VisitorInfo("visit_arguments", True),
+}
 
 
 def rustfmt(code: str) -> str:
@@ -124,6 +143,8 @@ class Node:
     doc: str | None
     fields: list[Field] | None
     derives: list[str]
+    custom_source_order: bool
+    source_order: list[str] | None
 
     def __init__(self, group: Group, node_name: str, node: dict[str, Any]) -> None:
         self.name = node_name
@@ -133,26 +154,83 @@ class Node:
         fields = node.get("fields")
         if fields is not None:
             self.fields = [Field(f) for f in fields]
+        self.custom_source_order = node.get("custom_source_order", False)
         self.derives = node.get("derives", [])
         self.doc = node.get("doc")
+        self.source_order = node.get("source_order")
+
+    def fields_in_source_order(self) -> list[Field]:
+        if self.fields is None:
+            return []
+        if self.source_order is None:
+            return list(filter(lambda x: not x.skip_source_order(), self.fields))
+
+        fields = []
+        for field_name in self.source_order:
+            field = None
+            for field in self.fields:
+                if field.skip_source_order():
+                    continue
+                if field.name == field_name:
+                    field = field
+                    break
+            fields.append(field)
+        return fields
 
 
 @dataclass
 class Field:
     name: str
     ty: str
+    _skip_visit: bool
+    is_annotation: bool
     parsed_ty: FieldType
 
     def __init__(self, field: dict[str, Any]) -> None:
         self.name = field["name"]
         self.ty = field["type"]
         self.parsed_ty = FieldType(self.ty)
+        self._skip_visit = field.get("skip_visit", False)
+        self.is_annotation = field.get("is_annotation", False)
+
+    def skip_source_order(self) -> bool:
+        return self._skip_visit or self.parsed_ty.inner in [
+            "str",
+            "ExprContext",
+            "Name",
+            "u32",
+            "bool",
+            "Number",
+            "IpyEscapeKind",
+        ]
+
+
+# Extracts the type argument from the given rust type with AST field type syntax.
+# Box<str> -> str
+# Box<Expr?> -> Expr
+# If the type does not have a type argument, it will return the string.
+# Does not support nested types
+def extract_type_argument(rust_type_str: str) -> str:
+    rust_type_str = rust_type_str.replace("*", "")
+    rust_type_str = rust_type_str.replace("?", "")
+    rust_type_str = rust_type_str.replace("&", "")
+
+    open_bracket_index = rust_type_str.find("<")
+    if open_bracket_index == -1:
+        return rust_type_str
+    close_bracket_index = rust_type_str.rfind(">")
+    if close_bracket_index == -1 or close_bracket_index <= open_bracket_index:
+        raise ValueError(f"Brackets are not balanced for type {rust_type_str}")
+    inner_type = rust_type_str[open_bracket_index + 1 : close_bracket_index].strip()
+    inner_type = inner_type.replace("crate::", "")
+    return inner_type
 
 
 @dataclass
 class FieldType:
     rule: str
     name: str
+    inner: str
     seq: bool = False
     optional: bool = False
     slice_: bool = False
@@ -160,6 +238,7 @@ class FieldType:
     def __init__(self, rule: str) -> None:
         self.rule = rule
         self.name = ""
+        self.inner = extract_type_argument(rule)
 
         # The following cases are the limitations of this parser(and not used in the ast.toml):
         # * Rules that involve declaring a sequence with optional items e.g. Vec<Option<...>>
@@ -201,6 +280,7 @@ def write_preamble(out: list[str]) -> None:
     // Run `crates/ruff_python_ast/generate.py` to re-generate the file.
 
     use crate::name::Name;
+    use crate::visitor::source_order::SourceOrderVisitor;
     """)
 
 
@@ -222,9 +302,11 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
 
     Also creates:
     - `impl Ranged for TypeParam`
+    - `impl HasNodeIndex for TypeParam`
     - `TypeParam::visit_source_order`
     - `impl From<TypeParamTypeVar> for TypeParam`
     - `impl Ranged for TypeParamTypeVar`
+    - `impl HasNodeIndex for TypeParamTypeVar`
     - `fn TypeParam::is_type_var() -> bool`
 
     If the `add_suffix_to_is_methods` group option is true, then the
@@ -236,6 +318,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
         if group.doc is not None:
             write_rustdoc(out, group.doc)
         out.append("#[derive(Clone, Debug, PartialEq)]")
+        out.append('#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]')
         out.append(f"pub enum {group.owned_enum_ty} {{")
         for node in group.nodes:
             out.append(f"{node.variant}({node.ty}),")
@@ -257,6 +340,19 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
         """)
         for node in group.nodes:
             out.append(f"Self::{node.variant}(node) => node.range(),")
+        out.append("""
+                }
+            }
+        }
+        """)
+
+        out.append(f"""
+        impl crate::HasNodeIndex for {group.owned_enum_ty} {{
+            fn node_index(&self) -> &crate::AtomicNodeIndex {{
+                match self {{
+        """)
+        for node in group.nodes:
+            out.append(f"Self::{node.variant}(node) => node.node_index(),")
         out.append("""
                 }
             }
@@ -359,6 +455,15 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
             }}
         """)
 
+    for node in ast.all_nodes:
+        out.append(f"""
+            impl crate::HasNodeIndex for {node.ty} {{
+                fn node_index(&self) -> &crate::AtomicNodeIndex {{
+                    &self.node_index
+                }}
+            }}
+        """)
+
     for group in ast.groups:
         out.append(f"""
             impl {group.owned_enum_ty} {{
@@ -400,6 +505,7 @@ def write_ref_enum(out: list[str], ast: Ast) -> None:
     - `impl<'a> From<&'a TypeParam> for TypeParamRef<'a>`
     - `impl<'a> From<&'a TypeParamTypeVar> for TypeParamRef<'a>`
     - `impl Ranged for TypeParamRef<'_>`
+    - `impl HasNodeIndex for TypeParamRef<'_>`
     - `fn TypeParamRef::is_type_var() -> bool`
 
     The name of each variant can be customized via the `variant` node option. If
@@ -412,6 +518,7 @@ def write_ref_enum(out: list[str], ast: Ast) -> None:
         if group.doc is not None:
             write_rustdoc(out, group.doc)
         out.append("""#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]""")
+        out.append('#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]')
         out.append(f"""pub enum {group.ref_enum_ty}<'a> {{""")
         for node in group.nodes:
             if group.add_suffix_to_is_methods:
@@ -457,6 +564,19 @@ def write_ref_enum(out: list[str], ast: Ast) -> None:
         }
         """)
 
+        out.append(f"""
+        impl crate::HasNodeIndex for {group.ref_enum_ty}<'_> {{
+            fn node_index(&self) -> &crate::AtomicNodeIndex {{
+                match self {{
+        """)
+        for node in group.nodes:
+            out.append(f"Self::{node.variant}(node) => node.node_index(),")
+        out.append("""
+                }
+            }
+        }
+        """)
+
 
 # ------------------------------------------------------------------------------
 # AnyNodeRef
@@ -480,12 +600,15 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
     - `impl<'a> From<TypeParamRef<'a>> for AnyNodeRef<'a>`
     - `impl<'a> From<&'a TypeParamTypeVarTuple> for AnyNodeRef<'a>`
     - `impl Ranged for AnyNodeRef<'_>`
+    - `impl HasNodeIndex for AnyNodeRef<'_>`
     - `fn AnyNodeRef::as_ptr(&self) -> std::ptr::NonNull<()>`
-    - `fn AnyNodeRef::visit_preorder(self, visitor &mut impl SourceOrderVisitor)`
+    - `fn AnyNodeRef::visit_source_order(self, visitor &mut impl SourceOrderVisitor)`
     """
 
     out.append("""
+    /// A flattened enumeration of all AST nodes.
     #[derive(Copy, Clone, Debug, is_macro::Is, PartialEq)]
+    #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
     pub enum AnyNodeRef<'a> {
     """)
     for node in ast.all_nodes:
@@ -525,6 +648,23 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
             }
         """)
 
+        # `as_*` methods to convert from `AnyNodeRef` to e.g. `ExprRef`
+        out.append(f"""
+            impl<'a> AnyNodeRef<'a> {{
+                pub fn as_{to_snake_case(group.ref_enum_ty)}(self) -> Option<{group.ref_enum_ty}<'a>> {{
+                    match self {{
+        """)
+        for node in group.nodes:
+            out.append(
+                f"Self::{node.name}(node) => Some({group.ref_enum_ty}::{node.variant}(node)),"
+            )
+        out.append("""
+                        _ => None,
+                    }
+                }
+            }
+        """)
+
     for node in ast.all_nodes:
         out.append(f"""
             impl<'a> From<&'a {node.ty}> for AnyNodeRef<'a> {{
@@ -548,6 +688,19 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
     """)
 
     out.append("""
+        impl crate::HasNodeIndex for AnyNodeRef<'_> {
+            fn node_index(&self) -> &crate::AtomicNodeIndex {
+                match self {
+    """)
+    for node in ast.all_nodes:
+        out.append(f"""AnyNodeRef::{node.name}(node) => node.node_index(),""")
+    out.append("""
+                }
+            }
+        }
+    """)
+
+    out.append("""
         impl AnyNodeRef<'_> {
             pub fn as_ptr(&self) -> std::ptr::NonNull<()> {
                 match self {
@@ -564,7 +717,7 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
 
     out.append("""
         impl<'a> AnyNodeRef<'a> {
-            pub fn visit_preorder<'b, V>(self, visitor: &mut V)
+            pub fn visit_source_order<'b, V>(self, visitor: &mut V)
             where
                 V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
                 'a: 'b,
@@ -596,6 +749,162 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
             }
         }
         """)
+
+
+# ------------------------------------------------------------------------------
+# AnyRootNodeRef
+
+
+def write_root_anynoderef(out: list[str], ast: Ast) -> None:
+    """
+    Create the AnyRootNodeRef type.
+
+    ```rust
+    pub enum AnyRootNodeRef<'a> {
+        ...
+        TypeParam(&'a TypeParam),
+        ...
+    }
+    ```
+
+    Also creates:
+    - `impl<'a> From<&'a TypeParam> for AnyRootNodeRef<'a>`
+    - `impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a TypeParam`
+    - `impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a TypeParamVarTuple`
+    - `impl Ranged for AnyRootNodeRef<'_>`
+    - `impl HasNodeIndex for AnyRootNodeRef<'_>`
+    - `fn AnyRootNodeRef::visit_source_order(self, visitor &mut impl SourceOrderVisitor)`
+    """
+
+    out.append("""
+    /// An enumeration of all AST nodes.
+    ///
+    /// Unlike `AnyNodeRef`, this type does not flatten nested enums, so its variants only
+    /// consist of the "root" AST node types. This is useful as it exposes references to the
+    /// original enums, not just references to their inner values.
+    ///
+    /// For example, `AnyRootNodeRef::Mod` contains a reference to the `Mod` enum, while
+    /// `AnyNodeRef` has top-level `AnyNodeRef::ModModule` and `AnyNodeRef::ModExpression`
+    /// variants.
+    #[derive(Copy, Clone, Debug, PartialEq)]
+    #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+    pub enum AnyRootNodeRef<'a> {
+    """)
+    for group in ast.groups:
+        out.append(f"""{group.name}(&'a {group.owned_enum_ty}),""")
+    for node in ast.ungrouped_nodes:
+        out.append(f"""{node.name}(&'a {node.ty}),""")
+    out.append("""
+    }
+    """)
+
+    for group in ast.groups:
+        out.append(f"""
+            impl<'a> From<&'a {group.owned_enum_ty}> for AnyRootNodeRef<'a> {{
+                fn from(node: &'a {group.owned_enum_ty}) -> AnyRootNodeRef<'a> {{
+                        AnyRootNodeRef::{group.name}(node)
+                }}
+            }}
+        """)
+
+        out.append(f"""
+            impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a {group.owned_enum_ty} {{
+                type Error = ();
+                fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a {group.owned_enum_ty}, ()> {{
+                    match node {{
+                        AnyRootNodeRef::{group.name}(node) => Ok(node),
+                        _ => Err(())
+                    }}
+                }}
+            }}
+        """)
+
+        for node in group.nodes:
+            out.append(f"""
+                impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a {node.ty} {{
+                    type Error = ();
+                    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a {node.ty}, ()> {{
+                        match node {{
+                            AnyRootNodeRef::{group.name}({group.owned_enum_ty}::{node.variant}(node)) => Ok(node),
+                            _ => Err(())
+                        }}
+                    }}
+                }}
+            """)
+
+    for node in ast.ungrouped_nodes:
+        out.append(f"""
+            impl<'a> From<&'a {node.ty}> for AnyRootNodeRef<'a> {{
+                fn from(node: &'a {node.ty}) -> AnyRootNodeRef<'a> {{
+                    AnyRootNodeRef::{node.name}(node)
+                }}
+            }}
+        """)
+
+        out.append(f"""
+            impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a {node.ty} {{
+                type Error = ();
+                fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a {node.ty}, ()> {{
+                    match node {{
+                        AnyRootNodeRef::{node.name}(node) => Ok(node),
+                        _ => Err(())
+                    }}
+                }}
+            }}
+        """)
+
+    out.append("""
+        impl ruff_text_size::Ranged for AnyRootNodeRef<'_> {
+            fn range(&self) -> ruff_text_size::TextRange {
+                match self {
+    """)
+    for group in ast.groups:
+        out.append(f"""AnyRootNodeRef::{group.name}(node) => node.range(),""")
+    for node in ast.ungrouped_nodes:
+        out.append(f"""AnyRootNodeRef::{node.name}(node) => node.range(),""")
+    out.append("""
+                }
+            }
+        }
+    """)
+
+    out.append("""
+        impl crate::HasNodeIndex for AnyRootNodeRef<'_> {
+            fn node_index(&self) -> &crate::AtomicNodeIndex {
+                match self {
+    """)
+    for group in ast.groups:
+        out.append(f"""AnyRootNodeRef::{group.name}(node) => node.node_index(),""")
+    for node in ast.ungrouped_nodes:
+        out.append(f"""AnyRootNodeRef::{node.name}(node) => node.node_index(),""")
+    out.append("""
+                }
+            }
+        }
+    """)
+
+    out.append("""
+        impl<'a> AnyRootNodeRef<'a> {
+            pub fn visit_source_order<'b, V>(self, visitor: &mut V)
+            where
+                V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
+                'a: 'b,
+            {
+                match self {
+    """)
+    for group in ast.groups:
+        out.append(
+            f"""AnyRootNodeRef::{group.name}(node) => node.visit_source_order(visitor),"""
+        )
+    for node in ast.ungrouped_nodes:
+        out.append(
+            f"""AnyRootNodeRef::{node.name}(node) => node.visit_source_order(visitor),"""
+        )
+    out.append("""
+                }
+            }
+        }
+    """)
 
 
 # ------------------------------------------------------------------------------
@@ -660,15 +969,17 @@ def write_node(out: list[str], ast: Ast) -> None:
                 + "".join(f", {derive}" for derive in node.derives)
                 + ")]"
             )
+            out.append('#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]')
             name = node.name
             out.append(f"pub struct {name} {{")
+            out.append("pub node_index: crate::AtomicNodeIndex,")
             out.append("pub range: ruff_text_size::TextRange,")
             for field in node.fields:
                 field_str = f"pub {field.name}: "
                 ty = field.parsed_ty
 
                 rust_ty = f"{field.parsed_ty.name}"
-                if ty.name in types_requiring_create_prefix:
+                if ty.name in types_requiring_crate_prefix:
                     rust_ty = f"crate::{rust_ty}"
                 if ty.slice_:
                     rust_ty = f"[{rust_ty}]"
@@ -687,6 +998,75 @@ def write_node(out: list[str], ast: Ast) -> None:
 
 
 # ------------------------------------------------------------------------------
+# Source order visitor
+
+
+def write_source_order(out: list[str], ast: Ast) -> None:
+    for group in ast.groups:
+        for node in group.nodes:
+            if node.fields is None or node.custom_source_order:
+                continue
+            name = node.name
+            fields_list = ""
+            body = ""
+
+            for field in node.fields:
+                if field.skip_source_order():
+                    fields_list += f"{field.name}: _,\n"
+                else:
+                    fields_list += f"{field.name},\n"
+            fields_list += "range: _,\n"
+            fields_list += "node_index: _,\n"
+
+            for field in node.fields_in_source_order():
+                visitor_name = (
+                    type_to_visitor_function.get(
+                        field.parsed_ty.inner, VisitorInfo("")
+                    ).name
+                    or f"visit_{to_snake_case(field.parsed_ty.inner)}"
+                )
+                visits_sequence = type_to_visitor_function.get(
+                    field.parsed_ty.inner, VisitorInfo("")
+                ).accepts_sequence
+
+                if field.is_annotation:
+                    visitor_name = "visit_annotation"
+
+                if field.parsed_ty.optional:
+                    body += f"""
+                            if let Some({field.name}) = {field.name} {{
+                                visitor.{visitor_name}({field.name});
+                            }}\n
+                      """
+                elif not visits_sequence and field.parsed_ty.seq:
+                    body += f"""
+                            for elm in {field.name} {{
+                                visitor.{visitor_name}(elm);
+                            }}
+                     """
+                else:
+                    body += f"visitor.{visitor_name}({field.name});\n"
+
+            visitor_arg_name = "visitor"
+            if len(node.fields_in_source_order()) == 0:
+                visitor_arg_name = "_"
+
+            out.append(f"""
+impl {name} {{
+    pub(crate) fn visit_source_order<'a, V>(&'a self, {visitor_arg_name}: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {{
+        let {name} {{
+            {fields_list}
+        }} = self;
+        {body}
+    }}
+}}
+        """)
+
+
+# ------------------------------------------------------------------------------
 # Format and write output
 
 
@@ -696,8 +1076,10 @@ def generate(ast: Ast) -> list[str]:
     write_owned_enum(out, ast)
     write_ref_enum(out, ast)
     write_anynoderef(out, ast)
+    write_root_anynoderef(out, ast)
     write_nodekind(out, ast)
     write_node(out, ast)
+    write_source_order(out, ast)
     return out
 
 

@@ -1,0 +1,47 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: basic.md - Structures - Attempting to import a stdlib module that was previously removed
+mdtest path: crates/ty_python_semantic/resources/mdtest/import/basic.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | import aifc  # error: [unresolved-import]
+2 | from distutils import sysconfig  # error: [unresolved-import]
+```
+
+# Diagnostics
+
+```
+error[unresolved-import]: Cannot resolve imported module `aifc`
+ --> src/mdtest_snippet.py:1:8
+  |
+1 | import aifc  # error: [unresolved-import]
+  |        ^^^^
+2 | from distutils import sysconfig  # error: [unresolved-import]
+  |
+info: The stdlib module `aifc` is only available on Python <=3.12
+info: Python 3.13 was assumed when resolving modules because it was specified on the command line
+info: rule `unresolved-import` is enabled by default
+
+```
+
+```
+error[unresolved-import]: Cannot resolve imported module `distutils`
+ --> src/mdtest_snippet.py:2:6
+  |
+1 | import aifc  # error: [unresolved-import]
+2 | from distutils import sysconfig  # error: [unresolved-import]
+  |      ^^^^^^^^^
+  |
+info: The stdlib module `distutils` is only available on Python <=3.11
+info: Python 3.13 was assumed when resolving modules because it was specified on the command line
+info: rule `unresolved-import` is enabled by default
+
+```

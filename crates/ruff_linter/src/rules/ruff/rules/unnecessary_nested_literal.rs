@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{AnyNodeRef, Expr, ExprContext, ExprSubscript, ExprTuple};
 use ruff_python_semantic::analyze::typing::traverse_literal;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unnecessary nested `Literal`.
@@ -55,10 +55,11 @@ use crate::checkers::ast::Checker;
 /// across multiple lines and some of the lines have trailing comments.
 ///
 /// ## References
-/// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.readthedocs.io/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
+/// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.python.org/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
 ///
 /// [PEP 586](https://peps.python.org/pep-0586/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct UnnecessaryNestedLiteral;
 
 impl Violation for UnnecessaryNestedLiteral {
@@ -74,7 +75,7 @@ impl Violation for UnnecessaryNestedLiteral {
     }
 }
 
-/// RUF039
+/// RUF041
 pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'a Expr) {
     let mut is_nested = false;
 
@@ -84,7 +85,7 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'
             // If the parent is not equal to the `literal_expr` then we know we are traversing recursively.
             if !AnyNodeRef::ptr_eq(parent.into(), literal_expr.into()) {
                 is_nested = true;
-            };
+            }
         },
         checker.semantic(),
         literal_expr,
@@ -105,7 +106,7 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'
         literal_expr,
     );
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryNestedLiteral, literal_expr.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryNestedLiteral, literal_expr.range());
 
     // Create a [`Fix`] that flattens all nodes.
     if let Expr::Subscript(subscript) = literal_expr {
@@ -116,12 +117,14 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'
                 Expr::Tuple(ExprTuple {
                     elts: nodes.into_iter().cloned().collect(),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     ctx: ExprContext::Load,
                     parenthesized: false,
                 })
             }),
             value: subscript.value.clone(),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,
         });
         let fix = Fix::applicable_edit(
@@ -133,7 +136,5 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'
             },
         );
         diagnostic.set_fix(fix);
-    };
-
-    checker.report_diagnostic(diagnostic);
+    }
 }

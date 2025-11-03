@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for docstrings that include backslashes, but are not defined as
@@ -42,6 +42,7 @@ use crate::docstrings::Docstring;
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [Python documentation: String and Bytes literals](https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.172")]
 pub(crate) struct EscapeSequenceInDocstring;
 
 impl Violation for EscapeSequenceInDocstring {
@@ -96,7 +97,8 @@ pub(crate) fn backslashes(checker: &Checker, docstring: &Docstring) {
 
         // Only allow continuations (backslashes followed by newlines) and Unicode escapes.
         if !matches!(*escaped_char, '\r' | '\n' | 'u' | 'U' | 'N') {
-            let mut diagnostic = Diagnostic::new(EscapeSequenceInDocstring, docstring.range());
+            let mut diagnostic =
+                checker.report_diagnostic(EscapeSequenceInDocstring, docstring.range());
 
             if !docstring.is_u_string() {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
@@ -105,7 +107,6 @@ pub(crate) fn backslashes(checker: &Checker, docstring: &Docstring) {
                 )));
             }
 
-            checker.report_diagnostic(diagnostic);
             break;
         }
     }

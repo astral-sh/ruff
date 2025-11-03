@@ -1,17 +1,17 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_true;
-use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
+use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_semantic::analyze::logging;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::logging;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for `except` clauses that catch all exceptions.  This includes
-/// bare `except`, `except BaseException` and `except Exception`.
+/// `except BaseException` and `except Exception`.
 ///
 ///
 /// ## Why is this bad?
@@ -47,9 +47,10 @@ use crate::checkers::ast::Checker;
 ///     raise
 /// ```
 ///
-/// Exceptions that are logged via `logging.exception()` or `logging.error()`
-/// with `exc_info` enabled will _not_ be flagged, as this is a common pattern
-/// for propagating exception traces:
+/// Exceptions that are logged via `logging.exception()` or are logged via
+/// `logging.error()` or `logging.critical()` with `exc_info` enabled will
+/// _not_ be flagged, as this is a common pattern for propagating exception
+/// traces:
 /// ```python
 /// try:
 ///     foo()
@@ -62,6 +63,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
 /// - [PEP 8: Programming Recommendations on bare `except`](https://peps.python.org/pep-0008/#programming-recommendations)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.127")]
 pub(crate) struct BlindExcept {
     name: String,
 }
@@ -71,6 +73,22 @@ impl Violation for BlindExcept {
     fn message(&self) -> String {
         let BlindExcept { name } = self;
         format!("Do not catch blind exception: `{name}`")
+    }
+}
+
+fn contains_blind_exception<'a>(
+    semantic: &'a SemanticModel,
+    expr: &'a Expr,
+) -> Option<(&'a str, ruff_text_size::TextRange)> {
+    match expr {
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
+            .iter()
+            .find_map(|elt| contains_blind_exception(semantic, elt)),
+        _ => {
+            let builtin_exception_type = semantic.resolve_builtin_symbol(expr)?;
+            matches!(builtin_exception_type, "BaseException" | "Exception")
+                .then(|| (builtin_exception_type, expr.range()))
+        }
     }
 }
 
@@ -86,12 +104,9 @@ pub(crate) fn blind_except(
     };
 
     let semantic = checker.semantic();
-    let Some(builtin_exception_type) = semantic.resolve_builtin_symbol(type_) else {
+    let Some((builtin_exception_type, range)) = contains_blind_exception(semantic, type_) else {
         return;
     };
-    if !matches!(builtin_exception_type, "BaseException" | "Exception") {
-        return;
-    }
 
     // If the exception is re-raised, don't flag an error.
     let mut visitor = ReraiseVisitor::new(name);
@@ -101,18 +116,18 @@ pub(crate) fn blind_except(
     }
 
     // If the exception is logged, don't flag an error.
-    let mut visitor = LogExceptionVisitor::new(semantic, &checker.settings.logger_objects);
+    let mut visitor = LogExceptionVisitor::new(semantic, &checker.settings().logger_objects);
     visitor.visit_body(body);
     if visitor.seen() {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         BlindExcept {
-            name: builtin_exception_type.to_string(),
+            name: builtin_exception_type.into(),
         },
-        type_.range(),
-    ));
+        range,
+    );
 }
 
 /// A visitor to detect whether the exception with the given name was re-raised.
@@ -135,24 +150,28 @@ impl<'a> ReraiseVisitor<'a> {
 
 impl<'a> StatementVisitor<'a> for ReraiseVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        if self.seen {
+            return;
+        }
         match stmt {
             Stmt::Raise(ast::StmtRaise { exc, cause, .. }) => {
-                if let Some(cause) = cause {
-                    if let Expr::Name(ast::ExprName { id, .. }) = cause.as_ref() {
-                        if self.name.is_some_and(|name| id == name) {
-                            self.seen = true;
-                        }
+                // except Exception [as <name>]:
+                //     raise [<exc> [from <cause>]]
+                let reraised = match (self.name, exc.as_deref(), cause.as_deref()) {
+                    // `raise`
+                    (_, None, None) => true,
+                    // `raise SomeExc from <name>`
+                    (Some(name), _, Some(Expr::Name(ast::ExprName { id, .. }))) if name == id => {
+                        true
                     }
-                } else {
-                    if let Some(exc) = exc {
-                        if let Expr::Name(ast::ExprName { id, .. }) = exc.as_ref() {
-                            if self.name.is_some_and(|name| id == name) {
-                                self.seen = true;
-                            }
-                        }
-                    } else {
-                        self.seen = true;
+                    // `raise <name>` and `raise <name> from SomeCause`
+                    (Some(name), Some(Expr::Name(ast::ExprName { id, .. })), _) if name == id => {
+                        true
                     }
+                    _ => false,
+                };
+                if reraised {
+                    self.seen = true;
                 }
             }
             Stmt::Try(_) | Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {}
@@ -186,6 +205,9 @@ impl<'a> LogExceptionVisitor<'a> {
 
 impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        if self.seen {
+            return;
+        }
         match stmt {
             Stmt::Expr(ast::StmtExpr { value, .. }) => {
                 if let Expr::Call(ast::ExprCall {
@@ -201,7 +223,7 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                             ) {
                                 if match attr.as_str() {
                                     "exception" => true,
-                                    "error" => arguments
+                                    "error" | "critical" => arguments
                                         .find_keyword("exc_info")
                                         .is_some_and(|keyword| is_const_true(&keyword.value)),
                                     _ => false,
@@ -214,7 +236,7 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                             if self.semantic.resolve_qualified_name(func).is_some_and(
                                 |qualified_name| match qualified_name.segments() {
                                     ["logging", "exception"] => true,
-                                    ["logging", "error"] => arguments
+                                    ["logging", "error" | "critical"] => arguments
                                         .find_keyword("exc_info")
                                         .is_some_and(|keyword| is_const_true(&keyword.value)),
                                     _ => false,

@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::{Scope, SemanticModel};
@@ -7,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the presence of unused private `TypeVar`, `ParamSpec` or
@@ -30,6 +30,7 @@ use crate::fix;
 /// The fix is always marked as unsafe, as it would break your code if the type
 /// variable is imported by another module.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.281")]
 pub(crate) struct UnusedPrivateTypeVar {
     type_var_like_name: String,
     type_var_like_kind: String,
@@ -86,6 +87,7 @@ impl Violation for UnusedPrivateTypeVar {
 /// def func(arg: _PrivateProtocol) -> None: ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.281")]
 pub(crate) struct UnusedPrivateProtocol {
     name: String,
 }
@@ -124,6 +126,7 @@ impl Violation for UnusedPrivateProtocol {
 /// def func(arg: _UsedTypeAlias) -> _UsedTypeAlias: ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.281")]
 pub(crate) struct UnusedPrivateTypeAlias {
     name: String,
 }
@@ -164,6 +167,7 @@ impl Violation for UnusedPrivateTypeAlias {
 /// def func(arg: _UsedPrivateTypedDict) -> _UsedPrivateTypedDict: ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.281")]
 pub(crate) struct UnusedPrivateTypedDict {
     name: String,
 }
@@ -224,21 +228,20 @@ pub(crate) fn unused_private_type_var(checker: &Checker, scope: &Scope) {
             continue;
         };
 
-        let diagnostic = Diagnostic::new(
-            UnusedPrivateTypeVar {
-                type_var_like_name: id.to_string(),
-                type_var_like_kind: type_var_like_kind.to_string(),
-            },
-            binding.range(),
-        )
-        .with_fix(Fix::unsafe_edit(fix::edits::delete_stmt(
-            stmt,
-            None,
-            checker.locator(),
-            checker.indexer(),
-        )));
-
-        checker.report_diagnostic(diagnostic);
+        checker
+            .report_diagnostic(
+                UnusedPrivateTypeVar {
+                    type_var_like_name: id.to_string(),
+                    type_var_like_kind: type_var_like_kind.to_string(),
+                },
+                binding.range(),
+            )
+            .set_fix(Fix::unsafe_edit(fix::edits::delete_stmt(
+                stmt,
+                None,
+                checker.locator(),
+                checker.indexer(),
+            )));
     }
 }
 
@@ -271,12 +274,12 @@ pub(crate) fn unused_private_protocol(checker: &Checker, scope: &Scope) {
             continue;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             UnusedPrivateProtocol {
                 name: class_def.name.to_string(),
             },
             binding.range(),
-        ));
+        );
     }
 }
 
@@ -303,12 +306,12 @@ pub(crate) fn unused_private_type_alias(checker: &Checker, scope: &Scope) {
             continue;
         };
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             UnusedPrivateTypeAlias {
                 name: alias_name.to_string(),
             },
             binding.range(),
-        ));
+        );
     }
 }
 
@@ -358,12 +361,12 @@ pub(crate) fn unused_private_typed_dict(checker: &Checker, scope: &Scope) {
             continue;
         };
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             UnusedPrivateTypedDict {
                 name: class_name.to_string(),
             },
             binding.range(),
-        ));
+        );
     }
 }
 
@@ -405,11 +408,7 @@ fn extract_typeddict_name<'a>(stmt: &'a Stmt, semantic: &SemanticModel) -> Optio
             };
             let ast::ExprName { id, .. } = target.as_name_expr()?;
             let ast::ExprCall { func, .. } = value.as_call_expr()?;
-            if is_typeddict(func) {
-                Some(id)
-            } else {
-                None
-            }
+            if is_typeddict(func) { Some(id) } else { None }
         }
         _ => None,
     }

@@ -2,8 +2,8 @@ use ruff_formatter::write;
 use ruff_python_ast::StmtDelete;
 use ruff_text_size::Ranged;
 
-use crate::builders::{parenthesize_if_expands, PyFormatterExtensions};
-use crate::comments::{dangling_node_comments, SourceComment};
+use crate::builders::{PyFormatterExtensions, parenthesize_if_expands};
+use crate::comments::{SourceComment, dangling_node_comments};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::{has_skip_comment, prelude::*};
@@ -13,7 +13,11 @@ pub struct FormatStmtDelete;
 
 impl FormatNodeRule<StmtDelete> for FormatStmtDelete {
     fn fmt_fields(&self, item: &StmtDelete, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtDelete { range: _, targets } = item;
+        let StmtDelete {
+            range: _,
+            node_index: _,
+            targets,
+        } = item;
 
         write!(f, [token("del"), space()])?;
 

@@ -1,0 +1,758 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR301 [*] `airflow.api_connexion.security.requires_access_dataset` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:17:1
+   |
+15 | from airflow.security.permissions import RESOURCE_DATASET
+16 |
+17 | requires_access_dataset()
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+18 |
+19 | DatasetDetails()
+   |
+help: Use `requires_access_asset` from `airflow.api_fastapi.core_api.security` instead.
+13 | from airflow.metrics.validators import AllowListValidator, BlockListValidator
+14 | from airflow.secrets.local_filesystem import load_connections
+15 | from airflow.security.permissions import RESOURCE_DATASET
+16 + from airflow.api_fastapi.core_api.security import requires_access_asset
+17 | 
+   - requires_access_dataset()
+18 + requires_access_asset()
+19 | 
+20 | DatasetDetails()
+21 | 
+
+AIR301 [*] `airflow.auth.managers.models.resource_details.DatasetDetails` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:19:1
+   |
+17 | requires_access_dataset()
+18 |
+19 | DatasetDetails()
+   | ^^^^^^^^^^^^^^
+20 |
+21 | DatasetManager()
+   |
+help: Use `AssetDetails` from `airflow.api_fastapi.auth.managers.models.resource_details` instead.
+13 | from airflow.metrics.validators import AllowListValidator, BlockListValidator
+14 | from airflow.secrets.local_filesystem import load_connections
+15 | from airflow.security.permissions import RESOURCE_DATASET
+16 + from airflow.api_fastapi.auth.managers.models.resource_details import AssetDetails
+17 | 
+18 | requires_access_dataset()
+19 | 
+   - DatasetDetails()
+20 + AssetDetails()
+21 | 
+22 | DatasetManager()
+23 | dataset_manager()
+
+AIR301 [*] `airflow.datasets.manager.DatasetManager` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:21:1
+   |
+19 | DatasetDetails()
+20 |
+21 | DatasetManager()
+   | ^^^^^^^^^^^^^^
+22 | dataset_manager()
+23 | resolve_dataset_manager()
+   |
+help: Use `AssetManager` from `airflow.assets.manager` instead.
+13 | from airflow.metrics.validators import AllowListValidator, BlockListValidator
+14 | from airflow.secrets.local_filesystem import load_connections
+15 | from airflow.security.permissions import RESOURCE_DATASET
+16 + from airflow.assets.manager import AssetManager
+17 | 
+18 | requires_access_dataset()
+19 | 
+20 | DatasetDetails()
+21 | 
+   - DatasetManager()
+22 + AssetManager()
+23 | dataset_manager()
+24 | resolve_dataset_manager()
+25 | 
+
+AIR301 [*] `airflow.datasets.manager.dataset_manager` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:22:1
+   |
+21 | DatasetManager()
+22 | dataset_manager()
+   | ^^^^^^^^^^^^^^^
+23 | resolve_dataset_manager()
+   |
+help: Use `asset_manager` from `airflow.assets.manager` instead.
+13 | from airflow.metrics.validators import AllowListValidator, BlockListValidator
+14 | from airflow.secrets.local_filesystem import load_connections
+15 | from airflow.security.permissions import RESOURCE_DATASET
+16 + from airflow.assets.manager import asset_manager
+17 | 
+18 | requires_access_dataset()
+19 | 
+20 | DatasetDetails()
+21 | 
+22 | DatasetManager()
+   - dataset_manager()
+23 + asset_manager()
+24 | resolve_dataset_manager()
+25 | 
+26 | DatasetLineageInfo()
+
+AIR301 [*] `airflow.datasets.manager.resolve_dataset_manager` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:23:1
+   |
+21 | DatasetManager()
+22 | dataset_manager()
+23 | resolve_dataset_manager()
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+24 |
+25 | DatasetLineageInfo()
+   |
+help: Use `resolve_asset_manager` from `airflow.assets.manager` instead.
+13 | from airflow.metrics.validators import AllowListValidator, BlockListValidator
+14 | from airflow.secrets.local_filesystem import load_connections
+15 | from airflow.security.permissions import RESOURCE_DATASET
+16 + from airflow.assets.manager import resolve_asset_manager
+17 | 
+18 | requires_access_dataset()
+19 | 
+--------------------------------------------------------------------------------
+21 | 
+22 | DatasetManager()
+23 | dataset_manager()
+   - resolve_dataset_manager()
+24 + resolve_asset_manager()
+25 | 
+26 | DatasetLineageInfo()
+27 | 
+
+AIR301 [*] `airflow.lineage.hook.DatasetLineageInfo` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:25:1
+   |
+23 | resolve_dataset_manager()
+24 |
+25 | DatasetLineageInfo()
+   | ^^^^^^^^^^^^^^^^^^
+26 |
+27 | AllowListValidator()
+   |
+help: Use `AssetLineageInfo` from `airflow.lineage.hook` instead.
+9  |     dataset_manager,
+10 |     resolve_dataset_manager,
+11 | )
+   - from airflow.lineage.hook import DatasetLineageInfo
+12 + from airflow.lineage.hook import DatasetLineageInfo, AssetLineageInfo
+13 | from airflow.metrics.validators import AllowListValidator, BlockListValidator
+14 | from airflow.secrets.local_filesystem import load_connections
+15 | from airflow.security.permissions import RESOURCE_DATASET
+--------------------------------------------------------------------------------
+22 | dataset_manager()
+23 | resolve_dataset_manager()
+24 | 
+   - DatasetLineageInfo()
+25 + AssetLineageInfo()
+26 | 
+27 | AllowListValidator()
+28 | BlockListValidator()
+
+AIR301 [*] `airflow.metrics.validators.AllowListValidator` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:27:1
+   |
+25 | DatasetLineageInfo()
+26 |
+27 | AllowListValidator()
+   | ^^^^^^^^^^^^^^^^^^
+28 | BlockListValidator()
+   |
+help: Use `PatternAllowListValidator` from `airflow.metrics.validators` instead.
+10 |     resolve_dataset_manager,
+11 | )
+12 | from airflow.lineage.hook import DatasetLineageInfo
+   - from airflow.metrics.validators import AllowListValidator, BlockListValidator
+13 + from airflow.metrics.validators import AllowListValidator, BlockListValidator, PatternAllowListValidator
+14 | from airflow.secrets.local_filesystem import load_connections
+15 | from airflow.security.permissions import RESOURCE_DATASET
+16 | 
+--------------------------------------------------------------------------------
+24 | 
+25 | DatasetLineageInfo()
+26 | 
+   - AllowListValidator()
+27 + PatternAllowListValidator()
+28 | BlockListValidator()
+29 | 
+30 | load_connections()
+
+AIR301 [*] `airflow.metrics.validators.BlockListValidator` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:28:1
+   |
+27 | AllowListValidator()
+28 | BlockListValidator()
+   | ^^^^^^^^^^^^^^^^^^
+29 |
+30 | load_connections()
+   |
+help: Use `PatternBlockListValidator` from `airflow.metrics.validators` instead.
+10 |     resolve_dataset_manager,
+11 | )
+12 | from airflow.lineage.hook import DatasetLineageInfo
+   - from airflow.metrics.validators import AllowListValidator, BlockListValidator
+13 + from airflow.metrics.validators import AllowListValidator, BlockListValidator, PatternBlockListValidator
+14 | from airflow.secrets.local_filesystem import load_connections
+15 | from airflow.security.permissions import RESOURCE_DATASET
+16 | 
+--------------------------------------------------------------------------------
+25 | DatasetLineageInfo()
+26 | 
+27 | AllowListValidator()
+   - BlockListValidator()
+28 + PatternBlockListValidator()
+29 | 
+30 | load_connections()
+31 | 
+
+AIR301 [*] `airflow.secrets.local_filesystem.load_connections` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:30:1
+   |
+28 | BlockListValidator()
+29 |
+30 | load_connections()
+   | ^^^^^^^^^^^^^^^^
+31 |
+32 | RESOURCE_DATASET
+   |
+help: Use `load_connections_dict` from `airflow.secrets.local_filesystem` instead.
+11 | )
+12 | from airflow.lineage.hook import DatasetLineageInfo
+13 | from airflow.metrics.validators import AllowListValidator, BlockListValidator
+   - from airflow.secrets.local_filesystem import load_connections
+14 + from airflow.secrets.local_filesystem import load_connections, load_connections_dict
+15 | from airflow.security.permissions import RESOURCE_DATASET
+16 | 
+17 | requires_access_dataset()
+--------------------------------------------------------------------------------
+27 | AllowListValidator()
+28 | BlockListValidator()
+29 | 
+   - load_connections()
+30 + load_connections_dict()
+31 | 
+32 | RESOURCE_DATASET
+33 | 
+
+AIR301 [*] `airflow.security.permissions.RESOURCE_DATASET` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:32:1
+   |
+30 | load_connections()
+31 |
+32 | RESOURCE_DATASET
+   | ^^^^^^^^^^^^^^^^
+   |
+help: Use `RESOURCE_ASSET` from `airflow.security.permissions` instead.
+12 | from airflow.lineage.hook import DatasetLineageInfo
+13 | from airflow.metrics.validators import AllowListValidator, BlockListValidator
+14 | from airflow.secrets.local_filesystem import load_connections
+   - from airflow.security.permissions import RESOURCE_DATASET
+15 + from airflow.security.permissions import RESOURCE_DATASET, RESOURCE_ASSET
+16 | 
+17 | requires_access_dataset()
+18 | 
+--------------------------------------------------------------------------------
+29 | 
+30 | load_connections()
+31 | 
+   - RESOURCE_DATASET
+32 + RESOURCE_ASSET
+33 | 
+34 | 
+35 | from airflow.listeners.spec.dataset import (
+
+AIR301 [*] `airflow.listeners.spec.dataset.on_dataset_created` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:40:1
+   |
+38 | )
+39 |
+40 | on_dataset_created()
+   | ^^^^^^^^^^^^^^^^^^
+41 | on_dataset_changed()
+   |
+help: Use `on_asset_created` from `airflow.listeners.spec.asset` instead.
+36 |     on_dataset_changed,
+37 |     on_dataset_created,
+38 | )
+39 + from airflow.listeners.spec.asset import on_asset_created
+40 | 
+   - on_dataset_created()
+41 + on_asset_created()
+42 | on_dataset_changed()
+43 | 
+44 | 
+
+AIR301 [*] `airflow.listeners.spec.dataset.on_dataset_changed` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:41:1
+   |
+40 | on_dataset_created()
+41 | on_dataset_changed()
+   | ^^^^^^^^^^^^^^^^^^
+   |
+help: Use `on_asset_changed` from `airflow.listeners.spec.asset` instead.
+36 |     on_dataset_changed,
+37 |     on_dataset_created,
+38 | )
+39 + from airflow.listeners.spec.asset import on_asset_changed
+40 | 
+41 | on_dataset_created()
+   - on_dataset_changed()
+42 + on_asset_changed()
+43 | 
+44 | 
+45 | # airflow.operators.python
+
+AIR301 [*] `airflow.operators.python.get_current_context` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:47:1
+   |
+45 | from airflow.operators.python import get_current_context
+46 |
+47 | get_current_context()
+   | ^^^^^^^^^^^^^^^^^^^
+48 |
+49 | # airflow.providers.mysql
+   |
+help: Use `get_current_context` from `airflow.sdk` instead.
+42 | 
+43 | 
+44 | # airflow.operators.python
+   - from airflow.operators.python import get_current_context
+45 + from airflow.sdk import get_current_context
+46 | 
+47 | get_current_context()
+48 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.providers.mysql.datasets.mysql.sanitize_uri` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:52:1
+   |
+50 | from airflow.providers.mysql.datasets.mysql import sanitize_uri
+51 |
+52 | sanitize_uri
+   | ^^^^^^^^^^^^
+53 |
+54 | # airflow.providers.postgres
+   |
+help: Use `sanitize_uri` from `airflow.providers.mysql.assets.mysql` instead.
+47 | get_current_context()
+48 | 
+49 | # airflow.providers.mysql
+   - from airflow.providers.mysql.datasets.mysql import sanitize_uri
+50 + from airflow.providers.mysql.assets.mysql import sanitize_uri
+51 | 
+52 | sanitize_uri
+53 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.providers.postgres.datasets.postgres.sanitize_uri` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:57:1
+   |
+55 | from airflow.providers.postgres.datasets.postgres import sanitize_uri
+56 |
+57 | sanitize_uri
+   | ^^^^^^^^^^^^
+58 |
+59 | # airflow.providers.trino
+   |
+help: Use `sanitize_uri` from `airflow.providers.postgres.assets.postgres` instead.
+52 | sanitize_uri
+53 | 
+54 | # airflow.providers.postgres
+   - from airflow.providers.postgres.datasets.postgres import sanitize_uri
+55 + from airflow.providers.postgres.assets.postgres import sanitize_uri
+56 | 
+57 | sanitize_uri
+58 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.providers.trino.datasets.trino.sanitize_uri` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:62:1
+   |
+60 | from airflow.providers.trino.datasets.trino import sanitize_uri
+61 |
+62 | sanitize_uri
+   | ^^^^^^^^^^^^
+63 |
+64 | # airflow.notifications.basenotifier
+   |
+help: Use `sanitize_uri` from `airflow.providers.trino.assets.trino` instead.
+57 | sanitize_uri
+58 | 
+59 | # airflow.providers.trino
+   - from airflow.providers.trino.datasets.trino import sanitize_uri
+60 + from airflow.providers.trino.assets.trino import sanitize_uri
+61 | 
+62 | sanitize_uri
+63 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.notifications.basenotifier.BaseNotifier` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:67:1
+   |
+65 | from airflow.notifications.basenotifier import BaseNotifier
+66 |
+67 | BaseNotifier()
+   | ^^^^^^^^^^^^
+68 |
+69 | # airflow.auth.manager
+   |
+help: Use `BaseNotifier` from `airflow.sdk.bases.notifier` instead.
+62 | sanitize_uri
+63 | 
+64 | # airflow.notifications.basenotifier
+   - from airflow.notifications.basenotifier import BaseNotifier
+65 + from airflow.sdk.bases.notifier import BaseNotifier
+66 | 
+67 | BaseNotifier()
+68 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.auth.managers.base_auth_manager.BaseAuthManager` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:72:1
+   |
+70 | from airflow.auth.managers.base_auth_manager import BaseAuthManager
+71 |
+72 | BaseAuthManager()
+   | ^^^^^^^^^^^^^^^
+   |
+help: Use `BaseAuthManager` from `airflow.api_fastapi.auth.managers.base_auth_manager` instead.
+67 | BaseNotifier()
+68 | 
+69 | # airflow.auth.manager
+   - from airflow.auth.managers.base_auth_manager import BaseAuthManager
+70 + from airflow.api_fastapi.auth.managers.base_auth_manager import BaseAuthManager
+71 | 
+72 | BaseAuthManager()
+73 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.configuration.get` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:87:1
+   |
+86 | # airflow.configuration
+87 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   | ^^^
+88 | from airflow.hooks.base_hook import BaseHook
+   |
+help: Use `conf.get` from `airflow.configuration` instead.
+81 |     has_option,
+82 |     remove_option,
+83 |     set,
+84 + conf,
+85 | )
+86 | 
+87 | # airflow.configuration
+   - get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+88 + conf, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+89 | from airflow.hooks.base_hook import BaseHook
+90 | 
+91 | # airflow.hooks
+
+AIR301 [*] `airflow.configuration.getboolean` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:87:6
+   |
+86 | # airflow.configuration
+87 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   |      ^^^^^^^^^^
+88 | from airflow.hooks.base_hook import BaseHook
+   |
+help: Use `conf.getboolean` from `airflow.configuration` instead.
+81 |     has_option,
+82 |     remove_option,
+83 |     set,
+84 + conf,
+85 | )
+86 | 
+87 | # airflow.configuration
+   - get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+88 + get, conf, getfloat, getint, has_option, remove_option, as_dict, set
+89 | from airflow.hooks.base_hook import BaseHook
+90 | 
+91 | # airflow.hooks
+
+AIR301 [*] `airflow.configuration.getfloat` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:87:18
+   |
+86 | # airflow.configuration
+87 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   |                  ^^^^^^^^
+88 | from airflow.hooks.base_hook import BaseHook
+   |
+help: Use `conf.getfloat` from `airflow.configuration` instead.
+81 |     has_option,
+82 |     remove_option,
+83 |     set,
+84 + conf,
+85 | )
+86 | 
+87 | # airflow.configuration
+   - get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+88 + get, getboolean, conf, getint, has_option, remove_option, as_dict, set
+89 | from airflow.hooks.base_hook import BaseHook
+90 | 
+91 | # airflow.hooks
+
+AIR301 [*] `airflow.configuration.getint` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:87:28
+   |
+86 | # airflow.configuration
+87 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   |                            ^^^^^^
+88 | from airflow.hooks.base_hook import BaseHook
+   |
+help: Use `conf.getint` from `airflow.configuration` instead.
+81 |     has_option,
+82 |     remove_option,
+83 |     set,
+84 + conf,
+85 | )
+86 | 
+87 | # airflow.configuration
+   - get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+88 + get, getboolean, getfloat, conf, has_option, remove_option, as_dict, set
+89 | from airflow.hooks.base_hook import BaseHook
+90 | 
+91 | # airflow.hooks
+
+AIR301 [*] `airflow.configuration.has_option` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:87:36
+   |
+86 | # airflow.configuration
+87 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   |                                    ^^^^^^^^^^
+88 | from airflow.hooks.base_hook import BaseHook
+   |
+help: Use `conf.has_option` from `airflow.configuration` instead.
+81 |     has_option,
+82 |     remove_option,
+83 |     set,
+84 + conf,
+85 | )
+86 | 
+87 | # airflow.configuration
+   - get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+88 + get, getboolean, getfloat, getint, conf, remove_option, as_dict, set
+89 | from airflow.hooks.base_hook import BaseHook
+90 | 
+91 | # airflow.hooks
+
+AIR301 [*] `airflow.configuration.remove_option` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:87:48
+   |
+86 | # airflow.configuration
+87 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   |                                                ^^^^^^^^^^^^^
+88 | from airflow.hooks.base_hook import BaseHook
+   |
+help: Use `conf.remove_option` from `airflow.configuration` instead.
+81 |     has_option,
+82 |     remove_option,
+83 |     set,
+84 + conf,
+85 | )
+86 | 
+87 | # airflow.configuration
+   - get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+88 + get, getboolean, getfloat, getint, has_option, conf, as_dict, set
+89 | from airflow.hooks.base_hook import BaseHook
+90 | 
+91 | # airflow.hooks
+
+AIR301 [*] `airflow.configuration.as_dict` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:87:63
+   |
+86 | # airflow.configuration
+87 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   |                                                               ^^^^^^^
+88 | from airflow.hooks.base_hook import BaseHook
+   |
+help: Use `conf.as_dict` from `airflow.configuration` instead.
+81 |     has_option,
+82 |     remove_option,
+83 |     set,
+84 + conf,
+85 | )
+86 | 
+87 | # airflow.configuration
+   - get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+88 + get, getboolean, getfloat, getint, has_option, remove_option, conf, set
+89 | from airflow.hooks.base_hook import BaseHook
+90 | 
+91 | # airflow.hooks
+
+AIR301 [*] `airflow.configuration.set` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:87:72
+   |
+86 | # airflow.configuration
+87 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   |                                                                        ^^^
+88 | from airflow.hooks.base_hook import BaseHook
+   |
+help: Use `conf.set` from `airflow.configuration` instead.
+81 |     has_option,
+82 |     remove_option,
+83 |     set,
+84 + conf,
+85 | )
+86 | 
+87 | # airflow.configuration
+   - get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+88 + get, getboolean, getfloat, getint, has_option, remove_option, as_dict, conf
+89 | from airflow.hooks.base_hook import BaseHook
+90 | 
+91 | # airflow.hooks
+
+AIR301 [*] `airflow.hooks.base_hook.BaseHook` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:91:1
+   |
+90 | # airflow.hooks
+91 | BaseHook()
+   | ^^^^^^^^
+92 |
+93 | from airflow.sensors.base_sensor_operator import BaseSensorOperator
+   |
+help: Use `BaseHook` from `airflow.hooks.base` instead.
+85 | 
+86 | # airflow.configuration
+87 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   - from airflow.hooks.base_hook import BaseHook
+88 + from airflow.hooks.base import BaseHook
+89 | 
+90 | # airflow.hooks
+91 | BaseHook()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.sensors.base_sensor_operator.BaseSensorOperator` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:96:1
+   |
+95 | # airflow.sensors.base_sensor_operator
+96 | BaseSensorOperator()
+   | ^^^^^^^^^^^^^^^^^^
+97 | BaseHook()
+   |
+help: Use `BaseSensorOperator` from `airflow.sdk.bases.sensor` instead.
+90 | # airflow.hooks
+91 | BaseHook()
+92 | 
+   - from airflow.sensors.base_sensor_operator import BaseSensorOperator
+93 + from airflow.sdk.bases.sensor import BaseSensorOperator
+94 | 
+95 | # airflow.sensors.base_sensor_operator
+96 | BaseSensorOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.hooks.base_hook.BaseHook` is removed in Airflow 3.0
+  --> AIR301_names_fix.py:97:1
+   |
+95 | # airflow.sensors.base_sensor_operator
+96 | BaseSensorOperator()
+97 | BaseHook()
+   | ^^^^^^^^
+98 |
+99 | from airflow.utils.helpers import chain as helper_chain
+   |
+help: Use `BaseHook` from `airflow.hooks.base` instead.
+85 | 
+86 | # airflow.configuration
+87 | get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
+   - from airflow.hooks.base_hook import BaseHook
+88 | 
+89 | # airflow.hooks
+90 | BaseHook()
+91 | 
+92 | from airflow.sensors.base_sensor_operator import BaseSensorOperator
+93 + from airflow.hooks.base import BaseHook
+94 | 
+95 | # airflow.sensors.base_sensor_operator
+96 | BaseSensorOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.utils.helpers.chain` is removed in Airflow 3.0
+   --> AIR301_names_fix.py:103:1
+    |
+102 | #  airflow.utils.helpers
+103 | helper_chain
+    | ^^^^^^^^^^^^
+104 | helper_cross_downstream
+    |
+help: Use `chain` from `airflow.sdk` instead.
+98  | 
+99  | from airflow.utils.helpers import chain as helper_chain
+100 | from airflow.utils.helpers import cross_downstream as helper_cross_downstream
+101 + from airflow.sdk import chain
+102 | 
+103 | #  airflow.utils.helpers
+    - helper_chain
+104 + chain
+105 | helper_cross_downstream
+106 | 
+107 | # airflow.utils.file
+
+AIR301 [*] `airflow.utils.helpers.cross_downstream` is removed in Airflow 3.0
+   --> AIR301_names_fix.py:104:1
+    |
+102 | #  airflow.utils.helpers
+103 | helper_chain
+104 | helper_cross_downstream
+    | ^^^^^^^^^^^^^^^^^^^^^^^
+105 |
+106 | # airflow.utils.file
+    |
+help: Use `cross_downstream` from `airflow.sdk` instead.
+98  | 
+99  | from airflow.utils.helpers import chain as helper_chain
+100 | from airflow.utils.helpers import cross_downstream as helper_cross_downstream
+101 + from airflow.sdk import cross_downstream
+102 | 
+103 | #  airflow.utils.helpers
+104 | helper_chain
+    - helper_cross_downstream
+105 + cross_downstream
+106 | 
+107 | # airflow.utils.file
+108 | from airflow.utils.file import TemporaryDirectory
+
+AIR301 [*] `airflow.utils.file.TemporaryDirectory` is removed in Airflow 3.0
+   --> AIR301_names_fix.py:109:1
+    |
+107 | from airflow.utils.file import TemporaryDirectory
+108 |
+109 | TemporaryDirectory()
+    | ^^^^^^^^^^^^^^^^^^
+110 |
+111 | from airflow.utils.log import secrets_masker
+    |
+help: Use `TemporaryDirectory` from `tempfile` instead.
+104 | helper_cross_downstream
+105 | 
+106 | # airflow.utils.file
+    - from airflow.utils.file import TemporaryDirectory
+107 + from tempfile import TemporaryDirectory
+108 | 
+109 | TemporaryDirectory()
+110 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR301 [*] `airflow.utils.log.secrets_masker` is removed in Airflow 3.0
+   --> AIR301_names_fix.py:114:1
+    |
+113 | #  airflow.utils.log
+114 | secrets_masker
+    | ^^^^^^^^^^^^^^
+    |
+help: Use `secrets_masker` from `airflow.sdk.execution_time` instead.
+108 | 
+109 | TemporaryDirectory()
+110 | 
+    - from airflow.utils.log import secrets_masker
+111 + from airflow.sdk.execution_time import secrets_masker
+112 | 
+113 | #  airflow.utils.log
+114 | secrets_masker
+note: This is an unsafe fix and may change runtime behavior

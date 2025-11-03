@@ -1,6 +1,6 @@
 use ruff_text_size::TextRange;
 
-use crate::visitor::transformer::{walk_expr, walk_keyword, Transformer};
+use crate::visitor::transformer::{Transformer, walk_expr, walk_keyword};
 use crate::{self as ast};
 use crate::{Expr, Keyword};
 
@@ -72,6 +72,9 @@ impl Transformer for Relocator {
             Expr::FString(ast::ExprFString { range, .. }) => {
                 *range = self.range;
             }
+            Expr::TString(ast::ExprTString { range, .. }) => {
+                *range = self.range;
+            }
             Expr::StringLiteral(ast::ExprStringLiteral { range, .. }) => {
                 *range = self.range;
             }
@@ -84,10 +87,10 @@ impl Transformer for Relocator {
             Expr::BooleanLiteral(ast::ExprBooleanLiteral { range, .. }) => {
                 *range = self.range;
             }
-            Expr::NoneLiteral(ast::ExprNoneLiteral { range }) => {
+            Expr::NoneLiteral(ast::ExprNoneLiteral { range, .. }) => {
                 *range = self.range;
             }
-            Expr::EllipsisLiteral(ast::ExprEllipsisLiteral { range }) => {
+            Expr::EllipsisLiteral(ast::ExprEllipsisLiteral { range, .. }) => {
                 *range = self.range;
             }
             Expr::Attribute(ast::ExprAttribute { range, .. }) => {

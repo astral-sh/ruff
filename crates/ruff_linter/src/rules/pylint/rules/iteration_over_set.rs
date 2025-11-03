@@ -1,12 +1,12 @@
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::comparable::HashableExpr;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
+use ruff_python_ast::comparable::HashableExpr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for iteration over a `set` literal where each element in the set is
@@ -31,6 +31,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct IterationOverSet;
 
 impl AlwaysFixableViolation for IterationOverSet {
@@ -63,7 +64,7 @@ pub(crate) fn iteration_over_set(checker: &Checker, expr: &Expr) {
         }
     }
 
-    let mut diagnostic = Diagnostic::new(IterationOverSet, expr.range());
+    let mut diagnostic = checker.report_diagnostic(IterationOverSet, expr.range());
 
     let tuple = if let [elt] = set.elts.as_slice() {
         let elt = checker.locator().slice(elt);
@@ -73,6 +74,4 @@ pub(crate) fn iteration_over_set(checker: &Checker, expr: &Expr) {
         format!("({})", &set[1..set.len() - 1])
     };
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(tuple, expr.range())));
-
-    checker.report_diagnostic(diagnostic);
 }

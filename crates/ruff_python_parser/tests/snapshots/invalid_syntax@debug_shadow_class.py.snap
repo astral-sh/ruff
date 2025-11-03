@@ -1,0 +1,106 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/debug_shadow_class.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..82,
+        body: [
+            ClassDef(
+                StmtClassDef {
+                    node_index: NodeIndex(None),
+                    range: 0..20,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("__debug__"),
+                        range: 6..15,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    arguments: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 17..20,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 17..20,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            ClassDef(
+                StmtClassDef {
+                    node_index: NodeIndex(None),
+                    range: 35..58,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("C"),
+                        range: 41..42,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 42..53,
+                            node_index: NodeIndex(None),
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 43..52,
+                                        name: Identifier {
+                                            id: Name("__debug__"),
+                                            range: 43..52,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    arguments: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 55..58,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 55..58,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | class __debug__: ...  # class name
+  |       ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+2 | class C[__debug__]: ...  # type parameter name
+  |
+
+
+  |
+1 | class __debug__: ...  # class name
+2 | class C[__debug__]: ...  # type parameter name
+  |         ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+  |

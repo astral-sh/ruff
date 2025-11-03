@@ -1,72 +1,72 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-runtime_evaluated_base_classes_1.py:10:12: TC004 [*] Move import `datetime` out of type-checking block. Import is used for more than type hinting.
+TC004 [*] Move import `datetime` out of type-checking block. Import is used for more than type hinting.
+  --> runtime_evaluated_base_classes_1.py:10:12
    |
  9 | if TYPE_CHECKING:
 10 |     import datetime  # TC004
-   |            ^^^^^^^^ TC004
+   |            ^^^^^^^^
 11 |     from array import array  # TC004
    |
-   = help: Move out of type-checking block
+help: Move out of type-checking block
+5  | 
+6  | import pydantic
+7  | from pydantic import BaseModel
+8  + import datetime
+9  | 
+10 | if TYPE_CHECKING:
+   -     import datetime  # TC004
+11 |     from array import array  # TC004
+12 | 
+13 |     import pandas  # TC004
+note: This is an unsafe fix and may change runtime behavior
 
-ℹ Unsafe fix
-5  5  | 
-6  6  | import pydantic
-7  7  | from pydantic import BaseModel
-   8  |+import datetime
-8  9  | 
-9  10 | if TYPE_CHECKING:
-10    |-    import datetime  # TC004
-11 11 |     from array import array  # TC004
-12 12 | 
-13 13 |     import pandas  # TC004
-
-runtime_evaluated_base_classes_1.py:11:23: TC004 [*] Move import `array.array` out of type-checking block. Import is used for more than type hinting.
+TC004 [*] Move import `array.array` out of type-checking block. Import is used for more than type hinting.
+  --> runtime_evaluated_base_classes_1.py:11:23
    |
  9 | if TYPE_CHECKING:
 10 |     import datetime  # TC004
 11 |     from array import array  # TC004
-   |                       ^^^^^ TC004
+   |                       ^^^^^
 12 |
 13 |     import pandas  # TC004
    |
-   = help: Move out of type-checking block
+help: Move out of type-checking block
+5  | 
+6  | import pydantic
+7  | from pydantic import BaseModel
+8  + from array import array
+9  | 
+10 | if TYPE_CHECKING:
+11 |     import datetime  # TC004
+   -     from array import array  # TC004
+12 | 
+13 |     import pandas  # TC004
+14 |     import pyproj
+note: This is an unsafe fix and may change runtime behavior
 
-ℹ Unsafe fix
-5  5  | 
-6  6  | import pydantic
-7  7  | from pydantic import BaseModel
-   8  |+from array import array
-8  9  | 
-9  10 | if TYPE_CHECKING:
-10 11 |     import datetime  # TC004
-11    |-    from array import array  # TC004
-12 12 | 
-13 13 |     import pandas  # TC004
-14 14 |     import pyproj
-
-runtime_evaluated_base_classes_1.py:13:12: TC004 [*] Move import `pandas` out of type-checking block. Import is used for more than type hinting.
+TC004 [*] Move import `pandas` out of type-checking block. Import is used for more than type hinting.
+  --> runtime_evaluated_base_classes_1.py:13:12
    |
 11 |     from array import array  # TC004
 12 |
 13 |     import pandas  # TC004
-   |            ^^^^^^ TC004
+   |            ^^^^^^
 14 |     import pyproj
    |
-   = help: Move out of type-checking block
-
-ℹ Unsafe fix
-5  5  | 
-6  6  | import pydantic
-7  7  | from pydantic import BaseModel
-   8  |+import pandas
-8  9  | 
-9  10 | if TYPE_CHECKING:
-10 11 |     import datetime  # TC004
-11 12 |     from array import array  # TC004
-12 13 | 
-13    |-    import pandas  # TC004
-14 14 |     import pyproj
-15 15 | 
-16 16 |
+help: Move out of type-checking block
+5  | 
+6  | import pydantic
+7  | from pydantic import BaseModel
+8  + import pandas
+9  | 
+10 | if TYPE_CHECKING:
+11 |     import datetime  # TC004
+12 |     from array import array  # TC004
+13 | 
+   -     import pandas  # TC004
+14 |     import pyproj
+15 | 
+16 | 
+note: This is an unsafe fix and may change runtime behavior

@@ -1,0 +1,257 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB116 [*] Replace `oct` call with `f"{num:o}"`
+  --> FURB116.py:9:7
+   |
+ 7 |     return num
+ 8 |
+ 9 | print(oct(num)[2:])  # FURB116
+   |       ^^^^^^^^^^^^
+10 | print(hex(num)[2:])  # FURB116
+11 | print(bin(num)[2:])  # FURB116
+   |
+help: Replace with `f"{num:o}"`
+6  | def return_num() -> int:
+7  |     return num
+8  | 
+   - print(oct(num)[2:])  # FURB116
+9  + print(f"{num:o}")  # FURB116
+10 | print(hex(num)[2:])  # FURB116
+11 | print(bin(num)[2:])  # FURB116
+12 | 
+note: This is a display-only fix and is likely to be incorrect
+
+FURB116 [*] Replace `hex` call with `f"{num:x}"`
+  --> FURB116.py:10:7
+   |
+ 9 | print(oct(num)[2:])  # FURB116
+10 | print(hex(num)[2:])  # FURB116
+   |       ^^^^^^^^^^^^
+11 | print(bin(num)[2:])  # FURB116
+   |
+help: Replace with `f"{num:x}"`
+7  |     return num
+8  | 
+9  | print(oct(num)[2:])  # FURB116
+   - print(hex(num)[2:])  # FURB116
+10 + print(f"{num:x}")  # FURB116
+11 | print(bin(num)[2:])  # FURB116
+12 | 
+13 | print(oct(1337)[2:])  # FURB116
+note: This is a display-only fix and is likely to be incorrect
+
+FURB116 [*] Replace `bin` call with `f"{num:b}"`
+  --> FURB116.py:11:7
+   |
+ 9 | print(oct(num)[2:])  # FURB116
+10 | print(hex(num)[2:])  # FURB116
+11 | print(bin(num)[2:])  # FURB116
+   |       ^^^^^^^^^^^^
+12 |
+13 | print(oct(1337)[2:])  # FURB116
+   |
+help: Replace with `f"{num:b}"`
+8  | 
+9  | print(oct(num)[2:])  # FURB116
+10 | print(hex(num)[2:])  # FURB116
+   - print(bin(num)[2:])  # FURB116
+11 + print(f"{num:b}")  # FURB116
+12 | 
+13 | print(oct(1337)[2:])  # FURB116
+14 | print(hex(1337)[2:])  # FURB116
+note: This is a display-only fix and is likely to be incorrect
+
+FURB116 [*] Replace `oct` call with `f"{1337:o}"`
+  --> FURB116.py:13:7
+   |
+11 | print(bin(num)[2:])  # FURB116
+12 |
+13 | print(oct(1337)[2:])  # FURB116
+   |       ^^^^^^^^^^^^^
+14 | print(hex(1337)[2:])  # FURB116
+15 | print(bin(1337)[2:])  # FURB116
+   |
+help: Replace with `f"{1337:o}"`
+10 | print(hex(num)[2:])  # FURB116
+11 | print(bin(num)[2:])  # FURB116
+12 | 
+   - print(oct(1337)[2:])  # FURB116
+13 + print(f"{1337:o}")  # FURB116
+14 | print(hex(1337)[2:])  # FURB116
+15 | print(bin(1337)[2:])  # FURB116
+16 | print(bin(+1337)[2:])  # FURB116
+
+FURB116 [*] Replace `hex` call with `f"{1337:x}"`
+  --> FURB116.py:14:7
+   |
+13 | print(oct(1337)[2:])  # FURB116
+14 | print(hex(1337)[2:])  # FURB116
+   |       ^^^^^^^^^^^^^
+15 | print(bin(1337)[2:])  # FURB116
+16 | print(bin(+1337)[2:])  # FURB116
+   |
+help: Replace with `f"{1337:x}"`
+11 | print(bin(num)[2:])  # FURB116
+12 | 
+13 | print(oct(1337)[2:])  # FURB116
+   - print(hex(1337)[2:])  # FURB116
+14 + print(f"{1337:x}")  # FURB116
+15 | print(bin(1337)[2:])  # FURB116
+16 | print(bin(+1337)[2:])  # FURB116
+17 | 
+
+FURB116 [*] Replace `bin` call with `f"{1337:b}"`
+  --> FURB116.py:15:7
+   |
+13 | print(oct(1337)[2:])  # FURB116
+14 | print(hex(1337)[2:])  # FURB116
+15 | print(bin(1337)[2:])  # FURB116
+   |       ^^^^^^^^^^^^^
+16 | print(bin(+1337)[2:])  # FURB116
+   |
+help: Replace with `f"{1337:b}"`
+12 | 
+13 | print(oct(1337)[2:])  # FURB116
+14 | print(hex(1337)[2:])  # FURB116
+   - print(bin(1337)[2:])  # FURB116
+15 + print(f"{1337:b}")  # FURB116
+16 | print(bin(+1337)[2:])  # FURB116
+17 | 
+18 | print(bin(return_num())[2:])  # FURB116 (no autofix)
+
+FURB116 [*] Replace `bin` call with `f"{+1337:b}"`
+  --> FURB116.py:16:7
+   |
+14 | print(hex(1337)[2:])  # FURB116
+15 | print(bin(1337)[2:])  # FURB116
+16 | print(bin(+1337)[2:])  # FURB116
+   |       ^^^^^^^^^^^^^^
+17 |
+18 | print(bin(return_num())[2:])  # FURB116 (no autofix)
+   |
+help: Replace with `f"{+1337:b}"`
+13 | print(oct(1337)[2:])  # FURB116
+14 | print(hex(1337)[2:])  # FURB116
+15 | print(bin(1337)[2:])  # FURB116
+   - print(bin(+1337)[2:])  # FURB116
+16 + print(f"{+1337:b}")  # FURB116
+17 | 
+18 | print(bin(return_num())[2:])  # FURB116 (no autofix)
+19 | print(bin(int(f"{num}"))[2:])  # FURB116 (no autofix)
+
+FURB116 Replace `bin` call with f-string
+  --> FURB116.py:18:7
+   |
+16 | print(bin(+1337)[2:])  # FURB116
+17 |
+18 | print(bin(return_num())[2:])  # FURB116 (no autofix)
+   |       ^^^^^^^^^^^^^^^^^^^^^
+19 | print(bin(int(f"{num}"))[2:])  # FURB116 (no autofix)
+   |
+help: Replace with f-string
+
+FURB116 Replace `bin` call with f-string
+  --> FURB116.py:19:7
+   |
+18 | print(bin(return_num())[2:])  # FURB116 (no autofix)
+19 | print(bin(int(f"{num}"))[2:])  # FURB116 (no autofix)
+   |       ^^^^^^^^^^^^^^^^^^^^^^
+20 |
+21 | ## invalid
+   |
+help: Replace with f-string
+
+FURB116 [*] Replace `bin` call with `f"{d:b}"`
+  --> FURB116.py:32:7
+   |
+30 | d = datetime.datetime.now(tz=datetime.UTC)
+31 | # autofix is display-only
+32 | print(bin(d)[2:])
+   |       ^^^^^^^^^^
+33 | # no autofix for Python 3.11 and earlier, as it introduces a syntax error
+34 | print(bin(len("xyz").numerator)[2:])
+   |
+help: Replace with `f"{d:b}"`
+29 | 
+30 | d = datetime.datetime.now(tz=datetime.UTC)
+31 | # autofix is display-only
+   - print(bin(d)[2:])
+32 + print(f"{d:b}")
+33 | # no autofix for Python 3.11 and earlier, as it introduces a syntax error
+34 | print(bin(len("xyz").numerator)[2:])
+35 | 
+note: This is a display-only fix and is likely to be incorrect
+
+FURB116 Replace `bin` call with f-string
+  --> FURB116.py:34:7
+   |
+32 | print(bin(d)[2:])
+33 | # no autofix for Python 3.11 and earlier, as it introduces a syntax error
+34 | print(bin(len("xyz").numerator)[2:])
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+35 |
+36 | # autofix is display-only
+   |
+help: Replace with f-string
+
+FURB116 [*] Replace `bin` call with `f"{ {0: 1}[0].numerator:b}"`
+  --> FURB116.py:37:7
+   |
+36 | # autofix is display-only
+37 | print(bin({0: 1}[0].numerator)[2:])
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+38 | # no autofix for Python 3.11 and earlier, as it introduces a syntax error
+39 | print(bin(ord("\\").numerator)[2:])
+   |
+help: Replace with `f"{ {0: 1}[0].numerator:b}"`
+34 | print(bin(len("xyz").numerator)[2:])
+35 | 
+36 | # autofix is display-only
+   - print(bin({0: 1}[0].numerator)[2:])
+37 + print(f"{ {0: 1}[0].numerator:b}")
+38 | # no autofix for Python 3.11 and earlier, as it introduces a syntax error
+39 | print(bin(ord("\\").numerator)[2:])
+40 | print(hex(sys
+note: This is a display-only fix and is likely to be incorrect
+
+FURB116 Replace `bin` call with f-string
+  --> FURB116.py:39:7
+   |
+37 | print(bin({0: 1}[0].numerator)[2:])
+38 | # no autofix for Python 3.11 and earlier, as it introduces a syntax error
+39 | print(bin(ord("\\").numerator)[2:])
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+40 | print(hex(sys
+41 | .maxunicode)[2:])
+   |
+help: Replace with f-string
+
+FURB116 Replace `hex` call with f-string
+  --> FURB116.py:40:7
+   |
+38 |   # no autofix for Python 3.11 and earlier, as it introduces a syntax error
+39 |   print(bin(ord("\\").numerator)[2:])
+40 |   print(hex(sys
+   |  _______^
+41 | | .maxunicode)[2:])
+   | |________________^
+42 |
+43 |   # for negatives numbers autofix is display-only
+   |
+help: Replace with f-string
+
+FURB116 [*] Replace `bin` call with `f"{-1:b}"`
+  --> FURB116.py:44:7
+   |
+43 | # for negatives numbers autofix is display-only
+44 | print(bin(-1)[2:])
+   |       ^^^^^^^^^^^
+   |
+help: Replace with `f"{-1:b}"`
+41 | .maxunicode)[2:])
+42 | 
+43 | # for negatives numbers autofix is display-only
+   - print(bin(-1)[2:])
+44 + print(f"{-1:b}")
+note: This is a display-only fix and is likely to be incorrect

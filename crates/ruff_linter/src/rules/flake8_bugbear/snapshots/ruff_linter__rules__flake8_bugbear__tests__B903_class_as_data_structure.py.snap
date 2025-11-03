@@ -1,16 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-class_as_data_structure.py:6:1: B903 Class could be dataclass or namedtuple
+B903 Class could be dataclass or namedtuple
+ --> class_as_data_structure.py:6:1
   |
 6 | / class Point:  # B903
 7 | |     def __init__(self, x: float, y: float) -> None:
 8 | |         self.x = x
 9 | |         self.y = y
-  | |__________________^ B903
+  | |__________________^
   |
 
-class_as_data_structure.py:40:1: B903 Class could be dataclass or namedtuple
+B903 Class could be dataclass or namedtuple
+  --> class_as_data_structure.py:40:1
    |
 38 |           ...
 39 |
@@ -18,12 +20,13 @@ class_as_data_structure.py:40:1: B903 Class could be dataclass or namedtuple
 41 | |     c: int
 42 | |     def __init__(self,d:list):
 43 | |         self.d = d
-   | |__________________^ B903
+   | |__________________^
 44 |
 45 |   class D:   # B903
    |
 
-class_as_data_structure.py:45:1: B903 Class could be dataclass or namedtuple
+B903 Class could be dataclass or namedtuple
+  --> class_as_data_structure.py:45:1
    |
 43 |           self.d = d
 44 |
@@ -32,12 +35,13 @@ class_as_data_structure.py:45:1: B903 Class could be dataclass or namedtuple
 47 | |     # this next method is an init
 48 | |     def __init__(self,e:dict):
 49 | |         self.e = e
-   | |__________________^ B903
+   | |__________________^
 50 |
 51 |   # <--- begin flake8-bugbear tests below
    |
 
-class_as_data_structure.py:63:1: B903 Class could be dataclass or namedtuple
+B903 Class could be dataclass or namedtuple
+  --> class_as_data_structure.py:63:1
    |
 63 | / class NoWarningsClassAttributes:
 64 | |     spam = "ham"
@@ -45,19 +49,21 @@ class_as_data_structure.py:63:1: B903 Class could be dataclass or namedtuple
 66 | |     def __init__(self, foo:int, bar:list):
 67 | |         self.foo = foo
 68 | |         self.bar = bar
-   | |______________________^ B903
+   | |______________________^
    |
 
-class_as_data_structure.py:85:1: B903 Class could be dataclass or namedtuple
+B903 Class could be dataclass or namedtuple
+  --> class_as_data_structure.py:85:1
    |
 85 | / class Warnings:
 86 | |     def __init__(self, foo:int, bar:list):
 87 | |         self.foo = foo
 88 | |         self.bar = bar
-   | |______________________^ B903
+   | |______________________^
    |
 
-class_as_data_structure.py:91:1: B903 Class could be dataclass or namedtuple
+B903 Class could be dataclass or namedtuple
+  --> class_as_data_structure.py:91:1
    |
 91 | / class WarningsWithDocstring:
 92 | |     """A docstring should not be an impediment to a warning"""
@@ -65,16 +71,17 @@ class_as_data_structure.py:91:1: B903 Class could be dataclass or namedtuple
 94 | |     def __init__(self, foo:int, bar:list):
 95 | |         self.foo = foo
 96 | |         self.bar = bar
-   | |______________________^ B903
+   | |______________________^
    |
 
-class_as_data_structure.py:99:1: B903 Class could be dataclass or namedtuple
+B903 Class could be dataclass or namedtuple
+   --> class_as_data_structure.py:99:1
     |
  99 | / class KeywordOnly: # OK with python3.9 or less, not OK starting python3.10
 100 | |     def __init__(self, *, foo: int, bar: int):
 101 | |         self.foo = foo
 102 | |         self.bar = bar 
-    | |______________________^ B903
+    | |______________________^
 103 |
 104 |   # <-- end flake8-bugbear tests
     |

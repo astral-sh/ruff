@@ -1,16 +1,18 @@
 use ruff_python_ast::{self as ast, Arguments, Expr};
 
-use crate::checkers::ast::Checker;
-use anyhow::{anyhow, Result};
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::{
+    checkers::ast::Checker, preview::is_fix_manual_list_comprehension_enabled,
+    rules::perflint::helpers::statement_deletion_range,
+};
+use anyhow::{Result, anyhow};
 
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use crate::rules::perflint::helpers::comment_strings_in_range;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_semantic::{analyze::typing::is_list, Binding};
-use ruff_python_trivia::{BackwardsTokenizer, PythonWhitespace, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_semantic::{Binding, analyze::typing::is_list};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
-
 /// ## What it does
 /// Checks for `for` loops that can be replaced by a list comprehension.
 ///
@@ -46,12 +48,8 @@ use ruff_text_size::{Ranged, TextRange};
 /// original = list(range(10000))
 /// filtered.extend(x for x in original if x % 2)
 /// ```
-///
-/// Take care that if the original for-loop uses an assignment expression
-/// as a conditional, such as `if match:=re.match("\d+","123")`, then
-/// the corresponding comprehension must wrap the assignment
-/// expression in parentheses to avoid a syntax error.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.276")]
 pub(crate) struct ManualListComprehension {
     is_async: bool,
     comprehension_type: Option<ComprehensionType>,
@@ -111,12 +109,14 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         //     if z:
         //         filtered.append(x)
         // ```
-        [ast::Stmt::If(ast::StmtIf {
-            body,
-            elif_else_clauses,
-            test,
-            ..
-        })] => {
+        [
+            ast::Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                test,
+                ..
+            }),
+        ] => {
             if !elif_else_clauses.is_empty() {
                 return;
             }
@@ -144,8 +144,10 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
                 args,
                 keywords,
                 range: _,
+                node_index: _,
             },
         range,
+        node_index: _,
     }) = value.as_ref()
     else {
         return;
@@ -248,6 +250,11 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         .iter()
         .find(|binding| for_stmt.target.range() == binding.range)
         .unwrap();
+    // If the target variable is global (e.g., `global INDEX`) or nonlocal (e.g., `nonlocal INDEX`),
+    // then it is intended to be used elsewhere outside the for loop.
+    if target_binding.is_global() || target_binding.is_nonlocal() {
+        return;
+    }
     // If any references to the loop target variable are after the loop,
     // then converting it into a comprehension would cause a NameError
     if target_binding
@@ -264,12 +271,23 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         ast::Stmt::Assign(assign) => Some(&assign.value),
         _ => None,
     });
+
     // If the variable is an empty list literal, then we might be able to replace it with a full list comprehension
-    // otherwise, it has to be replaced with a `list.extend`
+    // otherwise, it has to be replaced with a `list.extend`.
     let binding_is_empty_list =
-        list_binding_value.is_some_and(|binding_value| match binding_value.as_list_expr() {
-            Some(list_expr) => list_expr.elts.is_empty(),
-            None => false,
+        list_binding_value.is_some_and(|binding_value| match binding_value {
+            // `value = []`
+            Expr::List(list_expr) => list_expr.is_empty(),
+            // `value = list()`
+            // This might be linted against, but turning it into a list comprehension will also remove it
+            Expr::Call(call) => {
+                checker
+                    .semantic()
+                    .resolve_builtin_symbol(&call.func)
+                    .is_some_and(|name| name == "list")
+                    && call.arguments.is_empty()
+            }
+            _ => false,
         });
 
     // If the for loop does not have the same parent element as the binding, then it cannot always be
@@ -316,7 +334,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         ComprehensionType::Extend
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         ManualListComprehension {
             is_async: for_stmt.is_async,
             comprehension_type: Some(comprehension_type),
@@ -325,7 +343,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     );
 
     // TODO: once this fix is stabilized, change the rule to always fixable
-    if checker.settings.preview.is_enabled() {
+    if is_fix_manual_list_comprehension_enabled(checker.settings()) {
         diagnostic.try_set_fix(|| {
             convert_to_list_extend(
                 comprehension_type,
@@ -337,15 +355,13 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             )
         });
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 fn convert_to_list_extend(
     fix_type: ComprehensionType,
     binding: &Binding,
     for_stmt: &ast::StmtFor,
-    if_test: Option<&ast::Expr>,
+    if_test: Option<&Expr>,
     to_append: &Expr,
     checker: &Checker,
 ) -> Result<Fix> {
@@ -361,10 +377,11 @@ fn convert_to_list_extend(
             // since if the assignment expression appears
             // internally (e.g. as an operand in a boolean
             // operation) then it will already be parenthesized.
-            if test.is_named_expr() {
-                format!(" if ({})", locator.slice(test.range()))
-            } else {
-                format!(" if {}", locator.slice(test.range()))
+            match test {
+                Expr::Named(_) | Expr::If(_) | Expr::Lambda(_) => {
+                    format!(" if ({})", locator.slice(test.range()))
+                }
+                _ => format!(" if {}", locator.slice(test.range())),
             }
         }
         None => String::new(),
@@ -395,24 +412,21 @@ fn convert_to_list_extend(
     };
     let target_str = locator.slice(for_stmt.target.range());
     let elt_str = locator.slice(to_append);
-    let generator_str = format!("{elt_str} {for_type} {target_str} in {for_iter_str}{if_str}");
-
-    let comment_strings_in_range = |range| {
-        checker
-            .comment_ranges()
-            .comments_in_range(range)
-            .iter()
-            // Ignore comments inside of the append or iterator, since these are preserved
-            .filter(|comment| {
-                !to_append.range().contains_range(**comment)
-                    && !for_stmt.iter.range().contains_range(**comment)
-            })
-            .map(|range| locator.slice(range).trim_whitespace_start())
-            .collect()
+    let generator_str = if to_append
+        .as_generator_expr()
+        .is_some_and(|generator| !generator.parenthesized)
+    {
+        format!("({elt_str}) {for_type} {target_str} in {for_iter_str}{if_str}")
+    } else {
+        format!("{elt_str} {for_type} {target_str} in {for_iter_str}{if_str}")
     };
 
     let variable_name = locator.slice(binding);
-    let for_loop_inline_comments: Vec<&str> = comment_strings_in_range(for_stmt.range);
+    let for_loop_inline_comments = comment_strings_in_range(
+        checker,
+        for_stmt.range,
+        &[to_append.range(), for_stmt.iter.range()],
+    );
 
     let newline = checker.stylist().line_ending().as_str();
 
@@ -457,74 +471,25 @@ fn convert_to_list_extend(
                 .ok_or(anyhow!(
                     "Binding must have a statement to convert into a list comprehension"
                 ))?;
-            // If the binding has multiple statements on its line, the fix would be substantially more complicated
-            let (semicolon_before, after_semicolon) = {
-                // determine whether there's a semicolon either before or after the binding statement.
-                // Since it's a binding statement, we can just check whether there's a semicolon immediately
-                // after the whitespace in front of or behind it
-                let mut after_tokenizer =
-                    SimpleTokenizer::starts_at(binding_stmt_range.end(), locator.contents())
-                        .skip_trivia();
 
-                let after_semicolon = if after_tokenizer
-                    .next()
-                    .is_some_and(|token| token.kind() == SimpleTokenKind::Semi)
-                {
-                    after_tokenizer.next()
-                } else {
-                    None
-                };
-
-                let semicolon_before = BackwardsTokenizer::up_to(
-                    binding_stmt_range.start(),
-                    locator.contents(),
-                    checker.comment_ranges(),
-                )
-                .skip_trivia()
-                .next()
-                .filter(|token| token.kind() == SimpleTokenKind::Semi);
-
-                (semicolon_before, after_semicolon)
-            };
             // If there are multiple binding statements in one line, we don't want to accidentally delete them
             // Instead, we just delete the binding statement and leave any comments where they are
             let (binding_stmt_deletion_range, binding_is_multiple_stmts) =
-                match (semicolon_before, after_semicolon) {
-                    // ```python
-                    // a = []
-                    // ```
-                    (None, None) => (locator.full_lines_range(binding_stmt_range), false),
-
-                    // ```python
-                    // a = 1; b = []
-                    //      ^^^^^^^^
-                    // a = 1; b = []; c = 3
-                    //      ^^^^^^^^
-                    // ```
-                    (Some(semicolon_before), Some(_) | None) => (
-                        TextRange::new(semicolon_before.start(), binding_stmt_range.end()),
-                        true,
-                    ),
-
-                    // ```python
-                    // a = []; b = 3
-                    // ^^^^^^^
-                    // ```
-                    (None, Some(after_semicolon)) => (
-                        TextRange::new(binding_stmt_range.start(), after_semicolon.start()),
-                        true,
-                    ),
-                };
+                statement_deletion_range(checker, binding_stmt_range);
 
             let annotations = match binding_stmt.and_then(|stmt| stmt.as_ann_assign_stmt()) {
                 Some(assign) => format!(": {}", locator.slice(assign.annotation.range())),
                 None => String::new(),
             };
 
-            let mut comments_to_move = for_loop_inline_comments;
-            if !binding_is_multiple_stmts {
-                comments_to_move.extend(comment_strings_in_range(binding_stmt_deletion_range));
-            }
+            let comments_to_move = if binding_is_multiple_stmts {
+                for_loop_inline_comments
+            } else {
+                let mut new_comments =
+                    comment_strings_in_range(checker, binding_stmt_deletion_range, &[]);
+                new_comments.extend(for_loop_inline_comments);
+                new_comments
+            };
 
             let indentation = if comments_to_move.is_empty() {
                 String::new()

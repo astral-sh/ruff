@@ -14,7 +14,7 @@ export default function ThemeButton({
   return (
     <AstralButton
       type="button"
-      className="ml-4 sm:ml-0 dark:shadow-copied"
+      className="sm:ml-0 dark:shadow-copied"
       onClick={() => onChange(theme === "light" ? "dark" : "light")}
     >
       <span className="sr-only">

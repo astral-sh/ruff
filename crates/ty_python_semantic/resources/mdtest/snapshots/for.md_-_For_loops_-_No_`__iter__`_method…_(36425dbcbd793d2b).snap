@@ -1,0 +1,37 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - No `__iter__` method and `__getitem__` is not callable
+mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class Bad:
+2 |     __getitem__: None = None
+3 | 
+4 | # error: [not-iterable]
+5 | for x in Bad():
+6 |     reveal_type(x)  # revealed: Unknown
+```
+
+# Diagnostics
+
+```
+error[not-iterable]: Object of type `Bad` is not iterable
+ --> src/mdtest_snippet.py:5:10
+  |
+4 | # error: [not-iterable]
+5 | for x in Bad():
+  |          ^^^^^
+6 |     reveal_type(x)  # revealed: Unknown
+  |
+info: It has no `__iter__` method and its `__getitem__` attribute has type `None`, which is not callable
+info: rule `not-iterable` is enabled by default
+
+```

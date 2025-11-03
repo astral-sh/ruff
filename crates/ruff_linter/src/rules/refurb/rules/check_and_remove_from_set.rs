@@ -1,5 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, CmpOp, Expr, Stmt};
@@ -9,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `set.remove` that can be replaced with `set.discard`.
@@ -40,6 +40,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ## References
 /// - [Python documentation: `set.discard()`](https://docs.python.org/3/library/stdtypes.html?highlight=list#frozenset.discard)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct CheckAndRemoveFromSet {
     element: SourceCodeSnippet,
     set: String,
@@ -102,9 +103,9 @@ pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: &ast::StmtIf
         .is_some_and(|binding| is_set(binding, checker.semantic()))
     {
         return;
-    };
+    }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         CheckAndRemoveFromSet {
             element: SourceCodeSnippet::from_str(checker.locator().slice(check_element)),
             set: check_set.id.to_string(),
@@ -116,7 +117,6 @@ pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: &ast::StmtIf
         if_stmt.start(),
         if_stmt.end(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 fn compare(lhs: &ComparableExpr, rhs: &ComparableExpr) -> bool {
@@ -161,7 +161,7 @@ fn match_remove(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
         ..
     } = attr.as_attribute_expr()?;
 
-    let Expr::Name(ref set @ ast::ExprName { .. }) = receiver.as_ref() else {
+    let Expr::Name(set @ ast::ExprName { .. }) = receiver.as_ref() else {
         return None;
     };
 
@@ -186,6 +186,7 @@ fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) ->
         attr: ast::Identifier::new("discard".to_string(), TextRange::default()),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Make the actual call `set.discard(element)`
     let call = ast::ExprCall {
@@ -194,13 +195,16 @@ fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) ->
             args: Box::from([element.clone()]),
             keywords: Box::from([]),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(call.into()),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     generator.stmt(&stmt.into())
 }

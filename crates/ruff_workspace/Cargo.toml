@@ -18,6 +18,7 @@ ruff_formatter = { workspace = true }
 ruff_graph = { workspace = true, features = ["serde", "schemars"] }
 ruff_linter = { workspace = true }
 ruff_macros = { workspace = true }
+ruff_options_metadata = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true, features = ["serde"] }
 ruff_python_semantic = { workspace = true, features = ["serde"] }
@@ -41,9 +42,11 @@ regex = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true }
+serde_json = { workspace = true, optional = true }
 shellexpand = { workspace = true }
 strum = { workspace = true }
 toml = { workspace = true }
+unicode-normalization = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 etcetera = { workspace = true }
@@ -61,7 +64,9 @@ ignored = ["colored"]
 default = []
 schemars = [
     "dep:schemars",
+    "dep:serde_json",
     "ruff_formatter/schemars",
+    "ruff_linter/schemars",
     "ruff_python_formatter/schemars",
     "ruff_python_semantic/schemars",
 ]

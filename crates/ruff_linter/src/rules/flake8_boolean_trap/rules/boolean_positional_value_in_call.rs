@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_boolean_trap::helpers::allow_boolean_trap;
 
@@ -42,6 +42,7 @@ use crate::rules::flake8_boolean_trap::helpers::allow_boolean_trap;
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.127")]
 pub(crate) struct BooleanPositionalValueInCall;
 
 impl Violation for BooleanPositionalValueInCall {
@@ -51,6 +52,7 @@ impl Violation for BooleanPositionalValueInCall {
     }
 }
 
+/// FBT003
 pub(crate) fn boolean_positional_value_in_call(checker: &Checker, call: &ast::ExprCall) {
     if allow_boolean_trap(call, checker) {
         return;
@@ -61,6 +63,6 @@ pub(crate) fn boolean_positional_value_in_call(checker: &Checker, call: &ast::Ex
         .iter()
         .filter(|arg| arg.is_boolean_literal_expr())
     {
-        checker.report_diagnostic(Diagnostic::new(BooleanPositionalValueInCall, arg.range()));
+        checker.report_diagnostic(BooleanPositionalValueInCall, arg.range());
     }
 }

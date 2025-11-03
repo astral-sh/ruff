@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::ops::Deref;
 
 use bitflags::bitflags;
@@ -6,22 +5,27 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, FStringElements,
-    IpyEscapeKind, Number, Operator, OperatorPrecedence, StringFlags, UnaryOp,
+    self as ast, AnyStringFlags, AtomicNodeIndex, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext,
+    FString, InterpolatedStringElement, InterpolatedStringElements, IpyEscapeKind, Number,
+    Operator, OperatorPrecedence, StringFlags, TString, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::error::{FStringKind, StarTupleKind, UnparenthesizedNamedExprKind};
 use crate::parser::progress::ParserProgress;
-use crate::parser::{helpers, FunctionKind, Parser};
-use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
+use crate::parser::{FunctionKind, Parser, helpers};
+use crate::string::{
+    InterpolatedStringKind, StringType, parse_interpolated_string_literal_element,
+    parse_string_literal,
+};
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
 use crate::{
-    FStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxError, UnsupportedSyntaxErrorKind,
+    InterpolatedStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxError,
+    UnsupportedSyntaxErrorKind,
 };
 
-use super::{FStringElementsKind, Parenthesized, RecoveryContextKind};
+use super::{InterpolatedStringElementsKind, Parenthesized, RecoveryContextKind};
 
 /// A token set consisting of a newline or end of file.
 const NEWLINE_EOF_SET: TokenSet = TokenSet::new([TokenKind::Newline, TokenKind::EndOfFile]);
@@ -54,6 +58,7 @@ pub(super) const EXPR_SET: TokenSet = TokenSet::new([
     TokenKind::Not,
     TokenKind::Yield,
     TokenKind::FStringStart,
+    TokenKind::TStringStart,
     TokenKind::IpyEscapeCommand,
 ])
 .union(LITERAL_SET);
@@ -299,6 +304,7 @@ impl<'src> Parser<'src> {
                         op: bin_op,
                         right: Box::new(right.expr),
                         range: self.node_range(start),
+                        node_index: AtomicNodeIndex::NONE,
                     })
                 }
             };
@@ -466,6 +472,7 @@ impl<'src> Parser<'src> {
             range: identifier.range,
             id: identifier.id,
             ctx,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -481,13 +488,21 @@ impl<'src> Parser<'src> {
             let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
                 unreachable!();
             };
-            return ast::Identifier { id: name, range };
+            return ast::Identifier {
+                id: name,
+                range,
+                node_index: AtomicNodeIndex::NONE,
+            };
         }
 
         if self.current_token_kind().is_soft_keyword() {
             let id = Name::new(self.src_text(range));
             self.bump_soft_keyword_as_name();
-            return ast::Identifier { id, range };
+            return ast::Identifier {
+                id,
+                range,
+                node_index: AtomicNodeIndex::NONE,
+            };
         }
 
         if self.current_token_kind().is_keyword() {
@@ -502,7 +517,11 @@ impl<'src> Parser<'src> {
 
             let id = Name::new(self.src_text(range));
             self.bump_any();
-            ast::Identifier { id, range }
+            ast::Identifier {
+                id,
+                range,
+                node_index: AtomicNodeIndex::NONE,
+            }
         } else {
             self.add_error(
                 ParseErrorType::OtherError("Expected an identifier".into()),
@@ -512,6 +531,7 @@ impl<'src> Parser<'src> {
             ast::Identifier {
                 id: Name::empty(),
                 range: self.missing_node_range(),
+                node_index: AtomicNodeIndex::NONE,
             }
         }
     }
@@ -531,6 +551,7 @@ impl<'src> Parser<'src> {
                 Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: Number::Float(value),
                     range: self.node_range(start),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             }
             TokenKind::Complex => {
@@ -540,6 +561,7 @@ impl<'src> Parser<'src> {
                 Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: Number::Complex { real, imag },
                     range: self.node_range(start),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             }
             TokenKind::Int => {
@@ -549,6 +571,7 @@ impl<'src> Parser<'src> {
                 Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: Number::Int(value),
                     range: self.node_range(start),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             }
             TokenKind::True => {
@@ -556,6 +579,7 @@ impl<'src> Parser<'src> {
                 Expr::BooleanLiteral(ast::ExprBooleanLiteral {
                     value: true,
                     range: self.node_range(start),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             }
             TokenKind::False => {
@@ -563,25 +587,30 @@ impl<'src> Parser<'src> {
                 Expr::BooleanLiteral(ast::ExprBooleanLiteral {
                     value: false,
                     range: self.node_range(start),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             }
             TokenKind::None => {
                 self.bump(TokenKind::None);
                 Expr::NoneLiteral(ast::ExprNoneLiteral {
                     range: self.node_range(start),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             }
             TokenKind::Ellipsis => {
                 self.bump(TokenKind::Ellipsis);
                 Expr::EllipsisLiteral(ast::ExprEllipsisLiteral {
                     range: self.node_range(start),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             }
             TokenKind::Name => Expr::Name(self.parse_name()),
             TokenKind::IpyEscapeCommand => {
                 Expr::IpyEscapeCommand(self.parse_ipython_escape_command_expression())
             }
-            TokenKind::String | TokenKind::FStringStart => self.parse_strings(),
+            TokenKind::String | TokenKind::FStringStart | TokenKind::TStringStart => {
+                self.parse_strings()
+            }
             TokenKind::Lpar => {
                 return self.parse_parenthesized_expression();
             }
@@ -600,6 +629,7 @@ impl<'src> Parser<'src> {
                         range: self.missing_node_range(),
                         id: Name::empty(),
                         ctx: ExprContext::Invalid,
+                        node_index: AtomicNodeIndex::NONE,
                     })
                 }
             }
@@ -642,6 +672,7 @@ impl<'src> Parser<'src> {
             func: Box::new(func),
             arguments,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -661,127 +692,135 @@ impl<'src> Parser<'src> {
         let mut seen_keyword_argument = false; // foo = 1
         let mut seen_keyword_unpacking = false; // **foo
 
-        self.parse_comma_separated_list(RecoveryContextKind::Arguments, |parser| {
-            let argument_start = parser.node_start();
-            if parser.eat(TokenKind::DoubleStar) {
-                let value = parser.parse_conditional_expression_or_higher();
-
-                keywords.push(ast::Keyword {
-                    arg: None,
-                    value: value.expr,
-                    range: parser.node_range(argument_start),
-                });
-
-                seen_keyword_unpacking = true;
-            } else {
-                let start = parser.node_start();
-                let mut parsed_expr = parser
-                    .parse_named_expression_or_higher(ExpressionContext::starred_conditional());
-
-                match parser.current_token_kind() {
-                    TokenKind::Async | TokenKind::For => {
-                        if parsed_expr.is_unparenthesized_starred_expr() {
-                            parser.add_error(
-                                ParseErrorType::IterableUnpackingInComprehension,
-                                &parsed_expr,
-                            );
-                        }
-
-                        parsed_expr = Expr::Generator(parser.parse_generator_expression(
-                            parsed_expr.expr,
-                            start,
-                            Parenthesized::No,
-                        ))
-                        .into();
-                    }
-                    _ => {
-                        if seen_keyword_unpacking && parsed_expr.is_unparenthesized_starred_expr() {
-                            parser.add_error(
-                                ParseErrorType::InvalidArgumentUnpackingOrder,
-                                &parsed_expr,
-                            );
-                        }
-                    }
-                }
-
-                let arg_range = parser.node_range(start);
-                if parser.eat(TokenKind::Equal) {
-                    seen_keyword_argument = true;
-                    let arg = if let ParsedExpr {
-                        expr: Expr::Name(ident_expr),
-                        is_parenthesized,
-                    } = parsed_expr
-                    {
-                        // test_ok parenthesized_kwarg_py37
-                        // # parse_options: {"target-version": "3.7"}
-                        // f((a)=1)
-
-                        // test_err parenthesized_kwarg_py38
-                        // # parse_options: {"target-version": "3.8"}
-                        // f((a)=1)
-                        // f((a) = 1)
-                        // f( ( a ) = 1)
-
-                        if is_parenthesized {
-                            parser.add_unsupported_syntax_error(
-                                UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
-                                arg_range,
-                            );
-                        }
-
-                        ast::Identifier {
-                            id: ident_expr.id,
-                            range: ident_expr.range,
-                        }
-                    } else {
-                        // TODO(dhruvmanila): Parser shouldn't drop the `parsed_expr` if it's
-                        // not a name expression. We could add the expression into `args` but
-                        // that means the error is a missing comma instead.
-                        parser.add_error(
-                            ParseErrorType::OtherError("Expected a parameter name".to_string()),
-                            &parsed_expr,
-                        );
-                        ast::Identifier {
-                            id: Name::empty(),
-                            range: parsed_expr.range(),
-                        }
-                    };
-
+        let has_trailing_comma =
+            self.parse_comma_separated_list(RecoveryContextKind::Arguments, |parser| {
+                let argument_start = parser.node_start();
+                if parser.eat(TokenKind::DoubleStar) {
                     let value = parser.parse_conditional_expression_or_higher();
 
                     keywords.push(ast::Keyword {
-                        arg: Some(arg),
+                        arg: None,
                         value: value.expr,
                         range: parser.node_range(argument_start),
+                        node_index: AtomicNodeIndex::NONE,
                     });
+
+                    seen_keyword_unpacking = true;
                 } else {
-                    if !parsed_expr.is_unparenthesized_starred_expr() {
-                        if seen_keyword_unpacking {
-                            parser.add_error(
-                                ParseErrorType::PositionalAfterKeywordUnpacking,
-                                &parsed_expr,
-                            );
-                        } else if seen_keyword_argument {
-                            parser.add_error(
-                                ParseErrorType::PositionalAfterKeywordArgument,
-                                &parsed_expr,
-                            );
+                    let start = parser.node_start();
+                    let mut parsed_expr = parser
+                        .parse_named_expression_or_higher(ExpressionContext::starred_conditional());
+
+                    match parser.current_token_kind() {
+                        TokenKind::Async | TokenKind::For => {
+                            if parsed_expr.is_unparenthesized_starred_expr() {
+                                parser.add_error(
+                                    ParseErrorType::IterableUnpackingInComprehension,
+                                    &parsed_expr,
+                                );
+                            }
+
+                            parsed_expr = Expr::Generator(parser.parse_generator_expression(
+                                parsed_expr.expr,
+                                start,
+                                Parenthesized::No,
+                            ))
+                            .into();
+                        }
+                        _ => {
+                            if seen_keyword_unpacking
+                                && parsed_expr.is_unparenthesized_starred_expr()
+                            {
+                                parser.add_error(
+                                    ParseErrorType::InvalidArgumentUnpackingOrder,
+                                    &parsed_expr,
+                                );
+                            }
                         }
                     }
-                    args.push(parsed_expr.expr);
+
+                    let arg_range = parser.node_range(start);
+                    if parser.eat(TokenKind::Equal) {
+                        seen_keyword_argument = true;
+                        let arg = if let ParsedExpr {
+                            expr: Expr::Name(ident_expr),
+                            is_parenthesized,
+                        } = parsed_expr
+                        {
+                            // test_ok parenthesized_kwarg_py37
+                            // # parse_options: {"target-version": "3.7"}
+                            // f((a)=1)
+
+                            // test_err parenthesized_kwarg_py38
+                            // # parse_options: {"target-version": "3.8"}
+                            // f((a)=1)
+                            // f((a) = 1)
+                            // f( ( a ) = 1)
+
+                            if is_parenthesized {
+                                parser.add_unsupported_syntax_error(
+                                    UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
+                                    arg_range,
+                                );
+                            }
+
+                            ast::Identifier {
+                                id: ident_expr.id,
+                                range: ident_expr.range,
+                                node_index: AtomicNodeIndex::NONE,
+                            }
+                        } else {
+                            // TODO(dhruvmanila): Parser shouldn't drop the `parsed_expr` if it's
+                            // not a name expression. We could add the expression into `args` but
+                            // that means the error is a missing comma instead.
+                            parser.add_error(
+                                ParseErrorType::OtherError("Expected a parameter name".to_string()),
+                                &parsed_expr,
+                            );
+                            ast::Identifier {
+                                id: Name::empty(),
+                                range: parsed_expr.range(),
+                                node_index: AtomicNodeIndex::NONE,
+                            }
+                        };
+
+                        let value = parser.parse_conditional_expression_or_higher();
+
+                        keywords.push(ast::Keyword {
+                            arg: Some(arg),
+                            value: value.expr,
+                            range: parser.node_range(argument_start),
+                            node_index: AtomicNodeIndex::NONE,
+                        });
+                    } else {
+                        if !parsed_expr.is_unparenthesized_starred_expr() {
+                            if seen_keyword_unpacking {
+                                parser.add_error(
+                                    ParseErrorType::PositionalAfterKeywordUnpacking,
+                                    &parsed_expr,
+                                );
+                            } else if seen_keyword_argument {
+                                parser.add_error(
+                                    ParseErrorType::PositionalAfterKeywordArgument,
+                                    &parsed_expr,
+                                );
+                            }
+                        }
+                        args.push(parsed_expr.expr);
+                    }
                 }
-            }
-        });
+            });
 
         self.expect(TokenKind::Rpar);
 
         let arguments = ast::Arguments {
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
             args: args.into_boxed_slice(),
             keywords: keywords.into_boxed_slice(),
         };
 
-        self.validate_arguments(&arguments);
+        self.validate_arguments(&arguments, has_trailing_comma);
 
         arguments
     }
@@ -818,9 +857,11 @@ impl<'src> Parser<'src> {
                     range: slice_range,
                     id: Name::empty(),
                     ctx: ExprContext::Invalid,
+                    node_index: AtomicNodeIndex::NONE,
                 })),
                 ctx: ExprContext::Load,
                 range: self.node_range(start),
+                node_index: AtomicNodeIndex::NONE,
             };
         }
 
@@ -840,6 +881,7 @@ impl<'src> Parser<'src> {
                 ctx: ExprContext::Load,
                 range: self.node_range(slice_start),
                 parenthesized: false,
+                node_index: AtomicNodeIndex::NONE,
             });
         } else if slice.is_starred_expr() {
             // If the only slice element is a starred expression, that is represented
@@ -850,6 +892,7 @@ impl<'src> Parser<'src> {
                 ctx: ExprContext::Load,
                 range: self.node_range(slice_start),
                 parenthesized: false,
+                node_index: AtomicNodeIndex::NONE,
             });
         }
 
@@ -875,20 +918,30 @@ impl<'src> Parser<'src> {
 
         // test_err star_slices
         // array[*start:*end]
-        if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &slice {
+
+        // test_ok parenthesized_star_index_py310
+        // # parse_options: {"target-version": "3.10"}
+        // out[(*(slice(None) for _ in range(2)), *ind)] = 1
+        if let Expr::Tuple(ast::ExprTuple {
+            elts,
+            parenthesized: false,
+            ..
+        }) = &slice
+        {
             for elt in elts.iter().filter(|elt| elt.is_starred_expr()) {
                 self.add_unsupported_syntax_error(
                     UnsupportedSyntaxErrorKind::StarExpressionInIndex,
                     elt.range(),
                 );
             }
-        };
+        }
 
         ast::ExprSubscript {
             value: Box::new(value),
             slice: Box::new(slice),
             ctx: ExprContext::Load,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -982,6 +1035,7 @@ impl<'src> Parser<'src> {
 
         Expr::Slice(ast::ExprSlice {
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
             lower,
             upper,
             step,
@@ -1012,6 +1066,7 @@ impl<'src> Parser<'src> {
             op,
             operand: Box::new(operand.expr),
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1036,6 +1091,7 @@ impl<'src> Parser<'src> {
             attr,
             ctx: ExprContext::Load,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1079,6 +1135,7 @@ impl<'src> Parser<'src> {
             values,
             op,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1158,6 +1215,7 @@ impl<'src> Parser<'src> {
             ops: operators.into_boxed_slice(),
             comparators: comparators.into_boxed_slice(),
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1165,12 +1223,15 @@ impl<'src> Parser<'src> {
     ///
     /// # Panics
     ///
-    /// If the parser isn't positioned at a `String` or `FStringStart` token.
+    /// If the parser isn't positioned at a `String`, `FStringStart`, or `TStringStart` token.
     ///
     /// See: <https://docs.python.org/3/reference/grammar.html> (Search "strings:")
     pub(super) fn parse_strings(&mut self) -> Expr {
-        const STRING_START_SET: TokenSet =
-            TokenSet::new([TokenKind::String, TokenKind::FStringStart]);
+        const STRING_START_SET: TokenSet = TokenSet::new([
+            TokenKind::String,
+            TokenKind::FStringStart,
+            TokenKind::TStringStart,
+        ]);
 
         let start = self.node_start();
         let mut strings = vec![];
@@ -1182,8 +1243,34 @@ impl<'src> Parser<'src> {
 
             if self.at(TokenKind::String) {
                 strings.push(self.parse_string_or_byte_literal());
-            } else {
-                strings.push(StringType::FString(self.parse_fstring()));
+            } else if self.at(TokenKind::FStringStart) {
+                strings.push(StringType::FString(
+                    self.parse_interpolated_string(InterpolatedStringKind::FString)
+                        .into(),
+                ));
+            } else if self.at(TokenKind::TStringStart) {
+                // test_ok template_strings_py314
+                // # parse_options: {"target-version": "3.14"}
+                // t"{hey}"
+                // t'{there}'
+                // t"""what's
+                // happening?"""
+
+                // test_err template_strings_py313
+                // # parse_options: {"target-version": "3.13"}
+                // t"{hey}"
+                // t'{there}'
+                // t"""what's
+                // happening?"""
+                let string_type = StringType::TString(
+                    self.parse_interpolated_string(InterpolatedStringKind::TString)
+                        .into(),
+                );
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::TemplateStrings,
+                    string_type.range(),
+                );
+                strings.push(string_type);
             }
         }
 
@@ -1191,21 +1278,29 @@ impl<'src> Parser<'src> {
 
         match strings.len() {
             // This is not possible as the function was called by matching against a
-            // `String` or `FStringStart` token.
+            // `String`, `FStringStart`, or `TStringStart` token.
             0 => unreachable!("Expected to parse at least one string"),
             // We need a owned value, hence the `pop` here.
             1 => match strings.pop().unwrap() {
                 StringType::Str(string) => Expr::StringLiteral(ast::ExprStringLiteral {
                     value: ast::StringLiteralValue::single(string),
                     range,
+                    node_index: AtomicNodeIndex::NONE,
                 }),
                 StringType::Bytes(bytes) => Expr::BytesLiteral(ast::ExprBytesLiteral {
                     value: ast::BytesLiteralValue::single(bytes),
                     range,
+                    node_index: AtomicNodeIndex::NONE,
                 }),
                 StringType::FString(fstring) => Expr::FString(ast::ExprFString {
                     value: ast::FStringValue::single(fstring),
                     range,
+                    node_index: AtomicNodeIndex::NONE,
+                }),
+                StringType::TString(tstring) => Expr::TString(ast::ExprTString {
+                    value: ast::TStringValue::single(tstring),
+                    range,
+                    node_index: AtomicNodeIndex::NONE,
                 }),
             },
             _ => self.handle_implicitly_concatenated_strings(strings, range),
@@ -1226,53 +1321,82 @@ impl<'src> Parser<'src> {
 
         let mut has_fstring = false;
         let mut byte_literal_count = 0;
+        let mut tstring_count = 0;
         for string in &strings {
             match string {
                 StringType::FString(_) => has_fstring = true,
+                StringType::TString(_) => tstring_count += 1,
                 StringType::Bytes(_) => byte_literal_count += 1,
                 StringType::Str(_) => {}
             }
         }
         let has_bytes = byte_literal_count > 0;
+        let has_tstring = tstring_count > 0;
 
         if has_bytes {
-            match byte_literal_count.cmp(&strings.len()) {
-                Ordering::Less => {
-                    // TODO(dhruvmanila): This is not an ideal recovery because the parser
-                    // replaces the byte literals with an invalid string literal node. Any
-                    // downstream tools can extract the raw bytes from the range.
-                    //
-                    // We could convert the node into a string and mark it as invalid
-                    // and would be clever to mark the type which is fewer in quantity.
+            if byte_literal_count < strings.len() {
+                // TODO(dhruvmanila): This is not an ideal recovery because the parser
+                // replaces the byte literals with an invalid string literal node. Any
+                // downstream tools can extract the raw bytes from the range.
+                //
+                // We could convert the node into a string and mark it as invalid
+                // and would be clever to mark the type which is fewer in quantity.
 
-                    // test_err mixed_bytes_and_non_bytes_literals
-                    // 'first' b'second'
-                    // f'first' b'second'
-                    // 'first' f'second' b'third'
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "Bytes literal cannot be mixed with non-bytes literals".to_string(),
-                        ),
-                        range,
-                    );
-                }
-                // Only construct a byte expression if all the literals are bytes
-                // otherwise, we'll try either string or f-string. This is to retain
-                // as much information as possible.
-                Ordering::Equal => {
-                    let mut values = Vec::with_capacity(strings.len());
-                    for string in strings {
-                        values.push(match string {
-                            StringType::Bytes(value) => value,
-                            _ => unreachable!("Expected `StringType::Bytes`"),
-                        });
-                    }
-                    return Expr::from(ast::ExprBytesLiteral {
-                        value: ast::BytesLiteralValue::concatenated(values),
-                        range,
+                // test_err mixed_bytes_and_non_bytes_literals
+                // 'first' b'second'
+                // f'first' b'second'
+                // 'first' f'second' b'third'
+                self.add_error(
+                    ParseErrorType::OtherError(
+                        "Bytes literal cannot be mixed with non-bytes literals".to_string(),
+                    ),
+                    range,
+                );
+            }
+            // Only construct a byte expression if all the literals are bytes
+            // otherwise, we'll try either string, t-string, or f-string. This is to retain
+            // as much information as possible.
+            else {
+                let mut values = Vec::with_capacity(strings.len());
+                for string in strings {
+                    values.push(match string {
+                        StringType::Bytes(value) => value,
+                        _ => unreachable!("Expected `StringType::Bytes`"),
                     });
                 }
-                Ordering::Greater => unreachable!(),
+                return Expr::from(ast::ExprBytesLiteral {
+                    value: ast::BytesLiteralValue::concatenated(values),
+                    range,
+                    node_index: AtomicNodeIndex::NONE,
+                });
+            }
+        }
+
+        if has_tstring {
+            if tstring_count < strings.len() {
+                self.add_error(
+                    ParseErrorType::OtherError(
+                        "cannot mix t-string literals with string or bytes literals".to_string(),
+                    ),
+                    range,
+                );
+            }
+            // Only construct a t-string expression if all the literals are t-strings
+            // otherwise, we'll try either string or f-string. This is to retain
+            // as much information as possible.
+            else {
+                let mut values = Vec::with_capacity(strings.len());
+                for string in strings {
+                    values.push(match string {
+                        StringType::TString(value) => value,
+                        _ => unreachable!("Expected `StringType::TString`"),
+                    });
+                }
+                return Expr::from(ast::ExprTString {
+                    value: ast::TStringValue::concatenated(values),
+                    range,
+                    node_index: AtomicNodeIndex::NONE,
+                });
             }
         }
 
@@ -1298,7 +1422,7 @@ impl<'src> Parser<'src> {
         // )
         // 2 + 2
 
-        if !has_fstring {
+        if !has_fstring && !has_tstring {
             let mut values = Vec::with_capacity(strings.len());
             for string in strings {
                 values.push(match string {
@@ -1309,6 +1433,7 @@ impl<'src> Parser<'src> {
             return Expr::from(ast::ExprStringLiteral {
                 value: ast::StringLiteralValue::concatenated(values),
                 range,
+                node_index: AtomicNodeIndex::NONE,
             });
         }
 
@@ -1317,6 +1442,12 @@ impl<'src> Parser<'src> {
             match string {
                 StringType::FString(fstring) => parts.push(ast::FStringPart::FString(fstring)),
                 StringType::Str(string) => parts.push(ast::FStringPart::Literal(string)),
+                // Bytes and Template strings are invalid at this point
+                // and stored as invalid string literal parts in the
+                // f-string
+                StringType::TString(tstring) => parts.push(ast::FStringPart::Literal(
+                    ast::StringLiteral::invalid(tstring.range()),
+                )),
                 StringType::Bytes(bytes) => parts.push(ast::FStringPart::Literal(
                     ast::StringLiteral::invalid(bytes.range()),
                 )),
@@ -1326,6 +1457,7 @@ impl<'src> Parser<'src> {
         Expr::from(ast::ExprFString {
             value: ast::FStringValue::concatenated(parts),
             range,
+            node_index: AtomicNodeIndex::NONE,
         })
     }
 
@@ -1361,6 +1493,7 @@ impl<'src> Parser<'src> {
                         value: Box::new([]),
                         range,
                         flags: ast::BytesLiteralFlags::from(flags).with_invalid(),
+                        node_index: AtomicNodeIndex::NONE,
                     })
                 } else {
                     // test_err invalid_string_literal
@@ -1370,99 +1503,46 @@ impl<'src> Parser<'src> {
                         value: "".into(),
                         range,
                         flags: ast::StringLiteralFlags::from(flags).with_invalid(),
+                        node_index: AtomicNodeIndex::NONE,
                     })
                 }
             }
         }
     }
 
-    /// Parses a f-string.
+    /// Parses an f/t-string.
     ///
     /// This does not handle implicitly concatenated strings.
     ///
     /// # Panics
     ///
-    /// If the parser isn't positioned at a `FStringStart` token.
+    /// If the parser isn't positioned at an `FStringStart` or
+    /// `TStringStart` token.
     ///
-    /// See: <https://docs.python.org/3/reference/grammar.html> (Search "fstring:")
+    /// See: <https://docs.python.org/3/reference/grammar.html> (Search "fstring:" or "tstring:")
     /// See: <https://docs.python.org/3/reference/lexical_analysis.html#formatted-string-literals>
-    fn parse_fstring(&mut self) -> ast::FString {
+    fn parse_interpolated_string(
+        &mut self,
+        kind: InterpolatedStringKind,
+    ) -> InterpolatedStringData {
         let start = self.node_start();
-        let flags = self.tokens.current_flags().as_any_string_flags();
+        let mut flags = self.tokens.current_flags().as_any_string_flags();
 
-        self.bump(TokenKind::FStringStart);
-        let elements = self.parse_fstring_elements(flags, FStringElementsKind::Regular);
+        self.bump(kind.start_token());
+        let elements = self.parse_interpolated_string_elements(
+            flags,
+            InterpolatedStringElementsKind::Regular(kind),
+            kind,
+        );
 
-        self.expect(TokenKind::FStringEnd);
-
-        // test_ok pep701_f_string_py312
-        // # parse_options: {"target-version": "3.12"}
-        // f'Magic wand: { bag['wand'] }'     # nested quotes
-        // f"{'\n'.join(a)}"                  # escape sequence
-        // f'''A complex trick: {
-        //     bag['bag']                     # comment
-        // }'''
-        // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
-        // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
-        // f"test {a \
-        //     } more"                        # line continuation
-
-        // test_ok pep701_f_string_py311
-        // # parse_options: {"target-version": "3.11"}
-        // f"outer {'# not a comment'}"
-        // f'outer {x:{"# not a comment"} }'
-        // f"""{f'''{f'{"# not a comment"}'}'''}"""
-        // f"""{f'''# before expression {f'# aro{f"#{1+1}#"}und #'}'''} # after expression"""
-        // f"escape outside of \t {expr}\n"
-        // f"test\"abcd"
-
-        // test_err pep701_f_string_py311
-        // # parse_options: {"target-version": "3.11"}
-        // f'Magic wand: { bag['wand'] }'     # nested quotes
-        // f"{'\n'.join(a)}"                  # escape sequence
-        // f'''A complex trick: {
-        //     bag['bag']                     # comment
-        // }'''
-        // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
-        // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
-        // f"test {a \
-        //     } more"                        # line continuation
-        // f"""{f"""{x}"""}"""                # mark the whole triple quote
-        // f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
-
-        let range = self.node_range(start);
-
-        if !self.options.target_version.supports_pep_701() {
-            let quote_bytes = flags.quote_str().as_bytes();
-            let quote_len = flags.quote_len();
-            for expr in elements.expressions() {
-                for slash_position in memchr::memchr_iter(b'\\', self.source[expr.range].as_bytes())
-                {
-                    let slash_position = TextSize::try_from(slash_position).unwrap();
-                    self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
-                        TextRange::at(expr.range.start() + slash_position, '\\'.text_len()),
-                    );
-                }
-
-                if let Some(quote_position) =
-                    memchr::memmem::find(self.source[expr.range].as_bytes(), quote_bytes)
-                {
-                    let quote_position = TextSize::try_from(quote_position).unwrap();
-                    self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
-                        TextRange::at(expr.range.start() + quote_position, quote_len),
-                    );
-                };
-            }
-
-            self.check_fstring_comments(range);
+        if !self.expect(kind.end_token()) {
+            flags = flags.with_unclosed(true);
         }
 
-        ast::FString {
+        InterpolatedStringData {
             elements,
-            range,
-            flags: ast::FStringFlags::from(flags),
+            range: self.node_range(start),
+            flags,
         }
     }
 
@@ -1478,92 +1558,116 @@ impl<'src> Parser<'src> {
             }));
     }
 
-    /// Parses a list of f-string elements.
+    /// Parses a list of f/t-string elements.
     ///
     /// # Panics
     ///
-    /// If the parser isn't positioned at a `{` or `FStringMiddle` token.
-    fn parse_fstring_elements(
+    /// If the parser isn't positioned at a `{`, `FStringMiddle`,
+    /// or `TStringMiddle` token.
+    fn parse_interpolated_string_elements(
         &mut self,
         flags: ast::AnyStringFlags,
-        kind: FStringElementsKind,
-    ) -> FStringElements {
+        elements_kind: InterpolatedStringElementsKind,
+        string_kind: InterpolatedStringKind,
+    ) -> ast::InterpolatedStringElements {
         let mut elements = vec![];
+        let middle_token_kind = string_kind.middle_token();
 
-        self.parse_list(RecoveryContextKind::FStringElements(kind), |parser| {
-            let element = match parser.current_token_kind() {
-                TokenKind::Lbrace => {
-                    FStringElement::Expression(parser.parse_fstring_expression_element(flags))
-                }
-                TokenKind::FStringMiddle => {
-                    let range = parser.current_token_range();
-                    let TokenValue::FStringMiddle(value) =
-                        parser.bump_value(TokenKind::FStringMiddle)
-                    else {
-                        unreachable!()
-                    };
-                    FStringElement::Literal(
-                        parse_fstring_literal_element(value, flags, range).unwrap_or_else(
-                            |lex_error| {
-                                // test_err invalid_fstring_literal_element
-                                // f'hello \N{INVALID} world'
-                                // f"""hello \N{INVALID} world"""
-                                let location = lex_error.location();
-                                parser.add_error(
-                                    ParseErrorType::Lexical(lex_error.into_error()),
-                                    location,
-                                );
-                                ast::FStringLiteralElement {
-                                    value: "".into(),
-                                    range,
-                                }
-                            },
-                        ),
-                    )
-                }
-                // `Invalid` tokens are created when there's a lexical error, so
-                // we ignore it here to avoid creating unexpected token errors
-                TokenKind::Unknown => {
-                    parser.bump_any();
-                    return;
-                }
-                tok => {
-                    // This should never happen because the list parsing will only
-                    // call this closure for the above token kinds which are the same
-                    // as in the FIRST set.
-                    unreachable!(
-                        "f-string: unexpected token `{tok:?}` at {:?}",
-                        parser.current_token_range()
-                    );
-                }
-            };
-            elements.push(element);
-        });
+        self.parse_list(
+            RecoveryContextKind::InterpolatedStringElements(elements_kind),
+            |parser| {
+                let element = match parser.current_token_kind() {
+                    TokenKind::Lbrace => ast::InterpolatedStringElement::from(
+                        parser.parse_interpolated_element(flags, string_kind),
+                    ),
+                    tok if tok == middle_token_kind => {
+                        let range = parser.current_token_range();
+                        let TokenValue::InterpolatedStringMiddle(value) =
+                            parser.bump_value(middle_token_kind)
+                        else {
+                            unreachable!()
+                        };
+                        InterpolatedStringElement::Literal(
+                            parse_interpolated_string_literal_element(value, flags, range)
+                                .unwrap_or_else(|lex_error| {
+                                    // test_err invalid_fstring_literal_element
+                                    // f'hello \N{INVALID} world'
+                                    // f"""hello \N{INVALID} world"""
+                                    let location = lex_error.location();
+                                    parser.add_error(
+                                        ParseErrorType::Lexical(lex_error.into_error()),
+                                        location,
+                                    );
+                                    ast::InterpolatedStringLiteralElement {
+                                        value: "".into(),
+                                        range,
+                                        node_index: AtomicNodeIndex::NONE,
+                                    }
+                                }),
+                        )
+                    }
+                    // `Invalid` tokens are created when there's a lexical error, so
+                    // we ignore it here to avoid creating unexpected token errors
+                    TokenKind::Unknown => {
+                        parser.bump_any();
+                        return;
+                    }
+                    tok => {
+                        // This should never happen because the list parsing will only
+                        // call this closure for the above token kinds which are the same
+                        // as in the FIRST set.
+                        unreachable!(
+                            "{}: unexpected token `{tok:?}` at {:?}",
+                            string_kind,
+                            parser.current_token_range()
+                        );
+                    }
+                };
+                elements.push(element);
+            },
+        );
 
-        FStringElements::from(elements)
+        ast::InterpolatedStringElements::from(elements)
     }
 
-    /// Parses a f-string expression element.
+    /// Parses an f/t-string expression element.
     ///
     /// # Panics
     ///
     /// If the parser isn't positioned at a `{` token.
-    fn parse_fstring_expression_element(
+    fn parse_interpolated_element(
         &mut self,
         flags: ast::AnyStringFlags,
-    ) -> ast::FStringExpressionElement {
+        string_kind: InterpolatedStringKind,
+    ) -> ast::InterpolatedElement {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
+
+        self.tokens
+            .re_lex_string_token_in_interpolation_element(string_kind);
 
         // test_err f_string_empty_expression
         // f"{}"
         // f"{  }"
+
+        // test_err t_string_empty_expression
+        // # parse_options: {"target-version": "3.14"}
+        // t"{}"
+        // t"{  }"
 
         // test_err f_string_invalid_starred_expr
         // # Starred expression inside f-string has a minimum precedence of bitwise or.
         // f"{*}"
         // f"{*x and y}"
         // f"{*yield x}"
+
+        // test_err t_string_invalid_starred_expr
+        // # parse_options: {"target-version": "3.14"}
+        // # Starred expression inside t-string has a minimum precedence of bitwise or.
+        // t"{*}"
+        // t"{*x and y}"
+        // t"{*yield x}"
+
         let value = self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
 
         if !value.is_parenthesized && value.expr.is_lambda_expr() {
@@ -1573,8 +1677,15 @@ impl<'src> Parser<'src> {
 
             // test_err f_string_lambda_without_parentheses
             // f"{lambda x: x}"
+
+            // test_err t_string_lambda_without_parentheses
+            // # parse_options: {"target-version": "3.14"}
+            // t"{lambda x: x}"
             self.add_error(
-                ParseErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
+                ParseErrorType::from_interpolated_string_error(
+                    InterpolatedStringErrorType::LambdaWithoutParentheses,
+                    string_kind,
+                ),
                 value.range(),
             );
         }
@@ -1590,8 +1701,25 @@ impl<'src> Parser<'src> {
         };
 
         let conversion = if self.eat(TokenKind::Exclamation) {
+            // Ensure that the `r` is lexed as a `r` name token instead of a raw string
+            // in `f{abc!r"` (note the missing `}`).
+            self.tokens.re_lex_raw_string_in_format_spec();
+
             let conversion_flag_range = self.current_token_range();
             if self.at(TokenKind::Name) {
+                // test_err f_string_conversion_follows_exclamation
+                // f"{x! s}"
+                // t"{x! s}"
+                // f"{x! z}"
+                if self.prev_token_end != conversion_flag_range.start() {
+                    self.add_error(
+                        ParseErrorType::from_interpolated_string_error(
+                            InterpolatedStringErrorType::ConversionFlagNotImmediatelyAfterExclamation,
+                            string_kind,
+                        ),
+                        TextRange::new(self.prev_token_end, conversion_flag_range.start()),
+                    );
+                }
                 let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
                     unreachable!();
                 };
@@ -1602,8 +1730,15 @@ impl<'src> Parser<'src> {
                     _ => {
                         // test_err f_string_invalid_conversion_flag_name_tok
                         // f"{x!z}"
+
+                        // test_err t_string_invalid_conversion_flag_name_tok
+                        // # parse_options: {"target-version": "3.14"}
+                        // t"{x!z}"
                         self.add_error(
-                            ParseErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
+                            ParseErrorType::from_interpolated_string_error(
+                                InterpolatedStringErrorType::InvalidConversionFlag,
+                                string_kind,
+                            ),
                             conversion_flag_range,
                         );
                         ConversionFlag::None
@@ -1613,8 +1748,16 @@ impl<'src> Parser<'src> {
                 // test_err f_string_invalid_conversion_flag_other_tok
                 // f"{x!123}"
                 // f"{x!'a'}"
+
+                // test_err t_string_invalid_conversion_flag_other_tok
+                // # parse_options: {"target-version": "3.14"}
+                // t"{x!123}"
+                // t"{x!'a'}"
                 self.add_error(
-                    ParseErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
+                    ParseErrorType::from_interpolated_string_error(
+                        InterpolatedStringErrorType::InvalidConversionFlag,
+                        string_kind,
+                    ),
                     conversion_flag_range,
                 );
                 // TODO(dhruvmanila): Avoid dropping this token
@@ -1627,14 +1770,22 @@ impl<'src> Parser<'src> {
 
         let format_spec = if self.eat(TokenKind::Colon) {
             let spec_start = self.node_start();
-            let elements = self.parse_fstring_elements(flags, FStringElementsKind::FormatSpec);
-            Some(Box::new(ast::FStringFormatSpec {
+            let elements = self.parse_interpolated_string_elements(
+                flags,
+                InterpolatedStringElementsKind::FormatSpec,
+                string_kind,
+            );
+            Some(Box::new(ast::InterpolatedStringFormatSpec {
                 range: self.node_range(spec_start),
                 elements,
+                node_index: AtomicNodeIndex::NONE,
             }))
         } else {
             None
         };
+
+        self.tokens
+            .re_lex_string_token_in_interpolation_element(string_kind);
 
         // We're using `eat` here instead of `expect` to use the f-string specific error type.
         if !self.eat(TokenKind::Rbrace) {
@@ -1649,23 +1800,138 @@ impl<'src> Parser<'src> {
             // f"{"
             // f"""{"""
 
+            // test_err t_string_unclosed_lbrace
+            // # parse_options: {"target-version": "3.14"}
+            // t"{"
+            // t"{foo!r"
+            // t"{foo="
+            // t"{"
+            // t"""{"""
+
             // The lexer does emit `FStringEnd` for the following test cases:
 
             // test_err f_string_unclosed_lbrace_in_format_spec
             // f"hello {x:"
             // f"hello {x:.3f"
+
+            // test_err t_string_unclosed_lbrace_in_format_spec
+            // # parse_options: {"target-version": "3.14"}
+            // t"hello {x:"
+            // t"hello {x:.3f"
             self.add_error(
-                ParseErrorType::FStringError(FStringErrorType::UnclosedLbrace),
+                ParseErrorType::from_interpolated_string_error(
+                    InterpolatedStringErrorType::UnclosedLbrace,
+                    string_kind,
+                ),
                 self.current_token_range(),
             );
         }
 
-        ast::FStringExpressionElement {
+        // test_ok pep701_f_string_py312
+        // # parse_options: {"target-version": "3.12"}
+        // f'Magic wand: { bag['wand'] }'     # nested quotes
+        // f"{'\n'.join(a)}"                  # escape sequence
+        // f'''A complex trick: {
+        //     bag['bag']                     # comment
+        // }'''
+        // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+        // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // f"test {a \
+        //     } more"                        # line continuation
+
+        // test_ok pep750_t_string_py314
+        // # parse_options: {"target-version": "3.14"}
+        // t'Magic wand: { bag['wand'] }'     # nested quotes
+        // t"{'\n'.join(a)}"                  # escape sequence
+        // t'''A complex trick: {
+        //     bag['bag']                     # comment
+        // }'''
+        // t"{t"{t"{t"{t"{t"{1+1}"}"}"}"}"}"  # arbitrary nesting
+        // t"{t'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // t"test {a \
+        //     } more"                        # line continuation
+
+        // test_ok pep701_f_string_py311
+        // # parse_options: {"target-version": "3.11"}
+        // f"outer {'# not a comment'}"
+        // f'outer {x:{"# not a comment"} }'
+        // f"""{f'''{f'{"# not a comment"}'}'''}"""
+        // f"""{f'''# before expression {f'# aro{f"#{1+1}#"}und #'}'''} # after expression"""
+        // f"escape outside of \t {expr}\n"
+        // f"test\"abcd"
+        // f"{1:\x64}"  # escapes are valid in the format spec
+        // f"{1:\"d\"}"  # this also means that escaped outer quotes are valid
+
+        // test_err pep701_f_string_py311
+        // # parse_options: {"target-version": "3.11"}
+        // f'Magic wand: { bag['wand'] }'     # nested quotes
+        // f"{'\n'.join(a)}"                  # escape sequence
+        // f'''A complex trick: {
+        //     bag['bag']                     # comment
+        // }'''
+        // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+        // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // f"test {a \
+        //     } more"                        # line continuation
+        // f"""{f"""{x}"""}"""                # mark the whole triple quote
+        // f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+
+        // test_err pep701_nested_interpolation_py311
+        // # parse_options: {"target-version": "3.11"}
+        // # nested interpolations also need to be checked
+        // f'{1: abcd "{'aa'}" }'
+        // f'{1: abcd "{"\n"}" }'
+
+        // test_err nested_quote_in_format_spec_py312
+        // # parse_options: {"target-version": "3.12"}
+        // f"{1:""}"  # this is a ParseError on all versions
+
+        // test_ok non_nested_quote_in_format_spec_py311
+        // # parse_options: {"target-version": "3.11"}
+        // f"{1:''}"  # but this is okay on all versions
+        let range = self.node_range(start);
+
+        if !self.options.target_version.supports_pep_701()
+            && matches!(string_kind, InterpolatedStringKind::FString)
+        {
+            // We need to check the whole expression range, including any leading or trailing
+            // debug text, but exclude the format spec, where escapes and escaped, reused quotes
+            // are allowed.
+            let range = format_spec
+                .as_ref()
+                .map(|format_spec| TextRange::new(range.start(), format_spec.start()))
+                .unwrap_or(range);
+
+            let quote_bytes = flags.quote_str().as_bytes();
+            let quote_len = flags.quote_len();
+            for slash_position in memchr::memchr_iter(b'\\', self.source[range].as_bytes()) {
+                let slash_position = TextSize::try_from(slash_position).unwrap();
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
+                    TextRange::at(range.start() + slash_position, '\\'.text_len()),
+                );
+            }
+
+            if let Some(quote_position) =
+                memchr::memmem::find(self.source[range].as_bytes(), quote_bytes)
+            {
+                let quote_position = TextSize::try_from(quote_position).unwrap();
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
+                    TextRange::at(range.start() + quote_position, quote_len),
+                );
+            }
+
+            self.check_fstring_comments(range);
+        }
+
+        ast::InterpolatedElement {
             expression: Box::new(value.expr),
             debug_text,
             conversion,
             format_spec,
-            range: self.node_range(start),
+            range,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1695,6 +1961,7 @@ impl<'src> Parser<'src> {
                 elts: vec![],
                 ctx: ExprContext::Load,
                 range: self.node_range(start),
+                node_index: AtomicNodeIndex::NONE,
             });
         }
 
@@ -1746,6 +2013,7 @@ impl<'src> Parser<'src> {
             return Expr::Dict(ast::ExprDict {
                 items: vec![],
                 range: self.node_range(start),
+                node_index: AtomicNodeIndex::NONE,
             });
         }
 
@@ -1856,6 +2124,7 @@ impl<'src> Parser<'src> {
                 elts: vec![],
                 ctx: ExprContext::Load,
                 range: self.node_range(start),
+                node_index: AtomicNodeIndex::NONE,
                 parenthesized: true,
             })
             .into();
@@ -1944,6 +2213,7 @@ impl<'src> Parser<'src> {
             elts,
             ctx: ExprContext::Load,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
             parenthesized: parenthesized.is_yes(),
         }
     }
@@ -1972,6 +2242,7 @@ impl<'src> Parser<'src> {
             elts,
             ctx: ExprContext::Load,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2020,6 +2291,7 @@ impl<'src> Parser<'src> {
 
         ast::ExprSet {
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
             elts,
         }
     }
@@ -2062,6 +2334,7 @@ impl<'src> Parser<'src> {
 
         ast::ExprDict {
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
             items,
         }
     }
@@ -2105,7 +2378,7 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::For);
         } else {
             self.bump(TokenKind::For);
-        };
+        }
 
         let mut target =
             self.parse_expression_list(ExpressionContext::starred_conditional().with_in_excluded());
@@ -2129,6 +2402,7 @@ impl<'src> Parser<'src> {
 
         ast::Comprehension {
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
             target: target.expr,
             iter: iter.expr,
             ifs,
@@ -2158,6 +2432,7 @@ impl<'src> Parser<'src> {
             elt: Box::new(element),
             generators,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
             parenthesized: parenthesized.is_yes(),
         }
     }
@@ -2178,6 +2453,7 @@ impl<'src> Parser<'src> {
             elt: Box::new(element),
             generators,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2199,6 +2475,7 @@ impl<'src> Parser<'src> {
             value: Box::new(value),
             generators,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2218,6 +2495,7 @@ impl<'src> Parser<'src> {
             elt: Box::new(element),
             generators,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2254,6 +2532,7 @@ impl<'src> Parser<'src> {
             value: Box::new(parsed_expr.expr),
             ctx: ExprContext::Load,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2276,6 +2555,7 @@ impl<'src> Parser<'src> {
         ast::ExprAwait {
             value: Box::new(parsed_expr.expr),
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2324,6 +2604,7 @@ impl<'src> Parser<'src> {
         Expr::Yield(ast::ExprYield {
             value,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         })
     }
 
@@ -2363,6 +2644,7 @@ impl<'src> Parser<'src> {
         Expr::YieldFrom(ast::ExprYieldFrom {
             value: Box::new(expr),
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         })
     }
 
@@ -2403,6 +2685,7 @@ impl<'src> Parser<'src> {
             target: Box::new(target),
             value: Box::new(value.expr),
             range,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2450,6 +2733,7 @@ impl<'src> Parser<'src> {
             body: Box::new(body.expr),
             parameters,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2474,6 +2758,7 @@ impl<'src> Parser<'src> {
             test: Box::new(test.expr),
             orelse: Box::new(orelse.expr),
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2499,6 +2784,7 @@ impl<'src> Parser<'src> {
 
         let command = ast::ExprIpyEscapeCommand {
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
             kind,
             value,
         };
@@ -2512,9 +2798,9 @@ impl<'src> Parser<'src> {
 
     /// Performs the following validations on the function call arguments:
     /// 1. There aren't any duplicate keyword argument
-    /// 2. If there are more than one argument (positional or keyword), all generator expressions
-    ///    present should be parenthesized.
-    fn validate_arguments(&mut self, arguments: &ast::Arguments) {
+    /// 2. If there are more than one argument (positional or keyword) or a single argument with a
+    ///    trailing comma, all generator expressions present should be parenthesized.
+    fn validate_arguments(&mut self, arguments: &ast::Arguments, has_trailing_comma: bool) {
         let mut all_arg_names =
             FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
 
@@ -2532,7 +2818,7 @@ impl<'src> Parser<'src> {
             }
         }
 
-        if arguments.len() > 1 {
+        if has_trailing_comma || arguments.len() > 1 {
             for arg in &*arguments.args {
                 if let Some(ast::ExprGenerator {
                     range,
@@ -2541,11 +2827,14 @@ impl<'src> Parser<'src> {
                 }) = arg.as_generator_expr()
                 {
                     // test_ok args_unparenthesized_generator
+                    // zip((x for x in range(10)), (y for y in range(10)))
                     // sum(x for x in range(10))
+                    // sum((x for x in range(10)),)
 
                     // test_err args_unparenthesized_generator
                     // sum(x for x in range(10), 5)
                     // total(1, 2, x for x in range(5), 6)
+                    // sum(x for x in range(10),)
                     self.add_error(ParseErrorType::UnparenthesizedGeneratorExpression, range);
                 }
             }
@@ -2737,6 +3026,35 @@ impl ExpressionContext {
             StarredExpressionPrecedence::BitwiseOr
         } else {
             StarredExpressionPrecedence::Conditional
+        }
+    }
+}
+
+#[derive(Debug)]
+struct InterpolatedStringData {
+    elements: InterpolatedStringElements,
+    range: TextRange,
+    flags: AnyStringFlags,
+}
+
+impl From<InterpolatedStringData> for FString {
+    fn from(value: InterpolatedStringData) -> Self {
+        Self {
+            elements: value.elements,
+            range: value.range,
+            flags: value.flags.into(),
+            node_index: AtomicNodeIndex::NONE,
+        }
+    }
+}
+
+impl From<InterpolatedStringData> for TString {
+    fn from(value: InterpolatedStringData) -> Self {
+        Self {
+            elements: value.elements,
+            range: value.range,
+            flags: value.flags.into(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 }

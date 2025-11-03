@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal;
 use ruff_python_ast::{self as ast, Arguments, ElifElseClause, Expr, ExprContext, Stmt};
@@ -8,6 +7,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `if` statements that can be replaced with `bool`.
@@ -19,32 +19,44 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ## Example
 /// Given:
 /// ```python
-/// if x > 0:
-///     return True
-/// else:
+/// def foo(x: int) -> bool:
+///     if x > 0:
+///         return True
+///     else:
+///         return False
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(x: int) -> bool:
+///     return x > 0
+/// ```
+///
+/// Or, given:
+/// ```python
+/// def foo(x: int) -> bool:
+///     if x > 0:
+///         return True
 ///     return False
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// return x > 0
+/// def foo(x: int) -> bool:
+///     return x > 0
 /// ```
 ///
-/// Or, given:
-/// ```python
-/// if x > 0:
-///     return True
-/// return False
-/// ```
+/// ## Fix safety
 ///
-/// Use instead:
-/// ```python
-/// return x > 0
-/// ```
+/// This fix is marked as unsafe because it may change the program’s behavior if the condition does not
+/// return a proper Boolean. While the fix will try to wrap non-boolean values in a call to bool,
+/// custom implementations of comparison functions like `__eq__` can avoid the bool call and still
+/// lead to altered behavior.
 ///
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.214")]
 pub(crate) struct NeedlessBool {
     condition: Option<SourceCodeSnippet>,
     negate: bool,
@@ -96,11 +108,13 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         // else:
         //     return False
         // ```
-        [ElifElseClause {
-            body: else_body,
-            test: None,
-            ..
-        }] => (
+        [
+            ElifElseClause {
+                body: else_body,
+                test: None,
+                ..
+            },
+        ] => (
             if_test.as_ref(),
             if_body,
             else_body.as_slice(),
@@ -113,15 +127,21 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         // elif x < 0:
         //     return False
         // ```
-        [.., ElifElseClause {
-            body: elif_body,
-            test: Some(elif_test),
-            range: elif_range,
-        }, ElifElseClause {
-            body: else_body,
-            test: None,
-            range: else_range,
-        }] => (
+        [
+            ..,
+            ElifElseClause {
+                body: elif_body,
+                test: Some(elif_test),
+                range: elif_range,
+                node_index: _,
+            },
+            ElifElseClause {
+                body: else_body,
+                test: None,
+                range: else_range,
+                node_index: _,
+            },
+        ] => (
             elif_test,
             elif_body,
             else_body.as_slice(),
@@ -237,6 +257,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                         left: left.clone(),
                         comparators: Box::new([right.clone()]),
                         range: TextRange::default(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     }))
                 }
 
@@ -244,6 +265,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                     op: ast::UnaryOp::Not,
                     operand: Box::new(if_test.clone()),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 })),
             }
         } else if if_test.is_compare_expr() {
@@ -256,6 +278,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                 id: Name::new_static("bool"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             };
             let call_node = ast::ExprCall {
                 func: Box::new(func_node.into()),
@@ -263,8 +286,10 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                     args: Box::from([if_test.clone()]),
                     keywords: Box::from([]),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 },
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             };
             Some(Expr::Call(call_node))
         } else {
@@ -277,6 +302,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         Stmt::Return(ast::StmtReturn {
             value: Some(Box::new(expr.clone())),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })
     });
 
@@ -288,7 +314,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         .as_ref()
         .map(|expr| checker.generator().expr(expr));
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         NeedlessBool {
             condition: condition.map(SourceCodeSnippet::new),
             negate: inverted,
@@ -301,7 +327,6 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
             range,
         )));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -312,11 +337,7 @@ enum Bool {
 
 impl From<bool> for Bool {
     fn from(value: bool) -> Self {
-        if value {
-            Bool::True
-        } else {
-            Bool::False
-        }
+        if value { Bool::True } else { Bool::False }
     }
 }
 
@@ -324,7 +345,12 @@ fn is_one_line_return_bool(stmts: &[Stmt]) -> Option<Bool> {
     let [stmt] = stmts else {
         return None;
     };
-    let Stmt::Return(ast::StmtReturn { value, range: _ }) = stmt else {
+    let Stmt::Return(ast::StmtReturn {
+        value,
+        range: _,
+        node_index: _,
+    }) = stmt
+    else {
         return None;
     };
     let Some(Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. })) = value.as_deref() else {

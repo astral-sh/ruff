@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::rules::refurb::helpers::replace_with_identity_check;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `isinstance` that check if an object is of type `None`.
@@ -32,6 +32,7 @@ use crate::rules::refurb::helpers::replace_with_identity_check;
 /// - [Python documentation: `type`](https://docs.python.org/3/library/functions.html#type)
 /// - [Python documentation: Identity comparisons](https://docs.python.org/3/reference/expressions.html#is-not)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct IsinstanceTypeNone;
 
 impl Violation for IsinstanceTypeNone {
@@ -69,9 +70,9 @@ pub(crate) fn isinstance_type_none(checker: &Checker, call: &ast::ExprCall) {
     }
 
     let fix = replace_with_identity_check(expr, call.range, false, checker);
-    let diagnostic = Diagnostic::new(IsinstanceTypeNone, call.range);
-
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(IsinstanceTypeNone, call.range)
+        .set_fix(fix);
 }
 
 /// Returns `true` if the given expression is equivalent to checking if the
@@ -100,7 +101,9 @@ fn is_none(expr: &Expr, semantic: &SemanticModel) -> bool {
             }
 
             // Ex) `(type(None),)`
-            Expr::Tuple(tuple) => tuple.iter().all(|element| inner(element, false, semantic)),
+            Expr::Tuple(tuple) => {
+                !tuple.is_empty() && tuple.iter().all(|element| inner(element, false, semantic))
+            }
 
             // Ex) `type(None) | type(None)`
             Expr::BinOp(ast::ExprBinOp {
@@ -125,7 +128,8 @@ fn is_none(expr: &Expr, semantic: &SemanticModel) -> bool {
 
                 match slice.as_ref() {
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                        elts.iter().all(|element| inner(element, true, semantic))
+                        !elts.is_empty()
+                            && elts.iter().all(|element| inner(element, true, semantic))
                     }
                     slice => inner(slice, true, semantic),
                 }

@@ -1,0 +1,56 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            node_index: NodeIndex(None),
+            range: 0..10,
+            value: TString(
+                ExprTString {
+                    node_index: NodeIndex(None),
+                    range: 0..10,
+                    value: TStringValue {
+                        inner: Single(
+                            TString {
+                                range: 0..10,
+                                node_index: NodeIndex(None),
+                                elements: [
+                                    Interpolation(
+                                        InterpolatedElement {
+                                            range: 2..9,
+                                            node_index: NodeIndex(None),
+                                            expression: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 3..7,
+                                                    id: Name("user"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            debug_text: Some(
+                                                DebugText {
+                                                    leading: "",
+                                                    trailing: "=",
+                                                },
+                                            ),
+                                            conversion: None,
+                                            format_spec: None,
+                                        },
+                                    ),
+                                ],
+                                flags: TStringFlags {
+                                    quote_style: Double,
+                                    prefix: Regular,
+                                    triple_quoted: false,
+                                    unclosed: false,
+                                },
+                            },
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

@@ -15,6 +15,7 @@ doctest = false
 
 [dependencies]
 ruff_cache = { workspace = true }
+ruff_db = { workspace = true }
 ruff_formatter = { workspace = true }
 ruff_macros = { workspace = true }
 ruff_python_trivia = { workspace = true }
@@ -30,8 +31,10 @@ itertools = { workspace = true }
 memchr = { workspace = true }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
+salsa = { workspace = true }
 serde = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 smallvec = { workspace = true }
 static_assertions = { workspace = true }
 thiserror = { workspace = true }
@@ -58,8 +61,13 @@ required-features = ["serde"]
 
 [features]
 default = ["serde"]
-serde = ["dep:serde", "ruff_formatter/serde", "ruff_source_file/serde", "ruff_python_ast/serde"]
-schemars = ["dep:schemars", "ruff_formatter/schemars"]
+serde = [
+    "dep:serde",
+    "ruff_formatter/serde",
+    "ruff_source_file/serde",
+    "ruff_python_ast/serde",
+]
+schemars = ["dep:schemars", "dep:serde_json", "ruff_formatter/schemars"]
 
 [lints]
 workspace = true

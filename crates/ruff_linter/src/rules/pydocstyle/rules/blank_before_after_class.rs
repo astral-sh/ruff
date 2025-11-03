@@ -1,6 +1,5 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_trivia::{indentation_at_offset, PythonWhitespace};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_trivia::{PythonWhitespace, indentation_at_offset};
 use ruff_source_file::{Line, LineRanges, UniversalNewlineIterator};
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
@@ -8,6 +7,7 @@ use ruff_text_size::TextRange;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::registry::Rule;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for docstrings on class definitions that are not preceded by a
@@ -43,6 +43,7 @@ use crate::registry::Rule;
 ///
 /// [D211]: https://docs.astral.sh/ruff/rules/blank-line-before-class
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct IncorrectBlankLineBeforeClass;
 
 impl AlwaysFixableViolation for IncorrectBlankLineBeforeClass {
@@ -95,6 +96,7 @@ impl AlwaysFixableViolation for IncorrectBlankLineBeforeClass {
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct IncorrectBlankLineAfterClass;
 
 impl AlwaysFixableViolation for IncorrectBlankLineAfterClass {
@@ -142,6 +144,7 @@ impl AlwaysFixableViolation for IncorrectBlankLineAfterClass {
 ///
 /// [D203]: https://docs.astral.sh/ruff/rules/incorrect-blank-line-before-class
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct BlankLineBeforeClass;
 
 impl AlwaysFixableViolation for BlankLineBeforeClass {
@@ -170,8 +173,8 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
         return;
     }
 
-    if checker.enabled(Rule::IncorrectBlankLineBeforeClass)
-        || checker.enabled(Rule::BlankLineBeforeClass)
+    if checker.is_rule_enabled(Rule::IncorrectBlankLineBeforeClass)
+        || checker.is_rule_enabled(Rule::BlankLineBeforeClass)
     {
         let mut lines = UniversalNewlineIterator::with_offset(
             checker.locator().slice(between_range),
@@ -191,33 +194,32 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
             }
         }
 
-        if checker.enabled(Rule::BlankLineBeforeClass) {
+        if checker.is_rule_enabled(Rule::BlankLineBeforeClass) {
             if blank_lines_before != 0 {
-                let mut diagnostic = Diagnostic::new(BlankLineBeforeClass, docstring.range());
+                let mut diagnostic =
+                    checker.report_diagnostic(BlankLineBeforeClass, docstring.range());
                 // Delete the blank line before the class.
                 diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
                     blank_lines_start,
                     docstring.line_start(),
                 )));
-                checker.report_diagnostic(diagnostic);
             }
         }
-        if checker.enabled(Rule::IncorrectBlankLineBeforeClass) {
+        if checker.is_rule_enabled(Rule::IncorrectBlankLineBeforeClass) {
             if blank_lines_before != 1 {
                 let mut diagnostic =
-                    Diagnostic::new(IncorrectBlankLineBeforeClass, docstring.range());
+                    checker.report_diagnostic(IncorrectBlankLineBeforeClass, docstring.range());
                 // Insert one blank line before the class.
                 diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                     checker.stylist().line_ending().to_string(),
                     blank_lines_start,
                     docstring.line_start(),
                 )));
-                checker.report_diagnostic(diagnostic);
             }
         }
     }
 
-    if checker.enabled(Rule::IncorrectBlankLineAfterClass) {
+    if checker.is_rule_enabled(Rule::IncorrectBlankLineAfterClass) {
         let class_after_docstring_range = TextRange::new(docstring.end(), class.end());
         let class_after_docstring = checker.locator().slice(class_after_docstring_range);
         let mut lines = UniversalNewlineIterator::with_offset(
@@ -245,7 +247,7 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
                 let indentation = indentation_at_offset(docstring.start(), checker.source())
                     .expect("Own line docstring must have indentation");
                 let mut diagnostic =
-                    Diagnostic::new(IncorrectBlankLineAfterClass, docstring.range());
+                    checker.report_diagnostic(IncorrectBlankLineAfterClass, docstring.range());
                 let line_ending = checker.stylist().line_ending().as_str();
                 // We have to trim the whitespace twice, once before the semicolon above and
                 // once after the semicolon here, or we get invalid indents:
@@ -259,7 +261,7 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
                     replacement_start,
                     first_line.end(),
                 )));
-                checker.report_diagnostic(diagnostic);
+
                 return;
             } else if trailing.starts_with('#') {
                 // Keep the end-of-line comment, start counting empty lines after it
@@ -280,14 +282,14 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
         }
 
         if blank_lines_after != 1 {
-            let mut diagnostic = Diagnostic::new(IncorrectBlankLineAfterClass, docstring.range());
+            let mut diagnostic =
+                checker.report_diagnostic(IncorrectBlankLineAfterClass, docstring.range());
             // Insert a blank line before the class (replacing any existing lines).
             diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                 checker.stylist().line_ending().to_string(),
                 replacement_start,
                 blank_lines_end,
             )));
-            checker.report_diagnostic(diagnostic);
         }
     }
 }

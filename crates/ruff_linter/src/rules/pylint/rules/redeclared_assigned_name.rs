@@ -1,10 +1,10 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -27,8 +27,8 @@ use crate::checkers::ast::Checker;
 /// _, b, a = (1, 2, 3)
 /// print(a)  # 3
 /// ```
-///
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct RedeclaredAssignedName {
     name: String,
 }
@@ -57,18 +57,26 @@ fn check_expr(checker: &Checker, expr: &Expr, names: &mut Vec<Name>) {
                 check_expr(checker, target, names);
             }
         }
+        Expr::List(list) => {
+            for target in list {
+                check_expr(checker, target, names);
+            }
+        }
+        Expr::Starred(starred) => {
+            check_expr(checker, &starred.value, names);
+        }
         Expr::Name(ast::ExprName { id, .. }) => {
-            if checker.settings.dummy_variable_rgx.is_match(id) {
+            if checker.settings().dummy_variable_rgx.is_match(id) {
                 // Ignore dummy variable assignments
                 return;
             }
             if names.contains(id) {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     RedeclaredAssignedName {
                         name: id.to_string(),
                     },
                     expr.range(),
-                ));
+                );
             }
             names.push(id.clone());
         }

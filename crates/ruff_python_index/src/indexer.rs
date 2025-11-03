@@ -4,20 +4,22 @@
 use ruff_python_ast::Stmt;
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_trivia::{
-    has_leading_content, has_trailing_content, is_python_whitespace, CommentRanges,
+    CommentRanges, has_leading_content, has_trailing_content, is_python_whitespace,
 };
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::fstring_ranges::{FStringRanges, FStringRangesBuilder};
+use crate::interpolated_string_ranges::{
+    InterpolatedStringRanges, InterpolatedStringRangesBuilder,
+};
 use crate::multiline_ranges::{MultilineRanges, MultilineRangesBuilder};
 
 pub struct Indexer {
     /// Stores the start offset of continuation lines.
     continuation_lines: Vec<TextSize>,
 
-    /// The range of all f-string in the source document.
-    fstring_ranges: FStringRanges,
+    /// The range of all interpolated strings in the source document.
+    interpolated_string_ranges: InterpolatedStringRanges,
 
     /// The range of all multiline strings in the source document.
     multiline_ranges: MultilineRanges,
@@ -30,7 +32,7 @@ impl Indexer {
     pub fn from_tokens(tokens: &Tokens, source: &str) -> Self {
         assert!(TextSize::try_from(source.len()).is_ok());
 
-        let mut fstring_ranges_builder = FStringRangesBuilder::default();
+        let mut interpolated_string_ranges_builder = InterpolatedStringRangesBuilder::default();
         let mut multiline_ranges_builder = MultilineRangesBuilder::default();
         let mut continuation_lines = Vec::new();
         let mut comment_ranges = Vec::new();
@@ -53,13 +55,13 @@ impl Indexer {
                 continuation_lines.push(line_start);
 
                 // SAFETY: Safe because of the len assertion at the top of the function.
-                #[allow(clippy::cast_possible_truncation)]
+                #[expect(clippy::cast_possible_truncation)]
                 {
                     line_start = prev_end + TextSize::new((index + 1) as u32);
                 }
             }
 
-            fstring_ranges_builder.visit_token(token);
+            interpolated_string_ranges_builder.visit_token(token);
             multiline_ranges_builder.visit_token(token);
 
             match token.kind() {
@@ -82,7 +84,7 @@ impl Indexer {
 
         Self {
             continuation_lines,
-            fstring_ranges: fstring_ranges_builder.finish(),
+            interpolated_string_ranges: interpolated_string_ranges_builder.finish(),
             multiline_ranges: multiline_ranges_builder.finish(),
             comment_ranges: CommentRanges::new(comment_ranges),
         }
@@ -93,9 +95,9 @@ impl Indexer {
         &self.comment_ranges
     }
 
-    /// Returns the byte offset ranges of f-strings.
-    pub const fn fstring_ranges(&self) -> &FStringRanges {
-        &self.fstring_ranges
+    /// Returns the byte offset ranges of interpolated strings.
+    pub const fn interpolated_string_ranges(&self) -> &InterpolatedStringRanges {
+        &self.interpolated_string_ranges
     }
 
     /// Returns the byte offset ranges of multiline strings.
@@ -356,7 +358,7 @@ f"implicit " f"concatenation"
         .trim();
         assert_eq!(
             new_indexer(contents)
-                .fstring_ranges()
+                .interpolated_string_ranges()
                 .values()
                 .copied()
                 .collect::<Vec<_>>(),
@@ -390,7 +392,7 @@ f-string"""}
         .trim();
         assert_eq!(
             new_indexer(contents)
-                .fstring_ranges()
+                .interpolated_string_ranges()
                 .values()
                 .copied()
                 .collect::<Vec<_>>(),
@@ -504,11 +506,17 @@ the end"""
             ),
         ] {
             assert_eq!(
-                indexer.fstring_ranges().innermost(offset).unwrap(),
+                indexer
+                    .interpolated_string_ranges()
+                    .innermost(offset)
+                    .unwrap(),
                 innermost_range
             );
             assert_eq!(
-                indexer.fstring_ranges().outermost(offset).unwrap(),
+                indexer
+                    .interpolated_string_ranges()
+                    .outermost(offset)
+                    .unwrap(),
                 outermost_range
             );
         }

@@ -1,8 +1,8 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -14,14 +14,19 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```pyi
+/// from typing import TypeAlias
+///
 /// type_alias_name: TypeAlias = int
 /// ```
 ///
 /// Use instead:
 /// ```pyi
+/// from typing import TypeAlias
+///
 /// TypeAliasName: TypeAlias = int
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.265")]
 pub(crate) struct SnakeCaseTypeAlias {
     name: String,
 }
@@ -61,6 +66,7 @@ impl Violation for SnakeCaseTypeAlias {
 /// ## References
 /// - [PEP 484: Type Aliases](https://peps.python.org/pep-0484/#type-aliases)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.265")]
 pub(crate) struct TSuffixedTypeAlias {
     name: String,
 }
@@ -69,7 +75,9 @@ impl Violation for TSuffixedTypeAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { name } = self;
-        format!("Private type alias `{name}` should not be suffixed with `T` (the `T` suffix implies that an object is a `TypeVar`)")
+        format!(
+            "Private type alias `{name}` should not be suffixed with `T` (the `T` suffix implies that an object is a `TypeVar`)"
+        )
     }
 }
 
@@ -107,12 +115,12 @@ pub(crate) fn snake_case_type_alias(checker: &Checker, target: &Expr) {
             return;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             SnakeCaseTypeAlias {
                 name: id.to_string(),
             },
             *range,
-        ));
+        );
     }
 }
 
@@ -123,11 +131,11 @@ pub(crate) fn t_suffixed_type_alias(checker: &Checker, target: &Expr) {
             return;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             TSuffixedTypeAlias {
                 name: id.to_string(),
             },
             *range,
-        ));
+        );
     }
 }

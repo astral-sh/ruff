@@ -1,4 +1,5 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, btree_map};
+use std::io;
 use std::iter::FusedIterator;
 use std::sync::{Arc, RwLock, RwLockWriteGuard};
 
@@ -7,8 +8,8 @@ use filetime::FileTime;
 use rustc_hash::FxHashMap;
 
 use crate::system::{
-    walk_directory, DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result,
-    SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf,
+    DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, SystemPath,
+    SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf, file_time_now, walk_directory,
 };
 
 use super::walk_directory::{
@@ -153,6 +154,26 @@ impl MemoryFileSystem {
         virtual_files.contains_key(&path.to_path_buf())
     }
 
+    pub(crate) fn create_new_file(&self, path: &SystemPath) -> Result<()> {
+        let normalized = self.normalize_path(path);
+
+        let mut by_path = self.inner.by_path.write().unwrap();
+        match by_path.entry(normalized) {
+            btree_map::Entry::Vacant(entry) => {
+                entry.insert(Entry::File(File {
+                    content: String::new(),
+                    last_modified: file_time_now(),
+                }));
+
+                Ok(())
+            }
+            btree_map::Entry::Occupied(_) => Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "File already exists",
+            )),
+        }
+    }
+
     /// Stores a new file in the file system.
     ///
     /// The operation overrides the content for an existing file with the same normalized `path`.
@@ -163,7 +184,7 @@ impl MemoryFileSystem {
 
         let file = get_or_create_file(&mut by_path, &normalized)?;
         file.content = content.to_string();
-        file.last_modified = now();
+        file.last_modified = file_time_now();
 
         Ok(())
     }
@@ -215,7 +236,7 @@ impl MemoryFileSystem {
             std::collections::hash_map::Entry::Vacant(entry) => {
                 entry.insert(File {
                     content: content.to_string(),
-                    last_modified: now(),
+                    last_modified: file_time_now(),
                 });
             }
             std::collections::hash_map::Entry::Occupied(mut entry) => {
@@ -236,7 +257,7 @@ impl MemoryFileSystem {
         &self,
         pattern: &str,
     ) -> std::result::Result<
-        impl Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>,
+        impl Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_,
         glob::PatternError,
     > {
         // Very naive implementation that iterates over all files and collects all that match the given pattern.
@@ -278,14 +299,14 @@ impl MemoryFileSystem {
             let normalized = fs.normalize_path(path);
 
             match by_path.entry(normalized) {
-                std::collections::btree_map::Entry::Occupied(entry) => match entry.get() {
+                btree_map::Entry::Occupied(entry) => match entry.get() {
                     Entry::File(_) => {
                         entry.remove();
                         Ok(())
                     }
                     Entry::Directory(_) => Err(is_a_directory()),
                 },
-                std::collections::btree_map::Entry::Vacant(_) => Err(not_found()),
+                btree_map::Entry::Vacant(_) => Err(not_found()),
             }
         }
 
@@ -310,7 +331,7 @@ impl MemoryFileSystem {
         let mut by_path = self.inner.by_path.write().unwrap();
         let normalized = self.normalize_path(path.as_ref());
 
-        get_or_create_file(&mut by_path, &normalized)?.last_modified = now();
+        get_or_create_file(&mut by_path, &normalized)?.last_modified = file_time_now();
 
         Ok(())
     }
@@ -345,14 +366,14 @@ impl MemoryFileSystem {
             }
 
             match by_path.entry(normalized.clone()) {
-                std::collections::btree_map::Entry::Occupied(entry) => match entry.get() {
+                btree_map::Entry::Occupied(entry) => match entry.get() {
                     Entry::Directory(_) => {
                         entry.remove();
                         Ok(())
                     }
                     Entry::File(_) => Err(not_a_directory()),
                 },
-                std::collections::btree_map::Entry::Vacant(_) => Err(not_found()),
+                btree_map::Entry::Vacant(_) => Err(not_found()),
             }
         }
 
@@ -463,17 +484,17 @@ fn not_found() -> std::io::Error {
 fn is_a_directory() -> std::io::Error {
     // Note: Rust returns `ErrorKind::IsADirectory` for this error but this is a nightly only variant :(.
     //   So we have to use other for now.
-    std::io::Error::new(std::io::ErrorKind::Other, "Is a directory")
+    std::io::Error::other("Is a directory")
 }
 
 fn not_a_directory() -> std::io::Error {
     // Note: Rust returns `ErrorKind::NotADirectory` for this error but this is a nightly only variant :(.
     //   So we have to use `Other` for now.
-    std::io::Error::new(std::io::ErrorKind::Other, "Not a directory")
+    std::io::Error::other("Not a directory")
 }
 
 fn directory_not_empty() -> std::io::Error {
-    std::io::Error::new(std::io::ErrorKind::Other, "directory not empty")
+    std::io::Error::other("directory not empty")
 }
 
 fn create_dir_all(
@@ -486,7 +507,7 @@ fn create_dir_all(
         path.push(component);
         let entry = paths.entry(path.clone()).or_insert_with(|| {
             Entry::Directory(Directory {
-                last_modified: now(),
+                last_modified: file_time_now(),
             })
         });
 
@@ -513,7 +534,7 @@ fn get_or_create_file<'a>(
     let entry = paths.entry(normalized.to_path_buf()).or_insert_with(|| {
         Entry::File(File {
             content: String::new(),
-            last_modified: now(),
+            last_modified: file_time_now(),
         })
     });
 
@@ -695,38 +716,14 @@ enum WalkerState {
     Nested { path: SystemPathBuf, depth: usize },
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-fn now() -> FileTime {
-    FileTime::now()
-}
-
-#[cfg(target_arch = "wasm32")]
-fn now() -> FileTime {
-    // Copied from FileTime::from_system_time()
-    let time = web_time::SystemTime::now();
-
-    time.duration_since(web_time::UNIX_EPOCH)
-        .map(|d| FileTime::from_unix_time(d.as_secs() as i64, d.subsec_nanos()))
-        .unwrap_or_else(|e| {
-            let until_epoch = e.duration();
-            let (sec_offset, nanos) = if until_epoch.subsec_nanos() == 0 {
-                (0, 0)
-            } else {
-                (-1, 1_000_000_000 - until_epoch.subsec_nanos())
-            };
-
-            FileTime::from_unix_time(-(until_epoch.as_secs() as i64) + sec_offset, nanos)
-        })
-}
-
 #[cfg(test)]
 mod tests {
     use std::io::ErrorKind;
 
     use std::time::Duration;
 
-    use crate::system::walk_directory::tests::DirectoryEntryToString;
     use crate::system::walk_directory::WalkState;
+    use crate::system::walk_directory::tests::DirectoryEntryToString;
     use crate::system::{
         DirectoryEntry, FileType, MemoryFileSystem, Result, SystemPath, SystemPathBuf,
         SystemVirtualPath,

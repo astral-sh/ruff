@@ -1,0 +1,240 @@
+---
+source: crates/ty_server/tests/e2e/commands.rs
+expression: response
+---
+Client capabilities: ResolvedClientCapabilities(
+    WORKSPACE_CONFIGURATION,
+)
+Position encoding: UTF16
+Global settings: GlobalSettings {
+    diagnostic_mode: OpenFilesOnly,
+    experimental: ExperimentalSettings {
+        rename: false,
+        auto_import: false,
+    },
+}
+Open text documents: 0
+
+Workspace XXX
+Settings: WorkspaceSettings {
+    disable_language_services: false,
+    inlay_hints: InlayHintSettings {
+        variable_types: true,
+        call_argument_names: true,
+    },
+    overrides: None,
+}
+
+Project at XXX
+Settings: Settings {
+    rules: {
+        "ambiguous-protocol-member": Warning (Default),
+        "byte-string-type-annotation": Error (Default),
+        "call-non-callable": Error (Default),
+        "conflicting-argument-forms": Error (Default),
+        "conflicting-declarations": Error (Default),
+        "conflicting-metaclass": Error (Default),
+        "cyclic-class-definition": Error (Default),
+        "deprecated": Warning (Default),
+        "duplicate-base": Error (Default),
+        "duplicate-kw-only": Error (Default),
+        "escape-character-in-forward-annotation": Error (Default),
+        "fstring-type-annotation": Error (Default),
+        "ignore-comment-unknown-rule": Warning (Default),
+        "implicit-concatenated-string-type-annotation": Error (Default),
+        "inconsistent-mro": Error (Default),
+        "index-out-of-bounds": Error (Default),
+        "instance-layout-conflict": Error (Default),
+        "invalid-argument-type": Error (Default),
+        "invalid-assignment": Error (Default),
+        "invalid-attribute-access": Error (Default),
+        "invalid-await": Error (Default),
+        "invalid-base": Error (Default),
+        "invalid-context-manager": Error (Default),
+        "invalid-declaration": Error (Default),
+        "invalid-exception-caught": Error (Default),
+        "invalid-generic-class": Error (Default),
+        "invalid-ignore-comment": Warning (Default),
+        "invalid-key": Error (Default),
+        "invalid-legacy-type-variable": Error (Default),
+        "invalid-metaclass": Error (Default),
+        "invalid-named-tuple": Error (Default),
+        "invalid-overload": Error (Default),
+        "invalid-parameter-default": Error (Default),
+        "invalid-protocol": Error (Default),
+        "invalid-raise": Error (Default),
+        "invalid-return-type": Error (Default),
+        "invalid-super-argument": Error (Default),
+        "invalid-syntax-in-forward-annotation": Error (Default),
+        "invalid-type-alias-type": Error (Default),
+        "invalid-type-checking-constant": Error (Default),
+        "invalid-type-form": Error (Default),
+        "invalid-type-guard-call": Error (Default),
+        "invalid-type-guard-definition": Error (Default),
+        "invalid-type-variable-constraints": Error (Default),
+        "missing-argument": Error (Default),
+        "missing-typed-dict-key": Error (Default),
+        "no-matching-overload": Error (Default),
+        "non-subscriptable": Error (Default),
+        "not-iterable": Error (Default),
+        "parameter-already-assigned": Error (Default),
+        "positional-only-parameter-as-kwarg": Error (Default),
+        "possibly-missing-attribute": Warning (Default),
+        "possibly-missing-implicit-call": Warning (Default),
+        "possibly-missing-import": Warning (Default),
+        "raw-string-type-annotation": Error (Default),
+        "redundant-cast": Warning (Default),
+        "static-assert-error": Error (Default),
+        "subclass-of-final-class": Error (Default),
+        "too-many-positional-arguments": Error (Default),
+        "type-assertion-failure": Error (Default),
+        "unavailable-implicit-super-arguments": Error (Default),
+        "undefined-reveal": Warning (Default),
+        "unknown-argument": Error (Default),
+        "unresolved-attribute": Error (Default),
+        "unresolved-global": Warning (Default),
+        "unresolved-import": Error (Default),
+        "unresolved-reference": Error (Default),
+        "unsupported-base": Warning (Default),
+        "unsupported-bool-conversion": Error (Default),
+        "unsupported-operator": Error (Default),
+        "useless-overload-body": Warning (Default),
+        "zero-stepsize-in-slice": Error (Default),
+    },
+    terminal: TerminalSettings {
+        output_format: Full,
+        error_on_warning: false,
+    },
+    src: SrcSettings {
+        respect_ignore_files: true,
+        files: IncludeExcludeFilter {
+            include: IncludeFilter(
+                [
+                    "**",
+                ],
+                ..
+            ),
+            exclude: ExcludeFilter {
+                ignore: Gitignore(
+                    [
+                        IgnoreGlob {
+                            original: "**/.bzr/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                        IgnoreGlob {
+                            original: "**/.direnv/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                        IgnoreGlob {
+                            original: "**/.eggs/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                        IgnoreGlob {
+                            original: "**/.git/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                        IgnoreGlob {
+                            original: "**/.git-rewrite/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                        IgnoreGlob {
+                            original: "**/.hg/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                        IgnoreGlob {
+                            original: "**/.mypy_cache/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                        IgnoreGlob {
+                            original: "**/.nox/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                        IgnoreGlob {
+                            original: "**/.pants.d/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                        IgnoreGlob {
+                            original: "**/.pytype/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                        IgnoreGlob {
+                            original: "**/.ruff_cache/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                        IgnoreGlob {
+                            original: "**/.svn/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                        IgnoreGlob {
+                            original: "**/.tox/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                        IgnoreGlob {
+                            original: "**/.venv/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                        IgnoreGlob {
+                            original: "**/__pypackages__/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                        IgnoreGlob {
+                            original: "**/_build/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                        IgnoreGlob {
+                            original: "**/buck-out/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                        IgnoreGlob {
+                            original: "**/dist/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                        IgnoreGlob {
+                            original: "**/node_modules/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                        IgnoreGlob {
+                            original: "**/venv/",
+                            is_allow: false,
+                            is_only_dir: true,
+                        },
+                    ],
+                    ..
+                ),
+            },
+        },
+    },
+    overrides: [],
+}
+
+Memory report:
+=======SALSA STRUCTS=======
+`Program`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+`Project`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+`FileRoot`                                         metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+=======SALSA QUERIES=======
+=======SALSA SUMMARY=======
+TOTAL MEMORY USAGE: [X.XXMB]
+    struct metadata = [X.XXMB]
+    struct fields = [X.XXMB]
+    memo metadata = [X.XXMB]
+    memo fields = [X.XXMB]

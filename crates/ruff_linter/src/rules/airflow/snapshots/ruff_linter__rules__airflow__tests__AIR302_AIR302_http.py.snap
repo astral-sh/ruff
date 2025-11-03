@@ -1,0 +1,62 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR302 [*] `airflow.hooks.http_hook.HttpHook` is moved into `http` provider in Airflow 3.0;
+ --> AIR302_http.py:7:1
+  |
+5 | from airflow.sensors.http_sensor import HttpSensor
+6 |
+7 | HttpHook()
+  | ^^^^^^^^
+8 | SimpleHttpOperator()
+9 | HttpSensor()
+  |
+help: Install `apache-airflow-providers-http>=1.0.0` and use `HttpHook` from `airflow.providers.http.hooks.http` instead.
+1 | from __future__ import annotations
+2 | 
+  - from airflow.hooks.http_hook import HttpHook
+3 | from airflow.operators.http_operator import SimpleHttpOperator
+4 | from airflow.sensors.http_sensor import HttpSensor
+5 + from airflow.providers.http.hooks.http import HttpHook
+6 | 
+7 | HttpHook()
+8 | SimpleHttpOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR302 [*] `airflow.operators.http_operator.SimpleHttpOperator` is moved into `http` provider in Airflow 3.0;
+ --> AIR302_http.py:8:1
+  |
+7 | HttpHook()
+8 | SimpleHttpOperator()
+  | ^^^^^^^^^^^^^^^^^^
+9 | HttpSensor()
+  |
+help: Install `apache-airflow-providers-http>=5.0.0` and use `HttpOperator` from `airflow.providers.http.operators.http` instead.
+3  | from airflow.hooks.http_hook import HttpHook
+4  | from airflow.operators.http_operator import SimpleHttpOperator
+5  | from airflow.sensors.http_sensor import HttpSensor
+6  + from airflow.providers.http.operators.http import HttpOperator
+7  | 
+8  | HttpHook()
+   - SimpleHttpOperator()
+9  + HttpOperator()
+10 | HttpSensor()
+
+AIR302 [*] `airflow.sensors.http_sensor.HttpSensor` is moved into `http` provider in Airflow 3.0;
+ --> AIR302_http.py:9:1
+  |
+7 | HttpHook()
+8 | SimpleHttpOperator()
+9 | HttpSensor()
+  | ^^^^^^^^^^
+  |
+help: Install `apache-airflow-providers-http>=1.0.0` and use `HttpSensor` from `airflow.providers.http.sensors.http` instead.
+2 | 
+3 | from airflow.hooks.http_hook import HttpHook
+4 | from airflow.operators.http_operator import SimpleHttpOperator
+  - from airflow.sensors.http_sensor import HttpSensor
+5 + from airflow.providers.http.sensors.http import HttpSensor
+6 | 
+7 | HttpHook()
+8 | SimpleHttpOperator()
+note: This is an unsafe fix and may change runtime behavior

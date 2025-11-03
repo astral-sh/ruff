@@ -1,0 +1,262 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF060 Unnecessary membership test on empty collection
+ --> RUF060.py:2:1
+  |
+1 | # Errors
+2 | 1 in []
+  | ^^^^^^^
+3 | 1 not in []
+4 | 2 in list()
+  |
+
+RUF060 Unnecessary membership test on empty collection
+ --> RUF060.py:3:1
+  |
+1 | # Errors
+2 | 1 in []
+3 | 1 not in []
+  | ^^^^^^^^^^^
+4 | 2 in list()
+5 | 2 not in list()
+  |
+
+RUF060 Unnecessary membership test on empty collection
+ --> RUF060.py:4:1
+  |
+2 | 1 in []
+3 | 1 not in []
+4 | 2 in list()
+  | ^^^^^^^^^^^
+5 | 2 not in list()
+6 | _ in ()
+  |
+
+RUF060 Unnecessary membership test on empty collection
+ --> RUF060.py:5:1
+  |
+3 | 1 not in []
+4 | 2 in list()
+5 | 2 not in list()
+  | ^^^^^^^^^^^^^^^
+6 | _ in ()
+7 | _ not in ()
+  |
+
+RUF060 Unnecessary membership test on empty collection
+ --> RUF060.py:6:1
+  |
+4 | 2 in list()
+5 | 2 not in list()
+6 | _ in ()
+  | ^^^^^^^
+7 | _ not in ()
+8 | 'x' in tuple()
+  |
+
+RUF060 Unnecessary membership test on empty collection
+ --> RUF060.py:7:1
+  |
+5 | 2 not in list()
+6 | _ in ()
+7 | _ not in ()
+  | ^^^^^^^^^^^
+8 | 'x' in tuple()
+9 | 'y' not in tuple()
+  |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:8:1
+   |
+ 6 | _ in ()
+ 7 | _ not in ()
+ 8 | 'x' in tuple()
+   | ^^^^^^^^^^^^^^
+ 9 | 'y' not in tuple()
+10 | 'a' in set()
+   |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:9:1
+   |
+ 7 | _ not in ()
+ 8 | 'x' in tuple()
+ 9 | 'y' not in tuple()
+   | ^^^^^^^^^^^^^^^^^^
+10 | 'a' in set()
+11 | 'a' not in set()
+   |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:10:1
+   |
+ 8 | 'x' in tuple()
+ 9 | 'y' not in tuple()
+10 | 'a' in set()
+   | ^^^^^^^^^^^^
+11 | 'a' not in set()
+12 | 'b' in {}
+   |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:11:1
+   |
+ 9 | 'y' not in tuple()
+10 | 'a' in set()
+11 | 'a' not in set()
+   | ^^^^^^^^^^^^^^^^
+12 | 'b' in {}
+13 | 'b' not in {}
+   |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:12:1
+   |
+10 | 'a' in set()
+11 | 'a' not in set()
+12 | 'b' in {}
+   | ^^^^^^^^^
+13 | 'b' not in {}
+14 | 1 in dict()
+   |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:13:1
+   |
+11 | 'a' not in set()
+12 | 'b' in {}
+13 | 'b' not in {}
+   | ^^^^^^^^^^^^^
+14 | 1 in dict()
+15 | 2 not in dict()
+   |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:14:1
+   |
+12 | 'b' in {}
+13 | 'b' not in {}
+14 | 1 in dict()
+   | ^^^^^^^^^^^
+15 | 2 not in dict()
+16 | "a" in ""
+   |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:15:1
+   |
+13 | 'b' not in {}
+14 | 1 in dict()
+15 | 2 not in dict()
+   | ^^^^^^^^^^^^^^^
+16 | "a" in ""
+17 | b'c' in b""
+   |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:16:1
+   |
+14 | 1 in dict()
+15 | 2 not in dict()
+16 | "a" in ""
+   | ^^^^^^^^^
+17 | b'c' in b""
+18 | "b" in f""
+   |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:17:1
+   |
+15 | 2 not in dict()
+16 | "a" in ""
+17 | b'c' in b""
+   | ^^^^^^^^^^^
+18 | "b" in f""
+19 | b"a" in bytearray()
+   |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:18:1
+   |
+16 | "a" in ""
+17 | b'c' in b""
+18 | "b" in f""
+   | ^^^^^^^^^^
+19 | b"a" in bytearray()
+20 | b"a" in bytes()
+   |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:19:1
+   |
+17 | b'c' in b""
+18 | "b" in f""
+19 | b"a" in bytearray()
+   | ^^^^^^^^^^^^^^^^^^^
+20 | b"a" in bytes()
+21 | 1 in frozenset()
+   |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:20:1
+   |
+18 | "b" in f""
+19 | b"a" in bytearray()
+20 | b"a" in bytes()
+   | ^^^^^^^^^^^^^^^
+21 | 1 in frozenset()
+22 | 1 in set(set())
+   |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:21:1
+   |
+19 | b"a" in bytearray()
+20 | b"a" in bytes()
+21 | 1 in frozenset()
+   | ^^^^^^^^^^^^^^^^
+22 | 1 in set(set())
+23 | 2 in frozenset([])
+   |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:22:1
+   |
+20 | b"a" in bytes()
+21 | 1 in frozenset()
+22 | 1 in set(set())
+   | ^^^^^^^^^^^^^^^
+23 | 2 in frozenset([])
+24 | '' in set("")
+   |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:23:1
+   |
+21 | 1 in frozenset()
+22 | 1 in set(set())
+23 | 2 in frozenset([])
+   | ^^^^^^^^^^^^^^^^^^
+24 | '' in set("")
+   |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:24:1
+   |
+22 | 1 in set(set())
+23 | 2 in frozenset([])
+24 | '' in set("")
+   | ^^^^^^^^^^^^^
+25 |
+26 | # OK
+   |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:47:1
+   |
+46 | # https://github.com/astral-sh/ruff/issues/20238
+47 | "b" in f"" "" # Error
+   | ^^^^^^^^^^^^^
+48 | "b" in f"" "x" # OK
+   |

@@ -1,6 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability};
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::whitespace::trailing_comment_start_offset;
 use ruff_python_ast::{Expr, ExprStringLiteral, Stmt, StmtExpr};
@@ -9,6 +7,8 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{AlwaysFixableViolation, Applicability};
+use crate::{Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary `pass` statements and ellipsis (`...`) literals in
@@ -59,6 +59,7 @@ use crate::fix;
 /// ## References
 /// - [Python documentation: The `pass` statement](https://docs.python.org/3/reference/simple_stmts.html#the-pass-statement)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct UnnecessaryPlaceholder {
     kind: Placeholder,
 }
@@ -138,14 +139,14 @@ fn add_diagnostic(
     let isolation_level = Checker::isolation(checker.semantic().current_statement_id());
     let fix = Fix::applicable_edit(edit, applicability).isolate(isolation_level);
 
-    let diagnostic = Diagnostic::new(
-        UnnecessaryPlaceholder {
-            kind: placeholder_kind,
-        },
-        stmt.range(),
-    );
-
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(
+            UnnecessaryPlaceholder {
+                kind: placeholder_kind,
+            },
+            stmt.range(),
+        )
+        .set_fix(fix);
 }
 
 #[derive(Debug, PartialEq, Eq)]

@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprAttribute};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -53,6 +53,7 @@ use crate::checkers::ast::Checker;
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.281")]
 pub(crate) struct OsSepSplit;
 
 impl Violation for OsSepSplit {
@@ -74,7 +75,7 @@ pub(crate) fn os_sep_split(checker: &Checker, call: &ast::ExprCall) {
 
     if attr.as_str() != "split" {
         return;
-    };
+    }
 
     // Match `.split(os.sep)` or `.split(sep=os.sep)`, but avoid cases in which a `maxsplit` is
     // specified.
@@ -94,5 +95,5 @@ pub(crate) fn os_sep_split(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(OsSepSplit, attr.range()));
+    checker.report_diagnostic(OsSepSplit, attr.range());
 }

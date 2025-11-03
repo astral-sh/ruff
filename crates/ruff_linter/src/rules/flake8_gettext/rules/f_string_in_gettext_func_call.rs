@@ -1,9 +1,9 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -41,6 +41,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `gettext` — Multilingual internationalization services](https://docs.python.org/3/library/gettext.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.260")]
 pub(crate) struct FStringInGetTextFuncCall;
 
 impl Violation for FStringInGetTextFuncCall {
@@ -54,7 +55,7 @@ impl Violation for FStringInGetTextFuncCall {
 pub(crate) fn f_string_in_gettext_func_call(checker: &Checker, args: &[Expr]) {
     if let Some(first) = args.first() {
         if first.is_f_string_expr() {
-            checker.report_diagnostic(Diagnostic::new(FStringInGetTextFuncCall {}, first.range()));
+            checker.report_diagnostic(FStringInGetTextFuncCall {}, first.range());
         }
     }
 }

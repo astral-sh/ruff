@@ -1,5 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprBinOp, ExprCall, ExprStringLiteral, ExprSubscript, ExprUnaryOp,
@@ -9,6 +8,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for `datetime.fromisoformat()` calls
@@ -67,6 +67,7 @@ use crate::checkers::ast::Checker;
 /// [iso-8601]: https://www.iso.org/obp/ui/#iso:std:iso:8601
 /// [fromisoformat]: https://docs.python.org/3/library/datetime.html#datetime.date.fromisoformat
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct FromisoformatReplaceZ;
 
 impl AlwaysFixableViolation for FromisoformatReplaceZ {
@@ -118,10 +119,11 @@ pub(crate) fn fromisoformat_replace_z(checker: &Checker, call: &ExprCall) {
 
     let range_to_remove = TextRange::new(value_full_range.end(), argument.end());
 
-    let diagnostic = Diagnostic::new(FromisoformatReplaceZ, argument.range());
     let fix = Fix::unsafe_edit(Edit::range_deletion(range_to_remove));
 
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(FromisoformatReplaceZ, argument.range())
+        .set_fix(fix);
 }
 
 fn func_is_fromisoformat(func: &Expr, semantic: &SemanticModel) -> bool {
@@ -160,7 +162,7 @@ impl<'a> ReplaceTimeZone<'a> {
 
         if !arguments.keywords.is_empty() {
             return None;
-        };
+        }
 
         let ExprAttribute { value, attr, .. } = call.func.as_attribute_expr()?;
 

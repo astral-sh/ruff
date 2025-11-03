@@ -1,0 +1,27 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP018 [*] Unnecessary `int` call (rewrite as a literal)
+ --> UP018_CR.py:2:1
+  |
+1 |   # Keep parenthesis around preserved CR
+2 | / int(-
+3 | |     1)
+  | |______^
+4 |   int(+
+5 |       1)
+  |
+help: Replace with integer literal
+1 | # Keep parenthesis around preserved CR  - int(-2 + (-3 |     1)4 | int(+5 |     1)
+
+UP018 [*] Unnecessary `int` call (rewrite as a literal)
+ --> UP018_CR.py:4:1
+  |
+2 |   int(-
+3 |       1)
+4 | / int(+
+5 | |     1)
+  | |______^
+  |
+help: Replace with integer literal
+1 | # Keep parenthesis around preserved CR2 | int(-3 |     1)  - int(+4 + (+5 |     1)

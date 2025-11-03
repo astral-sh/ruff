@@ -2,13 +2,13 @@ use std::fmt;
 
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for `dict()` calls that take unnecessary dict literals or dict
@@ -35,6 +35,7 @@ use super::helpers;
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct UnnecessaryLiteralWithinDictCall {
     kind: DictKind,
 }
@@ -71,7 +72,7 @@ pub(crate) fn unnecessary_literal_within_dict_call(checker: &Checker, call: &ast
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryLiteralWithinDictCall {
             kind: argument_kind,
         },
@@ -88,8 +89,6 @@ pub(crate) fn unnecessary_literal_within_dict_call(checker: &Checker, call: &ast
 
         Fix::unsafe_edits(call_start, [call_end])
     });
-
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

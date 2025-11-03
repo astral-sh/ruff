@@ -1,7 +1,6 @@
 use itertools::Itertools;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Stmt};
@@ -11,6 +10,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_stmt;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the presence of unused variables in function scopes.
@@ -38,9 +38,22 @@ use crate::fix::edits::delete_stmt;
 ///     return x
 /// ```
 ///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because removing an unused variable assignment may
+/// delete comments that are attached to the assignment.
+///
+/// ## See also
+///
+/// This rule does not apply to bindings in unpacked assignments (e.g. `x, y = 1, 2`). See
+/// [`unused-unpacked-variable`][RUF059] for this case.
+///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
+///
+/// [RUF059]: https://docs.astral.sh/ruff/rules/unused-unpacked-variable/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.22")]
 pub(crate) struct UnusedVariable {
     pub name: String,
 }
@@ -182,7 +195,7 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
         } else {
             let name = binding.name(checker.source());
             let renamed = format!("_{name}");
-            if checker.settings.dummy_variable_rgx.is_match(&renamed) {
+            if checker.settings().dummy_variable_rgx.is_match(&renamed) {
                 let edit = Edit::range_replacement(renamed, binding.range());
 
                 return Some(Fix::unsafe_edit(edit).isolate(isolation));
@@ -251,7 +264,7 @@ pub(crate) fn unused_variable(checker: &Checker, name: &str, binding: &Binding) 
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnusedVariable {
             name: name.to_string(),
         },
@@ -260,5 +273,6 @@ pub(crate) fn unused_variable(checker: &Checker, name: &str, binding: &Binding) 
     if let Some(fix) = remove_unused_variable(binding, checker) {
         diagnostic.set_fix(fix);
     }
-    checker.report_diagnostic(diagnostic);
+    // Add Unnecessary tag for unused variables
+    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
 }

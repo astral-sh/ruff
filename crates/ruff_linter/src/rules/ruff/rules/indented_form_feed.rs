@@ -1,9 +1,10 @@
 use memchr::memchr;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::Line;
 use ruff_text_size::{TextRange, TextSize};
+
+use crate::{Violation, checkers::ast::LintContext};
 
 /// ## What it does
 /// Checks for form feed characters preceded by either a space or a tab.
@@ -30,6 +31,7 @@ use ruff_text_size::{TextRange, TextSize};
 ///
 /// [lexical-analysis-indentation]: https://docs.python.org/3/reference/lexical_analysis.html#indentation
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.9.6")]
 pub(crate) struct IndentedFormFeed;
 
 impl Violation for IndentedFormFeed {
@@ -48,11 +50,13 @@ const SPACE: u8 = b' ';
 const TAB: u8 = b'\t';
 
 /// RUF054
-pub(crate) fn indented_form_feed(line: &Line) -> Option<Diagnostic> {
-    let index_relative_to_line = memchr(FORM_FEED, line.as_bytes())?;
+pub(crate) fn indented_form_feed(line: &Line, context: &LintContext) {
+    let Some(index_relative_to_line) = memchr(FORM_FEED, line.as_bytes()) else {
+        return;
+    };
 
     if index_relative_to_line == 0 {
-        return None;
+        return;
     }
 
     if line[..index_relative_to_line]
@@ -60,12 +64,14 @@ pub(crate) fn indented_form_feed(line: &Line) -> Option<Diagnostic> {
         .iter()
         .any(|byte| *byte != SPACE && *byte != TAB)
     {
-        return None;
+        return;
     }
 
-    let relative_index = u32::try_from(index_relative_to_line).ok()?;
+    let Ok(relative_index) = u32::try_from(index_relative_to_line) else {
+        return;
+    };
     let absolute_index = line.start() + TextSize::new(relative_index);
     let range = TextRange::at(absolute_index, 1.into());
 
-    Some(Diagnostic::new(IndentedFormFeed, range))
+    context.report_diagnostic(IndentedFormFeed, range);
 }

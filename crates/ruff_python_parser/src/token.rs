@@ -12,12 +12,12 @@ use bitflags::bitflags;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_ast::str_prefix::{
-    AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
+    AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix, TStringPrefix,
 };
 use ruff_python_ast::{AnyStringFlags, BoolOp, Int, IpyEscapeKind, Operator, StringFlags, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 pub struct Token {
     /// The kind of the token.
     kind: TokenKind,
@@ -48,7 +48,7 @@ impl Token {
     ///
     /// # Panics
     ///
-    /// If it isn't a string or any f-string tokens.
+    /// If it isn't a string or any f/t-string tokens.
     pub fn is_triple_quoted_string(self) -> bool {
         self.unwrap_string_flags().is_triple_quoted()
     }
@@ -57,7 +57,7 @@ impl Token {
     ///
     /// # Panics
     ///
-    /// If it isn't a string or any f-string tokens.
+    /// If it isn't a string or any f/t-string tokens.
     pub fn string_quote_style(self) -> Quote {
         self.unwrap_string_flags().quote_style()
     }
@@ -66,7 +66,7 @@ impl Token {
     ///
     /// # Panics
     ///
-    /// If it isn't a string or any f-string tokens.
+    /// If it isn't a string or any f/t-string tokens.
     pub fn unwrap_string_flags(self) -> AnyStringFlags {
         self.string_flags()
             .unwrap_or_else(|| panic!("token to be a string"))
@@ -81,7 +81,8 @@ impl Token {
         }
     }
 
-    /// Returns `true` if this is any kind of string token.
+    /// Returns `true` if this is any kind of string token - including
+    /// tokens in t-strings (which do not have type `str`).
     const fn is_any_string(self) -> bool {
         matches!(
             self.kind,
@@ -89,6 +90,9 @@ impl Token {
                 | TokenKind::FStringStart
                 | TokenKind::FStringMiddle
                 | TokenKind::FStringEnd
+                | TokenKind::TStringStart
+                | TokenKind::TStringMiddle
+                | TokenKind::TStringEnd
         )
     }
 }
@@ -120,7 +124,7 @@ impl fmt::Debug for Token {
 }
 
 /// A kind of a token.
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord, get_size2::GetSize)]
 pub enum TokenKind {
     /// Token kind for a name, commonly known as an identifier.
     Name,
@@ -140,6 +144,14 @@ pub enum TokenKind {
     FStringMiddle,
     /// Token kind for the end of an f-string. This includes the closing quote.
     FStringEnd,
+    /// Token kind for the start of a t-string. This includes the `t`/`T`/`tr` prefix
+    /// and the opening quote(s).
+    TStringStart,
+    /// Token kind that includes the portion of text inside the t-string that's not
+    /// part of the interpolation part and isn't an opening or closing brace.
+    TStringMiddle,
+    /// Token kind for the end of a t-string. This includes the closing quote.
+    TStringEnd,
     /// Token kind for a IPython escape command.
     IpyEscapeCommand,
     /// Token kind for a comment. These are filtered out of the token stream prior to parsing.
@@ -462,6 +474,11 @@ impl TokenKind {
         matches!(self, TokenKind::Plus | TokenKind::Minus)
     }
 
+    #[inline]
+    pub const fn is_interpolated_string_end(self) -> bool {
+        matches!(self, TokenKind::FStringEnd | TokenKind::TStringEnd)
+    }
+
     /// Returns the [`UnaryOp`] that corresponds to this token kind, if it is a unary arithmetic
     /// operator, otherwise return [None].
     ///
@@ -469,7 +486,7 @@ impl TokenKind {
     ///
     /// [`as_unary_operator`]: TokenKind::as_unary_operator
     #[inline]
-    pub(crate) const fn as_unary_arithmetic_operator(self) -> Option<UnaryOp> {
+    pub const fn as_unary_arithmetic_operator(self) -> Option<UnaryOp> {
         Some(match self {
             TokenKind::Plus => UnaryOp::UAdd,
             TokenKind::Minus => UnaryOp::USub,
@@ -484,7 +501,7 @@ impl TokenKind {
     ///
     /// [`as_unary_arithmetic_operator`]: TokenKind::as_unary_arithmetic_operator
     #[inline]
-    pub(crate) const fn as_unary_operator(self) -> Option<UnaryOp> {
+    pub const fn as_unary_operator(self) -> Option<UnaryOp> {
         Some(match self {
             TokenKind::Plus => UnaryOp::UAdd,
             TokenKind::Minus => UnaryOp::USub,
@@ -497,7 +514,7 @@ impl TokenKind {
     /// Returns the [`BoolOp`] that corresponds to this token kind, if it is a boolean operator,
     /// otherwise return [None].
     #[inline]
-    pub(crate) const fn as_bool_operator(self) -> Option<BoolOp> {
+    pub const fn as_bool_operator(self) -> Option<BoolOp> {
         Some(match self {
             TokenKind::And => BoolOp::And,
             TokenKind::Or => BoolOp::Or,
@@ -511,7 +528,7 @@ impl TokenKind {
     /// Use [`as_augmented_assign_operator`] to match against an augmented assignment token.
     ///
     /// [`as_augmented_assign_operator`]: TokenKind::as_augmented_assign_operator
-    pub(crate) const fn as_binary_operator(self) -> Option<Operator> {
+    pub const fn as_binary_operator(self) -> Option<Operator> {
         Some(match self {
             TokenKind::Plus => Operator::Add,
             TokenKind::Minus => Operator::Sub,
@@ -533,7 +550,7 @@ impl TokenKind {
     /// Returns the [`Operator`] that corresponds to this token kind, if it is
     /// an augmented assignment operator, or [`None`] otherwise.
     #[inline]
-    pub(crate) const fn as_augmented_assign_operator(self) -> Option<Operator> {
+    pub const fn as_augmented_assign_operator(self) -> Option<Operator> {
         Some(match self {
             TokenKind::PlusEqual => Operator::Add,
             TokenKind::MinusEqual => Operator::Sub,
@@ -613,95 +630,98 @@ impl fmt::Display for TokenKind {
             TokenKind::FStringStart => "FStringStart",
             TokenKind::FStringMiddle => "FStringMiddle",
             TokenKind::FStringEnd => "FStringEnd",
+            TokenKind::TStringStart => "TStringStart",
+            TokenKind::TStringMiddle => "TStringMiddle",
+            TokenKind::TStringEnd => "TStringEnd",
             TokenKind::IpyEscapeCommand => "IPython escape command",
             TokenKind::Comment => "comment",
-            TokenKind::Question => "'?'",
-            TokenKind::Exclamation => "'!'",
-            TokenKind::Lpar => "'('",
-            TokenKind::Rpar => "')'",
-            TokenKind::Lsqb => "'['",
-            TokenKind::Rsqb => "']'",
-            TokenKind::Lbrace => "'{'",
-            TokenKind::Rbrace => "'}'",
-            TokenKind::Equal => "'='",
-            TokenKind::ColonEqual => "':='",
-            TokenKind::Dot => "'.'",
-            TokenKind::Colon => "':'",
-            TokenKind::Semi => "';'",
-            TokenKind::Comma => "','",
-            TokenKind::Rarrow => "'->'",
-            TokenKind::Plus => "'+'",
-            TokenKind::Minus => "'-'",
-            TokenKind::Star => "'*'",
-            TokenKind::DoubleStar => "'**'",
-            TokenKind::Slash => "'/'",
-            TokenKind::DoubleSlash => "'//'",
-            TokenKind::Percent => "'%'",
-            TokenKind::Vbar => "'|'",
-            TokenKind::Amper => "'&'",
-            TokenKind::CircumFlex => "'^'",
-            TokenKind::LeftShift => "'<<'",
-            TokenKind::RightShift => "'>>'",
-            TokenKind::Tilde => "'~'",
-            TokenKind::At => "'@'",
-            TokenKind::Less => "'<'",
-            TokenKind::Greater => "'>'",
-            TokenKind::EqEqual => "'=='",
-            TokenKind::NotEqual => "'!='",
-            TokenKind::LessEqual => "'<='",
-            TokenKind::GreaterEqual => "'>='",
-            TokenKind::PlusEqual => "'+='",
-            TokenKind::MinusEqual => "'-='",
-            TokenKind::StarEqual => "'*='",
-            TokenKind::DoubleStarEqual => "'**='",
-            TokenKind::SlashEqual => "'/='",
-            TokenKind::DoubleSlashEqual => "'//='",
-            TokenKind::PercentEqual => "'%='",
-            TokenKind::VbarEqual => "'|='",
-            TokenKind::AmperEqual => "'&='",
-            TokenKind::CircumflexEqual => "'^='",
-            TokenKind::LeftShiftEqual => "'<<='",
-            TokenKind::RightShiftEqual => "'>>='",
-            TokenKind::AtEqual => "'@='",
-            TokenKind::Ellipsis => "'...'",
-            TokenKind::False => "'False'",
-            TokenKind::None => "'None'",
-            TokenKind::True => "'True'",
-            TokenKind::And => "'and'",
-            TokenKind::As => "'as'",
-            TokenKind::Assert => "'assert'",
-            TokenKind::Async => "'async'",
-            TokenKind::Await => "'await'",
-            TokenKind::Break => "'break'",
-            TokenKind::Class => "'class'",
-            TokenKind::Continue => "'continue'",
-            TokenKind::Def => "'def'",
-            TokenKind::Del => "'del'",
-            TokenKind::Elif => "'elif'",
-            TokenKind::Else => "'else'",
-            TokenKind::Except => "'except'",
-            TokenKind::Finally => "'finally'",
-            TokenKind::For => "'for'",
-            TokenKind::From => "'from'",
-            TokenKind::Global => "'global'",
-            TokenKind::If => "'if'",
-            TokenKind::Import => "'import'",
-            TokenKind::In => "'in'",
-            TokenKind::Is => "'is'",
-            TokenKind::Lambda => "'lambda'",
-            TokenKind::Nonlocal => "'nonlocal'",
-            TokenKind::Not => "'not'",
-            TokenKind::Or => "'or'",
-            TokenKind::Pass => "'pass'",
-            TokenKind::Raise => "'raise'",
-            TokenKind::Return => "'return'",
-            TokenKind::Try => "'try'",
-            TokenKind::While => "'while'",
-            TokenKind::Match => "'match'",
-            TokenKind::Type => "'type'",
-            TokenKind::Case => "'case'",
-            TokenKind::With => "'with'",
-            TokenKind::Yield => "'yield'",
+            TokenKind::Question => "`?`",
+            TokenKind::Exclamation => "`!`",
+            TokenKind::Lpar => "`(`",
+            TokenKind::Rpar => "`)`",
+            TokenKind::Lsqb => "`[`",
+            TokenKind::Rsqb => "`]`",
+            TokenKind::Lbrace => "`{`",
+            TokenKind::Rbrace => "`}`",
+            TokenKind::Equal => "`=`",
+            TokenKind::ColonEqual => "`:=`",
+            TokenKind::Dot => "`.`",
+            TokenKind::Colon => "`:`",
+            TokenKind::Semi => "`;`",
+            TokenKind::Comma => "`,`",
+            TokenKind::Rarrow => "`->`",
+            TokenKind::Plus => "`+`",
+            TokenKind::Minus => "`-`",
+            TokenKind::Star => "`*`",
+            TokenKind::DoubleStar => "`**`",
+            TokenKind::Slash => "`/`",
+            TokenKind::DoubleSlash => "`//`",
+            TokenKind::Percent => "`%`",
+            TokenKind::Vbar => "`|`",
+            TokenKind::Amper => "`&`",
+            TokenKind::CircumFlex => "`^`",
+            TokenKind::LeftShift => "`<<`",
+            TokenKind::RightShift => "`>>`",
+            TokenKind::Tilde => "`~`",
+            TokenKind::At => "`@`",
+            TokenKind::Less => "`<`",
+            TokenKind::Greater => "`>`",
+            TokenKind::EqEqual => "`==`",
+            TokenKind::NotEqual => "`!=`",
+            TokenKind::LessEqual => "`<=`",
+            TokenKind::GreaterEqual => "`>=`",
+            TokenKind::PlusEqual => "`+=`",
+            TokenKind::MinusEqual => "`-=`",
+            TokenKind::StarEqual => "`*=`",
+            TokenKind::DoubleStarEqual => "`**=`",
+            TokenKind::SlashEqual => "`/=`",
+            TokenKind::DoubleSlashEqual => "`//=`",
+            TokenKind::PercentEqual => "`%=`",
+            TokenKind::VbarEqual => "`|=`",
+            TokenKind::AmperEqual => "`&=`",
+            TokenKind::CircumflexEqual => "`^=`",
+            TokenKind::LeftShiftEqual => "`<<=`",
+            TokenKind::RightShiftEqual => "`>>=`",
+            TokenKind::AtEqual => "`@=`",
+            TokenKind::Ellipsis => "`...`",
+            TokenKind::False => "`False`",
+            TokenKind::None => "`None`",
+            TokenKind::True => "`True`",
+            TokenKind::And => "`and`",
+            TokenKind::As => "`as`",
+            TokenKind::Assert => "`assert`",
+            TokenKind::Async => "`async`",
+            TokenKind::Await => "`await`",
+            TokenKind::Break => "`break`",
+            TokenKind::Class => "`class`",
+            TokenKind::Continue => "`continue`",
+            TokenKind::Def => "`def`",
+            TokenKind::Del => "`del`",
+            TokenKind::Elif => "`elif`",
+            TokenKind::Else => "`else`",
+            TokenKind::Except => "`except`",
+            TokenKind::Finally => "`finally`",
+            TokenKind::For => "`for`",
+            TokenKind::From => "`from`",
+            TokenKind::Global => "`global`",
+            TokenKind::If => "`if`",
+            TokenKind::Import => "`import`",
+            TokenKind::In => "`in`",
+            TokenKind::Is => "`is`",
+            TokenKind::Lambda => "`lambda`",
+            TokenKind::Nonlocal => "`nonlocal`",
+            TokenKind::Not => "`not`",
+            TokenKind::Or => "`or`",
+            TokenKind::Pass => "`pass`",
+            TokenKind::Raise => "`raise`",
+            TokenKind::Return => "`return`",
+            TokenKind::Try => "`try`",
+            TokenKind::While => "`while`",
+            TokenKind::Match => "`match`",
+            TokenKind::Type => "`type`",
+            TokenKind::Case => "`case`",
+            TokenKind::With => "`with`",
+            TokenKind::Yield => "`yield`",
         };
         f.write_str(value)
     }
@@ -709,7 +729,7 @@ impl fmt::Display for TokenKind {
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    pub(crate) struct TokenFlags: u8 {
+    pub(crate) struct TokenFlags: u16 {
         /// The token is a string with double quotes (`"`).
         const DOUBLE_QUOTES = 1 << 0;
         /// The token is a triple-quoted string i.e., it starts and ends with three consecutive
@@ -722,15 +742,22 @@ bitflags! {
         const BYTE_STRING = 1 << 3;
         /// The token is an f-string i.e., prefixed with `f` or `F`
         const F_STRING = 1 << 4;
+        /// The token is a t-string i.e., prefixed with `t` or `T`
+        const T_STRING = 1 << 5;
         /// The token is a raw string and the prefix character is in lowercase.
-        const RAW_STRING_LOWERCASE = 1 << 5;
+        const RAW_STRING_LOWERCASE = 1 << 6;
         /// The token is a raw string and the prefix character is in uppercase.
-        const RAW_STRING_UPPERCASE = 1 << 6;
+        const RAW_STRING_UPPERCASE = 1 << 7;
+        /// String without matching closing quote(s)
+        const UNCLOSED_STRING = 1 << 8;
 
         /// The token is a raw string i.e., prefixed with `r` or `R`
         const RAW_STRING = Self::RAW_STRING_LOWERCASE.bits() | Self::RAW_STRING_UPPERCASE.bits();
+
     }
 }
+
+impl get_size2::GetSize for TokenFlags {}
 
 impl StringFlags for TokenFlags {
     fn quote_style(self) -> Quote {
@@ -758,6 +785,14 @@ impl StringFlags for TokenFlags {
             } else {
                 AnyStringPrefix::Format(FStringPrefix::Regular)
             }
+        } else if self.intersects(TokenFlags::T_STRING) {
+            if self.intersects(TokenFlags::RAW_STRING_LOWERCASE) {
+                AnyStringPrefix::Template(TStringPrefix::Raw { uppercase_r: false })
+            } else if self.intersects(TokenFlags::RAW_STRING_UPPERCASE) {
+                AnyStringPrefix::Template(TStringPrefix::Raw { uppercase_r: true })
+            } else {
+                AnyStringPrefix::Template(TStringPrefix::Regular)
+            }
         } else if self.intersects(TokenFlags::BYTE_STRING) {
             if self.intersects(TokenFlags::RAW_STRING_LOWERCASE) {
                 AnyStringPrefix::Bytes(ByteStringPrefix::Raw { uppercase_r: false })
@@ -776,6 +811,10 @@ impl StringFlags for TokenFlags {
             AnyStringPrefix::Regular(StringLiteralPrefix::Empty)
         }
     }
+
+    fn is_unclosed(self) -> bool {
+        self.intersects(TokenFlags::UNCLOSED_STRING)
+    }
 }
 
 impl TokenFlags {
@@ -784,9 +823,19 @@ impl TokenFlags {
         self.intersects(TokenFlags::F_STRING)
     }
 
-    /// Returns `true` if the token is a triple-quoted f-string.
-    pub(crate) fn is_triple_quoted_fstring(self) -> bool {
-        self.contains(TokenFlags::F_STRING | TokenFlags::TRIPLE_QUOTED_STRING)
+    /// Returns `true` if the token is a t-string.
+    pub(crate) const fn is_t_string(self) -> bool {
+        self.intersects(TokenFlags::T_STRING)
+    }
+
+    /// Returns `true` if the token is a t-string.
+    pub(crate) const fn is_interpolated_string(self) -> bool {
+        self.intersects(TokenFlags::T_STRING.union(TokenFlags::F_STRING))
+    }
+
+    /// Returns `true` if the token is a triple-quoted t-string.
+    pub(crate) fn is_triple_quoted_interpolated_string(self) -> bool {
+        self.intersects(TokenFlags::TRIPLE_QUOTED_STRING) && self.is_interpolated_string()
     }
 
     /// Returns `true` if the token is a raw string.
@@ -819,7 +868,7 @@ pub(crate) enum TokenValue {
     String(Box<str>),
     /// Token value that includes the portion of text inside the f-string that's not
     /// part of the expression part and isn't an opening or closing brace.
-    FStringMiddle(Box<str>),
+    InterpolatedStringMiddle(Box<str>),
     /// Token value for IPython escape commands. These are recognized by the lexer
     /// only when the mode is [`Mode::Ipython`].
     IpyEscapeCommand {

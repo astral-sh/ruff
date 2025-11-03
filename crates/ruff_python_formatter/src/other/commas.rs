@@ -2,8 +2,8 @@ use ruff_formatter::FormatContext;
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::TextRange;
 
-use crate::prelude::*;
 use crate::MagicTrailingComma;
+use crate::prelude::*;
 
 /// Returns `true` if the range ends with a magic trailing comma (and the magic trailing comma
 /// should be respected).

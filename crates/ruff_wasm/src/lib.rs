@@ -1,31 +1,29 @@
 use std::path::Path;
 
 use js_sys::Error;
-use ruff_linter::message::{DiagnosticMessage, Message, SyntaxErrorMessage};
 use ruff_linter::settings::types::PythonVersion;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{FormatResult, Formatted, IndentStyle};
+use ruff_linter::Locator;
 use ruff_linter::directives;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::linter::check_path;
-use ruff_linter::registry::AsRule;
-use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
+use ruff_linter::settings::{DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, flags};
 use ruff_linter::source_kind::SourceKind;
-use ruff_linter::Locator;
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
-use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
+use ruff_python_formatter::{PyFormatContext, QuoteStyle, format_module_ast, pretty_comments};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{parse, parse_unchecked, Mode, ParseOptions, Parsed};
+use ruff_python_parser::{Mode, ParseOptions, Parsed, parse, parse_unchecked};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::SourceLocation;
+use ruff_source_file::{OneIndexed, PositionEncoding as SourcePositionEncoding, SourceLocation};
 use ruff_text_size::Ranged;
+use ruff_workspace::Settings;
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::options::{FormatOptions, LintCommonOptions, LintOptions, Options};
-use ruff_workspace::Settings;
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"
@@ -59,10 +57,10 @@ export interface Diagnostic {
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct ExpandedMessage {
-    pub code: Option<String>,
+    pub code: String,
     pub message: String,
-    pub start_location: SourceLocation,
-    pub end_location: SourceLocation,
+    pub start_location: Location,
+    pub end_location: Location,
     pub fix: Option<ExpandedFix>,
 }
 
@@ -74,14 +72,35 @@ pub struct ExpandedFix {
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 struct ExpandedEdit {
-    location: SourceLocation,
-    end_location: SourceLocation,
+    location: Location,
+    end_location: Location,
     content: Option<String>,
 }
+
+/// Perform global constructor initialization.
+#[cfg(target_family = "wasm")]
+#[expect(unsafe_code)]
+pub fn before_main() {
+    unsafe extern "C" {
+        fn __wasm_call_ctors();
+    }
+
+    // Salsa uses the `inventory` crate, which registers global constructors that may need to be
+    // called explicitly on WASM. See <https://github.com/dtolnay/inventory/blob/master/src/lib.rs#L105>
+    // for details.
+    unsafe {
+        __wasm_call_ctors();
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub fn before_main() {}
 
 #[wasm_bindgen(start)]
 pub fn run() {
     use log::Level;
+
+    before_main();
 
     // When the `console_error_panic_hook` feature is enabled, we can call the
     // `set_panic_hook` function at least once during initialization, and then
@@ -98,6 +117,7 @@ pub fn run() {
 #[wasm_bindgen]
 pub struct Workspace {
     settings: Settings,
+    position_encoding: SourcePositionEncoding,
 }
 
 #[wasm_bindgen]
@@ -107,7 +127,7 @@ impl Workspace {
     }
 
     #[wasm_bindgen(constructor)]
-    pub fn new(options: JsValue) -> Result<Workspace, Error> {
+    pub fn new(options: JsValue, position_encoding: PositionEncoding) -> Result<Workspace, Error> {
         let options: Options = serde_wasm_bindgen::from_value(options).map_err(into_error)?;
         let configuration =
             Configuration::from_options(options, Some(Path::new(".")), Path::new("."))
@@ -116,7 +136,10 @@ impl Workspace {
             .into_settings(Path::new("."))
             .map_err(into_error)?;
 
-        Ok(Workspace { settings })
+        Ok(Workspace {
+            settings,
+            position_encoding: position_encoding.into(),
+        })
     }
 
     #[wasm_bindgen(js_name = defaultSettings)]
@@ -166,7 +189,8 @@ impl Workspace {
         let target_version = self.settings.linter.unresolved_target_version;
 
         // Parse once.
-        let options = ParseOptions::from(source_type).with_target_version(target_version);
+        let options =
+            ParseOptions::from(source_type).with_target_version(target_version.parser_version());
         let parsed = parse_unchecked(source_kind.source_code(), options)
             .try_into_module()
             .expect("`PySourceType` always parses to a `ModModule`.");
@@ -183,13 +207,13 @@ impl Workspace {
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives = directives::extract_directives(
             parsed.tokens(),
-            directives::Flags::empty(),
+            directives::Flags::from_settings(&self.settings.linter),
             &locator,
             &indexer,
         );
 
         // Generate checks.
-        let messages = check_path(
+        let diagnostics = check_path(
             Path::new("<filename>"),
             None,
             &locator,
@@ -206,37 +230,35 @@ impl Workspace {
 
         let source_code = locator.to_source_code();
 
-        let messages: Vec<ExpandedMessage> = messages
+        let messages: Vec<ExpandedMessage> = diagnostics
             .into_iter()
-            .map(|message| match message {
-                Message::Diagnostic(DiagnosticMessage {
-                    kind, range, fix, ..
-                }) => ExpandedMessage {
-                    code: Some(kind.rule().noqa_code().to_string()),
-                    message: kind.body,
-                    start_location: source_code.source_location(range.start()),
-                    end_location: source_code.source_location(range.end()),
-                    fix: fix.map(|fix| ExpandedFix {
-                        message: kind.suggestion,
+            .map(|msg| {
+                let range = msg.range().unwrap_or_default();
+                ExpandedMessage {
+                    code: msg.secondary_code_or_id().to_string(),
+                    message: msg.body().to_string(),
+                    start_location: source_code
+                        .source_location(range.start(), self.position_encoding)
+                        .into(),
+                    end_location: source_code
+                        .source_location(range.end(), self.position_encoding)
+                        .into(),
+                    fix: msg.fix().map(|fix| ExpandedFix {
+                        message: msg.first_help_text().map(ToString::to_string),
                         edits: fix
                             .edits()
                             .iter()
                             .map(|edit| ExpandedEdit {
-                                location: source_code.source_location(edit.start()),
-                                end_location: source_code.source_location(edit.end()),
+                                location: source_code
+                                    .source_location(edit.start(), self.position_encoding)
+                                    .into(),
+                                end_location: source_code
+                                    .source_location(edit.end(), self.position_encoding)
+                                    .into(),
                                 content: edit.content().map(ToString::to_string),
                             })
                             .collect(),
                     }),
-                },
-                Message::SyntaxError(SyntaxErrorMessage { message, range, .. }) => {
-                    ExpandedMessage {
-                        code: None,
-                        message,
-                        start_location: source_code.source_location(range.start()),
-                        end_location: source_code.source_location(range.end()),
-                        fix: None,
-                    }
                 }
             })
             .collect();
@@ -301,7 +323,7 @@ impl<'a> ParsedModule<'a> {
         })
     }
 
-    fn format(&self, settings: &Settings) -> FormatResult<Formatted<PyFormatContext>> {
+    fn format(&self, settings: &Settings) -> FormatResult<Formatted<PyFormatContext<'_>>> {
         // TODO(konstin): Add an options for py/pyi to the UI (2/2)
         let options = settings
             .formatter
@@ -314,5 +336,43 @@ impl<'a> ParsedModule<'a> {
             self.source_code,
             options,
         )
+    }
+}
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+pub struct Location {
+    pub row: OneIndexed,
+    /// The character offset from the start of the line.
+    ///
+    /// The semantic of the offset depends on the [`PositionEncoding`] used when creating
+    /// the [`Workspace`].
+    pub column: OneIndexed,
+}
+
+impl From<SourceLocation> for Location {
+    fn from(value: SourceLocation) -> Self {
+        Self {
+            row: value.line,
+            column: value.character_offset,
+        }
+    }
+}
+
+#[derive(Default, Copy, Clone)]
+#[wasm_bindgen]
+pub enum PositionEncoding {
+    #[default]
+    Utf8,
+    Utf16,
+    Utf32,
+}
+
+impl From<PositionEncoding> for SourcePositionEncoding {
+    fn from(value: PositionEncoding) -> Self {
+        match value {
+            PositionEncoding::Utf8 => Self::Utf8,
+            PositionEncoding::Utf16 => Self::Utf16,
+            PositionEncoding::Utf32 => Self::Utf32,
+        }
     }
 }

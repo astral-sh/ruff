@@ -1,0 +1,44 @@
+[package]
+name = "ty_ide"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+bitflags = { workspace = true }
+ruff_db = { workspace = true }
+ruff_diagnostics = { workspace = true }
+ruff_index = { workspace = true }
+ruff_memory_usage = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_python_codegen = { workspace = true }
+ruff_python_importer = { workspace = true }
+ruff_python_parser = { workspace = true }
+ruff_python_trivia = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
+ty_python_semantic = { workspace = true }
+ty_project = { workspace = true, features = ["testing"] }
+ty_vendored = { workspace = true }
+
+get-size2 = { workspace = true }
+itertools = { workspace = true }
+rayon = { workspace = true }
+regex = { workspace = true }
+rustc-hash = { workspace = true }
+salsa = { workspace = true, features = ["compact_str"] }
+smallvec = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+camino = { workspace = true }
+insta = { workspace = true, features = ["filters"] }
+
+[lints]
+workspace = true

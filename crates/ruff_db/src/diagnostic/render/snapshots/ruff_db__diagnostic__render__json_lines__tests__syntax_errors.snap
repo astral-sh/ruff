@@ -1,0 +1,6 @@
+---
+source: crates/ruff_db/src/diagnostic/render/json_lines.rs
+expression: env.render_diagnostics(&diagnostics)
+---
+{"cell":null,"code":"invalid-syntax","end_location":{"column":1,"row":2},"filename":"/syntax_errors.py","fix":null,"location":{"column":15,"row":1},"message":"Expected one or more symbol names after import","noqa_row":null,"url":null}
+{"cell":null,"code":"invalid-syntax","end_location":{"column":1,"row":4},"filename":"/syntax_errors.py","fix":null,"location":{"column":12,"row":3},"message":"Expected ')', found newline","noqa_row":null,"url":null}

@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
@@ -9,6 +8,7 @@ use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -35,6 +35,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `__bytes__` method](https://docs.python.org/3/reference/datamodel.html#object.__bytes__)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct InvalidBytesReturnType;
 
 impl Violation for InvalidBytesReturnType {
@@ -68,10 +69,7 @@ pub(crate) fn invalid_bytes_return(checker: &Checker, function_def: &ast::StmtFu
 
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
-        checker.report_diagnostic(Diagnostic::new(
-            InvalidBytesReturnType,
-            function_def.identifier(),
-        ));
+        checker.report_diagnostic(InvalidBytesReturnType, function_def.identifier());
         return;
     }
 
@@ -87,11 +85,11 @@ pub(crate) fn invalid_bytes_return(checker: &Checker, function_def: &ast::StmtFu
                 ResolvedPythonType::from(value),
                 ResolvedPythonType::Unknown | ResolvedPythonType::Atom(PythonType::Bytes)
             ) {
-                checker.report_diagnostic(Diagnostic::new(InvalidBytesReturnType, value.range()));
+                checker.report_diagnostic(InvalidBytesReturnType, value.range());
             }
         } else {
             // Disallow implicit `None`.
-            checker.report_diagnostic(Diagnostic::new(InvalidBytesReturnType, stmt.range()));
+            checker.report_diagnostic(InvalidBytesReturnType, stmt.range());
         }
     }
 }

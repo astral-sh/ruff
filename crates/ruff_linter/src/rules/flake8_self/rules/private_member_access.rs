@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{is_dunder, is_sunder};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, Expr};
@@ -8,6 +7,7 @@ use ruff_python_semantic::analyze::typing::TypeChecker;
 use ruff_python_semantic::{BindingKind, ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::is_dunder_operator_method;
 
@@ -55,6 +55,7 @@ use crate::rules::pylint::helpers::is_dunder_operator_method;
 /// ## References
 /// - [_What is the meaning of single or double underscores before an object name?_](https://stackoverflow.com/questions/1301346/what-is-the-meaning-of-single-and-double-underscore-before-an-object-name)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.240")]
 pub(crate) struct PrivateMemberAccess {
     access: String,
 }
@@ -85,7 +86,7 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
     }
 
     if checker
-        .settings
+        .settings()
         .flake8_self
         .ignore_names
         .contains(attr.id())
@@ -144,12 +145,12 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
         }
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         PrivateMemberAccess {
             access: attr.to_string(),
         },
         expr.range(),
-    ));
+    );
 }
 
 /// Check for the following cases:

@@ -3,16 +3,16 @@ use std::borrow::Cow;
 use rustc_hash::FxHashMap;
 
 use crate::{
+    PositionEncoding,
     edit::{Replacement, ToRangeExt},
     resolve::is_document_excluded_for_linting,
     session::DocumentQuery,
-    PositionEncoding,
 };
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{
     linter::FixerResult,
     packaging::detect_package_root,
-    settings::{flags, LinterSettings},
+    settings::{LinterSettings, flags},
 };
 use ruff_notebook::SourceValue;
 use ruff_source_file::LineIndex;
@@ -28,21 +28,22 @@ pub(crate) fn fix_all(
 ) -> crate::Result<Fixes> {
     let source_kind = query.make_source_kind();
     let settings = query.settings();
-    let document_path = query.file_path();
+    let document_path = query.virtual_file_path();
 
     // If the document is excluded, return an empty list of fixes.
-    let package = if let Some(document_path) = document_path.as_ref() {
-        if is_document_excluded_for_linting(
-            document_path,
-            &settings.file_resolver,
-            linter_settings,
-            query.text_document_language_id(),
-        ) {
-            return Ok(Fixes::default());
-        }
+    if is_document_excluded_for_linting(
+        &document_path,
+        &settings.file_resolver,
+        linter_settings,
+        query.text_document_language_id(),
+    ) {
+        return Ok(Fixes::default());
+    }
 
+    let file_path = query.file_path();
+    let package = if let Some(file_path) = &file_path {
         detect_package_root(
-            document_path
+            file_path
                 .parent()
                 .expect("a path to a document should have a parent path"),
             &linter_settings.namespace_packages,
@@ -65,7 +66,7 @@ pub(crate) fn fix_all(
         result,
         ..
     } = ruff_linter::linter::lint_fix(
-        &query.virtual_file_path(),
+        &document_path,
         package,
         flags::Noqa::Enabled,
         settings.unsafe_fixes,

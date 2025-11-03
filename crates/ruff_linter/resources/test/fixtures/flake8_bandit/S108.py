@@ -40,3 +40,7 @@ with tempfile.TemporaryDirectory(dir="/dev/shm") as d:
 
 with TemporaryDirectory(dir="/tmp") as d:
     pass
+
+# ok (runtime error from t-string)
+with open(t"/foo/bar", "w") as f:
+    f.write("def")

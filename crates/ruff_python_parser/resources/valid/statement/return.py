@@ -1,7 +1,5 @@
 return
 return x
-return *x
-return *x | y
 return *x, *y
 return (x := 1)
 return None

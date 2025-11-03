@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::pep_604_union;
 use ruff_python_ast::{self as ast, Expr, ExprContext};
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the presence of multiple literal types in a union.
@@ -47,6 +47,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `typing.Literal`](https://docs.python.org/3/library/typing.html#typing.Literal)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.278")]
 pub(crate) struct UnnecessaryLiteralUnion {
     members: Vec<String>,
 }
@@ -124,7 +125,7 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryLiteralUnion {
             members: literal_exprs
                 .iter()
@@ -140,10 +141,12 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
             slice: Box::new(Expr::Tuple(ast::ExprTuple {
                 elts: literal_exprs.into_iter().cloned().collect(),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 ctx: ExprContext::Load,
                 parenthesized: true,
             })),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,
         });
 
@@ -162,10 +165,12 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
                         slice: Box::new(Expr::Tuple(ast::ExprTuple {
                             elts,
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                             ctx: ExprContext::Load,
                             parenthesized: true,
                         })),
                         range: TextRange::default(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                         ctx: ExprContext::Load,
                     }))
             } else {
@@ -180,6 +185,4 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
             Fix::safe_edit(edit)
         }
     });
-
-    checker.report_diagnostic(diagnostic);
 }

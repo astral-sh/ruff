@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Int};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -31,6 +31,7 @@ use crate::checkers::ast::Checker;
 /// - [Cybersecurity and Infrastructure Security Agency (CISA): Alert TA17-156A](https://www.cisa.gov/news-events/alerts/2017/06/05/reducing-risk-snmp-abuse)
 /// - [Common Weakness Enumeration: CWE-319](https://cwe.mitre.org/data/definitions/319.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.218")]
 pub(crate) struct SnmpInsecureVersion;
 
 impl Violation for SnmpInsecureVersion {
@@ -60,7 +61,7 @@ pub(crate) fn snmp_insecure_version(checker: &Checker, call: &ast::ExprCall) {
                     ..
                 })
             ) {
-                checker.report_diagnostic(Diagnostic::new(SnmpInsecureVersion, keyword.range()));
+                checker.report_diagnostic(SnmpInsecureVersion, keyword.range());
             }
         }
     }

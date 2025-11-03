@@ -1,9 +1,9 @@
 use std::borrow::Cow;
+use std::fmt::Write;
 use std::str::FromStr;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, whitespace::indentation, AnyStringFlags, Expr, StringFlags};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, AnyStringFlags, Expr, StringFlags, whitespace::indentation};
 use ruff_python_codegen::Stylist;
 use ruff_python_literal::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
@@ -13,9 +13,10 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::pyupgrade::helpers::curly_escape;
-use crate::Locator;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `printf`-style string formatting, and offers to replace it with
@@ -74,6 +75,7 @@ use crate::Locator;
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#old-string-formatting)
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.229")]
 pub(crate) struct PrintfStringFormatting;
 
 impl Violation for PrintfStringFormatting {
@@ -230,7 +232,12 @@ fn clean_params_tuple<'a>(right: &Expr, locator: &Locator<'a>) -> Cow<'a, str> {
 fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -> Option<String> {
     let is_multi_line = locator.contains_line_break(right.range());
     let mut contents = String::new();
-    if let Expr::Dict(ast::ExprDict { items, range: _ }) = &right {
+    if let Expr::Dict(ast::ExprDict {
+        items,
+        range: _,
+        node_index: _,
+    }) = &right
+    {
         let mut arguments: Vec<String> = vec![];
         let mut seen: Vec<&str> = vec![];
         let mut indent = None;
@@ -302,7 +309,7 @@ fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -
 /// [`Expr`] can be converted.
 fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
     for (.., format_part) in format_string.iter() {
-        let CFormatPart::Spec(ref fmt) = format_part else {
+        let CFormatPart::Spec(fmt) = format_part else {
             continue;
         };
 
@@ -384,13 +391,13 @@ pub(crate) fn printf_string_formatting(
             return;
         };
         if !convertible(&format_string, right) {
-            checker.report_diagnostic(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
+            checker.report_diagnostic(PrintfStringFormatting, string_expr.range());
             return;
         }
 
         // Count the number of positional and keyword arguments.
         for (.., format_part) in format_string.iter() {
-            let CFormatPart::Spec(ref fmt) = format_part else {
+            let CFormatPart::Spec(fmt) = format_part else {
                 continue;
             };
             if fmt.mapping_key.is_none() {
@@ -445,10 +452,7 @@ pub(crate) fn printf_string_formatting(
             let Some(params_string) =
                 clean_params_dictionary(right, checker.locator(), checker.stylist())
             else {
-                checker.report_diagnostic(Diagnostic::new(
-                    PrintfStringFormatting,
-                    string_expr.range(),
-                ));
+                checker.report_diagnostic(PrintfStringFormatting, string_expr.range());
                 return;
             };
             Cow::Owned(params_string)
@@ -501,14 +505,13 @@ pub(crate) fn printf_string_formatting(
     }
 
     // Add the `.format` call.
-    contents.push_str(&format!(".format{params_string}"));
+    let _ = write!(&mut contents, ".format{params_string}");
 
-    let mut diagnostic = Diagnostic::new(PrintfStringFormatting, bin_op.range());
+    let mut diagnostic = checker.report_diagnostic(PrintfStringFormatting, bin_op.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         contents,
         bin_op.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 #[cfg(test)]

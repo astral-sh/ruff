@@ -5,13 +5,13 @@ use std::fs;
 use std::path::Path;
 
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
-use ruff_python_ast::visitor::source_order::{walk_module, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{AnyNodeRef, Mod, PythonVersion};
+use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_module};
+use ruff_python_ast::{self as ast, AnyNodeRef, Mod, PythonVersion};
 use ruff_python_parser::semantic_errors::{
-    SemanticSyntaxCheckerVisitor, SemanticSyntaxContext, SemanticSyntaxError,
+    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
 };
-use ruff_python_parser::{parse_unchecked, Mode, ParseErrorType, ParseOptions, Token};
+use ruff_python_parser::{Mode, ParseErrorType, ParseOptions, Token, parse_unchecked};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -40,9 +40,9 @@ fn inline_err() {
 fn test_valid_syntax(input_path: &Path) {
     let source = fs::read_to_string(input_path).expect("Expected test file to exist");
     let options = extract_options(&source).unwrap_or_else(|| {
-        ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest())
+        ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest_preview())
     });
-    let parsed = parse_unchecked(&source, options);
+    let parsed = parse_unchecked(&source, options.clone());
 
     if parsed.has_syntax_errors() {
         let line_index = LineIndex::from_source_text(&source);
@@ -88,13 +88,14 @@ fn test_valid_syntax(input_path: &Path) {
 
     let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
 
-    let mut visitor = SemanticSyntaxCheckerVisitor::new(TestContext::default());
+    let mut visitor =
+        SemanticSyntaxCheckerVisitor::new(&source).with_python_version(options.target_version());
 
     for stmt in parsed.suite() {
         visitor.visit_stmt(stmt);
     }
 
-    let semantic_syntax_errors = visitor.into_context().diagnostics.into_inner();
+    let semantic_syntax_errors = visitor.into_diagnostics();
 
     if !semantic_syntax_errors.is_empty() {
         let mut message = "Expected no semantic syntax errors for a valid program:\n".to_string();
@@ -132,9 +133,9 @@ fn test_valid_syntax(input_path: &Path) {
 fn test_invalid_syntax(input_path: &Path) {
     let source = fs::read_to_string(input_path).expect("Expected test file to exist");
     let options = extract_options(&source).unwrap_or_else(|| {
-        ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest())
+        ParseOptions::from(Mode::Module).with_target_version(PythonVersion::PY314)
     });
-    let parsed = parse_unchecked(&source, options);
+    let parsed = parse_unchecked(&source, options.clone());
 
     validate_tokens(parsed.tokens(), source.text_len(), input_path);
     validate_ast(parsed.syntax(), source.text_len(), input_path);
@@ -182,13 +183,14 @@ fn test_invalid_syntax(input_path: &Path) {
 
     let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
 
-    let mut visitor = SemanticSyntaxCheckerVisitor::new(TestContext::default());
+    let mut visitor =
+        SemanticSyntaxCheckerVisitor::new(&source).with_python_version(options.target_version());
 
     for stmt in parsed.suite() {
         visitor.visit_stmt(stmt);
     }
 
-    let semantic_syntax_errors = visitor.into_context().diagnostics.into_inner();
+    let semantic_syntax_errors = visitor.into_diagnostics();
 
     assert!(
         parsed.has_syntax_errors() || !semantic_syntax_errors.is_empty(),
@@ -272,7 +274,7 @@ fn extract_options(source: &str) -> Option<ParseOptions> {
 // Use it for quickly debugging a parser issue.
 #[test]
 #[ignore]
-#[allow(clippy::print_stdout)]
+#[expect(clippy::print_stdout)]
 fn parser_quick_test() {
     let source = "\
 f'{'
@@ -431,7 +433,9 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
         );
 
         if let Some(previous) = self.previous {
-            assert_ne!(previous.range().ordering(node.range()), Ordering::Greater,
+            assert_ne!(
+                previous.range().ordering(node.range()),
+                Ordering::Greater,
                 "{path}: The ranges of the nodes are not strictly increasing when traversing the AST in pre-order.\nPrevious node: {previous:#?}\n\nCurrent node: {node:#?}\n\nRoot: {root:#?}",
                 path = self.test_path.display(),
                 root = self.parents.first()
@@ -439,7 +443,8 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
         }
 
         if let Some(parent) = self.parents.last() {
-            assert!(parent.range().contains_range(node.range()),
+            assert!(
+                parent.range().contains_range(node.range()),
                 "{path}: The range of the parent node does not fully enclose the range of the child node.\nParent node: {parent:#?}\n\nChild node: {node:#?}\n\nRoot: {root:#?}",
                 path = self.test_path.display(),
                 root = self.parents.first()
@@ -458,21 +463,206 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
     }
 }
 
-#[derive(Debug, Default)]
-struct TestContext {
-    diagnostics: RefCell<Vec<SemanticSyntaxError>>,
+enum Scope {
+    Module,
+    Function { is_async: bool },
+    Comprehension { is_async: bool },
+    Class,
 }
 
-impl SemanticSyntaxContext for TestContext {
-    fn seen_docstring_boundary(&self) -> bool {
+struct SemanticSyntaxCheckerVisitor<'a> {
+    checker: SemanticSyntaxChecker,
+    diagnostics: RefCell<Vec<SemanticSyntaxError>>,
+    python_version: PythonVersion,
+    source: &'a str,
+    scopes: Vec<Scope>,
+}
+
+impl<'a> SemanticSyntaxCheckerVisitor<'a> {
+    fn new(source: &'a str) -> Self {
+        Self {
+            checker: SemanticSyntaxChecker::new(),
+            diagnostics: RefCell::default(),
+            python_version: PythonVersion::default(),
+            source,
+            scopes: vec![Scope::Module],
+        }
+    }
+
+    #[must_use]
+    fn with_python_version(mut self, python_version: PythonVersion) -> Self {
+        self.python_version = python_version;
+        self
+    }
+
+    fn into_diagnostics(self) -> Vec<SemanticSyntaxError> {
+        self.diagnostics.into_inner()
+    }
+
+    fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Self)) {
+        let mut checker = std::mem::take(&mut self.checker);
+        f(&mut checker, self);
+        self.checker = checker;
+    }
+}
+
+impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
+    fn future_annotations_or_stub(&self) -> bool {
         false
     }
 
     fn python_version(&self) -> PythonVersion {
-        PythonVersion::default()
+        self.python_version
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
         self.diagnostics.borrow_mut().push(error);
+    }
+
+    fn source(&self) -> &str {
+        self.source
+    }
+
+    fn global(&self, _name: &str) -> Option<TextRange> {
+        None
+    }
+
+    fn in_async_context(&self) -> bool {
+        if let Some(scope) = self.scopes.iter().next_back() {
+            match scope {
+                Scope::Class | Scope::Module => false,
+                Scope::Comprehension { is_async } => *is_async,
+                Scope::Function { is_async } => *is_async,
+            }
+        } else {
+            false
+        }
+    }
+
+    fn in_sync_comprehension(&self) -> bool {
+        for scope in &self.scopes {
+            if let Scope::Comprehension { is_async: false } = scope {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn in_module_scope(&self) -> bool {
+        self.scopes.len() == 1
+    }
+
+    fn in_function_scope(&self) -> bool {
+        true
+    }
+
+    fn in_notebook(&self) -> bool {
+        false
+    }
+
+    fn in_await_allowed_context(&self) -> bool {
+        true
+    }
+
+    fn in_yield_allowed_context(&self) -> bool {
+        true
+    }
+
+    fn in_generator_scope(&self) -> bool {
+        true
+    }
+
+    fn in_loop_context(&self) -> bool {
+        true
+    }
+
+    fn is_bound_parameter(&self, _name: &str) -> bool {
+        false
+    }
+}
+
+impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
+    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
+        self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+        match stmt {
+            ast::Stmt::ClassDef(ast::StmtClassDef {
+                arguments,
+                body,
+                decorator_list,
+                type_params,
+                ..
+            }) => {
+                for decorator in decorator_list {
+                    self.visit_decorator(decorator);
+                }
+                if let Some(type_params) = type_params {
+                    self.visit_type_params(type_params);
+                }
+                if let Some(arguments) = arguments {
+                    self.visit_arguments(arguments);
+                }
+                self.scopes.push(Scope::Class);
+                self.visit_body(body);
+                self.scopes.pop().unwrap();
+            }
+            ast::Stmt::FunctionDef(ast::StmtFunctionDef { is_async, .. }) => {
+                self.scopes.push(Scope::Function {
+                    is_async: *is_async,
+                });
+                ast::visitor::walk_stmt(self, stmt);
+                self.scopes.pop().unwrap();
+            }
+            _ => {
+                ast::visitor::walk_stmt(self, stmt);
+            }
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &ast::Expr) {
+        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
+        match expr {
+            ast::Expr::Lambda(_) => {
+                self.scopes.push(Scope::Function { is_async: false });
+                ast::visitor::walk_expr(self, expr);
+                self.scopes.pop().unwrap();
+            }
+            ast::Expr::ListComp(ast::ExprListComp {
+                elt, generators, ..
+            })
+            | ast::Expr::SetComp(ast::ExprSetComp {
+                elt, generators, ..
+            })
+            | ast::Expr::Generator(ast::ExprGenerator {
+                elt, generators, ..
+            }) => {
+                for comprehension in generators {
+                    self.visit_comprehension(comprehension);
+                }
+                self.scopes.push(Scope::Comprehension {
+                    is_async: generators.iter().any(|generator| generator.is_async),
+                });
+                self.visit_expr(elt);
+                self.scopes.pop().unwrap();
+            }
+            ast::Expr::DictComp(ast::ExprDictComp {
+                key,
+                value,
+                generators,
+                ..
+            }) => {
+                for comprehension in generators {
+                    self.visit_comprehension(comprehension);
+                }
+                self.scopes.push(Scope::Comprehension {
+                    is_async: generators.iter().any(|generator| generator.is_async),
+                });
+                self.visit_expr(key);
+                self.visit_expr(value);
+                self.scopes.pop().unwrap();
+            }
+            _ => {
+                ast::visitor::walk_expr(self, expr);
+            }
+        }
     }
 }

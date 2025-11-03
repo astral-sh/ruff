@@ -1,17 +1,16 @@
 use anyhow::bail;
 use ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Fix};
-use ruff_diagnostics::{FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Stmt, WithItem};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
+use super::fix_with;
+use crate::Fix;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
-
-use super::fix_with;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the unnecessary nesting of multiple consecutive context
@@ -48,6 +47,7 @@ use super::fix_with;
 /// ## References
 /// - [Python documentation: The `with` statement](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.211")]
 pub(crate) struct MultipleWithStatements;
 
 impl Violation for MultipleWithStatements {
@@ -68,12 +68,14 @@ impl Violation for MultipleWithStatements {
 /// Returns a boolean indicating whether it's an async with statement, the items
 /// and body.
 fn next_with(body: &[Stmt]) -> Option<(bool, &[WithItem], &[Stmt])> {
-    let [Stmt::With(ast::StmtWith {
-        is_async,
-        items,
-        body,
-        ..
-    })] = body
+    let [
+        Stmt::With(ast::StmtWith {
+            is_async,
+            items,
+            body,
+            ..
+        }),
+    ] = body
     else {
         return None;
     };
@@ -162,7 +164,7 @@ pub(crate) fn multiple_with_statements(
             return;
         };
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             MultipleWithStatements,
             TextRange::new(with_stmt.start(), colon.end()),
         );
@@ -182,11 +184,11 @@ pub(crate) fn multiple_with_statements(
                                 content,
                                 with_stmt.into(),
                                 checker.locator(),
-                                checker.settings.pycodestyle.max_line_length,
-                                checker.settings.tab_size,
+                                checker.settings().pycodestyle.max_line_length,
+                                checker.settings().tab_size,
                             )
                         }) {
-                            Ok(Some(Fix::unsafe_edit(edit)))
+                            Ok(Some(Fix::safe_edit(edit)))
                         } else {
                             Ok(None)
                         }
@@ -195,6 +197,5 @@ pub(crate) fn multiple_with_statements(
                 }
             });
         }
-        checker.report_diagnostic(diagnostic);
     }
 }

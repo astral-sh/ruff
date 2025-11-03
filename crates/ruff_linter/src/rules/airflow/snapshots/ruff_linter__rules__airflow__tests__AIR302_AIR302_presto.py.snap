@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR302 [*] `airflow.hooks.presto_hook.PrestoHook` is moved into `presto` provider in Airflow 3.0;
+ --> AIR302_presto.py:5:1
+  |
+3 | from airflow.hooks.presto_hook import PrestoHook
+4 |
+5 | PrestoHook()
+  | ^^^^^^^^^^
+  |
+help: Install `apache-airflow-providers-presto>=1.0.0` and use `PrestoHook` from `airflow.providers.presto.hooks.presto` instead.
+1 | from __future__ import annotations
+2 | 
+  - from airflow.hooks.presto_hook import PrestoHook
+3 + from airflow.providers.presto.hooks.presto import PrestoHook
+4 | 
+5 | PrestoHook()
+note: This is an unsafe fix and may change runtime behavior

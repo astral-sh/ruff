@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableKeyword;
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Fix};
 
 use crate::rules::flake8_comprehensions::fixes;
 
@@ -48,6 +48,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct UnnecessaryDoubleCastOrProcess {
     inner: String,
     outer: String,
@@ -125,7 +126,7 @@ pub(crate) fn unnecessary_double_cast_or_process(
             | ("set", "set")
             | ("list" | "tuple", "list" | "tuple")
     ) {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             UnnecessaryDoubleCastOrProcess {
                 inner: inner_func_name.to_string(),
                 outer: outer_func_name.to_string(),
@@ -140,6 +141,5 @@ pub(crate) fn unnecessary_double_cast_or_process(
             )
             .map(Fix::unsafe_edit)
         });
-        checker.report_diagnostic(diagnostic);
     }
 }

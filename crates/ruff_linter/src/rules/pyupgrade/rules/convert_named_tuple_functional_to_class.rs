@@ -1,7 +1,6 @@
 use log::debug;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt};
@@ -13,6 +12,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `NamedTuple` declarations that use functional syntax.
@@ -50,6 +50,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `typing.NamedTuple`](https://docs.python.org/3/library/typing.html#typing.NamedTuple)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct ConvertNamedTupleFunctionalToClass {
     name: String,
 }
@@ -87,6 +88,7 @@ pub(crate) fn convert_named_tuple_functional_to_class(
         // Ex) `NamedTuple("MyType")`
         ([_typename], []) => vec![Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })],
         // Ex) `NamedTuple("MyType", [("a", int), ("b", str)])`
         ([_typename, fields], []) => {
@@ -113,7 +115,7 @@ pub(crate) fn convert_named_tuple_functional_to_class(
         }
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         ConvertNamedTupleFunctionalToClass {
             name: typename.to_string(),
         },
@@ -130,7 +132,6 @@ pub(crate) fn convert_named_tuple_functional_to_class(
             checker.comment_ranges(),
         ));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Return the typename, args, keywords, and base class.
@@ -146,6 +147,7 @@ fn match_named_tuple_assign<'a>(
         func,
         arguments: Arguments { args, keywords, .. },
         range: _,
+        node_index: _,
     }) = value
     else {
         return None;
@@ -164,6 +166,7 @@ fn create_field_assignment_stmt(field: Name, annotation: &Expr) -> Stmt {
                 id: field,
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }
             .into(),
         ),
@@ -171,6 +174,7 @@ fn create_field_assignment_stmt(field: Name, annotation: &Expr) -> Stmt {
         value: None,
         simple: true,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     }
     .into()
 }
@@ -181,6 +185,7 @@ fn create_fields_from_fields_arg(fields: &Expr) -> Option<Vec<Stmt>> {
     if fields.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
         Some(vec![node])
     } else {
@@ -232,11 +237,13 @@ fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &Expr) -> 
             args: Box::from([base_class.clone()]),
             keywords: Box::from([]),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })),
         body,
         type_params: None,
         decorator_list: vec![],
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     }
     .into()
 }

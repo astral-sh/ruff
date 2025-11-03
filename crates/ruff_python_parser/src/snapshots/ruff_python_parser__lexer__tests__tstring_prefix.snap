@@ -1,0 +1,153 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+## Tokens
+```
+[
+    (
+        TStringStart,
+        0..2,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        TStringEnd,
+        2..3,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        TStringStart,
+        4..6,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        TStringEnd,
+        6..7,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        TStringStart,
+        8..11,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING | RAW_STRING_LOWERCASE,
+        ),
+    ),
+    (
+        TStringEnd,
+        11..12,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING | RAW_STRING_LOWERCASE,
+        ),
+    ),
+    (
+        TStringStart,
+        13..16,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING | RAW_STRING_LOWERCASE,
+        ),
+    ),
+    (
+        TStringEnd,
+        16..17,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING | RAW_STRING_LOWERCASE,
+        ),
+    ),
+    (
+        TStringStart,
+        18..21,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING | RAW_STRING_UPPERCASE,
+        ),
+    ),
+    (
+        TStringEnd,
+        21..22,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING | RAW_STRING_UPPERCASE,
+        ),
+    ),
+    (
+        TStringStart,
+        23..26,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING | RAW_STRING_UPPERCASE,
+        ),
+    ),
+    (
+        TStringEnd,
+        26..27,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING | RAW_STRING_UPPERCASE,
+        ),
+    ),
+    (
+        TStringStart,
+        28..31,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING | RAW_STRING_LOWERCASE,
+        ),
+    ),
+    (
+        TStringEnd,
+        31..32,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING | RAW_STRING_LOWERCASE,
+        ),
+    ),
+    (
+        TStringStart,
+        33..36,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING | RAW_STRING_LOWERCASE,
+        ),
+    ),
+    (
+        TStringEnd,
+        36..37,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING | RAW_STRING_LOWERCASE,
+        ),
+    ),
+    (
+        TStringStart,
+        38..41,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING | RAW_STRING_UPPERCASE,
+        ),
+    ),
+    (
+        TStringEnd,
+        41..42,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING | RAW_STRING_UPPERCASE,
+        ),
+    ),
+    (
+        TStringStart,
+        43..46,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING | RAW_STRING_UPPERCASE,
+        ),
+    ),
+    (
+        TStringEnd,
+        46..47,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING | RAW_STRING_UPPERCASE,
+        ),
+    ),
+    (
+        Newline,
+        47..47,
+    ),
+]
+```

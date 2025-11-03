@@ -1,17 +1,14 @@
-use ruff_diagnostics::{
-    Applicability, Diagnostic, DiagnosticKind, Edit, Fix, FixAvailability, Violation,
-};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::analyze::typing::Pep604Operator;
+use ruff_python_semantic::analyze::typing::{Pep604Operator, to_pep604_operator};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix::edits::pad;
-use crate::settings::types::PreviewMode;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Check for type annotations that can be rewritten based on [PEP 604] syntax.
@@ -41,8 +38,7 @@ use crate::settings::types::PreviewMode;
 /// foo: int | str = 1
 /// ```
 ///
-/// ## Preview
-/// In preview mode, this rule only checks for usages of `typing.Union`,
+/// Note that this rule only checks for usages of `typing.Union`,
 /// while `UP045` checks for `typing.Optional`.
 ///
 /// ## Fix safety
@@ -58,6 +54,7 @@ use crate::settings::types::PreviewMode;
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct NonPEP604AnnotationUnion;
 
 impl Violation for NonPEP604AnnotationUnion {
@@ -102,8 +99,8 @@ impl Violation for NonPEP604AnnotationUnion {
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe, as it may lead to runtime errors when
-/// alongside libraries that rely on runtime type annotations, like Pydantic,
+/// This rule's fix is marked as unsafe, as it may lead to runtime errors
+/// using libraries that rely on runtime type annotations, like Pydantic,
 /// on Python versions prior to Python 3.10. It may also lead to runtime errors
 /// in unusual and likely incorrect type annotations where the type does not
 /// support the `|` operator.
@@ -114,6 +111,7 @@ impl Violation for NonPEP604AnnotationUnion {
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct NonPEP604AnnotationOptional;
 
 impl Violation for NonPEP604AnnotationOptional {
@@ -136,11 +134,23 @@ pub(crate) fn non_pep604_annotation(
     slice: &Expr,
     operator: Pep604Operator,
 ) {
+    // `NamedTuple` is not a type; it's a type constructor. Using it in a type annotation doesn't
+    // make much sense. But since type checkers will currently (incorrectly) _not_ complain about it
+    // being used in a type annotation, we just ignore `Optional[typing.NamedTuple]` and
+    // `Union[...]` containing `NamedTuple`.
+    // <https://github.com/astral-sh/ruff/issues/18619>
+    if is_optional_named_tuple(checker, operator, slice)
+        || is_union_with_named_tuple(checker, operator, slice)
+    {
+        return;
+    }
+
     // Avoid fixing forward references, types not in an annotation, and expressions that would
     // lead to invalid syntax.
     let fixable = checker.semantic().in_type_definition()
         && !checker.semantic().in_complex_string_type_definition()
-        && is_allowed_value(slice);
+        && is_allowed_value(slice)
+        && !is_optional_none(operator, slice);
 
     let applicability = if checker.target_version() >= PythonVersion::PY310 {
         Applicability::Safe
@@ -150,22 +160,12 @@ pub(crate) fn non_pep604_annotation(
 
     match operator {
         Pep604Operator::Optional => {
-            let (rule, diagnostic_kind) = match checker.settings.preview {
-                PreviewMode::Disabled => (
-                    Rule::NonPEP604AnnotationUnion,
-                    DiagnosticKind::from(NonPEP604AnnotationUnion),
-                ),
-                PreviewMode::Enabled => (
-                    Rule::NonPEP604AnnotationOptional,
-                    DiagnosticKind::from(NonPEP604AnnotationOptional),
-                ),
-            };
+            let guard =
+                checker.report_diagnostic_if_enabled(NonPEP604AnnotationOptional, expr.range());
 
-            if !checker.enabled(rule) {
+            let Some(mut diagnostic) = guard else {
                 return;
-            }
-
-            let mut diagnostic = Diagnostic::new(diagnostic_kind, expr.range());
+            };
 
             if fixable {
                 match slice {
@@ -173,10 +173,22 @@ pub(crate) fn non_pep604_annotation(
                         // Invalid type annotation.
                     }
                     _ => {
+                        // Unwrap all nested Optional[...] and wrap once as `X | None`.
+                        let mut inner = slice;
+                        while let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = inner {
+                            if let Some(Pep604Operator::Optional) =
+                                to_pep604_operator(value, slice, checker.semantic())
+                            {
+                                inner = slice;
+                            } else {
+                                break;
+                            }
+                        }
+
                         diagnostic.set_fix(Fix::applicable_edit(
                             Edit::range_replacement(
                                 pad(
-                                    checker.generator().expr(&pep_604_optional(slice)),
+                                    checker.generator().expr(&pep_604_optional(inner)),
                                     expr.range(),
                                     checker.locator(),
                                 ),
@@ -187,14 +199,13 @@ pub(crate) fn non_pep604_annotation(
                     }
                 }
             }
-            checker.report_diagnostic(diagnostic);
         }
         Pep604Operator::Union => {
-            if !checker.enabled(Rule::NonPEP604AnnotationUnion) {
+            if !checker.is_rule_enabled(Rule::NonPEP604AnnotationUnion) {
                 return;
             }
 
-            let mut diagnostic = Diagnostic::new(NonPEP604AnnotationUnion, expr.range());
+            let mut diagnostic = checker.report_diagnostic(NonPEP604AnnotationUnion, expr.range());
             if fixable {
                 match slice {
                     Expr::Slice(_) => {
@@ -229,7 +240,6 @@ pub(crate) fn non_pep604_annotation(
                     }
                 }
             }
-            checker.report_diagnostic(diagnostic);
         }
     }
 }
@@ -263,6 +273,7 @@ fn is_allowed_value(expr: &Expr) -> bool {
         | Expr::Compare(_)
         | Expr::Call(_)
         | Expr::FString(_)
+        | Expr::TString(_)
         | Expr::StringLiteral(_)
         | Expr::BytesLiteral(_)
         | Expr::NumberLiteral(_)
@@ -285,4 +296,28 @@ fn is_allowed_value(expr: &Expr) -> bool {
         | Expr::Slice(_)
         | Expr::IpyEscapeCommand(_) => false,
     }
+}
+
+/// Return `true` if this is an `Optional[typing.NamedTuple]` annotation.
+fn is_optional_named_tuple(checker: &Checker, operator: Pep604Operator, slice: &Expr) -> bool {
+    matches!(operator, Pep604Operator::Optional) && is_named_tuple(checker, slice)
+}
+
+/// Return `true` if this is a `Union[...]` annotation containing `typing.NamedTuple`.
+fn is_union_with_named_tuple(checker: &Checker, operator: Pep604Operator, slice: &Expr) -> bool {
+    matches!(operator, Pep604Operator::Union)
+        && (is_named_tuple(checker, slice)
+            || slice
+                .as_tuple_expr()
+                .is_some_and(|tuple| tuple.elts.iter().any(|elt| is_named_tuple(checker, elt))))
+}
+
+/// Return `true` if this is a `typing.NamedTuple` annotation.
+fn is_named_tuple(checker: &Checker, expr: &Expr) -> bool {
+    checker.semantic().match_typing_expr(expr, "NamedTuple")
+}
+
+/// Return `true` if this is an `Optional[None]` annotation.
+fn is_optional_none(operator: Pep604Operator, slice: &Expr) -> bool {
+    matches!(operator, Pep604Operator::Optional) && matches!(slice, Expr::NoneLiteral(_))
 }

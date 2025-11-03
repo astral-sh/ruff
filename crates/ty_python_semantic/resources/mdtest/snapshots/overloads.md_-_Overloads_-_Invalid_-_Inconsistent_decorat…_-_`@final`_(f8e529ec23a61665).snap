@@ -1,0 +1,114 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: overloads.md - Overloads - Invalid - Inconsistent decorators - `@final`
+mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import final, overload
+ 2 | 
+ 3 | class Foo:
+ 4 |     @overload
+ 5 |     def method1(self, x: int) -> int: ...
+ 6 |     @overload
+ 7 |     def method1(self, x: str) -> str: ...
+ 8 |     @final
+ 9 |     def method1(self, x: int | str) -> int | str:
+10 |         return x
+11 | 
+12 |     @overload
+13 |     @final
+14 |     def method2(self, x: int) -> int: ...
+15 |     @overload
+16 |     def method2(self, x: str) -> str: ...
+17 |     # error: [invalid-overload]
+18 |     def method2(self, x: int | str) -> int | str:
+19 |         return x
+20 | 
+21 |     @overload
+22 |     def method3(self, x: int) -> int: ...
+23 |     @overload
+24 |     @final
+25 |     def method3(self, x: str) -> str: ...
+26 |     # error: [invalid-overload]
+27 |     def method3(self, x: int | str) -> int | str:
+28 |         return x
+```
+
+## mdtest_snippet.pyi
+
+```
+ 1 | from typing_extensions import final, overload
+ 2 | 
+ 3 | class Foo:
+ 4 |     @overload
+ 5 |     @final
+ 6 |     def method1(self, x: int) -> int: ...
+ 7 |     @overload
+ 8 |     def method1(self, x: str) -> str: ...
+ 9 | 
+10 |     @overload
+11 |     def method2(self, x: int) -> int: ...
+12 |     @final
+13 |     @overload
+14 |     # error: [invalid-overload]
+15 |     def method2(self, x: str) -> str: ...
+```
+
+# Diagnostics
+
+```
+error[invalid-overload]: `@final` decorator should be applied only to the overload implementation
+  --> src/mdtest_snippet.py:18:9
+   |
+16 |     def method2(self, x: str) -> str: ...
+17 |     # error: [invalid-overload]
+18 |     def method2(self, x: int | str) -> int | str:
+   |         -------
+   |         |
+   |         Implementation defined here
+19 |         return x
+   |
+info: rule `invalid-overload` is enabled by default
+
+```
+
+```
+error[invalid-overload]: `@final` decorator should be applied only to the overload implementation
+  --> src/mdtest_snippet.py:27:9
+   |
+25 |     def method3(self, x: str) -> str: ...
+26 |     # error: [invalid-overload]
+27 |     def method3(self, x: int | str) -> int | str:
+   |         -------
+   |         |
+   |         Implementation defined here
+28 |         return x
+   |
+info: rule `invalid-overload` is enabled by default
+
+```
+
+```
+error[invalid-overload]: `@final` decorator should be applied only to the first overload
+  --> src/mdtest_snippet.pyi:11:9
+   |
+10 |     @overload
+11 |     def method2(self, x: int) -> int: ...
+   |         ------- First overload defined here
+12 |     @final
+13 |     @overload
+14 |     # error: [invalid-overload]
+15 |     def method2(self, x: str) -> str: ...
+   |         ^^^^^^^
+   |
+info: rule `invalid-overload` is enabled by default
+
+```

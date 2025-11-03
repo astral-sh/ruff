@@ -202,25 +202,22 @@ impl RuleSelector {
     }
 
     /// Returns rules matching the selector, taking into account rule groups like preview and deprecated.
-    pub fn rules<'a>(&'a self, preview: &PreviewOptions) -> impl Iterator<Item = Rule> + 'a {
+    pub fn rules<'a>(&'a self, preview: &PreviewOptions) -> impl Iterator<Item = Rule> + use<'a> {
         let preview_enabled = preview.mode.is_enabled();
         let preview_require_explicit = preview.require_explicit;
 
         self.all_rules().filter(move |rule| {
             match rule.group() {
                 // Always include stable rules
-                RuleGroup::Stable => true,
+                RuleGroup::Stable { .. } => true,
                 // Enabling preview includes all preview rules unless explicit selection is turned on
-                RuleGroup::Preview => {
+                RuleGroup::Preview { .. } => {
                     preview_enabled && (self.is_exact() || !preview_require_explicit)
                 }
-                // Deprecated rules are excluded in preview mode and with 'All' option unless explicitly selected
-                RuleGroup::Deprecated => {
-                    (!preview_enabled || self.is_exact())
-                        && !matches!(self, RuleSelector::All { .. })
-                }
+                // Deprecated rules are excluded by default unless explicitly selected
+                RuleGroup::Deprecated { .. } => !preview_enabled && self.is_exact(),
                 // Removed rules are included if explicitly selected but will error downstream
-                RuleGroup::Removed => self.is_exact(),
+                RuleGroup::Removed { .. } => self.is_exact(),
             }
         })
     }
@@ -260,74 +257,74 @@ pub struct PreviewOptions {
 #[cfg(feature = "schemars")]
 mod schema {
     use itertools::Itertools;
-    use schemars::JsonSchema;
-    use schemars::_serde_json::Value;
-    use schemars::schema::{InstanceType, Schema, SchemaObject};
+    use schemars::{JsonSchema, Schema, SchemaGenerator};
+    use serde_json::Value;
     use strum::IntoEnumIterator;
 
+    use crate::RuleSelector;
     use crate::registry::RuleNamespace;
     use crate::rule_selector::{Linter, RuleCodePrefix};
-    use crate::RuleSelector;
 
     impl JsonSchema for RuleSelector {
-        fn schema_name() -> String {
-            "RuleSelector".to_string()
+        fn schema_name() -> std::borrow::Cow<'static, str> {
+            std::borrow::Cow::Borrowed("RuleSelector")
         }
 
-        fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> Schema {
-            Schema::Object(SchemaObject {
-                instance_type: Some(InstanceType::String.into()),
-                enum_values: Some(
-                    [
-                        // Include the non-standard "ALL" selectors.
-                        "ALL".to_string(),
-                        // Include the legacy "C" and "T" selectors.
-                        "C".to_string(),
-                        "T".to_string(),
-                        // Include some common redirect targets for those legacy selectors.
-                        "C9".to_string(),
-                        "T1".to_string(),
-                        "T2".to_string(),
-                    ]
-                    .into_iter()
-                    .chain(
-                        RuleCodePrefix::iter()
-                            .map(|p| {
-                                let prefix = p.linter().common_prefix();
-                                let code = p.short_code();
-                                format!("{prefix}{code}")
-                            })
-                            .chain(Linter::iter().filter_map(|l| {
-                                let prefix = l.common_prefix();
-                                (!prefix.is_empty()).then(|| prefix.to_string())
-                            })),
-                    )
-                    .filter(|p| {
-                        // Exclude any prefixes where all of the rules are removed
-                        if let Ok(Self::Rule { prefix, .. } | Self::Prefix { prefix, .. }) =
-                            RuleSelector::parse_no_redirect(p)
-                        {
-                            !prefix.rules().all(|rule| rule.is_removed())
-                        } else {
-                            true
-                        }
+        fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
+            let enum_values: Vec<String> = [
+                // Include the non-standard "ALL" selectors.
+                "ALL".to_string(),
+                // Include the legacy "C" and "T" selectors.
+                "C".to_string(),
+                "T".to_string(),
+                // Include some common redirect targets for those legacy selectors.
+                "C9".to_string(),
+                "T1".to_string(),
+                "T2".to_string(),
+            ]
+            .into_iter()
+            .chain(
+                RuleCodePrefix::iter()
+                    .map(|p| {
+                        let prefix = p.linter().common_prefix();
+                        let code = p.short_code();
+                        format!("{prefix}{code}")
                     })
-                    .filter(|_rule| {
-                        // Filter out all test-only rules
-                        #[cfg(any(feature = "test-rules", test))]
-                        #[allow(clippy::used_underscore_binding)]
-                        if _rule.starts_with("RUF9") || _rule == "PLW0101" {
-                            return false;
-                        }
-
-                        true
-                    })
-                    .sorted()
-                    .map(Value::String)
-                    .collect(),
-                ),
-                ..SchemaObject::default()
+                    .chain(Linter::iter().filter_map(|l| {
+                        let prefix = l.common_prefix();
+                        (!prefix.is_empty()).then(|| prefix.to_string())
+                    })),
+            )
+            .filter(|p| {
+                // Exclude any prefixes where all of the rules are removed
+                if let Ok(Self::Rule { prefix, .. } | Self::Prefix { prefix, .. }) =
+                    RuleSelector::parse_no_redirect(p)
+                {
+                    !prefix.rules().all(|rule| rule.is_removed())
+                } else {
+                    true
+                }
             })
+            .filter(|_rule| {
+                // Filter out all test-only rules
+                #[cfg(any(feature = "test-rules", test))]
+                #[expect(clippy::used_underscore_binding)]
+                if _rule.starts_with("RUF9") || _rule == "PLW0101" {
+                    return false;
+                }
+
+                true
+            })
+            .sorted()
+            .collect();
+
+            let mut schema = schemars::json_schema!({ "type": "string" });
+            schema.ensure_object().insert(
+                "enum".to_string(),
+                Value::Array(enum_values.into_iter().map(Value::String).collect()),
+            );
+
+            schema
         }
     }
 }
@@ -347,7 +344,9 @@ impl RuleSelector {
                     2 => Specificity::Prefix2Chars,
                     3 => Specificity::Prefix3Chars,
                     4 => Specificity::Prefix4Chars,
-                    _ => panic!("RuleSelector::specificity doesn't yet support codes with so many characters"),
+                    _ => panic!(
+                        "RuleSelector::specificity doesn't yet support codes with so many characters"
+                    ),
                 }
             }
         }
@@ -413,10 +412,10 @@ pub mod clap_completion {
     use strum::IntoEnumIterator;
 
     use crate::{
+        RuleSelector,
         codes::RuleCodePrefix,
         registry::{Linter, RuleNamespace},
         rule_selector::is_single_rule_selector,
-        RuleSelector,
     };
 
     #[derive(Clone)]
@@ -484,8 +483,7 @@ pub mod clap_completion {
                                     prefix.linter().common_prefix(),
                                     prefix.short_code()
                                 );
-                                let name: &'static str = rule.into();
-                                return Some(PossibleValue::new(code).help(name));
+                                return Some(PossibleValue::new(code).help(rule.name().as_str()));
                             }
 
                             None

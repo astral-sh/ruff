@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::checkers::ast::LintContext;
 use crate::rules::pycodestyle::rules::logical_lines::{DefinitionState, LogicalLine};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for missing whitespace around the equals sign in an unannotated
@@ -32,6 +32,7 @@ use crate::rules::pycodestyle::rules::logical_lines::{DefinitionState, LogicalLi
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct UnexpectedSpacesAroundKeywordParameterEquals;
 
 impl AlwaysFixableViolation for UnexpectedSpacesAroundKeywordParameterEquals {
@@ -71,6 +72,7 @@ impl AlwaysFixableViolation for UnexpectedSpacesAroundKeywordParameterEquals {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct MissingWhitespaceAroundParameterEquals;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundParameterEquals {
@@ -85,10 +87,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundParameterEquals {
 }
 
 /// E251, E252
-pub(crate) fn whitespace_around_named_parameter_equals(
-    line: &LogicalLine,
-    context: &mut LogicalLinesContext,
-) {
+pub(crate) fn whitespace_around_named_parameter_equals(line: &LogicalLine, context: &LintContext) {
     let mut parens = 0u32;
     let mut fstrings = 0u32;
     let mut annotated_func_arg = false;
@@ -125,13 +124,15 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                 if definition_state.in_type_params() || (annotated_func_arg && parens == 1) {
                     let start = token.start();
                     if start == prev_end && prev_end != TextSize::new(0) {
-                        let mut diagnostic =
-                            Diagnostic::new(MissingWhitespaceAroundParameterEquals, token.range);
-                        diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                            " ".to_string(),
-                            token.start(),
-                        )));
-                        context.push_diagnostic(diagnostic);
+                        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
+                            MissingWhitespaceAroundParameterEquals,
+                            token.range,
+                        ) {
+                            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                                " ".to_string(),
+                                token.start(),
+                            )));
+                        }
                     }
 
                     while let Some(next) = iter.peek() {
@@ -141,15 +142,15 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                             let next_start = next.start();
 
                             if next_start == token.end() {
-                                let mut diagnostic = Diagnostic::new(
+                                if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                                     MissingWhitespaceAroundParameterEquals,
                                     token.range,
-                                );
-                                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                                    " ".to_string(),
-                                    token.end(),
-                                )));
-                                context.push_diagnostic(diagnostic);
+                                ) {
+                                    diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                                        " ".to_string(),
+                                        token.end(),
+                                    )));
+                                }
                             }
                             break;
                         }
@@ -157,12 +158,13 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                 } else {
                     // If there's space between the preceding token and the equals sign, report it.
                     if token.start() != prev_end {
-                        let mut diagnostic = Diagnostic::new(
+                        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                             UnexpectedSpacesAroundKeywordParameterEquals,
                             TextRange::new(prev_end, token.start()),
-                        );
-                        diagnostic.set_fix(Fix::safe_edit(Edit::deletion(prev_end, token.start())));
-                        context.push_diagnostic(diagnostic);
+                        ) {
+                            diagnostic
+                                .set_fix(Fix::safe_edit(Edit::deletion(prev_end, token.start())));
+                        }
                     }
 
                     // If there's space between the equals sign and the following token, report it.
@@ -171,15 +173,15 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                             iter.next();
                         } else {
                             if next.start() != token.end() {
-                                let mut diagnostic = Diagnostic::new(
+                                if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                                     UnexpectedSpacesAroundKeywordParameterEquals,
                                     TextRange::new(token.end(), next.start()),
-                                );
-                                diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
-                                    token.end(),
-                                    next.start(),
-                                )));
-                                context.push_diagnostic(diagnostic);
+                                ) {
+                                    diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+                                        token.end(),
+                                        next.start(),
+                                    )));
+                                }
                             }
                             break;
                         }

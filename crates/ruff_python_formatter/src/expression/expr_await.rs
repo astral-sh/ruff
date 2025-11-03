@@ -4,7 +4,7 @@ use ruff_python_ast::ExprAwait;
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{
-    is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parenthesize,
+    NeedsParentheses, OptionalParentheses, Parenthesize, is_expression_parenthesized,
 };
 use crate::prelude::*;
 
@@ -13,7 +13,11 @@ pub struct FormatExprAwait;
 
 impl FormatNodeRule<ExprAwait> for FormatExprAwait {
     fn fmt_fields(&self, item: &ExprAwait, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprAwait { range: _, value } = item;
+        let ExprAwait {
+            range: _,
+            node_index: _,
+            value,
+        } = item;
 
         write!(
             f,

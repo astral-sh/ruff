@@ -115,6 +115,7 @@ export default function SettingsEditor({
       onMount={handleMount}
       wrapperProps={visible ? {} : { style: { display: "none" } }}
       language="json"
+      path="ruff.json"
       value={source}
       theme={theme === "light" ? "Ayu-Light" : "Ayu-Dark"}
       onChange={handleChange}

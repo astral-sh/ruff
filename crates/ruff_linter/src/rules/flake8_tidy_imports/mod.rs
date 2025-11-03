@@ -10,7 +10,7 @@ mod tests {
     use anyhow::Result;
     use rustc_hash::FxHashMap;
 
-    use crate::assert_messages;
+    use crate::assert_diagnostics;
     use crate::registry::Rule;
     use crate::rules::flake8_tidy_imports;
     use crate::rules::flake8_tidy_imports::settings::{ApiBan, Strictness};
@@ -42,7 +42,7 @@ mod tests {
                 ..LinterSettings::for_rules(vec![Rule::BannedApi])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -72,7 +72,7 @@ mod tests {
                 ..LinterSettings::for_rules(vec![Rule::BannedApi])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -88,7 +88,7 @@ mod tests {
                 ..LinterSettings::for_rules(vec![Rule::RelativeImports])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -104,7 +104,7 @@ mod tests {
                 ..LinterSettings::for_rules(vec![Rule::RelativeImports])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -121,7 +121,7 @@ mod tests {
                 ..LinterSettings::for_rules(vec![Rule::RelativeImports])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -140,7 +140,7 @@ mod tests {
                 ..LinterSettings::for_rules(vec![Rule::BannedModuleLevelImports])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 }

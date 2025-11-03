@@ -1,14 +1,15 @@
 use std::fmt::{Display, Formatter};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::add_argument;
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for uses of `open` and related calls without an explicit `encoding`
@@ -28,6 +29,17 @@ use crate::fix::edits::add_argument;
 /// Python 3.10 and later, or `locale.getpreferredencoding()` on earlier versions,
 /// to make the encoding explicit.
 ///
+/// ## Fix safety
+/// This fix is always unsafe and may change the program's behavior. It forces
+/// `encoding="utf-8"` as the default, regardless of the platform’s actual default
+/// encoding, which may cause `UnicodeDecodeError` on non-UTF-8 systems.
+/// ```python
+/// with open("test.txt") as f:
+///     print(f.read()) # before fix (on UTF-8 systems): 你好，世界！
+/// with open("test.txt", encoding="utf-8") as f:
+///     print(f.read()) # after fix (on Windows): UnicodeDecodeError
+/// ```
+///
 /// ## Example
 /// ```python
 /// open("file.txt")
@@ -43,6 +55,7 @@ use crate::fix::edits::add_argument;
 ///
 /// [PEP 597]: https://peps.python.org/pep-0597/
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.1")]
 pub(crate) struct UnspecifiedEncoding {
     function_name: String,
     mode: ModeArgument,
@@ -80,7 +93,7 @@ pub(crate) fn unspecified_encoding(checker: &Checker, call: &ast::ExprCall) {
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnspecifiedEncoding {
             function_name,
             mode,
@@ -88,7 +101,6 @@ pub(crate) fn unspecified_encoding(checker: &Checker, call: &ast::ExprCall) {
         call.func.range(),
     );
     diagnostic.set_fix(generate_keyword_fix(checker, call));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Represents the path of the function or method being called.
@@ -101,20 +113,34 @@ enum Callee<'a> {
 }
 
 impl<'a> Callee<'a> {
+    fn is_pathlib_path_call(expr: &Expr, semantic: &SemanticModel) -> bool {
+        if let Expr::Call(ast::ExprCall { func, .. }) = expr {
+            semantic
+                .resolve_qualified_name(func)
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["pathlib", "Path"])
+                })
+        } else {
+            false
+        }
+    }
+
     fn try_from_call_expression(
         call: &'a ast::ExprCall,
         semantic: &'a SemanticModel,
     ) -> Option<Self> {
         if let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = call.func.as_ref() {
-            // Check for `pathlib.Path(...).open(...)` or equivalent
-            if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
-                if semantic
-                    .resolve_qualified_name(func)
-                    .is_some_and(|qualified_name| {
-                        matches!(qualified_name.segments(), ["pathlib", "Path"])
-                    })
-                {
-                    return Some(Callee::Pathlib(attr));
+            // Direct: Path(...).open()
+            if Self::is_pathlib_path_call(value, semantic) {
+                return Some(Callee::Pathlib(attr));
+            }
+            // Indirect: x.open() where x = Path(...)
+            else if let Expr::Name(name) = value.as_ref() {
+                if let Some(binding_id) = semantic.only_binding(name) {
+                    let binding = semantic.binding(binding_id);
+                    if typing::is_pathlib_path(binding, semantic) {
+                        return Some(Callee::Pathlib(attr));
+                    }
                 }
             }
         }
@@ -130,9 +156,10 @@ impl<'a> Callee<'a> {
         match self {
             Callee::Qualified(qualified_name) => match qualified_name.segments() {
                 ["" | "codecs" | "_io", "open"] => ModeArgument::Supported,
-                ["tempfile", "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"] => {
-                    ModeArgument::Supported
-                }
+                [
+                    "tempfile",
+                    "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile",
+                ] => ModeArgument::Supported,
                 ["io" | "_io", "TextIOWrapper"] => ModeArgument::Unsupported,
                 _ => ModeArgument::Unsupported,
             },
@@ -162,6 +189,7 @@ fn generate_keyword_fix(checker: &Checker, call: &ast::ExprCall) -> Fix {
                 value: Box::from("utf-8"),
                 flags: checker.default_string_flags(),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }))
         ),
         &call.arguments,
@@ -204,11 +232,23 @@ fn is_violation(call: &ast::ExprCall, qualified_name: &Callee) -> bool {
                         return false;
                     }
                 }
+
+                let encoding_param_pos = match qualified_name.segments() {
+                    // The `encoding` parameter position for `codecs.open`
+                    ["codecs", _] => 2,
+                    // The `encoding` parameter position for `_io.open` and the builtin `open`
+                    _ => 3,
+                };
+
                 // else mode not specified, defaults to text mode
-                call.arguments.find_argument_value("encoding", 3).is_none()
+                call.arguments
+                    .find_argument_value("encoding", encoding_param_pos)
+                    .is_none()
             }
-            ["tempfile", tempfile_class @ ("TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile")] =>
-            {
+            [
+                "tempfile",
+                tempfile_class @ ("TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"),
+            ] => {
                 let mode_pos = usize::from(*tempfile_class == "SpooledTemporaryFile");
                 if let Some(mode_arg) = call.arguments.find_argument_value("mode", mode_pos) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {

@@ -1,0 +1,43 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: async_for.md - Async - Error cases - Synchronously iterable, but not asynchronously iterable
+mdtest path: crates/ty_python_semantic/resources/mdtest/loops/async_for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | async def foo():
+ 2 |     class Iterator:
+ 3 |         def __next__(self) -> int:
+ 4 |             return 42
+ 5 | 
+ 6 |     class Iterable:
+ 7 |         def __iter__(self) -> Iterator:
+ 8 |             return Iterator()
+ 9 | 
+10 |     # error: [not-iterable] "Object of type `Iterator` is not async-iterable"
+11 |     async for x in Iterator():
+12 |         reveal_type(x)  # revealed: Unknown
+```
+
+# Diagnostics
+
+```
+error[not-iterable]: Object of type `Iterator` is not async-iterable
+  --> src/mdtest_snippet.py:11:20
+   |
+10 |     # error: [not-iterable] "Object of type `Iterator` is not async-iterable"
+11 |     async for x in Iterator():
+   |                    ^^^^^^^^^^
+12 |         reveal_type(x)  # revealed: Unknown
+   |
+info: It has no `__aiter__` method
+info: rule `not-iterable` is enabled by default
+
+```

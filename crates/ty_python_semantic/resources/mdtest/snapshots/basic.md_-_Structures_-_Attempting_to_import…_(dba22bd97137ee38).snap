@@ -1,0 +1,83 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: basic.md - Structures - Attempting to import a stdlib submodule when both parts haven't yet been added
+mdtest path: crates/ty_python_semantic/resources/mdtest/import/basic.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | import compression.zstd  # error: [unresolved-import]
+2 | from compression import zstd  # error: [unresolved-import]
+3 | import compression.fakebutwhocansay  # error: [unresolved-import]
+4 | from compression import fakebutwhocansay  # error: [unresolved-import]
+```
+
+# Diagnostics
+
+```
+error[unresolved-import]: Cannot resolve imported module `compression.zstd`
+ --> src/mdtest_snippet.py:1:8
+  |
+1 | import compression.zstd  # error: [unresolved-import]
+  |        ^^^^^^^^^^^^^^^^
+2 | from compression import zstd  # error: [unresolved-import]
+3 | import compression.fakebutwhocansay  # error: [unresolved-import]
+  |
+info: The stdlib module `compression` is only available on Python 3.14+
+info: Python 3.10 was assumed when resolving modules because it was specified on the command line
+info: rule `unresolved-import` is enabled by default
+
+```
+
+```
+error[unresolved-import]: Cannot resolve imported module `compression`
+ --> src/mdtest_snippet.py:2:6
+  |
+1 | import compression.zstd  # error: [unresolved-import]
+2 | from compression import zstd  # error: [unresolved-import]
+  |      ^^^^^^^^^^^
+3 | import compression.fakebutwhocansay  # error: [unresolved-import]
+4 | from compression import fakebutwhocansay  # error: [unresolved-import]
+  |
+info: The stdlib module `compression` is only available on Python 3.14+
+info: Python 3.10 was assumed when resolving modules because it was specified on the command line
+info: rule `unresolved-import` is enabled by default
+
+```
+
+```
+error[unresolved-import]: Cannot resolve imported module `compression.fakebutwhocansay`
+ --> src/mdtest_snippet.py:3:8
+  |
+1 | import compression.zstd  # error: [unresolved-import]
+2 | from compression import zstd  # error: [unresolved-import]
+3 | import compression.fakebutwhocansay  # error: [unresolved-import]
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+4 | from compression import fakebutwhocansay  # error: [unresolved-import]
+  |
+info: The stdlib module `compression` is only available on Python 3.14+
+info: Python 3.10 was assumed when resolving modules because it was specified on the command line
+info: rule `unresolved-import` is enabled by default
+
+```
+
+```
+error[unresolved-import]: Cannot resolve imported module `compression`
+ --> src/mdtest_snippet.py:4:6
+  |
+2 | from compression import zstd  # error: [unresolved-import]
+3 | import compression.fakebutwhocansay  # error: [unresolved-import]
+4 | from compression import fakebutwhocansay  # error: [unresolved-import]
+  |      ^^^^^^^^^^^
+  |
+info: The stdlib module `compression` is only available on Python 3.14+
+info: Python 3.10 was assumed when resolving modules because it was specified on the command line
+info: rule `unresolved-import` is enabled by default
+
+```

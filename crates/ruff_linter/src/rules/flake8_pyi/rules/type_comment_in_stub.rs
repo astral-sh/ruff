@@ -2,11 +2,12 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
 
 use crate::Locator;
+use crate::Violation;
+use crate::checkers::ast::LintContext;
 
 /// ## What it does
 /// Checks for the use of type comments (e.g., `x = 1  # type: int`) in stub
@@ -27,6 +28,7 @@ use crate::Locator;
 /// x: int = 1
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.254")]
 pub(crate) struct TypeCommentInStub;
 
 impl Violation for TypeCommentInStub {
@@ -38,7 +40,7 @@ impl Violation for TypeCommentInStub {
 
 /// PYI033
 pub(crate) fn type_comment_in_stub(
-    diagnostics: &mut Vec<Diagnostic>,
+    context: &LintContext,
     locator: &Locator,
     comment_ranges: &CommentRanges,
 ) {
@@ -46,7 +48,7 @@ pub(crate) fn type_comment_in_stub(
         let comment = locator.slice(range);
 
         if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {
-            diagnostics.push(Diagnostic::new(TypeCommentInStub, range));
+            context.report_diagnostic_if_enabled(TypeCommentInStub, range);
         }
     }
 }

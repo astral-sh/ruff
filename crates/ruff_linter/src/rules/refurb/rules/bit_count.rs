@@ -1,11 +1,12 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
+use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `bin(...).count("1")` to perform a population count.
@@ -27,12 +28,18 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// y = 0b1111011.bit_count()
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe unless the argument to `bin` can be inferred as
+/// an instance of a type that implements the `__index__` and `bit_count` methods because this can
+/// change the exception raised at runtime for an invalid argument.
+///
 /// ## Options
 /// - `target-version`
 ///
 /// ## References
 /// - [Python documentation:`int.bit_count`](https://docs.python.org/3/library/stdtypes.html#int.bit_count)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct BitCount {
     existing: SourceCodeSnippet,
     replacement: SourceCodeSnippet,
@@ -74,7 +81,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
 
     if !call.arguments.keywords.is_empty() {
         return;
-    };
+    }
     let [arg] = &*call.arguments.args else {
         return;
     };
@@ -100,7 +107,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
 
     if !arguments.keywords.is_empty() {
         return;
-    };
+    }
     let [arg] = &*arguments.args else {
         return;
     };
@@ -131,6 +138,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         Expr::StringLiteral(inner) => inner.value.is_implicit_concatenated(),
         Expr::BytesLiteral(inner) => inner.value.is_implicit_concatenated(),
         Expr::FString(inner) => inner.value.is_implicit_concatenated(),
+        Expr::TString(inner) => inner.value.is_implicit_concatenated(),
 
         Expr::Await(_)
         | Expr::Starred(_)
@@ -163,24 +171,29 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         | Expr::Subscript(_) => false,
     };
 
+    // check if the fix is safe or not
+    let applicability: Applicability = match ResolvedPythonType::from(arg) {
+        ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer | NumberLike::Bool)) => {
+            Applicability::Safe
+        }
+        _ => Applicability::Unsafe,
+    };
+
     let replacement = if parenthesize {
         format!("({literal_text}).bit_count()")
     } else {
         format!("{literal_text}.bit_count()")
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         BitCount {
             existing: SourceCodeSnippet::from_str(literal_text),
-            replacement: SourceCodeSnippet::new(replacement.to_string()),
+            replacement: SourceCodeSnippet::new(replacement.clone()),
         },
         call.range(),
     );
-
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        replacement,
-        call.range(),
-    )));
-
-    checker.report_diagnostic(diagnostic);
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::range_replacement(replacement, call.range()),
+        applicability,
+    ));
 }

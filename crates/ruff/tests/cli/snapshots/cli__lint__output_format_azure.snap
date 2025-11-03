@@ -1,0 +1,23 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - azure
+    - "--select"
+    - "F401,F821"
+    - "--target-version"
+    - py39
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+##vso[task.logissue type=error;sourcepath=[TMP]/input.py;linenumber=1;columnnumber=8;code=F401;]`os` imported but unused
+##vso[task.logissue type=error;sourcepath=[TMP]/input.py;linenumber=2;columnnumber=5;code=F821;]Undefined name `y`
+##vso[task.logissue type=error;sourcepath=[TMP]/input.py;linenumber=3;columnnumber=1;code=invalid-syntax;]Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+
+----- stderr -----

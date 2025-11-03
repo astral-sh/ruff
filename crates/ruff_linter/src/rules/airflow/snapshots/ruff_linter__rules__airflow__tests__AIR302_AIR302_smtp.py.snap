@@ -1,0 +1,40 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR302 [*] `airflow.operators.email_operator.EmailOperator` is moved into `smtp` provider in Airflow 3.0;
+ --> AIR302_smtp.py:5:1
+  |
+3 | from airflow.operators.email_operator import EmailOperator
+4 |
+5 | EmailOperator()
+  | ^^^^^^^^^^^^^
+6 |
+7 | from airflow.operators.email import EmailOperator
+  |
+help: Install `apache-airflow-providers-smtp>=1.0.0` and use `EmailOperator` from `airflow.providers.smtp.operators.smtp` instead.
+1 | from __future__ import annotations
+2 | 
+  - from airflow.operators.email_operator import EmailOperator
+3 + from airflow.providers.smtp.operators.smtp import EmailOperator
+4 | 
+5 | EmailOperator()
+6 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR302 [*] `airflow.operators.email.EmailOperator` is moved into `smtp` provider in Airflow 3.0;
+ --> AIR302_smtp.py:9:1
+  |
+7 | from airflow.operators.email import EmailOperator
+8 |
+9 | EmailOperator()
+  | ^^^^^^^^^^^^^
+  |
+help: Install `apache-airflow-providers-smtp>=1.0.0` and use `EmailOperator` from `airflow.providers.smtp.operators.smtp` instead.
+4 | 
+5 | EmailOperator()
+6 | 
+  - from airflow.operators.email import EmailOperator
+7 + from airflow.providers.smtp.operators.smtp import EmailOperator
+8 | 
+9 | EmailOperator()
+note: This is an unsafe fix and may change runtime behavior

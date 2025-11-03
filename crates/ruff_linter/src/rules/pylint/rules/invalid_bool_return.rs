@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
@@ -9,6 +8,7 @@ use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -35,6 +35,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `__bool__` method](https://docs.python.org/3/reference/datamodel.html#object.__bool__)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.3.3")]
 pub(crate) struct InvalidBoolReturnType;
 
 impl Violation for InvalidBoolReturnType {
@@ -68,10 +69,7 @@ pub(crate) fn invalid_bool_return(checker: &Checker, function_def: &ast::StmtFun
 
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
-        checker.report_diagnostic(Diagnostic::new(
-            InvalidBoolReturnType,
-            function_def.identifier(),
-        ));
+        checker.report_diagnostic(InvalidBoolReturnType, function_def.identifier());
         return;
     }
 
@@ -88,11 +86,11 @@ pub(crate) fn invalid_bool_return(checker: &Checker, function_def: &ast::StmtFun
                 ResolvedPythonType::Unknown
                     | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Bool))
             ) {
-                checker.report_diagnostic(Diagnostic::new(InvalidBoolReturnType, value.range()));
+                checker.report_diagnostic(InvalidBoolReturnType, value.range());
             }
         } else {
             // Disallow implicit `None`.
-            checker.report_diagnostic(Diagnostic::new(InvalidBoolReturnType, stmt.range()));
+            checker.report_diagnostic(InvalidBoolReturnType, stmt.range());
         }
     }
 }

@@ -213,6 +213,7 @@ linter.task_tags = [
 	XXX,
 ]
 linter.typing_modules = []
+linter.typing_extensions = true
 
 # Linter Plugins
 linter.flake8_annotations.mypy_init_return = false
@@ -250,6 +251,7 @@ linter.flake8_import_conventions.aliases = {
 	matplotlib.pyplot = plt,
 	networkx = nx,
 	numpy = np,
+	numpy.typing = npt,
 	pandas = pd,
 	panel = pn,
 	plotly.express = px,
@@ -369,6 +371,7 @@ linter.pylint.max_branches = 12
 linter.pylint.max_statements = 50
 linter.pylint.max_public_methods = 20
 linter.pylint.max_locals = 15
+linter.pylint.max_nested_blocks = 5
 linter.pyupgrade.keep_runtime_typing = false
 linter.ruff.parenthesize_tuple_in_subscript = false
 
@@ -390,7 +393,7 @@ formatter.docstring_code_line_width = dynamic
 analyze.exclude = []
 analyze.preview = disabled
 analyze.target_version = 3.7
-analyze.detect_string_imports = false
+analyze.string_imports = disabled
 analyze.extension = ExtensionMapping({})
 analyze.include_dependencies = {}
 

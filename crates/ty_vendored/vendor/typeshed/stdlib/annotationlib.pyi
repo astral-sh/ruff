@@ -1,0 +1,257 @@
+"""Helpers for introspecting and wrapping annotations."""
+
+import sys
+from typing import Literal
+
+if sys.version_info >= (3, 14):
+    import enum
+    import types
+    from _typeshed import AnnotateFunc, AnnotationForm, EvaluateFunc, SupportsItems
+    from collections.abc import Mapping
+    from typing import Any, ParamSpec, TypeVar, TypeVarTuple, final, overload
+    from warnings import deprecated
+
+    __all__ = [
+        "Format",
+        "ForwardRef",
+        "call_annotate_function",
+        "call_evaluate_function",
+        "get_annotate_from_class_namespace",
+        "get_annotations",
+        "annotations_to_string",
+        "type_repr",
+    ]
+
+    class Format(enum.IntEnum):
+        VALUE = 1
+        VALUE_WITH_FAKE_GLOBALS = 2
+        FORWARDREF = 3
+        STRING = 4
+
+    @final
+    class ForwardRef:
+        """Wrapper that holds a forward reference.
+
+        Constructor arguments:
+        * arg: a string representing the code to be evaluated.
+        * module: the module where the forward reference was created.
+          Must be a string, not a module object.
+        * owner: The owning object (module, class, or function).
+        * is_argument: Does nothing, retained for compatibility.
+        * is_class: True if the forward reference was created in class scope.
+
+        """
+
+        __slots__ = (
+            "__forward_is_argument__",
+            "__forward_is_class__",
+            "__forward_module__",
+            "__weakref__",
+            "__arg__",
+            "__globals__",
+            "__extra_names__",
+            "__code__",
+            "__ast_node__",
+            "__cell__",
+            "__owner__",
+            "__stringifier_dict__",
+        )
+        __forward_is_argument__: bool
+        __forward_is_class__: bool
+        __forward_module__: str | None
+        def __init__(
+            self, arg: str, *, module: str | None = None, owner: object = None, is_argument: bool = True, is_class: bool = False
+        ) -> None: ...
+        @overload
+        def evaluate(
+            self,
+            *,
+            globals: dict[str, Any] | None = None,
+            locals: Mapping[str, Any] | None = None,
+            type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] | None = None,
+            owner: object = None,
+            format: Literal[Format.STRING],
+        ) -> str:
+            """Evaluate the forward reference and return the value.
+
+            If the forward reference cannot be evaluated, raise an exception.
+            """
+
+        @overload
+        def evaluate(
+            self,
+            *,
+            globals: dict[str, Any] | None = None,
+            locals: Mapping[str, Any] | None = None,
+            type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] | None = None,
+            owner: object = None,
+            format: Literal[Format.FORWARDREF],
+        ) -> AnnotationForm | ForwardRef: ...
+        @overload
+        def evaluate(
+            self,
+            *,
+            globals: dict[str, Any] | None = None,
+            locals: Mapping[str, Any] | None = None,
+            type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] | None = None,
+            owner: object = None,
+            format: Format = Format.VALUE,  # noqa: Y011
+        ) -> AnnotationForm: ...
+        @deprecated("Use `ForwardRef.evaluate()` or `typing.evaluate_forward_ref()` instead.")
+        def _evaluate(
+            self,
+            globalns: dict[str, Any] | None,
+            localns: Mapping[str, Any] | None,
+            type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = ...,
+            *,
+            recursive_guard: frozenset[str],
+        ) -> AnnotationForm: ...
+        @property
+        def __forward_arg__(self) -> str: ...
+        @property
+        def __forward_code__(self) -> types.CodeType: ...
+        def __eq__(self, other: object) -> bool: ...
+        def __hash__(self) -> int: ...
+        def __or__(self, other: Any) -> types.UnionType: ...
+        def __ror__(self, other: Any) -> types.UnionType: ...
+
+    @overload
+    def call_evaluate_function(evaluate: EvaluateFunc, format: Literal[Format.STRING], *, owner: object = None) -> str:
+        """Call an evaluate function. Evaluate functions are normally generated for
+        the value of type aliases and the bounds, constraints, and defaults of
+        type parameter objects.
+        """
+
+    @overload
+    def call_evaluate_function(
+        evaluate: EvaluateFunc, format: Literal[Format.FORWARDREF], *, owner: object = None
+    ) -> AnnotationForm | ForwardRef: ...
+    @overload
+    def call_evaluate_function(evaluate: EvaluateFunc, format: Format, *, owner: object = None) -> AnnotationForm: ...
+    @overload
+    def call_annotate_function(annotate: AnnotateFunc, format: Literal[Format.STRING], *, owner: object = None) -> dict[str, str]:
+        """Call an __annotate__ function. __annotate__ functions are normally
+        generated by the compiler to defer the evaluation of annotations. They
+        can be called with any of the format arguments in the Format enum, but
+        compiler-generated __annotate__ functions only support the VALUE format.
+        This function provides additional functionality to call __annotate__
+        functions with the FORWARDREF and STRING formats.
+
+        *annotate* must be an __annotate__ function, which takes a single argument
+        and returns a dict of annotations.
+
+        *format* must be a member of the Format enum or one of the corresponding
+        integer values.
+
+        *owner* can be the object that owns the annotations (i.e., the module,
+        class, or function that the __annotate__ function derives from). With the
+        FORWARDREF format, it is used to provide better evaluation capabilities
+        on the generated ForwardRef objects.
+
+        """
+
+    @overload
+    def call_annotate_function(
+        annotate: AnnotateFunc, format: Literal[Format.FORWARDREF], *, owner: object = None
+    ) -> dict[str, AnnotationForm | ForwardRef]: ...
+    @overload
+    def call_annotate_function(annotate: AnnotateFunc, format: Format, *, owner: object = None) -> dict[str, AnnotationForm]: ...
+    def get_annotate_from_class_namespace(obj: Mapping[str, object]) -> AnnotateFunc | None:
+        """Retrieve the annotate function from a class namespace dictionary.
+
+        Return None if the namespace does not contain an annotate function.
+        This is useful in metaclass ``__new__`` methods to retrieve the annotate function.
+        """
+
+    @overload
+    def get_annotations(
+        obj: Any,  # any object with __annotations__ or __annotate__
+        *,
+        globals: dict[str, object] | None = None,
+        locals: Mapping[str, object] | None = None,
+        eval_str: bool = False,
+        format: Literal[Format.STRING],
+    ) -> dict[str, str]:
+        """Compute the annotations dict for an object.
+
+        obj may be a callable, class, module, or other object with
+        __annotate__ or __annotations__ attributes.
+        Passing any other object raises TypeError.
+
+        The *format* parameter controls the format in which annotations are returned,
+        and must be a member of the Format enum or its integer equivalent.
+        For the VALUE format, the __annotations__ is tried first; if it
+        does not exist, the __annotate__ function is called. The
+        FORWARDREF format uses __annotations__ if it exists and can be
+        evaluated, and otherwise falls back to calling the __annotate__ function.
+        The SOURCE format tries __annotate__ first, and falls back to
+        using __annotations__, stringified using annotations_to_string().
+
+        This function handles several details for you:
+
+          * If eval_str is true, values of type str will
+            be un-stringized using eval().  This is intended
+            for use with stringized annotations
+            ("from __future__ import annotations").
+          * If obj doesn't have an annotations dict, returns an
+            empty dict.  (Functions and methods always have an
+            annotations dict; classes, modules, and other types of
+            callables may not.)
+          * Ignores inherited annotations on classes.  If a class
+            doesn't have its own annotations dict, returns an empty dict.
+          * All accesses to object members and dict values are done
+            using getattr() and dict.get() for safety.
+          * Always, always, always returns a freshly-created dict.
+
+        eval_str controls whether or not values of type str are replaced
+        with the result of calling eval() on those values:
+
+          * If eval_str is true, eval() is called on values of type str.
+          * If eval_str is false (the default), values of type str are unchanged.
+
+        globals and locals are passed in to eval(); see the documentation
+        for eval() for more information.  If either globals or locals is
+        None, this function may replace that value with a context-specific
+        default, contingent on type(obj):
+
+          * If obj is a module, globals defaults to obj.__dict__.
+          * If obj is a class, globals defaults to
+            sys.modules[obj.__module__].__dict__ and locals
+            defaults to the obj class namespace.
+          * If obj is a callable, globals defaults to obj.__globals__,
+            although if obj is a wrapped function (using
+            functools.update_wrapper()) it is first unwrapped.
+        """
+
+    @overload
+    def get_annotations(
+        obj: Any,
+        *,
+        globals: dict[str, object] | None = None,
+        locals: Mapping[str, object] | None = None,
+        eval_str: bool = False,
+        format: Literal[Format.FORWARDREF],
+    ) -> dict[str, AnnotationForm | ForwardRef]: ...
+    @overload
+    def get_annotations(
+        obj: Any,
+        *,
+        globals: dict[str, object] | None = None,
+        locals: Mapping[str, object] | None = None,
+        eval_str: bool = False,
+        format: Format = Format.VALUE,  # noqa: Y011
+    ) -> dict[str, AnnotationForm]: ...
+    def type_repr(value: object) -> str:
+        """Convert a Python value to a format suitable for use with the STRING format.
+
+        This is intended as a helper for tools that support the STRING format but do
+        not have access to the code that originally produced the annotations. It uses
+        repr() for most objects.
+
+        """
+
+    def annotations_to_string(annotations: SupportsItems[str, object]) -> dict[str, str]:
+        """Convert an annotation dict containing values to approximately the STRING format.
+
+        Always returns a fresh a dictionary.
+        """

@@ -1,0 +1,232 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP050 [*] Class `A` uses `metaclass=type`, which is redundant
+ --> UP050.py:5:9
+  |
+5 | class A(metaclass=type):
+  |         ^^^^^^^^^^^^^^
+6 |     ...
+  |
+help: Remove `metaclass=type`
+2 |     ...
+3 | 
+4 | 
+  - class A(metaclass=type):
+5 + class A:
+6 |     ...
+7 | 
+8 | 
+
+UP050 [*] Class `A` uses `metaclass=type`, which is redundant
+  --> UP050.py:10:5
+   |
+ 9 | class A(
+10 |     metaclass=type
+   |     ^^^^^^^^^^^^^^
+11 | ):
+12 |     ...
+   |
+help: Remove `metaclass=type`
+6  |     ...
+7  | 
+8  | 
+   - class A(
+   -     metaclass=type
+   - ):
+9  + class A:
+10 |     ...
+11 | 
+12 | 
+
+UP050 [*] Class `A` uses `metaclass=type`, which is redundant
+  --> UP050.py:16:5
+   |
+15 | class A(
+16 |     metaclass=type
+   |     ^^^^^^^^^^^^^^
+17 |     #
+18 | ):
+   |
+help: Remove `metaclass=type`
+12 |     ...
+13 | 
+14 | 
+   - class A(
+   -     metaclass=type
+   -     #
+   - ):
+15 + class A:
+16 |     ...
+17 | 
+18 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP050 [*] Class `A` uses `metaclass=type`, which is redundant
+  --> UP050.py:24:5
+   |
+22 | class A(
+23 |     #
+24 |     metaclass=type
+   |     ^^^^^^^^^^^^^^
+25 | ):
+26 |     ...
+   |
+help: Remove `metaclass=type`
+19 |     ...
+20 | 
+21 | 
+   - class A(
+   -     #
+   -     metaclass=type
+   - ):
+22 + class A:
+23 |     ...
+24 | 
+25 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP050 [*] Class `A` uses `metaclass=type`, which is redundant
+  --> UP050.py:30:5
+   |
+29 | class A(
+30 |     metaclass=type,
+   |     ^^^^^^^^^^^^^^
+31 |     #
+32 | ):
+   |
+help: Remove `metaclass=type`
+26 |     ...
+27 | 
+28 | 
+   - class A(
+   -     metaclass=type,
+   -     #
+   - ):
+29 + class A:
+30 |     ...
+31 | 
+32 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP050 [*] Class `A` uses `metaclass=type`, which is redundant
+  --> UP050.py:38:5
+   |
+36 | class A(
+37 |     #
+38 |     metaclass=type,
+   |     ^^^^^^^^^^^^^^
+39 |     #
+40 | ):
+   |
+help: Remove `metaclass=type`
+33 |     ...
+34 | 
+35 | 
+   - class A(
+   -     #
+   -     metaclass=type,
+   -     #
+   - ):
+36 + class A:
+37 |     ...
+38 | 
+39 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP050 [*] Class `B` uses `metaclass=type`, which is redundant
+  --> UP050.py:44:12
+   |
+44 | class B(A, metaclass=type):
+   |            ^^^^^^^^^^^^^^
+45 |     ...
+   |
+help: Remove `metaclass=type`
+41 |     ...
+42 | 
+43 | 
+   - class B(A, metaclass=type):
+44 + class B(A):
+45 |     ...
+46 | 
+47 | 
+
+UP050 [*] Class `B` uses `metaclass=type`, which is redundant
+  --> UP050.py:50:5
+   |
+48 | class B(
+49 |     A,
+50 |     metaclass=type,
+   |     ^^^^^^^^^^^^^^
+51 | ):
+52 |     ...
+   |
+help: Remove `metaclass=type`
+47 | 
+48 | class B(
+49 |     A,
+   -     metaclass=type,
+50 | ):
+51 |     ...
+52 | 
+
+UP050 [*] Class `B` uses `metaclass=type`, which is redundant
+  --> UP050.py:58:5
+   |
+56 |     A,
+57 |     # comment
+58 |     metaclass=type,
+   |     ^^^^^^^^^^^^^^
+59 | ):
+60 |     ...
+   |
+help: Remove `metaclass=type`
+54 | 
+55 | class B(
+56 |     A,
+   -     # comment
+   -     metaclass=type,
+57 | ):
+58 |     ...
+59 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP050 [*] Class `A` uses `metaclass=type`, which is redundant
+  --> UP050.py:69:5
+   |
+68 | class A(
+69 |     metaclass=type  # comment
+   |     ^^^^^^^^^^^^^^
+70 |     ,
+71 | ):
+   |
+help: Remove `metaclass=type`
+65 |         ...
+66 | 
+67 | 
+   - class A(
+   -     metaclass=type  # comment
+   -     ,
+   - ):
+68 + class A:
+69 |     ...
+70 | 
+71 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP050 [*] Class `A` uses `metaclass=type`, which is redundant
+  --> UP050.py:83:9
+   |
+81 | import builtins
+82 |
+83 | class A(metaclass=builtins.type):
+   |         ^^^^^^^^^^^^^^^^^^^^^^^
+84 |     ...
+   |
+help: Remove `metaclass=type`
+80 | 
+81 | import builtins
+82 | 
+   - class A(metaclass=builtins.type):
+83 + class A:
+84 |     ...

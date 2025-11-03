@@ -5,89 +5,107 @@ permissions: {}
 on:
   pull_request:
     paths:
-      - "crates/red_knot*/**"
+      - "crates/ty*/**"
       - "crates/ruff_db"
       - "crates/ruff_python_ast"
       - "crates/ruff_python_parser"
       - ".github/workflows/mypy_primer.yaml"
       - ".github/workflows/mypy_primer_comment.yaml"
+      - "scripts/mypy_primer.sh"
+      - "Cargo.lock"
+      - "!**.md"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
 
 env:
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
+  RUST_BACKTRACE: 1
 
 jobs:
   mypy_primer:
     name: Run mypy_primer
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           path: ruff
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@f94ec6bedd8674c4426838e6b50417d36b6ab231 # v5
+        uses: astral-sh/setup-uv@85856786d1ce8acfbcc2f13a5f3fbd6b938f9f41 # v7.1.2
 
-      - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3 # v2
+      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
         with:
           workspaces: "ruff"
+
       - name: Install Rust toolchain
         run: rustup show
 
-      - name: Install mypy_primer
-        run: |
-          uv tool install "git+https://github.com/astral-sh/mypy_primer.git@add-red-knot-support"
-
       - name: Run mypy_primer
-        shell: bash
+        env:
+          PRIMER_SELECTOR: crates/ty_python_semantic/resources/primer/good.txt
+          DIFF_FILE: mypy_primer.diff
         run: |
           cd ruff
-
-          echo "new commit"
-          git rev-list --format=%s --max-count=1 "$GITHUB_SHA"
-
-          MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
-          git checkout -b base_commit "$MERGE_BASE"
-          echo "base commit"
-          git rev-list --format=%s --max-count=1 base_commit
-
-          cd ..
-
-          # Allow the exit code to be 0 or 1, only fail for actual mypy_primer crashes/bugs
-          uvx mypy_primer \
-            --repo ruff \
-            --type-checker knot \
-            --old base_commit \
-            --new "$GITHUB_SHA" \
-            --project-selector '/(mypy_primer|black|pyp|git-revise|zipp|arrow|isort|itsdangerous|rich|packaging|pybind11|pyinstrument)$' \
-            --output concise \
-            --debug > mypy_primer.diff || [ $? -eq 1 ]
-
-          # Output diff with ANSI color codes
-          cat mypy_primer.diff
-
-          # Remove ANSI color codes before uploading
-          sed -ie 's/\x1b\[[0-9;]*m//g' mypy_primer.diff
-
-          echo ${{ github.event.number }} > pr-number
+          scripts/mypy_primer.sh
+          echo ${{ github.event.number }} > ../pr-number
 
       - name: Upload diff
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: mypy_primer_diff
           path: mypy_primer.diff
 
       - name: Upload pr-number
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: pr-number
           path: pr-number
+
+  memory_usage:
+    name: Run memory statistics
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          path: ruff
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@85856786d1ce8acfbcc2f13a5f3fbd6b938f9f41 # v7.1.2
+
+      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+        with:
+          workspaces: "ruff"
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Run mypy_primer
+        env:
+          TY_MAX_PARALLELISM: 1 # for deterministic memory numbers
+          TY_MEMORY_REPORT: mypy_primer
+          PRIMER_SELECTOR: crates/ty_python_semantic/resources/primer/memory.txt
+          DIFF_FILE: mypy_primer_memory.diff
+        run: |
+          cd ruff
+          scripts/mypy_primer.sh
+
+      - name: Upload diff
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mypy_primer_memory_diff
+          path: mypy_primer_memory.diff

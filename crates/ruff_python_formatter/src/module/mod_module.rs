@@ -2,16 +2,20 @@ use ruff_formatter::write;
 use ruff_python_ast::ModModule;
 use ruff_python_trivia::lines_after;
 
+use crate::FormatNodeRule;
 use crate::prelude::*;
 use crate::statement::suite::SuiteKind;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatModModule;
 
 impl FormatNodeRule<ModModule> for FormatModModule {
     fn fmt_fields(&self, item: &ModModule, f: &mut PyFormatter) -> FormatResult<()> {
-        let ModModule { range, body } = item;
+        let ModModule {
+            range,
+            body,
+            node_index: _,
+        } = item;
 
         if body.is_empty() {
             // Only preserve an empty line if the source contains an empty line too.

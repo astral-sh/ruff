@@ -13,6 +13,7 @@ impl FormatNodeRule<PatternMatchAs> for FormatPatternMatchAs {
     fn fmt_fields(&self, item: &PatternMatchAs, f: &mut PyFormatter) -> FormatResult<()> {
         let PatternMatchAs {
             range: _,
+            node_index: _,
             pattern,
             name,
         } = item;

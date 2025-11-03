@@ -54,7 +54,6 @@ SECTIONS: list[Section] = [
     Section("Contributing", "contributing.md", generated=True),
 ]
 
-
 LINK_REWRITES: dict[str, str] = {
     "https://docs.astral.sh/ruff/": "index.md",
     "https://docs.astral.sh/ruff/configuration/": "configuration.md",
@@ -62,8 +61,8 @@ LINK_REWRITES: dict[str, str] = {
         "configuration.md#config-file-discovery"
     ),
     "https://docs.astral.sh/ruff/contributing/": "contributing.md",
+    "https://docs.astral.sh/ruff/editors": "editors/index.md",
     "https://docs.astral.sh/ruff/editors/setup": "editors/setup.md",
-    "https://docs.astral.sh/ruff/integrations/": "integrations.md",
     "https://docs.astral.sh/ruff/faq/#how-does-ruffs-linter-compare-to-flake8": (
         "faq.md#how-does-ruffs-linter-compare-to-flake8"
     ),

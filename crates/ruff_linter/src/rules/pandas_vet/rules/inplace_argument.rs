@@ -1,14 +1,15 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Keyword, Stmt};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
-use crate::fix::edits::{remove_argument, Parentheses};
 use crate::Locator;
+use crate::checkers::ast::Checker;
+use crate::fix::edits::{Parentheses, remove_argument};
+use crate::{Edit, Fix, FixAvailability, Violation};
+use ruff_python_semantic::Modules;
 
 /// ## What it does
 /// Checks for `inplace=True` usages in `pandas` function and method
@@ -35,6 +36,7 @@ use crate::Locator;
 /// ## References
 /// - [_Why You Should Probably Never Use pandas `inplace=True`_](https://towardsdatascience.com/why-you-should-probably-never-use-pandas-inplace-true-9f9f211849e4)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct PandasUseOfInplaceArgument;
 
 impl Violation for PandasUseOfInplaceArgument {
@@ -52,12 +54,7 @@ impl Violation for PandasUseOfInplaceArgument {
 
 /// PD002
 pub(crate) fn inplace_argument(checker: &Checker, call: &ast::ExprCall) {
-    // If the function was imported from another module, and it's _not_ Pandas, abort.
-    if checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| !matches!(qualified_name.segments(), ["pandas", ..]))
-    {
+    if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }
 
@@ -78,7 +75,8 @@ pub(crate) fn inplace_argument(checker: &Checker, call: &ast::ExprCall) {
         };
         if arg == "inplace" {
             if is_const_true(&keyword.value) {
-                let mut diagnostic = Diagnostic::new(PandasUseOfInplaceArgument, keyword.range());
+                let mut diagnostic =
+                    checker.report_diagnostic(PandasUseOfInplaceArgument, keyword.range());
                 // Avoid applying the fix if:
                 // 1. The keyword argument is followed by a star argument (we can't be certain that
                 //    the star argument _doesn't_ contain an override).
@@ -99,8 +97,6 @@ pub(crate) fn inplace_argument(checker: &Checker, call: &ast::ExprCall) {
                         diagnostic.set_fix(fix);
                     }
                 }
-
-                checker.report_diagnostic(diagnostic);
             }
 
             // Duplicate keywords is a syntax error, so we can stop here.
@@ -138,6 +134,7 @@ fn convert_inplace_argument_to_assignment(
         &call.arguments,
         Parentheses::Preserve,
         locator.contents(),
+        comment_ranges,
     )
     .ok()?;
 

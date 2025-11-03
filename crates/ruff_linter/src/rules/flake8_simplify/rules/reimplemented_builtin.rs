@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal;
@@ -13,6 +12,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
 use crate::line_width::LineWidthBuilder;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `for` loops that can be replaced with a builtin function, like
@@ -23,21 +23,28 @@ use crate::line_width::LineWidthBuilder;
 ///
 /// ## Example
 /// ```python
-/// for item in iterable:
-///     if predicate(item):
-///         return True
-/// return False
+/// def foo():
+///     for item in iterable:
+///         if predicate(item):
+///             return True
+///     return False
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// return any(predicate(item) for item in iterable)
+/// def foo():
+///     return any(predicate(item) for item in iterable)
 /// ```
+///
+/// ## Fix safety
+///
+/// This fix is always marked as unsafe because it might remove comments.
 ///
 /// ## References
 /// - [Python documentation: `any`](https://docs.python.org/3/library/functions.html#any)
 /// - [Python documentation: `all`](https://docs.python.org/3/library/functions.html#all)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.211")]
 pub(crate) struct ReimplementedBuiltin {
     replacement: String,
 }
@@ -101,15 +108,15 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                 &contents,
                 stmt.into(),
                 checker.locator(),
-                checker.settings.pycodestyle.max_line_length,
-                checker.settings.tab_size,
+                checker.settings().pycodestyle.max_line_length,
+                checker.settings().tab_size,
             ) {
                 return;
             }
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 ReimplementedBuiltin {
-                    replacement: contents.to_string(),
+                    replacement: contents.clone(),
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
@@ -120,7 +127,6 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                     terminal.stmt.end(),
                 )));
             }
-            checker.report_diagnostic(diagnostic);
         }
         // Replace with `all`.
         (false, true) => {
@@ -130,6 +136,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                     op: UnaryOp::Not,
                     operand,
                     range: _,
+                    node_index: _,
                 }) = &loop_.test
                 {
                     *operand.clone()
@@ -138,6 +145,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                     ops,
                     comparators,
                     range: _,
+                    node_index: _,
                 }) = &loop_.test
                 {
                     if let ([op], [comparator]) = (&**ops, &**comparators) {
@@ -158,6 +166,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                             ops: Box::from([op]),
                             comparators: Box::from([comparator.clone()]),
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                         };
                         node.into()
                     } else {
@@ -165,6 +174,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                             op: UnaryOp::Not,
                             operand: Box::new(loop_.test.clone()),
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                         };
                         node.into()
                     }
@@ -173,6 +183,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                         op: UnaryOp::Not,
                         operand: Box::new(loop_.test.clone()),
                         range: TextRange::default(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     };
                     node.into()
                 }
@@ -187,21 +198,21 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
 
             // Don't flag if the resulting expression would exceed the maximum line length.
             let line_start = checker.locator().line_start(stmt.start());
-            if LineWidthBuilder::new(checker.settings.tab_size)
+            if LineWidthBuilder::new(checker.settings().tab_size)
                 .add_str(
                     checker
                         .locator()
                         .slice(TextRange::new(line_start, stmt.start())),
                 )
                 .add_str(&contents)
-                > checker.settings.pycodestyle.max_line_length
+                > checker.settings().pycodestyle.max_line_length
             {
                 return;
             }
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 ReimplementedBuiltin {
-                    replacement: contents.to_string(),
+                    replacement: contents.clone(),
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
@@ -212,7 +223,6 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                     terminal.stmt.end(),
                 )));
             }
-            checker.report_diagnostic(diagnostic);
         }
         _ => {}
     }
@@ -258,7 +268,7 @@ struct Terminal<'a> {
     stmt: &'a Stmt,
 }
 
-fn match_loop(stmt: &Stmt) -> Option<Loop> {
+fn match_loop(stmt: &Stmt) -> Option<Loop<'_>> {
     let Stmt::For(ast::StmtFor {
         body, target, iter, ..
     }) = stmt
@@ -268,22 +278,28 @@ fn match_loop(stmt: &Stmt) -> Option<Loop> {
 
     // The loop itself should contain a single `if` statement, with a single `return` statement in
     // the body.
-    let [Stmt::If(ast::StmtIf {
-        body: nested_body,
-        test: nested_test,
-        elif_else_clauses: nested_elif_else_clauses,
-        range: _,
-    })] = body.as_slice()
+    let [
+        Stmt::If(ast::StmtIf {
+            body: nested_body,
+            test: nested_test,
+            elif_else_clauses: nested_elif_else_clauses,
+            range: _,
+            node_index: _,
+        }),
+    ] = body.as_slice()
     else {
         return None;
     };
     if !nested_elif_else_clauses.is_empty() {
         return None;
     }
-    let [Stmt::Return(ast::StmtReturn {
-        value: Some(value),
-        range: _,
-    })] = nested_body.as_slice()
+    let [
+        Stmt::Return(ast::StmtReturn {
+            value: Some(value),
+            range: _,
+            node_index: _,
+        }),
+    ] = nested_body.as_slice()
     else {
         return None;
     };
@@ -309,16 +325,19 @@ fn match_loop(stmt: &Stmt) -> Option<Loop> {
 ///         return True
 /// return False
 /// ```
-fn match_else_return(stmt: &Stmt) -> Option<Terminal> {
+fn match_else_return(stmt: &Stmt) -> Option<Terminal<'_>> {
     let Stmt::For(ast::StmtFor { orelse, .. }) = stmt else {
         return None;
     };
 
     // The `else` block has to contain a single `return True` or `return False`.
-    let [Stmt::Return(ast::StmtReturn {
-        value: Some(next_value),
-        range: _,
-    })] = orelse.as_slice()
+    let [
+        Stmt::Return(ast::StmtReturn {
+            value: Some(next_value),
+            range: _,
+            node_index: _,
+        }),
+    ] = orelse.as_slice()
     else {
         return None;
     };
@@ -360,6 +379,7 @@ fn match_sibling_return<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Termina
     let Stmt::Return(ast::StmtReturn {
         value: Some(next_value),
         range: _,
+        node_index: _,
     }) = &sibling
     else {
         return None;
@@ -387,14 +407,17 @@ fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
             ifs: vec![],
             is_async: false,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         }],
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         parenthesized: false,
     };
     let node1 = ast::ExprName {
         id,
         ctx: ExprContext::Load,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let node2 = ast::ExprCall {
         func: Box::new(node1.into()),
@@ -402,12 +425,15 @@ fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
             args: Box::from([node.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let node3 = ast::StmtReturn {
         value: Some(Box::new(node2.into())),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     generator.stmt(&node3.into())
 }

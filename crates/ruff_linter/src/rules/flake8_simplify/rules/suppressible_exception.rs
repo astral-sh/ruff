@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
@@ -9,6 +8,7 @@ use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `try`-`except`-`pass` blocks that can be replaced with the
@@ -43,6 +43,7 @@ use crate::importer::ImportRequest;
 /// - [Python documentation: `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
 /// - [a simpler `try`/`except` (and why maybe shouldn't)](https://www.youtube.com/watch?v=MZAJ8qnC7mk)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.211")]
 pub(crate) struct SuppressibleException {
     exception: String,
 }
@@ -58,14 +59,22 @@ impl Violation for SuppressibleException {
 
     fn fix_title(&self) -> Option<String> {
         let SuppressibleException { exception } = self;
-        Some(format!("Replace with `contextlib.suppress({exception})`"))
+        Some(format!(
+            "Replace `try`-`except`-`pass` with `with contextlib.suppress({exception}): ...`"
+        ))
     }
 }
 
 fn is_empty(body: &[Stmt]) -> bool {
     match body {
         [Stmt::Pass(_)] => true,
-        [Stmt::Expr(ast::StmtExpr { value, range: _ })] => value.is_ellipsis_literal_expr(),
+        [
+            Stmt::Expr(ast::StmtExpr {
+                value,
+                range: _,
+                node_index: _,
+            }),
+        ] => value.is_ellipsis_literal_expr(),
         _ => false,
     }
 }
@@ -96,8 +105,11 @@ pub(crate) fn suppressible_exception(
         return;
     }
 
-    let [ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, range, .. })] =
-        handlers
+    let [
+        ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+            body, range, type_, ..
+        }),
+    ] = handlers
     else {
         return;
     };
@@ -115,12 +127,18 @@ pub(crate) fn suppressible_exception(
     };
 
     let exception = if handler_names.is_empty() {
-        "Exception".to_string()
+        if type_.is_none() {
+            // case where there are no handler names provided at all
+            "BaseException".to_string()
+        } else {
+            // case where handler names is an empty tuple
+            String::new()
+        }
     } else {
         handler_names.join(", ")
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         SuppressibleException {
             exception: exception.clone(),
         },
@@ -136,16 +154,29 @@ pub(crate) fn suppressible_exception(
                 stmt.start(),
                 checker.semantic(),
             )?;
-            let replace_try = Edit::range_replacement(
-                format!("with {binding}({exception})"),
+            let mut rest: Vec<Edit> = Vec::new();
+            let content: String;
+            if exception == "BaseException" && handler_names.is_empty() {
+                let (import_exception, binding_exception) =
+                    checker.importer().get_or_import_symbol(
+                        &ImportRequest::import("builtins", &exception),
+                        stmt.start(),
+                        checker.semantic(),
+                    )?;
+                content = format!("with {binding}({binding_exception})");
+                rest.push(import_exception);
+            } else {
+                content = format!("with {binding}({exception})");
+            }
+            rest.push(Edit::range_deletion(
+                checker.locator().full_lines_range(*range),
+            ));
+            rest.push(Edit::range_replacement(
+                content,
                 TextRange::at(stmt.start(), "try".text_len()),
-            );
-            let remove_handler = Edit::range_deletion(checker.locator().full_lines_range(*range));
-            Ok(Fix::unsafe_edits(
-                import_edit,
-                [replace_try, remove_handler],
-            ))
+            ));
+
+            Ok(Fix::unsafe_edits(import_edit, rest))
         });
     }
-    checker.report_diagnostic(diagnostic);
 }

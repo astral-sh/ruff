@@ -1,17 +1,17 @@
 use std::borrow::Cow;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::Expr;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::Expr;
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
 use crate::Locator;
+use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for ternary `if` expressions that can be replaced with the `or`
@@ -39,6 +39,7 @@ use crate::Locator;
 /// (assuming `foo()` returns a truthy value), but only once in
 /// `foo() or bar()`.
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.3.6")]
 pub(crate) struct IfExpInsteadOfOrOperator;
 
 impl Violation for IfExpInsteadOfOrOperator {
@@ -61,13 +62,14 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &Checker, if_expr: &ast::Ex
         body,
         orelse,
         range,
+        node_index: _,
     } = if_expr;
 
     if ComparableExpr::from(test) != ComparableExpr::from(body) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(IfExpInsteadOfOrOperator, *range);
+    let mut diagnostic = checker.report_diagnostic(IfExpInsteadOfOrOperator, *range);
 
     // Replace with `{test} or {orelse}`.
     diagnostic.set_fix(Fix::applicable_edit(
@@ -85,8 +87,6 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &Checker, if_expr: &ast::Ex
             Applicability::Safe
         },
     ));
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Parenthesize an expression for use in an `or` operator (e.g., parenthesize `x` in `x or y`),

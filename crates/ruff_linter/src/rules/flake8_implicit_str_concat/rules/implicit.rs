@@ -1,17 +1,16 @@
 use std::borrow::Cow;
 
 use itertools::Itertools;
-
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::str::{leading_quote, trailing_quote};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::StringFlags;
 use ruff_python_index::Indexer;
-use ruff_python_parser::{TokenKind, Tokens};
+use ruff_python_parser::{Token, TokenKind, Tokens};
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
-use crate::settings::LinterSettings;
 use crate::Locator;
+use crate::checkers::ast::LintContext;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for implicitly concatenated strings on a single line.
@@ -35,6 +34,7 @@ use crate::Locator;
 /// z = "The quick brown fox."
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.201")]
 pub(crate) struct SingleLineImplicitStringConcatenation;
 
 impl Violation for SingleLineImplicitStringConcatenation {
@@ -92,6 +92,7 @@ impl Violation for SingleLineImplicitStringConcatenation {
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.201")]
 pub(crate) struct MultiLineImplicitStringConcatenation;
 
 impl Violation for MultiLineImplicitStringConcatenation {
@@ -103,17 +104,19 @@ impl Violation for MultiLineImplicitStringConcatenation {
 
 /// ISC001, ISC002
 pub(crate) fn implicit(
-    diagnostics: &mut Vec<Diagnostic>,
+    context: &LintContext,
     tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
-    settings: &LinterSettings,
 ) {
     for (a_token, b_token) in tokens
         .iter()
         .filter(|token| {
             token.kind() != TokenKind::Comment
-                && (settings.flake8_implicit_str_concat.allow_multiline
+                && (context
+                    .settings()
+                    .flake8_implicit_str_concat
+                    .allow_multiline
                     || token.kind() != TokenKind::NonLogicalNewline)
         })
         .tuple_windows()
@@ -121,21 +124,32 @@ pub(crate) fn implicit(
         let (a_range, b_range) = match (a_token.kind(), b_token.kind()) {
             (TokenKind::String, TokenKind::String) => (a_token.range(), b_token.range()),
             (TokenKind::String, TokenKind::FStringStart) => {
-                match indexer.fstring_ranges().innermost(b_token.start()) {
+                match indexer
+                    .interpolated_string_ranges()
+                    .innermost(b_token.start())
+                {
                     Some(b_range) => (a_token.range(), b_range),
                     None => continue,
                 }
             }
             (TokenKind::FStringEnd, TokenKind::String) => {
-                match indexer.fstring_ranges().innermost(a_token.start()) {
+                match indexer
+                    .interpolated_string_ranges()
+                    .innermost(a_token.start())
+                {
                     Some(a_range) => (a_range, b_token.range()),
                     None => continue,
                 }
             }
-            (TokenKind::FStringEnd, TokenKind::FStringStart) => {
+            (TokenKind::FStringEnd, TokenKind::FStringStart)
+            | (TokenKind::TStringEnd, TokenKind::TStringStart) => {
                 match (
-                    indexer.fstring_ranges().innermost(a_token.start()),
-                    indexer.fstring_ranges().innermost(b_token.start()),
+                    indexer
+                        .interpolated_string_ranges()
+                        .innermost(a_token.start()),
+                    indexer
+                        .interpolated_string_ranges()
+                        .innermost(b_token.start()),
                 ) {
                     (Some(a_range), Some(b_range)) => (a_range, b_range),
                     _ => continue,
@@ -145,57 +159,73 @@ pub(crate) fn implicit(
         };
 
         if locator.contains_line_break(TextRange::new(a_range.end(), b_range.start())) {
-            diagnostics.push(Diagnostic::new(
+            context.report_diagnostic_if_enabled(
                 MultiLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
-            ));
+            );
         } else {
-            let mut diagnostic = Diagnostic::new(
+            if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                 SingleLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
-            );
-
-            if let Some(fix) = concatenate_strings(a_range, b_range, locator) {
-                diagnostic.set_fix(fix);
+            ) {
+                if let Some(fix) = concatenate_strings(a_token, b_token, a_range, b_range, locator)
+                {
+                    diagnostic.set_fix(fix);
+                }
             }
-
-            diagnostics.push(diagnostic);
-        };
+        }
     }
 }
 
-fn concatenate_strings(a_range: TextRange, b_range: TextRange, locator: &Locator) -> Option<Fix> {
-    let a_text = locator.slice(a_range);
-    let b_text = locator.slice(b_range);
-
-    let a_leading_quote = leading_quote(a_text)?;
-    let b_leading_quote = leading_quote(b_text)?;
-
-    // Require, for now, that the leading quotes are the same.
-    if a_leading_quote != b_leading_quote {
+/// Concatenates two strings
+///
+/// The `a_string_range` and `b_string_range` are the range of the entire string,
+/// not just of the string token itself (important for interpolated strings where
+/// the start token doesn't span the entire token).
+fn concatenate_strings(
+    a_token: &Token,
+    b_token: &Token,
+    a_string_range: TextRange,
+    b_string_range: TextRange,
+    locator: &Locator,
+) -> Option<Fix> {
+    if a_token.string_flags()?.is_unclosed() || b_token.string_flags()?.is_unclosed() {
         return None;
     }
 
-    let a_trailing_quote = trailing_quote(a_text)?;
-    let b_trailing_quote = trailing_quote(b_text)?;
+    let a_string_flags = a_token.string_flags()?;
+    let b_string_flags = b_token.string_flags()?;
 
-    // Require, for now, that the trailing quotes are the same.
-    if a_trailing_quote != b_trailing_quote {
+    let a_prefix = a_string_flags.prefix();
+    let b_prefix = b_string_flags.prefix();
+
+    // Require, for now, that the strings have the same prefix,
+    // quote style, and number of quotes
+    if a_prefix != b_prefix
+        || a_string_flags.quote_style() != b_string_flags.quote_style()
+        || a_string_flags.is_triple_quoted() != b_string_flags.is_triple_quoted()
+    {
         return None;
     }
+
+    let a_text = locator.slice(a_string_range);
+    let b_text = locator.slice(b_string_range);
+
+    let quotes = a_string_flags.quote_str();
+
+    let opener_len = a_string_flags.opener_len();
+    let closer_len = a_string_flags.closer_len();
 
     let mut a_body =
-        Cow::Borrowed(&a_text[a_leading_quote.len()..a_text.len() - a_trailing_quote.len()]);
-    let b_body = &b_text[b_leading_quote.len()..b_text.len() - b_trailing_quote.len()];
+        Cow::Borrowed(&a_text[TextRange::new(opener_len, a_text.text_len() - closer_len)]);
+    let b_body = &b_text[TextRange::new(opener_len, b_text.text_len() - closer_len)];
 
-    if a_leading_quote.find(['r', 'R']).is_none()
-        && matches!(b_body.bytes().next(), Some(b'0'..=b'7'))
-    {
+    if !a_string_flags.is_raw_string() && matches!(b_body.bytes().next(), Some(b'0'..=b'7')) {
         normalize_ending_octal(&mut a_body);
     }
 
-    let concatenation = format!("{a_leading_quote}{a_body}{b_body}{a_trailing_quote}");
-    let range = TextRange::new(a_range.start(), b_range.end());
+    let concatenation = format!("{a_prefix}{quotes}{a_body}{b_body}{quotes}");
+    let range = TextRange::new(a_string_range.start(), b_string_range.end());
 
     Some(Fix::safe_edit(Edit::range_replacement(
         concatenation,

@@ -1,0 +1,40 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_await.md - Invalid await diagnostics - Basic
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_await.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | async def main() -> None:
+2 |     await 1  # error: [invalid-await]
+```
+
+# Diagnostics
+
+```
+error[invalid-await]: `Literal[1]` is not awaitable
+   --> src/mdtest_snippet.py:2:11
+    |
+  1 | async def main() -> None:
+  2 |     await 1  # error: [invalid-await]
+    |           ^
+    |
+   ::: stdlib/builtins.pyi:346:7
+    |
+345 | @disjoint_base
+346 | class int:
+    |       --- type defined here
+347 |     """int([x]) -> integer
+348 |     int(x, base=10) -> integer
+    |
+info: `__await__` is missing
+info: rule `invalid-await` is enabled by default
+
+```

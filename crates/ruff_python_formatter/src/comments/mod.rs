@@ -358,7 +358,10 @@ impl<'a> Comments<'a> {
     }
 
     /// Returns an iterator over the [leading](self#leading-comments), [dangling](self#dangling-comments), and [trailing](self#trailing) comments of `node`.
-    pub(crate) fn leading_dangling_trailing<T>(&self, node: T) -> LeadingDanglingTrailingComments
+    pub(crate) fn leading_dangling_trailing<T>(
+        &self,
+        node: T,
+    ) -> LeadingDanglingTrailingComments<'_>
     where
         T: Into<AnyNodeRef<'a>>,
     {
@@ -422,7 +425,7 @@ impl<'a> Comments<'a> {
             dangling.mark_formatted();
         }
 
-        node.visit_preorder(&mut MarkVerbatimCommentsAsFormattedVisitor(self));
+        node.visit_source_order(&mut MarkVerbatimCommentsAsFormattedVisitor(self));
     }
 
     /// Returns an object that implements [Debug] for nicely printing the [`Comments`].
@@ -460,7 +463,7 @@ impl<'a> Comments<'a> {
             comments: self,
             has_comment: false,
         };
-        node.visit_preorder(&mut visitor);
+        node.visit_source_order(&mut visitor);
 
         visitor.has_comment
     }
@@ -514,7 +517,7 @@ mod tests {
 
     use ruff_formatter::SourceCode;
     use ruff_python_ast::{Mod, PySourceType};
-    use ruff_python_parser::{parse, ParseOptions, Parsed};
+    use ruff_python_parser::{ParseOptions, Parsed, parse};
     use ruff_python_trivia::CommentRanges;
 
     use crate::comments::Comments;
@@ -540,7 +543,7 @@ mod tests {
             }
         }
 
-        fn to_comments(&self) -> Comments {
+        fn to_comments(&self) -> Comments<'_> {
             Comments::from_ast(self.parsed.syntax(), self.source_code, &self.comment_ranges)
         }
     }

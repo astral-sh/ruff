@@ -114,7 +114,6 @@ pub fn find_fallback_target_version<P: AsRef<Path>>(path: P) -> Option<PythonVer
 #[cfg(not(target_arch = "wasm32"))]
 pub fn find_user_settings_toml() -> Option<PathBuf> {
     use etcetera::BaseStrategy;
-    use ruff_linter::warn_user_once;
 
     let strategy = etcetera::base_strategy::choose_base_strategy().ok()?;
     let config_dir = strategy.config_dir().join("ruff");
@@ -124,23 +123,6 @@ pub fn find_user_settings_toml() -> Option<PathBuf> {
         let path = config_dir.join(filename);
         if path.is_file() {
             return Some(path);
-        }
-    }
-
-    // On macOS, we used to support reading from `/Users/Alice/Library/Application Support`.
-    if cfg!(target_os = "macos") {
-        let strategy = etcetera::base_strategy::Apple::new().ok()?;
-        let deprecated_config_dir = strategy.data_dir().join("ruff");
-
-        for file in [".ruff.toml", "ruff.toml", "pyproject.toml"] {
-            let path = deprecated_config_dir.join(file);
-            if path.is_file() {
-                warn_user_once!(
-                    "Reading configuration from `~/Library/Application Support` is deprecated. Please move your configuration to `{}/{file}`.",
-                    config_dir.display(),
-                );
-                return Some(path);
-            }
         }
     }
 
@@ -183,9 +165,13 @@ pub(super) fn load_options<P: AsRef<Path>>(
                         if let Some(dir) = path.parent() {
                             let fallback = get_fallback_target_version(dir);
                             if let Some(version) = fallback {
-                                debug!("Derived `target-version` from `requires-python` in `pyproject.toml`: {version:?}");
+                                debug!(
+                                    "Derived `target-version` from `requires-python` in `pyproject.toml`: {version:?}"
+                                );
                             } else {
-                                debug!("No `pyproject.toml` with `requires-python` in same directory; `target-version` unspecified");
+                                debug!(
+                                    "No `pyproject.toml` with `requires-python` in same directory; `target-version` unspecified"
+                                );
                             }
                             ruff.target_version = fallback;
                         }
@@ -209,7 +195,7 @@ fn get_fallback_target_version(dir: &Path) -> Option<PythonVersion> {
     let pyproject = match parsed_pyproject {
         Ok(pyproject) => pyproject,
         Err(err) => {
-            debug!("Failed to find fallback `target-version` due to: {}", err);
+            debug!("Failed to find fallback `target-version` due to: {err}");
             return None;
         }
     };
@@ -277,10 +263,9 @@ mod tests {
     use ruff_linter::settings::types::PatternPrefixPair;
 
     use crate::options::{Flake8BuiltinsOptions, LintCommonOptions, LintOptions, Options};
-    use crate::pyproject::{find_settings_toml, parse_pyproject_toml, Pyproject, Tools};
+    use crate::pyproject::{Pyproject, Tools, find_settings_toml, parse_pyproject_toml};
 
     #[test]
-
     fn deserialize() -> Result<()> {
         let pyproject: Pyproject = toml::from_str(r"")?;
         assert_eq!(pyproject.tool, None);
@@ -399,7 +384,7 @@ strict-checking = false
 "#,
         )?;
 
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         let expected = Flake8BuiltinsOptions {
             builtins_allowed_modules: Some(vec!["asyncio".to_string()]),
             allowed_modules: Some(vec!["sys".to_string()]),
@@ -436,33 +421,52 @@ strict-checking = false
         );
         assert!(!settings.strict_checking);
 
-        assert!(toml::from_str::<Pyproject>(
-            r"
+        assert!(
+            toml::from_str::<Pyproject>(
+                r"
 [tool.black]
 [tool.ruff]
 line_length = 79
 ",
-        )
-        .is_err());
+            )
+            .is_err()
+        );
 
-        assert!(toml::from_str::<Pyproject>(
-            r#"
+        assert!(
+            toml::from_str::<Pyproject>(
+                r#"
 [tool.black]
 [tool.ruff.lint]
 select = ["E123"]
 "#,
-        )
-        .is_err());
+            )
+            .is_err()
+        );
 
-        assert!(toml::from_str::<Pyproject>(
-            r"
+        assert!(
+            toml::from_str::<Pyproject>(
+                r"
 [tool.black]
 [tool.ruff]
 line-length = 79
 other-attribute = 1
 ",
+            )
+            .is_err()
+        );
+
+        let invalid_line_length = toml::from_str::<Pyproject>(
+            r"
+[tool.ruff]
+line-length = 500
+",
         )
-        .is_err());
+        .expect_err("Deserialization should have failed for a too large line-length");
+
+        assert_eq!(
+            invalid_line_length.message(),
+            "line-length must be between 1 and 320 (got 500)"
+        );
 
         Ok(())
     }

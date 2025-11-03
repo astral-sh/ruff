@@ -14,6 +14,7 @@ use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::importer::ImportRequest;
@@ -43,6 +44,7 @@ use crate::importer::ImportRequest;
 /// x: Literal[b"B"] | str
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.283")]
 pub(crate) struct RedundantLiteralUnion {
     literal: SourceCodeSnippet,
     builtin_type: ExprType,

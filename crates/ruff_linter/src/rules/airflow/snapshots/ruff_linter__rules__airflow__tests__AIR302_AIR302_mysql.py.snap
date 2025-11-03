@@ -1,0 +1,68 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR302 [*] `airflow.hooks.mysql_hook.MySqlHook` is moved into `mysql` provider in Airflow 3.0;
+  --> AIR302_mysql.py:9:1
+   |
+ 7 | )
+ 8 |
+ 9 | MySqlHook()
+   | ^^^^^^^^^
+10 | PrestoToMySqlOperator()
+11 | PrestoToMySqlTransfer()
+   |
+help: Install `apache-airflow-providers-mysql>=1.0.0` and use `MySqlHook` from `airflow.providers.mysql.hooks.mysql` instead.
+1  | from __future__ import annotations
+2  | 
+   - from airflow.hooks.mysql_hook import MySqlHook
+3  | from airflow.operators.presto_to_mysql import (
+4  |     PrestoToMySqlOperator,
+5  |     PrestoToMySqlTransfer,
+6  | )
+7  + from airflow.providers.mysql.hooks.mysql import MySqlHook
+8  | 
+9  | MySqlHook()
+10 | PrestoToMySqlOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR302 [*] `airflow.operators.presto_to_mysql.PrestoToMySqlOperator` is moved into `mysql` provider in Airflow 3.0;
+  --> AIR302_mysql.py:10:1
+   |
+ 9 | MySqlHook()
+10 | PrestoToMySqlOperator()
+   | ^^^^^^^^^^^^^^^^^^^^^
+11 | PrestoToMySqlTransfer()
+   |
+help: Install `apache-airflow-providers-mysql>=1.0.0` and use `PrestoToMySqlOperator` from `airflow.providers.mysql.transfers.presto_to_mysql` instead.
+2  | 
+3  | from airflow.hooks.mysql_hook import MySqlHook
+4  | from airflow.operators.presto_to_mysql import (
+   -     PrestoToMySqlOperator,
+5  |     PrestoToMySqlTransfer,
+6  | )
+7  + from airflow.providers.mysql.transfers.presto_to_mysql import PrestoToMySqlOperator
+8  | 
+9  | MySqlHook()
+10 | PrestoToMySqlOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR302 [*] `airflow.operators.presto_to_mysql.PrestoToMySqlTransfer` is moved into `mysql` provider in Airflow 3.0;
+  --> AIR302_mysql.py:11:1
+   |
+ 9 | MySqlHook()
+10 | PrestoToMySqlOperator()
+11 | PrestoToMySqlTransfer()
+   | ^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Install `apache-airflow-providers-mysql>=1.0.0` and use `PrestoToMySqlOperator` from `airflow.providers.mysql.transfers.presto_to_mysql` instead.
+2  | 
+3  | from airflow.hooks.mysql_hook import MySqlHook
+4  | from airflow.operators.presto_to_mysql import (
+   -     PrestoToMySqlOperator,
+5  |     PrestoToMySqlTransfer,
+6  | )
+7  + from airflow.providers.mysql.transfers.presto_to_mysql import PrestoToMySqlOperator
+8  | 
+9  | MySqlHook()
+10 | PrestoToMySqlOperator()
+note: This is an unsafe fix and may change runtime behavior

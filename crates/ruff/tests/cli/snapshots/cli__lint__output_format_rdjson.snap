@@ -1,0 +1,102 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - rdjson
+    - "--select"
+    - "F401,F821"
+    - "--target-version"
+    - py39
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+{
+  "diagnostics": [
+    {
+      "code": {
+        "url": "https://docs.astral.sh/ruff/rules/unused-import",
+        "value": "F401"
+      },
+      "location": {
+        "path": "[TMP]/input.py",
+        "range": {
+          "end": {
+            "column": 10,
+            "line": 1
+          },
+          "start": {
+            "column": 8,
+            "line": 1
+          }
+        }
+      },
+      "message": "`os` imported but unused",
+      "suggestions": [
+        {
+          "range": {
+            "end": {
+              "column": 1,
+              "line": 2
+            },
+            "start": {
+              "column": 1,
+              "line": 1
+            }
+          },
+          "text": ""
+        }
+      ]
+    },
+    {
+      "code": {
+        "url": "https://docs.astral.sh/ruff/rules/undefined-name",
+        "value": "F821"
+      },
+      "location": {
+        "path": "[TMP]/input.py",
+        "range": {
+          "end": {
+            "column": 6,
+            "line": 2
+          },
+          "start": {
+            "column": 5,
+            "line": 2
+          }
+        }
+      },
+      "message": "Undefined name `y`"
+    },
+    {
+      "code": {
+        "value": "invalid-syntax"
+      },
+      "location": {
+        "path": "[TMP]/input.py",
+        "range": {
+          "end": {
+            "column": 6,
+            "line": 3
+          },
+          "start": {
+            "column": 1,
+            "line": 3
+          }
+        }
+      },
+      "message": "Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)"
+    }
+  ],
+  "severity": "WARNING",
+  "source": {
+    "name": "ruff",
+    "url": "https://docs.astral.sh/ruff"
+  }
+}
+----- stderr -----

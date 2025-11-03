@@ -1,12 +1,12 @@
-use crate::fix::edits::pad;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::generate_comparison;
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad;
 use crate::registry::Rule;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for membership tests using `not {element} in {collection}`.
@@ -28,6 +28,7 @@ use crate::registry::Rule;
 ///     pass
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.28")]
 pub(crate) struct NotInTest;
 
 impl AlwaysFixableViolation for NotInTest {
@@ -64,6 +65,7 @@ impl AlwaysFixableViolation for NotInTest {
 ///
 /// [PEP8]: https://peps.python.org/pep-0008/#programming-recommendations
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.28")]
 pub(crate) struct NotIsTest;
 
 impl AlwaysFixableViolation for NotIsTest {
@@ -88,6 +90,7 @@ pub(crate) fn not_tests(checker: &Checker, unary_op: &ast::ExprUnaryOp) {
         ops,
         comparators,
         range: _,
+        node_index: _,
     }) = unary_op.operand.as_ref()
     else {
         return;
@@ -95,8 +98,8 @@ pub(crate) fn not_tests(checker: &Checker, unary_op: &ast::ExprUnaryOp) {
 
     match &**ops {
         [CmpOp::In] => {
-            if checker.enabled(Rule::NotInTest) {
-                let mut diagnostic = Diagnostic::new(NotInTest, unary_op.operand.range());
+            if checker.is_rule_enabled(Rule::NotInTest) {
+                let mut diagnostic = checker.report_diagnostic(NotInTest, unary_op.operand.range());
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     pad(
                         generate_comparison(
@@ -112,12 +115,11 @@ pub(crate) fn not_tests(checker: &Checker, unary_op: &ast::ExprUnaryOp) {
                     ),
                     unary_op.range(),
                 )));
-                checker.report_diagnostic(diagnostic);
             }
         }
         [CmpOp::Is] => {
-            if checker.enabled(Rule::NotIsTest) {
-                let mut diagnostic = Diagnostic::new(NotIsTest, unary_op.operand.range());
+            if checker.is_rule_enabled(Rule::NotIsTest) {
+                let mut diagnostic = checker.report_diagnostic(NotIsTest, unary_op.operand.range());
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     pad(
                         generate_comparison(
@@ -133,7 +135,6 @@ pub(crate) fn not_tests(checker: &Checker, unary_op: &ast::ExprUnaryOp) {
                     ),
                     unary_op.range(),
                 )));
-                checker.report_diagnostic(diagnostic);
             }
         }
         _ => {}

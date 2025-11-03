@@ -1,23 +1,19 @@
 use std::cmp::Reverse;
-use std::fmt::Display;
 use std::hash::Hash;
 use std::io::Write;
 
 use anyhow::Result;
 use bitflags::bitflags;
 use colored::Colorize;
-use itertools::{iterate, Itertools};
+use itertools::{Itertools, iterate};
+use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, SecondaryCode};
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
-use ruff_linter::message::{
-    AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
-    JsonEmitter, JsonLinesEmitter, JunitEmitter, Message, MessageKind, PylintEmitter,
-    RdjsonEmitter, SarifEmitter, TextEmitter,
-};
+use ruff_linter::message::{EmitterContext, render_diagnostics};
 use ruff_linter::notify_user;
-use ruff_linter::registry::Rule;
 use ruff_linter::settings::flags::{self};
 use ruff_linter::settings::types::{OutputFormat, UnsafeFixes};
 
@@ -30,64 +26,15 @@ bitflags! {
         const SHOW_VIOLATIONS = 1 << 0;
         /// Whether to show a summary of the fixed violations when emitting diagnostics.
         const SHOW_FIX_SUMMARY = 1 << 1;
-        /// Whether to show a diff of each fixed violation when emitting diagnostics.
-        const SHOW_FIX_DIFF = 1 << 2;
     }
 }
 
 #[derive(Serialize)]
-struct ExpandedStatistics {
-    code: Option<SerializeRuleAsCode>,
-    name: SerializeMessageKindAsTitle,
+struct ExpandedStatistics<'a> {
+    code: Option<&'a SecondaryCode>,
+    name: &'static str,
     count: usize,
     fixable: bool,
-}
-
-#[derive(Copy, Clone)]
-struct SerializeRuleAsCode(Rule);
-
-impl Serialize for SerializeRuleAsCode {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.0.noqa_code().to_string())
-    }
-}
-
-impl Display for SerializeRuleAsCode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.noqa_code())
-    }
-}
-
-impl From<Rule> for SerializeRuleAsCode {
-    fn from(rule: Rule) -> Self {
-        Self(rule)
-    }
-}
-
-struct SerializeMessageKindAsTitle(MessageKind);
-
-impl Serialize for SerializeMessageKindAsTitle {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(self.0.as_str())
-    }
-}
-
-impl Display for SerializeMessageKindAsTitle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.0.as_str())
-    }
-}
-
-impl From<MessageKind> for SerializeMessageKindAsTitle {
-    fn from(kind: MessageKind) -> Self {
-        Self(kind)
-    }
 }
 
 pub(crate) struct Printer {
@@ -128,11 +75,11 @@ impl Printer {
             let fixed = diagnostics
                 .fixed
                 .values()
-                .flat_map(std::collections::HashMap::values)
+                .flat_map(FixTable::counts)
                 .sum::<usize>();
 
             if self.flags.intersects(Flags::SHOW_VIOLATIONS) {
-                let remaining = diagnostics.messages.len();
+                let remaining = diagnostics.inner.len();
                 let total = fixed + remaining;
                 if fixed > 0 {
                     let s = if total == 1 { "" } else { "s" };
@@ -157,7 +104,8 @@ impl Printer {
                             } else {
                                 "es"
                             };
-                            writeln!(writer,
+                            writeln!(
+                                writer,
                                 "{fix_prefix} {} fixable with the `--fix` option ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
                                 fixables.applicable, fixables.inapplicable_unsafe
                             )?;
@@ -175,7 +123,8 @@ impl Printer {
                             } else {
                                 "es"
                             };
-                            writeln!(writer,
+                            writeln!(
+                                writer,
                                 "No fixes available ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
                                 fixables.inapplicable_unsafe
                             )?;
@@ -205,15 +154,27 @@ impl Printer {
                     if fixed > 0 {
                         let s = if fixed == 1 { "" } else { "s" };
                         if self.fix_mode.is_apply() {
-                            writeln!(writer, "Fixed {fixed} error{s} ({unapplied} additional fix{es} available with `--unsafe-fixes`).")?;
+                            writeln!(
+                                writer,
+                                "Fixed {fixed} error{s} ({unapplied} additional fix{es} available with `--unsafe-fixes`)."
+                            )?;
                         } else {
-                            writeln!(writer, "Would fix {fixed} error{s} ({unapplied} additional fix{es} available with `--unsafe-fixes`).")?;
+                            writeln!(
+                                writer,
+                                "Would fix {fixed} error{s} ({unapplied} additional fix{es} available with `--unsafe-fixes`)."
+                            )?;
                         }
                     } else {
                         if self.fix_mode.is_apply() {
-                            writeln!(writer, "No errors fixed ({unapplied} fix{es} available with `--unsafe-fixes`).")?;
+                            writeln!(
+                                writer,
+                                "No errors fixed ({unapplied} fix{es} available with `--unsafe-fixes`)."
+                            )?;
                         } else {
-                            writeln!(writer, "No errors would be fixed ({unapplied} fix{es} available with `--unsafe-fixes`).")?;
+                            writeln!(
+                                writer,
+                                "No errors would be fixed ({unapplied} fix{es} available with `--unsafe-fixes`)."
+                            )?;
                         }
                     }
                 } else {
@@ -235,13 +196,13 @@ impl Printer {
         &self,
         diagnostics: &Diagnostics,
         writer: &mut dyn Write,
+        preview: bool,
     ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
         }
 
         if !self.flags.intersects(Flags::SHOW_VIOLATIONS) {
-            #[allow(deprecated)]
             if matches!(
                 self.format,
                 OutputFormat::Full | OutputFormat::Concise | OutputFormat::Grouped
@@ -261,67 +222,28 @@ impl Printer {
         let context = EmitterContext::new(&diagnostics.notebook_indexes);
         let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
-        match self.format {
-            OutputFormat::Json => {
-                JsonEmitter.emit(writer, &diagnostics.messages, &context)?;
-            }
-            OutputFormat::Rdjson => {
-                RdjsonEmitter.emit(writer, &diagnostics.messages, &context)?;
-            }
-            OutputFormat::JsonLines => {
-                JsonLinesEmitter.emit(writer, &diagnostics.messages, &context)?;
-            }
-            OutputFormat::Junit => {
-                JunitEmitter.emit(writer, &diagnostics.messages, &context)?;
-            }
-            OutputFormat::Concise | OutputFormat::Full => {
-                TextEmitter::default()
-                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                    .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
-                    .with_show_source(self.format == OutputFormat::Full)
-                    .with_unsafe_fixes(self.unsafe_fixes)
-                    .emit(writer, &diagnostics.messages, &context)?;
+        let config = DisplayDiagnosticConfig::default()
+            .preview(preview)
+            .hide_severity(true)
+            .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
+            .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
+            .with_fix_applicability(self.unsafe_fixes.required_applicability())
+            .show_fix_diff(preview);
 
-                if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
-                    if !diagnostics.fixed.is_empty() {
-                        writeln!(writer)?;
-                        print_fix_summary(writer, &diagnostics.fixed)?;
-                        writeln!(writer)?;
-                    }
+        render_diagnostics(writer, self.format, config, &context, &diagnostics.inner)?;
+
+        if matches!(
+            self.format,
+            OutputFormat::Full | OutputFormat::Concise | OutputFormat::Grouped
+        ) {
+            if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
+                if !diagnostics.fixed.is_empty() {
+                    writeln!(writer)?;
+                    print_fix_summary(writer, &diagnostics.fixed)?;
+                    writeln!(writer)?;
                 }
-
-                self.write_summary_text(writer, diagnostics)?;
             }
-            OutputFormat::Grouped => {
-                GroupedEmitter::default()
-                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                    .with_unsafe_fixes(self.unsafe_fixes)
-                    .emit(writer, &diagnostics.messages, &context)?;
-
-                if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
-                    if !diagnostics.fixed.is_empty() {
-                        writeln!(writer)?;
-                        print_fix_summary(writer, &diagnostics.fixed)?;
-                        writeln!(writer)?;
-                    }
-                }
-                self.write_summary_text(writer, diagnostics)?;
-            }
-            OutputFormat::Github => {
-                GithubEmitter.emit(writer, &diagnostics.messages, &context)?;
-            }
-            OutputFormat::Gitlab => {
-                GitlabEmitter::default().emit(writer, &diagnostics.messages, &context)?;
-            }
-            OutputFormat::Pylint => {
-                PylintEmitter.emit(writer, &diagnostics.messages, &context)?;
-            }
-            OutputFormat::Azure => {
-                AzureEmitter.emit(writer, &diagnostics.messages, &context)?;
-            }
-            OutputFormat::Sarif => {
-                SarifEmitter.emit(writer, &diagnostics.messages, &context)?;
-            }
+            self.write_summary_text(writer, diagnostics)?;
         }
 
         writer.flush()?;
@@ -335,23 +257,27 @@ impl Printer {
         writer: &mut dyn Write,
     ) -> Result<()> {
         let statistics: Vec<ExpandedStatistics> = diagnostics
-            .messages
+            .inner
             .iter()
-            .sorted_by_key(|message| (message.rule(), message.fixable()))
-            .fold(vec![], |mut acc: Vec<(&Message, usize)>, message| {
-                if let Some((prev_message, count)) = acc.last_mut() {
-                    if prev_message.rule() == message.rule() {
-                        *count += 1;
-                        return acc;
+            .map(|message| (message.secondary_code(), message))
+            .sorted_by_key(|(code, message)| (*code, message.fixable()))
+            .fold(
+                vec![],
+                |mut acc: Vec<((Option<&SecondaryCode>, &Diagnostic), usize)>, (code, message)| {
+                    if let Some(((prev_code, _prev_message), count)) = acc.last_mut() {
+                        if *prev_code == code {
+                            *count += 1;
+                            return acc;
+                        }
                     }
-                }
-                acc.push((message, 1));
-                acc
-            })
+                    acc.push(((code, message), 1));
+                    acc
+                },
+            )
             .iter()
-            .map(|&(message, count)| ExpandedStatistics {
-                code: message.rule().map(std::convert::Into::into),
-                name: message.kind().into(),
+            .map(|&((code, message), count)| ExpandedStatistics {
+                code,
+                name: message.name(),
                 count,
                 fixable: if let Some(fix) = message.fix() {
                     fix.applies(self.unsafe_fixes.required_applicability())
@@ -379,12 +305,7 @@ impl Printer {
                 );
                 let code_width = statistics
                     .iter()
-                    .map(|statistic| {
-                        statistic
-                            .code
-                            .map_or_else(String::new, |rule| rule.to_string())
-                            .len()
-                    })
+                    .map(|statistic| statistic.code.map_or(0, |s| s.len()))
                     .max()
                     .unwrap();
                 let any_fixable = statistics.iter().any(|statistic| statistic.fixable);
@@ -400,7 +321,8 @@ impl Printer {
                         statistic.count.to_string().bold(),
                         statistic
                             .code
-                            .map_or_else(String::new, |rule| rule.to_string())
+                            .map(SecondaryCode::as_str)
+                            .unwrap_or_default()
                             .red()
                             .bold(),
                         if any_fixable {
@@ -446,30 +368,38 @@ impl Printer {
         }
 
         if self.log_level >= LogLevel::Default {
-            let s = if diagnostics.messages.len() == 1 {
+            let s = if diagnostics.inner.len() == 1 {
                 ""
             } else {
                 "s"
             };
             notify_user!(
                 "Found {} error{s}. Watching for file changes.",
-                diagnostics.messages.len()
+                diagnostics.inner.len()
             );
         }
 
         let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
-        if !diagnostics.messages.is_empty() {
+        if !diagnostics.inner.is_empty() {
             if self.log_level >= LogLevel::Default {
                 writeln!(writer)?;
             }
 
             let context = EmitterContext::new(&diagnostics.notebook_indexes);
-            TextEmitter::default()
+            let format = if preview {
+                self.format
+            } else {
+                OutputFormat::Concise
+            };
+            let config = DisplayDiagnosticConfig::default()
+                .preview(preview)
+                .hide_severity(true)
+                .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
                 .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                .with_show_source(preview)
-                .with_unsafe_fixes(self.unsafe_fixes)
-                .emit(writer, &diagnostics.messages, &context)?;
+                .with_fix_applicability(self.unsafe_fixes.required_applicability())
+                .show_fix_diff(preview);
+            render_diagnostics(writer, format, config, &context, &diagnostics.inner)?;
         }
         writer.flush()?;
 
@@ -503,13 +433,13 @@ fn show_fix_status(fix_mode: flags::FixMode, fixables: Option<&FixableStatistics
 fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap) -> Result<()> {
     let total = fixed
         .values()
-        .map(|table| table.values().sum::<usize>())
+        .map(|table| table.counts().sum::<usize>())
         .sum::<usize>();
     assert!(total > 0);
     let num_digits = num_digits(
-        *fixed
+        fixed
             .values()
-            .filter_map(|table| table.values().max())
+            .filter_map(|table| table.counts().max())
             .max()
             .unwrap(),
     );
@@ -529,12 +459,11 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap) -> Result<()> {
             relativize_path(filename).bold(),
             ":".cyan()
         )?;
-        for (rule, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
+        for (code, name, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
             writeln!(
                 writer,
-                "    {count:>num_digits$} × {} ({})",
-                rule.noqa_code().to_string().red().bold(),
-                rule.as_ref(),
+                "    {count:>num_digits$} × {code} ({name})",
+                code = code.to_string().red().bold(),
             )?;
         }
     }
@@ -553,7 +482,7 @@ impl FixableStatistics {
         let mut applicable = 0;
         let mut inapplicable_unsafe = 0;
 
-        for message in &diagnostics.messages {
+        for message in &diagnostics.inner {
             if let Some(fix) = message.fix() {
                 if fix.applies(unsafe_fixes.required_applicability()) {
                     applicable += 1;

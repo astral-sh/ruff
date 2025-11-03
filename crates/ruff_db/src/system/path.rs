@@ -45,6 +45,30 @@ impl SystemPath {
         SystemPath::from_std_path(dunce::simplified(self.as_std_path())).unwrap()
     }
 
+    /// Returns `true` if the `SystemPath` is absolute, i.e., if it is independent of
+    /// the current directory.
+    ///
+    /// * On Unix, a path is absolute if it starts with the root, so
+    ///   `is_absolute` and [`has_root`] are equivalent.
+    ///
+    /// * On Windows, a path is absolute if it has a prefix and starts with the
+    ///   root: `c:\windows` is absolute, while `c:temp` and `\temp` are not.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemPath;
+    ///
+    /// assert!(!SystemPath::new("foo.txt").is_absolute());
+    /// ```
+    ///
+    /// [`has_root`]: Utf8Path::has_root
+    #[inline]
+    #[must_use]
+    pub fn is_absolute(&self) -> bool {
+        self.0.is_absolute()
+    }
+
     /// Extracts the file extension, if possible.
     ///
     /// The extension is:
@@ -212,7 +236,7 @@ impl SystemPath {
     ///
     /// [`CurDir`]: camino::Utf8Component::CurDir
     #[inline]
-    pub fn components(&self) -> camino::Utf8Components {
+    pub fn components(&self) -> camino::Utf8Components<'_> {
         self.0.components()
     }
 
@@ -479,6 +503,12 @@ impl ToOwned for SystemPath {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct SystemPathBuf(#[cfg_attr(feature = "schemars", schemars(with = "String"))] Utf8PathBuf);
 
+impl get_size2::GetSize for SystemPathBuf {
+    fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(&self, tracker: T) -> (usize, T) {
+        (self.0.capacity(), tracker)
+    }
+}
+
 impl SystemPathBuf {
     pub fn new() -> Self {
         Self(Utf8PathBuf::new())
@@ -536,6 +566,10 @@ impl SystemPathBuf {
 
     pub fn into_std_path_buf(self) -> PathBuf {
         self.0.into_std_path_buf()
+    }
+
+    pub fn into_string(self) -> String {
+        self.0.into_string()
     }
 
     #[inline]
@@ -596,6 +630,13 @@ impl AsRef<SystemPath> for Utf8PathBuf {
     }
 }
 
+impl AsRef<SystemPath> for camino::Utf8Component<'_> {
+    #[inline]
+    fn as_ref(&self) -> &SystemPath {
+        SystemPath::new(self.as_str())
+    }
+}
+
 impl AsRef<SystemPath> for str {
     #[inline]
     fn as_ref(&self) -> &SystemPath {
@@ -623,6 +664,22 @@ impl Deref for SystemPathBuf {
     #[inline]
     fn deref(&self) -> &Self::Target {
         self.as_path()
+    }
+}
+
+impl<P: AsRef<SystemPath>> FromIterator<P> for SystemPathBuf {
+    fn from_iter<I: IntoIterator<Item = P>>(iter: I) -> Self {
+        let mut buf = SystemPathBuf::new();
+        buf.extend(iter);
+        buf
+    }
+}
+
+impl<P: AsRef<SystemPath>> Extend<P> for SystemPathBuf {
+    fn extend<I: IntoIterator<Item = P>>(&mut self, iter: I) {
+        for path in iter {
+            self.push(path);
+        }
     }
 }
 
@@ -666,10 +723,11 @@ impl ruff_cache::CacheKey for SystemPathBuf {
 
 /// A slice of a virtual path on [`System`](super::System) (akin to [`str`]).
 #[repr(transparent)]
+#[derive(Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct SystemVirtualPath(str);
 
 impl SystemVirtualPath {
-    pub fn new(path: &str) -> &SystemVirtualPath {
+    pub const fn new(path: &str) -> &SystemVirtualPath {
         // SAFETY: SystemVirtualPath is marked as #[repr(transparent)] so the conversion from a
         // *const str to a *const SystemVirtualPath is valid.
         unsafe { &*(path as *const str as *const SystemVirtualPath) }
@@ -705,13 +763,13 @@ impl SystemVirtualPath {
 }
 
 /// An owned, virtual path on [`System`](`super::System`) (akin to [`String`]).
-#[derive(Eq, PartialEq, Clone, Hash, PartialOrd, Ord)]
+#[derive(Eq, PartialEq, Clone, Hash, PartialOrd, Ord, get_size2::GetSize)]
 pub struct SystemVirtualPathBuf(String);
 
 impl SystemVirtualPathBuf {
     #[inline]
-    pub fn as_path(&self) -> &SystemVirtualPath {
-        SystemVirtualPath::new(&self.0)
+    pub const fn as_path(&self) -> &SystemVirtualPath {
+        SystemVirtualPath::new(self.0.as_str())
     }
 }
 
@@ -792,6 +850,12 @@ impl ruff_cache::CacheKey for SystemVirtualPath {
 impl ruff_cache::CacheKey for SystemVirtualPathBuf {
     fn cache_key(&self, hasher: &mut ruff_cache::CacheKeyHasher) {
         self.as_path().cache_key(hasher);
+    }
+}
+
+impl Borrow<SystemVirtualPath> for SystemVirtualPathBuf {
+    fn borrow(&self) -> &SystemVirtualPath {
+        self.as_path()
     }
 }
 

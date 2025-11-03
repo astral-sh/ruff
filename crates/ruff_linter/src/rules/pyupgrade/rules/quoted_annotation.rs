@@ -1,12 +1,12 @@
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Stmt;
 use ruff_python_parser::TokenKind;
+use ruff_python_semantic::SemanticModel;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::Stmt;
-use ruff_python_semantic::SemanticModel;
-use ruff_source_file::LineRanges;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for the presence of unnecessary quotes in type annotations.
@@ -57,6 +57,22 @@ use ruff_source_file::LineRanges;
 ///     bar: Bar
 /// ```
 ///
+/// ## Preview
+///
+/// When [preview] is enabled, if [`lint.future-annotations`] is set to `true`,
+/// `from __future__ import annotations` will be added if doing so would allow an annotation to be
+/// unquoted.
+///
+/// ## Fix safety
+///
+/// The rule's fix is marked as safe, unless [preview] and
+/// [`lint.future-annotations`] are enabled and a `from __future__ import
+/// annotations` import is added. Such an import may change the behavior of all annotations in the
+/// file.
+///
+/// ## Options
+/// - `lint.future-annotations`
+///
 /// ## See also
 /// - [`quoted-annotation-in-stub`][PYI020]: A rule that
 ///   removes all quoted annotations from stub files
@@ -69,7 +85,9 @@ use ruff_source_file::LineRanges;
 ///
 /// [PYI020]: https://docs.astral.sh/ruff/rules/quoted-annotation-in-stub/
 /// [TC008]: https://docs.astral.sh/ruff/rules/quoted-type-alias/
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.242")]
 pub(crate) struct QuotedAnnotation;
 
 impl AlwaysFixableViolation for QuotedAnnotation {
@@ -85,7 +103,12 @@ impl AlwaysFixableViolation for QuotedAnnotation {
 
 /// UP037
 pub(crate) fn quoted_annotation(checker: &Checker, annotation: &str, range: TextRange) {
-    let diagnostic = Diagnostic::new(QuotedAnnotation, range);
+    let add_future_import = checker.settings().future_annotations
+        && checker.semantic().in_runtime_evaluated_annotation();
+
+    if !(checker.semantic().in_typing_only_annotation() || add_future_import) {
+        return;
+    }
 
     let placeholder_range = TextRange::up_to(annotation.text_len());
     let spans_multiple_lines = annotation.contains_line_break(placeholder_range);
@@ -105,10 +128,18 @@ pub(crate) fn quoted_annotation(checker: &Checker, annotation: &str, range: Text
         (true, false) => format!("({annotation})"),
         (_, true) => format!("({annotation}\n)"),
     };
-    let edit = Edit::range_replacement(new_content, range);
-    let fix = Fix::safe_edit(edit);
+    let unquote_edit = Edit::range_replacement(new_content, range);
 
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    let fix = if add_future_import {
+        let import_edit = checker.importer().add_future_import();
+        Fix::unsafe_edits(unquote_edit, [import_edit])
+    } else {
+        Fix::safe_edit(unquote_edit)
+    };
+
+    checker
+        .report_diagnostic(QuotedAnnotation, range)
+        .set_fix(fix);
 }
 
 fn in_parameter_annotation(offset: TextSize, semantic: &SemanticModel) -> bool {

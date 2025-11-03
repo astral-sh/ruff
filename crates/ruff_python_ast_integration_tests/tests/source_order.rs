@@ -4,7 +4,7 @@ use insta::assert_snapshot;
 
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, BoolOp, CmpOp, Operator, Singleton, UnaryOp};
-use ruff_python_parser::{parse, Mode, ParseOptions};
+use ruff_python_parser::{Mode, ParseOptions, parse};
 
 #[test]
 fn function_arguments() {
@@ -140,6 +140,15 @@ fn bytes_literals() {
 #[test]
 fn f_strings() {
     let source = r"'pre' f'foo {bar:.{x}f} baz'";
+
+    let trace = trace_source_order_visitation(source);
+
+    assert_snapshot!(trace);
+}
+
+#[test]
+fn t_strings() {
+    let source = r"t'pre' t'foo {bar:.{x}f} baz'";
 
     let trace = trace_source_order_visitation(source);
 

@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for single-element tuples in exception handlers (e.g.,
@@ -36,6 +36,7 @@ use crate::fix::edits::pad;
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.89")]
 pub(crate) struct RedundantTupleInExceptionHandler {
     name: String,
 }
@@ -79,7 +80,7 @@ pub(crate) fn redundant_tuple_in_exception_handler(checker: &Checker, handlers: 
         if elt.is_starred_expr() {
             continue;
         }
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             RedundantTupleInExceptionHandler {
                 name: checker.generator().expr(elt),
             },
@@ -100,6 +101,5 @@ pub(crate) fn redundant_tuple_in_exception_handler(checker: &Checker, handlers: 
             ),
             type_.range(),
         )));
-        checker.report_diagnostic(diagnostic);
     }
 }

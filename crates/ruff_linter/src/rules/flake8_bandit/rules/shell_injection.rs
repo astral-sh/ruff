@@ -1,12 +1,12 @@
 //! Checks relating to shell injection.
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::{
     checkers::ast::Checker, registry::Rule, rules::flake8_bandit::helpers::string_literal,
 };
@@ -37,6 +37,7 @@ use crate::{
 /// - [Python documentation: `subprocess` — Subprocess management](https://docs.python.org/3/library/subprocess.html)
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct SubprocessPopenWithShellEqualsTrue {
     safety: Safety,
     is_exact: bool,
@@ -79,6 +80,7 @@ impl Violation for SubprocessPopenWithShellEqualsTrue {
 ///
 /// [#4045]: https://github.com/astral-sh/ruff/issues/4045
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct SubprocessWithoutShellEqualsTrue;
 
 impl Violation for SubprocessWithoutShellEqualsTrue {
@@ -108,15 +110,16 @@ impl Violation for SubprocessWithoutShellEqualsTrue {
 ///
 /// ## Example
 /// ```python
-/// import subprocess
+/// import my_custom_subprocess
 ///
 /// user_input = input("Enter a command: ")
-/// subprocess.run(user_input, shell=True)
+/// my_custom_subprocess.run(user_input, shell=True)
 /// ```
 ///
 /// ## References
 /// - [Python documentation: Security Considerations](https://docs.python.org/3/library/subprocess.html#security-considerations)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct CallWithShellEqualsTrue {
     is_exact: bool,
 }
@@ -169,6 +172,7 @@ impl Violation for CallWithShellEqualsTrue {
 /// ## References
 /// - [Python documentation: `subprocess`](https://docs.python.org/3/library/subprocess.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct StartProcessWithAShell {
     safety: Safety,
 }
@@ -210,6 +214,7 @@ impl Violation for StartProcessWithAShell {
 ///
 /// [S605]: https://docs.astral.sh/ruff/rules/start-process-with-a-shell
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct StartProcessWithNoShell;
 
 impl Violation for StartProcessWithNoShell {
@@ -245,6 +250,7 @@ impl Violation for StartProcessWithNoShell {
 /// - [Python documentation: `subprocess.Popen()`](https://docs.python.org/3/library/subprocess.html#subprocess.Popen)
 /// - [Common Weakness Enumeration: CWE-426](https://cwe.mitre.org/data/definitions/426.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct StartProcessWithPartialPath;
 
 impl Violation for StartProcessWithPartialPath {
@@ -265,25 +271,39 @@ impl Violation for StartProcessWithPartialPath {
 /// ```python
 /// import subprocess
 ///
-/// subprocess.Popen(["chmod", "777", "*.py"])
+/// subprocess.Popen(["chmod", "777", "*.py"], shell=True)
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// import subprocess
 ///
-/// subprocess.Popen(["chmod", "777", "main.py"])
+/// subprocess.Popen(["chmod", "777", "main.py"], shell=True)
 /// ```
 ///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct UnixCommandWildcardInjection;
 
 impl Violation for UnixCommandWildcardInjection {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Possible wildcard injection in call due to `*` usage".to_string()
+    }
+}
+
+/// Check if an expression is a trusted input for subprocess.run.
+/// We assume that any str, list[str] or tuple[str] literal can be trusted.
+fn is_trusted_input(arg: &Expr) -> bool {
+    match arg {
+        Expr::StringLiteral(_) => true,
+        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            elts.iter().all(|elt| matches!(elt, Expr::StringLiteral(_)))
+        }
+        Expr::Named(named) => is_trusted_input(&named.value),
+        _ => false,
     }
 }
 
@@ -299,35 +319,21 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                 Some(ShellKeyword {
                     truthiness: truthiness @ (Truthiness::True | Truthiness::Truthy),
                 }) => {
-                    if checker.enabled(Rule::SubprocessPopenWithShellEqualsTrue) {
-                        checker.report_diagnostic(Diagnostic::new(
-                            SubprocessPopenWithShellEqualsTrue {
-                                safety: Safety::from(arg),
-                                is_exact: matches!(truthiness, Truthiness::True),
-                            },
-                            call.func.range(),
-                        ));
-                    }
+                    checker.report_diagnostic_if_enabled(
+                        SubprocessPopenWithShellEqualsTrue {
+                            safety: Safety::from(arg),
+                            is_exact: matches!(truthiness, Truthiness::True),
+                        },
+                        call.func.range(),
+                    );
                 }
                 // S603
-                Some(ShellKeyword {
-                    truthiness:
-                        Truthiness::False | Truthiness::Falsey | Truthiness::None | Truthiness::Unknown,
-                }) => {
-                    if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
-                        checker.report_diagnostic(Diagnostic::new(
+                _ => {
+                    if !is_trusted_input(arg) {
+                        checker.report_diagnostic_if_enabled(
                             SubprocessWithoutShellEqualsTrue,
                             call.func.range(),
-                        ));
-                    }
-                }
-                // S603
-                None => {
-                    if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
-                        checker.report_diagnostic(Diagnostic::new(
-                            SubprocessWithoutShellEqualsTrue,
-                            call.func.range(),
-                        ));
+                        );
                     }
                 }
             }
@@ -337,53 +343,48 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     }) = shell_keyword
     {
         // S604
-        if checker.enabled(Rule::CallWithShellEqualsTrue) {
-            checker.report_diagnostic(Diagnostic::new(
-                CallWithShellEqualsTrue {
-                    is_exact: matches!(truthiness, Truthiness::True),
-                },
-                call.func.range(),
-            ));
-        }
+        checker.report_diagnostic_if_enabled(
+            CallWithShellEqualsTrue {
+                is_exact: matches!(truthiness, Truthiness::True),
+            },
+            call.func.range(),
+        );
     }
 
     // S605
-    if checker.enabled(Rule::StartProcessWithAShell) {
+    if checker.is_rule_enabled(Rule::StartProcessWithAShell) {
         if matches!(call_kind, Some(CallKind::Shell)) {
             if let Some(arg) = call.arguments.args.first() {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     StartProcessWithAShell {
                         safety: Safety::from(arg),
                     },
                     call.func.range(),
-                ));
+                );
             }
         }
     }
 
     // S606
-    if checker.enabled(Rule::StartProcessWithNoShell) {
+    if checker.is_rule_enabled(Rule::StartProcessWithNoShell) {
         if matches!(call_kind, Some(CallKind::NoShell)) {
-            checker.report_diagnostic(Diagnostic::new(StartProcessWithNoShell, call.func.range()));
+            checker.report_diagnostic(StartProcessWithNoShell, call.func.range());
         }
     }
 
     // S607
-    if checker.enabled(Rule::StartProcessWithPartialPath) {
+    if checker.is_rule_enabled(Rule::StartProcessWithPartialPath) {
         if call_kind.is_some() {
             if let Some(arg) = call.arguments.args.first() {
                 if is_partial_path(arg) {
-                    checker.report_diagnostic(Diagnostic::new(
-                        StartProcessWithPartialPath,
-                        arg.range(),
-                    ));
+                    checker.report_diagnostic(StartProcessWithPartialPath, arg.range());
                 }
             }
         }
     }
 
     // S609
-    if checker.enabled(Rule::UnixCommandWildcardInjection) {
+    if checker.is_rule_enabled(Rule::UnixCommandWildcardInjection) {
         if matches!(call_kind, Some(CallKind::Shell))
             || matches!(
                 (call_kind, shell_keyword),
@@ -397,10 +398,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
         {
             if let Some(arg) = call.arguments.args.first() {
                 if is_wildcard_command(arg) {
-                    checker.report_diagnostic(Diagnostic::new(
-                        UnixCommandWildcardInjection,
-                        arg.range(),
-                    ));
+                    checker.report_diagnostic(UnixCommandWildcardInjection, arg.range());
                 }
             }
         }

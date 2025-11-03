@@ -1,16 +1,22 @@
 use ruff_python_ast::Alias;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for import aliases that do not rename the original package.
+/// This rule does not apply in `__init__.py` files.
 ///
 /// ## Why is this bad?
 /// The import alias is redundant and should be removed to avoid confusion.
+///
+/// ## Fix safety
+/// This fix is marked as always unsafe because the user may be intentionally
+/// re-exporting the import. While statements like `import numpy as numpy`
+/// appear redundant, they can have semantic meaning in certain contexts.
 ///
 /// ## Example
 /// ```python
@@ -28,6 +34,7 @@ use crate::checkers::ast::Checker;
 /// import numpy
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.156")]
 pub(crate) struct UselessImportAlias {
     required_import_conflict: bool,
 }
@@ -37,7 +44,6 @@ impl Violation for UselessImportAlias {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        #[allow(clippy::if_not_else)]
         if !self.required_import_conflict {
             "Import alias does not rename original package".to_string()
         } else {
@@ -62,13 +68,19 @@ pub(crate) fn useless_import_alias(checker: &Checker, alias: &Alias) {
     if alias.name.as_str() != asname.as_str() {
         return;
     }
+
+    // A re-export in __init__.py is probably intentional.
+    if checker.path().ends_with("__init__.py") {
+        return;
+    }
+
     // A required import with a useless alias causes an infinite loop.
     // See https://github.com/astral-sh/ruff/issues/14283
     let required_import_conflict = checker
-        .settings
+        .settings()
         .isort
         .requires_module_import(alias.name.to_string(), Some(asname.to_string()));
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UselessImportAlias {
             required_import_conflict,
         },
@@ -80,8 +92,6 @@ pub(crate) fn useless_import_alias(checker: &Checker, alias: &Alias) {
             alias.range(),
         )));
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// PLC0414
@@ -97,15 +107,21 @@ pub(crate) fn useless_import_from_alias(
     if alias.name.as_str() != asname.as_str() {
         return;
     }
+
+    // A re-export in __init__.py is probably intentional.
+    if checker.path().ends_with("__init__.py") {
+        return;
+    }
+
     // A required import with a useless alias causes an infinite loop.
     // See https://github.com/astral-sh/ruff/issues/14283
-    let required_import_conflict = checker.settings.isort.requires_member_import(
+    let required_import_conflict = checker.settings().isort.requires_member_import(
         module.map(str::to_string),
         alias.name.to_string(),
         Some(asname.to_string()),
         level,
     );
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UselessImportAlias {
             required_import_conflict,
         },
@@ -118,6 +134,4 @@ pub(crate) fn useless_import_from_alias(
             alias.range(),
         )));
     }
-
-    checker.report_diagnostic(diagnostic);
 }

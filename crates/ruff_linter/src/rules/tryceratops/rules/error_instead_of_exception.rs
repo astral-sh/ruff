@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 use ruff_python_semantic::analyze::logging::exc_info;
@@ -9,6 +8,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `logging.error` instead of `logging.exception` when
@@ -52,6 +52,7 @@ use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 /// ## References
 /// - [Python documentation: `logging.exception`](https://docs.python.org/3/library/logging.html#logging.exception)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.236")]
 pub(crate) struct ErrorInsteadOfException;
 
 impl Violation for ErrorInsteadOfException {
@@ -73,14 +74,15 @@ pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHa
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) = handler;
         let calls = {
             let mut visitor =
-                LoggerCandidateVisitor::new(checker.semantic(), &checker.settings.logger_objects);
+                LoggerCandidateVisitor::new(checker.semantic(), &checker.settings().logger_objects);
             visitor.visit_body(body);
             visitor.calls
         };
         for (expr, logging_level) in calls {
             if matches!(logging_level, LoggingLevel::Error) {
                 if exc_info(&expr.arguments, checker.semantic()).is_none() {
-                    let mut diagnostic = Diagnostic::new(ErrorInsteadOfException, expr.range());
+                    let mut diagnostic =
+                        checker.report_diagnostic(ErrorInsteadOfException, expr.range());
 
                     match expr.func.as_ref() {
                         Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
@@ -134,8 +136,6 @@ pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHa
                         }
                         _ => {}
                     }
-
-                    checker.report_diagnostic(diagnostic);
                 }
             }
         }

@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -40,6 +40,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [targeted for deprecation]: https://github.com/python/cpython/issues/82616
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.281")]
 pub(crate) struct SubprocessPopenPreexecFn;
 
 impl Violation for SubprocessPopenPreexecFn {
@@ -65,7 +66,7 @@ pub(crate) fn subprocess_popen_preexec_fn(checker: &Checker, call: &ast::ExprCal
             .find_keyword("preexec_fn")
             .filter(|keyword| !keyword.value.is_none_literal_expr())
         {
-            checker.report_diagnostic(Diagnostic::new(SubprocessPopenPreexecFn, keyword.range()));
+            checker.report_diagnostic(SubprocessPopenPreexecFn, keyword.range());
         }
     }
 }

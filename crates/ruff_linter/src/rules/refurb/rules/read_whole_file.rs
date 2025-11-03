@@ -1,14 +1,17 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::visitor::{self, Visitor};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_diagnostics::{Applicability, Edit, Fix};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{
+    self as ast, Expr, Stmt,
+    visitor::{self, Visitor},
+};
 use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-
-use super::super::helpers::{find_file_opens, FileOpen};
+use crate::importer::ImportRequest;
+use crate::rules::refurb::helpers::{FileOpen, find_file_opens};
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `open` and `read` that can be replaced by `pathlib`
@@ -31,22 +34,35 @@ use super::super::helpers::{find_file_opens, FileOpen};
 ///
 /// contents = Path(filename).read_text()
 /// ```
+/// ## Fix Safety
+/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
 ///
 /// ## References
 /// - [Python documentation: `Path.read_bytes`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.read_bytes)
 /// - [Python documentation: `Path.read_text`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.read_text)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.2")]
 pub(crate) struct ReadWholeFile {
     filename: SourceCodeSnippet,
     suggestion: SourceCodeSnippet,
 }
 
 impl Violation for ReadWholeFile {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let filename = self.filename.truncated_display();
         let suggestion = self.suggestion.truncated_display();
         format!("`open` and `read` should be replaced by `Path({filename}).{suggestion}`")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!(
+            "Replace with `Path({}).{}`",
+            self.filename.truncated_display(),
+            self.suggestion.truncated_display(),
+        ))
     }
 }
 
@@ -64,49 +80,32 @@ pub(crate) fn read_whole_file(checker: &Checker, with: &ast::StmtWith) {
     }
 
     // Then we need to match each `open` operation with exactly one `read` call.
-    let matches = {
-        let mut matcher = ReadMatcher::new(candidates);
-        visitor::walk_body(&mut matcher, &with.body);
-        matcher.into_matches()
-    };
-
-    // All the matched operations should be reported.
-    let diagnostics: Vec<Diagnostic> = matches
-        .iter()
-        .map(|open| {
-            Diagnostic::new(
-                ReadWholeFile {
-                    filename: SourceCodeSnippet::from_str(&checker.generator().expr(open.filename)),
-                    suggestion: make_suggestion(open, checker.generator()),
-                },
-                open.item.range(),
-            )
-        })
-        .collect();
-    checker.report_diagnostics(diagnostics);
+    let mut matcher = ReadMatcher::new(checker, candidates, with);
+    visitor::walk_body(&mut matcher, &with.body);
 }
 
 /// AST visitor that matches `open` operations with the corresponding `read` calls.
-#[derive(Debug)]
-struct ReadMatcher<'a> {
+struct ReadMatcher<'a, 'b> {
+    checker: &'a Checker<'b>,
     candidates: Vec<FileOpen<'a>>,
-    matches: Vec<FileOpen<'a>>,
+    with_stmt: &'a ast::StmtWith,
 }
 
-impl<'a> ReadMatcher<'a> {
-    fn new(candidates: Vec<FileOpen<'a>>) -> Self {
+impl<'a, 'b> ReadMatcher<'a, 'b> {
+    fn new(
+        checker: &'a Checker<'b>,
+        candidates: Vec<FileOpen<'a>>,
+        with_stmt: &'a ast::StmtWith,
+    ) -> Self {
         Self {
+            checker,
             candidates,
-            matches: vec![],
+            with_stmt,
         }
     }
-
-    fn into_matches(self) -> Vec<FileOpen<'a>> {
-        self.matches
-    }
 }
 
-impl<'a> Visitor<'a> for ReadMatcher<'a> {
+impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         if let Some(read_from) = match_read_call(expr) {
             if let Some(open) = self
@@ -114,7 +113,39 @@ impl<'a> Visitor<'a> for ReadMatcher<'a> {
                 .iter()
                 .position(|open| open.is_ref(read_from))
             {
-                self.matches.push(self.candidates.remove(open));
+                let open = self.candidates.remove(open);
+                let suggestion = make_suggestion(&open, self.checker.generator());
+                let mut diagnostic = self.checker.report_diagnostic(
+                    ReadWholeFile {
+                        filename: SourceCodeSnippet::from_str(
+                            &self.checker.generator().expr(open.filename),
+                        ),
+                        suggestion: SourceCodeSnippet::from_str(&suggestion),
+                    },
+                    open.item.range(),
+                );
+
+                if !crate::preview::is_fix_read_whole_file_enabled(self.checker.settings()) {
+                    return;
+                }
+
+                let target = match self.with_stmt.body.first() {
+                    Some(Stmt::Assign(assign))
+                        if assign.value.range().contains_range(expr.range()) =>
+                    {
+                        match assign.targets.first() {
+                            Some(Expr::Name(name)) => Some(name.id.as_str()),
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                };
+
+                if let Some(fix) =
+                    generate_fix(self.checker, &open, target, self.with_stmt, &suggestion)
+                {
+                    diagnostic.set_fix(fix);
+                }
             }
             return;
         }
@@ -139,11 +170,12 @@ fn match_read_call(expr: &Expr) -> Option<&Expr> {
     Some(&*attr.value)
 }
 
-fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> SourceCodeSnippet {
+fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> String {
     let name = ast::ExprName {
         id: open.mode.pathlib_method(),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let call = ast::ExprCall {
         func: Box::new(name.into()),
@@ -151,8 +183,51 @@ fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> SourceCodeSnipp
             args: Box::from([]),
             keywords: open.keywords.iter().copied().cloned().collect(),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
-    SourceCodeSnippet::from_str(&generator.expr(&call.into()))
+    generator.expr(&call.into())
+}
+
+fn generate_fix(
+    checker: &Checker,
+    open: &FileOpen,
+    target: Option<&str>,
+    with_stmt: &ast::StmtWith,
+    suggestion: &str,
+) -> Option<Fix> {
+    if !(with_stmt.items.len() == 1 && matches!(with_stmt.body.as_slice(), [Stmt::Assign(_)])) {
+        return None;
+    }
+
+    let locator = checker.locator();
+    let filename_code = locator.slice(open.filename.range());
+
+    let (import_edit, binding) = checker
+        .importer()
+        .get_or_import_symbol(
+            &ImportRequest::import("pathlib", "Path"),
+            with_stmt.start(),
+            checker.semantic(),
+        )
+        .ok()?;
+
+    let replacement = match target {
+        Some(var) => format!("{var} = {binding}({filename_code}).{suggestion}"),
+        None => format!("{binding}({filename_code}).{suggestion}"),
+    };
+
+    let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    Some(Fix::applicable_edits(
+        Edit::range_replacement(replacement, with_stmt.range()),
+        [import_edit],
+        applicability,
+    ))
 }

@@ -1,0 +1,674 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR301 [*] `iter_datasets` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:27:19
+   |
+25 | # airflow.Dataset
+26 | dataset_from_root = DatasetFromRoot()
+27 | dataset_from_root.iter_datasets()
+   |                   ^^^^^^^^^^^^^
+28 | dataset_from_root.iter_dataset_aliases()
+   |
+help: Use `iter_assets` instead
+24 | 
+25 | # airflow.Dataset
+26 | dataset_from_root = DatasetFromRoot()
+   - dataset_from_root.iter_datasets()
+27 + dataset_from_root.iter_assets()
+28 | dataset_from_root.iter_dataset_aliases()
+29 | 
+30 | # airflow.datasets
+
+AIR301 [*] `iter_dataset_aliases` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:28:19
+   |
+26 | dataset_from_root = DatasetFromRoot()
+27 | dataset_from_root.iter_datasets()
+28 | dataset_from_root.iter_dataset_aliases()
+   |                   ^^^^^^^^^^^^^^^^^^^^
+29 |
+30 | # airflow.datasets
+   |
+help: Use `iter_asset_aliases` instead
+25 | # airflow.Dataset
+26 | dataset_from_root = DatasetFromRoot()
+27 | dataset_from_root.iter_datasets()
+   - dataset_from_root.iter_dataset_aliases()
+28 + dataset_from_root.iter_asset_aliases()
+29 | 
+30 | # airflow.datasets
+31 | dataset_to_test_method_call = Dataset()
+
+AIR301 [*] `iter_datasets` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:32:29
+   |
+30 | # airflow.datasets
+31 | dataset_to_test_method_call = Dataset()
+32 | dataset_to_test_method_call.iter_datasets()
+   |                             ^^^^^^^^^^^^^
+33 | dataset_to_test_method_call.iter_dataset_aliases()
+   |
+help: Use `iter_assets` instead
+29 | 
+30 | # airflow.datasets
+31 | dataset_to_test_method_call = Dataset()
+   - dataset_to_test_method_call.iter_datasets()
+32 + dataset_to_test_method_call.iter_assets()
+33 | dataset_to_test_method_call.iter_dataset_aliases()
+34 | 
+35 | alias_to_test_method_call = DatasetAlias()
+
+AIR301 [*] `iter_dataset_aliases` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:33:29
+   |
+31 | dataset_to_test_method_call = Dataset()
+32 | dataset_to_test_method_call.iter_datasets()
+33 | dataset_to_test_method_call.iter_dataset_aliases()
+   |                             ^^^^^^^^^^^^^^^^^^^^
+34 |
+35 | alias_to_test_method_call = DatasetAlias()
+   |
+help: Use `iter_asset_aliases` instead
+30 | # airflow.datasets
+31 | dataset_to_test_method_call = Dataset()
+32 | dataset_to_test_method_call.iter_datasets()
+   - dataset_to_test_method_call.iter_dataset_aliases()
+33 + dataset_to_test_method_call.iter_asset_aliases()
+34 | 
+35 | alias_to_test_method_call = DatasetAlias()
+36 | alias_to_test_method_call.iter_datasets()
+
+AIR301 [*] `iter_datasets` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:36:27
+   |
+35 | alias_to_test_method_call = DatasetAlias()
+36 | alias_to_test_method_call.iter_datasets()
+   |                           ^^^^^^^^^^^^^
+37 | alias_to_test_method_call.iter_dataset_aliases()
+   |
+help: Use `iter_assets` instead
+33 | dataset_to_test_method_call.iter_dataset_aliases()
+34 | 
+35 | alias_to_test_method_call = DatasetAlias()
+   - alias_to_test_method_call.iter_datasets()
+36 + alias_to_test_method_call.iter_assets()
+37 | alias_to_test_method_call.iter_dataset_aliases()
+38 | 
+39 | any_to_test_method_call = DatasetAny()
+
+AIR301 [*] `iter_dataset_aliases` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:37:27
+   |
+35 | alias_to_test_method_call = DatasetAlias()
+36 | alias_to_test_method_call.iter_datasets()
+37 | alias_to_test_method_call.iter_dataset_aliases()
+   |                           ^^^^^^^^^^^^^^^^^^^^
+38 |
+39 | any_to_test_method_call = DatasetAny()
+   |
+help: Use `iter_asset_aliases` instead
+34 | 
+35 | alias_to_test_method_call = DatasetAlias()
+36 | alias_to_test_method_call.iter_datasets()
+   - alias_to_test_method_call.iter_dataset_aliases()
+37 + alias_to_test_method_call.iter_asset_aliases()
+38 | 
+39 | any_to_test_method_call = DatasetAny()
+40 | any_to_test_method_call.iter_datasets()
+
+AIR301 [*] `iter_datasets` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:40:25
+   |
+39 | any_to_test_method_call = DatasetAny()
+40 | any_to_test_method_call.iter_datasets()
+   |                         ^^^^^^^^^^^^^
+41 | any_to_test_method_call.iter_dataset_aliases()
+   |
+help: Use `iter_assets` instead
+37 | alias_to_test_method_call.iter_dataset_aliases()
+38 | 
+39 | any_to_test_method_call = DatasetAny()
+   - any_to_test_method_call.iter_datasets()
+40 + any_to_test_method_call.iter_assets()
+41 | any_to_test_method_call.iter_dataset_aliases()
+42 | 
+43 | # airflow.datasets.manager
+
+AIR301 [*] `iter_dataset_aliases` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:41:25
+   |
+39 | any_to_test_method_call = DatasetAny()
+40 | any_to_test_method_call.iter_datasets()
+41 | any_to_test_method_call.iter_dataset_aliases()
+   |                         ^^^^^^^^^^^^^^^^^^^^
+42 |
+43 | # airflow.datasets.manager
+   |
+help: Use `iter_asset_aliases` instead
+38 | 
+39 | any_to_test_method_call = DatasetAny()
+40 | any_to_test_method_call.iter_datasets()
+   - any_to_test_method_call.iter_dataset_aliases()
+41 + any_to_test_method_call.iter_asset_aliases()
+42 | 
+43 | # airflow.datasets.manager
+44 | dm = DatasetManager()
+
+AIR301 [*] `airflow.datasets.manager.DatasetManager` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:44:6
+   |
+43 | # airflow.datasets.manager
+44 | dm = DatasetManager()
+   |      ^^^^^^^^^^^^^^
+45 | dm.register_dataset_change()
+46 | dm.create_datasets()
+   |
+help: Use `AssetManager` from `airflow.assets.manager` instead.
+20 | from airflow.providers_manager import ProvidersManager
+21 | from airflow.secrets.base_secrets import BaseSecretsBackend
+22 | from airflow.secrets.local_filesystem import LocalFilesystemBackend
+23 + from airflow.assets.manager import AssetManager
+24 | 
+25 | 
+26 | # airflow.Dataset
+--------------------------------------------------------------------------------
+42 | any_to_test_method_call.iter_dataset_aliases()
+43 | 
+44 | # airflow.datasets.manager
+   - dm = DatasetManager()
+45 + dm = AssetManager()
+46 | dm.register_dataset_change()
+47 | dm.create_datasets()
+48 | dm.notify_dataset_created()
+
+AIR301 [*] `register_dataset_change` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:45:4
+   |
+43 | # airflow.datasets.manager
+44 | dm = DatasetManager()
+45 | dm.register_dataset_change()
+   |    ^^^^^^^^^^^^^^^^^^^^^^^
+46 | dm.create_datasets()
+47 | dm.notify_dataset_created()
+   |
+help: Use `register_asset_change` instead
+42 | 
+43 | # airflow.datasets.manager
+44 | dm = DatasetManager()
+   - dm.register_dataset_change()
+45 + dm.register_asset_change()
+46 | dm.create_datasets()
+47 | dm.notify_dataset_created()
+48 | dm.notify_dataset_changed()
+
+AIR301 [*] `create_datasets` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:46:4
+   |
+44 | dm = DatasetManager()
+45 | dm.register_dataset_change()
+46 | dm.create_datasets()
+   |    ^^^^^^^^^^^^^^^
+47 | dm.notify_dataset_created()
+48 | dm.notify_dataset_changed()
+   |
+help: Use `create_assets` instead
+43 | # airflow.datasets.manager
+44 | dm = DatasetManager()
+45 | dm.register_dataset_change()
+   - dm.create_datasets()
+46 + dm.create_assets()
+47 | dm.notify_dataset_created()
+48 | dm.notify_dataset_changed()
+49 | dm.notify_dataset_alias_created()
+
+AIR301 [*] `notify_dataset_created` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:47:4
+   |
+45 | dm.register_dataset_change()
+46 | dm.create_datasets()
+47 | dm.notify_dataset_created()
+   |    ^^^^^^^^^^^^^^^^^^^^^^
+48 | dm.notify_dataset_changed()
+49 | dm.notify_dataset_alias_created()
+   |
+help: Use `notify_asset_created` instead
+44 | dm = DatasetManager()
+45 | dm.register_dataset_change()
+46 | dm.create_datasets()
+   - dm.notify_dataset_created()
+47 + dm.notify_asset_created()
+48 | dm.notify_dataset_changed()
+49 | dm.notify_dataset_alias_created()
+50 | 
+
+AIR301 [*] `notify_dataset_changed` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:48:4
+   |
+46 | dm.create_datasets()
+47 | dm.notify_dataset_created()
+48 | dm.notify_dataset_changed()
+   |    ^^^^^^^^^^^^^^^^^^^^^^
+49 | dm.notify_dataset_alias_created()
+   |
+help: Use `notify_asset_changed` instead
+45 | dm.register_dataset_change()
+46 | dm.create_datasets()
+47 | dm.notify_dataset_created()
+   - dm.notify_dataset_changed()
+48 + dm.notify_asset_changed()
+49 | dm.notify_dataset_alias_created()
+50 | 
+51 | # airflow.lineage.hook
+
+AIR301 [*] `notify_dataset_alias_created` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:49:4
+   |
+47 | dm.notify_dataset_created()
+48 | dm.notify_dataset_changed()
+49 | dm.notify_dataset_alias_created()
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+50 |
+51 | # airflow.lineage.hook
+   |
+help: Use `notify_asset_alias_created` instead
+46 | dm.create_datasets()
+47 | dm.notify_dataset_created()
+48 | dm.notify_dataset_changed()
+   - dm.notify_dataset_alias_created()
+49 + dm.notify_asset_alias_created()
+50 | 
+51 | # airflow.lineage.hook
+52 | dl_info = DatasetLineageInfo()
+
+AIR301 [*] `airflow.lineage.hook.DatasetLineageInfo` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:52:11
+   |
+51 | # airflow.lineage.hook
+52 | dl_info = DatasetLineageInfo()
+   |           ^^^^^^^^^^^^^^^^^^
+53 | dl_info.dataset
+   |
+help: Use `AssetLineageInfo` from `airflow.lineage.hook` instead.
+9  |     DatasetAny,
+10 | )
+11 | from airflow.datasets.manager import DatasetManager
+   - from airflow.lineage.hook import DatasetLineageInfo, HookLineageCollector
+12 + from airflow.lineage.hook import DatasetLineageInfo, HookLineageCollector, AssetLineageInfo
+13 | from airflow.models.dag import DAG
+14 | from airflow.providers.amazon.aws.auth_manager.aws_auth_manager import AwsAuthManager
+15 | from airflow.providers.apache.beam.hooks import BeamHook, NotAir302HookError
+--------------------------------------------------------------------------------
+49 | dm.notify_dataset_alias_created()
+50 | 
+51 | # airflow.lineage.hook
+   - dl_info = DatasetLineageInfo()
+52 + dl_info = AssetLineageInfo()
+53 | dl_info.dataset
+54 | 
+55 | hlc = HookLineageCollector()
+
+AIR301 [*] `dataset` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:53:9
+   |
+51 | # airflow.lineage.hook
+52 | dl_info = DatasetLineageInfo()
+53 | dl_info.dataset
+   |         ^^^^^^^
+54 |
+55 | hlc = HookLineageCollector()
+   |
+help: Use `asset` instead
+50 | 
+51 | # airflow.lineage.hook
+52 | dl_info = DatasetLineageInfo()
+   - dl_info.dataset
+53 + dl_info.asset
+54 | 
+55 | hlc = HookLineageCollector()
+56 | hlc.create_dataset()
+
+AIR301 [*] `create_dataset` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:56:5
+   |
+55 | hlc = HookLineageCollector()
+56 | hlc.create_dataset()
+   |     ^^^^^^^^^^^^^^
+57 | hlc.add_input_dataset()
+58 | hlc.add_output_dataset()
+   |
+help: Use `create_asset` instead
+53 | dl_info.dataset
+54 | 
+55 | hlc = HookLineageCollector()
+   - hlc.create_dataset()
+56 + hlc.create_asset()
+57 | hlc.add_input_dataset()
+58 | hlc.add_output_dataset()
+59 | hlc.collected_datasets()
+
+AIR301 [*] `add_input_dataset` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:57:5
+   |
+55 | hlc = HookLineageCollector()
+56 | hlc.create_dataset()
+57 | hlc.add_input_dataset()
+   |     ^^^^^^^^^^^^^^^^^
+58 | hlc.add_output_dataset()
+59 | hlc.collected_datasets()
+   |
+help: Use `add_input_asset` instead
+54 | 
+55 | hlc = HookLineageCollector()
+56 | hlc.create_dataset()
+   - hlc.add_input_dataset()
+57 + hlc.add_input_asset()
+58 | hlc.add_output_dataset()
+59 | hlc.collected_datasets()
+60 | 
+
+AIR301 [*] `add_output_dataset` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:58:5
+   |
+56 | hlc.create_dataset()
+57 | hlc.add_input_dataset()
+58 | hlc.add_output_dataset()
+   |     ^^^^^^^^^^^^^^^^^^
+59 | hlc.collected_datasets()
+   |
+help: Use `add_output_asset` instead
+55 | hlc = HookLineageCollector()
+56 | hlc.create_dataset()
+57 | hlc.add_input_dataset()
+   - hlc.add_output_dataset()
+58 + hlc.add_output_asset()
+59 | hlc.collected_datasets()
+60 | 
+61 | # airflow.models.dag.DAG
+
+AIR301 [*] `collected_datasets` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:59:5
+   |
+57 | hlc.add_input_dataset()
+58 | hlc.add_output_dataset()
+59 | hlc.collected_datasets()
+   |     ^^^^^^^^^^^^^^^^^^
+60 |
+61 | # airflow.models.dag.DAG
+   |
+help: Use `collected_assets` instead
+56 | hlc.create_dataset()
+57 | hlc.add_input_dataset()
+58 | hlc.add_output_dataset()
+   - hlc.collected_datasets()
+59 + hlc.collected_assets()
+60 | 
+61 | # airflow.models.dag.DAG
+62 | test_dag = DAG(dag_id="test_dag")
+
+AIR301 `create_dagrun` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:63:10
+   |
+61 | # airflow.models.dag.DAG
+62 | test_dag = DAG(dag_id="test_dag")
+63 | test_dag.create_dagrun()
+   |          ^^^^^^^^^^^^^
+64 |
+65 | # airflow.providers.amazon.auth_manager.aws_auth_manager
+   |
+
+AIR301 [*] `is_authorized_dataset` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:67:5
+   |
+65 | # airflow.providers.amazon.auth_manager.aws_auth_manager
+66 | aam = AwsAuthManager()
+67 | aam.is_authorized_dataset()
+   |     ^^^^^^^^^^^^^^^^^^^^^
+68 |
+69 | # airflow.providers.apache.beam.hooks
+   |
+help: Use `is_authorized_asset` instead
+64 | 
+65 | # airflow.providers.amazon.auth_manager.aws_auth_manager
+66 | aam = AwsAuthManager()
+   - aam.is_authorized_dataset()
+67 + aam.is_authorized_asset()
+68 | 
+69 | # airflow.providers.apache.beam.hooks
+70 | # check get_conn_uri is caught if the class inherits from an airflow hook
+
+AIR301 [*] `get_conn_uri` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:79:13
+   |
+77 | # airflow.providers.google.cloud.secrets.secret_manager
+78 | csm_backend = CloudSecretManagerBackend()
+79 | csm_backend.get_conn_uri()
+   |             ^^^^^^^^^^^^
+80 | csm_backend.get_connections()
+   |
+help: Use `get_conn_value` instead
+76 | 
+77 | # airflow.providers.google.cloud.secrets.secret_manager
+78 | csm_backend = CloudSecretManagerBackend()
+   - csm_backend.get_conn_uri()
+79 + csm_backend.get_conn_value()
+80 | csm_backend.get_connections()
+81 | 
+82 | # airflow.providers.hashicorp.secrets.vault
+
+AIR301 [*] `get_connections` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:80:13
+   |
+78 | csm_backend = CloudSecretManagerBackend()
+79 | csm_backend.get_conn_uri()
+80 | csm_backend.get_connections()
+   |             ^^^^^^^^^^^^^^^
+81 |
+82 | # airflow.providers.hashicorp.secrets.vault
+   |
+help: Use `get_connection` instead
+77 | # airflow.providers.google.cloud.secrets.secret_manager
+78 | csm_backend = CloudSecretManagerBackend()
+79 | csm_backend.get_conn_uri()
+   - csm_backend.get_connections()
+80 + csm_backend.get_connection()
+81 | 
+82 | # airflow.providers.hashicorp.secrets.vault
+83 | vault_backend = VaultBackend()
+
+AIR301 [*] `get_conn_uri` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:84:15
+   |
+82 | # airflow.providers.hashicorp.secrets.vault
+83 | vault_backend = VaultBackend()
+84 | vault_backend.get_conn_uri()
+   |               ^^^^^^^^^^^^
+85 | vault_backend.get_connections()
+   |
+help: Use `get_conn_value` instead
+81 | 
+82 | # airflow.providers.hashicorp.secrets.vault
+83 | vault_backend = VaultBackend()
+   - vault_backend.get_conn_uri()
+84 + vault_backend.get_conn_value()
+85 | vault_backend.get_connections()
+86 | 
+87 | not_an_error = NotAir302SecretError()
+
+AIR301 [*] `get_connections` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:85:15
+   |
+83 | vault_backend = VaultBackend()
+84 | vault_backend.get_conn_uri()
+85 | vault_backend.get_connections()
+   |               ^^^^^^^^^^^^^^^
+86 |
+87 | not_an_error = NotAir302SecretError()
+   |
+help: Use `get_connection` instead
+82 | # airflow.providers.hashicorp.secrets.vault
+83 | vault_backend = VaultBackend()
+84 | vault_backend.get_conn_uri()
+   - vault_backend.get_connections()
+85 + vault_backend.get_connection()
+86 | 
+87 | not_an_error = NotAir302SecretError()
+88 | not_an_error.get_conn_uri()
+
+AIR301 [*] `initialize_providers_dataset_uri_resources` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:92:4
+   |
+90 | # airflow.providers_manager
+91 | pm = ProvidersManager()
+92 | pm.initialize_providers_dataset_uri_resources()
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+93 | pm.dataset_factories
+94 | pm.dataset_uri_handlers
+   |
+help: Use `initialize_providers_asset_uri_resources` instead
+89 | 
+90 | # airflow.providers_manager
+91 | pm = ProvidersManager()
+   - pm.initialize_providers_dataset_uri_resources()
+92 + pm.initialize_providers_asset_uri_resources()
+93 | pm.dataset_factories
+94 | pm.dataset_uri_handlers
+95 | pm.dataset_to_openlineage_converters
+
+AIR301 [*] `dataset_factories` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:93:4
+   |
+91 | pm = ProvidersManager()
+92 | pm.initialize_providers_dataset_uri_resources()
+93 | pm.dataset_factories
+   |    ^^^^^^^^^^^^^^^^^
+94 | pm.dataset_uri_handlers
+95 | pm.dataset_to_openlineage_converters
+   |
+help: Use `asset_factories` instead
+90 | # airflow.providers_manager
+91 | pm = ProvidersManager()
+92 | pm.initialize_providers_dataset_uri_resources()
+   - pm.dataset_factories
+93 + pm.asset_factories
+94 | pm.dataset_uri_handlers
+95 | pm.dataset_to_openlineage_converters
+96 | 
+
+AIR301 [*] `dataset_uri_handlers` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:94:4
+   |
+92 | pm.initialize_providers_dataset_uri_resources()
+93 | pm.dataset_factories
+94 | pm.dataset_uri_handlers
+   |    ^^^^^^^^^^^^^^^^^^^^
+95 | pm.dataset_to_openlineage_converters
+   |
+help: Use `asset_uri_handlers` instead
+91 | pm = ProvidersManager()
+92 | pm.initialize_providers_dataset_uri_resources()
+93 | pm.dataset_factories
+   - pm.dataset_uri_handlers
+94 + pm.asset_uri_handlers
+95 | pm.dataset_to_openlineage_converters
+96 | 
+97 | # airflow.secrets.base_secrets
+
+AIR301 [*] `dataset_to_openlineage_converters` is removed in Airflow 3.0
+  --> AIR301_class_attribute.py:95:4
+   |
+93 | pm.dataset_factories
+94 | pm.dataset_uri_handlers
+95 | pm.dataset_to_openlineage_converters
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+96 |
+97 | # airflow.secrets.base_secrets
+   |
+help: Use `asset_to_openlineage_converters` instead
+92 | pm.initialize_providers_dataset_uri_resources()
+93 | pm.dataset_factories
+94 | pm.dataset_uri_handlers
+   - pm.dataset_to_openlineage_converters
+95 + pm.asset_to_openlineage_converters
+96 | 
+97 | # airflow.secrets.base_secrets
+98 | base_secret_backend = BaseSecretsBackend()
+
+AIR301 [*] `get_conn_uri` is removed in Airflow 3.0
+   --> AIR301_class_attribute.py:99:21
+    |
+ 97 | # airflow.secrets.base_secrets
+ 98 | base_secret_backend = BaseSecretsBackend()
+ 99 | base_secret_backend.get_conn_uri()
+    |                     ^^^^^^^^^^^^
+100 | base_secret_backend.get_connections()
+    |
+help: Use `get_conn_value` instead
+96  | 
+97  | # airflow.secrets.base_secrets
+98  | base_secret_backend = BaseSecretsBackend()
+    - base_secret_backend.get_conn_uri()
+99  + base_secret_backend.get_conn_value()
+100 | base_secret_backend.get_connections()
+101 | 
+102 | # airflow.secrets.local_filesystem
+
+AIR301 [*] `get_connections` is removed in Airflow 3.0
+   --> AIR301_class_attribute.py:100:21
+    |
+ 98 | base_secret_backend = BaseSecretsBackend()
+ 99 | base_secret_backend.get_conn_uri()
+100 | base_secret_backend.get_connections()
+    |                     ^^^^^^^^^^^^^^^
+101 |
+102 | # airflow.secrets.local_filesystem
+    |
+help: Use `get_connection` instead
+97  | # airflow.secrets.base_secrets
+98  | base_secret_backend = BaseSecretsBackend()
+99  | base_secret_backend.get_conn_uri()
+    - base_secret_backend.get_connections()
+100 + base_secret_backend.get_connection()
+101 | 
+102 | # airflow.secrets.local_filesystem
+103 | lfb = LocalFilesystemBackend()
+
+AIR301 [*] `get_connections` is removed in Airflow 3.0
+   --> AIR301_class_attribute.py:104:5
+    |
+102 | # airflow.secrets.local_filesystem
+103 | lfb = LocalFilesystemBackend()
+104 | lfb.get_connections()
+    |     ^^^^^^^^^^^^^^^
+105 |
+106 | from airflow.models import DAG
+    |
+help: Use `get_connection` instead
+101 | 
+102 | # airflow.secrets.local_filesystem
+103 | lfb = LocalFilesystemBackend()
+    - lfb.get_connections()
+104 + lfb.get_connection()
+105 | 
+106 | from airflow.models import DAG
+107 | 
+
+AIR301 `create_dagrun` is removed in Airflow 3.0
+   --> AIR301_class_attribute.py:110:10
+    |
+108 | # airflow.DAG
+109 | test_dag = DAG(dag_id="test_dag")
+110 | test_dag.create_dagrun()
+    |          ^^^^^^^^^^^^^
+111 |
+112 | from airflow import DAG
+    |
+
+AIR301 `create_dagrun` is removed in Airflow 3.0
+   --> AIR301_class_attribute.py:116:10
+    |
+114 | # airflow.DAG
+115 | test_dag = DAG(dag_id="test_dag")
+116 | test_dag.create_dagrun()
+    |          ^^^^^^^^^^^^^
+    |

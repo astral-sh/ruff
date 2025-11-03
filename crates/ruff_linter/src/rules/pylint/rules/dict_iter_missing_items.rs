@@ -1,12 +1,12 @@
 use ruff_python_ast::{Expr, Stmt};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_python_semantic::{Binding, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for dictionary unpacking in a for loop without calling `.items()`.
@@ -51,6 +51,7 @@ use crate::checkers::ast::Checker;
 /// ## Fix safety
 /// Due to the known problem with tuple keys, this fix is unsafe.
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.3.0")]
 pub(crate) struct DictIterMissingItems;
 
 impl AlwaysFixableViolation for DictIterMissingItems {
@@ -72,7 +73,7 @@ pub(crate) fn dict_iter_missing_items(checker: &Checker, target: &Expr, iter: &E
 
     if tuple.len() != 2 {
         return;
-    };
+    }
 
     let Expr::Name(name) = iter else {
         return;
@@ -94,12 +95,11 @@ pub(crate) fn dict_iter_missing_items(checker: &Checker, target: &Expr, iter: &E
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(DictIterMissingItems, iter.range());
+    let mut diagnostic = checker.report_diagnostic(DictIterMissingItems, iter.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         format!("{}.items()", name.id),
         iter.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns true if the binding is a dictionary where each key is a tuple with two elements.

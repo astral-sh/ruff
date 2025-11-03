@@ -1,5 +1,5 @@
 use ruff_formatter::{
-    write, FormatContext, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions,
+    FormatContext, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions, write,
 };
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt, Suite};
@@ -8,11 +8,14 @@ use ruff_python_trivia::{lines_after, lines_after_ignoring_end_of_line_trivia, l
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{
-    leading_comments, trailing_comments, Comments, LeadingDanglingTrailingComments,
+    Comments, LeadingDanglingTrailingComments, leading_comments, trailing_comments,
 };
 use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
 use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
+use crate::preview::{
+    is_allow_newline_after_block_open_enabled, is_blank_line_before_decorated_class_in_stub_enabled,
+};
 use crate::statement::stmt_expr::FormatStmtExpr;
 use crate::verbatim::{
     suppressed_node, write_suppressed_statements_starting_with_leading_comment,
@@ -168,9 +171,24 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 false,
             )
         } else {
+            // Allow an empty line after a function header in preview, if the function has no
+            // docstring and no initial comment.
+            let allow_newline_after_block_open =
+                is_allow_newline_after_block_open_enabled(f.context())
+                    && matches!(self.kind, SuiteKind::Function)
+                    && matches!(first, SuiteChildStatement::Other(_));
+
+            let start = comments
+                .leading(first)
+                .first()
+                .map_or_else(|| first.start(), Ranged::start);
+
+            if allow_newline_after_block_open && lines_before(start, f.context().source()) > 1 {
+                empty_line().fmt(f)?;
+            }
+
             first.fmt(f)?;
 
-            #[allow(clippy::if_same_then_else)]
             let empty_line_after_docstring = if matches!(first, SuiteChildStatement::Docstring(_))
                 && self.kind == SuiteKind::Class
             {
@@ -218,7 +236,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     )?;
                 } else {
                     // Preserve empty lines after a stub implementation but don't insert a new one if there isn't any present in the source.
-                    // This is useful when having multiple function overloads that should be grouped to getter by omitting new lines between them.
+                    // This is useful when having multiple function overloads that should be grouped together by omitting new lines between them.
                     let is_preceding_stub_function_without_empty_line = following
                         .is_function_def_stmt()
                         && preceding
@@ -701,10 +719,15 @@ fn stub_suite_can_omit_empty_line(preceding: &Stmt, following: &Stmt, f: &PyForm
     //
     // class LockType2: ...
     // ```
-    let class_decorator_instead_of_empty_line = preceding.is_function_def_stmt()
-        && following
-            .as_class_def_stmt()
-            .is_some_and(|class| !class.decorator_list.is_empty());
+    //
+    // However, this behavior is incorrect and should not be replicated in preview mode.
+    // See: https://github.com/astral-sh/ruff/issues/18865
+    let class_decorator_instead_of_empty_line =
+        !is_blank_line_before_decorated_class_in_stub_enabled(f.context())
+            && preceding.is_function_def_stmt()
+            && following
+                .as_class_def_stmt()
+                .is_some_and(|class| !class.decorator_list.is_empty());
 
     // A function definition following a stub function definition
     // ```python
@@ -723,17 +746,21 @@ fn stub_suite_can_omit_empty_line(preceding: &Stmt, following: &Stmt, f: &PyForm
 
 /// Returns `true` if a function or class body contains only an ellipsis with no comments.
 pub(crate) fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> bool {
-    match body {
-        [Stmt::Expr(ast::StmtExpr { value, .. })] => {
-            let [node] = body else {
-                return false;
-            };
-            value.is_ellipsis_literal_expr()
-                && !comments.has_leading(node)
-                && !comments.has_trailing_own_line(node)
-        }
-        _ => false,
+    as_only_an_ellipsis(body, comments).is_some()
+}
+
+/// Returns `Some(Stmt::Ellipsis)` if a function or class body contains only an ellipsis with no
+/// comments.
+pub(crate) fn as_only_an_ellipsis<'a>(body: &'a [Stmt], comments: &Comments) -> Option<&'a Stmt> {
+    if let [node @ Stmt::Expr(ast::StmtExpr { value, .. })] = body
+        && value.is_ellipsis_literal_expr()
+        && !comments.has_leading(node)
+        && !comments.has_trailing_own_line(node)
+    {
+        return Some(node);
     }
+
+    None
 }
 
 /// Returns `true` if a [`Stmt`] is a class or function definition.
@@ -917,10 +944,10 @@ mod tests {
     use ruff_python_parser::parse_module;
     use ruff_python_trivia::CommentRanges;
 
+    use crate::PyFormatOptions;
     use crate::comments::Comments;
     use crate::prelude::*;
     use crate::statement::suite::SuiteKind;
-    use crate::PyFormatOptions;
 
     fn format_suite(level: SuiteKind) -> String {
         let source = r"

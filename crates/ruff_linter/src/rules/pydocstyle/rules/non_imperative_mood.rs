@@ -2,12 +2,12 @@ use std::sync::LazyLock;
 
 use imperative::Mood;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::visibility::{is_property, is_test};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::rules::pydocstyle::helpers::normalize_word;
@@ -51,6 +51,7 @@ static MOOD: LazyLock<Mood> = LazyLock::new(Mood::new);
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.228")]
 pub(crate) struct NonImperativeMood {
     first_line: String,
 }
@@ -99,11 +100,11 @@ pub(crate) fn non_imperative_mood(checker: &Checker, docstring: &Docstring, sett
     }
 
     if matches!(MOOD.is_imperative(&first_word_norm), Some(false)) {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             NonImperativeMood {
                 first_line: first_line.to_string(),
             },
             docstring.range(),
-        ));
+        );
     }
 }

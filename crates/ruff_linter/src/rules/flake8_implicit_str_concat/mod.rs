@@ -11,7 +11,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::SingleLineImplicitStringConcatenation, Path::new("ISC.py"))]
     #[test_case(Rule::MultiLineImplicitStringConcatenation, Path::new("ISC.py"))]
@@ -23,6 +23,14 @@ mod tests {
         Rule::MultiLineImplicitStringConcatenation,
         Path::new("ISC_syntax_error.py")
     )]
+    #[test_case(
+        Rule::SingleLineImplicitStringConcatenation,
+        Path::new("ISC_syntax_error_2.py")
+    )]
+    #[test_case(
+        Rule::MultiLineImplicitStringConcatenation,
+        Path::new("ISC_syntax_error_2.py")
+    )]
     #[test_case(Rule::ExplicitStringConcatenation, Path::new("ISC.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
@@ -30,7 +38,7 @@ mod tests {
             Path::new("flake8_implicit_str_concat").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -52,7 +60,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

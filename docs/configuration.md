@@ -51,7 +51,7 @@ If left unspecified, Ruff's default configuration is equivalent to:
     target-version = "py39"
 
     [tool.ruff.lint]
-    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
     # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
     # McCabe complexity (`C901`) by default.
     select = ["E4", "E7", "E9", "F"]
@@ -133,7 +133,7 @@ If left unspecified, Ruff's default configuration is equivalent to:
     target-version = "py39"
 
     [lint]
-    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
     # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
     # McCabe complexity (`C901`) by default.
     select = ["E4", "E7", "E9", "F"]
@@ -270,7 +270,7 @@ There are a few exceptions to these rules:
 1. If no config file is found in the filesystem hierarchy, Ruff will fall back to using
     a default configuration. If a user-specific configuration file exists
     at `${config_dir}/ruff/pyproject.toml`, that file will be used instead of the default
-    configuration, with `${config_dir}` being determined via [`etcetera`'s native strategy](https://docs.rs/etcetera/latest/etcetera/#native-strategy),
+    configuration, with `${config_dir}` being determined via [`etcetera`'s base strategy](https://docs.rs/etcetera/latest/etcetera/#native-strategy),
     and all relative paths being again resolved relative to the _current working directory_.
 1. Any config-file-supported settings that are provided on the command-line (e.g., via
     `--select`) will override the settings in _every_ resolved configuration file.
@@ -608,7 +608,7 @@ Options:
           RUFF_OUTPUT_FILE=]
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values:
-          py37, py38, py39, py310, py311, py312, py313]
+          py37, py38, py39, py310, py311, py312, py313, py314]
       --preview
           Enable preview mode; checks will include unstable rules and fixes.
           Use `--no-preview` to disable
@@ -723,10 +723,15 @@ Options:
           notebooks, use `--extension ipy:ipynb`
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values:
-          py37, py38, py39, py310, py311, py312, py313]
+          py37, py38, py39, py310, py311, py312, py313, py314]
       --preview
           Enable preview mode; enables unstable formatting. Use `--no-preview`
           to disable
+      --output-format <OUTPUT_FORMAT>
+          Output serialization format for violations, when used with `--check`.
+          The default serialization format is "full" [env: RUFF_OUTPUT_FORMAT=]
+          [possible values: concise, full, json, json-lines, junit, grouped,
+          github, gitlab, pylint, rdjson, azure, sarif]
   -h, --help
           Print help (see more with '--help')
 

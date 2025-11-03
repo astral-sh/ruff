@@ -1,17 +1,18 @@
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_semantic::analyze::typing::{
     is_immutable_annotation, is_immutable_func, is_immutable_newtype_call,
 };
+use ruff_python_semantic::{ScopeId, SemanticModel};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::helpers::{
-    dataclass_kind, is_class_var_annotation, is_dataclass_field, is_descriptor_class,
-    AttrsAutoAttribs, DataclassKind,
+use crate::rules::ruff::helpers::{
+    AttrsAutoAttribs, DataclassKind, dataclass_kind, is_class_var_annotation, is_dataclass_field,
+    is_descriptor_class, is_frozen_dataclass,
 };
 
 /// ## What it does
@@ -60,6 +61,7 @@ use crate::rules::ruff::rules::helpers::{
 /// ## Options
 /// - `lint.flake8-bugbear.extend-immutable-calls`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct FunctionCallInDataclassDefaultArgument {
     name: Option<String>,
 }
@@ -76,7 +78,11 @@ impl Violation for FunctionCallInDataclassDefaultArgument {
 }
 
 /// RUF009
-pub(crate) fn function_call_in_dataclass_default(checker: &Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn function_call_in_dataclass_default(
+    checker: &Checker,
+    class_def: &ast::StmtClassDef,
+    scope_id: ScopeId,
+) {
     let semantic = checker.semantic();
 
     let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic) else {
@@ -107,7 +113,7 @@ pub(crate) fn function_call_in_dataclass_default(checker: &Checker, class_def: &
     };
 
     let extend_immutable_calls: Vec<QualifiedName> = checker
-        .settings
+        .settings()
         .flake8_bugbear
         .extend_immutable_calls
         .iter()
@@ -143,6 +149,7 @@ pub(crate) fn function_call_in_dataclass_default(checker: &Checker, class_def: &
             || func.as_name_expr().is_some_and(|name| {
                 is_immutable_newtype_call(name, checker.semantic(), &extend_immutable_calls)
             })
+            || is_frozen_dataclass_instantiation(func, semantic, scope_id)
         {
             continue;
         }
@@ -150,9 +157,7 @@ pub(crate) fn function_call_in_dataclass_default(checker: &Checker, class_def: &
         let kind = FunctionCallInDataclassDefaultArgument {
             name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
         };
-        let diagnostic = Diagnostic::new(kind, expr.range());
-
-        checker.report_diagnostic(diagnostic);
+        checker.report_diagnostic(kind, expr.range());
     }
 }
 
@@ -161,4 +166,26 @@ fn any_annotated(class_body: &[Stmt]) -> bool {
     class_body
         .iter()
         .any(|stmt| matches!(stmt, Stmt::AnnAssign(..)))
+}
+
+/// Checks that the passed function is an instantiation of the class,
+/// retrieves the ``StmtClassDef`` and verifies that it is a frozen dataclass
+fn is_frozen_dataclass_instantiation(
+    func: &Expr,
+    semantic: &SemanticModel,
+    scope_id: ScopeId,
+) -> bool {
+    semantic
+        .lookup_attribute_in_scope(func, scope_id)
+        .is_some_and(|id| {
+            let binding = &semantic.binding(id);
+            let Some(Stmt::ClassDef(class_def)) = binding.statement(semantic) else {
+                return false;
+            };
+
+            let Some((_, dataclass_decorator)) = dataclass_kind(class_def, semantic) else {
+                return false;
+            };
+            is_frozen_dataclass(dataclass_decorator, semantic)
+        })
 }

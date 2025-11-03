@@ -22,3 +22,10 @@ assert b"hello"  # [assert-on-string-literal]
 assert "", b"hi"  # [assert-on-string-literal]
 assert "WhyNotHere?", "HereIsOk"  # [assert-on-string-literal]
 assert 12, "ok here"
+
+
+# t-strings are always True even when "empty"
+# skip lint in this case
+assert t""
+assert t"hey"
+assert t"{a}"

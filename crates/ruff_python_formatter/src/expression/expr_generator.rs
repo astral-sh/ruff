@@ -1,8 +1,8 @@
-use ruff_formatter::{format_args, write, FormatRuleWithOptions};
+use ruff_formatter::{FormatRuleWithOptions, format_args, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprGenerator;
 
-use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, parenthesized};
 use crate::prelude::*;
 
 #[derive(Eq, PartialEq, Debug, Default)]
@@ -37,6 +37,7 @@ impl FormatNodeRule<ExprGenerator> for FormatExprGenerator {
     fn fmt_fields(&self, item: &ExprGenerator, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprGenerator {
             range: _,
+            node_index: _,
             elt,
             generators,
             parenthesized: is_parenthesized,

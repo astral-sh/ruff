@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
@@ -9,6 +8,7 @@ use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -41,6 +41,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `__index__` method](https://docs.python.org/3/reference/datamodel.html#object.__index__)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct InvalidIndexReturnType;
 
 impl Violation for InvalidIndexReturnType {
@@ -50,7 +51,7 @@ impl Violation for InvalidIndexReturnType {
     }
 }
 
-/// E0305
+/// PLE0305
 pub(crate) fn invalid_index_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     if function_def.name.as_str() != "__index__" {
         return;
@@ -74,10 +75,7 @@ pub(crate) fn invalid_index_return(checker: &Checker, function_def: &ast::StmtFu
 
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
-        checker.report_diagnostic(Diagnostic::new(
-            InvalidIndexReturnType,
-            function_def.identifier(),
-        ));
+        checker.report_diagnostic(InvalidIndexReturnType, function_def.identifier());
         return;
     }
 
@@ -94,11 +92,11 @@ pub(crate) fn invalid_index_return(checker: &Checker, function_def: &ast::StmtFu
                 ResolvedPythonType::Unknown
                     | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
             ) {
-                checker.report_diagnostic(Diagnostic::new(InvalidIndexReturnType, value.range()));
+                checker.report_diagnostic(InvalidIndexReturnType, value.range());
             }
         } else {
             // Disallow implicit `None`.
-            checker.report_diagnostic(Diagnostic::new(InvalidIndexReturnType, stmt.range()));
+            checker.report_diagnostic(InvalidIndexReturnType, stmt.range());
         }
     }
 }

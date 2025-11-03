@@ -1,0 +1,82 @@
+---
+source: crates/ty_server/tests/e2e/initialize.rs
+assertion_line: 17
+expression: initialization_result
+---
+{
+  "capabilities": {
+    "positionEncoding": "utf-16",
+    "textDocumentSync": {
+      "openClose": true,
+      "change": 2
+    },
+    "selectionRangeProvider": true,
+    "hoverProvider": true,
+    "completionProvider": {
+      "triggerCharacters": [
+        "."
+      ]
+    },
+    "signatureHelpProvider": {
+      "triggerCharacters": [
+        "(",
+        ","
+      ],
+      "retriggerCharacters": [
+        ")"
+      ]
+    },
+    "definitionProvider": true,
+    "typeDefinitionProvider": true,
+    "referencesProvider": true,
+    "documentHighlightProvider": true,
+    "documentSymbolProvider": true,
+    "workspaceSymbolProvider": true,
+    "declarationProvider": true,
+    "executeCommandProvider": {
+      "commands": [
+        "ty.printDebugInformation"
+      ],
+      "workDoneProgress": false
+    },
+    "semanticTokensProvider": {
+      "legend": {
+        "tokenTypes": [
+          "namespace",
+          "class",
+          "parameter",
+          "selfParameter",
+          "clsParameter",
+          "variable",
+          "property",
+          "function",
+          "method",
+          "keyword",
+          "string",
+          "number",
+          "decorator",
+          "builtinConstant",
+          "typeParameter"
+        ],
+        "tokenModifiers": [
+          "definition",
+          "readonly",
+          "async"
+        ]
+      },
+      "range": true,
+      "full": true
+    },
+    "inlayHintProvider": {},
+    "diagnosticProvider": {
+      "identifier": "ty",
+      "interFileDependencies": true,
+      "workspaceDiagnostics": true,
+      "workDoneProgress": true
+    }
+  },
+  "serverInfo": {
+    "name": "ty",
+    "version": "Unknown"
+  }
+}

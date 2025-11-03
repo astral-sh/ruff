@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF100 [*] Unused `noqa` directive (non-enabled: `F841`)
+ --> RUF100_6.py:1:1
+  |
+1 | # ruff: noqa: F841 -- intentional unused file directive; will be removed
+  | ^^^^^^^^^^^^^^^^^^
+  |
+help: Remove unused `noqa` directive
+  - # ruff: noqa: F841 -- intentional unused file directive; will be removed
+1 +

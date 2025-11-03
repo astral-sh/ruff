@@ -1,0 +1,39 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP018 [*] Unnecessary `int` call (rewrite as a literal)
+ --> UP018_LF.py:3:1
+  |
+1 |   # Keep parentheses around preserved \n 
+2 |
+3 | / int(-
+4 | |     1)
+  | |______^
+5 |
+6 |   int(+
+  |
+help: Replace with integer literal
+1 | # Keep parentheses around preserved \n 
+2 | 
+  - int(-
+3 + (-
+4 |     1)
+5 | 
+6 | int(+
+
+UP018 [*] Unnecessary `int` call (rewrite as a literal)
+ --> UP018_LF.py:6:1
+  |
+4 |       1)
+5 |
+6 | / int(+
+7 | |     1)
+  | |______^
+  |
+help: Replace with integer literal
+3 | int(-
+4 |     1)
+5 | 
+  - int(+
+6 + (+
+7 |     1)

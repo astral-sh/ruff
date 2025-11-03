@@ -1,0 +1,33 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: basic.md - Structures - Unresolvable module import
+mdtest path: crates/ty_python_semantic/resources/mdtest/import/basic.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve imported module `zqzqzqzqzqzqzq`"
+```
+
+# Diagnostics
+
+```
+error[unresolved-import]: Cannot resolve imported module `zqzqzqzqzqzqzq`
+ --> src/mdtest_snippet.py:1:8
+  |
+1 | import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve imported module `zqzqzqzqzqzqzq`"
+  |        ^^^^^^^^^^^^^^
+  |
+info: Searched in the following paths during module resolution:
+info:   1. /src (first-party code)
+info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+info: rule `unresolved-import` is enabled by default
+
+```

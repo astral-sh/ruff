@@ -1,0 +1,5 @@
+# These rules test for reformatting with specific line endings.
+# Using a formatter fixes that and breaks the tests
+[RUF046_{CR,LF}.py]
+generated_code = true
+ij_formatter_enabled = false

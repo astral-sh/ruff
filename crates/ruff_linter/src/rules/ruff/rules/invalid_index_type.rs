@@ -1,10 +1,10 @@
 use ruff_python_ast::{Expr, ExprNumberLiteral, ExprSlice, ExprSubscript, Number};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 use std::fmt;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -26,6 +26,7 @@ use crate::checkers::ast::Checker;
 /// var = [1, 2, 3][0]
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.278")]
 pub(crate) struct InvalidIndexType {
     value_type: String,
     index_type: String,
@@ -41,7 +42,9 @@ impl Violation for InvalidIndexType {
             is_slice,
         } = self;
         if *is_slice {
-            format!("Slice in indexed access to type `{value_type}` uses type `{index_type}` instead of an integer")
+            format!(
+                "Slice in indexed access to type `{value_type}` uses type `{index_type}` instead of an integer"
+            )
         } else {
             format!(
                 "Indexed access to type `{value_type}` uses type `{index_type}` instead of an integer or slice"
@@ -87,15 +90,17 @@ pub(crate) fn invalid_index_type(checker: &Checker, expr: &ExprSubscript) {
 
     if index_type.is_literal() {
         // If the index is a literal, require an integer
-        if index_type != CheckableExprType::IntLiteral {
-            checker.report_diagnostic(Diagnostic::new(
+        if index_type != CheckableExprType::IntLiteral
+            && index_type != CheckableExprType::BooleanLiteral
+        {
+            checker.report_diagnostic(
                 InvalidIndexType {
                     value_type: value_type.to_string(),
                     index_type: index_type.to_string(),
                     is_slice: false,
                 },
                 index.range(),
-            ));
+            );
         }
     } else if let Expr::Slice(ExprSlice {
         lower, upper, step, ..
@@ -109,38 +114,40 @@ pub(crate) fn invalid_index_type(checker: &Checker, expr: &ExprSubscript) {
                 // If the index is a slice, require integer or null bounds
                 if !matches!(
                     is_slice_type,
-                    CheckableExprType::IntLiteral | CheckableExprType::NoneLiteral
+                    CheckableExprType::IntLiteral
+                        | CheckableExprType::NoneLiteral
+                        | CheckableExprType::BooleanLiteral
                 ) {
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(
                         InvalidIndexType {
                             value_type: value_type.to_string(),
                             index_type: is_slice_type.to_string(),
                             is_slice: true,
                         },
                         is_slice.range(),
-                    ));
+                    );
                 }
             } else if let Some(is_slice_type) = CheckableExprType::try_from(is_slice.as_ref()) {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     InvalidIndexType {
                         value_type: value_type.to_string(),
                         index_type: is_slice_type.to_string(),
                         is_slice: true,
                     },
                     is_slice.range(),
-                ));
+                );
             }
         }
     } else {
         // If it's some other checkable data type, it's a violation
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             InvalidIndexType {
                 value_type: value_type.to_string(),
                 index_type: index_type.to_string(),
                 is_slice: false,
             },
             index.range(),
-        ));
+        );
     }
 }
 
@@ -152,6 +159,7 @@ pub(crate) fn invalid_index_type(checker: &Checker, expr: &ExprSubscript) {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum CheckableExprType {
     FString,
+    TString,
     StringLiteral,
     BytesLiteral,
     IntLiteral,
@@ -168,12 +176,15 @@ enum CheckableExprType {
     Dict,
     Tuple,
     Slice,
+    Generator,
+    Lambda,
 }
 
 impl fmt::Display for CheckableExprType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::FString => f.write_str("str"),
+            Self::TString => f.write_str("Template"),
             Self::StringLiteral => f.write_str("str"),
             Self::BytesLiteral => f.write_str("bytes"),
             Self::IntLiteral => f.write_str("int"),
@@ -190,6 +201,8 @@ impl fmt::Display for CheckableExprType {
             Self::Slice => f.write_str("slice"),
             Self::Dict => f.write_str("dict"),
             Self::Tuple => f.write_str("tuple"),
+            Self::Generator => f.write_str("generator"),
+            Self::Lambda => f.write_str("lambda"),
         }
     }
 }
@@ -207,6 +220,7 @@ impl CheckableExprType {
             Expr::BooleanLiteral(_) => Some(Self::BooleanLiteral),
             Expr::NoneLiteral(_) => Some(Self::NoneLiteral),
             Expr::EllipsisLiteral(_) => Some(Self::EllipsisLiteral),
+            Expr::TString(_) => Some(Self::TString),
             Expr::FString(_) => Some(Self::FString),
             Expr::List(_) => Some(Self::List),
             Expr::ListComp(_) => Some(Self::ListComp),
@@ -216,6 +230,8 @@ impl CheckableExprType {
             Expr::Dict(_) => Some(Self::Dict),
             Expr::Tuple(_) => Some(Self::Tuple),
             Expr::Slice(_) => Some(Self::Slice),
+            Expr::Generator(_) => Some(Self::Generator),
+            Expr::Lambda(_) => Some(Self::Lambda),
             _ => None,
         }
     }

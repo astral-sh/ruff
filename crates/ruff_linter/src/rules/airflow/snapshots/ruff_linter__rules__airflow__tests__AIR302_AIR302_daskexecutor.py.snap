@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR302 [*] `airflow.executors.dask_executor.DaskExecutor` is moved into `daskexecutor` provider in Airflow 3.0;
+ --> AIR302_daskexecutor.py:5:1
+  |
+3 | from airflow.executors.dask_executor import DaskExecutor
+4 |
+5 | DaskExecutor()
+  | ^^^^^^^^^^^^
+  |
+help: Install `apache-airflow-providers-daskexecutor>=1.0.0` and use `DaskExecutor` from `airflow.providers.daskexecutor.executors.dask_executor` instead.
+1 | from __future__ import annotations
+2 | 
+  - from airflow.executors.dask_executor import DaskExecutor
+3 + from airflow.providers.daskexecutor.executors.dask_executor import DaskExecutor
+4 | 
+5 | DaskExecutor()
+note: This is an unsafe fix and may change runtime behavior

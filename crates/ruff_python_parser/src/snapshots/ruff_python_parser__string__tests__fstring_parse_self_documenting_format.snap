@@ -1,26 +1,30 @@
 ---
 source: crates/ruff_python_parser/src/string.rs
 expression: suite
-snapshot_kind: text
 ---
 [
     Expr(
         StmtExpr {
+            node_index: NodeIndex(None),
             range: 0..14,
             value: FString(
                 ExprFString {
+                    node_index: NodeIndex(None),
                     range: 0..14,
                     value: FStringValue {
                         inner: Single(
                             FString(
                                 FString {
                                     range: 0..14,
+                                    node_index: NodeIndex(None),
                                     elements: [
-                                        Expression(
-                                            FStringExpressionElement {
+                                        Interpolation(
+                                            InterpolatedElement {
                                                 range: 2..13,
+                                                node_index: NodeIndex(None),
                                                 expression: Name(
                                                     ExprName {
+                                                        node_index: NodeIndex(None),
                                                         range: 3..7,
                                                         id: Name("user"),
                                                         ctx: Load,
@@ -34,12 +38,14 @@ snapshot_kind: text
                                                 ),
                                                 conversion: None,
                                                 format_spec: Some(
-                                                    FStringFormatSpec {
+                                                    InterpolatedStringFormatSpec {
                                                         range: 9..12,
+                                                        node_index: NodeIndex(None),
                                                         elements: [
                                                             Literal(
-                                                                FStringLiteralElement {
+                                                                InterpolatedStringLiteralElement {
                                                                     range: 9..12,
+                                                                    node_index: NodeIndex(None),
                                                                     value: ">10",
                                                                 },
                                                             ),
@@ -53,6 +59,7 @@ snapshot_kind: text
                                         quote_style: Double,
                                         prefix: Regular,
                                         triple_quoted: false,
+                                        unclosed: false,
                                     },
                                 },
                             ),

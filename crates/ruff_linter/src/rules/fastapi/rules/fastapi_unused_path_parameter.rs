@@ -1,19 +1,20 @@
-use std::iter::Peekable;
 use std::ops::Range;
-use std::str::CharIndices;
+use std::sync::LazyLock;
 
-use ruff_diagnostics::Fix;
-use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use regex::{CaptureMatches, Regex};
+
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Expr, ExprCall, ExprSubscript, Parameter, ParameterWithDefault};
 use ruff_python_semantic::{BindingKind, Modules, ScopeKind, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextSize};
 
+use crate::Fix;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::add_parameter;
 use crate::rules::fastapi::rules::is_fastapi_route_decorator;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Identifies FastAPI routes that declare path parameters in the route path
@@ -63,6 +64,7 @@ use crate::rules::fastapi::rules::is_fastapi_route_decorator;
 /// This rule's fix is marked as unsafe, as modifying a function signature can
 /// change the behavior of the code.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct FastApiUnusedPathParameter {
     arg_name: String,
     function_name: String,
@@ -79,9 +81,10 @@ impl Violation for FastApiUnusedPathParameter {
             function_name,
             is_positional,
         } = self;
-        #[allow(clippy::if_not_else)]
         if !is_positional {
-            format!("Parameter `{arg_name}` appears in route path, but not in `{function_name}` signature")
+            format!(
+                "Parameter `{arg_name}` appears in route path, but not in `{function_name}` signature"
+            )
         } else {
             format!(
                 "Parameter `{arg_name}` appears in route path, but only as a positional-only argument in `{function_name}` signature"
@@ -164,11 +167,6 @@ pub(crate) fn fastapi_unused_path_parameter(
 
     // Check if any of the path parameters are not in the function signature.
     for (path_param, range) in path_params {
-        // Ignore invalid identifiers (e.g., `user-id`, as opposed to `user_id`)
-        if !is_identifier(path_param) {
-            continue;
-        }
-
         // If the path parameter is already in the function or the dependency signature,
         // we don't need to do anything.
         if named_args.contains(&path_param) {
@@ -184,25 +182,24 @@ pub(crate) fn fastapi_unused_path_parameter(
             .iter()
             .any(|param| param.name() == path_param);
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             FastApiUnusedPathParameter {
                 arg_name: path_param.to_string(),
                 function_name: function_def.name.to_string(),
                 is_positional,
             },
-            #[allow(clippy::cast_possible_truncation)]
+            #[expect(clippy::cast_possible_truncation)]
             diagnostic_range
                 .add_start(TextSize::from(range.start as u32 + 1))
                 .sub_end(TextSize::from((path.len() - range.end + 1) as u32)),
         );
-        if !is_positional {
+        if !is_positional && is_identifier(path_param) && path_param != "__debug__" {
             diagnostic.set_fix(Fix::unsafe_edit(add_parameter(
                 path_param,
                 &function_def.parameters,
                 checker.locator().contents(),
             )));
         }
-        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -225,6 +222,9 @@ enum Dependency<'a> {
     /// A function defined in the same file, whose parameter names are as given.
     Function(Vec<&'a str>),
 
+    /// A class defined in the same file, whose constructor parameter names are as given.
+    Class(Vec<&'a str>),
+
     /// There are multiple `Depends()` calls.
     ///
     /// Multiple `Depends` annotations aren't supported by fastapi and the exact behavior is
@@ -238,6 +238,7 @@ impl<'a> Dependency<'a> {
             Self::Unknown => None,
             Self::Multiple => None,
             Self::Function(parameter_names) => Some(parameter_names.as_slice()),
+            Self::Class(parameter_names) => Some(parameter_names.as_slice()),
         }
     }
 }
@@ -278,7 +279,14 @@ impl<'a> Dependency<'a> {
         let mut dependencies = tuple.elts.iter().skip(1).filter_map(|metadata_element| {
             let arguments = depends_arguments(metadata_element, semantic)?;
 
-            Self::from_depends_call(arguments, semantic)
+            // Arguments to `Depends` can be empty if the dependency is a class
+            // that FastAPI will call to create an instance of the class itself.
+            // https://fastapi.tiangolo.com/tutorial/dependencies/classes-as-dependencies/#shortcut
+            if arguments.is_empty() {
+                Self::from_dependency_name(tuple.elts.first()?.as_name_expr()?, semantic)
+            } else {
+                Self::from_depends_call(arguments, semantic)
+            }
         });
 
         let dependency = dependencies.next()?;
@@ -301,25 +309,68 @@ impl<'a> Dependency<'a> {
             return None;
         };
 
+        Self::from_dependency_name(name, semantic)
+    }
+
+    fn from_dependency_name(name: &'a ast::ExprName, semantic: &SemanticModel<'a>) -> Option<Self> {
         let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
             return Some(Self::Unknown);
         };
 
-        let BindingKind::FunctionDefinition(scope_id) = binding.kind else {
-            return Some(Self::Unknown);
-        };
+        match binding.kind {
+            BindingKind::FunctionDefinition(scope_id) => {
+                let scope = &semantic.scopes[scope_id];
 
-        let scope = &semantic.scopes[scope_id];
+                let ScopeKind::Function(function_def) = scope.kind else {
+                    return Some(Self::Unknown);
+                };
 
-        let ScopeKind::Function(function_def) = scope.kind else {
-            return Some(Self::Unknown);
-        };
+                let parameter_names = non_posonly_non_variadic_parameters(function_def)
+                    .map(|param| param.name().as_str())
+                    .collect();
 
-        let parameter_names = non_posonly_non_variadic_parameters(function_def)
-            .map(|param| param.name().as_str())
-            .collect();
+                Some(Self::Function(parameter_names))
+            }
+            BindingKind::ClassDefinition(scope_id) => {
+                let scope = &semantic.scopes[scope_id];
 
-        Some(Self::Function(parameter_names))
+                let ScopeKind::Class(class_def) = scope.kind else {
+                    return Some(Self::Unknown);
+                };
+
+                let parameter_names = if class_def
+                    .bases()
+                    .iter()
+                    .any(|expr| is_pydantic_base_model(expr, semantic))
+                {
+                    class_def
+                        .body
+                        .iter()
+                        .filter_map(|stmt| {
+                            stmt.as_ann_assign_stmt()
+                                .and_then(|ann_assign| ann_assign.target.as_name_expr())
+                                .map(|name| name.id.as_str())
+                        })
+                        .collect()
+                } else if let Some(init_def) = class_def
+                    .body
+                    .iter()
+                    .filter_map(|stmt| stmt.as_function_def_stmt())
+                    .find(|func_def| func_def.name.as_str() == "__init__")
+                {
+                    // Skip `self` parameter
+                    non_posonly_non_variadic_parameters(init_def)
+                        .skip(1)
+                        .map(|param| param.name().as_str())
+                        .collect()
+                } else {
+                    return None;
+                };
+
+                Some(Self::Class(parameter_names))
+            }
+            _ => Some(Self::Unknown),
+        }
     }
 }
 
@@ -339,11 +390,17 @@ fn depends_arguments<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a
 }
 
 fn is_fastapi_depends(expr: &Expr, semantic: &SemanticModel) -> bool {
-    let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
-        return false;
-    };
+    semantic
+        .resolve_qualified_name(expr)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["fastapi", "Depends"]))
+}
 
-    matches!(qualified_name.segments(), ["fastapi", "Depends"])
+fn is_pydantic_base_model(expr: &Expr, semantic: &SemanticModel) -> bool {
+    semantic
+        .resolve_qualified_name(expr)
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["pydantic", "BaseModel"])
+        })
 }
 
 /// Extract the expected in-route name for a given parameter, if it has an alias.
@@ -396,17 +453,24 @@ fn parameter_alias<'a>(parameter: &'a Parameter, semantic: &SemanticModel) -> Op
 ///
 /// The iterator yields tuples of the parameter name and the range of the parameter in the input,
 /// inclusive of curly braces.
+///
+/// FastAPI only recognizes path parameters when there are no leading or trailing spaces around
+/// the parameter name. For example, `/{x}` is a valid parameter, but `/{ x }` is treated literally.
 #[derive(Debug)]
 struct PathParamIterator<'a> {
-    input: &'a str,
-    chars: Peekable<CharIndices<'a>>,
+    inner: CaptureMatches<'a, 'a>,
 }
 
 impl<'a> PathParamIterator<'a> {
     fn new(input: &'a str) -> Self {
-        PathParamIterator {
-            input,
-            chars: input.char_indices().peekable(),
+        /// Matches the Starlette pattern for path parameters with optional converters from
+        /// <https://github.com/Kludex/starlette/blob/e18637c68e36d112b1983bc0c8b663681e6a4c50/starlette/routing.py#L121>
+        static FASTAPI_PATH_PARAM_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r"\{([a-zA-Z_][a-zA-Z0-9_]*)(?::[a-zA-Z_][a-zA-Z0-9_]*)?\}").unwrap()
+        });
+
+        Self {
+            inner: FASTAPI_PATH_PARAM_REGEX.captures_iter(input),
         }
     }
 }
@@ -415,20 +479,10 @@ impl<'a> Iterator for PathParamIterator<'a> {
     type Item = (&'a str, Range<usize>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some((start, c)) = self.chars.next() {
-            if c == '{' {
-                if let Some((end, _)) = self.chars.by_ref().find(|&(_, ch)| ch == '}') {
-                    let param_content = &self.input[start + 1..end];
-                    // We ignore text after a colon, since those are path converters
-                    // See also: https://fastapi.tiangolo.com/tutorial/path-params/?h=path#path-convertor
-                    let param_name_end = param_content.find(':').unwrap_or(param_content.len());
-                    let param_name = &param_content[..param_name_end].trim();
-
-                    #[allow(clippy::range_plus_one)]
-                    return Some((param_name, start..end + 1));
-                }
-            }
-        }
-        None
+        self.inner
+            .next()
+            // Extract the first capture group (the path parameter), but return the range of the
+            // whole match (everything in braces and including the braces themselves).
+            .and_then(|capture| Some((capture.get(1)?.as_str(), capture.get(0)?.range())))
     }
 }

@@ -1,6 +1,5 @@
 use ast::{ExprContext, Operator};
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Stmt};
 use ruff_python_semantic::{Binding, SemanticModel, TypingOnlyBindingsStatus};
@@ -10,7 +9,9 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::flake8_type_checking::helpers::quote_type_expression;
+use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::parenthesize::parenthesized_range;
 
 /// ## What it does
 /// Checks if [PEP 613] explicit type aliases contain references to
@@ -48,6 +49,7 @@ use ruff_python_ast::PythonVersion;
 ///
 /// [PEP 613]: https://peps.python.org/pep-0613/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct UnquotedTypeAlias;
 
 impl Violation for UnquotedTypeAlias {
@@ -87,11 +89,15 @@ impl Violation for UnquotedTypeAlias {
 /// ## Example
 /// Given:
 /// ```python
+/// from typing import TypeAlias
+///
 /// OptInt: TypeAlias = "int | None"
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from typing import TypeAlias
+///
 /// OptInt: TypeAlias = int | None
 /// ```
 ///
@@ -128,6 +134,7 @@ impl Violation for UnquotedTypeAlias {
 /// [PYI020]: https://docs.astral.sh/ruff/rules/quoted-annotation-in-stub/
 /// [UP037]: https://docs.astral.sh/ruff/rules/quoted-annotation/
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.8.1")]
 pub(crate) struct QuotedTypeAlias;
 
 impl AlwaysFixableViolation for QuotedTypeAlias {
@@ -142,26 +149,26 @@ impl AlwaysFixableViolation for QuotedTypeAlias {
 }
 
 /// TC007
-pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) -> Option<Vec<Diagnostic>> {
+pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) {
     if binding.context.is_typing() {
-        return None;
+        return;
     }
 
     if !binding.is_annotated_type_alias() {
-        return None;
+        return;
     }
 
     let Some(Stmt::AnnAssign(ast::StmtAnnAssign {
         value: Some(expr), ..
     })) = binding.statement(checker.semantic())
     else {
-        return None;
+        return;
     };
 
     let mut names = Vec::new();
     collect_typing_references(checker, expr, &mut names);
     if names.is_empty() {
-        return None;
+        return;
     }
 
     // We generate a diagnostic for every name that needs to be quoted
@@ -178,14 +185,11 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) -> Optio
         checker.locator(),
         checker.default_string_flags(),
     );
-    let mut diagnostics = Vec::with_capacity(names.len());
     for name in names {
-        let mut diagnostic = Diagnostic::new(UnquotedTypeAlias, name.range());
+        let mut diagnostic = checker.report_diagnostic(UnquotedTypeAlias, name.range());
         diagnostic.set_parent(parent);
         diagnostic.set_fix(Fix::unsafe_edit(edit.clone()));
-        diagnostics.push(diagnostic);
     }
-    Some(diagnostics)
 }
 
 /// Traverses the type expression and collects `[Expr::Name]` nodes that are
@@ -249,7 +253,7 @@ fn collect_typing_references<'a>(
             // if TC004 is enabled we shouldn't emit a TC007 for a reference to
             // a binding that would emit a TC004, otherwise the fixes will never
             // stabilize and keep going in circles
-            if checker.enabled(Rule::RuntimeImportInTypeCheckingBlock)
+            if checker.is_rule_enabled(Rule::RuntimeImportInTypeCheckingBlock)
                 && checker
                     .semantic()
                     .binding(binding_id)
@@ -270,7 +274,7 @@ pub(crate) fn quoted_type_alias(
     expr: &Expr,
     annotation_expr: &ast::ExprStringLiteral,
 ) {
-    if checker.enabled(Rule::RuntimeStringUnion) {
+    if checker.is_rule_enabled(Rule::RuntimeStringUnion) {
         // this should return a TC010 error instead
         if let Some(Expr::BinOp(ast::ExprBinOp {
             op: Operator::BitOr,
@@ -289,14 +293,36 @@ pub(crate) fn quoted_type_alias(
     }
 
     let range = annotation_expr.range();
-    let mut diagnostic = Diagnostic::new(QuotedTypeAlias, range);
-    let edit = Edit::range_replacement(annotation_expr.value.to_string(), range);
+    let mut diagnostic = checker.report_diagnostic(QuotedTypeAlias, range);
+    let fix_string = annotation_expr.value.to_string();
+    let fix_string = if (fix_string.contains('\n') || fix_string.contains('\r'))
+        && parenthesized_range(
+            // Check for parenthesis outside string ("""...""")
+            annotation_expr.into(),
+            checker.semantic().current_statement().into(),
+            checker.comment_ranges(),
+            checker.locator().contents(),
+        )
+        .is_none()
+        && parenthesized_range(
+            // Check for parenthesis inside string """(...)"""
+            expr.into(),
+            annotation_expr.into(),
+            checker.comment_ranges(),
+            checker.locator().contents(),
+        )
+        .is_none()
+    {
+        format!("({fix_string})")
+    } else {
+        fix_string
+    };
+    let edit = Edit::range_replacement(fix_string, range);
     if checker.comment_ranges().intersects(range) {
         diagnostic.set_fix(Fix::unsafe_edit(edit));
     } else {
         diagnostic.set_fix(Fix::safe_edit(edit));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Traverses the type expression and checks if the expression can safely

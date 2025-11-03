@@ -1,11 +1,11 @@
 use anyhow::Context;
-use lsp_types::{self as types, request as req, Range};
+use lsp_types::{self as types, Range, request as req};
 
 use crate::edit::{RangeExt, ToRangeExt};
 use crate::resolve::is_document_excluded_for_formatting;
+use crate::server::Result;
 use crate::server::api::LSPResult;
-use crate::server::{client::Notifier, Result};
-use crate::session::{DocumentQuery, DocumentSnapshot};
+use crate::session::{Client, DocumentQuery, DocumentSnapshot};
 use crate::{PositionEncoding, TextDocument};
 
 pub(crate) struct FormatRange;
@@ -18,7 +18,7 @@ impl super::BackgroundDocumentRequestHandler for FormatRange {
     super::define_document_url!(params: &types::DocumentRangeFormattingParams);
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        _notifier: Notifier,
+        _client: &Client,
         params: types::DocumentRangeFormattingParams,
     ) -> Result<super::FormatResponse> {
         format_document_range(&snapshot, params.range)
@@ -36,7 +36,11 @@ fn format_document_range(
         .context("Failed to get text document for the format range request")
         .unwrap();
     let query = snapshot.query();
-    format_text_document_range(text_document, range, query, snapshot.encoding())
+    let backend = snapshot
+        .client_settings()
+        .editor_settings()
+        .format_backend();
+    format_text_document_range(text_document, range, query, snapshot.encoding(), backend)
 }
 
 /// Formats the specified [`Range`] in the [`TextDocument`].
@@ -45,20 +49,19 @@ fn format_text_document_range(
     range: Range,
     query: &DocumentQuery,
     encoding: PositionEncoding,
+    backend: crate::format::FormatBackend,
 ) -> Result<super::FormatResponse> {
     let settings = query.settings();
+    let file_path = query.virtual_file_path();
 
     // If the document is excluded, return early.
-    let file_path = query.file_path();
-    if let Some(file_path) = &file_path {
-        if is_document_excluded_for_formatting(
-            file_path,
-            &settings.file_resolver,
-            &settings.formatter,
-            text_document.language_id(),
-        ) {
-            return Ok(None);
-        }
+    if is_document_excluded_for_formatting(
+        &file_path,
+        &settings.file_resolver,
+        &settings.formatter,
+        text_document.language_id(),
+    ) {
+        return Ok(None);
     }
 
     let text = text_document.contents();
@@ -69,7 +72,8 @@ fn format_text_document_range(
         query.source_type(),
         &settings.formatter,
         range,
-        file_path.as_deref(),
+        &file_path,
+        backend,
     )
     .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 

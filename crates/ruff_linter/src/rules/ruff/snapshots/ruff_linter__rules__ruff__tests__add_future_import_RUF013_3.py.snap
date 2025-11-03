@@ -1,0 +1,65 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+ --> RUF013_3.py:4:12
+  |
+4 | def f(arg: typing.List[str] = None):  # RUF013
+  |            ^^^^^^^^^^^^^^^^
+5 |     pass
+  |
+help: Convert to `T | None`
+1 + from __future__ import annotations
+2 | import typing
+3 | 
+4 | 
+  - def f(arg: typing.List[str] = None):  # RUF013
+5 + def f(arg: typing.List[str] | None = None):  # RUF013
+6 |     pass
+7 | 
+8 | 
+note: This is an unsafe fix and may change runtime behavior
+
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+  --> RUF013_3.py:22:12
+   |
+22 | def f(arg: typing.Union[int, str] = None):  # RUF013
+   |            ^^^^^^^^^^^^^^^^^^^^^^
+23 |     pass
+   |
+help: Convert to `T | None`
+1  + from __future__ import annotations
+2  | import typing
+3  | 
+4  | 
+--------------------------------------------------------------------------------
+20 |     pass
+21 | 
+22 | 
+   - def f(arg: typing.Union[int, str] = None):  # RUF013
+23 + def f(arg: typing.Union[int, str] | None = None):  # RUF013
+24 |     pass
+25 | 
+26 | 
+note: This is an unsafe fix and may change runtime behavior
+
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+  --> RUF013_3.py:29:12
+   |
+29 | def f(arg: typing.Literal[1, "foo", True] = None):  # RUF013
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+30 |     pass
+   |
+help: Convert to `T | None`
+1  + from __future__ import annotations
+2  | import typing
+3  | 
+4  | 
+--------------------------------------------------------------------------------
+27 | # Literal
+28 | 
+29 | 
+   - def f(arg: typing.Literal[1, "foo", True] = None):  # RUF013
+30 + def f(arg: typing.Literal[1, "foo", True] | None = None):  # RUF013
+31 |     pass
+note: This is an unsafe fix and may change runtime behavior

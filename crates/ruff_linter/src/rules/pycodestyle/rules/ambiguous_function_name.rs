@@ -1,9 +1,10 @@
 use ruff_python_ast::Identifier;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
+use crate::checkers::ast::Checker;
 use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 
 /// ## What it does
@@ -25,6 +26,7 @@ use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 /// def long_name(x): ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.35")]
 pub(crate) struct AmbiguousFunctionName(pub String);
 
 impl Violation for AmbiguousFunctionName {
@@ -36,13 +38,8 @@ impl Violation for AmbiguousFunctionName {
 }
 
 /// E743
-pub(crate) fn ambiguous_function_name(name: &Identifier) -> Option<Diagnostic> {
+pub(crate) fn ambiguous_function_name(checker: &Checker, name: &Identifier) {
     if is_ambiguous_name(name) {
-        Some(Diagnostic::new(
-            AmbiguousFunctionName(name.to_string()),
-            name.range(),
-        ))
-    } else {
-        None
+        checker.report_diagnostic(AmbiguousFunctionName(name.to_string()), name.range());
     }
 }

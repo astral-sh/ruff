@@ -1,10 +1,10 @@
 use std::string::ToString;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{Scope, ScopeId};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -33,6 +33,7 @@ use crate::checkers::ast::Checker;
 ///     x += 1
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.24")]
 pub(crate) struct UndefinedLocal {
     name: String,
 }
@@ -62,12 +63,12 @@ pub(crate) fn undefined_local(checker: &Checker, scope_id: ScopeId, scope: &Scop
                     }
                 }) {
                     // Then it's probably an error.
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(
                         UndefinedLocal {
                             name: name.to_string(),
                         },
                         range,
-                    ));
+                    );
                 }
             }
         }

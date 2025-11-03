@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, CmpOp, Expr, ExprContext, Number};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::{error::RelaxedDecoratorError, TokenKind};
+use crate::{TokenKind, error::RelaxedDecoratorError};
 
 /// Set the `ctx` for `Expr::Id`, `Expr::Attribute`, `Expr::Subscript`, `Expr::Starred`,
 /// `Expr::Tuple` and `Expr::List`. If `expr` is either `Expr::Tuple` or `Expr::List`,
@@ -21,8 +21,9 @@ pub(super) fn set_expr_ctx(expr: &mut Expr, new_ctx: ExprContext) {
         Expr::List(ast::ExprList { elts, ctx, .. })
         | Expr::Tuple(ast::ExprTuple { elts, ctx, .. }) => {
             *ctx = new_ctx;
-            elts.iter_mut()
-                .for_each(|element| set_expr_ctx(element, new_ctx));
+            for element in elts.iter_mut() {
+                set_expr_ctx(element, new_ctx);
+            }
         }
         _ => {}
     }
@@ -58,7 +59,7 @@ pub(super) fn detect_invalid_pre_py39_decorator_node(
         Expr::Name(_) => return None,
 
         Expr::Attribute(attribute) => {
-            return detect_invalid_pre_py39_decorator_node(&attribute.value)
+            return detect_invalid_pre_py39_decorator_node(&attribute.value);
         }
 
         Expr::Call(_) => return Some((RelaxedDecoratorError::CallExpression, expr.range())),
@@ -94,6 +95,7 @@ pub(super) fn detect_invalid_pre_py39_decorator_node(
         Expr::YieldFrom(_) => "`yield from` expression",
         Expr::Compare(_) => "comparison expression",
         Expr::FString(_) => "f-string",
+        Expr::TString(_) => "t-string",
         Expr::Named(_) => "assignment expression",
         Expr::Subscript(_) => "subscript expression",
         Expr::IpyEscapeCommand(_) => "IPython escape command",

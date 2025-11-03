@@ -1,7 +1,8 @@
 use itertools::Itertools;
 
-use ruff_diagnostics::AlwaysFixableViolation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+
+use crate::AlwaysFixableViolation;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct UnusedCodes {
@@ -42,6 +43,7 @@ pub(crate) struct UnusedCodes {
 /// ## References
 /// - [Ruff error suppression](https://docs.astral.sh/ruff/linter/#error-suppression)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct UnusedNOQA {
     pub codes: Option<UnusedCodes>,
 }

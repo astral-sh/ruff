@@ -1,8 +1,9 @@
-use crate::checkers::ast::Checker;
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
+
+use crate::Violation;
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for useless `if`-`else` conditions with identical arms.
@@ -21,6 +22,7 @@ use ruff_python_ast::comparable::ComparableExpr;
 /// foo = x
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.9.0")]
 pub(crate) struct UselessIfElse;
 
 impl Violation for UselessIfElse {
@@ -44,5 +46,5 @@ pub(crate) fn useless_if_else(checker: &Checker, if_expr: &ast::ExprIf) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(UselessIfElse, *range));
+    checker.report_diagnostic(UselessIfElse, *range);
 }

@@ -1,12 +1,13 @@
 use itertools::Itertools;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_diagnostics::Applicability;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StmtClassDef;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `metaclass=abc.ABCMeta` to define abstract base classes
@@ -21,20 +22,32 @@ use crate::importer::ImportRequest;
 ///
 /// ## Example
 /// ```python
-/// class C(metaclass=ABCMeta):
+/// import abc
+///
+///
+/// class C(metaclass=abc.ABCMeta):
 ///     pass
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// class C(ABC):
+/// import abc
+///
+///
+/// class C(abc.ABC):
 ///     pass
 /// ```
+///
+/// ## Fix safety
+/// The rule's fix is unsafe if the class has base classes. This is because the base classes might
+/// be validating the class's other base classes (e.g., `typing.Protocol` does this) or otherwise
+/// alter runtime behavior if more base classes are added.
 ///
 /// ## References
 /// - [Python documentation: `abc.ABC`](https://docs.python.org/3/library/abc.html#abc.ABC)
 /// - [Python documentation: `abc.ABCMeta`](https://docs.python.org/3/library/abc.html#abc.ABCMeta)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.2.0")]
 pub(crate) struct MetaClassABCMeta;
 
 impl AlwaysFixableViolation for MetaClassABCMeta {
@@ -69,7 +82,12 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(MetaClassABCMeta, keyword.range);
+    let applicability = if class_def.bases().is_empty() {
+        Applicability::Safe
+    } else {
+        Applicability::Unsafe
+    };
+    let mut diagnostic = checker.report_diagnostic(MetaClassABCMeta, keyword.range);
 
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
@@ -80,7 +98,7 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         Ok(if position > 0 {
             // When the `abc.ABCMeta` is not the first keyword, put `abc.ABC` before the first
             // keyword.
-            Fix::safe_edits(
+            Fix::applicable_edits(
                 // Delete from the previous argument, to the end of the `metaclass` argument.
                 Edit::range_deletion(TextRange::new(
                     class_def.keywords()[position - 1].end(),
@@ -91,14 +109,14 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
                     Edit::insertion(format!("{binding}, "), class_def.keywords()[0].start()),
                     import_edit,
                 ],
+                applicability,
             )
         } else {
-            Fix::safe_edits(
+            Fix::applicable_edits(
                 Edit::range_replacement(binding, keyword.range),
                 [import_edit],
+                applicability,
             )
         })
     });
-
-    checker.report_diagnostic(diagnostic);
 }

@@ -1,10 +1,10 @@
 use itertools::Itertools;
 use ruff_python_ast::{CmpOp, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -28,6 +28,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.221")]
 pub(crate) struct ComparisonOfConstant {
     left_constant: String,
     op: CmpOp,
@@ -62,7 +63,7 @@ pub(crate) fn comparison_of_constant(
         .zip(ops)
     {
         if left.is_literal_expr() && right.is_literal_expr() {
-            let diagnostic = Diagnostic::new(
+            checker.report_diagnostic(
                 ComparisonOfConstant {
                     left_constant: checker.generator().expr(left),
                     op: *op,
@@ -70,8 +71,6 @@ pub(crate) fn comparison_of_constant(
                 },
                 left.range(),
             );
-
-            checker.report_diagnostic(diagnostic);
-        };
+        }
     }
 }

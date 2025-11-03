@@ -1,7 +1,6 @@
 use itertools::Itertools;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
@@ -9,10 +8,12 @@ use ruff_python_ast::{Expr, ExprCall, ExprName, Keyword, StmtAnnAssign, StmtAssi
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_type_var_default_enabled;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 use super::{
-    expr_name_to_type_var, DisplayTypeVars, TypeParamKind, TypeVar, TypeVarReferenceVisitor,
+    DisplayTypeVars, TypeParamKind, TypeVar, TypeVarReferenceVisitor, expr_name_to_type_var,
 };
 
 /// ## What it does
@@ -40,12 +41,18 @@ use super::{
 ///
 /// ## Example
 /// ```python
+/// from typing import Annotated, TypeAlias, TypeAliasType
+/// from annotated_types import Gt
+///
 /// ListOfInt: TypeAlias = list[int]
 /// PositiveInt = TypeAliasType("PositiveInt", Annotated[int, Gt(0)])
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from typing import Annotated
+/// from annotated_types import Gt
+///
 /// type ListOfInt = list[int]
 /// type PositiveInt = Annotated[int, Gt(0)]
 /// ```
@@ -77,6 +84,7 @@ use super::{
 /// [UP047]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function/
 /// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.283")]
 pub(crate) struct NonPEP695TypeAlias {
     name: String,
     type_alias_kind: TypeAliasKind,
@@ -138,11 +146,13 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
 
     let type_params = match arguments.keywords.as_ref() {
         [] => &[],
-        [Keyword {
-            arg: Some(name),
-            value: Expr::Tuple(type_params),
-            ..
-        }] if name.as_str() == "type_params" => type_params.elts.as_slice(),
+        [
+            Keyword {
+                arg: Some(name),
+                value: Expr::Tuple(type_params),
+                ..
+            },
+        ] if name.as_str() == "type_params" => type_params.elts.as_slice(),
         _ => return,
     };
 
@@ -170,14 +180,14 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
         return;
     };
 
-    checker.report_diagnostic(create_diagnostic(
+    create_diagnostic(
         checker,
         stmt.into(),
         &target_name.id,
         value,
         &vars,
         TypeAliasKind::TypeAliasType,
-    ));
+    );
 }
 
 /// UP040
@@ -224,19 +234,21 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
         .unique_by(|tvar| tvar.name)
         .collect::<Vec<_>>();
 
-    // TODO(brent) handle `default` arg for Python 3.13+
-    if vars.iter().any(|tv| tv.default.is_some()) {
+    // Skip if any TypeVar has defaults and preview mode is not enabled
+    if vars.iter().any(|tv| tv.default.is_some())
+        && !is_type_var_default_enabled(checker.settings())
+    {
         return;
     }
 
-    checker.report_diagnostic(create_diagnostic(
+    create_diagnostic(
         checker,
         stmt.into(),
         name,
         value,
         &vars,
         TypeAliasKind::TypeAlias,
-    ));
+    );
 }
 
 /// Generate a [`Diagnostic`] for a non-PEP 695 type alias or type alias type.
@@ -247,7 +259,7 @@ fn create_diagnostic(
     value: &Expr,
     type_vars: &[TypeVar],
     type_alias_kind: TypeAliasKind,
-) -> Diagnostic {
+) {
     let source = checker.source();
     let comment_ranges = checker.comment_ranges();
 
@@ -285,12 +297,13 @@ fn create_diagnostic(
             }
         };
 
-    Diagnostic::new(
-        NonPEP695TypeAlias {
-            name: name.to_string(),
-            type_alias_kind,
-        },
-        stmt.range(),
-    )
-    .with_fix(Fix::applicable_edit(edit, applicability))
+    checker
+        .report_diagnostic(
+            NonPEP695TypeAlias {
+                name: name.to_string(),
+                type_alias_kind,
+            },
+            stmt.range(),
+        )
+        .set_fix(Fix::applicable_edit(edit, applicability));
 }

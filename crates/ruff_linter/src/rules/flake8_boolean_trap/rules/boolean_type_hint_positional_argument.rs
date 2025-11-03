@@ -1,18 +1,18 @@
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, Decorator, Expr, Parameters};
-use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::visibility;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 
 /// ## What it does
 /// Checks for the use of boolean positional arguments in function definitions,
-/// as determined by the presence of a `bool` type hint.
+/// as determined by the presence of a type hint containing `bool` as an
+/// evident subtype - e.g. `bool`, `bool | int`, `typing.Optional[bool]`, etc.
 ///
 /// ## Why is this bad?
 /// Calling a function with boolean positional arguments is confusing as the
@@ -29,9 +29,6 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 ///
 /// Dunder methods that define operators are exempt from this rule, as are
 /// setters and `@override` definitions.
-///
-/// In [preview], this rule will also flag annotations that include boolean
-/// variants, like `bool | int`.
 ///
 /// ## Example
 ///
@@ -96,9 +93,8 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// ## References
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.127")]
 pub(crate) struct BooleanTypeHintPositionalArgument;
 
 impl Violation for BooleanTypeHintPositionalArgument {
@@ -128,14 +124,8 @@ pub(crate) fn boolean_type_hint_positional_argument(
         let Some(annotation) = parameter.annotation() else {
             continue;
         };
-        if checker.settings.preview.is_enabled() {
-            if !match_annotation_to_complex_bool(annotation, checker.semantic()) {
-                continue;
-            }
-        } else {
-            if !match_annotation_to_literal_bool(annotation) {
-                continue;
-            }
+        if !match_annotation_to_complex_bool(annotation, checker.semantic()) {
+            continue;
         }
 
         // Allow Boolean type hints in setters.
@@ -157,21 +147,7 @@ pub(crate) fn boolean_type_hint_positional_argument(
             return;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
-            BooleanTypeHintPositionalArgument,
-            parameter.identifier(),
-        ));
-    }
-}
-
-/// Returns `true` if the annotation is a boolean type hint (e.g., `bool`).
-fn match_annotation_to_literal_bool(annotation: &Expr) -> bool {
-    match annotation {
-        // Ex) `True`
-        Expr::Name(name) => &name.id == "bool",
-        // Ex) `"True"`
-        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value == "bool",
-        _ => false,
+        checker.report_diagnostic(BooleanTypeHintPositionalArgument, parameter.identifier());
     }
 }
 

@@ -1,9 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::settings::LinterSettings;
 use crate::Locator;
+use crate::Violation;
+use crate::checkers::ast::LintContext;
+use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for the absence of copyright notices within Python files.
@@ -19,6 +20,7 @@ use crate::Locator;
 /// - `lint.flake8-copyright.min-file-size`
 /// - `lint.flake8-copyright.notice-rgx`
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.273")]
 pub(crate) struct MissingCopyrightNotice;
 
 impl Violation for MissingCopyrightNotice {
@@ -32,10 +34,11 @@ impl Violation for MissingCopyrightNotice {
 pub(crate) fn missing_copyright_notice(
     locator: &Locator,
     settings: &LinterSettings,
-) -> Option<Diagnostic> {
+    context: &LintContext,
+) {
     // Ignore files that are too small to contain a copyright notice.
     if locator.len() < settings.flake8_copyright.min_file_size {
-        return None;
+        return;
     }
 
     // Only search the first 4096 bytes in the file.
@@ -47,15 +50,12 @@ pub(crate) fn missing_copyright_notice(
             Some(ref author) => {
                 // Ensure that it's immediately followed by the author.
                 if contents[match_.end()..].trim_start().starts_with(author) {
-                    return None;
+                    return;
                 }
             }
-            None => return None,
+            None => return,
         }
     }
 
-    Some(Diagnostic::new(
-        MissingCopyrightNotice,
-        TextRange::default(),
-    ))
+    context.report_diagnostic(MissingCopyrightNotice, TextRange::default());
 }

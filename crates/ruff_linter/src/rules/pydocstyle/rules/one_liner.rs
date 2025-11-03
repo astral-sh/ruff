@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for single-line docstrings that are broken across multiple lines.
@@ -27,11 +27,17 @@ use crate::docstrings::Docstring;
 ///     """Return the mean of the given values."""
 /// ```
 ///
+/// ## Fix safety
+/// The fix is marked as unsafe because it could affect tools that parse docstrings,
+/// documentation generators, or custom introspection utilities that rely on
+/// specific docstring formatting.
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.68")]
 pub(crate) struct UnnecessaryMultilineDocstring;
 
 impl Violation for UnnecessaryMultilineDocstring {
@@ -62,7 +68,8 @@ pub(crate) fn one_liner(checker: &Checker, docstring: &Docstring) {
     }
 
     if non_empty_line_count == 1 && line_count > 1 {
-        let mut diagnostic = Diagnostic::new(UnnecessaryMultilineDocstring, docstring.range());
+        let mut diagnostic =
+            checker.report_diagnostic(UnnecessaryMultilineDocstring, docstring.range());
 
         // If removing whitespace would lead to an invalid string of quote
         // characters, avoid applying the fix.
@@ -82,7 +89,5 @@ pub(crate) fn one_liner(checker: &Checker, docstring: &Docstring) {
                 docstring.range(),
             )));
         }
-
-        checker.report_diagnostic(diagnostic);
     }
 }

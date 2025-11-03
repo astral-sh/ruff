@@ -11,7 +11,11 @@ pub struct FormatStmtReturn;
 
 impl FormatNodeRule<StmtReturn> for FormatStmtReturn {
     fn fmt_fields(&self, item: &StmtReturn, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtReturn { range: _, value } = item;
+        let StmtReturn {
+            range: _,
+            node_index: _,
+            value,
+        } = item;
 
         token("return").fmt(f)?;
 

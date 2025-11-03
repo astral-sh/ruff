@@ -1,12 +1,12 @@
 use ruff_python_ast::{self as ast, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::helpers::{
+use crate::rules::ruff::helpers::{
     dataclass_kind, has_default_copy_semantics, is_class_var_annotation, is_final_annotation,
     is_special_attribute,
 };
@@ -84,6 +84,7 @@ use crate::rules::ruff::rules::helpers::{
 ///
 /// [ClassVar]: https://docs.python.org/3/library/typing.html#typing.ClassVar
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.273")]
 pub(crate) struct MutableClassDefault;
 
 impl Violation for MutableClassDefault {
@@ -118,7 +119,7 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                         return;
                     }
 
-                    checker.report_diagnostic(Diagnostic::new(MutableClassDefault, value.range()));
+                    checker.report_diagnostic(MutableClassDefault, value.range());
                 }
             }
             Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
@@ -130,7 +131,7 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                         return;
                     }
 
-                    checker.report_diagnostic(Diagnostic::new(MutableClassDefault, value.range()));
+                    checker.report_diagnostic(MutableClassDefault, value.range());
                 }
             }
             _ => (),

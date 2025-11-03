@@ -1,0 +1,130 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: dataclasses.md - Dataclasses - `dataclasses.KW_ONLY`
+mdtest path: crates/ty_python_semantic/resources/mdtest/dataclasses/dataclasses.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from dataclasses import dataclass, field, KW_ONLY
+ 2 | 
+ 3 | @dataclass
+ 4 | class C:
+ 5 |     x: int
+ 6 |     _: KW_ONLY
+ 7 |     y: str
+ 8 | 
+ 9 | reveal_type(C.__init__)  # revealed: (self: C, x: int, *, y: str) -> None
+10 | 
+11 | # error: [missing-argument]
+12 | # error: [too-many-positional-arguments]
+13 | C(3, "")
+14 | 
+15 | C(3, y="")
+16 | @dataclass
+17 | class Fails:  # error: [duplicate-kw-only]
+18 |     a: int
+19 |     b: KW_ONLY
+20 |     c: str
+21 |     d: KW_ONLY
+22 |     e: bytes
+23 | 
+24 | reveal_type(Fails.__init__)  # revealed: (self: Fails, a: int, *, c: str, e: bytes) -> None
+25 | def flag() -> bool:
+26 |     return True
+27 | 
+28 | @dataclass
+29 | class D:  # error: [duplicate-kw-only]
+30 |     x: int
+31 |     _1: KW_ONLY
+32 | 
+33 |     if flag():
+34 |         y: str
+35 |         _2: KW_ONLY
+36 |         z: float
+37 | from dataclasses import dataclass, KW_ONLY
+38 | 
+39 | @dataclass
+40 | class D:
+41 |     x: int
+42 |     _: KW_ONLY
+43 |     y: str
+44 | 
+45 | @dataclass
+46 | class E(D):
+47 |     z: bytes
+48 | 
+49 | # This should work: x=1 (positional), z=b"foo" (positional), y="foo" (keyword-only)
+50 | E(1, b"foo", y="foo")
+51 | 
+52 | reveal_type(E.__init__)  # revealed: (self: E, x: int, z: bytes, *, y: str) -> None
+```
+
+# Diagnostics
+
+```
+error[missing-argument]: No argument provided for required parameter `y`
+  --> src/mdtest_snippet.py:13:1
+   |
+11 | # error: [missing-argument]
+12 | # error: [too-many-positional-arguments]
+13 | C(3, "")
+   | ^^^^^^^^
+14 |
+15 | C(3, y="")
+   |
+info: rule `missing-argument` is enabled by default
+
+```
+
+```
+error[too-many-positional-arguments]: Too many positional arguments: expected 1, got 2
+  --> src/mdtest_snippet.py:13:6
+   |
+11 | # error: [missing-argument]
+12 | # error: [too-many-positional-arguments]
+13 | C(3, "")
+   |      ^^
+14 |
+15 | C(3, y="")
+   |
+info: rule `too-many-positional-arguments` is enabled by default
+
+```
+
+```
+error[duplicate-kw-only]: Dataclass has more than one field annotated with `KW_ONLY`
+  --> src/mdtest_snippet.py:17:7
+   |
+15 | C(3, y="")
+16 | @dataclass
+17 | class Fails:  # error: [duplicate-kw-only]
+   |       ^^^^^
+18 |     a: int
+19 |     b: KW_ONLY
+   |
+info: `KW_ONLY` fields: `b`, `d`
+info: rule `duplicate-kw-only` is enabled by default
+
+```
+
+```
+error[duplicate-kw-only]: Dataclass has more than one field annotated with `KW_ONLY`
+  --> src/mdtest_snippet.py:29:7
+   |
+28 | @dataclass
+29 | class D:  # error: [duplicate-kw-only]
+   |       ^
+30 |     x: int
+31 |     _1: KW_ONLY
+   |
+info: `KW_ONLY` fields: `_1`, `_2`
+info: rule `duplicate-kw-only` is enabled by default
+
+```

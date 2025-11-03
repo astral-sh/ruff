@@ -1,10 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
-use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for empty docstrings.
@@ -30,6 +29,7 @@ use crate::registry::Rule;
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.68")]
 pub(crate) struct EmptyDocstring;
 
 impl Violation for EmptyDocstring {
@@ -44,9 +44,6 @@ pub(crate) fn not_empty(checker: &Checker, docstring: &Docstring) -> bool {
     if !docstring.body().trim().is_empty() {
         return true;
     }
-
-    if checker.enabled(Rule::EmptyDocstring) {
-        checker.report_diagnostic(Diagnostic::new(EmptyDocstring, docstring.range()));
-    }
+    checker.report_diagnostic_if_enabled(EmptyDocstring, docstring.range());
     false
 }

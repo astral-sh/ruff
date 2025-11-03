@@ -1,13 +1,13 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::visitor::Visitor;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StmtFunctionDef;
+use ruff_python_ast::visitor::Visitor;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
-use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenceVisitor};
+use super::{DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, in_nested_context};
 
 /// ## What it does
 ///
@@ -25,7 +25,7 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 /// in Python 3.13.
 ///
 /// Not all type checkers fully support PEP 695 yet, so even valid fixes suggested by this rule may
-/// cause type checking to fail.
+/// cause type checking to [fail].
 ///
 /// ## Fix safety
 ///
@@ -76,7 +76,9 @@ use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenc
 /// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var/
 /// [UP046]: https://docs.astral.sh/ruff/rules/non-pep695-generic-class/
 /// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
+/// [fail]: https://github.com/python/mypy/issues/18507
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct NonPEP695GenericFunction {
     name: String,
 }
@@ -153,7 +155,7 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
         }
     }
 
-    let Some(type_vars) = check_type_vars(type_vars) else {
+    let Some(type_vars) = check_type_vars(type_vars, checker) else {
         return;
     };
 
@@ -163,16 +165,15 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
         source: checker.source(),
     };
 
-    checker.report_diagnostic(
-        Diagnostic::new(
+    checker
+        .report_diagnostic(
             NonPEP695GenericFunction {
                 name: name.to_string(),
             },
             TextRange::new(name.start(), parameters.end()),
         )
-        .with_fix(Fix::unsafe_edit(Edit::insertion(
+        .set_fix(Fix::unsafe_edit(Edit::insertion(
             type_params.to_string(),
             name.end(),
-        ))),
-    );
+        )));
 }

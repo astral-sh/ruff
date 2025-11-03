@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::analyze::function_type::{self as function_type, FunctionType};
 use ruff_python_semantic::ScopeKind;
+use ruff_python_semantic::analyze::function_type::{self as function_type, FunctionType};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -46,6 +46,7 @@ use crate::checkers::ast::Checker;
 ///         return supercls
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct SelfOrClsAssignment {
     method_type: MethodType,
 }
@@ -66,7 +67,7 @@ impl Violation for SelfOrClsAssignment {
     }
 }
 
-/// PLW0127
+/// PLW0642
 pub(crate) fn self_or_cls_assignment(checker: &Checker, target: &Expr) {
     let ScopeKind::Function(ast::StmtFunctionDef {
         name,
@@ -98,13 +99,13 @@ pub(crate) fn self_or_cls_assignment(checker: &Checker, target: &Expr) {
         decorator_list,
         parent,
         checker.semantic(),
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
 
     let method_type = match (function_type, self_or_cls.name().as_str()) {
-        (FunctionType::Method { .. }, "self") => MethodType::Instance,
-        (FunctionType::ClassMethod { .. }, "cls") => MethodType::Class,
+        (FunctionType::Method, "self") => MethodType::Instance,
+        (FunctionType::ClassMethod, "cls") => MethodType::Class,
         (FunctionType::NewMethod, "cls") => MethodType::New,
         _ => return,
     };
@@ -117,10 +118,7 @@ fn check_expr(checker: &Checker, target: &Expr, method_type: MethodType) {
         Expr::Name(_) => {
             if let Expr::Name(ast::ExprName { id, .. }) = target {
                 if id.as_str() == method_type.arg_name() {
-                    checker.report_diagnostic(Diagnostic::new(
-                        SelfOrClsAssignment { method_type },
-                        target.range(),
-                    ));
+                    checker.report_diagnostic(SelfOrClsAssignment { method_type }, target.range());
                 }
             }
         }

@@ -1,0 +1,76 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF055 [*] Plain string pattern passed to `re` function
+ --> RUF055_3.py:6:1
+  |
+5 | # Should be replaced with `b_src.replace(rb"x", b"y")`
+6 | re.sub(rb"x", b"y", b_src)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+7 |
+8 | # Should be replaced with `b_src.startswith(rb"abc")`
+  |
+help: Replace with `b_src.replace(rb"x", b"y")`
+3 | b_src = b"abc"
+4 | 
+5 | # Should be replaced with `b_src.replace(rb"x", b"y")`
+  - re.sub(rb"x", b"y", b_src)
+6 + b_src.replace(rb"x", b"y")
+7 | 
+8 | # Should be replaced with `b_src.startswith(rb"abc")`
+9 | if re.match(rb"abc", b_src):
+
+RUF055 [*] Plain string pattern passed to `re` function
+  --> RUF055_3.py:9:4
+   |
+ 8 | # Should be replaced with `b_src.startswith(rb"abc")`
+ 9 | if re.match(rb"abc", b_src):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^
+10 |     pass
+   |
+help: Replace with `b_src.startswith(rb"abc")`
+6  | re.sub(rb"x", b"y", b_src)
+7  | 
+8  | # Should be replaced with `b_src.startswith(rb"abc")`
+   - if re.match(rb"abc", b_src):
+9  + if b_src.startswith(rb"abc"):
+10 |     pass
+11 | 
+12 | # Should be replaced with `rb"x" in b_src`
+
+RUF055 [*] Plain string pattern passed to `re` function
+  --> RUF055_3.py:13:4
+   |
+12 | # Should be replaced with `rb"x" in b_src`
+13 | if re.search(rb"x", b_src):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^
+14 |     pass
+   |
+help: Replace with `rb"x" in b_src`
+10 |     pass
+11 | 
+12 | # Should be replaced with `rb"x" in b_src`
+   - if re.search(rb"x", b_src):
+13 + if rb"x" in b_src:
+14 |     pass
+15 | 
+16 | # Should be replaced with `b_src.split(rb"abc")`
+
+RUF055 [*] Plain string pattern passed to `re` function
+  --> RUF055_3.py:17:1
+   |
+16 | # Should be replaced with `b_src.split(rb"abc")`
+17 | re.split(rb"abc", b_src)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
+18 |
+19 | # Patterns containing metacharacters should NOT be replaced
+   |
+help: Replace with `b_src.split(rb"abc")`
+14 |     pass
+15 | 
+16 | # Should be replaced with `b_src.split(rb"abc")`
+   - re.split(rb"abc", b_src)
+17 + b_src.split(rb"abc")
+18 | 
+19 | # Patterns containing metacharacters should NOT be replaced
+20 | re.sub(rb"ab[c]", b"", b_src)

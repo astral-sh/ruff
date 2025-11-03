@@ -66,7 +66,9 @@ _Using configuration file path:_
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
-        configuration = "~/path/to/ruff.toml"
+        settings = {
+          configuration = "~/path/to/ruff.toml"
+        }
       }
     }
     ```
@@ -117,20 +119,22 @@ _Using inline configuration:_
     ```lua
     require('lspconfig').ruff.setup {
       init_options = {
-        configuration = {
-          lint = {
-            unfixable = {"F401"},
-            ["extend-select"] = {"TID251"},
-            ["flake8-tidy-imports"] = {
-              ["banned-api"] = {
-                ["typing.TypedDict"] = {
-                  msg = "Use `typing_extensions.TypedDict` instead"
+        settings = {
+          configuration = {
+            lint = {
+              unfixable = {"F401"},
+              ["extend-select"] = {"TID251"},
+              ["flake8-tidy-imports"] = {
+                ["banned-api"] = {
+                  ["typing.TypedDict"] = {
+                    msg = "Use `typing_extensions.TypedDict` instead"
+                  }
                 }
               }
+            },
+            format = {
+              ["quote-style"] = "single"
             }
-          },
-          format = {
-            ["quote-style"] = "single"
           }
         }
       }
@@ -959,6 +963,62 @@ Whether to enable Ruff's preview mode when formatting.
             "settings": {
               "format": {
                 "preview": true
+              }
+            }
+          }
+        }
+      }
+    }
+    ```
+
+### `backend` {: #format_backend }
+
+The backend to use for formatting files. Following options are available:
+
+- `"internal"`: Use the built-in Ruff formatter
+- `"uv"`: Use uv for formatting (requires uv >= 0.8.13)
+
+For `internal`, the formatter version will match the selected Ruff version while for `uv`, the
+formatter version may differ.
+
+**Default value**: `"internal"`
+
+**Type**: `"internal" | "uv"`
+
+**Example usage**:
+
+=== "VS Code"
+
+    ```json
+    {
+        "ruff.format.backend": "uv"
+    }
+    ```
+
+=== "Neovim"
+
+    ```lua
+    require('lspconfig').ruff.setup {
+      init_options = {
+        settings = {
+          format = {
+            backend = "uv"
+          }
+        }
+      }
+    }
+    ```
+
+=== "Zed"
+
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "format": {
+                "backend": "uv"
               }
             }
           }

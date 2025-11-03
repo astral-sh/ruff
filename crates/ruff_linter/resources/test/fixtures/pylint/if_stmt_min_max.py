@@ -237,3 +237,15 @@ if counter["a"] > counter["b"]:
 # case 8: counter["a"] = max(counter["b"], counter["a"])
 if counter["a"] > counter["b"]:
     counter["b"] = counter["a"]
+
+# https://github.com/astral-sh/ruff/issues/17311
+
+# fix marked unsafe as delete comments
+a, b = [], []
+if a >= b:
+    # very important comment
+    a = b
+
+# fix marked safe as preserve comments
+if a >= b:
+    a = b  # very important comment

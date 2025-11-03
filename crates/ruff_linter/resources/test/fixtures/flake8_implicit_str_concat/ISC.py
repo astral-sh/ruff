@@ -91,3 +91,120 @@ _ = "\8""0" # fix should be "\80"
 _ = "\12""8" # fix should be "\128"
 _ = "\12""foo" # fix should be "\12foo"
 _ = "\12" ""  # fix should be "\12"
+
+
+# Mixed literal + non-literal scenarios
+_ = (
+    "start" +
+    variable +
+    "end"
+)
+
+_ = (
+    f"format" +
+    func_call() +
+    "literal"
+)
+
+_ = (
+    rf"raw_f{x}" +
+    r"raw_normal"
+)
+
+
+# Different prefix combinations
+_ = (
+    u"unicode" +
+    r"raw"
+)
+
+_ = (
+    rb"raw_bytes" +
+    b"normal_bytes"
+)
+
+_ = (
+    b"bytes" +
+    b"with_bytes"
+)
+
+# Repeated concatenation
+
+_ = ("a" +
+    "b" +
+    "c" +
+    "d" + "e"
+)
+
+_ = ("a"
+    + "b"
+    + "c"
+    + "d"
+    + "e"
+)
+
+_ = (
+    "start" +
+    variable + # comment
+    "end"
+)
+
+_ = (
+    "start" +
+    variable
+		# leading comment
+    + "end"
+)
+
+_ = (
+    "first"
+    +    "second"  # extra spaces around +
+)
+
+_ = (
+    "first"    +  # trailing spaces before +
+    "second"
+)
+
+_ = ((
+    "deep" +
+    "nesting"
+))
+
+_ = (
+    "contains + plus" +
+    "another string"
+)
+
+_ = (
+    "start"
+		# leading comment
+    + "end"
+)
+
+_ = (
+    "start" +
+		# leading comment
+    "end"
+)
+
+# https://github.com/astral-sh/ruff/issues/20310
+# ISC001
+t"The quick " t"brown fox."
+
+# ISC002
+t"The quick brown fox jumps over the lazy "\
+t"dog."
+
+# ISC003
+(
+    t"The quick brown fox jumps over the lazy "
+    + t"dog"
+)
+
+# nested examples with both t and f-strings
+_ = "a" f"b {t"c" t"d"} e" "f"
+_ = t"b {f"c" f"d {t"e" t"f"} g"} h"
+_ = f"b {t"abc" \
+    t"def"} g"
+

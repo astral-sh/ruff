@@ -1,0 +1,53 @@
+---
+source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
+assertion_line: 71
+---
+G004 [*] Logging statement uses f-string
+ --> G004_implicit_concat.py:6:10
+  |
+5 | log = logging.getLogger(__name__)
+6 | log.info(f"a" f"b {variablename}")
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^
+7 | log.info("a " f"b {variablename}")
+8 | log.info("prefix " f"middle {variablename}" f" suffix")
+  |
+help: Convert to lazy `%` formatting
+3 | variablename = "value"
+4 | 
+5 | log = logging.getLogger(__name__)
+  - log.info(f"a" f"b {variablename}")
+6 + log.info("ab %s", variablename)
+7 | log.info("a " f"b {variablename}")
+8 | log.info("prefix " f"middle {variablename}" f" suffix")
+
+G004 [*] Logging statement uses f-string
+ --> G004_implicit_concat.py:7:10
+  |
+5 | log = logging.getLogger(__name__)
+6 | log.info(f"a" f"b {variablename}")
+7 | log.info("a " f"b {variablename}")
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^
+8 | log.info("prefix " f"middle {variablename}" f" suffix")
+  |
+help: Convert to lazy `%` formatting
+4 | 
+5 | log = logging.getLogger(__name__)
+6 | log.info(f"a" f"b {variablename}")
+  - log.info("a " f"b {variablename}")
+7 + log.info("a b %s", variablename)
+8 | log.info("prefix " f"middle {variablename}" f" suffix")
+
+G004 [*] Logging statement uses f-string
+ --> G004_implicit_concat.py:8:10
+  |
+6 | log.info(f"a" f"b {variablename}")
+7 | log.info("a " f"b {variablename}")
+8 | log.info("prefix " f"middle {variablename}" f" suffix")
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Convert to lazy `%` formatting
+5 | log = logging.getLogger(__name__)
+6 | log.info(f"a" f"b {variablename}")
+7 | log.info("a " f"b {variablename}")
+  - log.info("prefix " f"middle {variablename}" f" suffix")
+8 + log.info("prefix middle %s suffix", variablename)

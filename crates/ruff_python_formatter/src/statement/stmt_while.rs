@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::statement::clause::{clause_body, clause_header, ClauseHeader, ElseClause};
+use crate::statement::clause::{ClauseHeader, ElseClause, clause_body, clause_header};
 use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]
@@ -15,6 +15,7 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
     fn fmt_fields(&self, item: &StmtWhile, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtWhile {
             range: _,
+            node_index: _,
             test,
             body,
             orelse,

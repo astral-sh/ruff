@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: mapping pattern checks duplicate key `'key'`
+ --> resources/test/fixtures/semantic_errors/duplicate_match_key.py:2:21
+  |
+1 | match x:
+2 |     case {'key': 1, 'key': 2}:
+  |                     ^^^^^
+3 |             pass
+  |

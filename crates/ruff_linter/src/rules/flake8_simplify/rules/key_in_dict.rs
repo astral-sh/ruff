@@ -1,14 +1,14 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_diagnostics::{Applicability, Edit};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, CmpOp, Comprehension, Expr};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Fix};
+use crate::{Applicability, Edit};
 
 /// ## What it does
 /// Checks for key-existence checks against `dict.keys()` calls.
@@ -38,6 +38,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.176")]
 pub(crate) struct InDictKeys {
     operator: String,
 }
@@ -60,6 +61,7 @@ fn key_in_dict(checker: &Checker, left: &Expr, right: &Expr, operator: CmpOp, pa
         func,
         arguments: Arguments { args, keywords, .. },
         range: _,
+        node_index: _,
     }) = &right
     else {
         return;
@@ -103,7 +105,7 @@ fn key_in_dict(checker: &Checker, left: &Expr, right: &Expr, operator: CmpOp, pa
     )
     .unwrap_or(right.range());
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         InDictKeys {
             operator: operator.as_str().to_string(),
         },
@@ -158,7 +160,6 @@ fn key_in_dict(checker: &Checker, left: &Expr, right: &Expr, operator: CmpOp, pa
             ));
         }
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM118 in a `for` loop.

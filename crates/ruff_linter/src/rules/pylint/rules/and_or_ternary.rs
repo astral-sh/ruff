@@ -1,5 +1,6 @@
-use ruff_diagnostics::Violation;
 use ruff_macros::ViolationMetadata;
+
+use crate::Violation;
 
 /// ## Removal
 /// This rule was removed from Ruff because it was common for it to introduce behavioral changes.
@@ -28,6 +29,7 @@ use ruff_macros::ViolationMetadata;
 /// maximum = x if x >= y else y
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(removed_since = "v0.2.0")]
 pub(crate) struct AndOrTernary;
 
 /// PLR1706

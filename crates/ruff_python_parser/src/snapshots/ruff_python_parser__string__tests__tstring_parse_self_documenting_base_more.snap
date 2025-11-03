@@ -1,0 +1,92 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            node_index: NodeIndex(None),
+            range: 0..38,
+            value: TString(
+                ExprTString {
+                    node_index: NodeIndex(None),
+                    range: 0..38,
+                    value: TStringValue {
+                        inner: Single(
+                            TString {
+                                range: 0..38,
+                                node_index: NodeIndex(None),
+                                elements: [
+                                    Literal(
+                                        InterpolatedStringLiteralElement {
+                                            range: 2..6,
+                                            node_index: NodeIndex(None),
+                                            value: "mix ",
+                                        },
+                                    ),
+                                    Interpolation(
+                                        InterpolatedElement {
+                                            range: 6..13,
+                                            node_index: NodeIndex(None),
+                                            expression: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 7..11,
+                                                    id: Name("user"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            debug_text: Some(
+                                                DebugText {
+                                                    leading: "",
+                                                    trailing: "=",
+                                                },
+                                            ),
+                                            conversion: None,
+                                            format_spec: None,
+                                        },
+                                    ),
+                                    Literal(
+                                        InterpolatedStringLiteralElement {
+                                            range: 13..28,
+                                            node_index: NodeIndex(None),
+                                            value: " with text and ",
+                                        },
+                                    ),
+                                    Interpolation(
+                                        InterpolatedElement {
+                                            range: 28..37,
+                                            node_index: NodeIndex(None),
+                                            expression: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 29..35,
+                                                    id: Name("second"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            debug_text: Some(
+                                                DebugText {
+                                                    leading: "",
+                                                    trailing: "=",
+                                                },
+                                            ),
+                                            conversion: None,
+                                            format_spec: None,
+                                        },
+                                    ),
+                                ],
+                                flags: TStringFlags {
+                                    quote_style: Double,
+                                    prefix: Regular,
+                                    triple_quoted: false,
+                                    unclosed: false,
+                                },
+                            },
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

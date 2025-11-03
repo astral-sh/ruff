@@ -2,10 +2,10 @@ use anyhow::bail;
 use itertools::Itertools;
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -41,6 +41,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [#4282]: https://github.com/astral-sh/ruff/issues/4282
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.255")]
 pub(crate) struct CompareToEmptyString {
     existing: String,
     replacement: String,
@@ -89,13 +90,13 @@ pub(crate) fn compare_to_empty_string(
                         let expr = checker.generator().expr(rhs);
                         let existing = format!("{literal} {op} {expr}");
                         let replacement = format!("{}{expr}", op.into_unary());
-                        checker.report_diagnostic(Diagnostic::new(
+                        checker.report_diagnostic(
                             CompareToEmptyString {
                                 existing,
                                 replacement,
                             },
                             lhs.range(),
-                        ));
+                        );
                     }
                 }
             }
@@ -107,13 +108,13 @@ pub(crate) fn compare_to_empty_string(
                     let literal = checker.generator().expr(rhs);
                     let existing = format!("{expr} {op} {literal}");
                     let replacement = format!("{}{expr}", op.into_unary());
-                    checker.report_diagnostic(Diagnostic::new(
+                    checker.report_diagnostic(
                         CompareToEmptyString {
                             existing,
                             replacement,
                         },
                         rhs.range(),
-                    ));
+                    );
                 }
             }
         }

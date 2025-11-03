@@ -1,0 +1,68 @@
+[package]
+name = "ty_project"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ruff_cache = { workspace = true }
+ruff_db = { workspace = true, features = ["cache", "serde"] }
+ruff_macros = { workspace = true }
+ruff_memory_usage = { workspace = true }
+ruff_options_metadata = { workspace = true }
+ruff_python_ast = { workspace = true, features = ["serde"] }
+ruff_python_formatter = { workspace = true, optional = true }
+ruff_text_size = { workspace = true }
+ty_combine = { workspace = true }
+ty_python_semantic = { workspace = true, features = ["serde"] }
+ty_static = { workspace = true }
+ty_vendored = { workspace = true }
+
+anyhow = { workspace = true }
+camino = { workspace = true }
+colored = { workspace = true }
+crossbeam = { workspace = true }
+get-size2 = { workspace = true }
+globset = { workspace = true }
+notify = { workspace = true }
+pep440_rs = { workspace = true, features = ["version-ranges"] }
+ordermap = { workspace = true, features = ["serde"] }
+rayon = { workspace = true }
+regex = { workspace = true }
+regex-automata = { workspace = true }
+rustc-hash = { workspace = true }
+salsa = { workspace = true }
+schemars = { workspace = true, optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true, optional = true }
+thiserror = { workspace = true }
+toml = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+ruff_db = { workspace = true, features = ["testing"] }
+insta = { workspace = true, features = ["redactions", "ron"] }
+
+[features]
+default = ["zstd"]
+deflate = ["ty_vendored/deflate"]
+schemars = [
+    "dep:schemars",
+    "dep:serde_json",
+    "ruff_db/schemars",
+    "ruff_python_ast/schemars",
+    "ty_python_semantic/schemars",
+]
+zstd = ["ty_vendored/zstd"]
+format = ["ruff_python_formatter"]
+testing = []
+
+[lints]
+workspace = true

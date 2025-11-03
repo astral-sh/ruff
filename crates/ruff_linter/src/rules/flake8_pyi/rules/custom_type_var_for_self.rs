@@ -1,18 +1,17 @@
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use itertools::Itertools;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::PythonVersion;
 use ruff_python_semantic::analyze::class::is_metaclass;
 use ruff_python_semantic::analyze::function_type::{self, FunctionType};
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 use ruff_python_semantic::{Binding, ResolvedReference, ScopeId, SemanticModel};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::ast::Checker;
-use crate::importer::{ImportRequest, ResolutionError};
-use ruff_python_ast::PythonVersion;
+use crate::checkers::ast::{Checker, TypingImporter};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for methods that use custom [`TypeVar`s][typing_TypeVar] in their
@@ -54,7 +53,7 @@ use ruff_python_ast::PythonVersion;
 ///     def bar(cls, arg: int) -> Self: ...
 /// ```
 ///
-/// ## Fix behaviour and safety
+/// ## Fix behaviour
 /// The fix replaces all references to the custom type variable in the method's header and body
 /// with references to `Self`. The fix also adds an import of `Self` if neither `Self` nor `typing`
 /// is already imported in the module. If your [`target-version`] setting is set to Python 3.11 or
@@ -68,8 +67,19 @@ use ruff_python_ast::PythonVersion;
 /// [`unused-private-type-var`][PYI018] for a rule that will clean up unused private type
 /// variables.
 ///
+/// ## Fix safety
 /// The fix is only marked as unsafe if there is the possibility that it might delete a comment
 /// from your code.
+///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for Python versions
+/// before 3.11, its diagnostic will not be emitted, and no fix will be offered, if
+/// `typing_extensions` imports have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
 ///
 /// [PEP 673]: https://peps.python.org/pep-0673/#motivation
 /// [PEP-695]: https://peps.python.org/pep-0695/
@@ -79,6 +89,7 @@ use ruff_python_ast::PythonVersion;
 /// [typing_TypeVar]: https://docs.python.org/3/library/typing.html#typing.TypeVar
 /// [typing_extensions]: https://typing-extensions.readthedocs.io/en/latest/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.283")]
 pub(crate) struct CustomTypeVarForSelf {
     typevar_name: String,
 }
@@ -103,13 +114,18 @@ impl Violation for CustomTypeVarForSelf {
 }
 
 /// PYI019
-pub(crate) fn custom_type_var_instead_of_self(
-    checker: &Checker,
-    binding: &Binding,
-) -> Option<Diagnostic> {
+pub(crate) fn custom_type_var_instead_of_self(checker: &Checker, binding: &Binding) {
     let semantic = checker.semantic();
     let current_scope = &semantic.scopes[binding.scope];
-    let function_def = binding.statement(semantic)?.as_function_def_stmt()?;
+    let Some(function_def) = binding
+        .statement(semantic)
+        .and_then(|stmt| stmt.as_function_def_stmt())
+    else {
+        return;
+    };
+    let Some(importer) = checker.typing_importer("Self", PythonVersion::PY311) else {
+        return;
+    };
 
     let ast::StmtFunctionDef {
         name: function_name,
@@ -123,14 +139,26 @@ pub(crate) fn custom_type_var_instead_of_self(
     let type_params = type_params.as_deref();
 
     // Given, e.g., `def foo(self: _S, arg: bytes)`, extract `_S`.
-    let self_or_cls_parameter = parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .next()?;
+    let Some(self_or_cls_parameter) = parameters.posonlyargs.iter().chain(&parameters.args).next()
+    else {
+        return;
+    };
 
-    let self_or_cls_annotation = self_or_cls_parameter.annotation()?;
-    let parent_class = current_scope.kind.as_class()?;
+    let Some(self_or_cls_annotation_unchecked) = self_or_cls_parameter.annotation() else {
+        return;
+    };
+    let self_or_cls_annotation = match self_or_cls_annotation_unchecked {
+        ast::Expr::StringLiteral(literal_expr) => {
+            let Ok(parsed_expr) = checker.parse_type_annotation(literal_expr) else {
+                return;
+            };
+            parsed_expr.expression()
+        }
+        _ => self_or_cls_annotation_unchecked,
+    };
+    let Some(parent_class) = current_scope.kind.as_class() else {
+        return;
+    };
 
     // Skip any abstract/static/overloaded methods,
     // and any methods in metaclasses
@@ -138,7 +166,7 @@ pub(crate) fn custom_type_var_instead_of_self(
         || is_overload(decorator_list, semantic)
         || is_metaclass(parent_class, semantic).is_yes()
     {
-        return None;
+        return;
     }
 
     let function_kind = function_type::classify(
@@ -146,8 +174,8 @@ pub(crate) fn custom_type_var_instead_of_self(
         decorator_list,
         current_scope,
         semantic,
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
 
     let method = match function_kind {
@@ -159,17 +187,19 @@ pub(crate) fn custom_type_var_instead_of_self(
             self_annotation: self_or_cls_annotation,
             type_params,
         }),
-        FunctionType::Function | FunctionType::StaticMethod => return None,
+        FunctionType::Function | FunctionType::StaticMethod => return,
     };
 
-    let custom_typevar = method.custom_typevar(semantic, binding.scope)?;
+    let Some(custom_typevar) = method.custom_typevar(semantic, binding.scope) else {
+        return;
+    };
 
     let function_header_end = returns
         .as_deref()
         .map(Ranged::end)
         .unwrap_or_else(|| parameters.end());
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         CustomTypeVarForSelf {
             typevar_name: custom_typevar.name(checker.source()).to_string(),
         },
@@ -179,14 +209,13 @@ pub(crate) fn custom_type_var_instead_of_self(
     diagnostic.try_set_fix(|| {
         replace_custom_typevar_with_self(
             checker,
+            &importer,
             function_def,
             custom_typevar,
             self_or_cls_parameter,
-            self_or_cls_annotation,
+            self_or_cls_annotation_unchecked,
         )
     });
-
-    Some(diagnostic)
 }
 
 #[derive(Debug)]
@@ -311,13 +340,14 @@ fn custom_typevar<'a>(
 /// * If it was a PEP-695 type variable, removes that `TypeVar` from the PEP-695 type-parameter list
 fn replace_custom_typevar_with_self(
     checker: &Checker,
+    importer: &TypingImporter,
     function_def: &ast::StmtFunctionDef,
     custom_typevar: TypeVar,
     self_or_cls_parameter: &ast::ParameterWithDefault,
     self_or_cls_annotation: &ast::Expr,
 ) -> anyhow::Result<Fix> {
     // (1) Import `Self` (if necessary)
-    let (import_edit, self_symbol_binding) = import_self(checker, function_def.start())?;
+    let (import_edit, self_symbol_binding) = importer.import(function_def.start())?;
 
     // (2) Remove the first parameter's annotation
     let mut other_edits = vec![Edit::deletion(
@@ -365,24 +395,6 @@ fn replace_custom_typevar_with_self(
         other_edits,
         applicability,
     ))
-}
-
-/// Attempt to create an [`Edit`] that imports `Self`.
-///
-/// On Python <3.11, `Self` is imported from `typing_extensions`;
-/// on Python >=3.11, it is imported from `typing`.
-/// This is because it was added to the `typing` module on Python 3.11,
-/// but is available from the backport package `typing_extensions` on all versions.
-fn import_self(checker: &Checker, position: TextSize) -> Result<(Edit, String), ResolutionError> {
-    let source_module = if checker.target_version() >= PythonVersion::PY311 {
-        "typing"
-    } else {
-        "typing_extensions"
-    };
-    let request = ImportRequest::import_from(source_module, "Self");
-    checker
-        .importer()
-        .get_or_import_symbol(&request, position, checker.semantic())
 }
 
 /// Returns a series of [`Edit`]s that modify all references to the given `typevar`.

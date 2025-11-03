@@ -1,9 +1,10 @@
-use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprStringLiteral;
 use ruff_text_size::TextRange;
+
+use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of hardcoded charsets, which are defined in Python string module.
@@ -28,6 +29,7 @@ use ruff_text_size::TextRange;
 /// ## References
 /// - [Python documentation: String constants](https://docs.python.org/3/library/string.html#string-constants)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.7.0")]
 pub(crate) struct HardcodedStringCharset {
     name: &'static str,
 }
@@ -92,12 +94,7 @@ impl NamedCharset {
             name,
             bytes,
             // SAFETY: The named charset is guaranteed to have only ascii bytes.
-            // TODO: replace with `.unwrap()`, when `Option::unwrap` will be stable in `const fn`
-            //  https://github.com/rust-lang/rust/issues/67441
-            ascii_char_set: match AsciiCharSet::from_bytes(bytes) {
-                Some(ascii_char_set) => ascii_char_set,
-                None => unreachable!(),
-            },
+            ascii_char_set: AsciiCharSet::from_bytes(bytes).unwrap(),
         }
     }
 }
@@ -129,7 +126,7 @@ fn check_charset_exact(bytes: &[u8]) -> Option<&NamedCharset> {
 
 fn push_diagnostic(checker: &Checker, range: TextRange, charset: &NamedCharset) {
     let name = charset.name;
-    let mut diagnostic = Diagnostic::new(HardcodedStringCharset { name }, range);
+    let mut diagnostic = checker.report_diagnostic(HardcodedStringCharset { name }, range);
     diagnostic.try_set_fix(|| {
         let (edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("string", name),
@@ -141,5 +138,4 @@ fn push_diagnostic(checker: &Checker, range: TextRange, charset: &NamedCharset) 
             [edit],
         ))
     });
-    checker.report_diagnostic(diagnostic);
 }

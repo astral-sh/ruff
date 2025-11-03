@@ -1,0 +1,146 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/invalid_future_feature.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..151,
+        body: [
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 0..38,
+                    module: Some(
+                        Identifier {
+                            id: Name("__future__"),
+                            range: 5..15,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 23..38,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("invalid_feature"),
+                                range: 23..38,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 39..90,
+                    module: Some(
+                        Identifier {
+                            id: Name("__future__"),
+                            range: 44..54,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 62..73,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("annotations"),
+                                range: 62..73,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 75..90,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("invalid_feature"),
+                                range: 75..90,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 91..150,
+                    module: Some(
+                        Identifier {
+                            id: Name("__future__"),
+                            range: 96..106,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 114..131,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("invalid_feature_1"),
+                                range: 114..131,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 133..150,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("invalid_feature_2"),
+                                range: 133..150,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | from __future__ import invalid_feature
+  |                        ^^^^^^^^^^^^^^^ Syntax Error: Future feature `invalid_feature` is not defined
+2 | from __future__ import annotations, invalid_feature
+3 | from __future__ import invalid_feature_1, invalid_feature_2
+  |
+
+
+  |
+1 | from __future__ import invalid_feature
+2 | from __future__ import annotations, invalid_feature
+  |                                     ^^^^^^^^^^^^^^^ Syntax Error: Future feature `invalid_feature` is not defined
+3 | from __future__ import invalid_feature_1, invalid_feature_2
+  |
+
+
+  |
+1 | from __future__ import invalid_feature
+2 | from __future__ import annotations, invalid_feature
+3 | from __future__ import invalid_feature_1, invalid_feature_2
+  |                        ^^^^^^^^^^^^^^^^^ Syntax Error: Future feature `invalid_feature_1` is not defined
+  |
+
+
+  |
+1 | from __future__ import invalid_feature
+2 | from __future__ import annotations, invalid_feature
+3 | from __future__ import invalid_feature_1, invalid_feature_2
+  |                                           ^^^^^^^^^^^^^^^^^ Syntax Error: Future feature `invalid_feature_2` is not defined
+  |

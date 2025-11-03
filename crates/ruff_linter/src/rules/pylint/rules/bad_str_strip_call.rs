@@ -3,12 +3,12 @@ use std::fmt;
 use ruff_python_ast::{self as ast, Expr};
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_semantic::analyze::typing;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use ruff_python_ast::PythonVersion;
 
@@ -48,6 +48,7 @@ use ruff_python_ast::PythonVersion;
 /// ## References
 /// - [Python documentation: `str.strip`](https://docs.python.org/3/library/stdtypes.html?highlight=strip#str.strip)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.242")]
 pub(crate) struct BadStrStripCall {
     strip: StripKind,
     removal: Option<RemovalKind>,
@@ -211,7 +212,5 @@ pub(crate) fn bad_str_strip_call(checker: &Checker, call: &ast::ExprCall) {
         None
     };
 
-    let diagnostic = Diagnostic::new(BadStrStripCall { strip, removal }, arg.range());
-
-    checker.report_diagnostic(diagnostic);
+    checker.report_diagnostic(BadStrStripCall { strip, removal }, arg.range());
 }

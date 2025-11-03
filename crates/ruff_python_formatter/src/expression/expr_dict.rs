@@ -2,9 +2,9 @@ use ruff_formatter::{format_args, write};
 use ruff_python_ast::{AnyNodeRef, DictItem, Expr, ExprDict};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::comments::{dangling_comments, leading_comments, SourceComment};
+use crate::comments::{SourceComment, dangling_comments, leading_comments};
 use crate::expression::parentheses::{
-    empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
+    NeedsParentheses, OptionalParentheses, empty_parenthesized, parenthesized,
 };
 use crate::prelude::*;
 
@@ -13,7 +13,11 @@ pub struct FormatExprDict;
 
 impl FormatNodeRule<ExprDict> for FormatExprDict {
     fn fmt_fields(&self, item: &ExprDict, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprDict { range: _, items } = item;
+        let ExprDict {
+            range: _,
+            node_index: _,
+            items,
+        } = item;
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);

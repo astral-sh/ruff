@@ -1,0 +1,63 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR302 [*] `airflow.hooks.slack_hook.SlackHook` is moved into `slack` provider in Airflow 3.0;
+ --> AIR302_slack.py:6:1
+  |
+4 | from airflow.operators.slack_operator import SlackAPIOperator, SlackAPIPostOperator
+5 |
+6 | SlackHook()
+  | ^^^^^^^^^
+7 | SlackAPIOperator()
+8 | SlackAPIPostOperator()
+  |
+help: Install `apache-airflow-providers-slack>=1.0.0` and use `SlackHook` from `airflow.providers.slack.hooks.slack` instead.
+1 | from __future__ import annotations
+2 | 
+  - from airflow.hooks.slack_hook import SlackHook
+3 | from airflow.operators.slack_operator import SlackAPIOperator, SlackAPIPostOperator
+4 + from airflow.providers.slack.hooks.slack import SlackHook
+5 | 
+6 | SlackHook()
+7 | SlackAPIOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR302 [*] `airflow.operators.slack_operator.SlackAPIOperator` is moved into `slack` provider in Airflow 3.0;
+ --> AIR302_slack.py:7:1
+  |
+6 | SlackHook()
+7 | SlackAPIOperator()
+  | ^^^^^^^^^^^^^^^^
+8 | SlackAPIPostOperator()
+  |
+help: Install `apache-airflow-providers-slack>=1.0.0` and use `SlackAPIOperator` from `airflow.providers.slack.operators.slack` instead.
+1 | from __future__ import annotations
+2 | 
+3 | from airflow.hooks.slack_hook import SlackHook
+  - from airflow.operators.slack_operator import SlackAPIOperator, SlackAPIPostOperator
+4 + from airflow.operators.slack_operator import SlackAPIPostOperator
+5 + from airflow.providers.slack.operators.slack import SlackAPIOperator
+6 | 
+7 | SlackHook()
+8 | SlackAPIOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR302 [*] `airflow.operators.slack_operator.SlackAPIPostOperator` is moved into `slack` provider in Airflow 3.0;
+ --> AIR302_slack.py:8:1
+  |
+6 | SlackHook()
+7 | SlackAPIOperator()
+8 | SlackAPIPostOperator()
+  | ^^^^^^^^^^^^^^^^^^^^
+  |
+help: Install `apache-airflow-providers-slack>=1.0.0` and use `SlackAPIPostOperator` from `airflow.providers.slack.operators.slack` instead.
+1 | from __future__ import annotations
+2 | 
+3 | from airflow.hooks.slack_hook import SlackHook
+  - from airflow.operators.slack_operator import SlackAPIOperator, SlackAPIPostOperator
+4 + from airflow.operators.slack_operator import SlackAPIOperator
+5 + from airflow.providers.slack.operators.slack import SlackAPIPostOperator
+6 | 
+7 | SlackHook()
+8 | SlackAPIOperator()
+note: This is an unsafe fix and may change runtime behavior

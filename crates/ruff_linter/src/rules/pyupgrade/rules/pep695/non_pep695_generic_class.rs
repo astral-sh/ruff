@@ -1,15 +1,15 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{ExprSubscript, StmtClassDef};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::fix::edits::{remove_argument, Parentheses};
+use crate::fix::edits::{Parentheses, remove_argument};
+use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 use super::{
-    check_type_vars, find_generic, in_nested_context, DisplayTypeVars, TypeVarReferenceVisitor,
+    DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, find_generic, in_nested_context,
 };
 
 /// ## What it does
@@ -32,7 +32,7 @@ use super::{
 /// fix.
 ///
 /// Not all type checkers fully support PEP 695 yet, so even valid fixes suggested by this rule may
-/// cause type checking to fail.
+/// cause type checking to [fail].
 ///
 /// ## Fix safety
 ///
@@ -43,7 +43,7 @@ use super::{
 /// ## Example
 ///
 /// ```python
-/// from typing import TypeVar
+/// from typing import Generic, TypeVar
 ///
 /// T = TypeVar("T")
 ///
@@ -84,7 +84,9 @@ use super::{
 /// [PYI059]: https://docs.astral.sh/ruff/rules/generic-not-last-base-class/
 /// [UP047]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function/
 /// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
+/// [fail]: https://github.com/python/mypy/issues/18507
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct NonPEP695GenericClass {
     name: String,
 }
@@ -138,7 +140,7 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         NonPEP695GenericClass {
             name: name.to_string(),
         },
@@ -154,7 +156,6 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
     // because `find_generic` also finds the *first* Generic argument, this has the additional
     // benefit of bailing out with a diagnostic if multiple Generic arguments are present
     if generic_idx != arguments.len() - 1 {
-        checker.report_diagnostic(diagnostic);
         return;
     }
 
@@ -186,7 +187,8 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
     //
     // just because we can't confirm that `SomethingElse` is a `TypeVar`
     if !visitor.any_skipped {
-        let Some(type_vars) = check_type_vars(visitor.vars) else {
+        let Some(type_vars) = check_type_vars(visitor.vars, checker) else {
+            diagnostic.defuse();
             return;
         };
 
@@ -202,6 +204,7 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
                 arguments,
                 Parentheses::Remove,
                 checker.source(),
+                checker.comment_ranges(),
             )?;
             Ok(Fix::unsafe_edits(
                 Edit::insertion(type_params.to_string(), name.end()),
@@ -209,6 +212,4 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
             ))
         });
     }
-
-    checker.report_diagnostic(diagnostic);
 }

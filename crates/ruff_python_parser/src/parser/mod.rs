@@ -2,12 +2,13 @@ use std::cmp::Ordering;
 
 use bitflags::bitflags;
 
-use ruff_python_ast::{Mod, ModExpression, ModModule};
+use ruff_python_ast::{AtomicNodeIndex, Mod, ModExpression, ModModule};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::error::UnsupportedSyntaxError;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
+use crate::string::InterpolatedStringKind;
 use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
@@ -132,6 +133,7 @@ impl<'src> Parser<'src> {
         ModExpression {
             body: Box::new(parsed_expr.expr),
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -149,6 +151,7 @@ impl<'src> Parser<'src> {
         ModModule {
             body,
             range: TextRange::new(self.start_offset, self.current_token_range().end()),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -539,17 +542,19 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses a comma separated list of elements where each element is parsed
-    /// sing the given `parse_element` function.
+    /// using the given `parse_element` function.
     ///
     /// The difference between this function and `parse_comma_separated_list_into_vec`
     /// is that this function does not return the parsed elements. Instead, it is the
     /// caller's responsibility to handle the parsed elements. This is the reason
     /// that the `parse_element` parameter is bound to [`FnMut`] instead of [`Fn`].
+    ///
+    /// Returns `true` if there is a trailing comma present.
     fn parse_comma_separated_list(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
         mut parse_element: impl FnMut(&mut Parser<'src>),
-    ) {
+    ) -> bool {
         let mut progress = ParserProgress::default();
 
         let saved_context = self.recovery_context;
@@ -659,6 +664,8 @@ impl<'src> Parser<'src> {
         }
 
         self.recovery_context = saved_context;
+
+        trailing_comma_range.is_some()
     }
 
     #[cold]
@@ -793,15 +800,15 @@ impl WithItemKind {
     }
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
-enum FStringElementsKind {
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+enum InterpolatedStringElementsKind {
     /// The regular f-string elements.
     ///
     /// For example, the `"hello "`, `x`, and `" world"` elements in:
     /// ```py
     /// f"hello {x:.2f} world"
     /// ```
-    Regular,
+    Regular(InterpolatedStringKind),
 
     /// The f-string elements are part of the format specifier.
     ///
@@ -812,14 +819,14 @@ enum FStringElementsKind {
     FormatSpec,
 }
 
-impl FStringElementsKind {
+impl InterpolatedStringElementsKind {
     const fn list_terminator(self) -> TokenKind {
         match self {
-            FStringElementsKind::Regular => TokenKind::FStringEnd,
+            InterpolatedStringElementsKind::Regular(string_kind) => string_kind.end_token(),
             // test_ok fstring_format_spec_terminator
             // f"hello {x:} world"
             // f"hello {x:.3f} world"
-            FStringElementsKind::FormatSpec => TokenKind::Rbrace,
+            InterpolatedStringElementsKind::FormatSpec => TokenKind::Rbrace,
         }
     }
 }
@@ -927,9 +934,8 @@ enum RecoveryContextKind {
     /// When parsing a list of items in a `with` statement
     WithItems(WithItemKind),
 
-    /// When parsing a list of f-string elements which are either literal elements
-    /// or expressions.
-    FStringElements(FStringElementsKind),
+    /// When parsing a list of f-string or t-string elements which are either literal elements, expressions, or interpolations.
+    InterpolatedStringElements(InterpolatedStringElementsKind),
 }
 
 impl RecoveryContextKind {
@@ -1060,10 +1066,10 @@ impl RecoveryContextKind {
                 None => {
                     // test_ok match_sequence_pattern_terminator
                     // match subject:
-                    //     case a: ...
                     //     case a if x: ...
                     //     case a, b: ...
                     //     case a, b if x: ...
+                    //     case a: ...
                     matches!(p.current_token_kind(), TokenKind::Colon | TokenKind::If)
                         .then_some(ListTerminatorKind::Regular)
                 }
@@ -1113,7 +1119,7 @@ impl RecoveryContextKind {
                     .at(TokenKind::Colon)
                     .then_some(ListTerminatorKind::Regular),
             },
-            RecoveryContextKind::FStringElements(kind) => {
+            RecoveryContextKind::InterpolatedStringElements(kind) => {
                 if p.at(kind.list_terminator()) {
                     Some(ListTerminatorKind::Regular)
                 } else {
@@ -1170,13 +1176,23 @@ impl RecoveryContextKind {
                 ) || p.at_name_or_soft_keyword()
             }
             RecoveryContextKind::WithItems(_) => p.at_expr(),
-            RecoveryContextKind::FStringElements(_) => matches!(
-                p.current_token_kind(),
-                // Literal element
-                TokenKind::FStringMiddle
-                // Expression element
-                | TokenKind::Lbrace
-            ),
+            RecoveryContextKind::InterpolatedStringElements(elements_kind) => {
+                match elements_kind {
+                    InterpolatedStringElementsKind::Regular(interpolated_string_kind) => {
+                        p.current_token_kind() == interpolated_string_kind.middle_token()
+                            || p.current_token_kind() == TokenKind::Lbrace
+                    }
+                    InterpolatedStringElementsKind::FormatSpec => {
+                        matches!(
+                            p.current_token_kind(),
+                            // Literal element
+                            TokenKind::FStringMiddle | TokenKind::TStringMiddle
+                            // Expression element
+                            | TokenKind::Lbrace
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -1264,13 +1280,13 @@ impl RecoveryContextKind {
                     "Expected an expression or the end of the with item list".to_string(),
                 ),
             },
-            RecoveryContextKind::FStringElements(kind) => match kind {
-                FStringElementsKind::Regular => ParseErrorType::OtherError(
-                    "Expected an f-string element or the end of the f-string".to_string(),
+            RecoveryContextKind::InterpolatedStringElements(kind) => match kind {
+                InterpolatedStringElementsKind::Regular(string_kind) => ParseErrorType::OtherError(
+                    format!("Expected an element of or the end of the {string_kind}"),
                 ),
-                FStringElementsKind::FormatSpec => {
-                    ParseErrorType::OtherError("Expected an f-string element or a '}'".to_string())
-                }
+                InterpolatedStringElementsKind::FormatSpec => ParseErrorType::OtherError(
+                    "Expected an f-string or t-string element or a '}'".to_string(),
+                ),
             },
         }
     }
@@ -1310,7 +1326,8 @@ bitflags! {
         const WITH_ITEMS_PARENTHESIZED_EXPRESSION = 1 << 26;
         const WITH_ITEMS_UNPARENTHESIZED = 1 << 28;
         const F_STRING_ELEMENTS = 1 << 29;
-        const F_STRING_ELEMENTS_IN_FORMAT_SPEC = 1 << 30;
+        const T_STRING_ELEMENTS = 1 << 30;
+        const FT_STRING_ELEMENTS_IN_FORMAT_SPEC = 1 << 31;
     }
 }
 
@@ -1363,10 +1380,16 @@ impl RecoveryContext {
                 }
                 WithItemKind::Unparenthesized => RecoveryContext::WITH_ITEMS_UNPARENTHESIZED,
             },
-            RecoveryContextKind::FStringElements(kind) => match kind {
-                FStringElementsKind::Regular => RecoveryContext::F_STRING_ELEMENTS,
-                FStringElementsKind::FormatSpec => {
-                    RecoveryContext::F_STRING_ELEMENTS_IN_FORMAT_SPEC
+            RecoveryContextKind::InterpolatedStringElements(kind) => match kind {
+                InterpolatedStringElementsKind::Regular(InterpolatedStringKind::FString) => {
+                    RecoveryContext::F_STRING_ELEMENTS
+                }
+                InterpolatedStringElementsKind::Regular(InterpolatedStringKind::TString) => {
+                    RecoveryContext::T_STRING_ELEMENTS
+                }
+
+                InterpolatedStringElementsKind::FormatSpec => {
+                    RecoveryContext::FT_STRING_ELEMENTS_IN_FORMAT_SPEC
                 }
             },
         }
@@ -1435,11 +1458,16 @@ impl RecoveryContext {
             RecoveryContext::WITH_ITEMS_UNPARENTHESIZED => {
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized)
             }
-            RecoveryContext::F_STRING_ELEMENTS => {
-                RecoveryContextKind::FStringElements(FStringElementsKind::Regular)
-            }
-            RecoveryContext::F_STRING_ELEMENTS_IN_FORMAT_SPEC => {
-                RecoveryContextKind::FStringElements(FStringElementsKind::FormatSpec)
+            RecoveryContext::F_STRING_ELEMENTS => RecoveryContextKind::InterpolatedStringElements(
+                InterpolatedStringElementsKind::Regular(InterpolatedStringKind::FString),
+            ),
+            RecoveryContext::T_STRING_ELEMENTS => RecoveryContextKind::InterpolatedStringElements(
+                InterpolatedStringElementsKind::Regular(InterpolatedStringKind::TString),
+            ),
+            RecoveryContext::FT_STRING_ELEMENTS_IN_FORMAT_SPEC => {
+                RecoveryContextKind::InterpolatedStringElements(
+                    InterpolatedStringElementsKind::FormatSpec,
+                )
             }
             _ => return None,
         })

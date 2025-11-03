@@ -1,0 +1,122 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/t_string_empty_expression.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..58,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 44..49,
+                    value: TString(
+                        ExprTString {
+                            node_index: NodeIndex(None),
+                            range: 44..49,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString {
+                                        range: 44..49,
+                                        node_index: NodeIndex(None),
+                                        elements: [
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 46..48,
+                                                    node_index: NodeIndex(None),
+                                                    expression: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 47..47,
+                                                            id: Name(""),
+                                                            ctx: Invalid,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                            unclosed: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 50..57,
+                    value: TString(
+                        ExprTString {
+                            node_index: NodeIndex(None),
+                            range: 50..57,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString {
+                                        range: 50..57,
+                                        node_index: NodeIndex(None),
+                                        elements: [
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 52..56,
+                                                    node_index: NodeIndex(None),
+                                                    expression: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 53..53,
+                                                            id: Name(""),
+                                                            ctx: Invalid,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                            unclosed: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: {"target-version": "3.14"}
+2 | t"{}"
+  |    ^ Syntax Error: Expected an expression
+3 | t"{  }"
+  |
+
+
+  |
+1 | # parse_options: {"target-version": "3.14"}
+2 | t"{}"
+3 | t"{  }"
+  |      ^ Syntax Error: Expected an expression
+  |

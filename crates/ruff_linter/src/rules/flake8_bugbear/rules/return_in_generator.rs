@@ -1,11 +1,10 @@
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{self as ast, Expr, Stmt, StmtFunctionDef};
 use ruff_text_size::TextRange;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -80,6 +79,7 @@ use crate::checkers::ast::Checker;
 ///             yield from dir_path.glob(f"*.{file_type}")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.4.8")]
 pub(crate) struct ReturnInGenerator;
 
 impl Violation for ReturnInGenerator {
@@ -101,7 +101,7 @@ pub(crate) fn return_in_generator(checker: &Checker, function_def: &StmtFunction
 
     if visitor.has_yield {
         if let Some(return_) = visitor.return_ {
-            checker.report_diagnostic(Diagnostic::new(ReturnInGenerator, return_));
+            checker.report_diagnostic(ReturnInGenerator, return_);
         }
     }
 }
@@ -127,6 +127,7 @@ impl StatementVisitor<'_> for ReturnInGeneratorVisitor {
             Stmt::Return(ast::StmtReturn {
                 value: Some(_),
                 range,
+                node_index: _,
             }) => {
                 self.return_ = Some(*range);
             }

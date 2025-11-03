@@ -1,10 +1,10 @@
-use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 use ruff_text_size::Ranged;
+
+use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of the `exit()` and `quit()`.
@@ -18,6 +18,20 @@ use ruff_text_size::Ranged;
 ///
 /// Prefer `sys.exit()`, as the `sys` module is guaranteed to exist in all
 /// contexts.
+///
+/// ## Fix safety
+/// This fix is always unsafe. When replacing `exit` or `quit` with `sys.exit`,
+/// the behavior can change in the following ways:
+///
+/// 1. If the code runs in an environment where the `site` module is not imported
+///    (e.g., with `python -S`), the original code would raise a `NameError`, while
+///    the fixed code would execute normally.
+///
+/// 2. `site.exit` and `sys.exit` handle tuple arguments differently. `site.exit`
+///    treats tuples as regular objects and always returns exit code 1, while `sys.exit`
+///    interprets tuple contents to determine the exit code: an empty tuple () results in
+///    exit code 0, and a single-element tuple like (2,) uses that element's value (2) as
+///    the exit code.
 ///
 /// ## Example
 /// ```python
@@ -36,6 +50,7 @@ use ruff_text_size::Ranged;
 /// ## References
 /// - [Python documentation: Constants added by the `site` module](https://docs.python.org/3/library/constants.html#constants-added-by-the-site-module)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.156")]
 pub(crate) struct SysExitAlias {
     name: String,
 }
@@ -63,7 +78,7 @@ pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
     if !matches!(builtin, "exit" | "quit") {
         return;
     }
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         SysExitAlias {
             name: builtin.to_string(),
         },
@@ -77,9 +92,8 @@ pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
         .any(|kwarg| kwarg.arg.is_none());
     // only one optional argument allowed, and we can't convert **kwargs
     if call.arguments.len() > 1 || has_star_kwargs {
-        checker.report_diagnostic(diagnostic);
         return;
-    };
+    }
 
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
@@ -94,8 +108,7 @@ pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
                 checker.source()[kwarg.value.range()].to_string(),
                 kwarg.range,
             ));
-        };
+        }
         Ok(Fix::unsafe_edits(import_edit, edits))
     });
-    checker.report_diagnostic(diagnostic);
 }

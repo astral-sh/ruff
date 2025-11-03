@@ -2,13 +2,13 @@
 //!
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html>
 use itertools::Either;
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprCall, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+use crate::preview::is_suspicious_function_reference_enabled;
 
 /// ## What it does
 /// Checks for calls to `pickle` functions or modules that wrap them.
@@ -51,6 +51,7 @@ use crate::registry::AsRule;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousPickleUsage;
 
 impl Violation for SuspiciousPickleUsage {
@@ -100,6 +101,7 @@ impl Violation for SuspiciousPickleUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousMarshalUsage;
 
 impl Violation for SuspiciousMarshalUsage {
@@ -150,6 +152,7 @@ impl Violation for SuspiciousMarshalUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousInsecureHashUsage;
 
 impl Violation for SuspiciousInsecureHashUsage {
@@ -192,6 +195,7 @@ impl Violation for SuspiciousInsecureHashUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousInsecureCipherUsage;
 
 impl Violation for SuspiciousInsecureCipherUsage {
@@ -236,6 +240,7 @@ impl Violation for SuspiciousInsecureCipherUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousInsecureCipherModeUsage;
 
 impl Violation for SuspiciousInsecureCipherModeUsage {
@@ -285,6 +290,7 @@ impl Violation for SuspiciousInsecureCipherModeUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousMktempUsage;
 
 impl Violation for SuspiciousMktempUsage {
@@ -325,6 +331,7 @@ impl Violation for SuspiciousMktempUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousEvalUsage;
 
 impl Violation for SuspiciousEvalUsage {
@@ -368,7 +375,7 @@ impl Violation for SuspiciousEvalUsage {
 ///
 ///
 /// def render_username(username):
-///     return django.utils.html.format_html("<i>{}</i>", username)  # username is escaped.
+///     return format_html("<i>{}</i>", username)  # username is escaped.
 /// ```
 ///
 /// ## References
@@ -378,6 +385,7 @@ impl Violation for SuspiciousEvalUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousMarkSafeUsage;
 
 impl Violation for SuspiciousMarkSafeUsage {
@@ -430,6 +438,7 @@ impl Violation for SuspiciousMarkSafeUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousURLOpenUsage;
 
 impl Violation for SuspiciousURLOpenUsage {
@@ -472,6 +481,7 @@ impl Violation for SuspiciousURLOpenUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousNonCryptographicRandomUsage;
 
 impl Violation for SuspiciousNonCryptographicRandomUsage {
@@ -516,6 +526,7 @@ impl Violation for SuspiciousNonCryptographicRandomUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousXMLCElementTreeUsage;
 
 impl Violation for SuspiciousXMLCElementTreeUsage {
@@ -560,6 +571,7 @@ impl Violation for SuspiciousXMLCElementTreeUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousXMLElementTreeUsage;
 
 impl Violation for SuspiciousXMLElementTreeUsage {
@@ -604,6 +616,7 @@ impl Violation for SuspiciousXMLElementTreeUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousXMLExpatReaderUsage;
 
 impl Violation for SuspiciousXMLExpatReaderUsage {
@@ -648,6 +661,7 @@ impl Violation for SuspiciousXMLExpatReaderUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousXMLExpatBuilderUsage;
 
 impl Violation for SuspiciousXMLExpatBuilderUsage {
@@ -692,6 +706,7 @@ impl Violation for SuspiciousXMLExpatBuilderUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousXMLSaxUsage;
 
 impl Violation for SuspiciousXMLSaxUsage {
@@ -736,6 +751,7 @@ impl Violation for SuspiciousXMLSaxUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousXMLMiniDOMUsage;
 
 impl Violation for SuspiciousXMLMiniDOMUsage {
@@ -780,6 +796,7 @@ impl Violation for SuspiciousXMLMiniDOMUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousXMLPullDOMUsage;
 
 impl Violation for SuspiciousXMLPullDOMUsage {
@@ -789,9 +806,9 @@ impl Violation for SuspiciousXMLPullDOMUsage {
     }
 }
 
-/// ## Deprecation
+/// ## Removed
 ///
-/// This rule was deprecated as the `lxml` library has been modified to address
+/// This rule was removed as the `lxml` library has been modified to address
 /// known vulnerabilities and unsafe defaults. As such, the `defusedxml`
 /// library is no longer necessary, `defusedxml` has [deprecated] its `lxml`
 /// module.
@@ -821,6 +838,7 @@ impl Violation for SuspiciousXMLPullDOMUsage {
 /// [preview]: https://docs.astral.sh/ruff/preview/
 /// [deprecated]: https://pypi.org/project/defusedxml/0.8.0rc2/#defusedxml-lxml
 #[derive(ViolationMetadata)]
+#[violation_metadata(removed_since = "0.12.0")]
 pub(crate) struct SuspiciousXMLETreeUsage;
 
 impl Violation for SuspiciousXMLETreeUsage {
@@ -867,6 +885,7 @@ impl Violation for SuspiciousXMLETreeUsage {
 /// [PEP 476]: https://peps.python.org/pep-0476/
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousUnverifiedContextUsage;
 
 impl Violation for SuspiciousUnverifiedContextUsage {
@@ -892,6 +911,7 @@ impl Violation for SuspiciousUnverifiedContextUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousTelnetUsage;
 
 impl Violation for SuspiciousTelnetUsage {
@@ -917,6 +937,7 @@ impl Violation for SuspiciousTelnetUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousFTPLibUsage;
 
 impl Violation for SuspiciousFTPLibUsage {
@@ -936,7 +957,7 @@ pub(crate) fn suspicious_function_call(checker: &Checker, call: &ExprCall) {
 }
 
 pub(crate) fn suspicious_function_reference(checker: &Checker, func: &Expr) {
-    if checker.settings.preview.is_disabled() {
+    if !is_suspicious_function_reference_enabled(checker.settings()) {
         return;
     }
 
@@ -1006,9 +1027,9 @@ fn suspicious_function(
             // Ex) f"foo"
             Expr::FString(ast::ExprFString { value, .. }) => {
                 value.elements().next().and_then(|element| {
-                    if let ast::FStringElement::Literal(ast::FStringLiteralElement {
-                        value, ..
-                    }) = element
+                    if let ast::InterpolatedStringElement::Literal(
+                        ast::InterpolatedStringLiteralElement { value, .. },
+                    ) = element
                     {
                         Some(Either::Right(value.chars()))
                     } else {
@@ -1034,39 +1055,74 @@ fn suspicious_function(
         return;
     };
 
-    let diagnostic_kind: DiagnosticKind = match qualified_name.segments() {
+    match qualified_name.segments() {
         // Pickle
         ["pickle" | "dill", "load" | "loads" | "Unpickler"]
         | ["shelve", "open" | "DbfilenameShelf"]
         | ["jsonpickle", "decode"]
         | ["jsonpickle", "unpickler", "decode"]
-        | ["pandas", "read_pickle"] => SuspiciousPickleUsage.into(),
+        | ["pandas", "read_pickle"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousPickleUsage, range)
+        }
 
         // Marshal
-        ["marshal", "load" | "loads"] => SuspiciousMarshalUsage.into(),
+        ["marshal", "load" | "loads"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousMarshalUsage, range)
+        }
 
         // InsecureHash
-        ["Crypto" | "Cryptodome", "Hash", "SHA" | "MD2" | "MD3" | "MD4" | "MD5", "new"]
-        | ["cryptography", "hazmat", "primitives", "hashes", "SHA1" | "MD5"] => {
-            SuspiciousInsecureHashUsage.into()
-        }
+        [
+            "Crypto" | "Cryptodome",
+            "Hash",
+            "SHA" | "MD2" | "MD3" | "MD4" | "MD5",
+            "new",
+        ]
+        | [
+            "cryptography",
+            "hazmat",
+            "primitives",
+            "hashes",
+            "SHA1" | "MD5",
+        ] => checker.report_diagnostic_if_enabled(SuspiciousInsecureHashUsage, range),
 
         // InsecureCipher
-        ["Crypto" | "Cryptodome", "Cipher", "ARC2" | "Blowfish" | "DES" | "XOR", "new"]
-        | ["cryptography", "hazmat", "primitives", "ciphers", "algorithms", "ARC4" | "Blowfish" | "IDEA"] => {
-            SuspiciousInsecureCipherUsage.into()
-        }
+        [
+            "Crypto" | "Cryptodome",
+            "Cipher",
+            "ARC2" | "Blowfish" | "DES" | "XOR",
+            "new",
+        ]
+        | [
+            "cryptography",
+            "hazmat",
+            "primitives",
+            "ciphers",
+            "algorithms",
+            "ARC4" | "Blowfish" | "IDEA",
+        ] => checker.report_diagnostic_if_enabled(SuspiciousInsecureCipherUsage, range),
 
         // InsecureCipherMode
-        ["cryptography", "hazmat", "primitives", "ciphers", "modes", "ECB"] => {
-            SuspiciousInsecureCipherModeUsage.into()
-        }
+        [
+            "cryptography",
+            "hazmat",
+            "primitives",
+            "ciphers",
+            "modes",
+            "ECB",
+        ] => checker.report_diagnostic_if_enabled(SuspiciousInsecureCipherModeUsage, range),
 
         // Mktemp
-        ["tempfile", "mktemp"] => SuspiciousMktempUsage.into(),
+        ["tempfile", "mktemp"] => checker
+            .report_diagnostic_if_enabled(SuspiciousMktempUsage, range)
+            .map(|mut diagnostic| {
+                diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+                diagnostic
+            }),
 
         // Eval
-        ["" | "builtins", "eval"] => SuspiciousEvalUsage.into(),
+        ["" | "builtins", "eval"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousEvalUsage, range)
+        }
 
         // MarkSafe
         ["django", "utils", "safestring" | "html", "mark_safe"] => {
@@ -1077,7 +1133,7 @@ fn suspicious_function(
                     }
                 }
             }
-            SuspiciousMarkSafeUsage.into()
+            checker.report_diagnostic_if_enabled(SuspiciousMarkSafeUsage, range)
         }
 
         // URLOpen (`Request`)
@@ -1099,12 +1155,18 @@ fn suspicious_function(
                     }
                 }
             }
-            SuspiciousURLOpenUsage.into()
+            checker.report_diagnostic_if_enabled(SuspiciousURLOpenUsage, range)
         }
 
         // URLOpen (`urlopen`, `urlretrieve`)
         ["urllib", "request", "urlopen" | "urlretrieve"]
-        | ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve"] => {
+        | [
+            "six",
+            "moves",
+            "urllib",
+            "request",
+            "urlopen" | "urlretrieve",
+        ] => {
             if let Some(arguments) = arguments {
                 if arguments.args.iter().all(|arg| !arg.is_starred_expr())
                     && arguments
@@ -1145,72 +1207,94 @@ fn suspicious_function(
                     }
                 }
             }
-            SuspiciousURLOpenUsage.into()
+            checker.report_diagnostic_if_enabled(SuspiciousURLOpenUsage, range)
         }
 
         // URLOpen (`URLopener`, `FancyURLopener`)
         ["urllib", "request", "URLopener" | "FancyURLopener"]
-        | ["six", "moves", "urllib", "request", "URLopener" | "FancyURLopener"] => {
-            SuspiciousURLOpenUsage.into()
-        }
+        | [
+            "six",
+            "moves",
+            "urllib",
+            "request",
+            "URLopener" | "FancyURLopener",
+        ] => checker.report_diagnostic_if_enabled(SuspiciousURLOpenUsage, range),
 
         // NonCryptographicRandom
-        ["random", "Random" | "random" | "randrange" | "randint" | "choice" | "choices" | "uniform"
-        | "triangular" | "randbytes"] => SuspiciousNonCryptographicRandomUsage.into(),
+        [
+            "random",
+            "Random" | "random" | "randrange" | "randint" | "choice" | "choices" | "uniform"
+            | "triangular" | "randbytes",
+        ] => checker.report_diagnostic_if_enabled(SuspiciousNonCryptographicRandomUsage, range),
 
         // UnverifiedContext
-        ["ssl", "_create_unverified_context"] => SuspiciousUnverifiedContextUsage.into(),
+        ["ssl", "_create_unverified_context"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousUnverifiedContextUsage, range)
+        }
 
         // XMLCElementTree
-        ["xml", "etree", "cElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => {
-            SuspiciousXMLCElementTreeUsage.into()
-        }
+        [
+            "xml",
+            "etree",
+            "cElementTree",
+            "parse" | "iterparse" | "fromstring" | "XMLParser",
+        ] => checker.report_diagnostic_if_enabled(SuspiciousXMLCElementTreeUsage, range),
 
         // XMLElementTree
-        ["xml", "etree", "ElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => {
-            SuspiciousXMLElementTreeUsage.into()
-        }
+        [
+            "xml",
+            "etree",
+            "ElementTree",
+            "parse" | "iterparse" | "fromstring" | "XMLParser",
+        ] => checker.report_diagnostic_if_enabled(SuspiciousXMLElementTreeUsage, range),
 
         // XMLExpatReader
-        ["xml", "sax", "expatreader", "create_parser"] => SuspiciousXMLExpatReaderUsage.into(),
+        ["xml", "sax", "expatreader", "create_parser"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousXMLExpatReaderUsage, range)
+        }
 
         // XMLExpatBuilder
         ["xml", "dom", "expatbuilder", "parse" | "parseString"] => {
-            SuspiciousXMLExpatBuilderUsage.into()
+            checker.report_diagnostic_if_enabled(SuspiciousXMLExpatBuilderUsage, range)
         }
 
         // XMLSax
-        ["xml", "sax", "parse" | "parseString" | "make_parser"] => SuspiciousXMLSaxUsage.into(),
+        ["xml", "sax", "parse" | "parseString" | "make_parser"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousXMLSaxUsage, range)
+        }
 
         // XMLMiniDOM
-        ["xml", "dom", "minidom", "parse" | "parseString"] => SuspiciousXMLMiniDOMUsage.into(),
+        ["xml", "dom", "minidom", "parse" | "parseString"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousXMLMiniDOMUsage, range)
+        }
 
         // XMLPullDOM
-        ["xml", "dom", "pulldom", "parse" | "parseString"] => SuspiciousXMLPullDOMUsage.into(),
+        ["xml", "dom", "pulldom", "parse" | "parseString"] => {
+            checker.report_diagnostic_if_enabled(SuspiciousXMLPullDOMUsage, range)
+        }
 
         // XMLETree
-        ["lxml", "etree", "parse" | "fromstring" | "RestrictedElement" | "GlobalParserTLS" | "getDefaultParser"
-        | "check_docinfo"] => SuspiciousXMLETreeUsage.into(),
+        [
+            "lxml",
+            "etree",
+            "parse" | "fromstring" | "RestrictedElement" | "GlobalParserTLS" | "getDefaultParser"
+            | "check_docinfo",
+        ] => checker.report_diagnostic_if_enabled(SuspiciousXMLETreeUsage, range),
 
         // Telnet
-        ["telnetlib", ..] => SuspiciousTelnetUsage.into(),
+        ["telnetlib", ..] => checker.report_diagnostic_if_enabled(SuspiciousTelnetUsage, range),
 
         // FTPLib
-        ["ftplib", ..] => SuspiciousFTPLibUsage.into(),
+        ["ftplib", ..] => checker.report_diagnostic_if_enabled(SuspiciousFTPLibUsage, range),
 
         _ => return,
     };
-
-    let diagnostic = Diagnostic::new(diagnostic_kind, range);
-    if checker.enabled(diagnostic.kind.rule()) {
-        checker.report_diagnostic(diagnostic);
-    }
 }
 
 /// S308
 pub(crate) fn suspicious_function_decorator(checker: &Checker, decorator: &Decorator) {
     // In preview mode, references are handled collectively by `suspicious_function_reference`
-    if checker.settings.preview.is_disabled() {
+    if !is_suspicious_function_reference_enabled(checker.settings()) {
         suspicious_function(checker, &decorator.expression, None, decorator.range);
     }
 }

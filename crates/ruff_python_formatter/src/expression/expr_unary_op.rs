@@ -4,7 +4,7 @@ use ruff_python_ast::UnaryOp;
 
 use crate::comments::trailing_comments;
 use crate::expression::parentheses::{
-    is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
+    NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
 };
 use crate::prelude::*;
 
@@ -15,6 +15,7 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
     fn fmt_fields(&self, item: &ExprUnaryOp, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprUnaryOp {
             range: _,
+            node_index: _,
             op,
             operand,
         } = item;

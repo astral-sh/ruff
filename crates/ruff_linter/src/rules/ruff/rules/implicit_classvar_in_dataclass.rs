@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::{Expr, ExprName, Stmt, StmtAssign, StmtClassDef};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::helpers::{dataclass_kind, DataclassKind};
+use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 
 /// ## What it does
 /// Checks for implicit class variables in dataclasses.
@@ -52,6 +52,7 @@ use crate::rules::ruff::rules::helpers::{dataclass_kind, DataclassKind};
 /// ## Options
 /// - [`lint.dummy-variable-rgx`]
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.9.7")]
 pub(crate) struct ImplicitClassVarInDataclass;
 
 impl Violation for ImplicitClassVarInDataclass {
@@ -71,7 +72,7 @@ pub(crate) fn implicit_class_var_in_dataclass(checker: &mut Checker, class_def: 
 
     if !matches!(dataclass_kind, Some((DataclassKind::Stdlib, _))) {
         return;
-    };
+    }
 
     for statement in &class_def.body {
         let Stmt::Assign(StmtAssign { targets, .. }) = statement else {
@@ -87,7 +88,7 @@ pub(crate) fn implicit_class_var_in_dataclass(checker: &mut Checker, class_def: 
             continue;
         };
 
-        if checker.settings.dummy_variable_rgx.is_match(id.as_str()) {
+        if checker.settings().dummy_variable_rgx.is_match(id.as_str()) {
             continue;
         }
 
@@ -95,8 +96,6 @@ pub(crate) fn implicit_class_var_in_dataclass(checker: &mut Checker, class_def: 
             continue;
         }
 
-        let diagnostic = Diagnostic::new(ImplicitClassVarInDataclass, target.range());
-
-        checker.report_diagnostic(diagnostic);
+        checker.report_diagnostic(ImplicitClassVarInDataclass, target.range());
     }
 }

@@ -1,11 +1,11 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `datetime.timezone.utc`.
@@ -34,6 +34,7 @@ use crate::importer::ImportRequest;
 /// ## References
 /// - [Python documentation: `datetime.UTC`](https://docs.python.org/3/library/datetime.html#datetime.UTC)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.192")]
 pub(crate) struct DatetimeTimezoneUTC;
 
 impl Violation for DatetimeTimezoneUTC {
@@ -58,7 +59,7 @@ pub(crate) fn datetime_utc_alias(checker: &Checker, expr: &Expr) {
             matches!(qualified_name.segments(), ["datetime", "timezone", "utc"])
         })
     {
-        let mut diagnostic = Diagnostic::new(DatetimeTimezoneUTC, expr.range());
+        let mut diagnostic = checker.report_diagnostic(DatetimeTimezoneUTC, expr.range());
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from("datetime", "UTC"),
@@ -68,6 +69,5 @@ pub(crate) fn datetime_utc_alias(checker: &Checker, expr: &Expr) {
             let reference_edit = Edit::range_replacement(binding, expr.range());
             Ok(Fix::safe_edits(import_edit, [reference_edit]))
         });
-        checker.report_diagnostic(diagnostic);
     }
 }

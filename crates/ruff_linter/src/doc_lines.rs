@@ -4,7 +4,7 @@
 use std::iter::FusedIterator;
 use std::slice::Iter;
 
-use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
+use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast, Stmt, Suite};
 use ruff_python_parser::{Token, TokenKind, Tokens};
 use ruff_source_file::UniversalNewlineIterator;
@@ -13,7 +13,7 @@ use ruff_text_size::{Ranged, TextSize};
 use crate::Locator;
 
 /// Extract doc lines (standalone comments) from a token sequence.
-pub(crate) fn doc_lines_from_tokens(tokens: &Tokens) -> DocLines {
+pub(crate) fn doc_lines_from_tokens(tokens: &Tokens) -> DocLines<'_> {
     DocLines::new(tokens)
 }
 
@@ -73,6 +73,7 @@ impl StatementVisitor<'_> for StringLinesVisitor<'_> {
         if let Stmt::Expr(ast::StmtExpr {
             value: expr,
             range: _,
+            node_index: _,
         }) = stmt
         {
             if expr.is_string_literal_expr() {

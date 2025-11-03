@@ -13,30 +13,38 @@ license = { workspace = true }
 [dependencies]
 ruff_annotate_snippets = { workspace = true }
 ruff_cache = { workspace = true, optional = true }
+ruff_diagnostics = { workspace = true }
+ruff_memory_usage = { workspace = true }
 ruff_notebook = { workspace = true }
-ruff_python_ast = { workspace = true }
+ruff_python_ast = { workspace = true, features = ["get-size"] }
 ruff_python_parser = { workspace = true }
 ruff_python_trivia = { workspace = true }
-ruff_source_file = { workspace = true }
+ruff_source_file = { workspace = true, features = ["get-size"] }
 ruff_text_size = { workspace = true }
+ty_static = { workspace = true }
 
+anstyle = { workspace = true }
+arc-swap = { workspace = true }
 camino = { workspace = true }
-countme = { workspace = true }
 dashmap = { workspace = true }
 dunce = { workspace = true }
 filetime = { workspace = true }
+get-size2 = { workspace = true }
 glob = { workspace = true }
 ignore = { workspace = true, optional = true }
 matchit = { workspace = true }
+path-slash = { workspace = true }
+pathdiff = { workspace = true }
+quick-junit = { workspace = true, optional = true }
+rustc-hash = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
-path-slash = { workspace = true }
+serde_json = { workspace = true, optional = true }
+similar = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
-tracing-tree = { workspace = true, optional = true }
-rustc-hash = { workspace = true }
 zip = { workspace = true }
 
 [target.'cfg(target_arch="wasm32")'.dependencies]
@@ -46,12 +54,18 @@ web-time = { version = "1.1.0" }
 etcetera = { workspace = true, optional = true }
 
 [dev-dependencies]
-insta = { workspace = true }
+insta = { workspace = true, features = ["filters"] }
 tempfile = { workspace = true }
 
 [features]
 cache = ["ruff_cache"]
+junit = ["dep:quick-junit"]
 os = ["ignore", "dep:etcetera"]
-serde = ["dep:serde", "camino/serde1"]
+serde = [
+    "camino/serde1",
+    "dep:serde",
+    "dep:serde_json",
+    "ruff_diagnostics/serde",
+]
 # Exposes testing utilities.
-testing = ["tracing-subscriber", "tracing-tree"]
+testing = ["tracing-subscriber"]

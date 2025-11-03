@@ -36,15 +36,31 @@ Ruff Language Server in Neovim. To set it up, install
 [configuration](https://github.com/neovim/nvim-lspconfig#configuration) documentation, and add the
 following to your `init.lua`:
 
-```lua
-require('lspconfig').ruff.setup({
-  init_options = {
-    settings = {
-      -- Ruff language server settings go here
-    }
-  }
-})
-```
+=== "Neovim 0.10 (with [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig))"
+
+    ```lua
+    require('lspconfig').ruff.setup({
+      init_options = {
+        settings = {
+          -- Ruff language server settings go here
+        }
+      }
+    })
+    ```
+
+=== "Neovim 0.11+ (with [`vim.lsp.config`](https://neovim.io/doc/user/lsp.html#vim.lsp.config()))"
+
+    ```lua
+    vim.lsp.config('ruff', {
+      init_options = {
+        settings = {
+          -- Ruff language server settings go here
+        }
+      }
+    })
+
+    vim.lsp.enable('ruff')
+    ```
 
 !!! note
 
@@ -115,6 +131,63 @@ To view the trace logs between Neovim and Ruff, set the log level for Neovim's L
 vim.lsp.set_log_level('debug')
 ```
 
+<details>
+<summary>With the <a href="https://github.com/stevearc/conform.nvim"><code>conform.nvim</code></a> plugin for Neovim.</summary>
+
+```lua
+require("conform").setup({
+    formatters_by_ft = {
+        python = {
+          -- To fix auto-fixable lint errors.
+          "ruff_fix",
+          -- To run the Ruff formatter.
+          "ruff_format",
+          -- To organize the imports.
+          "ruff_organize_imports",
+        },
+    },
+})
+```
+
+</details>
+
+<details>
+<summary>With the <a href="https://github.com/mfussenegger/nvim-lint"><code>nvim-lint</code></a> plugin for Neovim.</summary>
+
+```lua
+require("lint").linters_by_ft = {
+  python = { "ruff" },
+}
+```
+
+</details>
+
+<details>
+<summary>With the <a href="https://github.com/dense-analysis/ale">ALE</a> plugin for Neovim or Vim.</summary>
+
+<i>Neovim (using Lua):</i>
+
+```lua
+-- Linters
+vim.g.ale_linters = { python = { "ruff" } }
+-- Fixers
+vim.g.ale_fixers = { python = { "ruff", "ruff_format" } }
+```
+
+<i>Vim (using Vimscript):</i>
+
+```vim
+" Linters
+let g:ale_linters = { "python": ["ruff"] }
+" Fixers
+let g:ale_fixers = { "python": ["ruff", "ruff_format"] }
+```
+
+For the fixers, <code>ruff</code> will run <code>ruff check --fix</code> (to fix all auto-fixable
+problems) whereas <code>ruff_format</code> will run <code>ruff format</code>.
+
+</details>
+
 ## Vim
 
 The [`vim-lsp`](https://github.com/prabirshrestha/vim-lsp) plugin can be used to configure the Ruff Language Server in Vim.
@@ -154,23 +227,7 @@ Ruff is also available as part of the [coc-pyright](https://github.com/fannheywa
 extension for [coc.nvim](https://github.com/neoclide/coc.nvim).
 
 <details>
-<summary>With the <a href="https://github.com/dense-analysis/ale">ALE</a> plugin for Vim or Neovim.</summary>
-
-```vim
-" Linters
-let g:ale_linters = { "python": ["ruff"] }
-" Fixers
-let g:ale_fixers = { "python": ["ruff", "ruff_format"] }
-```
-
-For the fixers, `ruff` will run `ruff check --fix` (to fix all auto-fixable problems) whereas
-`ruff_format` will run `ruff format`.
-
-</details>
-
-<details>
 <summary>Ruff can also be integrated via <a href="https://github.com/mattn/efm-langserver">efm language server</a> in just a few lines.</summary>
-<br>
 
 Following is an example config for efm to use Ruff for linting and formatting Python files:
 
@@ -183,38 +240,6 @@ tools:
       - "%f:%l:%c: %m"
     format-command: "ruff format --stdin-filename ${INPUT} --quiet -"
     format-stdin: true
-```
-
-</details>
-
-<details>
-<summary>With the <a href="https://github.com/stevearc/conform.nvim"><code>conform.nvim</code></a> plugin for Neovim.</summary>
-<br>
-
-```lua
-require("conform").setup({
-    formatters_by_ft = {
-        python = {
-          -- To fix auto-fixable lint errors.
-          "ruff_fix",
-          -- To run the Ruff formatter.
-          "ruff_format",
-          -- To organize the imports.
-          "ruff_organize_imports",
-        },
-    },
-})
-```
-
-</details>
-
-<details>
-<summary>With the <a href="https://github.com/mfussenegger/nvim-lint"><code>nvim-lint</code></a> plugin for Neovim.</summary>
-
-```lua
-require("lint").linters_by_ft = {
-  python = { "ruff" },
-}
 ```
 
 </details>
@@ -439,59 +464,46 @@ under the [`lsp.ruff.initialization_options.settings`](https://zed.dev/docs/conf
 }
 ```
 
-!!! note
-
-    Support for multiple formatters for a given language is only available in Zed version
-    `0.146.0` and later.
-
 You can configure Ruff to format Python code on-save by registering the Ruff formatter
 and enabling the [`format_on_save`](https://zed.dev/docs/configuring-zed#format-on-save) setting:
 
-=== "Zed 0.146.0+"
-
-    ```json
-    {
-      "languages": {
-        "Python": {
-          "language_servers": ["ruff"],
-          "format_on_save": "on",
-          "formatter": [
-            {
-              "language_server": {
-                "name": "ruff"
-              }
-            }
-          ]
+```json
+{
+  "languages": {
+    "Python": {
+      "language_servers": ["ruff"],
+      "format_on_save": "on",
+      "formatter": [
+        {
+          "language_server": {
+            "name": "ruff"
+          }
         }
-      }
+      ]
     }
-    ```
+  }
+}
+```
 
 You can configure Ruff to fix lint violations and/or organize imports on-save by enabling the
 `source.fixAll.ruff` and `source.organizeImports.ruff` code actions respectively:
 
-=== "Zed 0.146.0+"
-
-    ```json
-    {
-      "languages": {
-        "Python": {
-          "language_servers": ["ruff"],
-          "format_on_save": "on",
-          "formatter": [
-            {
-              "code_actions": {
-                // Fix all auto-fixable lint violations
-                "source.fixAll.ruff": true,
-                // Organize imports
-                "source.organizeImports.ruff": true
-              }
-            }
-          ]
-        }
-      }
+```json
+{
+  "languages": {
+    "Python": {
+      "language_servers": ["ruff"],
+      "format_on_save": "on",
+      "formatter": [
+        // Fix all auto-fixable lint violations
+        { "code_action": "source.fixAll.ruff" },
+        // Organize imports
+        { "code_action": "source.organizeImports.ruff" }
+      ]
     }
-    ```
+  }
+}
+```
 
 Taken together, you can configure Ruff to format, fix, and organize imports on-save via the
 following `settings.json`:
@@ -503,28 +515,18 @@ following `settings.json`:
     ensure that the formatter takes care of any remaining style issues after the code actions have
     been applied.
 
-=== "Zed 0.146.0+"
-
-    ```json
-    {
-      "languages": {
-        "Python": {
-          "language_servers": ["ruff"],
-          "format_on_save": "on",
-          "formatter": [
-            {
-              "code_actions": {
-                "source.organizeImports.ruff": true,
-                "source.fixAll.ruff": true
-              }
-            },
-            {
-              "language_server": {
-                "name": "ruff"
-              }
-            }
-          ]
-        }
-      }
+```json
+{
+  "languages": {
+    "Python": {
+      "language_servers": ["ruff"],
+      "format_on_save": "on",
+      "formatter": [
+        { "code_action": "source.fixAll.ruff" },
+        { "code_action": "source.organizeImports.ruff" },
+        { "language_server": { "name": "ruff" } }
+      ]
     }
-    ```
+  }
+}
+```

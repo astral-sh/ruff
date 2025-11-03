@@ -1,9 +1,9 @@
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Operator};
-
-use crate::checkers::ast::Checker;
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
+
+use crate::Violation;
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for printf-style formatted strings in `gettext` function calls.
@@ -40,6 +40,7 @@ use ruff_text_size::Ranged;
 /// ## References
 /// - [Python documentation: `gettext` — Multilingual internationalization services](https://docs.python.org/3/library/gettext.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.260")]
 pub(crate) struct PrintfInGetTextFuncCall;
 
 impl Violation for PrintfInGetTextFuncCall {
@@ -54,14 +55,13 @@ impl Violation for PrintfInGetTextFuncCall {
 pub(crate) fn printf_in_gettext_func_call(checker: &Checker, args: &[Expr]) {
     if let Some(first) = args.first() {
         if let Expr::BinOp(ast::ExprBinOp {
-            op: Operator::Mod { .. },
+            op: Operator::Mod,
             left,
             ..
         }) = &first
         {
             if left.is_string_literal_expr() {
-                checker
-                    .report_diagnostic(Diagnostic::new(PrintfInGetTextFuncCall {}, first.range()));
+                checker.report_diagnostic(PrintfInGetTextFuncCall {}, first.range());
             }
         }
     }

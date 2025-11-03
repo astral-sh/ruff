@@ -252,15 +252,20 @@ impl QuoteStyle {
     pub const fn is_preserve(self) -> bool {
         matches!(self, QuoteStyle::Preserve)
     }
+
+    /// Returns the string representation of the quote style.
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            QuoteStyle::Single => "single",
+            QuoteStyle::Double => "double",
+            QuoteStyle::Preserve => "preserve",
+        }
+    }
 }
 
 impl fmt::Display for QuoteStyle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Single => write!(f, "single"),
-            Self::Double => write!(f, "double"),
-            Self::Preserve => write!(f, "preserve"),
-        }
+        f.write_str(self.as_str())
     }
 }
 
@@ -302,10 +307,10 @@ impl MagicTrailingComma {
 
 impl fmt::Display for MagicTrailingComma {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Respect => write!(f, "respect"),
-            Self::Ignore => write!(f, "ignore"),
-        }
+        f.write_str(match self {
+            MagicTrailingComma::Respect => "respect",
+            MagicTrailingComma::Ignore => "ignore",
+        })
     }
 }
 
@@ -398,15 +403,12 @@ pub enum DocstringCodeLineWidth {
 #[cfg(feature = "schemars")]
 mod schema {
     use ruff_formatter::LineWidth;
-    use schemars::gen::SchemaGenerator;
-    use schemars::schema::{Metadata, Schema, SubschemaValidation};
+    use schemars::{Schema, SchemaGenerator};
+    use serde_json::Value;
 
     /// A dummy type that is used to generate a schema for `DocstringCodeLineWidth::Dynamic`.
     pub(super) fn dynamic(_: &mut SchemaGenerator) -> Schema {
-        Schema::Object(schemars::schema::SchemaObject {
-            const_value: Some("dynamic".to_string().into()),
-            ..Default::default()
-        })
+        schemars::json_schema!({ "const": "dynamic" })
     }
 
     // We use a manual schema for `fixed` even thought it isn't strictly necessary according to the
@@ -415,21 +417,16 @@ mod schema {
     //
     // The only difference to the automatically derived schema is that we use `oneOf` instead of
     // `allOf`. There's no semantic difference between `allOf` and `oneOf` for single element lists.
-    pub(super) fn fixed(gen: &mut SchemaGenerator) -> Schema {
-        let schema = gen.subschema_for::<LineWidth>();
-        Schema::Object(schemars::schema::SchemaObject {
-            metadata: Some(Box::new(Metadata {
-                description: Some(
-                    "Wrap docstring code examples at a fixed line width.".to_string(),
-                ),
-                ..Metadata::default()
-            })),
-            subschemas: Some(Box::new(SubschemaValidation {
-                one_of: Some(vec![schema]),
-                ..SubschemaValidation::default()
-            })),
-            ..Default::default()
-        })
+    pub(super) fn fixed(generator: &mut SchemaGenerator) -> Schema {
+        let schema = generator.subschema_for::<LineWidth>();
+        let mut schema_object = Schema::default();
+        let map = schema_object.ensure_object();
+        map.insert(
+            "description".to_string(),
+            Value::String("Wrap docstring code examples at a fixed line width.".to_string()),
+        );
+        map.insert("oneOf".to_string(), Value::Array(vec![schema.into()]));
+        schema_object
     }
 }
 
@@ -457,7 +454,7 @@ fn deserialize_docstring_code_line_width_dynamic<'de, D>(d: D) -> Result<(), D::
 where
     D: serde::Deserializer<'de>,
 {
-    use serde::{de::Error, Deserialize};
+    use serde::{Deserialize, de::Error};
 
     let value = String::deserialize(d)?;
     match &*value {

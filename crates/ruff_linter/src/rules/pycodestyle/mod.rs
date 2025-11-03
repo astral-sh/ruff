@@ -19,7 +19,7 @@ mod tests {
     use crate::rules::{isort, pycodestyle};
     use crate::settings::types::PreviewMode;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     use super::settings::Settings;
 
@@ -71,7 +71,7 @@ mod tests {
             Path::new("pycodestyle").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -95,7 +95,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -106,7 +106,7 @@ mod tests {
             &settings::LinterSettings::for_rule(Rule::MissingNewlineAtEndOfFile),
         )?;
 
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -155,7 +155,7 @@ mod tests {
             Path::new("pycodestyle").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -172,7 +172,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -190,7 +190,7 @@ mod tests {
             Path::new("pycodestyle").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -214,7 +214,7 @@ mod tests {
             Path::new("pycodestyle").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -244,7 +244,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -257,7 +257,9 @@ mod tests {
         lines_after_imports: isize,
         lines_between_types: usize,
     ) -> Result<()> {
-        let snapshot = format!("too_many_blank_lines_isort_compatibility-lines-after({lines_after_imports})-between({lines_between_types})");
+        let snapshot = format!(
+            "too_many_blank_lines_isort_compatibility-lines-after({lines_after_imports})-between({lines_between_types})"
+        );
         let diagnostics = test_path(
             Path::new("pycodestyle").join("E30_isort.py"),
             &settings::LinterSettings {
@@ -272,7 +274,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -288,7 +290,7 @@ mod tests {
             Path::new("pycodestyle").join("E30.pyi"),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -304,7 +306,7 @@ mod tests {
             Path::new("pycodestyle").join("E30.ipynb"),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -320,7 +322,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -334,7 +336,7 @@ mod tests {
                 Rule::IsLiteral,
             ]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -349,7 +351,7 @@ mod tests {
                 Rule::MultipleLeadingHashesForBlockComment,
             ]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -367,7 +369,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::LineTooLong)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -383,7 +385,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::DocLineTooLong)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -399,7 +401,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::DocLineTooLong)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -420,7 +422,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::LineTooLong)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

@@ -1,0 +1,215 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: instance_layout_conflict.md - Tests for ty's `instance-layout-conflict` error code - Built-ins with implicit layouts
+mdtest path: crates/ty_python_semantic/resources/mdtest/instance_layout_conflict.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import disjoint_base
+ 2 | 
+ 3 | # fmt: off
+ 4 | 
+ 5 | class A(  # error: [instance-layout-conflict]
+ 6 |     int,
+ 7 |     str
+ 8 | ): ...
+ 9 | 
+10 | class B:
+11 |     __slots__ = ("b",)
+12 | 
+13 | class C(  # error: [instance-layout-conflict]
+14 |     int,
+15 |     B,
+16 | ): ...
+17 | class D(int): ...
+18 | 
+19 | class E(  # error: [instance-layout-conflict]
+20 |     D,
+21 |     str
+22 | ): ...
+23 | 
+24 | class F(int, str, bytes, bytearray): ...  # error: [instance-layout-conflict]
+25 | 
+26 | @disjoint_base
+27 | class G: ...
+28 | 
+29 | @disjoint_base
+30 | class H: ...
+31 | 
+32 | class I(  # error: [instance-layout-conflict]
+33 |     G,
+34 |     H
+35 | ): ...
+36 | 
+37 | # fmt: on
+38 | class Foo(range, str): ...  # error: [subclass-of-final-class]
+```
+
+# Diagnostics
+
+```
+error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to incompatible bases
+  --> src/mdtest_snippet.py:5:7
+   |
+ 3 |   # fmt: off
+ 4 |
+ 5 |   class A(  # error: [instance-layout-conflict]
+   |  _______^
+ 6 | |     int,
+ 7 | |     str
+ 8 | | ): ...
+   | |_^ Bases `int` and `str` cannot be combined in multiple inheritance
+ 9 |
+10 |   class B:
+   |
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
+ --> src/mdtest_snippet.py:6:5
+  |
+5 | class A(  # error: [instance-layout-conflict]
+6 |     int,
+  |     --- `int` instances have a distinct memory layout because of the way `int` is implemented in a C extension
+7 |     str
+  |     --- `str` instances have a distinct memory layout because of the way `str` is implemented in a C extension
+8 | ): ...
+  |
+info: rule `instance-layout-conflict` is enabled by default
+
+```
+
+```
+error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to incompatible bases
+  --> src/mdtest_snippet.py:13:7
+   |
+11 |       __slots__ = ("b",)
+12 |
+13 |   class C(  # error: [instance-layout-conflict]
+   |  _______^
+14 | |     int,
+15 | |     B,
+16 | | ): ...
+   | |_^ Bases `int` and `B` cannot be combined in multiple inheritance
+17 |   class D(int): ...
+   |
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
+  --> src/mdtest_snippet.py:14:5
+   |
+13 | class C(  # error: [instance-layout-conflict]
+14 |     int,
+   |     --- `int` instances have a distinct memory layout because of the way `int` is implemented in a C extension
+15 |     B,
+   |     - `B` instances have a distinct memory layout because `B` defines non-empty `__slots__`
+16 | ): ...
+17 | class D(int): ...
+   |
+info: rule `instance-layout-conflict` is enabled by default
+
+```
+
+```
+error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to incompatible bases
+  --> src/mdtest_snippet.py:19:7
+   |
+17 |   class D(int): ...
+18 |
+19 |   class E(  # error: [instance-layout-conflict]
+   |  _______^
+20 | |     D,
+21 | |     str
+22 | | ): ...
+   | |_^ Bases `D` and `str` cannot be combined in multiple inheritance
+23 |
+24 |   class F(int, str, bytes, bytearray): ...  # error: [instance-layout-conflict]
+   |
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
+  --> src/mdtest_snippet.py:20:5
+   |
+19 | class E(  # error: [instance-layout-conflict]
+20 |     D,
+   |     -
+   |     |
+   |     `D` instances have a distinct memory layout because `D` inherits from `int`
+   |     `int` instances have a distinct memory layout because of the way `int` is implemented in a C extension
+21 |     str
+   |     --- `str` instances have a distinct memory layout because of the way `str` is implemented in a C extension
+22 | ): ...
+   |
+info: rule `instance-layout-conflict` is enabled by default
+
+```
+
+```
+error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to incompatible bases
+  --> src/mdtest_snippet.py:24:7
+   |
+22 | ): ...
+23 |
+24 | class F(int, str, bytes, bytearray): ...  # error: [instance-layout-conflict]
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Bases `int`, `str`, `bytes` and `bytearray` cannot be combined in multiple inheritance
+25 |
+26 | @disjoint_base
+   |
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
+  --> src/mdtest_snippet.py:24:9
+   |
+22 | ): ...
+23 |
+24 | class F(int, str, bytes, bytearray): ...  # error: [instance-layout-conflict]
+   |         ---  ---  -----  --------- `bytearray` instances have a distinct memory layout because of the way `bytearray` is implemented in a C extension
+   |         |    |    |
+   |         |    |    `bytes` instances have a distinct memory layout because of the way `bytes` is implemented in a C extension
+   |         |    `str` instances have a distinct memory layout because of the way `str` is implemented in a C extension
+   |         `int` instances have a distinct memory layout because of the way `int` is implemented in a C extension
+25 |
+26 | @disjoint_base
+   |
+info: rule `instance-layout-conflict` is enabled by default
+
+```
+
+```
+error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to incompatible bases
+  --> src/mdtest_snippet.py:32:7
+   |
+30 |   class H: ...
+31 |
+32 |   class I(  # error: [instance-layout-conflict]
+   |  _______^
+33 | |     G,
+34 | |     H
+35 | | ): ...
+   | |_^ Bases `G` and `H` cannot be combined in multiple inheritance
+36 |
+37 |   # fmt: on
+   |
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
+  --> src/mdtest_snippet.py:33:5
+   |
+32 | class I(  # error: [instance-layout-conflict]
+33 |     G,
+   |     - `G` instances have a distinct memory layout because of the way `G` is implemented in a C extension
+34 |     H
+   |     - `H` instances have a distinct memory layout because of the way `H` is implemented in a C extension
+35 | ): ...
+   |
+info: rule `instance-layout-conflict` is enabled by default
+
+```
+
+```
+error[subclass-of-final-class]: Class `Foo` cannot inherit from final class `range`
+  --> src/mdtest_snippet.py:38:11
+   |
+37 | # fmt: on
+38 | class Foo(range, str): ...  # error: [subclass-of-final-class]
+   |           ^^^^^
+   |
+info: rule `subclass-of-final-class` is enabled by default
+
+```

@@ -1,12 +1,12 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, Stmt};
 use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::super::helpers::at_last_top_level_expression_in_cell;
+use crate::rules::flake8_bugbear::helpers::at_last_top_level_expression_in_cell;
 
 /// ## What it does
 /// Checks for useless comparisons.
@@ -34,6 +34,7 @@ use super::super::helpers::at_last_top_level_expression_in_cell;
 /// ## References
 /// - [Python documentation: `assert` statement](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.102")]
 pub(crate) struct UselessComparison {
     at: ComparisonLocationAt,
 }
@@ -78,22 +79,22 @@ pub(crate) fn useless_comparison(checker: &Checker, expr: &Expr) {
                 .and_then(Stmt::as_expr_stmt)
                 .is_some_and(|last_stmt| &*last_stmt.value == expr)
             {
-                checker.report_diagnostic(Diagnostic::new(
+                checker.report_diagnostic(
                     UselessComparison {
                         at: ComparisonLocationAt::EndOfFunction,
                     },
                     expr.range(),
-                ));
+                );
                 return;
             }
         }
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             UselessComparison {
                 at: ComparisonLocationAt::MiddleBody,
             },
             expr.range(),
-        ));
+        );
     }
 }
 

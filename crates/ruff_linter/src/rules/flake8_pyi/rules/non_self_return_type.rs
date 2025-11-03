@@ -1,11 +1,10 @@
-use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use crate::checkers::ast::{Checker, TypingImporter};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::PythonVersion;
 use ruff_python_semantic::analyze;
 use ruff_python_semantic::analyze::class::might_be_generic;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_final, is_overload};
@@ -51,6 +50,29 @@ use ruff_text_size::Ranged;
 /// 1. `__aiter__` methods that return `AsyncIterator`, despite the class
 ///    inheriting directly from `AsyncIterator`.
 ///
+/// The rule attempts to avoid flagging methods on metaclasses, since
+/// [PEP 673] specifies that `Self` is disallowed in metaclasses. Ruff can
+/// detect a class as being a metaclass if it inherits from a stdlib
+/// metaclass such as `builtins.type` or `abc.ABCMeta`, and additionally
+/// infers that a class may be a metaclass if it has a `__new__` method
+/// with a similar signature to `type.__new__`. The heuristic used to
+/// identify a metaclass-like `__new__` method signature is that it:
+///
+/// 1. Has exactly 5 parameters (including `cls`)
+/// 1. Has a second parameter annotated with `str`
+/// 1. Has a third parameter annotated with a `tuple` type
+/// 1. Has a fourth parameter annotated with a `dict` type
+/// 1. Has a fifth parameter is keyword-variadic (`**kwargs`)
+///
+/// For example, the following class would be detected as a metaclass, disabling
+/// the rule:
+///
+/// ```python
+/// class MyMetaclass(django.db.models.base.ModelBase):
+///     def __new__(cls, name: str, bases: tuple[Any, ...], attrs: dict[str, Any], **kwargs: Any) -> MyMetaclass:
+///         ...
+/// ```
+///
 /// ## Example
 ///
 /// ```pyi
@@ -76,9 +98,22 @@ use ruff_text_size::Ranged;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe as it changes the meaning of your type annotations.
 ///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for Python versions
+/// before 3.11, its diagnostic will not be emitted, and no fix will be offered, if
+/// `typing_extensions` imports have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
+///
 /// ## References
 /// - [Python documentation: `typing.Self`](https://docs.python.org/3/library/typing.html#typing.Self)
+///
+/// [PEP 673]: https://peps.python.org/pep-0673/#valid-locations-for-self
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct NonSelfReturnType {
     class_name: String,
     method_name: String,
@@ -97,7 +132,9 @@ impl Violation for NonSelfReturnType {
         if matches!(class_name.as_str(), "__new__") {
             "`__new__` methods usually return `self` at runtime".to_string()
         } else {
-            format!("`{method_name}` methods in classes like `{class_name}` usually return `self` at runtime")
+            format!(
+                "`{method_name}` methods in classes like `{class_name}` usually return `self` at runtime"
+            )
         }
     }
 
@@ -131,7 +168,10 @@ pub(crate) fn non_self_return_type(
     };
 
     // PEP 673 forbids the use of `typing(_extensions).Self` in metaclasses.
-    if analyze::class::is_metaclass(class_def, semantic).is_yes() {
+    if !matches!(
+        analyze::class::is_metaclass(class_def, semantic),
+        analyze::class::IsMetaclass::No
+    ) {
         return;
     }
 
@@ -193,7 +233,11 @@ fn add_diagnostic(
     class_def: &ast::StmtClassDef,
     method_name: &str,
 ) {
-    let mut diagnostic = Diagnostic::new(
+    let Some(importer) = checker.typing_importer("Self", PythonVersion::PY311) else {
+        return;
+    };
+
+    let mut diagnostic = checker.report_diagnostic(
         NonSelfReturnType {
             class_name: class_def.name.to_string(),
             method_name: method_name.to_string(),
@@ -201,30 +245,19 @@ fn add_diagnostic(
         stmt.identifier(),
     );
 
-    diagnostic.try_set_fix(|| replace_with_self_fix(checker, stmt, returns, class_def));
-
-    checker.report_diagnostic(diagnostic);
+    diagnostic.try_set_fix(|| {
+        replace_with_self_fix(checker.semantic(), &importer, stmt, returns, class_def)
+    });
 }
 
 fn replace_with_self_fix(
-    checker: &Checker,
+    semantic: &SemanticModel,
+    importer: &TypingImporter,
     stmt: &ast::Stmt,
     returns: &ast::Expr,
     class_def: &ast::StmtClassDef,
 ) -> anyhow::Result<Fix> {
-    let semantic = checker.semantic();
-
-    let (self_import, self_binding) = {
-        let source_module = if checker.target_version() >= PythonVersion::PY311 {
-            "typing"
-        } else {
-            "typing_extensions"
-        };
-
-        let (importer, semantic) = (checker.importer(), checker.semantic());
-        let request = ImportRequest::import_from(source_module, "Self");
-        importer.get_or_import_symbol(&request, returns.start(), semantic)?
-    };
+    let (self_import, self_binding) = importer.import(returns.start())?;
 
     let mut others = Vec::with_capacity(2);
 
@@ -240,7 +273,7 @@ fn replace_with_self_fix(
     others.extend(remove_first_argument_type_hint());
     others.push(Edit::range_replacement(self_binding, returns.range()));
 
-    let applicability = if might_be_generic(class_def, checker.semantic()) {
+    let applicability = if might_be_generic(class_def, semantic) {
         Applicability::DisplayOnly
     } else {
         Applicability::Unsafe

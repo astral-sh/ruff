@@ -1,0 +1,43 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - `__iter__` method with a bad signature
+mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class Iterator:
+ 2 |     def __next__(self) -> int:
+ 3 |         return 42
+ 4 | 
+ 5 | class Iterable:
+ 6 |     def __iter__(self, extra_arg) -> Iterator:
+ 7 |         return Iterator()
+ 8 | 
+ 9 | # error: [not-iterable]
+10 | for x in Iterable():
+11 |     reveal_type(x)  # revealed: int
+```
+
+# Diagnostics
+
+```
+error[not-iterable]: Object of type `Iterable` is not iterable
+  --> src/mdtest_snippet.py:10:10
+   |
+ 9 | # error: [not-iterable]
+10 | for x in Iterable():
+   |          ^^^^^^^^^^
+11 |     reveal_type(x)  # revealed: int
+   |
+info: Its `__iter__` method has an invalid signature
+info: Expected signature `def __iter__(self): ...`
+info: rule `not-iterable` is enabled by default
+
+```

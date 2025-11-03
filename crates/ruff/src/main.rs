@@ -1,11 +1,12 @@
 use std::io::Write;
 use std::process::ExitCode;
 
+use anyhow::Context;
 use clap::Parser;
 use colored::Colorize;
 
 use ruff::args::Args;
-use ruff::{run, ExitStatus};
+use ruff::{ExitStatus, run};
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -15,10 +16,12 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
     not(target_os = "windows"),
     not(target_os = "openbsd"),
     not(target_os = "aix"),
+    not(target_os = "android"),
     any(
         target_arch = "x86_64",
         target_arch = "aarch64",
-        target_arch = "powerpc64"
+        target_arch = "powerpc64",
+        target_arch = "riscv64"
     )
 ))]
 #[global_allocator]
@@ -31,45 +34,52 @@ pub fn main() -> ExitCode {
 
     // support FORCE_COLOR env var
     if let Some(force_color) = std::env::var_os("FORCE_COLOR") {
-        if force_color.len() > 0 {
+        if !force_color.is_empty() {
             colored::control::set_override(true);
         }
     }
 
     let args = wild::args_os();
-    let args = argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX).unwrap();
+    let args = match argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX)
+        .context("Failed to read CLI arguments from files")
+    {
+        Ok(args) => args,
+        Err(err) => return report_error(&err),
+    };
 
     let args = Args::parse_from(args);
 
     match run(args) {
         Ok(code) => code.into(),
-        Err(err) => {
-            {
-                // Exit "gracefully" on broken pipe errors.
-                //
-                // See: https://github.com/BurntSushi/ripgrep/blob/bf63fe8f258afc09bae6caa48f0ae35eaf115005/crates/core/main.rs#L47C1-L61C14
-                for cause in err.chain() {
-                    if let Some(ioerr) = cause.downcast_ref::<std::io::Error>() {
-                        if ioerr.kind() == std::io::ErrorKind::BrokenPipe {
-                            return ExitCode::from(0);
-                        }
-                    }
-                }
+        Err(err) => report_error(&err),
+    }
+}
 
-                // Use `writeln` instead of `eprintln` to avoid panicking when the stderr pipe is broken.
-                let mut stderr = std::io::stderr().lock();
-
-                // This communicates that this isn't a linter error but ruff itself hard-errored for
-                // some reason (e.g. failed to resolve the configuration)
-                writeln!(stderr, "{}", "ruff failed".red().bold()).ok();
-                // Currently we generally only see one error, but e.g. with io errors when resolving
-                // the configuration it is help to chain errors ("resolving configuration failed" ->
-                // "failed to read file: subdir/pyproject.toml")
-                for cause in err.chain() {
-                    writeln!(stderr, "  {} {cause}", "Cause:".bold()).ok();
+fn report_error(err: &anyhow::Error) -> ExitCode {
+    {
+        // Exit "gracefully" on broken pipe errors.
+        //
+        // See: https://github.com/BurntSushi/ripgrep/blob/bf63fe8f258afc09bae6caa48f0ae35eaf115005/crates/core/main.rs#L47C1-L61C14
+        for cause in err.chain() {
+            if let Some(ioerr) = cause.downcast_ref::<std::io::Error>() {
+                if ioerr.kind() == std::io::ErrorKind::BrokenPipe {
+                    return ExitCode::from(0);
                 }
             }
-            ExitStatus::Error.into()
+        }
+
+        // Use `writeln` instead of `eprintln` to avoid panicking when the stderr pipe is broken.
+        let mut stderr = std::io::stderr().lock();
+
+        // This communicates that this isn't a linter error but ruff itself hard-errored for
+        // some reason (e.g. failed to resolve the configuration)
+        writeln!(stderr, "{}", "ruff failed".red().bold()).ok();
+        // Currently we generally only see one error, but e.g. with io errors when resolving
+        // the configuration it is help to chain errors ("resolving configuration failed" ->
+        // "failed to read file: subdir/pyproject.toml")
+        for cause in err.chain() {
+            writeln!(stderr, "  {} {cause}", "Cause:".bold()).ok();
         }
     }
+    ExitStatus::Error.into()
 }

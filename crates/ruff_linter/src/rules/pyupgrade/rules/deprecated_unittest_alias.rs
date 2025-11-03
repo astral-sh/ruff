@@ -2,11 +2,11 @@ use ruff_python_ast::{self as ast, Expr};
 use rustc_hash::FxHashMap;
 use std::sync::LazyLock;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of deprecated methods from the `unittest` module.
@@ -39,6 +39,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python 3.11 documentation: Deprecated aliases](https://docs.python.org/3.11/library/unittest.html#deprecated-aliases)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct DeprecatedUnittestAlias {
     alias: String,
     target: String,
@@ -91,16 +92,16 @@ pub(crate) fn deprecated_unittest_alias(checker: &Checker, expr: &Expr) {
     if id != "self" {
         return;
     }
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         DeprecatedUnittestAlias {
             alias: attr.to_string(),
             target: (*target).to_string(),
         },
         expr.range(),
     );
+    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         format!("self.{target}"),
         expr.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }

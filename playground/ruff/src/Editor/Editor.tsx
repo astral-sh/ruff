@@ -6,7 +6,7 @@ import {
   useState,
 } from "react";
 import { Panel, PanelGroup } from "react-resizable-panels";
-import { Diagnostic, Workspace } from "ruff_wasm";
+import { Diagnostic, Workspace, PositionEncoding } from "ruff_wasm";
 import {
   ErrorMessage,
   Theme,
@@ -173,7 +173,7 @@ export default function Editor({
 
     try {
       const config = JSON.parse(settingsSource);
-      const workspace = new Workspace(config);
+      const workspace = new Workspace(config, PositionEncoding.Utf16);
       const diagnostics = workspace.check(pythonSource);
 
       let secondary: SecondaryPanelResult = null;

@@ -3,13 +3,16 @@
 use wasm_bindgen_test::wasm_bindgen_test;
 
 use ruff_linter::registry::Rule;
-use ruff_source_file::{OneIndexed, SourceLocation};
-use ruff_wasm::{ExpandedMessage, Workspace};
+use ruff_source_file::OneIndexed;
+use ruff_wasm::{ExpandedMessage, Location, PositionEncoding, Workspace};
 
 macro_rules! check {
     ($source:expr, $config:expr, $expected:expr) => {{
         let config = js_sys::JSON::parse($config).unwrap();
-        match Workspace::new(config).unwrap().check($source) {
+        match Workspace::new(config, PositionEncoding::Utf8)
+            .unwrap()
+            .check($source)
+        {
             Ok(output) => {
                 let result: Vec<ExpandedMessage> = serde_wasm_bindgen::from_value(output).unwrap();
                 assert_eq!(result, $expected);
@@ -21,17 +24,19 @@ macro_rules! check {
 
 #[wasm_bindgen_test]
 fn empty_config() {
+    ruff_wasm::before_main();
+
     check!(
         "if (1, 2):\n    pass",
         r#"{}"#,
         [ExpandedMessage {
-            code: Some(Rule::IfTuple.noqa_code().to_string()),
+            code: Rule::IfTuple.noqa_code().to_string(),
             message: "If test is a tuple, which is always `True`".to_string(),
-            start_location: SourceLocation {
+            start_location: Location {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(3)
             },
-            end_location: SourceLocation {
+            end_location: Location {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(9)
             },
@@ -42,17 +47,19 @@ fn empty_config() {
 
 #[wasm_bindgen_test]
 fn syntax_error() {
+    ruff_wasm::before_main();
+
     check!(
         "x =\ny = 1\n",
         r#"{}"#,
         [ExpandedMessage {
-            code: None,
-            message: "SyntaxError: Expected an expression".to_string(),
-            start_location: SourceLocation {
+            code: "invalid-syntax".to_string(),
+            message: "Expected an expression".to_string(),
+            start_location: Location {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(3)
             },
-            end_location: SourceLocation {
+            end_location: Location {
                 row: OneIndexed::from_zero_indexed(1),
                 column: OneIndexed::from_zero_indexed(0)
             },
@@ -63,17 +70,20 @@ fn syntax_error() {
 
 #[wasm_bindgen_test]
 fn unsupported_syntax_error() {
+    ruff_wasm::before_main();
+
     check!(
         "match 2:\n    case 1: ...",
-        r#"{"preview": true}"#,
+        r#"{"target-version": "py39"}"#,
         [ExpandedMessage {
-            code: None,
-            message: "SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)".to_string(),
-            start_location: SourceLocation {
+            code: "invalid-syntax".to_string(),
+            message: "Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)"
+                .to_string(),
+            start_location: Location {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(0)
             },
-            end_location: SourceLocation {
+            end_location: Location {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(5)
             },
@@ -84,11 +94,15 @@ fn unsupported_syntax_error() {
 
 #[wasm_bindgen_test]
 fn partial_config() {
+    ruff_wasm::before_main();
+
     check!("if (1, 2):\n    pass", r#"{"ignore": ["F"]}"#, []);
 }
 
 #[wasm_bindgen_test]
 fn partial_nested_config() {
+    ruff_wasm::before_main();
+
     let config = r#"{
           "select": ["Q"],
           "flake8-quotes": {

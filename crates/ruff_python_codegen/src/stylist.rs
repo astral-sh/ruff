@@ -1,43 +1,53 @@
 //! Detect code style from Python source code.
 
+use std::borrow::Cow;
 use std::cell::OnceCell;
 use std::ops::Deref;
 
 use ruff_python_ast::str::Quote;
 use ruff_python_parser::{Token, TokenKind, Tokens};
-use ruff_source_file::{find_newline, LineEnding, LineRanges};
+use ruff_source_file::{LineEnding, LineRanges, find_newline};
 use ruff_text_size::Ranged;
 
 #[derive(Debug, Clone)]
 pub struct Stylist<'a> {
-    source: &'a str,
+    source: Cow<'a, str>,
     indentation: Indentation,
     quote: Quote,
     line_ending: OnceCell<LineEnding>,
 }
 
 impl<'a> Stylist<'a> {
-    pub fn indentation(&'a self) -> &'a Indentation {
+    pub fn indentation(&self) -> &Indentation {
         &self.indentation
     }
 
-    pub fn quote(&'a self) -> Quote {
+    pub fn quote(&self) -> Quote {
         self.quote
     }
 
-    pub fn line_ending(&'a self) -> LineEnding {
+    pub fn line_ending(&self) -> LineEnding {
         *self.line_ending.get_or_init(|| {
-            find_newline(self.source)
+            find_newline(&self.source)
                 .map(|(_, ending)| ending)
                 .unwrap_or_default()
         })
+    }
+
+    pub fn into_owned(self) -> Stylist<'static> {
+        Stylist {
+            source: Cow::Owned(self.source.into_owned()),
+            indentation: self.indentation,
+            quote: self.quote,
+            line_ending: self.line_ending,
+        }
     }
 
     pub fn from_tokens(tokens: &Tokens, source: &'a str) -> Self {
         let indentation = detect_indentation(tokens, source);
 
         Self {
-            source,
+            source: Cow::Borrowed(source),
             indentation,
             quote: detect_quote(tokens),
             line_ending: OnceCell::default(),
@@ -49,7 +59,7 @@ fn detect_quote(tokens: &[Token]) -> Quote {
     for token in tokens {
         match token.kind() {
             TokenKind::String if !token.is_triple_quoted_string() => {
-                return token.string_quote_style()
+                return token.string_quote_style();
             }
             TokenKind::FStringStart => return token.string_quote_style(),
             _ => continue,
@@ -148,8 +158,8 @@ impl Deref for Indentation {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_parser::{parse_module, parse_unchecked, Mode, ParseOptions};
-    use ruff_source_file::{find_newline, LineEnding};
+    use ruff_python_parser::{Mode, ParseOptions, parse_module, parse_unchecked};
+    use ruff_source_file::{LineEnding, find_newline};
 
     use super::{Indentation, Quote, Stylist};
 

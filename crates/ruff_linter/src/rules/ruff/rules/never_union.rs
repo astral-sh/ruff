@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprBinOp, Operator};
-use ruff_python_semantic::{analyze::typing::traverse_union, SemanticModel};
+use ruff_python_semantic::{SemanticModel, analyze::typing::traverse_union};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `typing.NoReturn` and `typing.Never` in union types.
@@ -35,6 +35,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `typing.Never`](https://docs.python.org/3/library/typing.html#typing.Never)
 /// - [Python documentation: `typing.NoReturn`](https://docs.python.org/3/library/typing.html#typing.NoReturn)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct NeverUnion {
     never_like: NeverLike,
     union_like: UnionLike,
@@ -74,10 +75,11 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
             left,
             right,
             range: _,
+            node_index: _,
         }) => {
             // Analyze the left-hand side of the `|` operator.
             if let Some(never_like) = NeverLike::from_expr(left, checker.semantic()) {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     NeverUnion {
                         never_like,
                         union_like: UnionLike::PEP604,
@@ -95,12 +97,11 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                         expr.range(),
                     )));
                 }
-                checker.report_diagnostic(diagnostic);
             }
 
             // Analyze the right-hand side of the `|` operator.
             if let Some(never_like) = NeverLike::from_expr(right, checker.semantic()) {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     NeverUnion {
                         never_like,
                         union_like: UnionLike::PEP604,
@@ -113,7 +114,6 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                         expr.range(),
                     )));
                 }
-                checker.report_diagnostic(diagnostic);
             }
         }
 
@@ -123,6 +123,7 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
             slice,
             ctx: _,
             range: _,
+            node_index: _,
         }) if checker.semantic().match_typing_expr(value, "Union") => {
             let Expr::Tuple(tuple_slice) = &**slice else {
                 return;
@@ -143,7 +144,7 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                         return;
                     }
 
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         NeverUnion {
                             never_like,
                             union_like: UnionLike::TypingUnion,
@@ -164,15 +165,16 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                                         elts: rest,
                                         ctx: ast::ExprContext::Load,
                                         range: TextRange::default(),
+                                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                                         parenthesized: true,
                                     })),
                                     ctx: ast::ExprContext::Load,
                                     range: TextRange::default(),
+                                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                                 }))
                         },
                         expr.range(),
                     )));
-                    checker.report_diagnostic(diagnostic);
                 }
             }
         }

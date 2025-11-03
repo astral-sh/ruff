@@ -1,0 +1,57 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF061 [*] Use context-manager form of `pytest.deprecated_call()`
+  --> RUF061_deprecated_call.py:16:5
+   |
+15 | def test_error_trivial():
+16 |     pytest.deprecated_call(raise_deprecation_warning, "deprecated")
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Use `pytest.deprecated_call()` as a context-manager
+13 | 
+14 | 
+15 | def test_error_trivial():
+   -     pytest.deprecated_call(raise_deprecation_warning, "deprecated")
+16 +     with pytest.deprecated_call():
+17 +         raise_deprecation_warning("deprecated")
+18 | 
+19 | 
+20 | def test_error_assign():
+note: This is an unsafe fix and may change runtime behavior
+
+RUF061 [*] Use context-manager form of `pytest.deprecated_call()`
+  --> RUF061_deprecated_call.py:20:9
+   |
+19 | def test_error_assign():
+20 |     s = pytest.deprecated_call(raise_deprecation_warning, "deprecated")
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+21 |     print(s)
+   |
+help: Use `pytest.deprecated_call()` as a context-manager
+17 | 
+18 | 
+19 | def test_error_assign():
+   -     s = pytest.deprecated_call(raise_deprecation_warning, "deprecated")
+20 +     with pytest.deprecated_call():
+21 +         s = raise_deprecation_warning("deprecated")
+22 |     print(s)
+23 | 
+24 | 
+note: This is an unsafe fix and may change runtime behavior
+
+RUF061 [*] Use context-manager form of `pytest.deprecated_call()`
+  --> RUF061_deprecated_call.py:25:5
+   |
+24 | def test_error_lambda():
+25 |     pytest.deprecated_call(lambda: warnings.warn("", DeprecationWarning))
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Use `pytest.deprecated_call()` as a context-manager
+22 | 
+23 | 
+24 | def test_error_lambda():
+   -     pytest.deprecated_call(lambda: warnings.warn("", DeprecationWarning))
+25 +     with pytest.deprecated_call():
+26 +         (lambda: warnings.warn("", DeprecationWarning))()
+note: This is an unsafe fix and may change runtime behavior

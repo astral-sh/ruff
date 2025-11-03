@@ -28,14 +28,13 @@ An extremely fast Python linter and code formatter, written in Rust.
 - ⚡️ 10-100x faster than existing linters (like Flake8) and formatters (like Black)
 - 🐍 Installable via `pip`
 - 🛠️ `pyproject.toml` support
-- 🤝 Python 3.13 compatibility
+- 🤝 Python 3.14 compatibility
 - ⚖️ Drop-in parity with [Flake8](https://docs.astral.sh/ruff/faq/#how-does-ruffs-linter-compare-to-flake8), isort, and [Black](https://docs.astral.sh/ruff/faq/#how-does-ruffs-formatter-compare-to-black)
 - 📦 Built-in caching, to avoid re-analyzing unchanged files
 - 🔧 Fix support, for automatic error correction (e.g., automatically remove unused imports)
 - 📏 Over [800 built-in rules](https://docs.astral.sh/ruff/rules/), with native re-implementations
     of popular Flake8 plugins, like flake8-bugbear
-- ⌨️ First-party [editor integrations](https://docs.astral.sh/ruff/integrations/) for
-    [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://docs.astral.sh/ruff/editors/setup)
+- ⌨️ First-party [editor integrations](https://docs.astral.sh/ruff/editors) for [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://docs.astral.sh/ruff/editors/setup)
 - 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://docs.astral.sh/ruff/configuration/#config-file-discovery)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
@@ -90,8 +89,7 @@ creator of [isort](https://github.com/PyCQA/isort):
 > Just switched my first project to Ruff. Only one downside so far: it's so fast I couldn't believe
 > it was working till I intentionally introduced some errors.
 
-[**Tim Abbott**](https://github.com/astral-sh/ruff/issues/465#issuecomment-1317400028), lead
-developer of [Zulip](https://github.com/zulip/zulip):
+[**Tim Abbott**](https://github.com/zulip/zulip/pull/23431#issuecomment-1302557034), lead developer of [Zulip](https://github.com/zulip/zulip) (also [here](https://github.com/astral-sh/ruff/issues/465#issuecomment-1317400028)):
 
 > This is just ridiculously fast... `ruff` is amazing.
 
@@ -149,8 +147,8 @@ curl -LsSf https://astral.sh/ruff/install.sh | sh
 powershell -c "irm https://astral.sh/ruff/install.ps1 | iex"
 
 # For a specific version.
-curl -LsSf https://astral.sh/ruff/0.11.2/install.sh | sh
-powershell -c "irm https://astral.sh/ruff/0.11.2/install.ps1 | iex"
+curl -LsSf https://astral.sh/ruff/0.14.3/install.sh | sh
+powershell -c "irm https://astral.sh/ruff/0.14.3/install.ps1 | iex"
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
@@ -183,10 +181,10 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.11.2
+  rev: v0.14.3
   hooks:
     # Run the linter.
-    - id: ruff
+    - id: ruff-check
       args: [ --fix ]
     # Run the formatter.
     - id: ruff-format
@@ -255,7 +253,7 @@ indent-width = 4
 target-version = "py39"
 
 [lint]
-# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
 select = ["E4", "E7", "E9", "F"]
 ignore = []
 
@@ -422,14 +420,16 @@ Ruff is released under the MIT license.
 
 Ruff is used by a number of major open-source projects and companies, including:
 
-- [Albumentations](https://github.com/albumentations-team/albumentations)
+- [Albumentations](https://github.com/albumentations-team/AlbumentationsX)
 - Amazon ([AWS SAM](https://github.com/aws/serverless-application-model))
+- [Anki](https://apps.ankiweb.net/)
 - Anthropic ([Python SDK](https://github.com/anthropics/anthropic-sdk-python))
 - [Apache Airflow](https://github.com/apache/airflow)
 - AstraZeneca ([Magnus](https://github.com/AstraZeneca/magnus-core))
 - [Babel](https://github.com/python-babel/babel)
 - Benchling ([Refac](https://github.com/benchling/refac))
 - [Bokeh](https://github.com/bokeh/bokeh)
+- Capital One ([datacompy](https://github.com/capitalone/datacompy))
 - CrowdCent ([NumerBlox](https://github.com/crowdcent/numerblox)) <!-- typos: ignore -->
 - [Cryptography (PyCA)](https://github.com/pyca/cryptography)
 - CERN ([Indico](https://getindico.io/))
@@ -506,6 +506,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Streamlit](https://github.com/streamlit/streamlit)
 - [The Algorithms](https://github.com/TheAlgorithms/Python)
 - [Vega-Altair](https://github.com/altair-viz/altair)
+- [Weblate](https://weblate.org/)
 - WordPress ([Openverse](https://github.com/WordPress/openverse))
 - [ZenML](https://github.com/zenml-io/zenml)
 - [Zulip](https://github.com/zulip/zulip)

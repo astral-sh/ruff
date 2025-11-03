@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprAttribute};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -34,6 +34,7 @@ use crate::checkers::ast::Checker;
 /// - [Django documentation: SQL injection protection](https://docs.djangoproject.com/en/dev/topics/security/#sql-injection-protection)
 /// - [Common Weakness Enumeration: CWE-89](https://cwe.mitre.org/data/definitions/89.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct DjangoExtra;
 
 impl Violation for DjangoExtra {
@@ -54,7 +55,7 @@ pub(crate) fn django_extra(checker: &Checker, call: &ast::ExprCall) {
     }
 
     if is_call_insecure(call) {
-        checker.report_diagnostic(Diagnostic::new(DjangoExtra, call.arguments.range()));
+        checker.report_diagnostic(DjangoExtra, call.arguments.range());
     }
 }
 

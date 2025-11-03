@@ -9,8 +9,9 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
     use ruff_python_ast::PythonVersion;
 
     #[test_case(Path::new("edge_case.py"))]
@@ -30,15 +31,16 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_future_annotations").join(path).as_path(),
             &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY37,
+                unresolved_target_version: PythonVersion::PY37.into(),
                 ..settings::LinterSettings::for_rule(Rule::FutureRewritableTypeAnnotation)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(Path::new("no_future_import_uses_lowercase.py"))]
+    #[test_case(Path::new("no_future_import_uses_preview_generics.py"))]
     #[test_case(Path::new("no_future_import_uses_union.py"))]
     #[test_case(Path::new("no_future_import_uses_union_inner.py"))]
     #[test_case(Path::new("ok_no_types.py"))]
@@ -49,11 +51,26 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_future_annotations").join(path).as_path(),
             &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY37,
+                unresolved_target_version: PythonVersion::PY37.into(),
                 ..settings::LinterSettings::for_rule(Rule::FutureRequiredTypeAnnotation)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("no_future_import_uses_preview_generics.py"))]
+    fn fa102_preview(path: &Path) -> Result<()> {
+        let snapshot = format!("fa102_preview_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_future_annotations").join(path).as_path(),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY37.into(),
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(Rule::FutureRequiredTypeAnnotation)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

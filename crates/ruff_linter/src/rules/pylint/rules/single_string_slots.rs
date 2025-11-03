@@ -1,9 +1,9 @@
 use ruff_python_ast::{self as ast, Expr, Stmt, StmtClassDef};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -48,6 +48,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.276")]
 pub(crate) struct SingleStringSlots;
 
 impl Violation for SingleStringSlots {
@@ -66,10 +67,7 @@ pub(crate) fn single_string_slots(checker: &Checker, class: &StmtClassDef) {
                     if let Expr::Name(ast::ExprName { id, .. }) = target {
                         if id.as_str() == "__slots__" {
                             if matches!(value.as_ref(), Expr::StringLiteral(_) | Expr::FString(_)) {
-                                checker.report_diagnostic(Diagnostic::new(
-                                    SingleStringSlots,
-                                    stmt.identifier(),
-                                ));
+                                checker.report_diagnostic(SingleStringSlots, stmt.identifier());
                             }
                         }
                     }
@@ -83,10 +81,7 @@ pub(crate) fn single_string_slots(checker: &Checker, class: &StmtClassDef) {
                 if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
                     if id.as_str() == "__slots__" {
                         if matches!(value.as_ref(), Expr::StringLiteral(_) | Expr::FString(_)) {
-                            checker.report_diagnostic(Diagnostic::new(
-                                SingleStringSlots,
-                                stmt.identifier(),
-                            ));
+                            checker.report_diagnostic(SingleStringSlots, stmt.identifier());
                         }
                     }
                 }

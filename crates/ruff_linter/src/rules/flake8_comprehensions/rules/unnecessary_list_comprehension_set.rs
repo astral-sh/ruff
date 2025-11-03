@@ -1,5 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_parser::TokenKind;
@@ -7,8 +6,9 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for unnecessary list comprehensions.
@@ -31,6 +31,7 @@ use super::helpers;
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.58")]
 pub(crate) struct UnnecessaryListComprehensionSet;
 
 impl AlwaysFixableViolation for UnnecessaryListComprehensionSet {
@@ -60,7 +61,7 @@ pub(crate) fn unnecessary_list_comprehension_set(checker: &Checker, call: &ast::
     if !argument.is_list_comp_expr() {
         return;
     }
-    let diagnostic = Diagnostic::new(UnnecessaryListComprehensionSet, call.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryListComprehensionSet, call.range());
     let one = TextSize::from(1);
 
     // Replace `set(` with `{`.
@@ -100,5 +101,5 @@ pub(crate) fn unnecessary_list_comprehension_set(checker: &Checker, call: &ast::
     let replacement =
         Edit::range_replacement(checker.source()[span].to_string(), replacement_range);
     let fix = Fix::unsafe_edits(call_start, [call_end, replacement]);
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    diagnostic.set_fix(fix);
 }

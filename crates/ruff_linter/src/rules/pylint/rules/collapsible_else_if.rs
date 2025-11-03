@@ -1,17 +1,17 @@
 use anyhow::Result;
 
 use ast::whitespace::indentation;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, ElifElseClause, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::adjust_indentation;
-use crate::Locator;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `else` blocks that consist of a single `if` statement.
@@ -46,6 +46,7 @@ use crate::Locator;
 /// ## References
 /// - [Python documentation: `if` Statements](https://docs.python.org/3/tutorial/controlflow.html#if-statements)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.253")]
 pub(crate) struct CollapsibleElseIf;
 
 impl Violation for CollapsibleElseIf {
@@ -82,7 +83,7 @@ pub(crate) fn collapsible_else_if(checker: &Checker, stmt: &Stmt) {
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         CollapsibleElseIf,
         TextRange::new(else_clause.start(), first.start()),
     );
@@ -95,7 +96,6 @@ pub(crate) fn collapsible_else_if(checker: &Checker, stmt: &Stmt) {
             checker.stylist(),
         )
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Generate [`Fix`] to convert an `else` block to an `elif` block.

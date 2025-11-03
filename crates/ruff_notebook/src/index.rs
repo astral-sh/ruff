@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use ruff_source_file::{OneIndexed, SourceLocation};
+use ruff_source_file::{LineColumn, OneIndexed, SourceLocation};
 
 /// Jupyter Notebook indexing table
 ///
@@ -33,16 +33,37 @@ impl NotebookIndex {
         self.row_to_row_in_cell.get(row.to_zero_indexed()).copied()
     }
 
-    /// Translates the given source location based on the indexing table.
+    /// Returns an iterator over the row:cell-number pairs (both 1-based).
+    pub fn iter(&self) -> impl Iterator<Item = (OneIndexed, OneIndexed)> {
+        self.row_to_cell
+            .iter()
+            .enumerate()
+            .map(|(row, cell)| (OneIndexed::from_zero_indexed(row), *cell))
+    }
+
+    /// Translates the given [`LineColumn`] based on the indexing table.
     ///
     /// This will translate the row/column in the concatenated source code
     /// to the row/column in the Jupyter Notebook.
-    pub fn translate_location(&self, source_location: &SourceLocation) -> SourceLocation {
-        SourceLocation {
-            row: self
-                .cell_row(source_location.row)
+    pub fn translate_line_column(&self, source_location: &LineColumn) -> LineColumn {
+        LineColumn {
+            line: self
+                .cell_row(source_location.line)
                 .unwrap_or(OneIndexed::MIN),
             column: source_location.column,
+        }
+    }
+
+    /// Translates the given [`SourceLocation`] based on the indexing table.
+    ///
+    /// This will translate the line/character in the concatenated source code
+    /// to the line/character in the Jupyter Notebook.
+    pub fn translate_source_location(&self, source_location: &SourceLocation) -> SourceLocation {
+        SourceLocation {
+            line: self
+                .cell_row(source_location.line)
+                .unwrap_or(OneIndexed::MIN),
+            character_offset: source_location.character_offset,
         }
     }
 }

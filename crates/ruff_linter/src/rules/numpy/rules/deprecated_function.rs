@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of deprecated NumPy functions.
@@ -31,6 +31,7 @@ use crate::importer::ImportRequest;
 /// np.all([True, False])
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.276")]
 pub(crate) struct NumpyDeprecatedFunction {
     existing: String,
     replacement: String,
@@ -73,13 +74,14 @@ pub(crate) fn deprecated_function(checker: &Checker, expr: &Expr) {
                 _ => None,
             })
     {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             NumpyDeprecatedFunction {
                 existing: existing.to_string(),
                 replacement: replacement.to_string(),
             },
             expr.range(),
         );
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from("numpy", replacement),
@@ -89,6 +91,5 @@ pub(crate) fn deprecated_function(checker: &Checker, expr: &Expr) {
             let replacement_edit = Edit::range_replacement(binding, expr.range());
             Ok(Fix::safe_edits(import_edit, [replacement_edit]))
         });
-        checker.report_diagnostic(diagnostic);
     }
 }

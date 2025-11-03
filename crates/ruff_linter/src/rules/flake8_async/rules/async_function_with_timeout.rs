@@ -1,14 +1,14 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_async::helpers::AsyncModule;
 use ruff_python_ast::PythonVersion;
 
-#[allow(clippy::doc_link_with_quotes)]
+#[expect(clippy::doc_link_with_quotes)]
 /// ## What it does
 /// Checks for `async` function definitions with `timeout` parameters.
 ///
@@ -65,6 +65,7 @@ use ruff_python_ast::PythonVersion;
 ///
 /// ["structured concurrency"]: https://vorpus.org/blog/some-thoughts-on-asynchronous-api-design-in-a-post-asyncawait-world/#timeouts-and-cancellation
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct AsyncFunctionWithTimeout {
     module: AsyncModule,
 }
@@ -112,8 +113,5 @@ pub(crate) fn async_function_with_timeout(checker: &Checker, function_def: &ast:
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
-        AsyncFunctionWithTimeout { module },
-        timeout.range(),
-    ));
+    checker.report_diagnostic(AsyncFunctionWithTimeout { module }, timeout.range());
 }

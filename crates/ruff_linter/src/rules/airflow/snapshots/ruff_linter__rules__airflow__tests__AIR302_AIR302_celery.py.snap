@@ -1,0 +1,67 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR302 [*] `airflow.config_templates.default_celery.DEFAULT_CELERY_CONFIG` is moved into `celery` provider in Airflow 3.0;
+  --> AIR302_celery.py:9:1
+   |
+ 7 | )
+ 8 |
+ 9 | DEFAULT_CELERY_CONFIG
+   | ^^^^^^^^^^^^^^^^^^^^^
+10 |
+11 | app
+   |
+help: Install `apache-airflow-providers-celery>=3.3.0` and use `DEFAULT_CELERY_CONFIG` from `airflow.providers.celery.executors.default_celery` instead.
+1  | from __future__ import annotations
+2  | 
+   - from airflow.config_templates.default_celery import DEFAULT_CELERY_CONFIG
+3  | from airflow.executors.celery_executor import (
+4  |     CeleryExecutor,
+5  |     app,
+6  | )
+7  + from airflow.providers.celery.executors.default_celery import DEFAULT_CELERY_CONFIG
+8  | 
+9  | DEFAULT_CELERY_CONFIG
+10 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR302 [*] `airflow.executors.celery_executor.app` is moved into `celery` provider in Airflow 3.0;
+  --> AIR302_celery.py:11:1
+   |
+ 9 | DEFAULT_CELERY_CONFIG
+10 |
+11 | app
+   | ^^^
+12 | CeleryExecutor()
+   |
+help: Install `apache-airflow-providers-celery>=3.3.0` and use `app` from `airflow.providers.celery.executors.celery_executor_utils` instead.
+3  | from airflow.config_templates.default_celery import DEFAULT_CELERY_CONFIG
+4  | from airflow.executors.celery_executor import (
+5  |     CeleryExecutor,
+   -     app,
+6  | )
+7  + from airflow.providers.celery.executors.celery_executor_utils import app
+8  | 
+9  | DEFAULT_CELERY_CONFIG
+10 | 
+note: This is an unsafe fix and may change runtime behavior
+
+AIR302 [*] `airflow.executors.celery_executor.CeleryExecutor` is moved into `celery` provider in Airflow 3.0;
+  --> AIR302_celery.py:12:1
+   |
+11 | app
+12 | CeleryExecutor()
+   | ^^^^^^^^^^^^^^
+   |
+help: Install `apache-airflow-providers-celery>=3.3.0` and use `CeleryExecutor` from `airflow.providers.celery.executors.celery_executor` instead.
+2  | 
+3  | from airflow.config_templates.default_celery import DEFAULT_CELERY_CONFIG
+4  | from airflow.executors.celery_executor import (
+   -     CeleryExecutor,
+5  |     app,
+6  | )
+7  + from airflow.providers.celery.executors.celery_executor import CeleryExecutor
+8  | 
+9  | DEFAULT_CELERY_CONFIG
+10 | 
+note: This is an unsafe fix and may change runtime behavior

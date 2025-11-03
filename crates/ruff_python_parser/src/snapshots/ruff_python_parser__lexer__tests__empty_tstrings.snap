@@ -1,0 +1,98 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+## Tokens
+```
+[
+    (
+        TStringStart,
+        0..2,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        TStringEnd,
+        2..3,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        String(
+            "",
+        ),
+        4..6,
+        TokenFlags(
+            DOUBLE_QUOTES,
+        ),
+    ),
+    (
+        TStringStart,
+        7..9,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        TStringEnd,
+        9..10,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        TStringStart,
+        11..13,
+        TokenFlags(
+            T_STRING,
+        ),
+    ),
+    (
+        TStringEnd,
+        13..14,
+        TokenFlags(
+            T_STRING,
+        ),
+    ),
+    (
+        String(
+            "",
+        ),
+        15..17,
+    ),
+    (
+        TStringStart,
+        18..22,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        TStringEnd,
+        22..25,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        TStringStart,
+        26..30,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        TStringEnd,
+        30..33,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | T_STRING,
+        ),
+    ),
+    (
+        Newline,
+        33..33,
+    ),
+]
+```

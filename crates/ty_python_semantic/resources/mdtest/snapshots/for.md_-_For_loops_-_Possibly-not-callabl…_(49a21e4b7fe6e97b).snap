@@ -1,0 +1,76 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - Possibly-not-callable `__getitem__` method
+mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def _(flag: bool):
+ 2 |     class CustomCallable:
+ 3 |         if flag:
+ 4 |             def __call__(self, *args, **kwargs) -> int:
+ 5 |                 return 42
+ 6 |         else:
+ 7 |             __call__: None = None
+ 8 | 
+ 9 |     class Iterable1:
+10 |         __getitem__: CustomCallable = CustomCallable()
+11 | 
+12 |     class Iterable2:
+13 |         if flag:
+14 |             def __getitem__(self, key: int) -> int:
+15 |                 return 42
+16 |         else:
+17 |             __getitem__: None = None
+18 | 
+19 |     # error: [not-iterable]
+20 |     for x in Iterable1():
+21 |         # TODO... `int` might be ideal here?
+22 |         reveal_type(x)  # revealed: int | Unknown
+23 | 
+24 |     # error: [not-iterable]
+25 |     for y in Iterable2():
+26 |         # TODO... `int` might be ideal here?
+27 |         reveal_type(y)  # revealed: int | Unknown
+```
+
+# Diagnostics
+
+```
+error[not-iterable]: Object of type `Iterable1` may not be iterable
+  --> src/mdtest_snippet.py:20:14
+   |
+19 |     # error: [not-iterable]
+20 |     for x in Iterable1():
+   |              ^^^^^^^^^^^
+21 |         # TODO... `int` might be ideal here?
+22 |         reveal_type(x)  # revealed: int | Unknown
+   |
+info: It has no `__iter__` method and its `__getitem__` attribute is invalid
+info: `__getitem__` has type `CustomCallable`, which is not callable
+info: rule `not-iterable` is enabled by default
+
+```
+
+```
+error[not-iterable]: Object of type `Iterable2` may not be iterable
+  --> src/mdtest_snippet.py:25:14
+   |
+24 |     # error: [not-iterable]
+25 |     for y in Iterable2():
+   |              ^^^^^^^^^^^
+26 |         # TODO... `int` might be ideal here?
+27 |         reveal_type(y)  # revealed: int | Unknown
+   |
+info: It has no `__iter__` method and its `__getitem__` attribute is invalid
+info: `__getitem__` has type `(bound method Iterable2.__getitem__(key: int) -> int) | None`, which is not callable
+info: rule `not-iterable` is enabled by default
+
+```

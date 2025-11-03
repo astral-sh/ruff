@@ -1,0 +1,40 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR302 [*] `airflow.hooks.pig_hook.PigCliHook` is moved into `apache-pig` provider in Airflow 3.0;
+ --> AIR302_pig.py:6:1
+  |
+4 | from airflow.operators.pig_operator import PigOperator
+5 |
+6 | PigCliHook()
+  | ^^^^^^^^^^
+7 | PigOperator()
+  |
+help: Install `apache-airflow-providers-apache-pig>=1.0.0` and use `PigCliHook` from `airflow.providers.apache.pig.hooks.pig` instead.
+1 | from __future__ import annotations
+2 | 
+  - from airflow.hooks.pig_hook import PigCliHook
+3 | from airflow.operators.pig_operator import PigOperator
+4 + from airflow.providers.apache.pig.hooks.pig import PigCliHook
+5 | 
+6 | PigCliHook()
+7 | PigOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR302 [*] `airflow.operators.pig_operator.PigOperator` is moved into `apache-pig` provider in Airflow 3.0;
+ --> AIR302_pig.py:7:1
+  |
+6 | PigCliHook()
+7 | PigOperator()
+  | ^^^^^^^^^^^
+  |
+help: Install `apache-airflow-providers-apache-pig>=1.0.0` and use `PigOperator` from `airflow.providers.apache.pig.operators.pig` instead.
+1 | from __future__ import annotations
+2 | 
+3 | from airflow.hooks.pig_hook import PigCliHook
+  - from airflow.operators.pig_operator import PigOperator
+4 + from airflow.providers.apache.pig.operators.pig import PigOperator
+5 | 
+6 | PigCliHook()
+7 | PigOperator()
+note: This is an unsafe fix and may change runtime behavior

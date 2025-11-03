@@ -2,10 +2,8 @@ use clap::builder::{PossibleValue, TypedValueParser, ValueParserFactory};
 use itertools::Itertools;
 use std::str::FromStr;
 
-use ruff_workspace::{
-    options::Options,
-    options_base::{OptionField, OptionSet, OptionsMetadata, Visit},
-};
+use ruff_options_metadata::{OptionField, OptionSet, OptionsMetadata, Visit};
+use ruff_workspace::options::Options;
 
 #[derive(Default)]
 struct CollectOptionsVisitor {

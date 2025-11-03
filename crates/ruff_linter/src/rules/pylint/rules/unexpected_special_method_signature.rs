@@ -2,11 +2,11 @@ use std::cmp::Ordering;
 
 use ruff_python_ast::{Decorator, Parameters, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -110,6 +110,7 @@ impl ExpectedParams {
 /// ## References
 /// - [Python documentation: Data model](https://docs.python.org/3/reference/datamodel.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.263")]
 pub(crate) struct UnexpectedSpecialMethodSignature {
     method_name: String,
     expected_params: ExpectedParams,
@@ -186,13 +187,13 @@ pub(crate) fn unexpected_special_method_signature(
     };
 
     if !valid_signature {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             UnexpectedSpecialMethodSignature {
                 method_name: name.to_owned(),
                 expected_params,
                 actual_params,
             },
             stmt.identifier(),
-        ));
+        );
     }
 }

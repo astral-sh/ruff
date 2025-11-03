@@ -1,9 +1,9 @@
 use ruff_python_ast::{Expr, Keyword};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -46,6 +46,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [Disallow iterable argument unpacking after a keyword argument?](https://github.com/python/cpython/issues/82741)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.109")]
 pub(crate) struct StarArgUnpackingAfterKeywordArg;
 
 impl Violation for StarArgUnpackingAfterKeywordArg {
@@ -71,9 +72,6 @@ pub(crate) fn star_arg_unpacking_after_keyword_arg(
         if arg.start() <= keyword.start() {
             continue;
         }
-        checker.report_diagnostic(Diagnostic::new(
-            StarArgUnpackingAfterKeywordArg,
-            arg.range(),
-        ));
+        checker.report_diagnostic(StarArgUnpackingAfterKeywordArg, arg.range());
     }
 }

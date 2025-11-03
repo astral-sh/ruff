@@ -1,12 +1,13 @@
 use std::fmt;
 use std::str::FromStr;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, OperatorPrecedence, UnaryOp};
+use ruff_source_file::find_newline;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum LiteralType {
@@ -38,23 +39,27 @@ impl LiteralType {
             LiteralType::Str => ast::StringLiteral {
                 value: Box::default(),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 flags: checker.default_string_flags(),
             }
             .into(),
             LiteralType::Bytes => ast::BytesLiteral {
                 value: Box::default(),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 flags: checker.default_bytes_flags(),
             }
             .into(),
             LiteralType::Int => ast::ExprNumberLiteral {
                 value: ast::Number::Int(Int::from(0u8)),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }
             .into(),
             LiteralType::Float => ast::ExprNumberLiteral {
                 value: ast::Number::Float(0.0),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }
             .into(),
             LiteralType::Bool => ast::ExprBooleanLiteral::default().into(),
@@ -123,6 +128,7 @@ impl fmt::Display for LiteralType {
 /// - [Python documentation: `float`](https://docs.python.org/3/library/functions.html#float)
 /// - [Python documentation: `bool`](https://docs.python.org/3/library/functions.html#bool)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.193")]
 pub(crate) struct NativeLiterals {
     literal_type: LiteralType,
 }
@@ -159,14 +165,17 @@ pub(crate) fn native_literals(
                 args,
                 keywords,
                 range: _,
+                node_index: _,
             },
-        range: _,
+        range: call_range,
+        node_index: _,
     } = call;
 
     if !keywords.is_empty() || args.len() > 1 {
         return;
     }
 
+    let tokens = checker.tokens();
     let semantic = checker.semantic();
 
     let Some(builtin) = semantic.resolve_builtin_symbol(func) else {
@@ -191,13 +200,14 @@ pub(crate) fn native_literals(
 
     match args.first() {
         None => {
-            let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
-
             // Do not suggest fix for attribute access on an int like `int().attribute`
             // Ex) `int().denominator` is valid but `0.denominator` is not
             if literal_type == LiteralType::Int && matches!(parent_expr, Some(Expr::Attribute(_))) {
                 return;
             }
+
+            let mut diagnostic =
+                checker.report_diagnostic(NativeLiterals { literal_type }, call.range());
 
             let expr = literal_type.as_zero_value_expr(checker);
             let content = checker.generator().expr(&expr);
@@ -205,7 +215,6 @@ pub(crate) fn native_literals(
                 content,
                 call.range(),
             )));
-            checker.report_diagnostic(diagnostic);
         }
         Some(arg) => {
             let (has_unary_op, literal_expr) = if let Some(literal_expr) = arg.as_literal_expr() {
@@ -243,7 +252,23 @@ pub(crate) fn native_literals(
 
             let arg_code = checker.locator().slice(arg);
 
-            let content = match (parent_expr, literal_type, has_unary_op) {
+            let mut needs_space = false;
+            // Look for the `Rpar` token of the call expression and check if there is a keyword token right
+            // next to it without any space separating them. Without this check, the fix for this
+            // rule would create a syntax error.
+            // Ex) `bool(True)and None` no space between `)` and the keyword `and`.
+            //
+            // Subtract 1 from the end of the range to include `Rpar` token in the slice.
+            if let [paren_token, next_token, ..] = tokens.after(call_range.sub_end(1.into()).end())
+            {
+                needs_space = next_token.kind().is_keyword()
+                    && paren_token.range().end() == next_token.range().start();
+            }
+
+            let mut content = match (parent_expr, literal_type, has_unary_op) {
+                // Expressions including newlines must be parenthesised to be valid syntax
+                (_, _, true) if find_newline(arg_code).is_some() => format!("({arg_code})"),
+
                 // Attribute access on an integer requires the integer to be parenthesized to disambiguate from a float
                 // Ex) `(7).denominator` is valid but `7.denominator` is not
                 // Note that floats do not have this problem
@@ -261,6 +286,10 @@ pub(crate) fn native_literals(
                 _ => arg_code.to_string(),
             };
 
+            if needs_space {
+                content.push(' ');
+            }
+
             let applicability = if checker.comment_ranges().intersects(call.range) {
                 Applicability::Unsafe
             } else {
@@ -269,8 +298,9 @@ pub(crate) fn native_literals(
             let edit = Edit::range_replacement(content, call.range());
             let fix = Fix::applicable_edit(edit, applicability);
 
-            let diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
-            checker.report_diagnostic(diagnostic.with_fix(fix));
+            checker
+                .report_diagnostic(NativeLiterals { literal_type }, call.range())
+                .set_fix(fix);
         }
     }
 }

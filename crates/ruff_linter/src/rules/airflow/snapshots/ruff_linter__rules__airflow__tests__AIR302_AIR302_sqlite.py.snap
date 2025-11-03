@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR302 [*] `airflow.hooks.sqlite_hook.SqliteHook` is moved into `sqlite` provider in Airflow 3.0;
+ --> AIR302_sqlite.py:5:1
+  |
+3 | from airflow.hooks.sqlite_hook import SqliteHook
+4 |
+5 | SqliteHook()
+  | ^^^^^^^^^^
+  |
+help: Install `apache-airflow-providers-sqlite>=1.0.0` and use `SqliteHook` from `airflow.providers.sqlite.hooks.sqlite` instead.
+1 | from __future__ import annotations
+2 | 
+  - from airflow.hooks.sqlite_hook import SqliteHook
+3 + from airflow.providers.sqlite.hooks.sqlite import SqliteHook
+4 | 
+5 | SqliteHook()
+note: This is an unsafe fix and may change runtime behavior

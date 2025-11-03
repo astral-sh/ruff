@@ -1,9 +1,13 @@
 [files]
 # https://github.com/crate-ci/typos/issues/868
 extend-exclude = [
-    "crates/red_knot_vendored/vendor/**/*",
+    "crates/ty_vendored/vendor/**/*",
     "**/resources/**/*",
     "**/snapshots/**/*",
+    # Completion tests tend to have a lot of incomplete
+    # words naturally. It's annoying to have to make all
+    # of them actually words. So just ignore typos here.
+    "crates/ty_ide/src/completion.rs",
 ]
 
 [default.extend-words]
@@ -27,6 +31,7 @@ extend-ignore-re = [
     "typ",
     # TODO: Remove this once the `TYP` redirects are removed from `rule_redirects.rs`
     "TYP",
+    "ntBre"
 ]
 
 [default.extend-identifiers]

@@ -1,0 +1,49 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - Union type as iterable where one union element has invalid `__iter__` method
+mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class TestIter:
+ 2 |     def __next__(self) -> int:
+ 3 |         return 42
+ 4 | 
+ 5 | class Test:
+ 6 |     def __iter__(self) -> TestIter:
+ 7 |         return TestIter()
+ 8 | 
+ 9 | class Test2:
+10 |     def __iter__(self) -> int:
+11 |         return 42
+12 | 
+13 | def _(flag: bool):
+14 |     # TODO: Improve error message to state which union variant isn't iterable (https://github.com/astral-sh/ruff/issues/13989)
+15 |     # error: [not-iterable]
+16 |     for x in Test() if flag else Test2():
+17 |         reveal_type(x)  # revealed: int
+```
+
+# Diagnostics
+
+```
+error[not-iterable]: Object of type `Test | Test2` may not be iterable
+  --> src/mdtest_snippet.py:16:14
+   |
+14 |     # TODO: Improve error message to state which union variant isn't iterable (https://github.com/astral-sh/ruff/issues/13989)
+15 |     # error: [not-iterable]
+16 |     for x in Test() if flag else Test2():
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+17 |         reveal_type(x)  # revealed: int
+   |
+info: Its `__iter__` method returns an object of type `TestIter | int`, which may not have a `__next__` method
+info: rule `not-iterable` is enabled by default
+
+```

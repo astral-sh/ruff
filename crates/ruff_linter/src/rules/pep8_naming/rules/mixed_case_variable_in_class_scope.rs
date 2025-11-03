@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
 
@@ -41,6 +41,7 @@ use crate::rules::pep8_naming::helpers;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.89")]
 pub(crate) struct MixedCaseVariableInClassScope {
     name: String,
 }
@@ -72,14 +73,14 @@ pub(crate) fn mixed_case_variable_in_class_scope(
         return;
     }
 
-    if checker.settings.pep8_naming.ignore_names.matches(name) {
+    if checker.settings().pep8_naming.ignore_names.matches(name) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         MixedCaseVariableInClassScope {
             name: name.to_string(),
         },
         expr.range(),
-    ));
+    );
 }

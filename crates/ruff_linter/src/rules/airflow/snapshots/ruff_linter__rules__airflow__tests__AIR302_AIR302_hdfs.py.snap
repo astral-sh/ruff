@@ -1,0 +1,40 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR302 [*] `airflow.hooks.webhdfs_hook.WebHDFSHook` is moved into `apache-hdfs` provider in Airflow 3.0;
+ --> AIR302_hdfs.py:6:1
+  |
+4 | from airflow.sensors.web_hdfs_sensor import WebHdfsSensor
+5 |
+6 | WebHDFSHook()
+  | ^^^^^^^^^^^
+7 | WebHdfsSensor()
+  |
+help: Install `apache-airflow-providers-apache-hdfs>=1.0.0` and use `WebHDFSHook` from `airflow.providers.apache.hdfs.hooks.webhdfs` instead.
+1 | from __future__ import annotations
+2 | 
+  - from airflow.hooks.webhdfs_hook import WebHDFSHook
+3 | from airflow.sensors.web_hdfs_sensor import WebHdfsSensor
+4 + from airflow.providers.apache.hdfs.hooks.webhdfs import WebHDFSHook
+5 | 
+6 | WebHDFSHook()
+7 | WebHdfsSensor()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR302 [*] `airflow.sensors.web_hdfs_sensor.WebHdfsSensor` is moved into `apache-hdfs` provider in Airflow 3.0;
+ --> AIR302_hdfs.py:7:1
+  |
+6 | WebHDFSHook()
+7 | WebHdfsSensor()
+  | ^^^^^^^^^^^^^
+  |
+help: Install `apache-airflow-providers-apache-hdfs>=1.0.0` and use `WebHdfsSensor` from `airflow.providers.apache.hdfs.sensors.web_hdfs` instead.
+1 | from __future__ import annotations
+2 | 
+3 | from airflow.hooks.webhdfs_hook import WebHDFSHook
+  - from airflow.sensors.web_hdfs_sensor import WebHdfsSensor
+4 + from airflow.providers.apache.hdfs.sensors.web_hdfs import WebHdfsSensor
+5 | 
+6 | WebHDFSHook()
+7 | WebHdfsSensor()
+note: This is an unsafe fix and may change runtime behavior

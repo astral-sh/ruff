@@ -4,15 +4,15 @@ use ruff_python_ast::{
     self as ast, AnyNodeRef, Comprehension, Expr, ModModule, Parameter, Parameters, StringLike,
 };
 use ruff_python_trivia::{
-    find_only_token_in_range, first_non_trivia_token, indentation_at_offset, BackwardsTokenizer,
-    CommentRanges, SimpleToken, SimpleTokenKind, SimpleTokenizer,
+    BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind, SimpleTokenizer,
+    find_only_token_in_range, first_non_trivia_token, indentation_at_offset,
 };
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange};
 use std::cmp::Ordering;
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
-use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
+use crate::expression::expr_slice::{ExprSliceCommentSection, assign_comment_in_slice};
 use crate::expression::parentheses::is_expression_parenthesized;
 use crate::other::parameters::{
     assign_argument_separator_comment_placement, find_parameter_separators,
@@ -273,7 +273,7 @@ fn handle_enclosed_comment<'a>(
                     .any(|token| token.kind() == SimpleTokenKind::LBracket)
                 {
                     return CommentPlacement::Default(comment);
-                };
+                }
 
                 // If there are no additional tokens between the open parenthesis and the comment, then
                 // it should be attached as a dangling comment on the brackets, rather than a leading
@@ -311,39 +311,39 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::StmtClassDef(class_def) => {
             handle_leading_class_with_decorators_comment(comment, class_def)
         }
-        AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
+        AnyNodeRef::StmtImportFrom(import_from) => {
+            handle_import_from_comment(comment, import_from, source)
+        }
+        AnyNodeRef::Alias(alias) => handle_alias_comment(comment, alias, source),
         AnyNodeRef::StmtWith(with_) => handle_with_comment(comment, with_),
         AnyNodeRef::ExprCall(_) => handle_call_comment(comment),
-        AnyNodeRef::ExprStringLiteral(_) => {
-            if let Some(AnyNodeRef::FString(fstring)) = comment.enclosing_parent() {
-                CommentPlacement::dangling(fstring, comment)
-            } else {
-                CommentPlacement::Default(comment)
-            }
-        }
+        AnyNodeRef::ExprStringLiteral(_) => match comment.enclosing_parent() {
+            Some(AnyNodeRef::FString(fstring)) => CommentPlacement::dangling(fstring, comment),
+            Some(AnyNodeRef::TString(tstring)) => CommentPlacement::dangling(tstring, comment),
+            _ => CommentPlacement::Default(comment),
+        },
         AnyNodeRef::FString(fstring) => CommentPlacement::dangling(fstring, comment),
-        AnyNodeRef::FStringExpressionElement(_) => {
-            // Handle comments after the format specifier (should be rare):
-            //
-            // ```python
-            // f"literal {
-            //     expr:.3f
-            //     # comment
-            // }"
-            // ```
-            //
-            // This is a valid comment placement.
-            if matches!(
-                comment.preceding_node(),
-                Some(
-                    AnyNodeRef::FStringExpressionElement(_) | AnyNodeRef::FStringLiteralElement(_)
-                )
-            ) {
-                CommentPlacement::trailing(comment.enclosing_node(), comment)
-            } else {
-                handle_bracketed_end_of_line_comment(comment, source)
+        AnyNodeRef::TString(tstring) => CommentPlacement::dangling(tstring, comment),
+        AnyNodeRef::InterpolatedElement(element) => {
+            if let Some(preceding) = comment.preceding_node() {
+                // Own line comment before format specifier
+                // ```py
+                // aaaaaaaaaaa = f"""asaaaaaaaaaaaaaaaa {
+                //    aaaaaaaaaaaa + bbbbbbbbbbbb + ccccccccccccccc + dddddddd
+                //    # comment
+                //    :.3f} cccccccccc"""
+                // ```
+                if comment.line_position().is_own_line()
+                    && element.format_spec.is_some()
+                    && comment.following_node().is_some()
+                {
+                    return CommentPlacement::trailing(preceding, comment);
+                }
             }
+
+            handle_bracketed_end_of_line_comment(comment, source)
         }
+
         AnyNodeRef::ExprList(_)
         | AnyNodeRef::ExprSet(_)
         | AnyNodeRef::ExprListComp(_)
@@ -1066,6 +1066,7 @@ fn handle_slice_comments<'a>(
 ) -> CommentPlacement<'a> {
     let ast::ExprSlice {
         range: _,
+        node_index: _,
         lower,
         upper,
         step,
@@ -1393,7 +1394,7 @@ fn handle_attribute_comment<'a>(
     {
         if comment.start() < right_paren.start() {
             return CommentPlacement::trailing(attribute.value.as_ref(), comment);
-        };
+        }
     }
 
     // If the comment precedes the `.`, treat it as trailing _if_ it's on the same line as the
@@ -1449,6 +1450,7 @@ fn handle_expr_if_comment<'a>(
 ) -> CommentPlacement<'a> {
     let ast::ExprIf {
         range: _,
+        node_index: _,
         test,
         body,
         orelse,
@@ -1648,7 +1650,7 @@ fn handle_pattern_match_mapping_comment<'a>(
     // like `rest` above, isn't a node.)
     if comment.following_node().is_some() {
         return CommentPlacement::Default(comment);
-    };
+    }
 
     // If there's no rest pattern, no need to do anything special.
     let Some(rest) = pattern.rest.as_ref() else {
@@ -1923,7 +1925,7 @@ fn handle_bracketed_end_of_line_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
-/// Attach an enclosed end-of-line comment to a [`ast::StmtImportFrom`].
+/// Attach an enclosed comment to a [`ast::StmtImportFrom`].
 ///
 /// For example, given:
 /// ```python
@@ -1934,9 +1936,37 @@ fn handle_bracketed_end_of_line_comment<'a>(
 ///
 /// The comment will be attached to the [`ast::StmtImportFrom`] node as a dangling comment, to
 /// ensure that it remains on the same line as the [`ast::StmtImportFrom`] itself.
+///
+/// If the comment's preceding node is an alias, and the comment is *before* a comma:
+/// ```python
+/// from foo import (
+///     bar as baz  # comment
+///     ,
+/// )
+/// ```
+///
+/// The comment will then be attached to the [`ast::Alias`] node as a dangling comment instead,
+/// to ensure that it retains its position before the comma.
+///
+/// Otherwise, if the comment is *after* the comma or before a following alias:
+/// ```python
+/// from foo import (
+///     bar as baz,  # comment
+/// )
+///
+/// from foo import (
+///     bar,
+///     # comment
+///     baz,
+/// )
+/// ```
+///
+/// Then it will retain the default behavior of being attached to the relevant [`ast::Alias`] node
+/// as either a leading or trailing comment.
 fn handle_import_from_comment<'a>(
     comment: DecoratedComment<'a>,
     import_from: &'a ast::StmtImportFrom,
+    source: &str,
 ) -> CommentPlacement<'a> {
     // The comment needs to be on the same line, but before the first member. For example, we want
     // to treat this as a dangling comment:
@@ -1964,8 +1994,67 @@ fn handle_import_from_comment<'a>(
     {
         CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {
-        CommentPlacement::Default(comment)
+        if let Some(SimpleToken {
+            kind: SimpleTokenKind::Comma,
+            ..
+        }) = SimpleTokenizer::starts_at(comment.start(), source)
+            .skip_trivia()
+            .next()
+        {
+            // Treat comments before the comma as dangling, after as trailing (default)
+            if let Some(AnyNodeRef::Alias(alias)) = comment.preceding_node() {
+                CommentPlacement::dangling(alias, comment)
+            } else {
+                CommentPlacement::Default(comment)
+            }
+        } else {
+            CommentPlacement::Default(comment)
+        }
     }
+}
+
+/// Attach an enclosed comment to the appropriate [`ast::Identifier`]  within an [`ast::Alias`].
+///
+/// For example:
+/// ```python
+/// from foo import (
+///     bar  # comment
+///     as baz,
+/// )
+/// ```
+///
+/// Will attach the comment as a trailing comment on the first name [`ast::Identifier`].
+///
+/// Whereas:
+/// ```python
+/// from foo import (
+///     bar as  # comment
+///     baz,
+/// )
+/// ```
+///
+/// Will attach the comment as a leading comment on the second name [`ast::Identifier`].
+fn handle_alias_comment<'a>(
+    comment: DecoratedComment<'a>,
+    alias: &'a ruff_python_ast::Alias,
+    source: &str,
+) -> CommentPlacement<'a> {
+    if let Some(asname) = &alias.asname {
+        if let Some(SimpleToken {
+            kind: SimpleTokenKind::As,
+            range: as_range,
+        }) = SimpleTokenizer::starts_at(alias.name.end(), source)
+            .skip_trivia()
+            .next()
+        {
+            return if comment.start() < as_range.start() {
+                CommentPlacement::trailing(&alias.name, comment)
+            } else {
+                CommentPlacement::leading(asname, comment)
+            };
+        }
+    }
+    CommentPlacement::Default(comment)
 }
 
 /// Attach an enclosed end-of-line comment to a [`ast::StmtWith`].
@@ -2256,7 +2345,9 @@ mod tests {
         );
 
         assert_eq!(
-            max_empty_lines("# trailing comment\n\n# own line comment\n\n\n# an other own line comment\n# block"),
+            max_empty_lines(
+                "# trailing comment\n\n# own line comment\n\n\n# an other own line comment\n# block"
+            ),
             2
         );
 

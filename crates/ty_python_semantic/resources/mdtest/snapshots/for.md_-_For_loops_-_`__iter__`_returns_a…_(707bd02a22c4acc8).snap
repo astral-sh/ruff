@@ -1,0 +1,68 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - `__iter__` returns an iterator with an invalid `__next__` method
+mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class Iterator1:
+ 2 |     def __next__(self, extra_arg) -> int:
+ 3 |         return 42
+ 4 | 
+ 5 | class Iterator2:
+ 6 |     __next__: None = None
+ 7 | 
+ 8 | class Iterable1:
+ 9 |     def __iter__(self) -> Iterator1:
+10 |         return Iterator1()
+11 | 
+12 | class Iterable2:
+13 |     def __iter__(self) -> Iterator2:
+14 |         return Iterator2()
+15 | 
+16 | # error: [not-iterable]
+17 | for x in Iterable1():
+18 |     reveal_type(x)  # revealed: int
+19 | 
+20 | # error: [not-iterable]
+21 | for y in Iterable2():
+22 |     reveal_type(y)  # revealed: Unknown
+```
+
+# Diagnostics
+
+```
+error[not-iterable]: Object of type `Iterable1` is not iterable
+  --> src/mdtest_snippet.py:17:10
+   |
+16 | # error: [not-iterable]
+17 | for x in Iterable1():
+   |          ^^^^^^^^^^^
+18 |     reveal_type(x)  # revealed: int
+   |
+info: Its `__iter__` method returns an object of type `Iterator1`, which has an invalid `__next__` method
+info: Expected signature for `__next__` is `def __next__(self): ...`
+info: rule `not-iterable` is enabled by default
+
+```
+
+```
+error[not-iterable]: Object of type `Iterable2` is not iterable
+  --> src/mdtest_snippet.py:21:10
+   |
+20 | # error: [not-iterable]
+21 | for y in Iterable2():
+   |          ^^^^^^^^^^^
+22 |     reveal_type(y)  # revealed: Unknown
+   |
+info: Its `__iter__` method returns an object of type `Iterator2`, which has a `__next__` attribute that is not callable
+info: rule `not-iterable` is enabled by default
+
+```

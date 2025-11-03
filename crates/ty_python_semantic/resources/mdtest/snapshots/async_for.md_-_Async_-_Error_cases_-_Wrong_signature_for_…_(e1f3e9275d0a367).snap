@@ -1,0 +1,45 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: async_for.md - Async - Error cases - Wrong signature for `__aiter__`
+mdtest path: crates/ty_python_semantic/resources/mdtest/loops/async_for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class AsyncIterator:
+ 2 |     async def __anext__(self) -> int:
+ 3 |         return 42
+ 4 | 
+ 5 | class AsyncIterable:
+ 6 |     def __aiter__(self, arg: int) -> AsyncIterator:  # wrong
+ 7 |         return AsyncIterator()
+ 8 | 
+ 9 | async def foo():
+10 |     # error: [not-iterable] "Object of type `AsyncIterable` is not async-iterable"
+11 |     async for x in AsyncIterable():
+12 |         reveal_type(x)  # revealed: int
+```
+
+# Diagnostics
+
+```
+error[not-iterable]: Object of type `AsyncIterable` is not async-iterable
+  --> src/mdtest_snippet.py:11:20
+   |
+ 9 | async def foo():
+10 |     # error: [not-iterable] "Object of type `AsyncIterable` is not async-iterable"
+11 |     async for x in AsyncIterable():
+   |                    ^^^^^^^^^^^^^^^
+12 |         reveal_type(x)  # revealed: int
+   |
+info: Its `__aiter__` method has an invalid signature
+info: Expected signature `def __aiter__(self): ...`
+info: rule `not-iterable` is enabled by default
+
+```

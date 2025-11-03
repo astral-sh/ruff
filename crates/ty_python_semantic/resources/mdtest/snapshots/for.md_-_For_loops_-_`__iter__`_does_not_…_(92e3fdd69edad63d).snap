@@ -1,0 +1,38 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - `__iter__` does not return an iterator
+mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class Bad:
+2 |     def __iter__(self) -> int:
+3 |         return 42
+4 | 
+5 | # error: [not-iterable]
+6 | for x in Bad():
+7 |     reveal_type(x)  # revealed: Unknown
+```
+
+# Diagnostics
+
+```
+error[not-iterable]: Object of type `Bad` is not iterable
+ --> src/mdtest_snippet.py:6:10
+  |
+5 | # error: [not-iterable]
+6 | for x in Bad():
+  |          ^^^^^
+7 |     reveal_type(x)  # revealed: Unknown
+  |
+info: Its `__iter__` method returns an object of type `int`, which has no `__next__` method
+info: rule `not-iterable` is enabled by default
+
+```

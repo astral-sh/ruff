@@ -1,13 +1,13 @@
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableLiteral;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, CmpOp, ElifElseClause, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -18,19 +18,25 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
-/// if x == 1:
-///     return "Hello"
-/// elif x == 2:
-///     return "Goodbye"
-/// else:
-///     return "Goodnight"
+/// def find_phrase(x):
+///     if x == 1:
+///         return "Hello"
+///     elif x == 2:
+///         return "Goodbye"
+///     elif x == 3:
+///         return "Good morning"
+///     else:
+///         return "Goodnight"
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// return {1: "Hello", 2: "Goodbye"}.get(x, "Goodnight")
+/// def find_phrase(x):
+///     phrases = {1: "Hello", 2: "Goodye", 3: "Good morning"}
+///     return phrases.get(x, "Goodnight")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.250")]
 pub(crate) struct IfElseBlockInsteadOfDictLookup;
 
 impl Violation for IfElseBlockInsteadOfDictLookup {
@@ -57,6 +63,7 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
         ops,
         comparators,
         range: _,
+        node_index: _,
     }) = test.as_ref()
     else {
         return;
@@ -73,7 +80,14 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
     let Some(literal_expr) = expr.as_literal_expr() else {
         return;
     };
-    let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
+    let [
+        Stmt::Return(ast::StmtReturn {
+            value,
+            range: _,
+            node_index: _,
+        }),
+    ] = body.as_slice()
+    else {
         return;
     };
 
@@ -99,7 +113,14 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
 
     for clause in elif_else_clauses {
         let ElifElseClause { test, body, .. } = clause;
-        let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
+        let [
+            Stmt::Return(ast::StmtReturn {
+                value,
+                range: _,
+                node_index: _,
+            }),
+        ] = body.as_slice()
+        else {
             return;
         };
 
@@ -107,14 +128,21 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
             // `else`
             None => {
                 // The else must also be a single effect-free return statement
-                let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
+                let [
+                    Stmt::Return(ast::StmtReturn {
+                        value,
+                        range: _,
+                        node_index: _,
+                    }),
+                ] = body.as_slice()
+                else {
                     return;
                 };
                 if value.as_ref().is_some_and(|value| {
                     contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
                 }) {
                     return;
-                };
+                }
             }
             // `elif`
             Some(Expr::Compare(ast::ExprCompare {
@@ -122,6 +150,7 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
                 ops,
                 comparators,
                 range: _,
+                node_index: _,
             })) => {
                 let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
                     return;
@@ -140,7 +169,7 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
                     contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
                 }) {
                     return;
-                };
+                }
 
                 // The `expr` was checked to be a literal above, so this is safe.
                 literals.insert(literal_expr.into());
@@ -156,8 +185,5 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
-        IfElseBlockInsteadOfDictLookup,
-        stmt_if.range(),
-    ));
+    checker.report_diagnostic(IfElseBlockInsteadOfDictLookup, stmt_if.range());
 }

@@ -31,7 +31,7 @@ no_sep = None
 
 " a*a a*a a ".split("*", -1)  # [" a", "a a", "a a "]
 "".split()  # []
-""" 	
+"""
 """.split()  # []
 "   	".split()  # []
 "/abc/".split() # ["/abc/"]
@@ -73,7 +73,7 @@ r"\n " "\n".split()  # [r"\n"]
 
 # negatives
 
-# invalid values should not cause panic 
+# invalid values should not cause panic
 "a,b,c,d".split(maxsplit="hello")
 "a,b,c,d".split(maxsplit=-"hello")
 
@@ -106,3 +106,68 @@ b"TesT.WwW.ExamplE.CoM".split(b".")
 '''itemC'''
 "'itemD'"
 """.split()
+
+# https://github.com/astral-sh/ruff/issues/18042
+print("a,b".rsplit(","))
+print("a,b,c".rsplit(",", 1))
+
+# https://github.com/astral-sh/ruff/issues/18069
+
+print("".split(maxsplit=0))
+print("".split(sep=None, maxsplit=0))
+print(" ".split(maxsplit=0))
+print(" ".split(sep=None, maxsplit=0))
+print(" x ".split(maxsplit=0))
+print(" x ".split(sep=None, maxsplit=0))
+print("  x  ".split(maxsplit=0))
+print("  x  ".split(sep=None, maxsplit=0))
+print("".rsplit(maxsplit=0))
+print("".rsplit(sep=None, maxsplit=0))
+print(" ".rsplit(maxsplit=0))
+print(" ".rsplit(sep=None, maxsplit=0))
+print(" x ".rsplit(maxsplit=0))
+print(" x ".rsplit(maxsplit=0))
+print(" x ".rsplit(sep=None, maxsplit=0))
+print("  x  ".rsplit(maxsplit=0))
+print("  x  ".rsplit(sep=None, maxsplit=0))
+
+# https://github.com/astral-sh/ruff/issues/19581 - embedded quotes in raw strings
+r"""simple@example.com
+very.common@example.com
+FirstName.LastName@EasierReading.org
+x@example.com
+long.email-address-with-hyphens@and.subdomains.example.com
+user.name+tag+sorting@example.com
+name/surname@example.com
+xample@s.example
+" "@example.org
+"john..doe"@example.org
+mailhost!username@example.org
+"very.(),:;<>[]\".VERY.\"very@\\ \"very\".unusual"@strange.example.com
+user%example.com@example.org
+user-@example.org
+I❤️CHOCOLATE@example.com
+this\ still\"not\\allowed@example.com
+stellyamburrr985@example.com
+Abc.123@example.com
+user+mailbox/department=shipping@example.com
+!#$%&'*+-/=?^_`.{|}~@example.com
+"Abc@def"@example.com
+"Fred\ Bloggs"@example.com
+"Joe.\\Blow"@example.com""".split("\n")
+
+
+r"""first
+'no need' to escape
+"swap" quote style
+"use' ugly triple quotes""".split("\n")
+
+# https://github.com/astral-sh/ruff/issues/19845
+print("S\x1cP\x1dL\x1eI\x1fT".split())
+print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
+print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
+
+# leading/trailing whitespace should not count towards maxsplit
+" a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
+" a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+"a  b".split(maxsplit=1)  # ["a", "b"]

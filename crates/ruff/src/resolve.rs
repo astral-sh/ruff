@@ -1,14 +1,14 @@
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use log::debug;
 use path_absolutize::path_dedot;
 
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::pyproject::{self, find_fallback_target_version};
 use ruff_workspace::resolver::{
-    resolve_root_settings, ConfigurationOrigin, ConfigurationTransformer, PyprojectConfig,
-    PyprojectDiscoveryStrategy,
+    ConfigurationOrigin, ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy,
+    resolve_root_settings,
 };
 
 use ruff_python_ast as ast;
@@ -21,10 +21,14 @@ pub fn resolve(
     config_arguments: &ConfigArguments,
     stdin_filename: Option<&Path>,
 ) -> Result<PyprojectConfig> {
+    let Ok(cwd) = std::env::current_dir() else {
+        bail!("Working directory does not exist")
+    };
+
     // First priority: if we're running in isolated mode, use the default settings.
     if config_arguments.isolated {
         let config = config_arguments.transform(Configuration::default());
-        let settings = config.into_settings(&path_dedot::CWD)?;
+        let settings = config.into_settings(&cwd)?;
         debug!("Isolated mode, not reading any pyproject.toml");
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Fixed,
@@ -58,11 +62,7 @@ pub fn resolve(
     // that directory. (With `Strategy::Hierarchical`, we'll end up finding
     // the "closest" `pyproject.toml` file for every Python file later on,
     // so these act as the "default" settings.)
-    if let Some(pyproject) = pyproject::find_settings_toml(
-        stdin_filename
-            .as_ref()
-            .unwrap_or(&path_dedot::CWD.as_path()),
-    )? {
+    if let Some(pyproject) = pyproject::find_settings_toml(stdin_filename.unwrap_or(&cwd))? {
         debug!(
             "Using configuration file (via parent) at: {}",
             pyproject.display()
@@ -130,17 +130,13 @@ pub fn resolve(
         // `pyproject::find_settings_toml`.)
         // However, there may be a `pyproject.toml` with a `requires-python`
         // specified, and that is what we look for in this step.
-        let fallback = find_fallback_target_version(
-            stdin_filename
-                .as_ref()
-                .unwrap_or(&path_dedot::CWD.as_path()),
-        );
+        let fallback = find_fallback_target_version(stdin_filename.unwrap_or(&cwd));
         if let Some(version) = fallback {
             debug!("Derived `target-version` from found `requires-python`: {version:?}");
         }
         config.target_version = fallback.map(ast::PythonVersion::from);
     }
-    let settings = config.into_settings(&path_dedot::CWD)?;
+    let settings = config.into_settings(&cwd)?;
     Ok(PyprojectConfig::new(
         PyprojectDiscoveryStrategy::Hierarchical,
         settings,

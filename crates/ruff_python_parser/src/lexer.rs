@@ -13,20 +13,24 @@ use unicode_ident::{is_xid_continue, is_xid_start};
 use unicode_normalization::UnicodeNormalization;
 
 use ruff_python_ast::name::Name;
+use ruff_python_ast::str_prefix::{AnyStringPrefix, StringLiteralPrefix};
 use ruff_python_ast::{Int, IpyEscapeKind, StringFlags};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use crate::error::{FStringErrorType, LexicalError, LexicalErrorType};
-use crate::lexer::cursor::{Cursor, EOF_CHAR};
-use crate::lexer::fstring::{FStringContext, FStrings, FStringsCheckpoint};
-use crate::lexer::indentation::{Indentation, Indentations, IndentationsCheckpoint};
-use crate::token::{TokenFlags, TokenKind, TokenValue};
 use crate::Mode;
+use crate::error::{InterpolatedStringErrorType, LexicalError, LexicalErrorType};
+use crate::lexer::cursor::{Cursor, EOF_CHAR};
+use crate::lexer::indentation::{Indentation, Indentations, IndentationsCheckpoint};
+use crate::lexer::interpolated_string::{
+    InterpolatedStringContext, InterpolatedStrings, InterpolatedStringsCheckpoint,
+};
+use crate::string::InterpolatedStringKind;
+use crate::token::{TokenFlags, TokenKind, TokenValue};
 
 mod cursor;
-mod fstring;
 mod indentation;
+mod interpolated_string;
 
 const BOM: char = '\u{feff}';
 
@@ -65,8 +69,8 @@ pub struct Lexer<'src> {
     /// Lexer mode.
     mode: Mode,
 
-    /// F-string contexts.
-    fstrings: FStrings,
+    /// F-string and t-string contexts.
+    interpolated_strings: InterpolatedStrings,
 
     /// Errors encountered while lexing.
     errors: Vec<LexicalError>,
@@ -102,7 +106,7 @@ impl<'src> Lexer<'src> {
             indentations: Indentations::default(),
             pending_indentation: None,
             mode,
-            fstrings: FStrings::default(),
+            interpolated_strings: InterpolatedStrings::default(),
             errors: Vec::new(),
         };
 
@@ -162,11 +166,11 @@ impl<'src> Lexer<'src> {
     }
 
     fn lex_token(&mut self) -> TokenKind {
-        if let Some(fstring) = self.fstrings.current() {
-            if !fstring.is_in_expression(self.nesting) {
-                if let Some(token) = self.lex_fstring_middle_or_end() {
-                    if matches!(token, TokenKind::FStringEnd) {
-                        self.fstrings.pop();
+        if let Some(interpolated_string) = self.interpolated_strings.current() {
+            if !interpolated_string.is_in_interpolation(self.nesting) {
+                if let Some(token) = self.lex_interpolated_string_middle_or_end() {
+                    if token.is_interpolated_string_end() {
+                        self.interpolated_strings.pop();
                     }
                     return token;
                 }
@@ -246,15 +250,16 @@ impl<'src> Lexer<'src> {
                     self.cursor.bump();
                     if self.cursor.eat_char('\r') {
                         self.cursor.eat_char('\n');
-                    } else if self.cursor.is_eof() {
-                        return Some(self.push_error(LexicalError::new(
-                            LexicalErrorType::Eof,
-                            self.token_range(),
-                        )));
                     } else if !self.cursor.eat_char('\n') {
                         return Some(self.push_error(LexicalError::new(
                             LexicalErrorType::LineContinuationError,
                             TextRange::at(self.offset() - '\\'.text_len(), '\\'.text_len()),
+                        )));
+                    }
+                    if self.cursor.is_eof() {
+                        return Some(self.push_error(LexicalError::new(
+                            LexicalErrorType::Eof,
+                            self.token_range(),
                         )));
                     }
                     indentation = Indentation::root();
@@ -280,7 +285,7 @@ impl<'src> Lexer<'src> {
     }
 
     fn handle_indentation(&mut self, indentation: Indentation) -> Option<TokenKind> {
-        let token = match self.indentations.current().try_compare(indentation) {
+        match self.indentations.current().try_compare(indentation) {
             // Dedent
             Ok(Ordering::Greater) => {
                 self.pending_indentation = Some(indentation);
@@ -290,7 +295,7 @@ impl<'src> Lexer<'src> {
                         LexicalErrorType::IndentationError,
                         self.token_range(),
                     )));
-                };
+                }
 
                 // The lexer might've eaten some whitespaces to calculate the `indentation`. For
                 // example:
@@ -317,15 +322,11 @@ impl<'src> Lexer<'src> {
                 self.indentations.indent(indentation);
                 Some(TokenKind::Indent)
             }
-            Err(_) => {
-                return Some(self.push_error(LexicalError::new(
-                    LexicalErrorType::IndentationError,
-                    self.token_range(),
-                )));
-            }
-        };
-
-        token
+            Err(_) => Some(self.push_error(LexicalError::new(
+                LexicalErrorType::IndentationError,
+                self.token_range(),
+            ))),
+        }
     }
 
     fn skip_whitespace(&mut self) -> Result<(), LexicalError> {
@@ -341,13 +342,14 @@ impl<'src> Lexer<'src> {
                     self.cursor.bump();
                     if self.cursor.eat_char('\r') {
                         self.cursor.eat_char('\n');
-                    } else if self.cursor.is_eof() {
-                        return Err(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
                     } else if !self.cursor.eat_char('\n') {
                         return Err(LexicalError::new(
                             LexicalErrorType::LineContinuationError,
                             TextRange::at(self.offset() - '\\'.text_len(), '\\'.text_len()),
                         ));
+                    }
+                    if self.cursor.is_eof() {
+                        return Err(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
                     }
                 }
                 // Form feed
@@ -508,23 +510,26 @@ impl<'src> Lexer<'src> {
                 TokenKind::Lbrace
             }
             '}' => {
-                if let Some(fstring) = self.fstrings.current_mut() {
-                    if fstring.nesting() == self.nesting {
-                        return self.push_error(LexicalError::new(
-                            LexicalErrorType::FStringError(FStringErrorType::SingleRbrace),
-                            self.token_range(),
-                        ));
+                if let Some(interpolated_string) = self.interpolated_strings.current_mut() {
+                    if interpolated_string.nesting() == self.nesting {
+                        let error_type = LexicalErrorType::from_interpolated_string_error(
+                            InterpolatedStringErrorType::SingleRbrace,
+                            interpolated_string.kind(),
+                        );
+                        return self.push_error(LexicalError::new(error_type, self.token_range()));
                     }
-                    fstring.try_end_format_spec(self.nesting);
+                    interpolated_string.try_end_format_spec(self.nesting);
                 }
                 self.nesting = self.nesting.saturating_sub(1);
                 TokenKind::Rbrace
             }
             ':' => {
                 if self
-                    .fstrings
+                    .interpolated_strings
                     .current_mut()
-                    .is_some_and(|fstring| fstring.try_start_format_spec(self.nesting))
+                    .is_some_and(|interpolated_string| {
+                        interpolated_string.try_start_format_spec(self.nesting)
+                    })
                 {
                     TokenKind::Colon
                 } else if self.cursor.eat_char('=') {
@@ -575,11 +580,11 @@ impl<'src> Lexer<'src> {
                     self.state = State::AfterNewline;
                     TokenKind::Newline
                 } else {
-                    if let Some(fstring) = self.fstrings.current_mut() {
-                        fstring.try_end_format_spec(self.nesting);
+                    if let Some(interpolated_string) = self.interpolated_strings.current_mut() {
+                        interpolated_string.try_end_format_spec(self.nesting);
                     }
                     TokenKind::NonLogicalNewline
-                }
+                };
             }
             '\r' => {
                 self.cursor.eat_char('\n');
@@ -588,8 +593,8 @@ impl<'src> Lexer<'src> {
                     self.state = State::AfterNewline;
                     TokenKind::Newline
                 } else {
-                    if let Some(fstring) = self.fstrings.current_mut() {
-                        fstring.try_end_format_spec(self.nesting);
+                    if let Some(interpolated_string) = self.interpolated_strings.current_mut() {
+                        interpolated_string.try_end_format_spec(self.nesting);
                     }
                     TokenKind::NonLogicalNewline
                 };
@@ -612,7 +617,7 @@ impl<'src> Lexer<'src> {
 
     /// Lex an identifier. Also used for keywords and string/bytes literals with a prefix.
     fn lex_identifier(&mut self, first: char) -> TokenKind {
-        // Detect potential string like rb'' b'' f'' u'' r''
+        // Detect potential string like rb'' b'' f'' t'' u'' r''
         let quote = match (first, self.cursor.first()) {
             (_, quote @ ('\'' | '"')) => self.try_single_char_prefix(first).then(|| {
                 self.cursor.bump();
@@ -629,8 +634,10 @@ impl<'src> Lexer<'src> {
         };
 
         if let Some(quote) = quote {
-            if self.current_flags.is_f_string() {
-                return self.lex_fstring_start(quote);
+            if self.current_flags.is_interpolated_string() {
+                if let Some(kind) = self.lex_interpolated_string_start(quote) {
+                    return kind;
+                }
             }
 
             return self.lex_string(quote);
@@ -713,6 +720,7 @@ impl<'src> Lexer<'src> {
     fn try_single_char_prefix(&mut self, first: char) -> bool {
         match first {
             'f' | 'F' => self.current_flags |= TokenFlags::F_STRING,
+            't' | 'T' => self.current_flags |= TokenFlags::T_STRING,
             'u' | 'U' => self.current_flags |= TokenFlags::UNICODE_STRING,
             'b' | 'B' => self.current_flags |= TokenFlags::BYTE_STRING,
             'r' => self.current_flags |= TokenFlags::RAW_STRING_LOWERCASE,
@@ -732,6 +740,12 @@ impl<'src> Lexer<'src> {
             ['R', 'f' | 'F'] | ['f' | 'F', 'R'] => {
                 self.current_flags |= TokenFlags::F_STRING | TokenFlags::RAW_STRING_UPPERCASE;
             }
+            ['r', 't' | 'T'] | ['t' | 'T', 'r'] => {
+                self.current_flags |= TokenFlags::T_STRING | TokenFlags::RAW_STRING_LOWERCASE;
+            }
+            ['R', 't' | 'T'] | ['t' | 'T', 'R'] => {
+                self.current_flags |= TokenFlags::T_STRING | TokenFlags::RAW_STRING_UPPERCASE;
+            }
             ['r', 'b' | 'B'] | ['b' | 'B', 'r'] => {
                 self.current_flags |= TokenFlags::BYTE_STRING | TokenFlags::RAW_STRING_LOWERCASE;
             }
@@ -743,8 +757,8 @@ impl<'src> Lexer<'src> {
         true
     }
 
-    /// Lex a f-string start token.
-    fn lex_fstring_start(&mut self, quote: char) -> TokenKind {
+    /// Lex a f-string or t-string start token if positioned at the start of an f-string or t-string.
+    fn lex_interpolated_string_start(&mut self, quote: char) -> Option<TokenKind> {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), quote);
 
@@ -756,27 +770,32 @@ impl<'src> Lexer<'src> {
             self.current_flags |= TokenFlags::TRIPLE_QUOTED_STRING;
         }
 
-        self.fstrings
-            .push(FStringContext::new(self.current_flags, self.nesting));
+        let ftcontext = InterpolatedStringContext::new(self.current_flags, self.nesting)?;
 
-        TokenKind::FStringStart
+        let kind = ftcontext.kind();
+
+        self.interpolated_strings.push(ftcontext);
+
+        Some(kind.start_token())
     }
 
-    /// Lex a f-string middle or end token.
-    fn lex_fstring_middle_or_end(&mut self) -> Option<TokenKind> {
+    /// Lex an f-string or t-string middle or end token.
+    fn lex_interpolated_string_middle_or_end(&mut self) -> Option<TokenKind> {
         // SAFETY: Safe because the function is only called when `self.fstrings` is not empty.
-        let fstring = self.fstrings.current().unwrap();
+        let interpolated_string = self.interpolated_strings.current().unwrap();
+        let string_kind = interpolated_string.kind();
+        let interpolated_flags = interpolated_string.flags();
 
         // Check if we're at the end of the f-string.
-        if fstring.is_triple_quoted() {
-            let quote_char = fstring.quote_char();
+        if interpolated_string.is_triple_quoted() {
+            let quote_char = interpolated_string.quote_char();
             if self.cursor.eat_char3(quote_char, quote_char, quote_char) {
-                self.current_flags = fstring.flags();
-                return Some(TokenKind::FStringEnd);
+                self.current_flags = interpolated_string.flags();
+                return Some(string_kind.end_token());
             }
-        } else if self.cursor.eat_char(fstring.quote_char()) {
-            self.current_flags = fstring.flags();
-            return Some(TokenKind::FStringEnd);
+        } else if self.cursor.eat_char(interpolated_string.quote_char()) {
+            self.current_flags = interpolated_string.flags();
+            return Some(string_kind.end_token());
         }
 
         // We have to decode `{{` and `}}` into `{` and `}` respectively. As an
@@ -788,7 +807,7 @@ impl<'src> Lexer<'src> {
         let mut last_offset = self.offset();
 
         // This isn't going to change for the duration of the loop.
-        let in_format_spec = fstring.is_in_format_spec(self.nesting);
+        let in_format_spec = interpolated_string.is_in_format_spec(self.nesting);
 
         let mut in_named_unicode = false;
 
@@ -798,30 +817,41 @@ impl<'src> Lexer<'src> {
                 // in the source code and the one returned by `self.cursor.first()` when
                 // we reach the end of the source code.
                 EOF_CHAR if self.cursor.is_eof() => {
-                    let error = if fstring.is_triple_quoted() {
-                        FStringErrorType::UnterminatedTripleQuotedString
+                    let error = if interpolated_string.is_triple_quoted() {
+                        InterpolatedStringErrorType::UnterminatedTripleQuotedString
                     } else {
-                        FStringErrorType::UnterminatedString
+                        InterpolatedStringErrorType::UnterminatedString
                     };
-                    self.fstrings.pop();
-                    return Some(self.push_error(LexicalError::new(
-                        LexicalErrorType::FStringError(error),
+
+                    self.nesting = interpolated_string.nesting();
+                    self.interpolated_strings.pop();
+                    self.current_flags |= TokenFlags::UNCLOSED_STRING;
+                    self.push_error(LexicalError::new(
+                        LexicalErrorType::from_interpolated_string_error(error, string_kind),
                         self.token_range(),
-                    )));
+                    ));
+
+                    break;
                 }
-                '\n' | '\r' if !fstring.is_triple_quoted() => {
-                    // If we encounter a newline while we're in a format spec, then
-                    // we stop here and let the lexer emit the newline token.
-                    //
-                    // Relevant discussion: https://github.com/python/cpython/issues/110259
-                    if in_format_spec {
-                        break;
-                    }
-                    self.fstrings.pop();
-                    return Some(self.push_error(LexicalError::new(
-                        LexicalErrorType::FStringError(FStringErrorType::UnterminatedString),
+                '\n' | '\r' if !interpolated_string.is_triple_quoted() => {
+                    // https://github.com/astral-sh/ruff/issues/18632
+
+                    let error_type = if in_format_spec {
+                        InterpolatedStringErrorType::NewlineInFormatSpec
+                    } else {
+                        InterpolatedStringErrorType::UnterminatedString
+                    };
+
+                    self.nesting = interpolated_string.nesting();
+                    self.interpolated_strings.pop();
+                    self.current_flags |= TokenFlags::UNCLOSED_STRING;
+
+                    self.push_error(LexicalError::new(
+                        LexicalErrorType::from_interpolated_string_error(error_type, string_kind),
                         self.token_range(),
-                    )));
+                    ));
+
+                    break;
                 }
                 '\\' => {
                     self.cursor.bump(); // '\'
@@ -829,7 +859,7 @@ impl<'src> Lexer<'src> {
                         // Don't consume `{` or `}` as we want them to be emitted as tokens.
                         // They will be handled in the next iteration.
                         continue;
-                    } else if !fstring.is_raw_string() {
+                    } else if !interpolated_string.is_raw_string() {
                         if self.cursor.eat_char2('N', '{') {
                             in_named_unicode = true;
                             continue;
@@ -842,8 +872,8 @@ impl<'src> Lexer<'src> {
                         self.cursor.bump();
                     }
                 }
-                quote @ ('\'' | '"') if quote == fstring.quote_char() => {
-                    if let Some(triple_quotes) = fstring.triple_quotes() {
+                quote @ ('\'' | '"') if quote == interpolated_string.quote_char() => {
+                    if let Some(triple_quotes) = interpolated_string.triple_quotes() {
                         if self.cursor.rest().starts_with(triple_quotes) {
                             break;
                         }
@@ -894,10 +924,10 @@ impl<'src> Lexer<'src> {
             normalized
         };
 
-        self.current_value = TokenValue::FStringMiddle(value.into_boxed_str());
+        self.current_value = TokenValue::InterpolatedStringMiddle(value.into_boxed_str());
 
-        self.current_flags = fstring.flags();
-        Some(TokenKind::FStringMiddle)
+        self.current_flags = interpolated_flags;
+        Some(string_kind.middle_token())
     }
 
     /// Lex a string literal.
@@ -925,10 +955,12 @@ impl<'src> Lexer<'src> {
                 let Some(index) = memchr::memchr(quote_byte, self.cursor.rest().as_bytes()) else {
                     self.cursor.skip_to_end();
 
-                    return self.push_error(LexicalError::new(
+                    self.current_flags |= TokenFlags::UNCLOSED_STRING;
+                    self.push_error(LexicalError::new(
                         LexicalErrorType::UnclosedStringError,
                         self.token_range(),
                     ));
+                    break self.offset();
                 };
 
                 // Rare case: if there are an odd number of backslashes before the quote, then
@@ -960,11 +992,14 @@ impl<'src> Lexer<'src> {
                     memchr::memchr3(quote_byte, b'\r', b'\n', self.cursor.rest().as_bytes())
                 else {
                     self.cursor.skip_to_end();
+                    self.current_flags |= TokenFlags::UNCLOSED_STRING;
 
-                    return self.push_error(LexicalError::new(
-                        LexicalErrorType::StringError,
+                    self.push_error(LexicalError::new(
+                        LexicalErrorType::UnclosedStringError,
                         self.token_range(),
                     ));
+
+                    break self.offset();
                 };
 
                 // Rare case: if there are an odd number of backslashes before the quote, then
@@ -992,10 +1027,12 @@ impl<'src> Lexer<'src> {
 
                 match quote_or_newline {
                     '\r' | '\n' => {
-                        return self.push_error(LexicalError::new(
+                        self.current_flags |= TokenFlags::UNCLOSED_STRING;
+                        self.push_error(LexicalError::new(
                             LexicalErrorType::UnclosedStringError,
                             self.token_range(),
                         ));
+                        break self.offset();
                     }
                     ch if ch == quote => {
                         let value_end = self.offset();
@@ -1071,7 +1108,7 @@ impl<'src> Lexer<'src> {
         if first_digit_or_dot != '.' {
             number.push(first_digit_or_dot);
             self.radix_run(&mut number, Radix::Decimal);
-        };
+        }
 
         let is_float = if first_digit_or_dot == '.' || self.cursor.eat_char('.') {
             number.push('.');
@@ -1154,7 +1191,7 @@ impl<'src> Lexer<'src> {
                         return self.push_error(LexicalError::new(
                             LexicalErrorType::OtherError(format!("{err:?}").into_boxed_str()),
                             self.token_range(),
-                        ))
+                        ));
                     }
                 };
                 self.current_value = TokenValue::Int(value);
@@ -1314,7 +1351,20 @@ impl<'src> Lexer<'src> {
 
     fn consume_end(&mut self) -> TokenKind {
         // We reached end of file.
-        // First of all, we need all nestings to be finished.
+
+        // First, finish any unterminated interpolated-strings.
+        while let Some(interpolated_string) = self.interpolated_strings.pop() {
+            self.nesting = interpolated_string.nesting();
+            self.push_error(LexicalError::new(
+                LexicalErrorType::from_interpolated_string_error(
+                    InterpolatedStringErrorType::UnterminatedString,
+                    interpolated_string.kind(),
+                ),
+                self.token_range(),
+            ));
+        }
+
+        // Second, finish all nestings.
         // For Mode::ParenthesizedExpression we start with nesting level 1.
         // So we check if we end with that level.
         let init_nesting = u32::from(self.mode == Mode::ParenthesizedExpression);
@@ -1405,9 +1455,9 @@ impl<'src> Lexer<'src> {
         // i.e., it recovered from an unclosed parenthesis (`(`, `[`, or `{`).
         self.nesting -= 1;
 
-        // The lexer can't be moved back for a triple-quoted f-string because the newlines are
-        // part of the f-string itself, so there is no newline token to be emitted.
-        if self.current_flags.is_triple_quoted_fstring() {
+        // The lexer can't be moved back for a triple-quoted f/t-string because the newlines are
+        // part of the f/t-string itself, so there is no newline token to be emitted.
+        if self.current_flags.is_triple_quoted_interpolated_string() {
             return false;
         }
 
@@ -1442,6 +1492,107 @@ impl<'src> Lexer<'src> {
         true
     }
 
+    /// Re-lexes an unclosed string token in the context of an interpolated string element.
+    ///
+    /// ```py
+    /// f'{a'
+    /// ```
+    ///
+    /// This method re-lexes the trailing `'` as the end of the f-string rather than the
+    /// start of a new string token for better error recovery.
+    pub(crate) fn re_lex_string_token_in_interpolation_element(
+        &mut self,
+        kind: InterpolatedStringKind,
+    ) {
+        let Some(interpolated_string) = self.interpolated_strings.current() else {
+            return;
+        };
+
+        let current_string_flags = self.current_flags().as_any_string_flags();
+
+        // Only unclosed strings, that have the same quote character
+        if !matches!(self.current_kind, TokenKind::String)
+            || !self.current_flags.is_unclosed()
+            || current_string_flags.prefix() != AnyStringPrefix::Regular(StringLiteralPrefix::Empty)
+            || current_string_flags.quote_style().as_char() != interpolated_string.quote_char()
+            || current_string_flags.is_triple_quoted() != interpolated_string.is_triple_quoted()
+        {
+            return;
+        }
+
+        // Only if the string's first line only contains whitespace,
+        // or ends in a comment (not `f"{"abc`)
+        let first_line = &self.source
+            [(self.current_range.start() + current_string_flags.quote_len()).to_usize()..];
+
+        for c in first_line.chars() {
+            if matches!(c, '\n' | '\r' | '#') {
+                break;
+            }
+
+            // `f'{'ab`, we want to parse `ab` as a normal string and not the closing element of the f-string
+            if !is_python_whitespace(c) {
+                return;
+            }
+        }
+
+        if self.errors.last().is_some_and(|error| {
+            error.location() == self.current_range
+                && matches!(error.error(), LexicalErrorType::UnclosedStringError)
+        }) {
+            self.errors.pop();
+        }
+
+        self.current_range =
+            TextRange::at(self.current_range.start(), self.current_flags.quote_len());
+        self.current_kind = kind.end_token();
+        self.current_value = TokenValue::None;
+        self.current_flags = TokenFlags::empty();
+
+        self.nesting = interpolated_string.nesting();
+        self.interpolated_strings.pop();
+
+        self.cursor = Cursor::new(self.source);
+        self.cursor.skip_bytes(self.current_range.end().to_usize());
+    }
+
+    /// Re-lex `r"` in a format specifier position.
+    ///
+    /// `r"` in a format specifier position is unlikely to be the start of a raw string.
+    /// Instead, it's the format specifier `!r` followed by the closing quote of the f-string,
+    /// when the `}` is missing.
+    ///
+    /// ```py
+    /// f"{test!r"
+    /// ```
+    ///
+    /// This function re-lexes the `r"` as `r` (a name token). The next `next_token` call will
+    /// return a unclosed string token for `"`, which [`Self::re_lex_string_token_in_interpolation_element`]
+    /// can then re-lex as the end of the f-string.
+    pub(crate) fn re_lex_raw_string_in_format_spec(&mut self) {
+        // Re-lex `r"` as `NAME r` followed by an unclosed string
+        // `f"{test!r"` -> `f"{test!`, `r`, `"`
+        if matches!(self.current_kind, TokenKind::String)
+            && self.current_flags.is_unclosed()
+            && self.current_flags.prefix()
+                == AnyStringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: false })
+        {
+            if self.errors.last().is_some_and(|error| {
+                error.location() == self.current_range
+                    && matches!(error.error(), LexicalErrorType::UnclosedStringError)
+            }) {
+                self.errors.pop();
+            }
+
+            self.current_range = TextRange::at(self.current_range.start(), 'r'.text_len());
+            self.current_kind = TokenKind::Name;
+            self.current_value = TokenValue::Name(Name::new_static("r"));
+            self.current_flags = TokenFlags::empty();
+            self.cursor = Cursor::new(self.source);
+            self.cursor.skip_bytes(self.current_range.end().to_usize());
+        }
+    }
+
     #[inline]
     fn token_range(&self) -> TextRange {
         let end = self.offset();
@@ -1457,7 +1608,7 @@ impl<'src> Lexer<'src> {
 
     /// Retrieves the current offset of the cursor within the source code.
     // SAFETY: Lexer doesn't allow files larger than 4GB
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     #[inline]
     fn offset(&self) -> TextSize {
         TextSize::new(self.source.len() as u32) - self.cursor.text_len()
@@ -1480,7 +1631,7 @@ impl<'src> Lexer<'src> {
             nesting: self.nesting,
             indentations_checkpoint: self.indentations.checkpoint(),
             pending_indentation: self.pending_indentation,
-            fstrings_checkpoint: self.fstrings.checkpoint(),
+            interpolated_strings_checkpoint: self.interpolated_strings.checkpoint(),
             errors_position: self.errors.len(),
         }
     }
@@ -1497,7 +1648,7 @@ impl<'src> Lexer<'src> {
             nesting,
             indentations_checkpoint,
             pending_indentation,
-            fstrings_checkpoint,
+            interpolated_strings_checkpoint,
             errors_position,
         } = checkpoint;
 
@@ -1514,7 +1665,8 @@ impl<'src> Lexer<'src> {
         self.nesting = nesting;
         self.indentations.rewind(indentations_checkpoint);
         self.pending_indentation = pending_indentation;
-        self.fstrings.rewind(fstrings_checkpoint);
+        self.interpolated_strings
+            .rewind(interpolated_strings_checkpoint);
         self.errors.truncate(errors_position);
     }
 
@@ -1533,7 +1685,7 @@ pub(crate) struct LexerCheckpoint {
     nesting: u32,
     indentations_checkpoint: IndentationsCheckpoint,
     pending_indentation: Option<Indentation>,
-    fstrings_checkpoint: FStringsCheckpoint,
+    interpolated_strings_checkpoint: InterpolatedStringsCheckpoint,
     errors_position: usize,
 }
 
@@ -1669,7 +1821,7 @@ impl<'a> LexedText<'a> {
 }
 
 /// Create a new [`Lexer`] for the given source code and [`Mode`].
-pub fn lex(source: &str, mode: Mode) -> Lexer {
+pub fn lex(source: &str, mode: Mode) -> Lexer<'_> {
     Lexer::new(source, mode, TextSize::default())
 }
 
@@ -1748,6 +1900,7 @@ mod tests {
         }
     }
 
+    #[track_caller]
     fn lex_valid(source: &str, mode: Mode, start_offset: TextSize) -> LexerOutput {
         let output = lex(source, mode, start_offset);
 
@@ -1763,6 +1916,7 @@ mod tests {
         output
     }
 
+    #[track_caller]
     fn lex_invalid(source: &str, mode: Mode) -> LexerOutput {
         let output = lex(source, mode, TextSize::default());
 
@@ -1774,14 +1928,17 @@ mod tests {
         output
     }
 
+    #[track_caller]
     fn lex_source(source: &str) -> LexerOutput {
         lex_valid(source, Mode::Module, TextSize::default())
     }
 
+    #[track_caller]
     fn lex_source_with_offset(source: &str, start_offset: TextSize) -> LexerOutput {
         lex_valid(source, Mode::Module, start_offset)
     }
 
+    #[track_caller]
     fn lex_jupyter_source(source: &str) -> LexerOutput {
         lex_valid(source, Mode::Ipython, TextSize::default())
     }
@@ -1954,8 +2111,7 @@ def f(arg=%timeit a = b):
 
     #[test]
     fn test_numbers() {
-        let source =
-            "0x2f 0o12 0b1101 0 123 123_45_67_890 0.2 1e+2 2.1e3 2j 2.2j 000 0x995DC9BBDF1939FA 0x995DC9BBDF1939FA995DC9BBDF1939FA";
+        let source = "0x2f 0o12 0b1101 0 123 123_45_67_890 0.2 1e+2 2.1e3 2j 2.2j 000 0x995DC9BBDF1939FA 0x995DC9BBDF1939FA995DC9BBDF1939FA";
         assert_snapshot!(lex_source(source));
     }
 
@@ -2212,6 +2368,46 @@ if first:
         assert_snapshot!(triple_quoted_eol(WINDOWS_EOL));
     }
 
+    fn line_continuation_at_eof_after_newline(eol: &str) -> LexerOutput {
+        let source = format!(r"\{eol}");
+        lex_invalid(&source, Mode::Module)
+    }
+
+    #[test]
+    fn test_line_continuation_at_eof_after_newline_unix_eol() {
+        assert_snapshot!(line_continuation_at_eof_after_newline(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_line_continuation_at_eof_after_newline_mac_eol() {
+        assert_snapshot!(line_continuation_at_eof_after_newline(MAC_EOL));
+    }
+
+    #[test]
+    fn test_line_continuation_at_eof_after_newline_windows_eol() {
+        assert_snapshot!(line_continuation_at_eof_after_newline(WINDOWS_EOL));
+    }
+
+    fn line_continuation_at_eof(eol: &str) -> LexerOutput {
+        let source = format!(r"1, \{eol}");
+        lex_invalid(&source, Mode::Module)
+    }
+
+    #[test]
+    fn test_line_continuation_at_eof_unix_eol() {
+        assert_snapshot!(line_continuation_at_eof(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_line_continuation_at_eof_mac_eol() {
+        assert_snapshot!(line_continuation_at_eof(MAC_EOL));
+    }
+
+    #[test]
+    fn test_line_continuation_at_eof_windows_eol() {
+        assert_snapshot!(line_continuation_at_eof(WINDOWS_EOL));
+    }
+
     // This test case is to just make sure that the lexer doesn't go into
     // infinite loop on invalid input.
     #[test]
@@ -2335,6 +2531,13 @@ f'''__{
         b
           c
 }__'''
+";
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_fstring_newline_format_spec() {
+        let source = r"
 f'__{
     x:d
 }__'
@@ -2343,7 +2546,7 @@ f'__{
         b
 }__'
 ";
-        assert_snapshot!(lex_source(source));
+        assert_snapshot!(lex_invalid(source, Mode::Module));
     }
 
     #[test]
@@ -2414,6 +2617,197 @@ f"{(lambda x:{x})}"
     }
 
     #[test]
+    fn test_empty_tstrings() {
+        let source = r#"t"" "" t"" t'' '' t"""""" t''''''"#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_prefix() {
+        let source = r#"t"" t"" rt"" rt"" Rt"" Rt"" tr"" Tr"" tR"" TR"""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring() {
+        let source = r#"t"normal {foo} {{another}} {bar} {{{three}}}""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_parentheses() {
+        let source = r#"t"{}" t"{{}}" t" {}" t"{{{}}}" t"{{{{}}}}" t" {} {{}} {{{}}} {{{{}}}}  ""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    fn tstring_single_quote_escape_eol(eol: &str) -> LexerOutput {
+        let source = format!(r"t'text \{eol} more text'");
+        lex_source(&source)
+    }
+
+    #[test]
+    fn test_tstring_single_quote_escape_unix_eol() {
+        assert_snapshot!(tstring_single_quote_escape_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_tstring_single_quote_escape_mac_eol() {
+        assert_snapshot!(tstring_single_quote_escape_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn test_tstring_single_quote_escape_windows_eol() {
+        assert_snapshot!(tstring_single_quote_escape_eol(WINDOWS_EOL));
+    }
+
+    #[test]
+    fn test_tstring_escape() {
+        let source = r#"t"\{x:\"\{x}} \"\"\
+ end""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_escape_braces() {
+        let source = r"t'\{foo}' t'\\{foo}' t'\{{foo}}' t'\\{{foo}}'";
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_escape_raw() {
+        let source = r#"rt"\{x:\"\{x}} \"\"\
+ end""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_named_unicode() {
+        let source = r#"t"\N{BULLET} normal \Nope \N""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_named_unicode_raw() {
+        let source = r#"rt"\N{BULLET} normal""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_with_named_expression() {
+        let source = r#"t"{x:=10} {(x:=10)} {x,{y:=10}} {[x:=10]}""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_with_format_spec() {
+        let source = r#"t"{foo:} {x=!s:.3f} {x:.{y}f} {'':*^{1:{1}}} {x:{{1}.pop()}}""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_with_multiline_format_spec() {
+        // The last t-string is invalid syntactically but we should still lex it.
+        // Note that the `b` is a `Name` token and not a `TStringMiddle` token.
+        let source = r"t'''__{
+    x:d
+}__'''
+t'''__{
+    x:a
+        b
+          c
+}__'''
+";
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_newline_format_spec() {
+        let source = r"
+t'__{
+    x:d
+}__'
+t'__{
+    x:a
+        b
+}__'
+";
+        assert_snapshot!(lex_invalid(source, Mode::Module));
+    }
+
+    #[test]
+    fn test_tstring_conversion() {
+        let source = r#"t"{x!s} {x=!r} {x:.3f!r} {{x!r}}""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_nested() {
+        let source = r#"t"foo {t"bar {x + t"{wow}"}"} baz" t'foo {t'bar'} some {t"another"}'"#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_expression_multiline() {
+        let source = r#"t"first {
+    x
+        *
+            y
+} second""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_multiline() {
+        let source = r#"t"""
+hello
+    world
+""" t'''
+    world
+hello
+''' t"some {t"""multiline
+allowed {x}"""} string""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_comments() {
+        let source = r#"t"""
+# not a comment { # comment {
+    x
+} # not a comment
+""""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_with_ipy_escape_command() {
+        let source = r#"t"foo {!pwd} bar""#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_with_lambda_expression() {
+        let source = r#"
+t"{lambda x:{x}}"
+t"{(lambda x:{x})}"
+"#
+        .trim();
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_tstring_with_nul_char() {
+        let source = r"t'\0'";
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_nested_t_and_fstring() {
+        let source = r#"t"foo {f"bar {x + t"{wow}"}"} baz" f'foo {t'bar'!r} some {f"another"}'"#;
+        assert_snapshot!(lex_source(source));
+    }
+
+    #[test]
     fn test_match_softkeyword_in_notebook() {
         let source = r"match foo:
     case bar:
@@ -2421,7 +2815,7 @@ f"{(lambda x:{x})}"
         assert_snapshot!(lex_jupyter_source(source));
     }
 
-    fn lex_fstring_error(source: &str) -> FStringErrorType {
+    fn lex_fstring_error(source: &str) -> InterpolatedStringErrorType {
         let output = lex(source, Mode::Module, TextSize::default());
         match output
             .errors
@@ -2437,7 +2831,9 @@ f"{(lambda x:{x})}"
 
     #[test]
     fn test_fstring_error() {
-        use FStringErrorType::{SingleRbrace, UnterminatedString, UnterminatedTripleQuotedString};
+        use InterpolatedStringErrorType::{
+            SingleRbrace, UnterminatedString, UnterminatedTripleQuotedString,
+        };
 
         assert_eq!(lex_fstring_error("f'}'"), SingleRbrace);
         assert_eq!(lex_fstring_error("f'{{}'"), SingleRbrace);
@@ -2459,6 +2855,208 @@ f"{(lambda x:{x})}"
         );
         assert_eq!(
             lex_fstring_error(r#"f""""""#),
+            UnterminatedTripleQuotedString
+        );
+    }
+
+    fn lex_tstring_error(source: &str) -> InterpolatedStringErrorType {
+        let output = lex(source, Mode::Module, TextSize::default());
+        match output
+            .errors
+            .into_iter()
+            .next()
+            .expect("lexer should give at least one error")
+            .into_error()
+        {
+            LexicalErrorType::TStringError(error) => error,
+            err => panic!("Expected TStringError: {err:?}"),
+        }
+    }
+
+    #[test]
+    fn lex_fstring_unclosed() {
+        let source = r#"f"hello"#;
+
+        assert_snapshot!(lex_invalid(source, Mode::Module), @r#"
+        ## Tokens
+        ```
+        [
+            (
+                FStringStart,
+                0..2,
+                TokenFlags(
+                    DOUBLE_QUOTES | F_STRING,
+                ),
+            ),
+            (
+                InterpolatedStringMiddle(
+                    "hello",
+                ),
+                2..7,
+                TokenFlags(
+                    DOUBLE_QUOTES | F_STRING,
+                ),
+            ),
+            (
+                Newline,
+                7..7,
+            ),
+        ]
+        ```
+        ## Errors
+        ```
+        [
+            LexicalError {
+                error: FStringError(
+                    UnterminatedString,
+                ),
+                location: 2..7,
+            },
+        ]
+        ```
+        "#);
+    }
+
+    #[test]
+    fn lex_fstring_missing_brace() {
+        let source = "f'{'";
+
+        assert_snapshot!(lex_invalid(source, Mode::Module), @r#"
+        ## Tokens
+        ```
+        [
+            (
+                FStringStart,
+                0..2,
+                TokenFlags(
+                    F_STRING,
+                ),
+            ),
+            (
+                Lbrace,
+                2..3,
+            ),
+            (
+                String(
+                    "",
+                ),
+                3..4,
+                TokenFlags(
+                    UNCLOSED_STRING,
+                ),
+            ),
+            (
+                Newline,
+                4..4,
+            ),
+        ]
+        ```
+        ## Errors
+        ```
+        [
+            LexicalError {
+                error: UnclosedStringError,
+                location: 3..4,
+            },
+            LexicalError {
+                error: FStringError(
+                    UnterminatedString,
+                ),
+                location: 4..4,
+            },
+        ]
+        ```
+        "#);
+    }
+
+    #[test]
+    fn lex_fstring_missing_brace_after_format_spec() {
+        let source = r#"f"{foo!r""#;
+
+        assert_snapshot!(lex_invalid(source, Mode::Module), @r#"
+        ## Tokens
+        ```
+        [
+            (
+                FStringStart,
+                0..2,
+                TokenFlags(
+                    DOUBLE_QUOTES | F_STRING,
+                ),
+            ),
+            (
+                Lbrace,
+                2..3,
+            ),
+            (
+                Name(
+                    Name("foo"),
+                ),
+                3..6,
+            ),
+            (
+                Exclamation,
+                6..7,
+            ),
+            (
+                String(
+                    "",
+                ),
+                7..9,
+                TokenFlags(
+                    DOUBLE_QUOTES | RAW_STRING_LOWERCASE | UNCLOSED_STRING,
+                ),
+            ),
+            (
+                Newline,
+                9..9,
+            ),
+        ]
+        ```
+        ## Errors
+        ```
+        [
+            LexicalError {
+                error: UnclosedStringError,
+                location: 7..9,
+            },
+            LexicalError {
+                error: FStringError(
+                    UnterminatedString,
+                ),
+                location: 9..9,
+            },
+        ]
+        ```
+        "#);
+    }
+
+    #[test]
+    fn test_tstring_error() {
+        use InterpolatedStringErrorType::{
+            SingleRbrace, UnterminatedString, UnterminatedTripleQuotedString,
+        };
+
+        assert_eq!(lex_tstring_error("t'}'"), SingleRbrace);
+        assert_eq!(lex_tstring_error("t'{{}'"), SingleRbrace);
+        assert_eq!(lex_tstring_error("t'{{}}}'"), SingleRbrace);
+        assert_eq!(lex_tstring_error("t'foo}'"), SingleRbrace);
+        assert_eq!(lex_tstring_error(r"t'\u007b}'"), SingleRbrace);
+        assert_eq!(lex_tstring_error("t'{a:b}}'"), SingleRbrace);
+        assert_eq!(lex_tstring_error("t'{3:}}>10}'"), SingleRbrace);
+        assert_eq!(lex_tstring_error(r"t'\{foo}\}'"), SingleRbrace);
+
+        assert_eq!(lex_tstring_error(r#"t""#), UnterminatedString);
+        assert_eq!(lex_tstring_error(r"t'"), UnterminatedString);
+
+        assert_eq!(lex_tstring_error(r#"t""""#), UnterminatedTripleQuotedString);
+        assert_eq!(lex_tstring_error(r"t'''"), UnterminatedTripleQuotedString);
+        assert_eq!(
+            lex_tstring_error(r#"t"""""#),
+            UnterminatedTripleQuotedString
+        );
+        assert_eq!(
+            lex_tstring_error(r#"t""""""#),
             UnterminatedTripleQuotedString
         );
     }

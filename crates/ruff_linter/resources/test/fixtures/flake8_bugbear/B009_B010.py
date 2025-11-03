@@ -67,3 +67,6 @@ getattr(self.
 
 import builtins
 builtins.getattr(foo, "bar")
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/18353
+setattr(foo, "__debug__", 0)

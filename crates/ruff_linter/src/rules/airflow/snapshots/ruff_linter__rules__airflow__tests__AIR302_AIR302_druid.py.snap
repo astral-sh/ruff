@@ -1,0 +1,95 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR302 [*] `airflow.hooks.druid_hook.DruidDbApiHook` is moved into `apache-druid` provider in Airflow 3.0;
+  --> AIR302_druid.py:12:1
+   |
+10 | )
+11 |
+12 | DruidDbApiHook()
+   | ^^^^^^^^^^^^^^
+13 | DruidHook()
+   |
+help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `DruidDbApiHook` from `airflow.providers.apache.druid.hooks.druid` instead.
+1  | from __future__ import annotations
+2  | 
+3  | from airflow.hooks.druid_hook import (
+   -     DruidDbApiHook,
+4  |     DruidHook,
+5  | )
+6  | from airflow.operators.hive_to_druid import (
+7  |     HiveToDruidOperator,
+8  |     HiveToDruidTransfer,
+9  | )
+10 + from airflow.providers.apache.druid.hooks.druid import DruidDbApiHook
+11 | 
+12 | DruidDbApiHook()
+13 | DruidHook()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR302 [*] `airflow.hooks.druid_hook.DruidHook` is moved into `apache-druid` provider in Airflow 3.0;
+  --> AIR302_druid.py:13:1
+   |
+12 | DruidDbApiHook()
+13 | DruidHook()
+   | ^^^^^^^^^
+14 |
+15 | HiveToDruidOperator()
+   |
+help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `DruidHook` from `airflow.providers.apache.druid.hooks.druid` instead.
+2  | 
+3  | from airflow.hooks.druid_hook import (
+4  |     DruidDbApiHook,
+   -     DruidHook,
+5  | )
+6  | from airflow.operators.hive_to_druid import (
+7  |     HiveToDruidOperator,
+8  |     HiveToDruidTransfer,
+9  | )
+10 + from airflow.providers.apache.druid.hooks.druid import DruidHook
+11 | 
+12 | DruidDbApiHook()
+13 | DruidHook()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR302 [*] `airflow.operators.hive_to_druid.HiveToDruidOperator` is moved into `apache-druid` provider in Airflow 3.0;
+  --> AIR302_druid.py:15:1
+   |
+13 | DruidHook()
+14 |
+15 | HiveToDruidOperator()
+   | ^^^^^^^^^^^^^^^^^^^
+16 | HiveToDruidTransfer()
+   |
+help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `HiveToDruidOperator` from `airflow.providers.apache.druid.transfers.hive_to_druid` instead.
+5  |     DruidHook,
+6  | )
+7  | from airflow.operators.hive_to_druid import (
+   -     HiveToDruidOperator,
+8  |     HiveToDruidTransfer,
+9  | )
+10 + from airflow.providers.apache.druid.transfers.hive_to_druid import HiveToDruidOperator
+11 | 
+12 | DruidDbApiHook()
+13 | DruidHook()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR302 [*] `airflow.operators.hive_to_druid.HiveToDruidTransfer` is moved into `apache-druid` provider in Airflow 3.0;
+  --> AIR302_druid.py:16:1
+   |
+15 | HiveToDruidOperator()
+16 | HiveToDruidTransfer()
+   | ^^^^^^^^^^^^^^^^^^^
+   |
+help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `HiveToDruidOperator` from `airflow.providers.apache.druid.transfers.hive_to_druid` instead.
+5  |     DruidHook,
+6  | )
+7  | from airflow.operators.hive_to_druid import (
+   -     HiveToDruidOperator,
+8  |     HiveToDruidTransfer,
+9  | )
+10 + from airflow.providers.apache.druid.transfers.hive_to_druid import HiveToDruidOperator
+11 | 
+12 | DruidDbApiHook()
+13 | DruidHook()
+note: This is an unsafe fix and may change runtime behavior

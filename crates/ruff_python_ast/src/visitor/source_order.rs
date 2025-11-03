@@ -1,10 +1,10 @@
-use crate::AnyNodeRef;
 use crate::{
     Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator, ElifElseClause,
-    ExceptHandler, Expr, FString, FStringElement, Keyword, MatchCase, Mod, Operator, Parameter,
-    ParameterWithDefault, Parameters, Pattern, PatternArguments, PatternKeyword, Singleton, Stmt,
-    StringLiteral, TypeParam, TypeParams, UnaryOp, WithItem,
+    ExceptHandler, Expr, FString, InterpolatedStringElement, Keyword, MatchCase, Mod, Operator,
+    Parameter, ParameterWithDefault, Parameters, Pattern, PatternArguments, PatternKeyword,
+    Singleton, Stmt, StringLiteral, TString, TypeParam, TypeParams, UnaryOp, WithItem,
 };
+use crate::{AnyNodeRef, Identifier};
 
 /// Visitor that traverses all nodes recursively in the order they appear in the source.
 ///
@@ -157,8 +157,16 @@ pub trait SourceOrderVisitor<'a> {
     }
 
     #[inline]
-    fn visit_f_string_element(&mut self, f_string_element: &'a FStringElement) {
-        walk_f_string_element(self, f_string_element);
+    fn visit_interpolated_string_element(
+        &mut self,
+        interpolated_string_element: &'a InterpolatedStringElement,
+    ) {
+        walk_interpolated_string_element(self, interpolated_string_element);
+    }
+
+    #[inline]
+    fn visit_t_string(&mut self, t_string: &'a TString) {
+        walk_t_string(self, t_string);
     }
 
     #[inline]
@@ -169,6 +177,11 @@ pub trait SourceOrderVisitor<'a> {
     #[inline]
     fn visit_bytes_literal(&mut self, bytes_literal: &'a BytesLiteral) {
         walk_bytes_literal(self, bytes_literal);
+    }
+
+    #[inline]
+    fn visit_identifier(&mut self, identifier: &'a Identifier) {
+        walk_identifier(self, identifier);
     }
 }
 
@@ -222,12 +235,7 @@ impl TraversalSignal {
 }
 
 pub fn walk_annotation<'a, V: SourceOrderVisitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
-    let node = AnyNodeRef::from(expr);
-    if visitor.enter_node(node).is_traverse() {
-        visitor.visit_expr(expr);
-    }
-
-    visitor.leave_node(node);
+    visitor.visit_expr(expr);
 }
 
 pub fn walk_decorator<'a, V>(visitor: &mut V, decorator: &'a Decorator)
@@ -267,6 +275,7 @@ where
             Expr::Compare(expr) => expr.visit_source_order(visitor),
             Expr::Call(expr) => expr.visit_source_order(visitor),
             Expr::FString(expr) => expr.visit_source_order(visitor),
+            Expr::TString(expr) => expr.visit_source_order(visitor),
             Expr::StringLiteral(expr) => expr.visit_source_order(visitor),
             Expr::BytesLiteral(expr) => expr.visit_source_order(visitor),
             Expr::NumberLiteral(expr) => expr.visit_source_order(visitor),
@@ -487,20 +496,22 @@ where
 {
     let node = AnyNodeRef::from(pattern_keyword);
     if visitor.enter_node(node).is_traverse() {
-        visitor.visit_pattern(&pattern_keyword.pattern);
+        pattern_keyword.visit_source_order(visitor);
     }
     visitor.leave_node(node);
 }
 
-pub fn walk_f_string_element<'a, V: SourceOrderVisitor<'a> + ?Sized>(
+pub fn walk_interpolated_string_element<'a, V: SourceOrderVisitor<'a> + ?Sized>(
     visitor: &mut V,
-    f_string_element: &'a FStringElement,
+    f_string_element: &'a InterpolatedStringElement,
 ) {
     let node = AnyNodeRef::from(f_string_element);
     if visitor.enter_node(node).is_traverse() {
         match f_string_element {
-            FStringElement::Expression(element) => element.visit_source_order(visitor),
-            FStringElement::Literal(element) => element.visit_source_order(visitor),
+            InterpolatedStringElement::Interpolation(element) => {
+                element.visit_source_order(visitor);
+            }
+            InterpolatedStringElement::Literal(element) => element.visit_source_order(visitor),
         }
     }
     visitor.leave_node(node);
@@ -546,6 +557,18 @@ where
 }
 
 #[inline]
+pub fn walk_t_string<'a, V>(visitor: &mut V, t_string: &'a TString)
+where
+    V: SourceOrderVisitor<'a> + ?Sized,
+{
+    let node = AnyNodeRef::from(t_string);
+    if visitor.enter_node(node).is_traverse() {
+        t_string.visit_source_order(visitor);
+    }
+    visitor.leave_node(node);
+}
+
+#[inline]
 pub fn walk_string_literal<'a, V>(visitor: &mut V, string_literal: &'a StringLiteral)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
@@ -577,6 +600,18 @@ where
     let node = AnyNodeRef::from(alias);
     if visitor.enter_node(node).is_traverse() {
         alias.visit_source_order(visitor);
+    }
+    visitor.leave_node(node);
+}
+
+#[inline]
+pub fn walk_identifier<'a, V: SourceOrderVisitor<'a> + ?Sized>(
+    visitor: &mut V,
+    identifier: &'a Identifier,
+) {
+    let node = AnyNodeRef::from(identifier);
+    if visitor.enter_node(node).is_traverse() {
+        identifier.visit_source_order(visitor);
     }
     visitor.leave_node(node);
 }

@@ -21,6 +21,11 @@ impl<'a> Cursor<'a> {
         }
     }
 
+    /// Retrieves the current offset of the cursor within the source code.
+    pub fn offset(&self) -> TextSize {
+        self.source_length - self.text_len()
+    }
+
     /// Return the remaining input as a string slice.
     pub fn chars(&self) -> Chars<'a> {
         self.chars.clone()

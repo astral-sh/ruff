@@ -1,0 +1,56 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: protocols.md - Protocols - Protocol members in statically known branches
+mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | import sys
+ 2 | from typing_extensions import Protocol, get_protocol_members
+ 3 | 
+ 4 | class Foo(Protocol):
+ 5 |     if sys.version_info >= (3, 10):
+ 6 |         a: int
+ 7 |         b = 42
+ 8 |         def c(self) -> None: ...
+ 9 |     else:
+10 |         d: int
+11 |         e = 56  # error: [ambiguous-protocol-member]
+12 |         def f(self) -> None: ...
+13 | 
+14 | reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["d", "e", "f"]]
+```
+
+# Diagnostics
+
+```
+warning[ambiguous-protocol-member]: Cannot assign to undeclared variable in the body of a protocol class
+  --> src/mdtest_snippet.py:11:9
+   |
+ 9 |     else:
+10 |         d: int
+11 |         e = 56  # error: [ambiguous-protocol-member]
+   |         ^^^^^^ Consider adding an annotation, e.g. `e: int = ...`
+12 |         def f(self) -> None: ...
+   |
+info: Assigning to an undeclared variable in a protocol class leads to an ambiguous interface
+ --> src/mdtest_snippet.py:4:7
+  |
+2 | from typing_extensions import Protocol, get_protocol_members
+3 |
+4 | class Foo(Protocol):
+  |       ^^^^^^^^^^^^^ `Foo` declared as a protocol here
+5 |     if sys.version_info >= (3, 10):
+6 |         a: int
+  |
+info: No declarations found for `e` in the body of `Foo` or any of its superclasses
+info: rule `ambiguous-protocol-member` is enabled by default
+
+```

@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::rules::flake8_tidy_imports::rules::BannedModuleImportPolicies;
 use crate::{
     checkers::ast::Checker, codes::Rule, rules::flake8_tidy_imports::matchers::NameMatchPolicy,
@@ -32,7 +32,7 @@ use crate::{
 /// def print_python_version():
 ///     import platform
 ///
-///     print(python.python_version())
+///     print(platform.python_version())
 /// ```
 ///
 /// Use instead:
@@ -41,11 +41,19 @@ use crate::{
 ///
 ///
 /// def print_python_version():
-///     print(python.python_version())
+///     print(platform.python_version())
 /// ```
 ///
+/// ## See also
+/// This rule will ignore import statements configured in
+/// [`lint.flake8-tidy-imports.banned-module-level-imports`][banned-module-level-imports]
+/// if the rule [`banned-module-level-imports`][TID253] is enabled.
+///
+/// [banned-module-level-imports]: https://docs.astral.sh/ruff/settings/#lint_flake8-tidy-imports_banned-module-level-imports
+/// [TID253]: https://docs.astral.sh/ruff/rules/banned-module-level-imports/
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct ImportOutsideTopLevel;
 
 impl Violation for ImportOutsideTopLevel {
@@ -55,7 +63,7 @@ impl Violation for ImportOutsideTopLevel {
     }
 }
 
-/// C0415
+/// PLC0415
 pub(crate) fn import_outside_top_level(checker: &Checker, stmt: &Stmt) {
     if checker.semantic().current_scope().kind.is_module() {
         // "Top-level" imports are allowed
@@ -64,7 +72,7 @@ pub(crate) fn import_outside_top_level(checker: &Checker, stmt: &Stmt) {
 
     // Check if any of the non-top-level imports are banned by TID253
     // before emitting the diagnostic to avoid conflicts.
-    if checker.enabled(Rule::BannedModuleLevelImports) {
+    if checker.is_rule_enabled(Rule::BannedModuleLevelImports) {
         let mut all_aliases_banned = true;
         let mut has_alias = false;
         for (policy, node) in &BannedModuleImportPolicies::new(stmt, checker) {
@@ -84,14 +92,14 @@ pub(crate) fn import_outside_top_level(checker: &Checker, stmt: &Stmt) {
     }
 
     // Emit the diagnostic
-    checker.report_diagnostic(Diagnostic::new(ImportOutsideTopLevel, stmt.range()));
+    checker.report_diagnostic(ImportOutsideTopLevel, stmt.range());
 }
 
 fn is_banned_module_level_import(policy: &NameMatchPolicy, checker: &Checker) -> bool {
     policy
         .find(
             checker
-                .settings
+                .settings()
                 .flake8_tidy_imports
                 .banned_module_level_imports(),
         )

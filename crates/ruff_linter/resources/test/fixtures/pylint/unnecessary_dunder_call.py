@@ -129,3 +129,6 @@ blah = dict[{"a": 1}.__delitem__("a")]  # OK
 
 # https://github.com/astral-sh/ruff/issues/14597
 assert "abc".__str__() == "abc"
+
+# https://github.com/astral-sh/ruff/issues/18813
+three = 1 if 1 else(3.0).__str__()

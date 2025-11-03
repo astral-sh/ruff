@@ -3,7 +3,6 @@
  */
 
 import { Monaco } from "@monaco-editor/react";
-import schema from "../../../ruff.schema.json";
 
 export const WHITE = "#ffffff";
 export const RADIATE = "#d7ff64";
@@ -26,7 +25,14 @@ export const LUNAR = "#fbf2fc";
 export const ASTEROID = "#e3cee3";
 export const CRATER = "#f0dfdf";
 
-export function setupMonaco(monaco: Monaco) {
+export function setupMonaco(
+  monaco: Monaco,
+  settingsSchema: {
+    fileMatch: [string];
+    uri: string;
+    schema: object;
+  },
+) {
   defineAyuThemes(monaco);
   defineFirLanguage(monaco);
   defineRustPythonTokensLanguage(monaco);
@@ -34,13 +40,7 @@ export function setupMonaco(monaco: Monaco) {
   defineCommentsLanguage(monaco);
 
   monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
-    schemas: [
-      {
-        uri: "https://raw.githubusercontent.com/astral-sh/ruff/main/ruff.schema.json",
-        fileMatch: ["*"],
-        schema,
-      },
-    ],
+    schemas: [settingsSchema],
   });
 }
 
@@ -287,12 +287,12 @@ function defineAyuThemes(monaco: Monaco) {
         token: "comment",
       },
       {
-        foreground: ROCK,
-        token: "string",
+        foreground: COSMIC,
+        token: "keyword",
       },
       {
-        foreground: SUN,
-        token: "keyword",
+        foreground: COSMIC,
+        token: "builtinConstant",
       },
       {
         foreground: CONSTELLATION,
@@ -301,6 +301,22 @@ function defineAyuThemes(monaco: Monaco) {
       {
         token: "tag",
         foreground: ROCK,
+      },
+      {
+        foreground: ROCK,
+        token: "string",
+      },
+      {
+        token: "method",
+        foreground: SUN,
+      },
+      {
+        token: "function",
+        foreground: SUN,
+      },
+      {
+        token: "decorator",
+        foreground: SUN,
       },
     ],
     encodedTokensColors: [],
@@ -548,11 +564,11 @@ function defineAyuThemes(monaco: Monaco) {
         token: "comment",
       },
       {
-        foreground: RADIATE,
+        foreground: ELECTRON,
         token: "string",
       },
       {
-        foreground: ELECTRON,
+        foreground: CONSTELLATION,
         token: "number",
       },
       {
@@ -560,8 +576,12 @@ function defineAyuThemes(monaco: Monaco) {
         token: "identifier",
       },
       {
-        foreground: SUN,
+        foreground: RADIATE,
         token: "keyword",
+      },
+      {
+        foreground: RADIATE,
+        token: "builtinConstant",
       },
       {
         foreground: PROTON,
@@ -570,6 +590,30 @@ function defineAyuThemes(monaco: Monaco) {
       {
         foreground: ASTEROID,
         token: "delimiter",
+      },
+      {
+        token: "class",
+        foreground: SUPERNOVA,
+      },
+      {
+        foreground: STARLIGHT,
+        token: "variable",
+      },
+      {
+        foreground: STARLIGHT,
+        token: "parameter",
+      },
+      {
+        token: "method",
+        foreground: SUN,
+      },
+      {
+        token: "function",
+        foreground: SUN,
+      },
+      {
+        token: "decorator",
+        foreground: SUN,
       },
     ],
     encodedTokensColors: [],

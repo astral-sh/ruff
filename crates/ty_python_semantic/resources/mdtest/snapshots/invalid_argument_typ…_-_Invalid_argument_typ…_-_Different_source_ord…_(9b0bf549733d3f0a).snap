@@ -1,0 +1,45 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_argument_type.md - Invalid argument type diagnostics - Different source order
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_argument_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | def bar():
+2 |     foo("hello")  # error: [invalid-argument-type]
+3 | 
+4 | def foo(x: int) -> int:
+5 |     return x * x
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to function `foo` is incorrect
+ --> src/mdtest_snippet.py:2:9
+  |
+1 | def bar():
+2 |     foo("hello")  # error: [invalid-argument-type]
+  |         ^^^^^^^ Expected `int`, found `Literal["hello"]`
+3 |
+4 | def foo(x: int) -> int:
+  |
+info: Function defined here
+ --> src/mdtest_snippet.py:4:5
+  |
+2 |     foo("hello")  # error: [invalid-argument-type]
+3 |
+4 | def foo(x: int) -> int:
+  |     ^^^ ------ Parameter declared here
+5 |     return x * x
+  |
+info: rule `invalid-argument-type` is enabled by default
+
+```

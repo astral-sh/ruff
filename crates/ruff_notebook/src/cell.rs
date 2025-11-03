@@ -5,8 +5,8 @@ use itertools::Itertools;
 
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::schema::{Cell, SourceValue};
 use crate::CellMetadata;
+use crate::schema::{Cell, SourceValue};
 
 impl fmt::Display for SourceValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -307,6 +307,13 @@ impl CellOffsets {
             }
         })
         .is_ok()
+    }
+
+    /// Returns an iterator over [`TextRange`]s covered by each cell.
+    pub fn ranges(&self) -> impl Iterator<Item = TextRange> {
+        self.iter()
+            .tuple_windows()
+            .map(|(start, end)| TextRange::new(*start, *end))
     }
 }
 

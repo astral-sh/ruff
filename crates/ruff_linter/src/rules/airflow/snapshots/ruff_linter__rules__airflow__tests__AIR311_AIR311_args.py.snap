@@ -1,0 +1,47 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR311 [*] `airflow.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR311_args.py:13:1
+   |
+13 | DAG(dag_id="class_sla_callback", sla_miss_callback=sla_callback)
+   | ^^^
+   |
+help: Use `DAG` from `airflow.sdk` instead.
+2  | 
+3  | from datetime import timedelta
+4  | 
+   - from airflow import DAG, dag
+5  + from airflow import dag
+6  | from airflow.operators.datetime import BranchDateTimeOperator
+7  + from airflow.sdk import DAG
+8  | 
+9  | 
+10 | def sla_callback(*arg, **kwargs):
+note: This is an unsafe fix and may change runtime behavior
+
+AIR311 `sla_miss_callback` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR311_args.py:13:34
+   |
+13 | DAG(dag_id="class_sla_callback", sla_miss_callback=sla_callback)
+   |                                  ^^^^^^^^^^^^^^^^^
+   |
+
+AIR311 `sla_miss_callback` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR311_args.py:16:6
+   |
+16 | @dag(sla_miss_callback=sla_callback)
+   |      ^^^^^^^^^^^^^^^^^
+17 | def decorator_sla_callback():
+18 |     pass
+   |
+
+AIR311 `sla` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR311_args.py:25:9
+   |
+23 |     branch_dt_op2 = BranchDateTimeOperator(
+24 |         task_id="branch_dt_op2",
+25 |         sla=timedelta(seconds=10),
+   |         ^^^
+26 |     )
+   |

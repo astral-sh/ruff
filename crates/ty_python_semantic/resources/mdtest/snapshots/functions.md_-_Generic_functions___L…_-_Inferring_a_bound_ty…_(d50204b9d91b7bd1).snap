@@ -1,0 +1,51 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: functions.md - Generic functions: Legacy syntax - Inferring a bound typevar
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/functions.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import TypeVar
+ 2 | 
+ 3 | T = TypeVar("T", bound=int)
+ 4 | 
+ 5 | def f(x: T) -> T:
+ 6 |     return x
+ 7 | 
+ 8 | reveal_type(f(1))  # revealed: Literal[1]
+ 9 | reveal_type(f(True))  # revealed: Literal[True]
+10 | # error: [invalid-argument-type]
+11 | reveal_type(f("string"))  # revealed: Unknown
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:11:15
+   |
+ 9 | reveal_type(f(True))  # revealed: Literal[True]
+10 | # error: [invalid-argument-type]
+11 | reveal_type(f("string"))  # revealed: Unknown
+   |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy upper bound `int` of type variable `T`
+   |
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:1
+  |
+1 | from typing import TypeVar
+2 |
+3 | T = TypeVar("T", bound=int)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+4 |
+5 | def f(x: T) -> T:
+  |
+info: rule `invalid-argument-type` is enabled by default
+
+```

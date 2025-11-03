@@ -1,10 +1,10 @@
 use ruff_python_ast::{self as ast, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::in_dunder_method;
 
@@ -35,6 +35,7 @@ use crate::rules::pylint::helpers::in_dunder_method;
 /// ## References
 /// - [CodeQL: `py-explicit-return-in-init`](https://codeql.github.com/codeql-query-help/python/py-explicit-return-in-init/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.248")]
 pub(crate) struct ReturnInInit;
 
 impl Violation for ReturnInInit {
@@ -46,7 +47,12 @@ impl Violation for ReturnInInit {
 
 /// PLE0101
 pub(crate) fn return_in_init(checker: &Checker, stmt: &Stmt) {
-    if let Stmt::Return(ast::StmtReturn { value, range: _ }) = stmt {
+    if let Stmt::Return(ast::StmtReturn {
+        value,
+        range: _,
+        node_index: _,
+    }) = stmt
+    {
         if let Some(expr) = value {
             if expr.is_none_literal_expr() {
                 // Explicit `return None`.
@@ -58,7 +64,7 @@ pub(crate) fn return_in_init(checker: &Checker, stmt: &Stmt) {
         }
     }
 
-    if in_dunder_method("__init__", checker.semantic(), checker.settings) {
-        checker.report_diagnostic(Diagnostic::new(ReturnInInit, stmt.range()));
+    if in_dunder_method("__init__", checker.semantic(), checker.settings()) {
+        checker.report_diagnostic(ReturnInInit, stmt.range());
     }
 }

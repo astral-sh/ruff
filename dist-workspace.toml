@@ -1,0 +1,72 @@
+[workspace]
+members = ["cargo:."]
+packages = ["ruff"]
+
+# Config for 'dist'
+[dist]
+# The preferred dist version to use in CI (Cargo.toml SemVer syntax)
+cargo-dist-version = "0.30.0"
+# Whether to consider the binaries in a package for distribution (defaults true)
+dist = false
+# CI backends to support
+ci = "github"
+# The installers to generate for each app
+installers = ["shell", "powershell"]
+# The archive format to use for windows builds (defaults .zip)
+windows-archive = ".zip"
+# The archive format to use for non-windows builds (defaults .tar.xz)
+unix-archive = ".tar.gz"
+# Target platforms to build apps for (Rust target-triple syntax)
+targets = [
+    "aarch64-apple-darwin",
+    "aarch64-unknown-linux-gnu",
+    "aarch64-unknown-linux-musl",
+    "aarch64-pc-windows-msvc",
+    "arm-unknown-linux-musleabihf",
+    "armv7-unknown-linux-gnueabihf",
+    "armv7-unknown-linux-musleabihf",
+    "x86_64-apple-darwin",
+    "powerpc64-unknown-linux-gnu",
+    "powerpc64le-unknown-linux-gnu",
+    "riscv64gc-unknown-linux-gnu",
+    "s390x-unknown-linux-gnu",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-unknown-linux-musl",
+    "x86_64-pc-windows-msvc",
+    "i686-unknown-linux-gnu",
+    "i686-unknown-linux-musl",
+    "i686-pc-windows-msvc"
+]
+# Whether to auto-include files like READMEs, LICENSEs, and CHANGELOGs (default true)
+auto-includes = false
+# Whether dist should create a Github Release or use an existing draft
+create-release = true
+# Which actions to run on pull requests
+pr-run-mode = "plan"
+# Whether CI should trigger releases with dispatches instead of tag pushes
+dispatch-releases = true
+# Which phase dist should use to create the GitHub release
+github-release = "announce"
+# Whether CI should include auto-generated code to build local artifacts
+build-local-artifacts = false
+# Local artifacts jobs to run in CI
+local-artifacts-jobs = ["./build-binaries", "./build-docker"]
+# Publish jobs to run in CI
+publish-jobs = ["./publish-pypi", "./publish-wasm"]
+# Post-announce jobs to run in CI
+post-announce-jobs = ["./notify-dependents", "./publish-docs", "./publish-playground"]
+# Custom permissions for GitHub Jobs
+github-custom-job-permissions = { "build-docker" = { packages = "write", contents = "read" }, "publish-wasm" = { contents = "read", id-token = "write", packages = "write" } }
+# Whether to install an updater program
+install-updater = false
+# Path that installers should place binaries in
+install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
+
+[dist.github-custom-runners]
+global = "depot-ubuntu-latest-4"
+
+[dist.github-action-commits]
+"actions/checkout" = "ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493" # v5.0.0
+"actions/upload-artifact" = "330a01c490aca151604b8cf639adc76d48f6c5d4" # v5.0.0
+"actions/download-artifact" = "018cc2cf5baa6db3ef3c5f8a56943fffe632ef53" # v6.0.0
+"actions/attest-build-provenance" = "c074443f1aee8d4aeeae555aebba3282517141b2" #v2.2.3

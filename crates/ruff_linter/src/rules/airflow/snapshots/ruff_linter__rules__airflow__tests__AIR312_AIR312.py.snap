@@ -1,0 +1,838 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR312 [*] `airflow.hooks.filesystem.FSHook` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:13:1
+   |
+11 | from airflow.operators.weekday import BranchDayOfWeekOperator
+12 |
+13 | FSHook()
+   | ^^^^^^
+14 | PackageIndexHook()
+15 | SubprocessHook()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `FSHook` from `airflow.providers.standard.hooks.filesystem` instead.
+1  | from __future__ import annotations
+2  | 
+   - from airflow.hooks.filesystem import FSHook
+3  | from airflow.hooks.package_index import PackageIndexHook
+4  | from airflow.hooks.subprocess import SubprocessHook
+5  | from airflow.operators.bash import BashOperator
+--------------------------------------------------------------------------------
+8  | from airflow.operators.latest_only import LatestOnlyOperator
+9  | from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+10 | from airflow.operators.weekday import BranchDayOfWeekOperator
+11 + from airflow.providers.standard.hooks.filesystem import FSHook
+12 | 
+13 | FSHook()
+14 | PackageIndexHook()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.hooks.package_index.PackageIndexHook` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:14:1
+   |
+13 | FSHook()
+14 | PackageIndexHook()
+   | ^^^^^^^^^^^^^^^^
+15 | SubprocessHook()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `PackageIndexHook` from `airflow.providers.standard.hooks.package_index` instead.
+1  | from __future__ import annotations
+2  | 
+3  | from airflow.hooks.filesystem import FSHook
+   - from airflow.hooks.package_index import PackageIndexHook
+4  | from airflow.hooks.subprocess import SubprocessHook
+5  | from airflow.operators.bash import BashOperator
+6  | from airflow.operators.datetime import BranchDateTimeOperator
+--------------------------------------------------------------------------------
+8  | from airflow.operators.latest_only import LatestOnlyOperator
+9  | from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+10 | from airflow.operators.weekday import BranchDayOfWeekOperator
+11 + from airflow.providers.standard.hooks.package_index import PackageIndexHook
+12 | 
+13 | FSHook()
+14 | PackageIndexHook()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.hooks.subprocess.SubprocessHook` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:15:1
+   |
+13 | FSHook()
+14 | PackageIndexHook()
+15 | SubprocessHook()
+   | ^^^^^^^^^^^^^^
+16 |
+17 | BashOperator()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.3` and use `SubprocessHook` from `airflow.providers.standard.hooks.subprocess` instead.
+2  | 
+3  | from airflow.hooks.filesystem import FSHook
+4  | from airflow.hooks.package_index import PackageIndexHook
+   - from airflow.hooks.subprocess import SubprocessHook
+5  | from airflow.operators.bash import BashOperator
+6  | from airflow.operators.datetime import BranchDateTimeOperator
+7  | from airflow.operators.empty import EmptyOperator
+8  | from airflow.operators.latest_only import LatestOnlyOperator
+9  | from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+10 | from airflow.operators.weekday import BranchDayOfWeekOperator
+11 + from airflow.providers.standard.hooks.subprocess import SubprocessHook
+12 | 
+13 | FSHook()
+14 | PackageIndexHook()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.operators.bash.BashOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:17:1
+   |
+15 | SubprocessHook()
+16 |
+17 | BashOperator()
+   | ^^^^^^^^^^^^
+18 | BranchDateTimeOperator()
+19 | TriggerDagRunOperator()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `BashOperator` from `airflow.providers.standard.operators.bash` instead.
+3  | from airflow.hooks.filesystem import FSHook
+4  | from airflow.hooks.package_index import PackageIndexHook
+5  | from airflow.hooks.subprocess import SubprocessHook
+   - from airflow.operators.bash import BashOperator
+6  | from airflow.operators.datetime import BranchDateTimeOperator
+7  | from airflow.operators.empty import EmptyOperator
+8  | from airflow.operators.latest_only import LatestOnlyOperator
+9  | from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+10 | from airflow.operators.weekday import BranchDayOfWeekOperator
+11 + from airflow.providers.standard.operators.bash import BashOperator
+12 | 
+13 | FSHook()
+14 | PackageIndexHook()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.operators.datetime.BranchDateTimeOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:18:1
+   |
+17 | BashOperator()
+18 | BranchDateTimeOperator()
+   | ^^^^^^^^^^^^^^^^^^^^^^
+19 | TriggerDagRunOperator()
+20 | EmptyOperator()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `BranchDateTimeOperator` from `airflow.providers.standard.operators.datetime` instead.
+4  | from airflow.hooks.package_index import PackageIndexHook
+5  | from airflow.hooks.subprocess import SubprocessHook
+6  | from airflow.operators.bash import BashOperator
+   - from airflow.operators.datetime import BranchDateTimeOperator
+7  | from airflow.operators.empty import EmptyOperator
+8  | from airflow.operators.latest_only import LatestOnlyOperator
+9  | from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+10 | from airflow.operators.weekday import BranchDayOfWeekOperator
+11 + from airflow.providers.standard.operators.datetime import BranchDateTimeOperator
+12 | 
+13 | FSHook()
+14 | PackageIndexHook()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.operators.trigger_dagrun.TriggerDagRunOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:19:1
+   |
+17 | BashOperator()
+18 | BranchDateTimeOperator()
+19 | TriggerDagRunOperator()
+   | ^^^^^^^^^^^^^^^^^^^^^
+20 | EmptyOperator()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.2` and use `TriggerDagRunOperator` from `airflow.providers.standard.operators.trigger_dagrun` instead.
+7  | from airflow.operators.datetime import BranchDateTimeOperator
+8  | from airflow.operators.empty import EmptyOperator
+9  | from airflow.operators.latest_only import LatestOnlyOperator
+   - from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+10 | from airflow.operators.weekday import BranchDayOfWeekOperator
+11 + from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
+12 | 
+13 | FSHook()
+14 | PackageIndexHook()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.operators.empty.EmptyOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:20:1
+   |
+18 | BranchDateTimeOperator()
+19 | TriggerDagRunOperator()
+20 | EmptyOperator()
+   | ^^^^^^^^^^^^^
+21 |
+22 | LatestOnlyOperator()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.2` and use `EmptyOperator` from `airflow.providers.standard.operators.empty` instead.
+5  | from airflow.hooks.subprocess import SubprocessHook
+6  | from airflow.operators.bash import BashOperator
+7  | from airflow.operators.datetime import BranchDateTimeOperator
+   - from airflow.operators.empty import EmptyOperator
+8  | from airflow.operators.latest_only import LatestOnlyOperator
+9  | from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+10 | from airflow.operators.weekday import BranchDayOfWeekOperator
+11 + from airflow.providers.standard.operators.empty import EmptyOperator
+12 | 
+13 | FSHook()
+14 | PackageIndexHook()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.operators.latest_only.LatestOnlyOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:22:1
+   |
+20 | EmptyOperator()
+21 |
+22 | LatestOnlyOperator()
+   | ^^^^^^^^^^^^^^^^^^
+23 | BranchDayOfWeekOperator()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.3` and use `LatestOnlyOperator` from `airflow.providers.standard.operators.latest_only` instead.
+6  | from airflow.operators.bash import BashOperator
+7  | from airflow.operators.datetime import BranchDateTimeOperator
+8  | from airflow.operators.empty import EmptyOperator
+   - from airflow.operators.latest_only import LatestOnlyOperator
+9  | from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+10 | from airflow.operators.weekday import BranchDayOfWeekOperator
+11 + from airflow.providers.standard.operators.latest_only import LatestOnlyOperator
+12 | 
+13 | FSHook()
+14 | PackageIndexHook()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.operators.weekday.BranchDayOfWeekOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:23:1
+   |
+22 | LatestOnlyOperator()
+23 | BranchDayOfWeekOperator()
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+24 |
+25 | from airflow.operators.python import (
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `BranchDayOfWeekOperator` from `airflow.providers.standard.operators.weekday` instead.
+8  | from airflow.operators.empty import EmptyOperator
+9  | from airflow.operators.latest_only import LatestOnlyOperator
+10 | from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+   - from airflow.operators.weekday import BranchDayOfWeekOperator
+11 + from airflow.providers.standard.operators.weekday import BranchDayOfWeekOperator
+12 | 
+13 | FSHook()
+14 | PackageIndexHook()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.operators.python.BranchPythonOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:34:1
+   |
+32 | from airflow.sensors.date_time import DateTimeSensor
+33 |
+34 | BranchPythonOperator()
+   | ^^^^^^^^^^^^^^^^^^^^
+35 | PythonOperator()
+36 | PythonVirtualenvOperator()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `BranchPythonOperator` from `airflow.providers.standard.operators.python` instead.
+23 | BranchDayOfWeekOperator()
+24 | 
+25 | from airflow.operators.python import (
+   -     BranchPythonOperator,
+26 |     PythonOperator,
+27 |     PythonVirtualenvOperator,
+28 |     ShortCircuitOperator,
+29 | )
+30 | from airflow.sensors.bash import BashSensor
+31 | from airflow.sensors.date_time import DateTimeSensor
+32 + from airflow.providers.standard.operators.python import BranchPythonOperator
+33 | 
+34 | BranchPythonOperator()
+35 | PythonOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.operators.python.PythonOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:35:1
+   |
+34 | BranchPythonOperator()
+35 | PythonOperator()
+   | ^^^^^^^^^^^^^^
+36 | PythonVirtualenvOperator()
+37 | ShortCircuitOperator()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonOperator` from `airflow.providers.standard.operators.python` instead.
+24 | 
+25 | from airflow.operators.python import (
+26 |     BranchPythonOperator,
+   -     PythonOperator,
+27 |     PythonVirtualenvOperator,
+28 |     ShortCircuitOperator,
+29 | )
+30 | from airflow.sensors.bash import BashSensor
+31 | from airflow.sensors.date_time import DateTimeSensor
+32 + from airflow.providers.standard.operators.python import PythonOperator
+33 | 
+34 | BranchPythonOperator()
+35 | PythonOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.operators.python.PythonVirtualenvOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:36:1
+   |
+34 | BranchPythonOperator()
+35 | PythonOperator()
+36 | PythonVirtualenvOperator()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
+37 | ShortCircuitOperator()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonVirtualenvOperator` from `airflow.providers.standard.operators.python` instead.
+25 | from airflow.operators.python import (
+26 |     BranchPythonOperator,
+27 |     PythonOperator,
+   -     PythonVirtualenvOperator,
+28 |     ShortCircuitOperator,
+29 | )
+30 | from airflow.sensors.bash import BashSensor
+31 | from airflow.sensors.date_time import DateTimeSensor
+32 + from airflow.providers.standard.operators.python import PythonVirtualenvOperator
+33 | 
+34 | BranchPythonOperator()
+35 | PythonOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.operators.python.ShortCircuitOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:37:1
+   |
+35 | PythonOperator()
+36 | PythonVirtualenvOperator()
+37 | ShortCircuitOperator()
+   | ^^^^^^^^^^^^^^^^^^^^
+38 |
+39 | BashSensor()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `ShortCircuitOperator` from `airflow.providers.standard.operators.python` instead.
+26 |     BranchPythonOperator,
+27 |     PythonOperator,
+28 |     PythonVirtualenvOperator,
+   -     ShortCircuitOperator,
+29 | )
+30 | from airflow.sensors.bash import BashSensor
+31 | from airflow.sensors.date_time import DateTimeSensor
+32 + from airflow.providers.standard.operators.python import ShortCircuitOperator
+33 | 
+34 | BranchPythonOperator()
+35 | PythonOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.sensors.bash.BashSensor` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:39:1
+   |
+37 | ShortCircuitOperator()
+38 |
+39 | BashSensor()
+   | ^^^^^^^^^^
+40 | DateTimeSensor()
+41 | from airflow.sensors.date_time import DateTimeSensorAsync
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `BashSensor` from `airflow.providers.standard.sensor.bash` instead.
+28 |     PythonVirtualenvOperator,
+29 |     ShortCircuitOperator,
+30 | )
+   - from airflow.sensors.bash import BashSensor
+31 | from airflow.sensors.date_time import DateTimeSensor
+32 + from airflow.providers.standard.sensor.bash import BashSensor
+33 | 
+34 | BranchPythonOperator()
+35 | PythonOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.sensors.date_time.DateTimeSensor` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:40:1
+   |
+39 | BashSensor()
+40 | DateTimeSensor()
+   | ^^^^^^^^^^^^^^
+41 | from airflow.sensors.date_time import DateTimeSensorAsync
+42 | from airflow.sensors.external_task import (
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `DateTimeSensor` from `airflow.providers.standard.sensors.date_time` instead.
+29 |     ShortCircuitOperator,
+30 | )
+31 | from airflow.sensors.bash import BashSensor
+   - from airflow.sensors.date_time import DateTimeSensor
+32 + from airflow.providers.standard.sensors.date_time import DateTimeSensor
+33 | 
+34 | BranchPythonOperator()
+35 | PythonOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.operators.python.BranchPythonOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:49:1
+   |
+47 | from airflow.sensors.python import PythonSensor
+48 |
+49 | BranchPythonOperator()
+   | ^^^^^^^^^^^^^^^^^^^^
+50 | PythonOperator()
+51 | PythonVirtualenvOperator()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `BranchPythonOperator` from `airflow.providers.standard.operators.python` instead.
+23 | BranchDayOfWeekOperator()
+24 | 
+25 | from airflow.operators.python import (
+   -     BranchPythonOperator,
+26 |     PythonOperator,
+27 |     PythonVirtualenvOperator,
+28 |     ShortCircuitOperator,
+--------------------------------------------------------------------------------
+44 | )
+45 | from airflow.sensors.filesystem import FileSensor
+46 | from airflow.sensors.python import PythonSensor
+47 + from airflow.providers.standard.operators.python import BranchPythonOperator
+48 | 
+49 | BranchPythonOperator()
+50 | PythonOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.operators.python.PythonOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:50:1
+   |
+49 | BranchPythonOperator()
+50 | PythonOperator()
+   | ^^^^^^^^^^^^^^
+51 | PythonVirtualenvOperator()
+52 | ShortCircuitOperator()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonOperator` from `airflow.providers.standard.operators.python` instead.
+24 | 
+25 | from airflow.operators.python import (
+26 |     BranchPythonOperator,
+   -     PythonOperator,
+27 |     PythonVirtualenvOperator,
+28 |     ShortCircuitOperator,
+29 | )
+--------------------------------------------------------------------------------
+44 | )
+45 | from airflow.sensors.filesystem import FileSensor
+46 | from airflow.sensors.python import PythonSensor
+47 + from airflow.providers.standard.operators.python import PythonOperator
+48 | 
+49 | BranchPythonOperator()
+50 | PythonOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.operators.python.PythonVirtualenvOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:51:1
+   |
+49 | BranchPythonOperator()
+50 | PythonOperator()
+51 | PythonVirtualenvOperator()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
+52 | ShortCircuitOperator()
+53 | DateTimeSensorAsync()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonVirtualenvOperator` from `airflow.providers.standard.operators.python` instead.
+25 | from airflow.operators.python import (
+26 |     BranchPythonOperator,
+27 |     PythonOperator,
+   -     PythonVirtualenvOperator,
+28 |     ShortCircuitOperator,
+29 | )
+30 | from airflow.sensors.bash import BashSensor
+--------------------------------------------------------------------------------
+44 | )
+45 | from airflow.sensors.filesystem import FileSensor
+46 | from airflow.sensors.python import PythonSensor
+47 + from airflow.providers.standard.operators.python import PythonVirtualenvOperator
+48 | 
+49 | BranchPythonOperator()
+50 | PythonOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.operators.python.ShortCircuitOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:52:1
+   |
+50 | PythonOperator()
+51 | PythonVirtualenvOperator()
+52 | ShortCircuitOperator()
+   | ^^^^^^^^^^^^^^^^^^^^
+53 | DateTimeSensorAsync()
+54 | ExternalTaskMarker()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `ShortCircuitOperator` from `airflow.providers.standard.operators.python` instead.
+26 |     BranchPythonOperator,
+27 |     PythonOperator,
+28 |     PythonVirtualenvOperator,
+   -     ShortCircuitOperator,
+29 | )
+30 | from airflow.sensors.bash import BashSensor
+31 | from airflow.sensors.date_time import DateTimeSensor
+--------------------------------------------------------------------------------
+44 | )
+45 | from airflow.sensors.filesystem import FileSensor
+46 | from airflow.sensors.python import PythonSensor
+47 + from airflow.providers.standard.operators.python import ShortCircuitOperator
+48 | 
+49 | BranchPythonOperator()
+50 | PythonOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.sensors.date_time.DateTimeSensorAsync` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:53:1
+   |
+51 | PythonVirtualenvOperator()
+52 | ShortCircuitOperator()
+53 | DateTimeSensorAsync()
+   | ^^^^^^^^^^^^^^^^^^^
+54 | ExternalTaskMarker()
+55 | ExternalTaskSensor()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `DateTimeSensorAsync` from `airflow.providers.standard.sensors.date_time` instead.
+38 | 
+39 | BashSensor()
+40 | DateTimeSensor()
+   - from airflow.sensors.date_time import DateTimeSensorAsync
+41 | from airflow.sensors.external_task import (
+42 |     ExternalTaskMarker,
+43 |     ExternalTaskSensor,
+44 | )
+45 | from airflow.sensors.filesystem import FileSensor
+46 | from airflow.sensors.python import PythonSensor
+47 + from airflow.providers.standard.sensors.date_time import DateTimeSensorAsync
+48 | 
+49 | BranchPythonOperator()
+50 | PythonOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.sensors.external_task.ExternalTaskMarker` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:54:1
+   |
+52 | ShortCircuitOperator()
+53 | DateTimeSensorAsync()
+54 | ExternalTaskMarker()
+   | ^^^^^^^^^^^^^^^^^^
+55 | ExternalTaskSensor()
+56 | FileSensor()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.3` and use `ExternalTaskMarker` from `airflow.providers.standard.sensors.external_task` instead.
+40 | DateTimeSensor()
+41 | from airflow.sensors.date_time import DateTimeSensorAsync
+42 | from airflow.sensors.external_task import (
+   -     ExternalTaskMarker,
+43 |     ExternalTaskSensor,
+44 | )
+45 | from airflow.sensors.filesystem import FileSensor
+46 | from airflow.sensors.python import PythonSensor
+47 + from airflow.providers.standard.sensors.external_task import ExternalTaskMarker
+48 | 
+49 | BranchPythonOperator()
+50 | PythonOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.sensors.external_task.ExternalTaskSensor` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:55:1
+   |
+53 | DateTimeSensorAsync()
+54 | ExternalTaskMarker()
+55 | ExternalTaskSensor()
+   | ^^^^^^^^^^^^^^^^^^
+56 | FileSensor()
+57 | PythonSensor()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.3` and use `ExternalTaskSensor` from `airflow.providers.standard.sensors.external_task` instead.
+41 | from airflow.sensors.date_time import DateTimeSensorAsync
+42 | from airflow.sensors.external_task import (
+43 |     ExternalTaskMarker,
+   -     ExternalTaskSensor,
+44 | )
+45 | from airflow.sensors.filesystem import FileSensor
+46 | from airflow.sensors.python import PythonSensor
+47 + from airflow.providers.standard.sensors.external_task import ExternalTaskSensor
+48 | 
+49 | BranchPythonOperator()
+50 | PythonOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.sensors.filesystem.FileSensor` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:56:1
+   |
+54 | ExternalTaskMarker()
+55 | ExternalTaskSensor()
+56 | FileSensor()
+   | ^^^^^^^^^^
+57 | PythonSensor()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.2` and use `FileSensor` from `airflow.providers.standard.sensors.filesystem` instead.
+43 |     ExternalTaskMarker,
+44 |     ExternalTaskSensor,
+45 | )
+   - from airflow.sensors.filesystem import FileSensor
+46 | from airflow.sensors.python import PythonSensor
+47 + from airflow.providers.standard.sensors.filesystem import FileSensor
+48 | 
+49 | BranchPythonOperator()
+50 | PythonOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.sensors.python.PythonSensor` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:57:1
+   |
+55 | ExternalTaskSensor()
+56 | FileSensor()
+57 | PythonSensor()
+   | ^^^^^^^^^^^^
+58 |
+59 | from airflow.sensors.time_sensor import (
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonSensor` from `airflow.providers.standard.sensors.python` instead.
+44 |     ExternalTaskSensor,
+45 | )
+46 | from airflow.sensors.filesystem import FileSensor
+   - from airflow.sensors.python import PythonSensor
+47 + from airflow.providers.standard.sensors.python import PythonSensor
+48 | 
+49 | BranchPythonOperator()
+50 | PythonOperator()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.sensors.time_sensor.TimeSensor` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:64:1
+   |
+62 | )
+63 |
+64 | TimeSensor()
+   | ^^^^^^^^^^
+65 | TimeSensorAsync()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `TimeSensor` from `airflow.providers.standard.sensors.time` instead.
+57 | PythonSensor()
+58 | 
+59 | from airflow.sensors.time_sensor import (
+   -     TimeSensor,
+60 |     TimeSensorAsync,
+61 | )
+62 + from airflow.providers.standard.sensors.time import TimeSensor
+63 | 
+64 | TimeSensor()
+65 | TimeSensorAsync()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.sensors.time_sensor.TimeSensorAsync` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:65:1
+   |
+64 | TimeSensor()
+65 | TimeSensorAsync()
+   | ^^^^^^^^^^^^^^^
+66 |
+67 | from airflow.sensors.time_delta import (
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `TimeSensorAsync` from `airflow.providers.standard.sensors.time` instead.
+58 | 
+59 | from airflow.sensors.time_sensor import (
+60 |     TimeSensor,
+   -     TimeSensorAsync,
+61 | )
+62 + from airflow.providers.standard.sensors.time import TimeSensorAsync
+63 | 
+64 | TimeSensor()
+65 | TimeSensorAsync()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.sensors.time_delta.TimeDeltaSensor` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:82:1
+   |
+80 | )
+81 |
+82 | TimeDeltaSensor()
+   | ^^^^^^^^^^^^^^^
+83 | TimeDeltaSensorAsync()
+84 | DayOfWeekSensor()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `TimeDeltaSensor` from `airflow.providers.standard.sensors.time_delta` instead.
+65 | TimeSensorAsync()
+66 | 
+67 | from airflow.sensors.time_delta import (
+   -     TimeDeltaSensor,
+68 |     TimeDeltaSensorAsync,
+69 | )
+70 | from airflow.sensors.weekday import DayOfWeekSensor
+--------------------------------------------------------------------------------
+77 |     DateTimeTrigger,
+78 |     TimeDeltaTrigger,
+79 | )
+80 + from airflow.providers.standard.sensors.time_delta import TimeDeltaSensor
+81 | 
+82 | TimeDeltaSensor()
+83 | TimeDeltaSensorAsync()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.sensors.time_delta.TimeDeltaSensorAsync` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:83:1
+   |
+82 | TimeDeltaSensor()
+83 | TimeDeltaSensorAsync()
+   | ^^^^^^^^^^^^^^^^^^^^
+84 | DayOfWeekSensor()
+85 | DagStateTrigger()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `TimeDeltaSensorAsync` from `airflow.providers.standard.sensors.time_delta` instead.
+66 | 
+67 | from airflow.sensors.time_delta import (
+68 |     TimeDeltaSensor,
+   -     TimeDeltaSensorAsync,
+69 | )
+70 | from airflow.sensors.weekday import DayOfWeekSensor
+71 | from airflow.triggers.external_task import (
+--------------------------------------------------------------------------------
+77 |     DateTimeTrigger,
+78 |     TimeDeltaTrigger,
+79 | )
+80 + from airflow.providers.standard.sensors.time_delta import TimeDeltaSensorAsync
+81 | 
+82 | TimeDeltaSensor()
+83 | TimeDeltaSensorAsync()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.sensors.weekday.DayOfWeekSensor` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:84:1
+   |
+82 | TimeDeltaSensor()
+83 | TimeDeltaSensorAsync()
+84 | DayOfWeekSensor()
+   | ^^^^^^^^^^^^^^^
+85 | DagStateTrigger()
+86 | WorkflowTrigger()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `DayOfWeekSensor` from `airflow.providers.standard.sensors.weekday` instead.
+68 |     TimeDeltaSensor,
+69 |     TimeDeltaSensorAsync,
+70 | )
+   - from airflow.sensors.weekday import DayOfWeekSensor
+71 | from airflow.triggers.external_task import (
+72 |     DagStateTrigger,
+73 |     WorkflowTrigger,
+--------------------------------------------------------------------------------
+77 |     DateTimeTrigger,
+78 |     TimeDeltaTrigger,
+79 | )
+80 + from airflow.providers.standard.sensors.weekday import DayOfWeekSensor
+81 | 
+82 | TimeDeltaSensor()
+83 | TimeDeltaSensorAsync()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.triggers.external_task.DagStateTrigger` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:85:1
+   |
+83 | TimeDeltaSensorAsync()
+84 | DayOfWeekSensor()
+85 | DagStateTrigger()
+   | ^^^^^^^^^^^^^^^
+86 | WorkflowTrigger()
+87 | FileTrigger()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.3` and use `DagStateTrigger` from `airflow.providers.standard.triggers.external_task` instead.
+70 | )
+71 | from airflow.sensors.weekday import DayOfWeekSensor
+72 | from airflow.triggers.external_task import (
+   -     DagStateTrigger,
+73 |     WorkflowTrigger,
+74 | )
+75 | from airflow.triggers.file import FileTrigger
+--------------------------------------------------------------------------------
+77 |     DateTimeTrigger,
+78 |     TimeDeltaTrigger,
+79 | )
+80 + from airflow.providers.standard.triggers.external_task import DagStateTrigger
+81 | 
+82 | TimeDeltaSensor()
+83 | TimeDeltaSensorAsync()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.triggers.external_task.WorkflowTrigger` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:86:1
+   |
+84 | DayOfWeekSensor()
+85 | DagStateTrigger()
+86 | WorkflowTrigger()
+   | ^^^^^^^^^^^^^^^
+87 | FileTrigger()
+88 | DateTimeTrigger()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.3` and use `WorkflowTrigger` from `airflow.providers.standard.triggers.external_task` instead.
+71 | from airflow.sensors.weekday import DayOfWeekSensor
+72 | from airflow.triggers.external_task import (
+73 |     DagStateTrigger,
+   -     WorkflowTrigger,
+74 | )
+75 | from airflow.triggers.file import FileTrigger
+76 | from airflow.triggers.temporal import (
+77 |     DateTimeTrigger,
+78 |     TimeDeltaTrigger,
+79 | )
+80 + from airflow.providers.standard.triggers.external_task import WorkflowTrigger
+81 | 
+82 | TimeDeltaSensor()
+83 | TimeDeltaSensorAsync()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.triggers.file.FileTrigger` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:87:1
+   |
+85 | DagStateTrigger()
+86 | WorkflowTrigger()
+87 | FileTrigger()
+   | ^^^^^^^^^^^
+88 | DateTimeTrigger()
+89 | TimeDeltaTrigger()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.3` and use `FileTrigger` from `airflow.providers.standard.triggers.file` instead.
+73 |     DagStateTrigger,
+74 |     WorkflowTrigger,
+75 | )
+   - from airflow.triggers.file import FileTrigger
+76 | from airflow.triggers.temporal import (
+77 |     DateTimeTrigger,
+78 |     TimeDeltaTrigger,
+79 | )
+80 + from airflow.providers.standard.triggers.file import FileTrigger
+81 | 
+82 | TimeDeltaSensor()
+83 | TimeDeltaSensorAsync()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.triggers.temporal.DateTimeTrigger` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:88:1
+   |
+86 | WorkflowTrigger()
+87 | FileTrigger()
+88 | DateTimeTrigger()
+   | ^^^^^^^^^^^^^^^
+89 | TimeDeltaTrigger()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.3` and use `DateTimeTrigger` from `airflow.providers.standard.triggers.temporal` instead.
+75 | )
+76 | from airflow.triggers.file import FileTrigger
+77 | from airflow.triggers.temporal import (
+   -     DateTimeTrigger,
+78 |     TimeDeltaTrigger,
+79 | )
+80 + from airflow.providers.standard.triggers.temporal import DateTimeTrigger
+81 | 
+82 | TimeDeltaSensor()
+83 | TimeDeltaSensorAsync()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR312 [*] `airflow.triggers.temporal.TimeDeltaTrigger` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:89:1
+   |
+87 | FileTrigger()
+88 | DateTimeTrigger()
+89 | TimeDeltaTrigger()
+   | ^^^^^^^^^^^^^^^^
+   |
+help: Install `apache-airflow-providers-standard>=0.0.3` and use `TimeDeltaTrigger` from `airflow.providers.standard.triggers.temporal` instead.
+76 | from airflow.triggers.file import FileTrigger
+77 | from airflow.triggers.temporal import (
+78 |     DateTimeTrigger,
+   -     TimeDeltaTrigger,
+79 | )
+80 + from airflow.providers.standard.triggers.temporal import TimeDeltaTrigger
+81 | 
+82 | TimeDeltaSensor()
+83 | TimeDeltaSensorAsync()
+note: This is an unsafe fix and may change runtime behavior

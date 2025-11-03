@@ -1,13 +1,12 @@
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, Parameter};
 use ruff_python_semantic::analyze::visibility::{is_overload, is_override};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::super::helpers::shadows_builtin;
+use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
 /// ## What it does
 /// Checks for function arguments that use the same names as builtins.
@@ -50,6 +49,7 @@ use super::super::helpers::shadows_builtin;
 /// - [_Is it bad practice to use a built-in function name as an attribute or method identifier?_](https://stackoverflow.com/questions/9109333/is-it-bad-practice-to-use-a-built-in-function-name-as-an-attribute-or-method-ide)
 /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.48")]
 pub(crate) struct BuiltinArgumentShadowing {
     name: String,
 }
@@ -67,7 +67,7 @@ pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: &Paramete
     if shadows_builtin(
         parameter.name(),
         checker.source_type,
-        &checker.settings.flake8_builtins.ignorelist,
+        &checker.settings().flake8_builtins.ignorelist,
         checker.target_version(),
     ) {
         // Ignore parameters in lambda expressions.
@@ -92,11 +92,11 @@ pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: &Paramete
             return;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             BuiltinArgumentShadowing {
                 name: parameter.name.to_string(),
             },
             parameter.name.range(),
-        ));
+        );
     }
 }

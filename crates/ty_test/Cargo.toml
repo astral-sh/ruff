@@ -1,0 +1,43 @@
+[package]
+name = "ty_test"
+version = "0.0.0"
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+ruff_db = { workspace = true, features = ["os", "testing"] }
+ruff_index = { workspace = true }
+ruff_notebook = { workspace = true }
+ruff_python_trivia = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
+ruff_python_ast = { workspace = true }
+ty_python_semantic = { workspace = true, features = ["serde", "testing"] }
+ty_static = { workspace = true }
+ty_vendored = { workspace = true }
+
+anyhow = { workspace = true }
+camino = { workspace = true }
+colored = { workspace = true }
+insta = { workspace = true, features = ["filters"] }
+memchr = { workspace = true }
+path-slash = { workspace = true }
+regex = { workspace = true }
+rustc-hash = { workspace = true }
+rustc-stable-hash = { workspace = true }
+salsa = { workspace = true }
+smallvec = { workspace = true }
+serde = { workspace = true }
+tempfile = { workspace = true }
+toml = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

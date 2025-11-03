@@ -1,0 +1,101 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/debug_shadow_with.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..39,
+        body: [
+            With(
+                StmtWith {
+                    node_index: NodeIndex(None),
+                    range: 0..38,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 5..33,
+                            node_index: NodeIndex(None),
+                            context_expr: Call(
+                                ExprCall {
+                                    node_index: NodeIndex(None),
+                                    range: 5..20,
+                                    func: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 5..9,
+                                            id: Name("open"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 9..20,
+                                        node_index: NodeIndex(None),
+                                        args: [
+                                            StringLiteral(
+                                                ExprStringLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 10..19,
+                                                    value: StringLiteralValue {
+                                                        inner: Single(
+                                                            StringLiteral {
+                                                                range: 10..19,
+                                                                node_index: NodeIndex(None),
+                                                                value: "foo.txt",
+                                                                flags: StringLiteralFlags {
+                                                                    quote_style: Double,
+                                                                    prefix: Empty,
+                                                                    triple_quoted: false,
+                                                                    unclosed: false,
+                                                                },
+                                                            },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                            optional_vars: Some(
+                                Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 24..33,
+                                        id: Name("__debug__"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ),
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 35..38,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 35..38,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | with open("foo.txt") as __debug__: ...
+  |                         ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+  |

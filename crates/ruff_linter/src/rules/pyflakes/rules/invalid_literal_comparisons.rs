@@ -1,13 +1,13 @@
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers;
 use ruff_python_ast::{CmpOp, Expr};
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for `is` and `is not` comparisons against literals, like integers,
@@ -51,6 +51,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: Value comparisons](https://docs.python.org/3/reference/expressions.html#value-comparisons)
 /// - [_Why does Python log a SyntaxWarning for ‘is’ with literals?_ by Adam Johnson](https://adamj.eu/tech/2020/01/21/why-does-python-3-8-syntaxwarning-for-is-literal/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.39")]
 pub(crate) struct IsLiteral {
     cmp_op: IsCmpOp,
 }
@@ -90,7 +91,8 @@ pub(crate) fn invalid_literal_comparison(
                 || helpers::is_mutable_iterable_initializer(left)
                 || helpers::is_mutable_iterable_initializer(right))
         {
-            let mut diagnostic = Diagnostic::new(IsLiteral { cmp_op: op.into() }, expr.range());
+            let mut diagnostic =
+                checker.report_diagnostic(IsLiteral { cmp_op: op.into() }, expr.range());
             if lazy_located.is_none() {
                 lazy_located = Some(locate_cmp_ops(expr, checker.tokens()));
             }
@@ -117,7 +119,6 @@ pub(crate) fn invalid_literal_comparison(
                     bail!("Failed to fix invalid comparison due to missing op")
                 }
             });
-            checker.report_diagnostic(diagnostic);
         }
         left = right;
     }
@@ -246,7 +247,7 @@ mod tests {
     use ruff_python_parser::parse_expression;
     use ruff_text_size::TextSize;
 
-    use super::{locate_cmp_ops, LocatedCmpOp};
+    use super::{LocatedCmpOp, locate_cmp_ops};
 
     fn extract_cmp_op_locations(source: &str) -> Result<Vec<LocatedCmpOp>> {
         let parsed = parse_expression(source)?;

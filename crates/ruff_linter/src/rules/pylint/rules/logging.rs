@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::pyflakes::cformat::CFormatSummary;
@@ -37,6 +37,7 @@ use crate::rules::pyflakes::cformat::CFormatSummary;
 ///     raise
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.252")]
 pub(crate) struct LoggingTooFewArgs;
 
 impl Violation for LoggingTooFewArgs {
@@ -74,6 +75,7 @@ impl Violation for LoggingTooFewArgs {
 ///     raise
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.252")]
 pub(crate) struct LoggingTooManyArgs;
 
 impl Violation for LoggingTooManyArgs {
@@ -105,11 +107,11 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
             if LoggingLevel::from_attribute(attr).is_none() {
                 return;
-            };
+            }
             if !logging::is_logger_candidate(
                 &call.func,
                 checker.semantic(),
-                &checker.settings.logger_objects,
+                &checker.settings().logger_objects,
             ) {
                 return;
             }
@@ -126,10 +128,10 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
             };
             if LoggingLevel::from_attribute(attribute).is_none() {
                 return;
-            };
+            }
         }
         _ => return,
-    };
+    }
 
     let Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) =
         call.arguments.find_positional(0)
@@ -152,15 +154,15 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
     let num_message_args = call.arguments.args.len() - 1;
     let num_keywords = call.arguments.keywords.len();
 
-    if checker.enabled(Rule::LoggingTooManyArgs) {
+    if checker.is_rule_enabled(Rule::LoggingTooManyArgs) {
         if summary.num_positional < num_message_args {
-            checker.report_diagnostic(Diagnostic::new(LoggingTooManyArgs, call.func.range()));
+            checker.report_diagnostic(LoggingTooManyArgs, call.func.range());
         }
     }
 
-    if checker.enabled(Rule::LoggingTooFewArgs) {
+    if checker.is_rule_enabled(Rule::LoggingTooFewArgs) {
         if num_message_args > 0 && num_keywords == 0 && summary.num_positional > num_message_args {
-            checker.report_diagnostic(Diagnostic::new(LoggingTooFewArgs, call.func.range()));
+            checker.report_diagnostic(LoggingTooFewArgs, call.func.range());
         }
     }
 }

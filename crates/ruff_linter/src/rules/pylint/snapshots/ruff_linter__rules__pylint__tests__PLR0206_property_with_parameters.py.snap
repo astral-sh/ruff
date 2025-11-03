@@ -1,79 +1,87 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
-property_with_parameters.py:7:9: PLR0206 Cannot have defined parameters for properties
+PLR0206 Cannot have defined parameters for properties
+ --> property_with_parameters.py:7:9
   |
 5 | class Cls:
 6 |     @property
 7 |     def attribute(self, param, param1):  # [property-with-parameters]
-  |         ^^^^^^^^^ PLR0206
+  |         ^^^^^^^^^
 8 |         return param + param1
   |
 
-property_with_parameters.py:11:9: PLR0206 Cannot have defined parameters for properties
+PLR0206 Cannot have defined parameters for properties
+  --> property_with_parameters.py:11:9
    |
 10 |     @property
 11 |     def attribute_keyword_only(self, *, param, param1):  # [property-with-parameters]
-   |         ^^^^^^^^^^^^^^^^^^^^^^ PLR0206
+   |         ^^^^^^^^^^^^^^^^^^^^^^
 12 |         return param + param1
    |
 
-property_with_parameters.py:15:9: PLR0206 Cannot have defined parameters for properties
+PLR0206 Cannot have defined parameters for properties
+  --> property_with_parameters.py:15:9
    |
 14 |     @property
 15 |     def attribute_positional_only(self, param, param1, /):  # [property-with-parameters]
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^ PLR0206
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^
 16 |         return param + param1
    |
 
-property_with_parameters.py:35:9: PLR0206 Cannot have defined parameters for properties
+PLR0206 Cannot have defined parameters for properties
+  --> property_with_parameters.py:35:9
    |
 33 | class VariadicParameters:
 34 |     @property
 35 |     def attribute_var_args(self, *args):  # [property-with-parameters]
-   |         ^^^^^^^^^^^^^^^^^^ PLR0206
+   |         ^^^^^^^^^^^^^^^^^^
 36 |         return sum(args)
    |
 
-property_with_parameters.py:39:9: PLR0206 Cannot have defined parameters for properties
+PLR0206 Cannot have defined parameters for properties
+  --> property_with_parameters.py:39:9
    |
 38 |     @property
 39 |     def attribute_var_kwargs(self, **kwargs):  #[property-with-parameters]
-   |         ^^^^^^^^^^^^^^^^^^^^ PLR0206
+   |         ^^^^^^^^^^^^^^^^^^^^
 40 |         return {key: value * 2 for key, value in kwargs.items()}
    |
 
-property_with_parameters.py:48:9: PLR0206 Cannot have defined parameters for properties
+PLR0206 Cannot have defined parameters for properties
+  --> property_with_parameters.py:48:9
    |
 46 | class Cached:
 47 |     @cached_property
 48 |     def cached_prop(self, value):  # [property-with-parameters]
-   |         ^^^^^^^^^^^ PLR0206
+   |         ^^^^^^^^^^^
 49 |         ...
    |
 
-property_with_parameters.py:59:9: PLR0206 Cannot have defined parameters for properties
+PLR0206 Cannot have defined parameters for properties
+  --> property_with_parameters.py:59:9
    |
 57 | class Baz:
 58 |     @abc.abstractproperty
 59 |     def prop2(self, param) -> None:  # [property-with-parameters]
-   |         ^^^^^ PLR0206
+   |         ^^^^^
 60 |         return None
    |
 
-property_with_parameters.py:63:9: PLR0206 Cannot have defined parameters for properties
+PLR0206 Cannot have defined parameters for properties
+  --> property_with_parameters.py:63:9
    |
 62 |     @types.DynamicClassAttribute
 63 |     def prop3(self, param) -> None:  # [property-with-parameters]
-   |         ^^^^^ PLR0206
+   |         ^^^^^
 64 |         return None
    |
 
-property_with_parameters.py:67:9: PLR0206 Cannot have defined parameters for properties
+PLR0206 Cannot have defined parameters for properties
+  --> property_with_parameters.py:67:9
    |
 66 |     @enum.property
 67 |     def prop4(self, param) -> None:  # [property-with-parameters]
-   |         ^^^^^ PLR0206
+   |         ^^^^^
 68 |         return None
    |

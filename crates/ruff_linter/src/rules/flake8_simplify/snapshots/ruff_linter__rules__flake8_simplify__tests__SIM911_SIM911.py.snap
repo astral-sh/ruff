@@ -1,0 +1,95 @@
+---
+source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+---
+SIM911 [*] Use `d.items()` instead of `zip(d.keys(), d.values())`
+ --> SIM911.py:2:17
+  |
+1 | def foo(d: dict[str, str]) -> None:
+2 |     for k, v in zip(d.keys(), d.values()):  # SIM911
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+3 |         ...
+  |
+help: Replace `zip(d.keys(), d.values())` with `d.items()`
+1 | def foo(d: dict[str, str]) -> None:
+  -     for k, v in zip(d.keys(), d.values()):  # SIM911
+2 +     for k, v in d.items():  # SIM911
+3 |         ...
+4 | 
+5 |     for k, v in zip(d.keys(), d.values(), strict=True):  # SIM911
+
+SIM911 [*] Use `d.items()` instead of `zip(d.keys(), d.values(), strict=True)`
+ --> SIM911.py:5:17
+  |
+3 |         ...
+4 |
+5 |     for k, v in zip(d.keys(), d.values(), strict=True):  # SIM911
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+6 |         ...
+  |
+help: Replace `zip(d.keys(), d.values(), strict=True)` with `d.items()`
+2 |     for k, v in zip(d.keys(), d.values()):  # SIM911
+3 |         ...
+4 | 
+  -     for k, v in zip(d.keys(), d.values(), strict=True):  # SIM911
+5 +     for k, v in d.items():  # SIM911
+6 |         ...
+7 | 
+8 |     for k, v in zip(d.keys(), d.values(), struct=True):  # OK
+
+SIM911 [*] Use `d2.items()` instead of `zip(d2.keys(), d2.values())`
+  --> SIM911.py:20:13
+   |
+18 |     ...
+19 |
+20 | for k, v in zip(d2.keys(), d2.values()):  # SIM911
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+21 |     ...
+   |
+help: Replace `zip(d2.keys(), d2.values())` with `d2.items()`
+17 | for k, v in zip(d1.items(), d2.values()):  # OK
+18 |     ...
+19 | 
+   - for k, v in zip(d2.keys(), d2.values()):  # SIM911
+20 + for k, v in d2.items():  # SIM911
+21 |     ...
+22 | 
+23 | items = zip(x.keys(), x.values())  # OK
+
+SIM911 [*] Use `dict.items()` instead of `zip(dict.keys(), dict.values())`
+  --> SIM911.py:30:27
+   |
+28 | def foo():
+29 |     dict = {}
+30 |     for country, stars in zip(dict.keys(), dict.values()):
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+31 |         ...
+   |
+help: Replace `zip(dict.keys(), dict.values())` with `dict.items()`
+27 | # https://github.com/astral-sh/ruff/issues/18777
+28 | def foo():
+29 |     dict = {}
+   -     for country, stars in zip(dict.keys(), dict.values()):
+30 +     for country, stars in dict.items():
+31 |         ...
+32 | 
+33 | 
+
+SIM911 [*] Use ` flag_stars.items()` instead of `(zip)(flag_stars.keys(), flag_stars.values())`
+  --> SIM911.py:36:22
+   |
+34 | # https://github.com/astral-sh/ruff/issues/18776
+35 | flag_stars = {}
+36 | for country, stars in(zip)(flag_stars.keys(), flag_stars.values()):...
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+37 |
+38 | # Regression test for https://github.com/astral-sh/ruff/issues/18778
+   |
+help: Replace `(zip)(flag_stars.keys(), flag_stars.values())` with ` flag_stars.items()`
+33 | 
+34 | # https://github.com/astral-sh/ruff/issues/18776
+35 | flag_stars = {}
+   - for country, stars in(zip)(flag_stars.keys(), flag_stars.values()):...
+36 + for country, stars in flag_stars.items():...
+37 | 
+38 | # Regression test for https://github.com/astral-sh/ruff/issues/18778
+39 | d = {}

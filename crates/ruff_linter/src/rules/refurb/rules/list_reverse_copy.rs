@@ -1,13 +1,13 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     Expr, ExprCall, ExprName, ExprSlice, ExprSubscript, ExprUnaryOp, Int, StmtAssign, UnaryOp,
 };
-use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for list reversals that can be performed in-place in lieu of
@@ -47,6 +47,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: More on Lists](https://docs.python.org/3/tutorial/datastructures.html#more-on-lists)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct ListReverseCopy {
     name: String,
 }
@@ -89,18 +90,17 @@ pub(crate) fn list_assign_reversed(checker: &Checker, assign: &StmtAssign) {
         return;
     }
 
-    checker.report_diagnostic(
-        Diagnostic::new(
+    checker
+        .report_diagnostic(
             ListReverseCopy {
                 name: target_expr.id.to_string(),
             },
             assign.range(),
         )
-        .with_fix(Fix::unsafe_edit(Edit::range_replacement(
+        .set_fix(Fix::unsafe_edit(Edit::range_replacement(
             format!("{}.reverse()", target_expr.id),
             assign.range(),
-        ))),
-    );
+        )));
 }
 
 /// Recursively removes any `list` wrappers from the expression.
@@ -182,7 +182,7 @@ fn extract_name_from_sliced_reversed(expr: &Expr) -> Option<&ExprName> {
         .is_none_or(|value| value != 1)
     {
         return None;
-    };
+    }
     value.as_name_expr()
 }
 

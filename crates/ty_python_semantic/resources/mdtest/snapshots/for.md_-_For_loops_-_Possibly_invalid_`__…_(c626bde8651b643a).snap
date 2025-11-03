@@ -1,0 +1,79 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - Possibly invalid `__next__` method
+mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def _(flag: bool):
+ 2 |     class Iterator1:
+ 3 |         if flag:
+ 4 |             def __next__(self) -> int:
+ 5 |                 return 42
+ 6 |         else:
+ 7 |             def __next__(self, invalid_extra_arg) -> str:
+ 8 |                 return "foo"
+ 9 | 
+10 |     class Iterator2:
+11 |         if flag:
+12 |             def __next__(self) -> int:
+13 |                 return 42
+14 |         else:
+15 |             __next__: None = None
+16 | 
+17 |     class Iterable1:
+18 |         def __iter__(self) -> Iterator1:
+19 |             return Iterator1()
+20 | 
+21 |     class Iterable2:
+22 |         def __iter__(self) -> Iterator2:
+23 |             return Iterator2()
+24 | 
+25 |     # error: [not-iterable]
+26 |     for x in Iterable1():
+27 |         reveal_type(x)  # revealed: int | str
+28 | 
+29 |     # error: [not-iterable]
+30 |     for y in Iterable2():
+31 |         # TODO: `int` would probably be better here:
+32 |         reveal_type(y)  # revealed: int | Unknown
+```
+
+# Diagnostics
+
+```
+error[not-iterable]: Object of type `Iterable1` may not be iterable
+  --> src/mdtest_snippet.py:26:14
+   |
+25 |     # error: [not-iterable]
+26 |     for x in Iterable1():
+   |              ^^^^^^^^^^^
+27 |         reveal_type(x)  # revealed: int | str
+   |
+info: Its `__iter__` method returns an object of type `Iterator1`, which may have an invalid `__next__` method
+info: Expected signature for `__next__` is `def __next__(self): ...`
+info: rule `not-iterable` is enabled by default
+
+```
+
+```
+error[not-iterable]: Object of type `Iterable2` may not be iterable
+  --> src/mdtest_snippet.py:30:14
+   |
+29 |     # error: [not-iterable]
+30 |     for y in Iterable2():
+   |              ^^^^^^^^^^^
+31 |         # TODO: `int` would probably be better here:
+32 |         reveal_type(y)  # revealed: int | Unknown
+   |
+info: Its `__iter__` method returns an object of type `Iterator2`, which has a `__next__` attribute that may not be callable
+info: rule `not-iterable` is enabled by default
+
+```

@@ -1,18 +1,18 @@
 use rustc_hash::FxHashSet;
 use std::iter;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     Arguments, Expr, ExprStarred, ExprSubscript, ExprTuple, StmtClassDef, TypeParams,
 };
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
-use crate::fix::edits::{remove_argument, Parentheses};
+use crate::fix::edits::{Parentheses, remove_argument};
 use crate::rules::pyupgrade::rules::pep695::{
-    expr_name_to_type_var, find_generic, DisplayTypeVars, TypeParamKind, TypeVar,
+    DisplayTypeVars, TypeParamKind, TypeVar, expr_name_to_type_var, find_generic,
 };
+use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does
@@ -62,6 +62,7 @@ use ruff_python_ast::PythonVersion;
 /// [PEP 695]: https://peps.python.org/pep-0695/
 /// [type parameter lists]: https://docs.python.org/3/reference/compound_stmts.html#type-params
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct ClassWithMixedTypeVars;
 
 impl Violation for ClassWithMixedTypeVars {
@@ -103,7 +104,7 @@ pub(crate) fn class_with_mixed_type_vars(checker: &Checker, class_def: &StmtClas
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(ClassWithMixedTypeVars, generic_base.range);
+    let mut diagnostic = checker.report_diagnostic(ClassWithMixedTypeVars, generic_base.range);
 
     diagnostic.try_set_optional_fix(|| {
         convert_type_vars(
@@ -114,8 +115,6 @@ pub(crate) fn class_with_mixed_type_vars(checker: &Checker, class_def: &StmtClas
             checker,
         )
     });
-
-    checker.report_diagnostic(diagnostic);
 }
 
 fn typing_generic_base_and_arguments<'a>(
@@ -159,8 +158,13 @@ fn convert_type_vars(
         source,
     };
 
-    let remove_generic_base =
-        remove_argument(generic_base, class_arguments, Parentheses::Remove, source)?;
+    let remove_generic_base = remove_argument(
+        generic_base,
+        class_arguments,
+        Parentheses::Remove,
+        source,
+        checker.comment_ranges(),
+    )?;
     let replace_type_params =
         Edit::range_replacement(new_type_params.to_string(), type_params.range);
 

@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
@@ -9,6 +8,7 @@ use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -35,6 +35,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `__str__` method](https://docs.python.org/3/reference/datamodel.html#object.__str__)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct InvalidStrReturnType;
 
 impl Violation for InvalidStrReturnType {
@@ -44,7 +45,7 @@ impl Violation for InvalidStrReturnType {
     }
 }
 
-/// E0307
+/// PLE0307
 pub(crate) fn invalid_str_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     if function_def.name.as_str() != "__str__" {
         return;
@@ -68,10 +69,7 @@ pub(crate) fn invalid_str_return(checker: &Checker, function_def: &ast::StmtFunc
 
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
-        checker.report_diagnostic(Diagnostic::new(
-            InvalidStrReturnType,
-            function_def.identifier(),
-        ));
+        checker.report_diagnostic(InvalidStrReturnType, function_def.identifier());
         return;
     }
 
@@ -87,11 +85,11 @@ pub(crate) fn invalid_str_return(checker: &Checker, function_def: &ast::StmtFunc
                 ResolvedPythonType::from(value),
                 ResolvedPythonType::Unknown | ResolvedPythonType::Atom(PythonType::String)
             ) {
-                checker.report_diagnostic(Diagnostic::new(InvalidStrReturnType, value.range()));
+                checker.report_diagnostic(InvalidStrReturnType, value.range());
             }
         } else {
             // Disallow implicit `None`.
-            checker.report_diagnostic(Diagnostic::new(InvalidStrReturnType, stmt.range()));
+            checker.report_diagnostic(InvalidStrReturnType, stmt.range());
         }
     }
 }

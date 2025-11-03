@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, CmpOp, Stmt};
@@ -7,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `if` statements that can be replaced with `min()` or `max()`
@@ -29,10 +29,24 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// highest_score = max(highest_score, score)
 /// ```
 ///
+/// ## Fix safety
+/// This fix is marked unsafe if it would delete any comments within the replacement range.
+///
+/// An example to illustrate where comments are preserved and where they are not:
+///
+/// ```py
+/// a, b = 0, 10
+///
+/// if a >= b: # deleted comment
+///     # deleted comment
+///     a = b # preserved comment
+/// ```
+///
 /// ## References
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct IfStmtMinMax {
     min_max: MinMax,
     replacement: SourceCodeSnippet,
@@ -67,24 +81,27 @@ impl Violation for IfStmtMinMax {
     }
 }
 
-/// R1730, R1731
+/// PLR1730, PLR1731
 pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
     let ast::StmtIf {
         test,
         body,
         elif_else_clauses,
         range: _,
+        node_index: _,
     } = stmt_if;
 
     if !elif_else_clauses.is_empty() {
         return;
     }
 
-    let [body @ Stmt::Assign(ast::StmtAssign {
-        targets: body_targets,
-        value: body_value,
-        ..
-    })] = body.as_slice()
+    let [
+        body @ Stmt::Assign(ast::StmtAssign {
+            targets: body_targets,
+            value: body_value,
+            ..
+        }),
+    ] = body.as_slice()
     else {
         return;
     };
@@ -161,7 +178,7 @@ pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
         checker.locator().slice(arg2),
     );
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         IfStmtMinMax {
             min_max,
             replacement: SourceCodeSnippet::from_str(replacement.as_str()),
@@ -169,14 +186,19 @@ pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
         stmt_if.range(),
     );
 
-    if checker.semantic().has_builtin_binding(min_max.as_str()) {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            replacement,
-            stmt_if.range(),
-        )));
-    }
+    let range_replacement = stmt_if.range();
+    let applicability = if checker.comment_ranges().intersects(range_replacement) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
 
-    checker.report_diagnostic(diagnostic);
+    if checker.semantic().has_builtin_binding(min_max.as_str()) {
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::range_replacement(replacement, range_replacement),
+            applicability,
+        ));
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

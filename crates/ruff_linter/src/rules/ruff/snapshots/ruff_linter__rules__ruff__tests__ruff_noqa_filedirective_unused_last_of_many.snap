@@ -1,0 +1,31 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF100 [*] Unused `noqa` directive (unused: `E501`)
+ --> RUF100_7.py:1:1
+  |
+1 | # flake8: noqa: F841, E501 -- used followed by unused code
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2 | # ruff: noqa: E701, F541 -- unused followed by used code
+  |
+help: Remove unused `noqa` directive
+  - # flake8: noqa: F841, E501 -- used followed by unused code
+1 + # flake8: noqa: F841 -- used followed by unused code
+2 | # ruff: noqa: E701, F541 -- unused followed by used code
+3 | 
+4 | 
+
+RUF100 [*] Unused `noqa` directive (non-enabled: `E701`)
+ --> RUF100_7.py:2:1
+  |
+1 | # flake8: noqa: F841, E501 -- used followed by unused code
+2 | # ruff: noqa: E701, F541 -- unused followed by used code
+  | ^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove unused `noqa` directive
+1 | # flake8: noqa: F841, E501 -- used followed by unused code
+  - # ruff: noqa: E701, F541 -- unused followed by used code
+2 + # ruff: noqa: F541 -- unused followed by used code
+3 | 
+4 | 
+5 | def a():

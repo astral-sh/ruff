@@ -1,0 +1,34 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+PLE1142 `await` should be used within an async function
+ --> resources/test/fixtures/syntax_errors/async_comprehension.py:5:8
+  |
+4 | def regular_function():
+5 |     [x async for x in elements(1)]
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+6 |
+7 |     async with elements(1) as x:
+  |
+
+PLE1142 `await` should be used within an async function
+  --> resources/test/fixtures/syntax_errors/async_comprehension.py:7:5
+   |
+ 5 |       [x async for x in elements(1)]
+ 6 |
+ 7 | /     async with elements(1) as x:
+ 8 | |         pass
+   | |____________^
+ 9 |
+10 |       async for _ in elements(1):
+   |
+
+PLE1142 `await` should be used within an async function
+  --> resources/test/fixtures/syntax_errors/async_comprehension.py:10:5
+   |
+ 8 |           pass
+ 9 |
+10 | /     async for _ in elements(1):
+11 | |         pass
+   | |____________^
+   |

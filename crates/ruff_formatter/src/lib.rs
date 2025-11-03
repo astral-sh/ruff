@@ -7,10 +7,10 @@
 //!
 //! * [`Format`]: Implemented by objects that can be formatted.
 //! * [`FormatRule`]: Rule that knows how to format an object of another type. Useful in the situation where
-//!    it's necessary to implement [Format] on an object from another crate. This module defines the
-//!    [`FormatRefWithRule`] and [`FormatOwnedWithRule`] structs to pass an item with its corresponding rule.
+//!   it's necessary to implement [Format] on an object from another crate. This module defines the
+//!   [`FormatRefWithRule`] and [`FormatOwnedWithRule`] structs to pass an item with its corresponding rule.
 //! * [`FormatWithRule`] implemented by objects that know how to format another type. Useful for implementing
-//!    some reusable formatting logic inside of this module if the type itself doesn't implement [Format]
+//!   some reusable formatting logic inside of this module if the type itself doesn't implement [Format]
 //!
 //! ## Formatting Macros
 //!
@@ -38,7 +38,7 @@ use crate::prelude::TagKind;
 use std::fmt;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
-use std::num::{NonZeroU16, NonZeroU8, TryFromIntError};
+use std::num::{NonZeroU8, NonZeroU16, TryFromIntError};
 
 use crate::format_element::document::Document;
 use crate::printer::{Printer, PrinterOptions};
@@ -50,7 +50,7 @@ pub use builders::BestFitting;
 pub use source_code::{SourceCode, SourceCodeSlice};
 
 pub use crate::diagnostics::{ActualStart, FormatError, InvalidDocumentError, PrintError};
-pub use format_element::{normalize_newlines, FormatElement, LINE_TERMINATORS};
+pub use format_element::{FormatElement, LINE_TERMINATORS, normalize_newlines};
 pub use group_id::GroupId;
 use ruff_macros::CacheKey;
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -81,18 +81,23 @@ impl IndentStyle {
     pub const fn is_space(&self) -> bool {
         matches!(self, IndentStyle::Space)
     }
-}
 
-impl std::fmt::Display for IndentStyle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    /// Returns the string representation of the indent style.
+    pub const fn as_str(&self) -> &'static str {
         match self {
-            IndentStyle::Tab => std::write!(f, "tab"),
-            IndentStyle::Space => std::write!(f, "space"),
+            IndentStyle::Tab => "tab",
+            IndentStyle::Space => "space",
         }
     }
 }
 
-/// The visual width of a indentation.
+impl std::fmt::Display for IndentStyle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// The visual width of an indentation.
 ///
 /// Determines the visual width of a tab character (`\t`) and the number of
 /// spaces per indent when using [`IndentStyle::Space`].
@@ -193,7 +198,7 @@ pub trait FormatContext {
     fn options(&self) -> &Self::Options;
 
     /// Returns the source code from the document that gets formatted.
-    fn source_code(&self) -> SourceCode;
+    fn source_code(&self) -> SourceCode<'_>;
 }
 
 /// Options customizing how the source code should be formatted.
@@ -207,7 +212,7 @@ pub trait FormatOptions {
     /// What's the max width of a line. Defaults to 80.
     fn line_width(&self) -> LineWidth;
 
-    /// Derives the print options from the these format options
+    /// Derives the print options from these format options
     fn as_print_options(&self) -> PrinterOptions;
 }
 
@@ -239,7 +244,7 @@ impl FormatContext for SimpleFormatContext {
         &self.options
     }
 
-    fn source_code(&self) -> SourceCode {
+    fn source_code(&self) -> SourceCode<'_> {
         SourceCode::new(&self.source_code)
     }
 }
@@ -326,7 +331,7 @@ where
         printer.print_with_indent(&self.document, indent)
     }
 
-    fn create_printer(&self) -> Printer {
+    fn create_printer(&self) -> Printer<'_> {
         let source_code = self.context.source_code();
         let print_options = self.context.options().as_print_options();
 
@@ -925,7 +930,7 @@ pub struct FormatState<Context> {
     group_id_builder: UniqueGroupIdBuilder,
 }
 
-#[allow(clippy::missing_fields_in_debug)]
+#[expect(clippy::missing_fields_in_debug)]
 impl<Context> std::fmt::Debug for FormatState<Context>
 where
     Context: std::fmt::Debug,

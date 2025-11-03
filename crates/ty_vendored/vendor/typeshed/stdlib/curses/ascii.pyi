@@ -1,0 +1,64 @@
+"""Constants and membership tests for ASCII characters"""
+
+from typing import Final, TypeVar
+
+_CharT = TypeVar("_CharT", str, int)
+
+NUL: Final = 0x00
+SOH: Final = 0x01
+STX: Final = 0x02
+ETX: Final = 0x03
+EOT: Final = 0x04
+ENQ: Final = 0x05
+ACK: Final = 0x06
+BEL: Final = 0x07
+BS: Final = 0x08
+TAB: Final = 0x09
+HT: Final = 0x09
+LF: Final = 0x0A
+NL: Final = 0x0A
+VT: Final = 0x0B
+FF: Final = 0x0C
+CR: Final = 0x0D
+SO: Final = 0x0E
+SI: Final = 0x0F
+DLE: Final = 0x10
+DC1: Final = 0x11
+DC2: Final = 0x12
+DC3: Final = 0x13
+DC4: Final = 0x14
+NAK: Final = 0x15
+SYN: Final = 0x16
+ETB: Final = 0x17
+CAN: Final = 0x18
+EM: Final = 0x19
+SUB: Final = 0x1A
+ESC: Final = 0x1B
+FS: Final = 0x1C
+GS: Final = 0x1D
+RS: Final = 0x1E
+US: Final = 0x1F
+SP: Final = 0x20
+DEL: Final = 0x7F
+
+controlnames: Final[list[int]]
+
+def isalnum(c: str | int) -> bool: ...
+def isalpha(c: str | int) -> bool: ...
+def isascii(c: str | int) -> bool: ...
+def isblank(c: str | int) -> bool: ...
+def iscntrl(c: str | int) -> bool: ...
+def isdigit(c: str | int) -> bool: ...
+def isgraph(c: str | int) -> bool: ...
+def islower(c: str | int) -> bool: ...
+def isprint(c: str | int) -> bool: ...
+def ispunct(c: str | int) -> bool: ...
+def isspace(c: str | int) -> bool: ...
+def isupper(c: str | int) -> bool: ...
+def isxdigit(c: str | int) -> bool: ...
+def isctrl(c: str | int) -> bool: ...
+def ismeta(c: str | int) -> bool: ...
+def ascii(c: _CharT) -> _CharT: ...
+def ctrl(c: _CharT) -> _CharT: ...
+def alt(c: _CharT) -> _CharT: ...
+def unctrl(c: str | int) -> str: ...

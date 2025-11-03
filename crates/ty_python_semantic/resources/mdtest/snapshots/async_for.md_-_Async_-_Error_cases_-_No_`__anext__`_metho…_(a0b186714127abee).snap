@@ -1,0 +1,42 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: async_for.md - Async - Error cases - No `__anext__` method
+mdtest path: crates/ty_python_semantic/resources/mdtest/loops/async_for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class NoAnext: ...
+ 2 | 
+ 3 | class AsyncIterable:
+ 4 |     def __aiter__(self) -> NoAnext:
+ 5 |         return NoAnext()
+ 6 | 
+ 7 | async def foo():
+ 8 |     # error: [not-iterable] "Object of type `AsyncIterable` is not async-iterable"
+ 9 |     async for x in AsyncIterable():
+10 |         reveal_type(x)  # revealed: Unknown
+```
+
+# Diagnostics
+
+```
+error[not-iterable]: Object of type `AsyncIterable` is not async-iterable
+  --> src/mdtest_snippet.py:9:20
+   |
+ 7 | async def foo():
+ 8 |     # error: [not-iterable] "Object of type `AsyncIterable` is not async-iterable"
+ 9 |     async for x in AsyncIterable():
+   |                    ^^^^^^^^^^^^^^^
+10 |         reveal_type(x)  # revealed: Unknown
+   |
+info: Its `__aiter__` method returns an object of type `NoAnext`, which has no `__anext__` method
+info: rule `not-iterable` is enabled by default
+
+```

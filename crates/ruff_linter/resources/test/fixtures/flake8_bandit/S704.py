@@ -12,7 +12,7 @@ flask.Markup("unsafe %s" % content)  # S704
 Markup(object="safe")
 Markup(object="unsafe {}".format(content))  # Not currently detected
 
-# NOTE: We may be able to get rid of these false positives with red-knot
+# NOTE: We may be able to get rid of these false positives with ty
 #       if it includes comprehensive constant expression detection/evaluation.
 Markup("*" * 8)  # S704 (false positive)
 flask.Markup("hello {}".format("world"))  # S704 (false positive)

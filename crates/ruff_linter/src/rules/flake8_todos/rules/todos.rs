@@ -2,13 +2,14 @@ use std::sync::LazyLock;
 
 use regex::RegexSet;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use crate::directives::{TodoComment, TodoDirective, TodoDirectiveKind};
 use crate::Locator;
+use crate::checkers::ast::LintContext;
+use crate::directives::{TodoComment, TodoDirective, TodoDirectiveKind};
+use crate::{AlwaysFixableViolation, Edit, Fix, Violation};
 
 /// ## What it does
 /// Checks that a TODO comment is labelled with "TODO".
@@ -30,6 +31,7 @@ use crate::Locator;
 /// # TODO(ruff): this is now fixed!
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.269")]
 pub(crate) struct InvalidTodoTag {
     pub tag: String,
 }
@@ -60,6 +62,7 @@ impl Violation for InvalidTodoTag {
 /// # TODO(charlie): now an author is assigned
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.269")]
 pub(crate) struct MissingTodoAuthor;
 
 impl Violation for MissingTodoAuthor {
@@ -101,6 +104,7 @@ impl Violation for MissingTodoAuthor {
 /// # SIXCHR-003
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.269")]
 pub(crate) struct MissingTodoLink;
 
 impl Violation for MissingTodoLink {
@@ -130,6 +134,7 @@ impl Violation for MissingTodoLink {
 /// # TODO(charlie): colon fixed
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.269")]
 pub(crate) struct MissingTodoColon;
 
 impl Violation for MissingTodoColon {
@@ -157,6 +162,7 @@ impl Violation for MissingTodoColon {
 /// # TODO(charlie): fix some issue
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.269")]
 pub(crate) struct MissingTodoDescription;
 
 impl Violation for MissingTodoDescription {
@@ -184,6 +190,7 @@ impl Violation for MissingTodoDescription {
 /// # TODO(charlie): this is capitalized
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.269")]
 pub(crate) struct InvalidTodoCapitalization {
     tag: String,
 }
@@ -221,6 +228,7 @@ impl AlwaysFixableViolation for InvalidTodoCapitalization {
 /// # TODO(charlie): fix this
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.269")]
 pub(crate) struct MissingSpaceAfterTodoColon;
 
 impl Violation for MissingSpaceAfterTodoColon {
@@ -248,7 +256,7 @@ static ISSUE_LINK_TODO_LINE_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
 });
 
 pub(crate) fn todos(
-    diagnostics: &mut Vec<Diagnostic>,
+    context: &LintContext,
     todo_comments: &[TodoComment],
     locator: &Locator,
     comment_ranges: &CommentRanges,
@@ -267,8 +275,8 @@ pub(crate) fn todos(
             continue;
         }
 
-        directive_errors(diagnostics, directive);
-        static_errors(diagnostics, content, range, directive);
+        directive_errors(context, directive);
+        static_errors(context, content, range, directive);
 
         let mut has_issue_link = false;
         // VSCode recommended links on same line are ok:
@@ -307,46 +315,44 @@ pub(crate) fn todos(
 
         if !has_issue_link {
             // TD003
-            diagnostics.push(Diagnostic::new(MissingTodoLink, directive.range));
+            context.report_diagnostic_if_enabled(MissingTodoLink, directive.range);
         }
     }
 }
 
 /// Check that the directive itself is valid. This function modifies `diagnostics` in-place.
-fn directive_errors(diagnostics: &mut Vec<Diagnostic>, directive: &TodoDirective) {
+fn directive_errors(context: &LintContext, directive: &TodoDirective) {
     if directive.content == "TODO" {
         return;
     }
 
     if directive.content.to_uppercase() == "TODO" {
         // TD006
-        let mut diagnostic = Diagnostic::new(
+        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
             InvalidTodoCapitalization {
                 tag: directive.content.to_string(),
             },
             directive.range,
-        );
-
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            "TODO".to_string(),
-            directive.range,
-        )));
-
-        diagnostics.push(diagnostic);
+        ) {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                "TODO".to_string(),
+                directive.range,
+            )));
+        }
     } else {
         // TD001
-        diagnostics.push(Diagnostic::new(
+        context.report_diagnostic_if_enabled(
             InvalidTodoTag {
                 tag: directive.content.to_string(),
             },
             directive.range,
-        ));
+        );
     }
 }
 
 /// Checks for "static" errors in the comment: missing colon, missing author, etc.
-fn static_errors(
-    diagnostics: &mut Vec<Diagnostic>,
+pub(crate) fn static_errors(
+    context: &LintContext,
     comment: &str,
     comment_range: TextRange,
     directive: &TodoDirective,
@@ -367,13 +373,13 @@ fn static_errors(
                 TextSize::try_from(end_index).unwrap()
             } else {
                 // TD002
-                diagnostics.push(Diagnostic::new(MissingTodoAuthor, directive.range));
+                context.report_diagnostic_if_enabled(MissingTodoAuthor, directive.range);
 
                 TextSize::new(0)
             }
         } else {
             // TD002
-            diagnostics.push(Diagnostic::new(MissingTodoAuthor, directive.range));
+            context.report_diagnostic_if_enabled(MissingTodoAuthor, directive.range);
 
             TextSize::new(0)
         };
@@ -382,18 +388,18 @@ fn static_errors(
     if let Some(after_colon) = after_author.strip_prefix(':') {
         if after_colon.is_empty() {
             // TD005
-            diagnostics.push(Diagnostic::new(MissingTodoDescription, directive.range));
+            context.report_diagnostic_if_enabled(MissingTodoDescription, directive.range);
         } else if !after_colon.starts_with(char::is_whitespace) {
             // TD007
-            diagnostics.push(Diagnostic::new(MissingSpaceAfterTodoColon, directive.range));
+            context.report_diagnostic_if_enabled(MissingSpaceAfterTodoColon, directive.range);
         }
     } else {
         // TD004
-        diagnostics.push(Diagnostic::new(MissingTodoColon, directive.range));
+        context.report_diagnostic_if_enabled(MissingTodoColon, directive.range);
 
         if after_author.is_empty() {
             // TD005
-            diagnostics.push(Diagnostic::new(MissingTodoDescription, directive.range));
+            context.report_diagnostic_if_enabled(MissingTodoDescription, directive.range);
         }
     }
 }

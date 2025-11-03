@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::comment_indentation_after;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{Stmt, StmtExpr, StmtFor, StmtIf, StmtTry, StmtWhile};
@@ -10,6 +9,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for `else` clauses that only contains `pass` and `...` statements.
@@ -31,6 +31,7 @@ use crate::checkers::ast::Checker;
 ///     bar()
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.9.3")]
 pub(crate) struct NeedlessElse;
 
 impl AlwaysFixableViolation for NeedlessElse {
@@ -70,9 +71,9 @@ pub(crate) fn needless_else(checker: &Checker, stmt: AnyNodeWithOrElse) {
     let edit = Edit::range_deletion(remove_range);
     let fix = Fix::safe_edit(edit);
 
-    let diagnostic = Diagnostic::new(NeedlessElse, else_range);
-
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(NeedlessElse, else_range)
+        .set_fix(fix);
 }
 
 /// Whether `body` contains only one `pass` or `...` statement.

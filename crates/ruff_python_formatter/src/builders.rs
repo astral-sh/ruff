@@ -1,4 +1,4 @@
-use ruff_formatter::{write, Argument, Arguments};
+use ruff_formatter::{Argument, Arguments, write};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::context::{NodeLevel, WithNodeLevel};
@@ -42,7 +42,7 @@ impl<'ast> Format<PyFormatContext<'ast>> for ParenthesizeIfExpands<'_, 'ast> {
                         soft_block_indent(&Arguments::from(&self.inner)).fmt(f)?;
                     } else {
                         Arguments::from(&self.inner).fmt(f)?;
-                    };
+                    }
 
                     if_group_breaks(&token(")")).fmt(f)
                 }))]
@@ -178,7 +178,6 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
         self
     }
 
-    #[allow(unused)]
     pub(crate) fn entries<T, I, F>(&mut self, entries: I) -> &mut Self
     where
         T: Ranged,
@@ -206,14 +205,14 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
 
     pub(crate) fn finish(&mut self) -> FormatResult<()> {
         self.result.and_then(|()| {
-            // Don't add a magic trailing comma when formatting an f-string expression
+            // Don't add a magic trailing comma when formatting an f-string or t-string expression
             // that always must be flat because the `expand_parent` forces enclosing
             // groups to expand, e.g. `print(f"{(a,)} ")` would format the f-string in
             // flat mode but the `print` call gets expanded because of the `expand_parent`.
             if self
                 .fmt
                 .context()
-                .f_string_state()
+                .interpolated_string_state()
                 .can_contain_line_breaks()
                 == Some(false)
             {

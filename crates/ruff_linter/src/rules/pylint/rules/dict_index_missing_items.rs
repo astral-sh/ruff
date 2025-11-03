@@ -1,16 +1,15 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{
-    self as ast,
+    self as ast, Expr, ExprContext,
     visitor::{self, Visitor},
-    Expr, ExprContext,
 };
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing::is_dict;
-use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -46,8 +45,8 @@ use crate::checkers::ast::Checker;
 /// for instrument, section in ORCHESTRA.items():
 ///     print(f"{instrument}: {section}")
 /// ```
-
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct DictIndexMissingItems;
 
 impl Violation for DictIndexMissingItems {
@@ -87,8 +86,7 @@ pub(crate) fn dict_index_missing_items(checker: &Checker, stmt_for: &ast::StmtFo
     };
 
     if has_violation {
-        let diagnostic = Diagnostic::new(DictIndexMissingItems, stmt_for.range());
-        checker.report_diagnostic(diagnostic);
+        checker.report_diagnostic(DictIndexMissingItems, stmt_for.range());
     }
 }
 

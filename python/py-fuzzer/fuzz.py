@@ -4,24 +4,21 @@ Python source-code files.
 
 This script can be installed into a virtual environment using
 `uv pip install -e ./python/py-fuzzer` from the Ruff repository root,
-or can be run using `uvx --from ./python/py-fuzzer fuzz`
+or can be run using `uv run --project=./python/py-fuzzer fuzz`
 (in which case the virtual environment does not need to be activated).
+Note that using `uv run --project` rather than `uvx --from` means that
+uv will respect the script's lockfile.
 
 Example invocations of the script using `uv`:
 - Run the fuzzer on Ruff's parser using seeds 0, 1, 2, 78 and 93 to generate the code:
-  `uvx --from ./python/py-fuzzer fuzz --bin ruff 0-2 78 93`
+  `uv run --project=./python/py-fuzzer fuzz --bin ruff 0-2 78 93`
 - Run the fuzzer concurrently using seeds in range 0-10 inclusive,
   but only reporting bugs that are new on your branch:
-  `uvx --from ./python/py-fuzzer fuzz --bin ruff 0-10 --new-bugs-only`
+  `uv run --project=./python/py-fuzzer fuzz --bin ruff 0-10 --only-new-bugs`
 - Run the fuzzer concurrently on 10,000 different Python source-code files,
   using a random selection of seeds, and only print a summary at the end
   (the `shuf` command is Unix-specific):
-  `uvx --from ./python/py-fuzzer fuzz --bin ruff $(shuf -i 0-1000000 -n 10000) --quiet
-
-If you make local modifications to this script, you'll need to run the above
-with `--reinstall` to get your changes reflected in the uv-cached installed
-package. Alternatively, if iterating quickly on changes, you can add
-`--with-editable ./python/py-fuzzer`.
+  `uv run --project=./python/py-fuzzer fuzz --bin ruff $(shuf -i 0-1000000 -n 10000) --quiet
 """
 
 from __future__ import annotations
@@ -32,6 +29,7 @@ import concurrent.futures
 import enum
 import subprocess
 import tempfile
+from collections.abc import Callable
 from dataclasses import KW_ONLY, dataclass
 from functools import partial
 from pathlib import Path
@@ -47,17 +45,15 @@ Seed = NewType("Seed", int)
 ExitCode = NewType("ExitCode", int)
 
 
-def redknot_contains_bug(code: str, *, red_knot_executable: Path) -> bool:
+def ty_contains_bug(code: str, *, ty_executable: Path) -> bool:
     """Return `True` if the code triggers a panic in type-checking code."""
     with tempfile.TemporaryDirectory() as tempdir:
-        Path(tempdir, "pyproject.toml").write_text('[project]\n\tname = "fuzz-input"')
-        Path(tempdir, "input.py").write_text(code)
+        input_file = Path(tempdir, "input.py")
+        input_file.write_text(code)
         completed_process = subprocess.run(
-            [red_knot_executable, "check", "--project", tempdir],
-            capture_output=True,
-            text=True,
+            [ty_executable, "check", input_file], capture_output=True, text=True
         )
-    return completed_process.returncode != 0 and completed_process.returncode != 1
+    return completed_process.returncode not in {0, 1, 2}
 
 
 def ruff_contains_bug(code: str, *, ruff_executable: Path) -> bool:
@@ -70,7 +66,8 @@ def ruff_contains_bug(code: str, *, ruff_executable: Path) -> bool:
             "lint.select=[]",
             "--no-cache",
             "--target-version",
-            "py313",
+            "py314",
+            "--preview",
             "-",
         ],
         capture_output=True,
@@ -85,8 +82,8 @@ def contains_bug(code: str, *, executable: Executable, executable_path: Path) ->
     match executable:
         case Executable.RUFF:
             return ruff_contains_bug(code, ruff_executable=executable_path)
-        case Executable.RED_KNOT:
-            return redknot_contains_bug(code, red_knot_executable=executable_path)
+        case Executable.TY:
+            return ty_contains_bug(code, ty_executable=executable_path)
         case _ as unreachable:
             assert_never(unreachable)
 
@@ -120,6 +117,8 @@ class FuzzResult:
     maybe_bug: MinimizedSourceCode | None
     # The executable we're testing
     executable: Executable
+    _: KW_ONLY
+    only_new_bugs: bool
 
     def print_description(self, index: int, num_seeds: int) -> None:
         """Describe the results of fuzzing the parser with this seed."""
@@ -131,12 +130,14 @@ class FuzzResult:
         )
         print(f"{msg:<60} {progress:>15}", flush=True)
 
+        new = "new " if self.only_new_bugs else ""
+
         if self.maybe_bug:
             match self.executable:
                 case Executable.RUFF:
-                    panic_message = "The following code triggers a parser bug:"
-                case Executable.RED_KNOT:
-                    panic_message = "The following code triggers a red-knot panic:"
+                    panic_message = f"The following code triggers a {new}parser bug:"
+                case Executable.TY:
+                    panic_message = f"The following code triggers a {new}ty panic:"
                 case _ as unreachable:
                     assert_never(unreachable)
 
@@ -149,47 +150,63 @@ class FuzzResult:
 def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
     """Return a `FuzzResult` instance describing the fuzzing result from this seed."""
     code = generate_random_code(seed)
-    has_bug = (
-        contains_new_bug(
+    bug_found = False
+    minimizer_callback: Callable[[str], bool] | None = None
+
+    if args.baseline_executable_path is None:
+        only_new_bugs = False
+        if contains_bug(
+            code, executable=args.executable, executable_path=args.test_executable_path
+        ):
+            bug_found = True
+            minimizer_callback = partial(
+                contains_bug,
+                executable=args.executable,
+                executable_path=args.test_executable_path,
+            )
+    else:
+        only_new_bugs = True
+        if contains_new_bug(
             code,
             executable=args.executable,
             test_executable_path=args.test_executable_path,
             baseline_executable_path=args.baseline_executable_path,
-        )
-        if args.baseline_executable_path is not None
-        else contains_bug(
-            code, executable=args.executable, executable_path=args.test_executable_path
-        )
-    )
-    if has_bug:
-        callback = partial(
-            contains_bug,
-            executable=args.executable,
-            executable_path=args.test_executable_path,
-        )
-        try:
-            maybe_bug = MinimizedSourceCode(minimize_repro(code, callback))
-        except CouldNotMinimize as e:
-            # This is to double-check that there isn't a bug in
-            # `pysource-minimize`/`pysource-codegen`.
-            # `pysource-minimize` *should* never produce code that's invalid syntax.
-            try:
-                ast.parse(code)
-            except SyntaxError:
-                raise e from None
-            else:
-                maybe_bug = MinimizedSourceCode(code)
+        ):
+            bug_found = True
+            minimizer_callback = partial(
+                contains_new_bug,
+                executable=args.executable,
+                test_executable_path=args.test_executable_path,
+                baseline_executable_path=args.baseline_executable_path,
+            )
 
-    else:
-        maybe_bug = None
-    return FuzzResult(seed, maybe_bug, args.executable)
+    if not bug_found:
+        return FuzzResult(seed, None, args.executable, only_new_bugs=only_new_bugs)
+
+    assert minimizer_callback is not None
+
+    try:
+        maybe_bug = MinimizedSourceCode(minimize_repro(code, minimizer_callback))
+    except CouldNotMinimize as e:
+        # This is to double-check that there isn't a bug in
+        # `pysource-minimize`/`pysource-codegen`.
+        # `pysource-minimize` *should* never produce code that's invalid syntax.
+        try:
+            ast.parse(code)
+        except SyntaxError:
+            raise e from None
+        else:
+            maybe_bug = MinimizedSourceCode(code)
+
+    return FuzzResult(seed, maybe_bug, args.executable, only_new_bugs=only_new_bugs)
 
 
 def run_fuzzer_concurrently(args: ResolvedCliArgs) -> list[FuzzResult]:
     num_seeds = len(args.seeds)
     print(
         f"Concurrently running the fuzzer on "
-        f"{num_seeds} randomly generated source-code files..."
+        f"{num_seeds} randomly generated source-code "
+        f"file{'s' if num_seeds != 1 else ''}..."
     )
     bugs: list[FuzzResult] = []
     with concurrent.futures.ProcessPoolExecutor() as executor:
@@ -217,7 +234,8 @@ def run_fuzzer_sequentially(args: ResolvedCliArgs) -> list[FuzzResult]:
     num_seeds = len(args.seeds)
     print(
         f"Sequentially running the fuzzer on "
-        f"{num_seeds} randomly generated source-code files..."
+        f"{num_seeds} randomly generated source-code "
+        f"file{'s' if num_seeds != 1 else ''}..."
     )
     bugs: list[FuzzResult] = []
     for i, seed in enumerate(args.seeds, start=1):
@@ -242,6 +260,10 @@ def run_fuzzer(args: ResolvedCliArgs) -> ExitCode:
     else:
         print(colored(f"No {noun_phrase.lower()} found!", "green"))
         return ExitCode(0)
+
+
+def absolute_path(p: str) -> Path:
+    return Path(p).absolute()
 
 
 def parse_seed_argument(arg: str) -> int | range:
@@ -269,7 +291,7 @@ def parse_seed_argument(arg: str) -> int | range:
 
 class Executable(enum.StrEnum):
     RUFF = "ruff"
-    RED_KNOT = "red_knot"
+    TY = "ty"
 
 
 @dataclass(slots=True)
@@ -313,7 +335,7 @@ def parse_args() -> ResolvedCliArgs:
             "Executable to test. "
             "Defaults to a fresh build of the currently checked-out branch."
         ),
-        type=Path,
+        type=absolute_path,
     )
     parser.add_argument(
         "--baseline-executable",
@@ -322,7 +344,7 @@ def parse_args() -> ResolvedCliArgs:
             "Defaults to whatever version is installed "
             "in the Python environment."
         ),
-        type=Path,
+        type=absolute_path,
     )
     parser.add_argument(
         "--bin",
