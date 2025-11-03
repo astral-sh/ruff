@@ -2,7 +2,7 @@ import MonacoEditor from "@monaco-editor/react";
 import { AstralButton, Theme } from "shared";
 import { ReadonlyFiles } from "../Playground";
 import { Suspense, use, useState } from "react";
-import { loadPyodide, PyodideInterface } from "pyodide";
+import { loadPyodide } from "pyodide";
 import classNames from "classnames";
 
 export enum SecondaryTool {
