@@ -4,20 +4,20 @@ use anyhow::Result;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_diagnostics::{Applicability, Edit, Fix};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     self as ast, Expr, ExprBinOp, ExprContext, ExprName, ExprSubscript, LiteralExpressionRef,
     Operator,
 };
-use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::importer::ImportRequest;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for redundant unions between a `Literal` and a builtin supertype of
@@ -78,7 +78,7 @@ impl Violation for RedundantLiteralUnion {
             match union_kind {
                 UnionKind::TypingUnion => Some(format!(
                     "Replace `typing.Union[Literal[{literal}], {builtin_type}]` with `{builtin_type}`"
-                    )),
+                )),
                 UnionKind::PEP604 => Some(format!(
                     "Replace `Literal[{literal}] | {builtin_type}` with `{builtin_type}`"
                 )),
@@ -141,7 +141,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
         return;
     };
 
-    let mut diagnostics = Vec::new();
+    let mut diagnostics: Vec<(RedundantLiteralUnion, TextRange)> = Vec::new();
     let mut non_redundant_literal_types = Vec::new();
 
     for typing_literal_expr in typing_literal_exprs {
@@ -150,7 +150,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
         };
 
         if builtin_types_in_union.contains(&literal_type) {
-            diagnostics.push(Diagnostic::new(
+            diagnostics.push((
                 RedundantLiteralUnion {
                     literal: SourceCodeSnippet::from_str(
                         checker.locator().slice(typing_literal_expr),
@@ -165,8 +165,10 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
         }
     }
 
-    if checker.settings.preview.is_disabled() {
-        checker.report_diagnostics(diagnostics);
+    if checker.settings().preview.is_disabled() {
+        for (kind, range) in diagnostics {
+            let _ = checker.report_diagnostic(kind, range);
+        }
         return;
     }
 
@@ -212,11 +214,13 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
             }
             LiteralExprType::NonRedundantTypes(group) => {
                 let new_literal_expr = Expr::Subscript(ast::ExprSubscript {
+                    node_index: Default::default(),
                     value: Box::new(literal_subscript.clone()),
                     range: TextRange::default(),
                     ctx: ExprContext::Load,
                     slice: Box::new(if group.len() > 1 {
                         Expr::Tuple(ast::ExprTuple {
+                            node_index: Default::default(),
                             elts: group.into_iter().cloned().collect(),
                             range: TextRange::default(),
                             ctx: ExprContext::Load,
@@ -240,23 +244,26 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
         Applicability::Safe
     };
 
-    for diagnostic in &mut diagnostics {
+    for (kind, range) in diagnostics {
+        let mut diagnostic = checker.report_diagnostic(kind, range);
         match union_kind {
-            UnionKind::PEP604 => diagnostic.try_set_optional_fix(|| {
-                Ok(generate_pep604_fix(
-                    checker,
-                    &new_exprs,
-                    union,
-                    applicability,
-                ))
-            }),
-            UnionKind::TypingUnion => diagnostic.try_set_optional_fix(|| {
-                generate_typing_union_fix(checker, &new_exprs, union, applicability)
-            }),
+            UnionKind::PEP604 => {
+                diagnostic.try_set_optional_fix(|| -> anyhow::Result<Option<Fix>> {
+                    Ok(generate_pep604_fix(
+                        checker,
+                        &new_exprs,
+                        union,
+                        applicability,
+                    ))
+                });
+            }
+            UnionKind::TypingUnion => {
+                diagnostic.try_set_optional_fix(|| -> anyhow::Result<Option<Fix>> {
+                    generate_typing_union_fix(checker, &new_exprs, union, applicability)
+                });
+            }
         }
     }
-
-    checker.report_diagnostics(diagnostics);
 }
 
 fn generate_pep604_fix(
@@ -275,6 +282,7 @@ fn generate_pep604_fix(
     let new_expr = new_exprs.iter().fold(None, |acc, right| {
         if let Some(left) = acc {
             Some(Expr::BinOp(ExprBinOp {
+                node_index: Default::default(),
                 left: Box::new(left),
                 op: Operator::BitOr,
                 right: Box::new(right.clone()),
@@ -305,14 +313,17 @@ fn generate_typing_union_fix(
 
     // Construct the expression as `Subscript[typing.Union, Tuple[expr, [expr, ...]]]`
     let new_expr = Expr::Subscript(ExprSubscript {
+        node_index: Default::default(),
         range: TextRange::default(),
         value: Box::new(Expr::Name(ExprName {
+            node_index: Default::default(),
             id: Name::new(binding),
             ctx: ExprContext::Store,
             range: TextRange::default(),
         })),
         slice: Box::new(if new_exprs.len() > 1 {
             Expr::Tuple(ast::ExprTuple {
+                node_index: Default::default(),
                 elts: new_exprs.to_vec(),
                 range: TextRange::default(),
                 ctx: ExprContext::Load,
