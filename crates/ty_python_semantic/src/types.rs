@@ -7811,7 +7811,7 @@ impl<'db> KnownInstanceType<'db> {
                             constraints.display(self.db)
                         )
                     }
-                    KnownInstanceType::UnionType(_) => f.write_str("UnionType"),
+                    KnownInstanceType::UnionType(_) => f.write_str("types.UnionType"),
                 }
             }
         }
