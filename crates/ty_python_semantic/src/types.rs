@@ -7905,20 +7905,22 @@ impl<'db> KnownInstanceType<'db> {
     ) -> Self {
         match self {
             Self::SubscriptedProtocol(context) => {
-                Self::SubscriptedProtocol(context.recursive_type_normalized(db, visitor))
+                Self::SubscriptedProtocol(context.recursive_type_normalized_impl(db, visitor))
             }
             Self::SubscriptedGeneric(context) => {
-                Self::SubscriptedGeneric(context.recursive_type_normalized(db, visitor))
+                Self::SubscriptedGeneric(context.recursive_type_normalized_impl(db, visitor))
             }
-            Self::TypeVar(typevar) => Self::TypeVar(typevar.recursive_type_normalized(db, visitor)),
+            Self::TypeVar(typevar) => {
+                Self::TypeVar(typevar.recursive_type_normalized_impl(db, visitor))
+            }
             Self::TypeAliasType(type_alias) => {
-                Self::TypeAliasType(type_alias.recursive_type_normalized(db, visitor))
+                Self::TypeAliasType(type_alias.recursive_type_normalized_impl(db, visitor))
             }
             Self::Deprecated(deprecated) => {
                 // Nothing to normalize
                 Self::Deprecated(deprecated)
             }
-            Self::Field(field) => Self::Field(field.recursive_type_normalized(db, visitor)),
+            Self::Field(field) => Self::Field(field.recursive_type_normalized_impl(db, visitor)),
             Self::ConstraintSet(set) => {
                 // Nothing to normalize
                 Self::ConstraintSet(set)
@@ -8426,7 +8428,7 @@ impl<'db> FieldInstance<'db> {
         )
     }
 
-    fn recursive_type_normalized(
+    fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
         visitor: &RecursiveTypeNormalizedVisitor<'db>,
@@ -8661,7 +8663,7 @@ impl<'db> TypeVarInstance<'db> {
         )
     }
 
-    fn recursive_type_normalized(
+    fn recursive_type_normalized_impl(
         self,
         _db: &'db dyn Db,
         _visitor: &RecursiveTypeNormalizedVisitor<'db>,
@@ -9071,7 +9073,7 @@ impl<'db> BoundTypeVarInstance<'db> {
     ) -> Self {
         Self::new(
             db,
-            self.typevar(db).recursive_type_normalized(db, visitor),
+            self.typevar(db).recursive_type_normalized_impl(db, visitor),
             self.binding_context(db),
         )
     }
@@ -10631,7 +10633,8 @@ impl<'db> CallableType<'db> {
     ) -> Self {
         CallableType::new(
             db,
-            self.signatures(db).recursive_type_normalized(db, visitor),
+            self.signatures(db)
+                .recursive_type_normalized_impl(db, visitor),
             self.is_function_like(db),
         )
     }
@@ -11542,7 +11545,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         self
     }
 
-    fn recursive_type_normalized(
+    fn recursive_type_normalized_impl(
         self,
         _db: &'db dyn Db,
         _visitor: &RecursiveTypeNormalizedVisitor<'db>,
@@ -11603,7 +11606,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         )
     }
 
-    fn recursive_type_normalized(
+    fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
         visitor: &RecursiveTypeNormalizedVisitor<'db>,
@@ -11657,17 +11660,17 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    fn recursive_type_normalized(
+    fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
         visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
         match self {
             TypeAliasType::PEP695(type_alias) => {
-                TypeAliasType::PEP695(type_alias.recursive_type_normalized(db, visitor))
+                TypeAliasType::PEP695(type_alias.recursive_type_normalized_impl(db, visitor))
             }
             TypeAliasType::ManualPEP695(type_alias) => {
-                TypeAliasType::ManualPEP695(type_alias.recursive_type_normalized(db, visitor))
+                TypeAliasType::ManualPEP695(type_alias.recursive_type_normalized_impl(db, visitor))
             }
         }
     }

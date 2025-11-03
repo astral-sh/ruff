@@ -357,10 +357,10 @@ impl<'db> NominalInstanceType<'db> {
     ) -> Self {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => Self(NominalInstanceInner::ExactTuple(
-                tuple.recursive_type_normalized(db, visitor),
+                tuple.recursive_type_normalized_impl(db, visitor),
             )),
             NominalInstanceInner::NonTuple(class) => Self(NominalInstanceInner::NonTuple(
-                class.recursive_type_normalized(db, visitor),
+                class.recursive_type_normalized_impl(db, visitor),
             )),
             NominalInstanceInner::Object => Self(NominalInstanceInner::Object),
         }

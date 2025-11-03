@@ -625,7 +625,7 @@ impl<'db> GenericContext<'db> {
         Self::from_typevar_instances(db, variables)
     }
 
-    pub(super) fn recursive_type_normalized(
+    pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
         visitor: &RecursiveTypeNormalizedVisitor<'db>,
@@ -1076,7 +1076,7 @@ impl<'db> Specialization<'db> {
         )
     }
 
-    pub(super) fn recursive_type_normalized(
+    pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
         visitor: &RecursiveTypeNormalizedVisitor<'db>,
@@ -1088,10 +1088,10 @@ impl<'db> Specialization<'db> {
             .collect();
         let tuple_inner = self
             .tuple_inner(db)
-            .map(|tuple| tuple.recursive_type_normalized(db, visitor));
+            .map(|tuple| tuple.recursive_type_normalized_impl(db, visitor));
         let context = self
             .generic_context(db)
-            .recursive_type_normalized(db, visitor);
+            .recursive_type_normalized_impl(db, visitor);
         Self::new(
             db,
             context,

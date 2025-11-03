@@ -229,12 +229,15 @@ impl<'db> TupleType<'db> {
         TupleType::new(db, &self.tuple(db).normalized_impl(db, visitor))
     }
 
-    pub(super) fn recursive_type_normalized(
+    pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
         visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
-        Self::new_internal(db, self.tuple(db).recursive_type_normalized(db, visitor))
+        Self::new_internal(
+            db,
+            self.tuple(db).recursive_type_normalized_impl(db, visitor),
+        )
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -400,7 +403,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         Self::from_elements(self.0.iter().map(|ty| ty.normalized_impl(db, visitor)))
     }
 
-    fn recursive_type_normalized(
+    fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
         visitor: &RecursiveTypeNormalizedVisitor<'db>,
@@ -778,7 +781,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         })
     }
 
-    fn recursive_type_normalized(
+    fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
         visitor: &RecursiveTypeNormalizedVisitor<'db>,
@@ -1197,14 +1200,16 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    pub(super) fn recursive_type_normalized(
+    pub(super) fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
         visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
         match self {
-            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.recursive_type_normalized(db, visitor)),
-            Tuple::Variable(tuple) => Tuple::Variable(tuple.recursive_type_normalized(db, visitor)),
+            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.recursive_type_normalized_impl(db, visitor)),
+            Tuple::Variable(tuple) => {
+                Tuple::Variable(tuple.recursive_type_normalized_impl(db, visitor))
+            }
         }
     }
 

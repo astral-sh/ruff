@@ -1060,10 +1060,10 @@ impl<'db> FunctionType<'db> {
         let literal = self.literal(db);
         let updated_signature = self
             .updated_signature(db)
-            .map(|signature| signature.recursive_type_normalized(db, visitor));
+            .map(|signature| signature.recursive_type_normalized_impl(db, visitor));
         let updated_last_definition_signature = self
             .updated_last_definition_signature(db)
-            .map(|signature| signature.recursive_type_normalized(db, visitor));
+            .map(|signature| signature.recursive_type_normalized_impl(db, visitor));
         Self::new(
             db,
             literal,

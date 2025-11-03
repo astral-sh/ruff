@@ -192,7 +192,7 @@ impl<'db> SuperOwnerKind<'db> {
         }
     }
 
-    fn recursive_type_normalized(
+    fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
         visitor: &RecursiveTypeNormalizedVisitor<'db>,
@@ -202,7 +202,7 @@ impl<'db> SuperOwnerKind<'db> {
                 SuperOwnerKind::Dynamic(dynamic.recursive_type_normalized())
             }
             SuperOwnerKind::Class(class) => {
-                SuperOwnerKind::Class(class.recursive_type_normalized(db, visitor))
+                SuperOwnerKind::Class(class.recursive_type_normalized_impl(db, visitor))
             }
             SuperOwnerKind::Instance(instance) => {
                 SuperOwnerKind::Instance(instance.recursive_type_normalized_impl(db, visitor))
@@ -605,8 +605,9 @@ impl<'db> BoundSuperType<'db> {
     ) -> Self {
         Self::new(
             db,
-            self.pivot_class(db).recursive_type_normalized(db, visitor),
-            self.owner(db).recursive_type_normalized(db, visitor),
+            self.pivot_class(db)
+                .recursive_type_normalized_impl(db, visitor),
+            self.owner(db).recursive_type_normalized_impl(db, visitor),
         )
     }
 }

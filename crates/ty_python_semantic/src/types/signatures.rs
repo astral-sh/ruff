@@ -142,7 +142,7 @@ impl<'db> CallableSignature<'db> {
         )
     }
 
-    pub(super) fn recursive_type_normalized(
+    pub(super) fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
         visitor: &RecursiveTypeNormalizedVisitor<'db>,
@@ -150,7 +150,7 @@ impl<'db> CallableSignature<'db> {
         Self::from_overloads(
             self.overloads
                 .iter()
-                .map(|signature| signature.recursive_type_normalized(db, visitor)),
+                .map(|signature| signature.recursive_type_normalized_impl(db, visitor)),
         )
     }
 
@@ -524,7 +524,7 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(super) fn recursive_type_normalized(
+    pub(super) fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
         visitor: &RecursiveTypeNormalizedVisitor<'db>,
@@ -532,12 +532,12 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self
                 .generic_context
-                .map(|ctx| ctx.recursive_type_normalized(db, visitor)),
+                .map(|ctx| ctx.recursive_type_normalized_impl(db, visitor)),
             definition: self.definition,
             parameters: self
                 .parameters
                 .iter()
-                .map(|param| param.recursive_type_normalized(db, visitor))
+                .map(|param| param.recursive_type_normalized_impl(db, visitor))
                 .collect(),
             return_ty: self
                 .return_ty
@@ -1763,7 +1763,7 @@ impl<'db> Parameter<'db> {
         }
     }
 
-    pub(super) fn recursive_type_normalized(
+    pub(super) fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
         visitor: &RecursiveTypeNormalizedVisitor<'db>,

@@ -297,7 +297,7 @@ impl<'db> GenericAlias<'db> {
             db,
             self.origin(db),
             self.specialization(db)
-                .recursive_type_normalized(db, visitor),
+                .recursive_type_normalized_impl(db, visitor),
         )
     }
 
@@ -432,7 +432,7 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    pub(super) fn recursive_type_normalized(
+    pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
         visitor: &RecursiveTypeNormalizedVisitor<'db>,
