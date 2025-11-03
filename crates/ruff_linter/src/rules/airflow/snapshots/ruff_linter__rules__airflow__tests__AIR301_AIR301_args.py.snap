@@ -280,5 +280,22 @@ AIR301 `appbuilder` is removed in Airflow 3.0
 106 |
 107 | FabAuthManager(None)
     |               ^^^^^^
+108 |
+109 | DAG(dag_id="concurrency", concurrency=12)
     |
 help: The constructor takes no parameter now
+
+AIR301 [*] `concurrency` is removed in Airflow 3.0
+   --> AIR301_args.py:109:27
+    |
+107 | FabAuthManager(None)
+108 |
+109 | DAG(dag_id="concurrency", concurrency=12)
+    |                           ^^^^^^^^^^^
+    |
+help: Use `max_active_tasks` instead
+106 | 
+107 | FabAuthManager(None)
+108 | 
+    - DAG(dag_id="concurrency", concurrency=12)
+109 + DAG(dag_id="concurrency", max_active_tasks=12)

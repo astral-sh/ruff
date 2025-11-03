@@ -105,3 +105,5 @@ ElasticsearchTaskHandler(filename_template="/tmp/test")
 GCSTaskHandler(filename_template="/tmp/test")
 
 FabAuthManager(None)
+
+DAG(dag_id="concurrency", concurrency=12)
