@@ -354,7 +354,7 @@ pub(crate) struct StarImportDefinitionNodeRef<'ast> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromDefinitionNodeRef<'ast> {
     pub(crate) node: &'ast ast::StmtImportFrom,
-    pub(crate) alias_index: usize,
+    pub(crate) alias_index: Option<usize>,
     pub(crate) is_reexported: bool,
 }
 
@@ -561,7 +561,9 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 node,
                 alias_index,
                 is_reexported: _,
-            }) => (&node.names[alias_index]).into(),
+            }) => alias_index
+                .map(|alias_index| (&node.names[alias_index]).into())
+                .unwrap_or_else(|| node.into()),
 
             // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
             // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
@@ -718,7 +720,7 @@ impl DefinitionKind<'_> {
     pub(crate) fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
         match self {
             DefinitionKind::Import(import) => import.alias(module).range(),
-            DefinitionKind::ImportFrom(import) => import.alias(module).range(),
+            DefinitionKind::ImportFrom(import) => import.range(module),
             DefinitionKind::StarImport(import) => import.alias(module).range(),
             DefinitionKind::Function(function) => function.node(module).name.range(),
             DefinitionKind::Class(class) => class.node(module).name.range(),
@@ -755,7 +757,7 @@ impl DefinitionKind<'_> {
     pub(crate) fn full_range(&self, module: &ParsedModuleRef) -> TextRange {
         match self {
             DefinitionKind::Import(import) => import.alias(module).range(),
-            DefinitionKind::ImportFrom(import) => import.alias(module).range(),
+            DefinitionKind::ImportFrom(import) => import.range(module),
             DefinitionKind::StarImport(import) => import.import(module).range(),
             DefinitionKind::Function(function) => function.node(module).range(),
             DefinitionKind::Class(class) => class.node(module).range(),
@@ -974,7 +976,7 @@ impl ImportDefinitionKind {
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ImportFromDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
-    alias_index: usize,
+    alias_index: Option<usize>,
     is_reexported: bool,
 }
 
@@ -983,8 +985,34 @@ impl ImportFromDefinitionKind {
         self.node.node(module)
     }
 
-    pub(crate) fn alias<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Alias {
-        &self.node.node(module).names[self.alias_index]
+    pub(crate) fn alias<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<&'ast ast::Alias> {
+        let index = self.alias_index?;
+        Some(&self.node.node(module).names[index])
+    }
+
+    pub(crate) fn name<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast str {
+        let node = self.node.node(module);
+        if let Some(index) = self.alias_index {
+            &node.names[index].name
+        } else {
+            let module_name = node
+                .module
+                .as_ref()
+                .expect("must have non-empty module name in this path");
+            module_name
+                .split_once('.')
+                .map(|(first, _)| first)
+                .unwrap_or(module_name.as_str())
+        }
+    }
+
+    pub(crate) fn range(&self, module: &ParsedModuleRef) -> TextRange {
+        let node = self.node.node(module);
+        if let Some(index) = self.alias_index {
+            node.names[index].range()
+        } else {
+            node.range()
+        }
     }
 
     pub(crate) fn is_reexported(&self) -> bool {
@@ -1117,6 +1145,12 @@ pub(crate) struct DefinitionNodeKey(NodeKey);
 
 impl From<&ast::Alias> for DefinitionNodeKey {
     fn from(node: &ast::Alias) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::StmtImportFrom> for DefinitionNodeKey {
+    fn from(node: &ast::StmtImportFrom) -> Self {
         Self(NodeKey::from_node(node))
     }
 }

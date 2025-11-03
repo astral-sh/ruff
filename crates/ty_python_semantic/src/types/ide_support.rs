@@ -1279,7 +1279,7 @@ mod resolve_definition {
                 let file = definition.file(db);
                 let module = parsed_module(db, file).load(db);
                 let import_node = import_from_def.import(&module);
-                let alias = import_from_def.alias(&module);
+                let name = import_from_def.name(&module);
 
                 // For `ImportFrom`, we need to resolve the original imported symbol name
                 // (alias.name), not the local alias (symbol_name)
@@ -1287,7 +1287,7 @@ mod resolve_definition {
                     db,
                     file,
                     import_node,
-                    &alias.name,
+                    name,
                     visited,
                     alias_resolution,
                 )

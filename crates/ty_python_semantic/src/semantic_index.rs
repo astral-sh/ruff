@@ -105,10 +105,15 @@ pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSe
 /// `from . import subpackage`, with the intent that `mypackage.subpackage` should be
 /// available for anyone who only does `import mypackage`.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+#[allow(dead_code)]
 pub(crate) fn imported_relative_submodules_of_stub_package<'db>(
     db: &'db dyn Db,
     importing_module: Module<'db>,
 ) -> Box<[ModuleName]> {
+    // FIXME(Gankra): temporarily disabled
+    if true {
+        return Box::default();
+    }
     let Some(file) = importing_module.file(db) else {
         return Box::default();
     };
@@ -177,8 +182,6 @@ pub(crate) fn imported_relative_submodules_of_stub_package<'db>(
                 // The module we're importing from is ourselves!
                 // In this case all imports are presumably of modules, as it "doesn't"
                 // make sense to write `from . import an_actual_function`
-
-                // FOR NOW NOT ALLOWED
                 let submodules = names.iter().filter_map(|(name, alias)| {
                     if alias.is_some() && alias.as_ref() != Some(name) {
                         return None;

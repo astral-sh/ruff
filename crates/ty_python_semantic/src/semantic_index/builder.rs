@@ -1453,6 +1453,23 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.current_use_def_map_mut()
                     .record_node_reachability(NodeKey::from_node(node));
 
+                if node.level == 1
+                    && let Some(submodule_raw) = &node.module
+                    && let Some(submodule) = ModuleName::new(submodule_raw.as_str())
+                    && let Some(direct_submodule) = submodule.components().next()
+                {
+                    let direct_submodule_name = Name::new(direct_submodule);
+                    let symbol = self.add_symbol(direct_submodule_name);
+                    self.add_definition(
+                        symbol.into(),
+                        ImportFromDefinitionNodeRef {
+                            node,
+                            alias_index: None,
+                            is_reexported: true,
+                        },
+                    );
+                }
+
                 self.maybe_imported_modules.insert(MaybeModuleImport {
                     level: node.level,
                     from_module: node.module.clone().map(Into::into),
@@ -1576,7 +1593,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
                         (&asname.id, asname.id == alias.name.id)
                     } else {
-                        (&alias.name.id, false)
+                        (&alias.name.id, node.level == 1 && node.module.is_none())
                     };
 
                     // Look for imports `from __future__ import annotations`, ignore `as ...`
@@ -1593,7 +1610,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         symbol.into(),
                         ImportFromDefinitionNodeRef {
                             node,
-                            alias_index,
+                            alias_index: Some(alias_index),
                             is_reexported,
                         },
                     );
