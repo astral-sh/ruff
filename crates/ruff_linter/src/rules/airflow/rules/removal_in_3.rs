@@ -196,6 +196,7 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
     match qualified_name.segments() {
         ["airflow", .., "DAG" | "dag"] => {
             // with replacement
+            diagnostic_for_argument(checker, arguments, "concurrency", Some("max_active_tasks"));
             diagnostic_for_argument(checker, arguments, "fail_stop", Some("fail_fast"));
             diagnostic_for_argument(checker, arguments, "schedule_interval", Some("schedule"));
             diagnostic_for_argument(checker, arguments, "timetable", Some("schedule"));
