@@ -113,8 +113,11 @@ pub enum PythonVersionSource {
     /// long argument (`--extra-paths`) or `--config key=value`.
     Cli,
 
-    /// The value comes from the Python VS Code extension (the selected interpreter).
-    PythonVSCodeExtension,
+    /// The value comes from the user's editor,
+    /// while it's left open if specified as a setting
+    /// or if the value was auto-discovered by the editor
+    /// (e.g., the Python environment)
+    Editor,
 
     /// We fell back to a default value because the value was not specified via the CLI or a config file.
     #[default]
