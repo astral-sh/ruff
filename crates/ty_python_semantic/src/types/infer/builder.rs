@@ -5382,6 +5382,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // This isn't actually introducing a symbol here
         if alias.is_none() && !import_is_self_referential {
+            self.add_unknown_declaration_with_binding(def_node(), definition);
             return;
         }
         
