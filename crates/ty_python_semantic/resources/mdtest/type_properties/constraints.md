@@ -833,3 +833,52 @@ def f[T]():
     # revealed: ty_extensions.ConstraintSet[(T@f ≤ int | str)]
     reveal_type(ConstraintSet.range(Never, T, int | str))
 ```
+
+### Constraints on the same typevar
+
+Any particular specialization maps each typevar to one type. That means it's not useful to constrain
+a typevar with itself as an upper or lower bound. No matter what type the typevar is specialized to,
+that type is always a subtype of itself. (Remember that typevars are only specialized to fully
+static types.)
+
+```py
+from typing import Never
+from ty_extensions import ConstraintSet
+
+def same_typevar[T]():
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(ConstraintSet.range(Never, T, T))
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(ConstraintSet.range(T, T, object))
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(ConstraintSet.range(T, T, T))
+```
+
+This is also true when the typevar appears in a union in the upper bound, or in an intersection in
+the lower bound. (Note that this lines up with how we simplify the intersection of two constraints,
+as shown above.)
+
+```py
+from ty_extensions import Intersection
+
+def same_typevar[T]():
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(ConstraintSet.range(Never, T, T | None))
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(ConstraintSet.range(Intersection[T, None], T, object))
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(ConstraintSet.range(Intersection[T, None], T, T | None))
+```
+
+Similarly, if the lower bound is an intersection containing the _negation_ of the typevar, then the
+constraint set can never be satisfied, since every type is disjoint with its negation.
+
+```py
+from ty_extensions import Not
+
+def same_typevar[T]():
+    # revealed: ty_extensions.ConstraintSet[never]
+    reveal_type(ConstraintSet.range(Intersection[Not[T], None], T, object))
+    # revealed: ty_extensions.ConstraintSet[never]
+    reveal_type(ConstraintSet.range(Not[T], T, object))
+```
