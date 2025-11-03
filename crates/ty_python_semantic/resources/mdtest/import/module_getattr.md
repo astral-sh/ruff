@@ -95,7 +95,7 @@ import mod.sub
 reveal_type(mod.sub)  # revealed: <module 'mod.sub'>
 ```
 
-If you `from mod import sub`, at runtime `sub` will be the return value from the module
+If you `from mod import sub`, at runtime `sub` will be the value returned by the module
 `__getattr__`, but other type checkers do not model the precedence this way. They will always prefer
 a submodule over a package `__getattr__`, and thus this is the current expectation in the ecosystem.
 Effectively, this assumes that a well-implemented package `__getattr__` will always raise
