@@ -143,6 +143,12 @@ pub(super) fn rounded_and_ndigits<'a>(
         return None;
     }
 
+    if !arguments.args.is_empty() || !arguments.keywords.is_empty() {
+        if arguments.keywords.iter().any(|kw| kw.arg.is_none()) {
+            return None;
+        }
+    }
+
     let rounded = arguments.find_argument_value("number", 0)?;
     let ndigits = arguments.find_argument_value("ndigits", 1);
 
