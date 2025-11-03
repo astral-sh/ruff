@@ -1626,7 +1626,7 @@ impl std::fmt::Display for SysPrefixPathOrigin {
             Self::CondaPrefixVar => f.write_str("`CONDA_PREFIX` environment variable"),
             Self::DerivedFromPyvenvCfg => f.write_str("derived `sys.prefix` path"),
             Self::LocalVenv => f.write_str("local virtual environment"),
-            Self::Editor => f.write_str("selected interpreter in the user's editor"),
+            Self::Editor => f.write_str("selected interpreter in your editor"),
         }
     }
 }
