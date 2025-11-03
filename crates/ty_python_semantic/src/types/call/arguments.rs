@@ -256,15 +256,14 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
 pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
         Type::NominalInstance(instance) => {
-            let class = instance.class(db);
-            class.is_known(db, KnownClass::Bool)
+            instance.has_known_class(db, KnownClass::Bool)
                 || instance.tuple_spec(db).is_some_and(|spec| match &*spec {
                     Tuple::Fixed(fixed_length_tuple) => fixed_length_tuple
                         .all_elements()
                         .any(|element| is_expandable_type(db, *element)),
                     Tuple::Variable(_) => false,
                 })
-                || enum_metadata(db, class.class_literal(db).0).is_some()
+                || enum_metadata(db, instance.class_literal(db)).is_some()
         }
         Type::Union(_) => true,
         _ => false,
@@ -278,9 +277,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
     // NOTE: Update `is_expandable_type` if this logic changes accordingly.
     match ty {
         Type::NominalInstance(instance) => {
-            let class = instance.class(db);
-
-            if class.is_known(db, KnownClass::Bool) {
+            if instance.has_known_class(db, KnownClass::Bool) {
                 return Some(vec![
                     Type::BooleanLiteral(true),
                     Type::BooleanLiteral(false),
@@ -315,7 +312,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                 };
             }
 
-            if let Some(enum_members) = enum_member_literals(db, class.class_literal(db).0, None) {
+            if let Some(enum_members) = enum_member_literals(db, instance.class_literal(db), None) {
                 return Some(enum_members.collect());
             }
 

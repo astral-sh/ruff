@@ -821,17 +821,6 @@ impl<'db> Type<'db> {
             .is_some_and(|instance| instance.has_known_class(db, KnownClass::NoneType))
     }
 
-    fn is_bool(&self, db: &'db dyn Db) -> bool {
-        self.as_nominal_instance()
-            .is_some_and(|instance| instance.has_known_class(db, KnownClass::Bool))
-    }
-
-    fn is_enum(&self, db: &'db dyn Db) -> bool {
-        self.as_nominal_instance()
-            .and_then(|instance| crate::types::enums::enum_metadata(db, instance.class_literal(db)))
-            .is_some()
-    }
-
     /// Return true if this type overrides __eq__ or __ne__ methods
     fn overrides_equality(&self, db: &'db dyn Db) -> bool {
         let check_dunder = |dunder_name, allowed_return_value| {
@@ -1148,7 +1137,7 @@ impl<'db> Type<'db> {
 
     #[cfg(test)]
     #[track_caller]
-    pub(crate) fn expect_function_literal(self) -> FunctionType<'db> {
+    pub(crate) const fn expect_function_literal(self) -> FunctionType<'db> {
         self.as_function_literal()
             .expect("Expected a Type::FunctionLiteral variant")
     }
@@ -1175,40 +1164,40 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn is_union_of_single_valued(&self, db: &'db dyn Db) -> bool {
-        self.as_union().is_some_and(|union| {
-            union.elements(db).iter().all(|ty| {
-                ty.is_single_valued(db)
-                    || ty.is_bool(db)
-                    || ty.is_literal_string()
-                    || (ty.is_enum(db) && !ty.overrides_equality(db))
-            })
-        }) || self.is_bool(db)
-            || self.is_literal_string()
-            || (self.is_enum(db) && !self.overrides_equality(db))
+        match self {
+            Type::LiteralString => true,
+            Type::NominalInstance(instance) => {
+                instance.has_known_class(db, KnownClass::Bool)
+                    || (enums::enum_metadata(db, instance.class_literal(db)).is_some()
+                        && !self.overrides_equality(db))
+            }
+            Type::Union(union) => union.elements(db).iter().all(|element| {
+                element.is_single_valued(db) || element.is_union_of_single_valued(db)
+            }),
+            _ => false,
+        }
     }
 
     pub(crate) fn is_union_with_single_valued(&self, db: &'db dyn Db) -> bool {
-        self.as_union().is_some_and(|union| {
-            union.elements(db).iter().any(|ty| {
-                ty.is_single_valued(db)
-                    || ty.is_bool(db)
-                    || ty.is_literal_string()
-                    || (ty.is_enum(db) && !ty.overrides_equality(db))
-            })
-        }) || self.is_bool(db)
-            || self.is_literal_string()
-            || (self.is_enum(db) && !self.overrides_equality(db))
+        match self {
+            Type::LiteralString => true,
+            Type::NominalInstance(instance) => {
+                instance.has_known_class(db, KnownClass::Bool)
+                    || (enums::enum_metadata(db, instance.class_literal(db)).is_some()
+                        && !self.overrides_equality(db))
+            }
+            Type::Union(union) => union.elements(db).iter().any(|element| {
+                element.is_single_valued(db) || element.is_union_of_single_valued(db)
+            }),
+            _ => false,
+        }
     }
 
-    pub(crate) fn as_string_literal(self) -> Option<StringLiteralType<'db>> {
+    pub(crate) const fn as_string_literal(self) -> Option<StringLiteralType<'db>> {
         match self {
             Type::StringLiteral(string_literal) => Some(string_literal),
             _ => None,
         }
-    }
-
-    pub(crate) const fn is_literal_string(&self) -> bool {
-        matches!(self, Type::LiteralString)
     }
 
     pub(crate) fn string_literal(db: &'db dyn Db, string: &str) -> Self {
@@ -7336,20 +7325,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) fn generic_origin(self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
-        match self {
-            Type::GenericAlias(generic) => Some(generic.origin(db)),
-            Type::NominalInstance(instance) => {
-                if let ClassType::Generic(generic) = instance.class(db) {
-                    Some(generic.origin(db))
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        }
-    }
-
     pub(super) fn has_divergent_type(self, db: &'db dyn Db, div: Type<'db>) -> bool {
         any_over_type(db, self, &|ty| ty == div, false)
     }
@@ -11306,7 +11281,7 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub(crate) fn as_pep_695_type_alias(self) -> Option<PEP695TypeAliasType<'db>> {
+    pub(crate) const fn as_pep_695_type_alias(self) -> Option<PEP695TypeAliasType<'db>> {
         match self {
             TypeAliasType::PEP695(type_alias) => Some(type_alias),
             TypeAliasType::ManualPEP695(_) => None,
