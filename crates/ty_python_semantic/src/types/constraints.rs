@@ -320,6 +320,11 @@ impl<'db> ConstraintSet<'db> {
         self
     }
 
+    /// Returns a constraint set encoding that this constraint set implies another.
+    pub(crate) fn implies(self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
+        self.negate(db).or(db, other)
+    }
+
     pub(crate) fn iff(self, db: &'db dyn Db, other: Self) -> Self {
         ConstraintSet {
             node: self.node.iff(db, other.node),
