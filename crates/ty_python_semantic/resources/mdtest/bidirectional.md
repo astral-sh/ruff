@@ -275,8 +275,8 @@ class A:
 
 A(f(1))
 
-# error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `list[int | str]`, found `list[list[Unknown]]`"
-# error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `list[int | None]`, found `list[list[Unknown]]`"
+# error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `list[int | str]`, found `list[list[Unknown]] & list[list[Unknown] | int | str] & list[list[Unknown] | int | None]`"
+# error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `list[int | None]`, found `list[list[Unknown]] & list[list[Unknown] | int | str] & list[list[Unknown] | int | None]`"
 A(f([]))
 ```
 
