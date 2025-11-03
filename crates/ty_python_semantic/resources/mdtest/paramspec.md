@@ -118,7 +118,8 @@ def foo1[**P]() -> None:
 def foo2[**P = ...]() -> None:
     reveal_type(P)  # revealed: typing.ParamSpec
 
-def foo3[**P = [int, str]]() -> None: ...
+def foo3[**P = [int, str]]() -> None:
+    reveal_type(P)  # revealed: typing.ParamSpec
 
 def foo4[**P, **Q = P]():
     reveal_type(P)  # revealed: typing.ParamSpec
