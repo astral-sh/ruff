@@ -7894,6 +7894,10 @@ bitflags! {
         /// instance attributes that are only implicitly defined via `self.x = …` in
         /// the body of a class method.
         const IMPLICIT_INSTANCE_ATTRIBUTE = 1 << 6;
+        /// A non-standard type qualifier that marks a type returned from a module-level
+        /// `__getattr__` function. We need this in order to implement precedence of submodules
+        /// over module-level `__getattr__`, for compatibility with other type checkers.
+        const FROM_MODULE_GETATTR = 1 << 7;
     }
 }
 
@@ -11007,7 +11011,10 @@ impl<'db> ModuleLiteralType<'db> {
                     db,
                     &CallArguments::positional([Type::string_literal(db, name)]),
                 ) {
-                    return Place::Defined(outcome.return_type(db), origin, boundness).into();
+                    return PlaceAndQualifiers {
+                        place: Place::Defined(outcome.return_type(db), origin, boundness),
+                        qualifiers: TypeQualifiers::FROM_MODULE_GETATTR,
+                    };
                 }
             }
         }
