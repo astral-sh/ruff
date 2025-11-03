@@ -1699,15 +1699,22 @@ impl<'db> Type<'db> {
             // holds true if `T` is also a dynamic type or a union that contains a dynamic type.
             // Similarly, `T <: Any` only holds true if `T` is a dynamic type or an intersection
             // that contains a dynamic type.
-            (Type::Dynamic(_), _) => ConstraintSet::from(match relation {
-                TypeRelation::Subtyping => false,
-                TypeRelation::Assignability => true,
-                TypeRelation::Redundancy => match target {
-                    Type::Dynamic(_) => true,
-                    Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
-                    _ => false,
-                },
-            }),
+            (Type::Dynamic(dynamic), _) => {
+                // If a `Divergent` type is involved, it must not be eliminated.
+                debug_assert!(
+                    !matches!(dynamic, DynamicType::Divergent(_)),
+                    "DynamicType::Divergent should have been handled in an earlier branch"
+                );
+                ConstraintSet::from(match relation {
+                    TypeRelation::Subtyping => false,
+                    TypeRelation::Assignability => true,
+                    TypeRelation::Redundancy => match target {
+                        Type::Dynamic(_) => true,
+                        Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
+                        _ => false,
+                    },
+                })
+            }
             (_, Type::Dynamic(_)) => ConstraintSet::from(match relation {
                 TypeRelation::Subtyping => false,
                 TypeRelation::Assignability => true,
