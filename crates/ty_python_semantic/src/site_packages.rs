@@ -111,6 +111,12 @@ impl SitePackagesPaths {
     }
 }
 
+impl fmt::Display for SitePackagesPaths {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.0.iter()).finish()
+    }
+}
+
 impl<const N: usize> From<[SystemPathBuf; N]> for SitePackagesPaths {
     fn from(paths: [SystemPathBuf; N]) -> Self {
         Self(IndexSet::from(paths))
@@ -543,7 +549,7 @@ System site-packages will not be used for module resolution.",
         }
 
         tracing::debug!(
-            "Resolved site-packages directories for this virtual environment are: {site_packages_directories:?}"
+            "Resolved site-packages directories for this virtual environment are: {site_packages_directories}"
         );
         Ok(site_packages_directories)
     }
@@ -823,7 +829,7 @@ impl SystemEnvironment {
         )?;
 
         tracing::debug!(
-            "Resolved site-packages directories for this environment are: {site_packages_directories:?}"
+            "Resolved site-packages directories for this environment are: {site_packages_directories}"
         );
         Ok(site_packages_directories)
     }
@@ -1567,8 +1573,8 @@ pub enum SysPrefixPathOrigin {
     ConfigFileSetting(Arc<SystemPathBuf>, Option<TextRange>),
     /// The `sys.prefix` path came from a `--python` CLI flag
     PythonCliFlag,
-    /// The selected interpreter in the VS Code's Python extension.
-    PythonVSCodeExtension,
+    /// The selected interpreter in the user's editor.
+    Editor,
     /// The `sys.prefix` path came from the `VIRTUAL_ENV` environment variable
     VirtualEnvVar,
     /// The `sys.prefix` path came from the `CONDA_PREFIX` environment variable
@@ -1590,7 +1596,7 @@ impl SysPrefixPathOrigin {
             Self::LocalVenv | Self::VirtualEnvVar => true,
             Self::ConfigFileSetting(..)
             | Self::PythonCliFlag
-            | Self::PythonVSCodeExtension
+            | Self::Editor
             | Self::DerivedFromPyvenvCfg
             | Self::CondaPrefixVar => false,
         }
@@ -1602,9 +1608,7 @@ impl SysPrefixPathOrigin {
     /// the `sys.prefix` directory, e.g. the `--python` CLI flag.
     pub(crate) const fn must_point_directly_to_sys_prefix(&self) -> bool {
         match self {
-            Self::PythonCliFlag | Self::ConfigFileSetting(..) | Self::PythonVSCodeExtension => {
-                false
-            }
+            Self::PythonCliFlag | Self::ConfigFileSetting(..) | Self::Editor => false,
             Self::VirtualEnvVar
             | Self::CondaPrefixVar
             | Self::DerivedFromPyvenvCfg
@@ -1622,9 +1626,7 @@ impl std::fmt::Display for SysPrefixPathOrigin {
             Self::CondaPrefixVar => f.write_str("`CONDA_PREFIX` environment variable"),
             Self::DerivedFromPyvenvCfg => f.write_str("derived `sys.prefix` path"),
             Self::LocalVenv => f.write_str("local virtual environment"),
-            Self::PythonVSCodeExtension => {
-                f.write_str("selected interpreter in the VS Code Python extension")
-            }
+            Self::Editor => f.write_str("selected interpreter in your editor"),
         }
     }
 }
@@ -2376,5 +2378,16 @@ mod tests {
         assert_eq!(version.0, "3.13");
         assert_eq!(&pyvenv_cfg[version.1], version.0);
         assert_eq!(parsed.implementation, PythonImplementation::PyPy);
+    }
+
+    #[test]
+    fn site_packages_paths_display() {
+        let paths = SitePackagesPaths::default();
+        assert_eq!(paths.to_string(), "[]");
+
+        let mut paths = SitePackagesPaths::default();
+        paths.insert(SystemPathBuf::from("/path/to/site/packages"));
+
+        assert_eq!(paths.to_string(), r#"["/path/to/site/packages"]"#);
     }
 }

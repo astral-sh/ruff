@@ -2000,7 +2000,7 @@ pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeR
     let Some(builder) = context.report_lint(&ZERO_STEPSIZE_IN_SLICE, node) else {
         return;
     };
-    builder.into_diagnostic("Slice step size can not be zero");
+    builder.into_diagnostic("Slice step size cannot be zero");
 }
 
 fn report_invalid_assignment_with_message(

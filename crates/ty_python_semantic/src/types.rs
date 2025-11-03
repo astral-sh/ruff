@@ -328,7 +328,7 @@ impl AttributeKind {
 /// When invoked on a class object, the fallback type (a class attribute) can shadow a
 /// non-data descriptor of the meta-type (the class's metaclass). However, this is not
 /// true for instances. When invoked on an instance, the fallback type (an attribute on
-/// the instance) can not completely shadow a non-data descriptor of the meta-type (the
+/// the instance) cannot completely shadow a non-data descriptor of the meta-type (the
 /// class), because we do not currently attempt to statically infer if an instance
 /// attribute is definitely defined (i.e. to check whether a particular method has been
 /// called).
@@ -976,6 +976,10 @@ impl<'db> Type<'db> {
 
     const fn is_dynamic(&self) -> bool {
         matches!(self, Type::Dynamic(_))
+    }
+
+    const fn is_non_divergent_dynamic(&self) -> bool {
+        self.is_dynamic() && !self.is_divergent()
     }
 
     /// Is a value of this type only usable in typing contexts?
@@ -1895,22 +1899,33 @@ impl<'db> Type<'db> {
             // holds true if `T` is also a dynamic type or a union that contains a dynamic type.
             // Similarly, `T <: Any` only holds true if `T` is a dynamic type or an intersection
             // that contains a dynamic type.
-            (Type::Dynamic(_), _) => ConstraintSet::from(match relation {
-                TypeRelation::Subtyping => false,
-                TypeRelation::Assignability => true,
-                TypeRelation::Redundancy => match target {
-                    Type::Dynamic(_) => true,
-                    Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
-                    _ => false,
-                },
-            }),
+            (Type::Dynamic(dynamic), _) => {
+                // If a `Divergent` type is involved, it must not be eliminated.
+                debug_assert!(
+                    !matches!(dynamic, DynamicType::Divergent(_)),
+                    "DynamicType::Divergent should have been handled in an earlier branch"
+                );
+                ConstraintSet::from(match relation {
+                    TypeRelation::Subtyping => false,
+                    TypeRelation::Assignability => true,
+                    TypeRelation::Redundancy => match target {
+                        Type::Dynamic(_) => true,
+                        Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
+                        _ => false,
+                    },
+                })
+            }
             (_, Type::Dynamic(_)) => ConstraintSet::from(match relation {
                 TypeRelation::Subtyping => false,
                 TypeRelation::Assignability => true,
                 TypeRelation::Redundancy => match self {
                     Type::Dynamic(_) => true,
                     Type::Intersection(intersection) => {
-                        intersection.positive(db).iter().any(Type::is_dynamic)
+                        // If a `Divergent` type is involved, it must not be eliminated.
+                        intersection
+                            .positive(db)
+                            .iter()
+                            .any(Type::is_non_divergent_dynamic)
                     }
                     _ => false,
                 },
@@ -4612,7 +4627,7 @@ impl<'db> Type<'db> {
                 };
 
                 if result.is_class_var() && self.is_typed_dict() {
-                    // `ClassVar`s on `TypedDictFallback` can not be accessed on inhabitants of `SomeTypedDict`.
+                    // `ClassVar`s on `TypedDictFallback` cannot be accessed on inhabitants of `SomeTypedDict`.
                     // They can only be accessed on `SomeTypedDict` directly.
                     return Place::Undefined.into();
                 }
@@ -10291,6 +10306,10 @@ pub(crate) enum TypeRelation {
     /// materialization of `Any` and `int | Any` may be the same type (`object`), but the
     /// two differ in their bottom materializations (`Never` and `int`, respectively).
     ///
+    /// Despite the above principles, there is one exceptional type that should never be union-simplified: the `Divergent` type.
+    /// This is a kind of dynamic type, but it acts as a marker to track recursive type structures.
+    /// If this type is accidentally eliminated by simplification, the fixed-point iteration will not converge.
+    ///
     /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
     /// [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
     Redundancy,
@@ -12518,7 +12537,7 @@ pub(crate) mod tests {
         assert!(todo1.is_assignable_to(&db, int));
 
         // We lose information when combining several `Todo` types. This is an
-        // acknowledged limitation of the current implementation. We can not
+        // acknowledged limitation of the current implementation. We cannot
         // easily store the meta information of several `Todo`s in a single
         // variant, as `TodoType` needs to implement `Copy`, meaning it can't
         // contain `Vec`/`Box`/etc., and can't be boxed itself.
@@ -12565,6 +12584,27 @@ pub(crate) mod tests {
         assert!(div.is_equivalent_to(&db, div));
         assert!(!div.is_equivalent_to(&db, Type::unknown()));
         assert!(!Type::unknown().is_equivalent_to(&db, div));
+        assert!(!div.is_redundant_with(&db, Type::unknown()));
+        assert!(!Type::unknown().is_redundant_with(&db, div));
+
+        let truthy_div = IntersectionBuilder::new(&db)
+            .add_positive(div)
+            .add_negative(Type::AlwaysFalsy)
+            .build();
+
+        let union = UnionType::from_elements(&db, [Type::unknown(), truthy_div]);
+        assert!(!truthy_div.is_redundant_with(&db, Type::unknown()));
+        assert_eq!(
+            union.display(&db).to_string(),
+            "Unknown | (Divergent & ~AlwaysFalsy)"
+        );
+
+        let union = UnionType::from_elements(&db, [truthy_div, Type::unknown()]);
+        assert!(!Type::unknown().is_redundant_with(&db, truthy_div));
+        assert_eq!(
+            union.display(&db).to_string(),
+            "(Divergent & ~AlwaysFalsy) | Unknown"
+        );
 
         // The `object` type has a good convergence property, that is, its union with all other types is `object`.
         // (e.g. `object | tuple[Divergent] == object`, `object | tuple[object] == object`)

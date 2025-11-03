@@ -738,7 +738,7 @@ fn is_subtype_in_invariant_position<'db>(
         // TODO:
         // This should be removed and properly handled in the respective
         // `(Type::TypeVar(_), _) | (_, Type::TypeVar(_))` branch of
-        // `Type::has_relation_to_impl`. Right now, we can not generally
+        // `Type::has_relation_to_impl`. Right now, we cannot generally
         // return `ConstraintSet::from(true)` from that branch, as that
         // leads to union simplification, which means that we lose track
         // of type variables without recording the constraints under which

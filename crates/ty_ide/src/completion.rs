@@ -883,9 +883,16 @@ fn is_in_definition_place(db: &dyn Db, tokens: &[Token], file: File) -> bool {
 /// This has the effect of putting all dunder attributes after "normal"
 /// attributes, and all single-underscore attributes after dunder attributes.
 fn compare_suggestions(c1: &Completion, c2: &Completion) -> Ordering {
-    let (kind1, kind2) = (NameKind::classify(&c1.name), NameKind::classify(&c2.name));
+    fn key<'a>(completion: &'a Completion) -> (bool, NameKind, bool, &'a Name) {
+        (
+            completion.module_name.is_some(),
+            NameKind::classify(&completion.name),
+            completion.is_type_check_only,
+            &completion.name,
+        )
+    }
 
-    (kind1, c1.is_type_check_only, &c1.name).cmp(&(kind2, c2.is_type_check_only, &c2.name))
+    key(c1).cmp(&key(c2))
 }
 
 #[cfg(test)]
@@ -3440,8 +3447,8 @@ from os.<CURSOR>
             .build()
             .snapshot();
         assert_snapshot!(snapshot, @r"
-        AbraKadabra :: Unavailable :: package
         Kadabra :: Literal[1] :: Current module
+        AbraKadabra :: Unavailable :: package
         ");
     }
 
@@ -4166,6 +4173,27 @@ type <CURSOR>
 
         // This is okay because the ide will not request completions when the cursor is in this position.
         assert!(!builder.build().completions().is_empty());
+    }
+
+    #[test]
+    fn favour_symbols_currently_imported() {
+        let snapshot = CursorTest::builder()
+            .source("main.py", "long_nameb = 1\nlong_name<CURSOR>")
+            .source("foo.py", "def long_namea(): ...")
+            .completion_test_builder()
+            .type_signatures()
+            .auto_import()
+            .module_names()
+            .filter(|c| c.name.contains("long_name"))
+            .build()
+            .snapshot();
+
+        // Even though long_namea is alphabetically before long_nameb,
+        // long_nameb is currently imported and should be preferred.
+        assert_snapshot!(snapshot, @r"
+        long_nameb :: Literal[1] :: Current module
+        long_namea :: Unavailable :: foo
+        ");
     }
 
     /// A way to create a simple single-file (named `main.py`) completion test
