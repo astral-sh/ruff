@@ -817,13 +817,11 @@ impl<'db> Type<'db> {
     }
 
     fn is_none(&self, db: &'db dyn Db) -> bool {
-        self.as_nominal_instance()
-            .is_some_and(|instance| instance.has_known_class(db, KnownClass::NoneType))
+        self.is_instance_of(db, KnownClass::NoneType)
     }
 
     fn is_bool(&self, db: &'db dyn Db) -> bool {
-        self.as_nominal_instance()
-            .is_some_and(|instance| instance.has_known_class(db, KnownClass::Bool))
+        self.is_instance_of(db, KnownClass::Bool)
     }
 
     fn is_enum(&self, db: &'db dyn Db) -> bool {
@@ -857,8 +855,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
-        self.as_nominal_instance()
-            .is_some_and(|instance| instance.has_known_class(db, KnownClass::NotImplementedType))
+        self.is_instance_of(db, KnownClass::NotImplementedType)
     }
 
     pub(crate) const fn is_todo(&self) -> bool {
@@ -6436,6 +6433,17 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Generic],
                     fallback_type: Type::unknown(),
                 }),
+                KnownInstanceType::UnionType(union_type) => {
+                    let mut builder = UnionBuilder::new(db);
+                    for element in union_type.elements(db) {
+                        builder = builder.add(element.in_type_expression(
+                            db,
+                            scope_id,
+                            typevar_binding_context,
+                        )?);
+                    }
+                    Ok(builder.build())
+                }
             },
 
             Type::SpecialForm(special_form) => match special_form {
@@ -6603,9 +6611,6 @@ impl<'db> Type<'db> {
                 )),
                 Some(KnownClass::GenericAlias) => Ok(todo_type!(
                     "Support for `typing.GenericAlias` instances in type expressions"
-                )),
-                Some(KnownClass::UnionType) => Ok(todo_type!(
-                    "Support for `types.UnionType` instances in type expressions"
                 )),
                 _ => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec_inline![
@@ -7646,6 +7651,10 @@ pub enum KnownInstanceType<'db> {
     /// A constraint set, which is exposed in mdtests as an instance of
     /// `ty_extensions.ConstraintSet`.
     ConstraintSet(TrackedConstraintSet<'db>),
+
+    /// A single instance of `types.UnionType`, which stores the left- and
+    /// right-hand sides of a PEP 604 union.
+    UnionType(UnionTypeInstance<'db>),
 }
 
 fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -7670,6 +7679,11 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         KnownInstanceType::Field(field) => {
             if let Some(default_ty) = field.default_type(db) {
                 visitor.visit_type(db, default_ty);
+            }
+        }
+        KnownInstanceType::UnionType(union_type) => {
+            for element in union_type.elements(db) {
+                visitor.visit_type(db, element);
             }
         }
     }
@@ -7708,6 +7722,7 @@ impl<'db> KnownInstanceType<'db> {
                 // Nothing to normalize
                 Self::ConstraintSet(set)
             }
+            Self::UnionType(union_type) => Self::UnionType(union_type.normalized_impl(db, visitor)),
         }
     }
 
@@ -7722,6 +7737,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Deprecated(_) => KnownClass::Deprecated,
             Self::Field(_) => KnownClass::Field,
             Self::ConstraintSet(_) => KnownClass::ConstraintSet,
+            Self::UnionType(_) => KnownClass::UnionType,
         }
     }
 
@@ -7795,6 +7811,7 @@ impl<'db> KnownInstanceType<'db> {
                             constraints.display(self.db)
                         )
                     }
+                    KnownInstanceType::UnionType(_) => f.write_str("UnionType"),
                 }
             }
         }
@@ -8915,6 +8932,34 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
                 ))
             }
         }
+    }
+}
+
+/// An instance of `types.UnionType`.
+///
+/// # Ordering
+/// Ordering is based on the context's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the context was garbage collected and recreated.
+#[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
+pub struct UnionTypeInstance<'db> {
+    left: Type<'db>,
+    right: Type<'db>,
+}
+
+impl get_size2::GetSize for UnionTypeInstance<'_> {}
+
+impl<'db> UnionTypeInstance<'db> {
+    pub(crate) fn elements(self, db: &'db dyn Db) -> [Type<'db>; 2] {
+        [self.left(db), self.right(db)]
+    }
+
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        UnionTypeInstance::new(
+            db,
+            self.left(db).normalized_impl(db, visitor),
+            self.right(db).normalized_impl(db, visitor),
+        )
     }
 }
 

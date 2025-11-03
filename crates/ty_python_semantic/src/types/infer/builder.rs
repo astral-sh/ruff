@@ -103,7 +103,7 @@ use crate::types::{
     TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
     TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
     TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
-    binding_type, todo_type,
+    UnionTypeInstance, binding_type, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -8449,19 +8449,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 )))
             }
 
-            // Special-case `X | Y` with `X` and `Y` instances of `type` to produce a `types.UnionType` instance, in order to
-            // overwrite the typeshed return type for `type.__or__`, which would result in `types.UnionType | X`. We currently
-            // do this to avoid false positives when a legacy type alias like `IntOrStr = int | str` is later used in a type
-            // expression, because `types.UnionType` will result in a `@Todo` type, while `types.UnionType | <class 'int'>` does
-            // not.
-            //
-            // TODO: Remove this special case once we add support for legacy type aliases.
+            // PEP 604-style union types using the `|` operator.
             (
-                Type::ClassLiteral(..) | Type::SubclassOf(..) | Type::GenericAlias(..),
-                Type::ClassLiteral(..) | Type::SubclassOf(..) | Type::GenericAlias(..),
+                Type::ClassLiteral(..)
+                | Type::SubclassOf(..)
+                | Type::GenericAlias(..)
+                | Type::SpecialForm(_)
+                | Type::KnownInstance(KnownInstanceType::UnionType(_)),
+                _,
+                ast::Operator::BitOr,
+            )
+            | (
+                _,
+                Type::ClassLiteral(..)
+                | Type::SubclassOf(..)
+                | Type::GenericAlias(..)
+                | Type::SpecialForm(_)
+                | Type::KnownInstance(KnownInstanceType::UnionType(_)),
                 ast::Operator::BitOr,
             ) if Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY310 => {
-                Some(KnownClass::UnionType.to_instance(self.db()))
+                // For a value expression like `int | None`, the inferred type for `None` will be
+                // a nominal instance of `NoneType`, so we need to convert it to a class literal
+                // such that it can later be converted back to a nominal instance type when calling
+                // `.in_type_expression` on the `UnionType` instance.
+                let convert_none_type = |ty: Type<'db>| {
+                    if ty.is_none(self.db()) {
+                        KnownClass::NoneType.to_class_literal(self.db())
+                    } else {
+                        ty
+                    }
+                };
+
+                if left_ty.is_equivalent_to(self.db(), right_ty) {
+                    Some(left_ty)
+                } else {
+                    Some(Type::KnownInstance(KnownInstanceType::UnionType(
+                        UnionTypeInstance::new(
+                            self.db(),
+                            convert_none_type(left_ty),
+                            convert_none_type(right_ty),
+                        ),
+                    )))
+                }
             }
 
             // We've handled all of the special cases that we support for literals, so we need to

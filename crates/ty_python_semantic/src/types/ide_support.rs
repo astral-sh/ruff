@@ -290,7 +290,9 @@ impl<'db> AllMembers<'db> {
                             }
                             Type::ClassLiteral(class) if class.is_protocol(db) => continue,
                             Type::KnownInstance(
-                                KnownInstanceType::TypeVar(_) | KnownInstanceType::TypeAliasType(_),
+                                KnownInstanceType::TypeVar(_)
+                                | KnownInstanceType::TypeAliasType(_)
+                                | KnownInstanceType::UnionType(_),
                             ) => continue,
                             Type::Dynamic(DynamicType::TodoTypeAlias) => continue,
                             _ => {}

@@ -146,13 +146,11 @@ def _(flag: bool):
 def _(flag: bool):
     x = 1 if flag else "a"
 
-    # TODO: this should cause us to emit a diagnostic during
-    # type checking
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Unknown, ...]`, found `Literal["a"]"
     if isinstance(x, "a"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 
-    # TODO: this should cause us to emit a diagnostic during
-    # type checking
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Unknown, ...]`, found `Literal["int"]"
     if isinstance(x, "int"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 ```
