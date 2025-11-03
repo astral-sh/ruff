@@ -1427,6 +1427,19 @@ impl<'db> InteriorNode<'db> {
             .tuple_combinations()
             .collect();
 
+        let add_constraint =
+            |seen_constraints: &mut FxHashSet<ConstrainedTypeVar<'db>>,
+             to_visit: &mut Vec<(ConstrainedTypeVar<'db>, ConstrainedTypeVar<'db>)>,
+             constraint: ConstrainedTypeVar<'db>| {
+                if seen_constraints.insert(constraint) {
+                    to_visit.extend(
+                        (seen_constraints.iter().copied())
+                            .filter(|seen| *seen != constraint)
+                            .map(|seen| (seen, constraint)),
+                    );
+                }
+            };
+
         // Repeatedly pop constraint pairs off of the visit queue, checking whether each pair can
         // be simplified.
         let mut simplified = Node::Interior(self);
@@ -1497,6 +1510,7 @@ impl<'db> InteriorNode<'db> {
                 if seen_constraints.contains(&new_constraint) {
                     continue;
                 }
+                add_constraint(&mut seen_constraints, &mut to_visit, new_constraint);
                 let new_node = Node::new_constraint(db, new_constraint);
                 let positive_left_node =
                     Node::new_satisfied_constraint(db, left_constraint.when_true());
@@ -1589,13 +1603,11 @@ impl<'db> InteriorNode<'db> {
                     // If the intersection is non-empty, we need to create a new constraint to
                     // represent that intersection. We also need to add the new constraint to our
                     // seen set and (if we haven't already seen it) to the to-visit queue.
-                    if seen_constraints.insert(intersection_constraint) {
-                        to_visit.extend(
-                            (seen_constraints.iter().copied())
-                                .filter(|seen| *seen != intersection_constraint)
-                                .map(|seen| (seen, intersection_constraint)),
-                        );
-                    }
+                    add_constraint(
+                        &mut seen_constraints,
+                        &mut to_visit,
+                        intersection_constraint,
+                    );
                     let positive_intersection_node =
                         Node::new_satisfied_constraint(db, intersection_constraint.when_true());
                     let negative_intersection_node =
