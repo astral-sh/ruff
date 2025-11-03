@@ -642,3 +642,29 @@ match sequence_pattern_brackets:
         xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     ] as capture:
         pass
+
+
+match class_pattern:
+    # 1
+    case Class(xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx) as capture:  # 2
+        # 3
+        pass # 4
+    # 5
+    case Class( # 6
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx # 7
+    ) as capture: # 8
+        pass
+    case Class( # 9
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx # 10
+    ) as capture: # 11
+        pass
+    case Class( # 12
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx # 13
+    ) as really_really_really_really_really_really_really_really_really_really_really_really_long_capture: # 14
+        pass
+    case Class( # 0
+            # 1
+            xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx # 2
+            # 3
+    ) as capture:
+        pass
