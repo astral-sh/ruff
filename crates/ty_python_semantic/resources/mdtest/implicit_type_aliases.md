@@ -22,11 +22,8 @@ f(1)
 ```py
 MyNone = None
 
-# TODO: this should not be an error
-# error: [invalid-type-form] "Variable of type `None` is not allowed in a type expression"
 def g(x: MyNone):
-    # TODO: this should be `None`
-    reveal_type(x)  # revealed: Unknown
+    reveal_type(x)  # revealed: None
 
 g(None)
 ```
