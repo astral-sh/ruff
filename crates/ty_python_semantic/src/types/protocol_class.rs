@@ -339,6 +339,25 @@ impl<'db> ProtocolInterface<'db> {
         )
     }
 
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &crate::types::RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.inner(db)
+                .iter()
+                .map(|(name, data)| {
+                    (
+                        name.clone(),
+                        data.recursive_type_normalized_impl(db, visitor),
+                    )
+                })
+                .collect::<BTreeMap<_, _>>(),
+        )
+    }
+
     pub(super) fn specialized_and_normalized<'a>(
         self,
         db: &'db dyn Db,
@@ -426,6 +445,27 @@ impl<'db> ProtocolMemberData<'db> {
     fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self {
             kind: self.kind.normalized_impl(db, visitor),
+            qualifiers: self.qualifiers,
+        }
+    }
+
+    fn recursive_type_normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        visitor: &crate::types::RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        Self {
+            kind: match &self.kind {
+                ProtocolMemberKind::Method(callable) => {
+                    ProtocolMemberKind::Method(callable.recursive_type_normalized_impl(db, visitor))
+                }
+                ProtocolMemberKind::Property(property) => ProtocolMemberKind::Property(
+                    property.recursive_type_normalized_impl(db, visitor),
+                ),
+                ProtocolMemberKind::Other(ty) => {
+                    ProtocolMemberKind::Other(ty.recursive_type_normalized_impl(db, visitor))
+                }
+            },
             qualifiers: self.qualifiers,
         }
     }

@@ -719,10 +719,13 @@ impl<'db> ProtocolInstanceType<'db> {
 
     pub(super) fn recursive_type_normalized_impl(
         self,
-        _db: &'db dyn Db,
-        _visitor: &RecursiveTypeNormalizedVisitor<'db>,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
-        self
+        Self {
+            inner: self.inner.recursive_type_normalized_impl(db, visitor),
+            _phantom: PhantomData,
+        }
     }
 
     /// Return `true` if this protocol type is equivalent to the protocol `other`.
@@ -833,6 +836,21 @@ impl<'db> Protocol<'db> {
             Self::Synthesized(synthesized) => synthesized.interface(),
         }
     }
+
+    fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &crate::types::RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        match self {
+            Self::FromClass(class) => {
+                Self::FromClass(class.recursive_type_normalized_impl(db, visitor))
+            }
+            Self::Synthesized(synthesized) => {
+                Self::Synthesized(synthesized.recursive_type_normalized_impl(db, visitor))
+            }
+        }
+    }
 }
 
 impl<'db> VarianceInferable<'db> for Protocol<'db> {
@@ -901,6 +919,14 @@ mod synthesized_protocol {
 
         pub(in crate::types) fn interface(self) -> ProtocolInterface<'db> {
             self.0
+        }
+
+        pub(in crate::types) fn recursive_type_normalized_impl(
+            self,
+            db: &'db dyn Db,
+            visitor: &crate::types::RecursiveTypeNormalizedVisitor<'db>,
+        ) -> Self {
+            Self(self.0.recursive_type_normalized_impl(db, visitor))
         }
     }
 
