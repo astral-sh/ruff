@@ -2003,6 +2003,20 @@ pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeR
     builder.into_diagnostic("Slice step size can not be zero");
 }
 
+// We avoid emitting invalid assignment diagnostic for literal assignments to a `TypedDict`, as
+// they can only occur if we already failed to validate the dict (and emitted some diagnostic).
+pub(crate) fn is_invalid_typed_dict_literal(
+    db: &dyn Db,
+    target_ty: Type,
+    source: AnyNodeRef<'_>,
+) -> bool {
+    target_ty
+        .filter_union(db, Type::is_typed_dict)
+        .as_typed_dict()
+        .is_some()
+        && matches!(source, AnyNodeRef::ExprDict(_))
+}
+
 fn report_invalid_assignment_with_message(
     context: &InferContext,
     node: AnyNodeRef,
@@ -2040,15 +2054,27 @@ pub(super) fn report_invalid_assignment<'db>(
     target_ty: Type,
     mut source_ty: Type<'db>,
 ) {
+    let value_expr = match definition.kind(context.db()) {
+        DefinitionKind::Assignment(def) => Some(def.value(context.module())),
+        DefinitionKind::AnnotatedAssignment(def) => def.value(context.module()),
+        DefinitionKind::NamedExpression(def) => Some(&*def.node(context.module()).value),
+        _ => None,
+    };
+
+    if let Some(value_expr) = value_expr
+        && is_invalid_typed_dict_literal(context.db(), target_ty, value_expr.into())
+    {
+        return;
+    }
+
     let settings =
         DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), target_ty, source_ty);
 
-    if let DefinitionKind::AnnotatedAssignment(annotated_assignment) = definition.kind(context.db())
-        && let Some(value) = annotated_assignment.value(context.module())
-    {
+    if let Some(value_expr) = value_expr {
         // Re-infer the RHS of the annotated assignment, ignoring the type context for more precise
         // error messages.
-        source_ty = infer_isolated_expression(context.db(), definition.scope(context.db()), value);
+        source_ty =
+            infer_isolated_expression(context.db(), definition.scope(context.db()), value_expr);
     }
 
     report_invalid_assignment_with_message(
@@ -2070,6 +2096,11 @@ pub(super) fn report_invalid_attribute_assignment(
     source_ty: Type,
     attribute_name: &'_ str,
 ) {
+    // TODO: Ideally we would not emit diagnostics for `TypedDict` literal arguments
+    // here (see `diagnostic::is_invalid_typed_dict_literal`). However, we may have
+    // silenced diagnostics during attribute resolution, and rely on the assignability
+    // diagnostic being emitted here.
+
     report_invalid_assignment_with_message(
         context,
         node,
