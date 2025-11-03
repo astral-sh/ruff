@@ -816,3 +816,160 @@ from mypackage import funcmod
 
 x = funcmod(1)
 ```
+
+## Shadowing Import With Definition
+
+`mypackage/__init__.pyi`:
+
+```pyi
+from .funcmod import other
+
+def funcmod(x: int) -> int: ...
+```
+
+`mypackage/funcmod/__init__.pyi`:
+
+```pyi
+def other(int) -> int: ...
+```
+
+`main.py`:
+
+```py
+from mypackage import funcmod
+
+x = funcmod(1)
+```
+
+## Shadowing Import With Definition (Non-Stub Check)
+
+`mypackage/__init__.py`:
+
+```py
+from .funcmod import other
+
+def funcmod(x: int) -> int:
+    return x
+```
+
+`mypackage/funcmod/__init__.py`:
+
+```py
+def other(x: int) -> int:
+    return x
+```
+
+`main.py`:
+
+```py
+from mypackage import funcmod
+
+x = funcmod(1)
+```
+
+## Shadowing Import With Assignment
+
+`mypackage/__init__.pyi`:
+
+```pyi
+from .funcmod import other
+
+# TODO: do better!
+# error: [invalid-assignment]
+funcmod = other
+```
+
+`mypackage/funcmod/__init__.pyi`:
+
+```pyi
+def other(x: int) -> int: ...
+```
+
+`main.py`:
+
+```py
+from mypackage import funcmod
+
+# TODO: do better!
+# error: [call-non-callable]
+x = funcmod(1)
+```
+
+## Shadowing Import With Assignment (Non-Stub Check)
+
+`mypackage/__init__.py`:
+
+```py
+from .funcmod import other
+
+# TODO: do better!
+# error: [invalid-assignment]
+funcmod = other
+```
+
+`mypackage/funcmod/__init__.py`:
+
+```py
+def other(x: int) -> int:
+    return x
+```
+
+`main.py`:
+
+```py
+from mypackage import funcmod
+
+# error: [call-non-callable]
+x = funcmod(1)
+```
+
+## Shadowing Import Not Clobbered By Second Import
+
+`mypackage/__init__.pyi`:
+
+```pyi
+from .funcmod import funcmod as funcmod
+from .funcmod import other
+```
+
+`mypackage/funcmod/__init__.pyi`:
+
+```pyi
+def other(x: int) -> int: ...
+def funcmod(x: int) -> int: ...
+```
+
+`main.py`:
+
+```py
+from mypackage import funcmod
+
+x = funcmod(1)
+```
+
+## Shadowing Import Not Clobbered By Second Import (Non-Stub Check)
+
+`mypackage/__init__.py`:
+
+```py
+from .funcmod import funcmod
+from .funcmod import other
+```
+
+`mypackage/funcmod/__init__.py`:
+
+```py
+def other(x: int) -> int:
+    return x
+
+def funcmod(x: int) -> int:
+    return x
+```
+
+`main.py`:
+
+```py
+from mypackage import funcmod
+
+x = funcmod(1)
+```
