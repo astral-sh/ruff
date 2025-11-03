@@ -48,7 +48,7 @@ tuple_with_typevar = ("foo", ParamSpec("P2"))
 reveal_type(tuple_with_typevar[1])  # revealed: ParamSpec
 ```
 
-### `TypeVar` parameter must match variable name
+### `ParamSpec` parameter must match variable name
 
 ```py
 from typing import ParamSpec
@@ -118,7 +118,11 @@ def foo1[**P]() -> None:
 def foo2[**P = ...]() -> None:
     reveal_type(P)  # revealed: typing.ParamSpec
 
-def foo2[**P = [int, str]]() -> None: ...
+def foo3[**P = [int, str]]() -> None: ...
+
+def foo4[**P, **Q = P]():
+    reveal_type(P)  # revealed: typing.ParamSpec
+    reveal_type(Q)  # revealed: typing.ParamSpec
 ```
 
 #### Invalid
