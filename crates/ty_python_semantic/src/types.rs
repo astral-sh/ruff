@@ -903,6 +903,10 @@ impl<'db> Type<'db> {
         Self::Dynamic(DynamicType::Divergent(DivergentType { id }))
     }
 
+    pub(crate) const fn is_divergent(&self) -> bool {
+        matches!(self, Type::Dynamic(DynamicType::Divergent(_)))
+    }
+
     pub const fn is_unknown(&self) -> bool {
         matches!(self, Type::Dynamic(DynamicType::Unknown))
     }
