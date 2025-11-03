@@ -873,6 +873,10 @@ impl<'db> Type<'db> {
         matches!(self, Type::Dynamic(_))
     }
 
+    const fn is_non_divergent_dynamic(&self) -> bool {
+        self.is_dynamic() && !self.is_divergent()
+    }
+
     /// Is a value of this type only usable in typing contexts?
     pub(crate) fn is_type_check_only(&self, db: &'db dyn Db) -> bool {
         match self {
@@ -1710,7 +1714,11 @@ impl<'db> Type<'db> {
                 TypeRelation::Redundancy => match self {
                     Type::Dynamic(_) => true,
                     Type::Intersection(intersection) => {
-                        intersection.positive(db).iter().any(Type::is_dynamic)
+                        // If a `Divergent` type is involved, it must not be eliminated.
+                        intersection
+                            .positive(db)
+                            .iter()
+                            .any(Type::is_non_divergent_dynamic)
                     }
                     _ => false,
                 },
@@ -9991,6 +9999,10 @@ pub(crate) enum TypeRelation {
     /// materialization of `Any` and `int | Any` may be the same type (`object`), but the
     /// two differ in their bottom materializations (`Never` and `int`, respectively).
     ///
+    /// Despite the above principles, there is one exceptional type that should never be union-simplified: the `Divergent` type.
+    /// This is a kind of dynamic type, but it acts as a marker to track recursive type structures.
+    /// If this type is accidentally eliminated by simplification, the fixed-point iteration will not converge.
+    ///
     /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
     /// [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
     Redundancy,
@@ -12103,6 +12115,27 @@ pub(crate) mod tests {
         assert!(div.is_equivalent_to(&db, div));
         assert!(!div.is_equivalent_to(&db, Type::unknown()));
         assert!(!Type::unknown().is_equivalent_to(&db, div));
+        assert!(!div.is_redundant_with(&db, Type::unknown()));
+        assert!(!Type::unknown().is_redundant_with(&db, div));
+
+        let truthy_div = IntersectionBuilder::new(&db)
+            .add_positive(div)
+            .add_negative(Type::AlwaysFalsy)
+            .build();
+
+        let union = UnionType::from_elements(&db, [Type::unknown(), truthy_div]);
+        assert!(!truthy_div.is_redundant_with(&db, Type::unknown()));
+        assert_eq!(
+            union.display(&db).to_string(),
+            "Unknown | (Divergent & ~AlwaysFalsy)"
+        );
+
+        let union = UnionType::from_elements(&db, [truthy_div, Type::unknown()]);
+        assert!(!Type::unknown().is_redundant_with(&db, truthy_div));
+        assert_eq!(
+            union.display(&db).to_string(),
+            "(Divergent & ~AlwaysFalsy) | Unknown"
+        );
 
         // The `object` type has a good convergence property, that is, its union with all other types is `object`.
         // (e.g. `object | tuple[Divergent] == object`, `object | tuple[object] == object`)

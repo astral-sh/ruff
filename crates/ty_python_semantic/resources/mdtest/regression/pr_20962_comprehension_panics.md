@@ -35,16 +35,3 @@ else:
 async def name_5():
     pass
 ```
-
-## Too many cycle iterations in `infer_definition_types`
-
-<!-- expect-panic: too many cycle iterations -->
-
-```py
-for name_1 in {
-    {{0: name_4 for unique_name_0 in unique_name_1}: 0 for unique_name_2 in unique_name_3 if name_4}: 0
-    for unique_name_4 in name_1
-    for name_4 in name_1
-}:
-    pass
-```
