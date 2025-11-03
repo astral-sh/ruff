@@ -680,7 +680,7 @@ def _(p: Person) -> None:
     reveal_type(p.__class__)  # revealed: <class 'dict[str, object]'>
 ```
 
-Also, the "attributes" on the class definition can not be accessed. Neither on the class itself, nor
+Also, the "attributes" on the class definition cannot be accessed. Neither on the class itself, nor
 on inhabitants of the type defined by the class:
 
 ```py
@@ -714,7 +714,7 @@ reveal_type(Person.__required_keys__)  # revealed: frozenset[str]
 reveal_type(Person.__optional_keys__)  # revealed: frozenset[str]
 ```
 
-These attributes can not be accessed on inhabitants:
+These attributes cannot be accessed on inhabitants:
 
 ```py
 def _(person: Person) -> None:
@@ -723,7 +723,7 @@ def _(person: Person) -> None:
     person.__optional_keys__  # error: [unresolved-attribute]
 ```
 
-Also, they can not be accessed on `type(person)`, as that would be `dict` at runtime:
+Also, they cannot be accessed on `type(person)`, as that would be `dict` at runtime:
 
 ```py
 def _(person: Person) -> None:

@@ -130,7 +130,7 @@ static_assert(has_member(C, "base_attr"))
 static_assert(not has_member(C, "non_existent"))
 ```
 
-But instance attributes can not be accessed this way:
+But instance attributes cannot be accessed this way:
 
 ```py
 static_assert(not has_member(C, "instance_attr"))

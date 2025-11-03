@@ -1878,7 +1878,7 @@ date.day = 8
 date.month = 4
 date.year = 2025
 
-# error: [unresolved-attribute] "Can not assign object of type `Literal["UTC"]` to attribute `tz` on type `Date` with custom `__setattr__` method."
+# error: [unresolved-attribute] "Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date` with custom `__setattr__` method."
 date.tz = "UTC"
 ```
 
@@ -1894,10 +1894,10 @@ class Frozen:
     existing: int = 1
 
     def __setattr__(self, name, value) -> Never:
-        raise AttributeError("Attributes can not be modified")
+        raise AttributeError("Attributes cannot be modified")
 
 instance = Frozen()
-instance.non_existing = 2  # error: [invalid-assignment] "Can not assign to unresolved attribute `non_existing` on type `Frozen`"
+instance.non_existing = 2  # error: [invalid-assignment] "Cannot assign to unresolved attribute `non_existing` on type `Frozen`"
 instance.existing = 2  # error: [invalid-assignment] "Cannot assign to attribute `existing` on type `Frozen` whose `__setattr__` method returns `Never`/`NoReturn`"
 ```
 
@@ -1949,7 +1949,7 @@ def flag() -> bool:
 class Frozen:
     if flag():
         def __setattr__(self, name, value) -> Never:
-            raise AttributeError("Attributes can not be modified")
+            raise AttributeError("Attributes cannot be modified")
 
 instance = Frozen()
 instance.non_existing = 2  # error: [invalid-assignment]
