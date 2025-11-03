@@ -4318,6 +4318,13 @@ impl<'db> Type<'db> {
                     .into()
             }
 
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                if typevar.kind(db).is_paramspec()
+                    && matches!(name.as_str(), "args" | "kwargs") =>
+            {
+                Place::bound(todo_type!("ParamSpecArgs / ParamSpecKwargs")).into()
+            }
+
             Type::NominalInstance(..)
             | Type::ProtocolInstance(..)
             | Type::BooleanLiteral(..)

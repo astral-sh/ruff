@@ -308,8 +308,8 @@ from typing_extensions import Callable
 
 def _[**P1](c: Callable[P1, int]):
     # TODO: Should reveal `ParamSpecArgs` and `ParamSpecKwargs`
-    reveal_type(P1.args)  # revealed: Unknown
-    reveal_type(P1.kwargs)  # revealed: Unknown
+    reveal_type(P1.args)  # revealed: @Todo(ParamSpecArgs / ParamSpecKwargs)
+    reveal_type(P1.kwargs)  # revealed: @Todo(ParamSpecArgs / ParamSpecKwargs)
 
     # TODO: Signature should be (**P1) -> int
     reveal_type(c)  # revealed: (...) -> int
