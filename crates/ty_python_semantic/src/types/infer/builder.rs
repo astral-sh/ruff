@@ -5385,7 +5385,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.add_unknown_declaration_with_binding(def_node(), definition);
             return;
         }
-        
+
         // Although it isn't the runtime semantics, we go to some trouble to prioritize a submodule
         // over module `__getattr__`, because that's what other type checkers do.
         let mut from_module_getattr = None;

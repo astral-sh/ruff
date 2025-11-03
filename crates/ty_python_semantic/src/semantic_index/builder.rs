@@ -1459,6 +1459,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     && let Some(submodule_raw) = &node.module
                     && let Some(submodule) = ModuleName::new(submodule_raw.as_str())
                     && let Some(direct_submodule) = submodule.components().next()
+                    && self.file.is_package(self.db)
                     && !self.seen_submodule_imports.contains(direct_submodule)
                 {
                     self.seen_submodule_imports

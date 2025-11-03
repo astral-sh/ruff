@@ -817,6 +817,27 @@ from mypackage import funcmod
 x = funcmod(1)
 ```
 
+## Re-export Nameclash Problems In Functions (Non-Stub Check)
+
+`mypackage/__init__.py`:
+
+```py
+from .funcmod import funcmod
+
+funcmod(1)
+
+def run():
+    # error: [call-non-callable]
+    funcmod(2)
+```
+
+`mypackage/funcmod.py`:
+
+```py
+def funcmod(x: int) -> int:
+    return x
+```
+
 ## Shadowing Import With Definition
 
 `mypackage/__init__.pyi`:
