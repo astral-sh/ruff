@@ -297,7 +297,7 @@ impl AttributeKind {
 /// When invoked on a class object, the fallback type (a class attribute) can shadow a
 /// non-data descriptor of the meta-type (the class's metaclass). However, this is not
 /// true for instances. When invoked on an instance, the fallback type (an attribute on
-/// the instance) can not completely shadow a non-data descriptor of the meta-type (the
+/// the instance) cannot completely shadow a non-data descriptor of the meta-type (the
 /// class), because we do not currently attempt to statically infer if an instance
 /// attribute is definitely defined (i.e. to check whether a particular method has been
 /// called).
@@ -4412,7 +4412,7 @@ impl<'db> Type<'db> {
                 };
 
                 if result.is_class_var() && self.is_typed_dict() {
-                    // `ClassVar`s on `TypedDictFallback` can not be accessed on inhabitants of `SomeTypedDict`.
+                    // `ClassVar`s on `TypedDictFallback` cannot be accessed on inhabitants of `SomeTypedDict`.
                     // They can only be accessed on `SomeTypedDict` directly.
                     return Place::Undefined.into();
                 }
@@ -12050,7 +12050,7 @@ pub(crate) mod tests {
         assert!(todo1.is_assignable_to(&db, int));
 
         // We lose information when combining several `Todo` types. This is an
-        // acknowledged limitation of the current implementation. We can not
+        // acknowledged limitation of the current implementation. We cannot
         // easily store the meta information of several `Todo`s in a single
         // variant, as `TodoType` needs to implement `Copy`, meaning it can't
         // contain `Vec`/`Box`/etc., and can't be boxed itself.

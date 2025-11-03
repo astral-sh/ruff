@@ -390,7 +390,7 @@ static_assert(not is_single_valued(Literal["a"] | Literal["b"]))
 
 We use `TypeOf` to get the inferred type of an expression. This is useful when we want to refer to
 it in a type expression. For example, if we want to make sure that the class literal type `str` is a
-subtype of `type[str]`, we can not use `is_subtype_of(str, type[str])`, as that would test if the
+subtype of `type[str]`, we cannot use `is_subtype_of(str, type[str])`, as that would test if the
 type `str` itself is a subtype of `type[str]`. Instead, we can use `TypeOf[str]` to get the type of
 the expression `str`:
 

@@ -299,7 +299,7 @@ impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
                 }
 
                 // `case 4+3j:` or `case 4-3j:
-                // Can not contain arbitrary expressions. Limited to complex numbers.
+                // Cannot contain arbitrary expressions. Limited to complex numbers.
                 Expr::BinOp(_) => {
                     self.update_max_precedence(OperatorPrecedence::Additive, 1);
                 }

@@ -308,7 +308,7 @@ reveal_type(C.f)  # revealed: bound method <class 'C'>.f(arg: int) -> str
 reveal_type(C.f(1))  # revealed: str
 ```
 
-The method `f` can not be accessed from an instance of the class:
+The method `f` cannot be accessed from an instance of the class:
 
 ```py
 # error: [unresolved-attribute] "Object of type `C` has no attribute `f`"

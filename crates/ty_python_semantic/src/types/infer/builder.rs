@@ -3804,7 +3804,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                                     let msg = if !member_exists {
                                         format!(
-                                            "Can not assign to unresolved attribute `{attribute}` on type `{}`",
+                                            "Cannot assign to unresolved attribute `{attribute}` on type `{}`",
                                             object_ty.display(db)
                                         )
                                     } else if is_setattr_synthesized {
@@ -3840,7 +3840,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
                             {
                                 builder.into_diagnostic(format_args!(
-                                    "Can not assign object of type `{}` to attribute \
+                                    "Cannot assign object of type `{}` to attribute \
                                      `{attribute}` on type `{}` with \
                                      custom `__setattr__` method.",
                                     value_ty.display(db),
