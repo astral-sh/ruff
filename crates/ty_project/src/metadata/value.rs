@@ -28,7 +28,10 @@ pub enum ValueSource {
     /// long argument (`--extra-paths`) or `--config key=value`.
     Cli,
 
-    /// The value comes from the user's editor settings.
+    /// The value comes from the user's editor,
+    /// while it's left open if specified as a setting
+    /// or if the value was auto-discovered by the editor
+    /// (e.g., the Python environment)
     Editor,
 }
 
