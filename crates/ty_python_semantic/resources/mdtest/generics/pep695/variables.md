@@ -694,19 +694,19 @@ A bound or constrained typevar is a subtype of itself in a union:
 
 ```py
 def union[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(T@union ≤ Base)]
     reveal_type(is_assignable_to(T, T | None))
     static_assert(is_assignable_to(T, T | None))
 
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(U@union = Base) ∨ (U@union = Unrelated)]
     reveal_type(is_assignable_to(U, U | None))
     static_assert(is_assignable_to(U, U | None))
 
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(T@union ≤ Base)]
     reveal_type(is_subtype_of(T, T | None))
     static_assert(is_subtype_of(T, T | None))
 
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(U@union = Base) ∨ (U@union = Unrelated)]
     reveal_type(is_subtype_of(U, U | None))
     static_assert(is_subtype_of(U, U | None))
 ```
@@ -715,11 +715,11 @@ A bound or constrained typevar in a union with a dynamic type is assignable to t
 
 ```py
 def union_with_dynamic[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(T@union_with_dynamic ≤ Base)]
     reveal_type(is_assignable_to(T | Any, T))
     static_assert(is_assignable_to(T | Any, T))
 
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(U@union_with_dynamic = Base) ∨ (U@union_with_dynamic = Unrelated)]
     reveal_type(is_assignable_to(U | Any, U))
     static_assert(is_assignable_to(U | Any, U))
 
@@ -740,19 +740,19 @@ from ty_extensions import Intersection, Not, is_disjoint_from
 class A: ...
 
 def inter[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(T@inter ≤ Base)]
     reveal_type(is_assignable_to(Intersection[T, Unrelated], T))
     static_assert(is_assignable_to(Intersection[T, Unrelated], T))
 
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(T@inter ≤ Base)]
     reveal_type(is_subtype_of(Intersection[T, Unrelated], T))
     static_assert(is_subtype_of(Intersection[T, Unrelated], T))
 
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(U@inter = Base) ∨ (U@inter = Unrelated)]
     reveal_type(is_assignable_to(Intersection[U, A], U))
     static_assert(is_assignable_to(Intersection[U, A], U))
 
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(U@inter = Base) ∨ (U@inter = Unrelated)]
     reveal_type(is_subtype_of(Intersection[U, A], U))
     static_assert(is_subtype_of(Intersection[U, A], U))
 
