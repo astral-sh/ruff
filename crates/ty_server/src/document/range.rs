@@ -175,26 +175,26 @@ impl PositionExt for lsp_types::Position {
 pub(crate) trait TextSizeExt {
     /// Converts this position to an `LspPosition`, which then requires an explicit
     /// decision about how to use it (as a local position or as a location).
-    fn as_lsp_position(
-        self,
-        db: &dyn Db,
+    fn as_lsp_position<'db>(
+        &self,
+        db: &'db dyn Db,
         file: File,
         encoding: PositionEncoding,
-    ) -> LspPosition<'_>
+    ) -> LspPosition<'db>
     where
         Self: Sized;
 }
 
 impl TextSizeExt for TextSize {
-    fn as_lsp_position(
-        self,
-        db: &dyn Db,
+    fn as_lsp_position<'db>(
+        &self,
+        db: &'db dyn Db,
         file: File,
         encoding: PositionEncoding,
-    ) -> LspPosition<'_> {
+    ) -> LspPosition<'db> {
         LspPosition {
             file,
-            position: self,
+            position: *self,
             db,
             encoding,
         }
