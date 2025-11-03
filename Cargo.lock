@@ -45,7 +45,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "710e8eae58854cdc1790fcb56cca04d712a17be849eeb81da2a724bf4bae2bc4"
 dependencies = [
  "anstyle",
- "unicode-width 0.2.1",
+ "unicode-width",
 ]
 
 [[package]]
@@ -106,7 +106,7 @@ dependencies = [
  "anstyle-lossy",
  "anstyle-parse",
  "html-escape",
- "unicode-width 0.2.1",
+ "unicode-width",
 ]
 
 [[package]]
@@ -687,7 +687,7 @@ dependencies = [
  "encode_unicode",
  "libc",
  "once_cell",
- "unicode-width 0.2.1",
+ "unicode-width",
  "windows-sys 0.61.0",
 ]
 
@@ -1007,7 +1007,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.61.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1093,7 +1093,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1250,7 +1250,7 @@ version = "0.2.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cfe4fbac503b8d1f88e6676011885f34b7174f46e59956bba534ba83abded4df"
 dependencies = [
- "unicode-width 0.2.1",
+ "unicode-width",
 ]
 
 [[package]]
@@ -1560,13 +1560,13 @@ dependencies = [
 
 [[package]]
 name = "indicatif"
-version = "0.18.0"
+version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70a646d946d06bedbbc4cac4c218acf4bbf2d87757a784857025f4d447e4e1cd"
+checksum = "ade6dfcba0dfb62ad59e59e7241ec8912af34fd29e0e743e3db992bd278e8b65"
 dependencies = [
  "console 0.16.1",
  "portable-atomic",
- "unicode-width 0.2.1",
+ "unicode-width",
  "unit-prefix",
  "vt100",
  "web-time",
@@ -2324,7 +2324,7 @@ checksum = "31095ca1f396e3de32745f42b20deef7bc09077f918b085307e8eab6ddd8fb9c"
 dependencies = [
  "once_cell",
  "serde",
- "unicode-width 0.2.1",
+ "unicode-width",
  "unscanny",
  "version-ranges",
 ]
@@ -2345,7 +2345,7 @@ dependencies = [
  "serde",
  "smallvec",
  "thiserror 1.0.69",
- "unicode-width 0.2.1",
+ "unicode-width",
  "url",
  "urlencoding",
  "version-ranges",
@@ -2899,7 +2899,7 @@ dependencies = [
  "snapbox",
  "toml",
  "tryfn",
- "unicode-width 0.2.1",
+ "unicode-width",
 ]
 
 [[package]]
@@ -3050,7 +3050,7 @@ dependencies = [
  "serde",
  "static_assertions",
  "tracing",
- "unicode-width 0.2.1",
+ "unicode-width",
 ]
 
 [[package]]
@@ -3140,7 +3140,7 @@ dependencies = [
  "toml",
  "typed-arena",
  "unicode-normalization",
- "unicode-width 0.2.1",
+ "unicode-width",
  "unicode_names2",
  "url",
 ]
@@ -3538,7 +3538,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3934,7 +3934,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.61.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4659,12 +4659,6 @@ dependencies = [
 
 [[package]]
 name = "unicode-width"
-version = "0.1.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7dd6e30e90baa6f72411720665d41d89b9a3d039dc45b8faea1ddd07f617f6af"
-
-[[package]]
-name = "unicode-width"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a1a07cc7db3810833284e8d372ccdc6da29741639ecc70c9ec107df0fa6154c"
@@ -4798,25 +4792,13 @@ checksum = "051eb1abcf10076295e815102942cc58f9d5e3b4560e46e53c21e8ff6f3af7b1"
 
 [[package]]
 name = "vt100"
-version = "0.15.2"
+version = "0.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84cd863bf0db7e392ba3bd04994be3473491b31e66340672af5d11943c6274de"
+checksum = "054ff75fb8fa83e609e685106df4faeffdf3a735d3c74ebce97ec557d5d36fd9"
 dependencies = [
  "itoa",
- "log",
- "unicode-width 0.1.14",
- "vte 0.11.1",
-]
-
-[[package]]
-name = "vte"
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5022b5fbf9407086c180e9557be968742d839e68346af7792b8592489732197"
-dependencies = [
- "arrayvec",
- "utf8parse",
- "vte_generate_state_changes",
+ "unicode-width",
+ "vte 0.15.0",
 ]
 
 [[package]]
@@ -4829,13 +4811,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "vte_generate_state_changes"
-version = "0.1.2"
+name = "vte"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e369bee1b05d510a7b4ed645f5faa90619e05437111783ea5848f28d97d3c2e"
+checksum = "a5924018406ce0063cd67f8e008104968b74b563ee1b85dde3ed1f7cb87d3dbd"
 dependencies = [
- "proc-macro2",
- "quote",
+ "arrayvec",
+ "memchr",
 ]
 
 [[package]]
@@ -5014,7 +4996,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
