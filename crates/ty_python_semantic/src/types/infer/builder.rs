@@ -5347,6 +5347,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .as_module_literal()
             .is_some_and(|module| Some(self.file()) == module.module(self.db()).file(self.db()));
 
+        // Although it isn't the runtime semantics, we go to some trouble to prioritize a submodule
+        // over module `__getattr__`, because that's what other type checkers do.
+        let mut from_module_getattr = None;
+
         // First try loading the requested attribute from the module.
         if !import_is_self_referential {
             if let PlaceAndQualifiers {
@@ -5366,19 +5370,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
                 }
-                self.add_declaration_with_binding(
-                    alias.into(),
-                    definition,
-                    &DeclaredAndInferredType::MightBeDifferent {
-                        declared_ty: TypeAndQualifiers {
-                            inner: ty,
-                            origin: TypeOrigin::Declared,
-                            qualifiers,
+                if qualifiers.contains(TypeQualifiers::FROM_MODULE_GETATTR) {
+                    from_module_getattr = Some((ty, qualifiers));
+                } else {
+                    self.add_declaration_with_binding(
+                        alias.into(),
+                        definition,
+                        &DeclaredAndInferredType::MightBeDifferent {
+                            declared_ty: TypeAndQualifiers {
+                                inner: ty,
+                                origin: TypeOrigin::Declared,
+                                qualifiers,
+                            },
+                            inferred_ty: ty,
                         },
-                        inferred_ty: ty,
-                    },
-                );
-                return;
+                    );
+                    return;
+                }
             }
         }
 
@@ -5414,6 +5422,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 alias.into(),
                 definition,
                 &DeclaredAndInferredType::are_the_same_type(submodule_type),
+            );
+            return;
+        }
+
+        // We've checked for a submodule, so now we can go ahead and use a type from module
+        // `__getattr__`.
+        if let Some((ty, qualifiers)) = from_module_getattr {
+            self.add_declaration_with_binding(
+                alias.into(),
+                definition,
+                &DeclaredAndInferredType::MightBeDifferent {
+                    declared_ty: TypeAndQualifiers {
+                        inner: ty,
+                        origin: TypeOrigin::Declared,
+                        qualifiers,
+                    },
+                    inferred_ty: ty,
+                },
             );
             return;
         }
