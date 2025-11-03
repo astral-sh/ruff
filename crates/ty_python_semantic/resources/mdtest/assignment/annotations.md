@@ -222,10 +222,10 @@ reveal_type(r)  # revealed: dict[int | str, int | str]
 ## Incorrect collection literal assignments are complained about
 
 ```py
-# error: [invalid-assignment] "Object of type `list[Unknown | int]` is not assignable to `list[str]`"
+# error: [invalid-assignment] "Object of type `list[str | int]` is not assignable to `list[str]`"
 a: list[str] = [1, 2, 3]
 
-# error: [invalid-assignment] "Object of type `set[Unknown | int | str]` is not assignable to `set[int]`"
+# error: [invalid-assignment] "Object of type `set[int | str]` is not assignable to `set[int]`"
 b: set[int] = {1, 2, "3"}
 ```
 
@@ -422,7 +422,7 @@ reveal_type(d)  # revealed: list[int | tuple[int, int]]
 e: list[int] = f(True)
 reveal_type(e)  # revealed: list[int]
 
-# error: [invalid-assignment] "Object of type `list[str]` is not assignable to `list[int]`"
+# error: [invalid-assignment] "Object of type `list[int | str]` is not assignable to `list[int]`"
 g: list[int] = f("a")
 
 # error: [invalid-assignment] "Object of type `list[str]` is not assignable to `tuple[int]`"
@@ -459,12 +459,12 @@ reveal_type(b)  # revealed: TD
 
 # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
 # error: [invalid-key] "Unknown key "y" for TypedDict `TD`"
-# error: [invalid-assignment] "Object of type `Unknown | dict[Unknown | str, Unknown | int]` is not assignable to `TD`"
+# error: [invalid-assignment] "Object of type `TD | dict[Unknown | str, Unknown | int]` is not assignable to `TD`"
 c: TD = f([{"y": 0}, {"x": 1}])
 
 # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
 # error: [invalid-key] "Unknown key "y" for TypedDict `TD`"
-# error: [invalid-assignment] "Object of type `Unknown | dict[Unknown | str, Unknown | int]` is not assignable to `TD | None`"
+# error: [invalid-assignment] "Object of type `TD | None | dict[Unknown | str, Unknown | int]` is not assignable to `TD | None`"
 c: TD | None = f([{"y": 0}, {"x": 1}])
 ```
 
