@@ -103,6 +103,8 @@ function Content({
   }
 }
 
+const PYODIDE_HOME = "/home/pyodide/";
+
 function Run({ files, theme }: { files: ReadonlyFiles; theme: Theme }) {
   const [runOutput, setRunOutput] = useState<Promise<string> | null>(null);
   const handleRun = () => {
@@ -122,7 +124,13 @@ function Run({ files, theme }: { files: ReadonlyFiles; theme: Theme }) {
 
       let fileName = "main.py";
       for (const file of files.index) {
-        pyodide.FS.writeFile(file.name, files.contents[file.id]);
+        const last_separator = file.name.lastIndexOf("/");
+
+        if (last_separator !== -1) {
+          const directory = PYODIDE_HOME + file.name.slice(0, last_separator);
+          pyodide.FS.mkdirTree(directory);
+        }
+        pyodide.FS.writeFile(PYODIDE_HOME + file.name, files.contents[file.id]);
 
         if (file.id === files.selected) {
           fileName = file.name;
@@ -133,7 +141,7 @@ function Run({ files, theme }: { files: ReadonlyFiles; theme: Theme }) {
       const globals = dict();
 
       try {
-        // Patch up reveal types
+        // Patch `reveal_type` to print runtime values
         pyodide.runPython(`
         import builtins
 
