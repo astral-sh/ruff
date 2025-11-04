@@ -8474,11 +8474,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::GenericAlias(..)
                 | Type::SpecialForm(_)
                 | Type::KnownInstance(KnownInstanceType::UnionType(_)),
-                _,
-                ast::Operator::BitOr,
-            )
-            | (
-                _,
                 Type::ClassLiteral(..)
                 | Type::SubclassOf(..)
                 | Type::GenericAlias(..)
@@ -8486,29 +8481,65 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::KnownInstance(KnownInstanceType::UnionType(_)),
                 ast::Operator::BitOr,
             ) if Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY310 => {
-                // For a value expression like `int | None`, the inferred type for `None` will be
-                // a nominal instance of `NoneType`, so we need to convert it to a class literal
-                // such that it can later be converted back to a nominal instance type when calling
-                // `.in_type_expression` on the `UnionType` instance.
-                let convert_none_type = |ty: Type<'db>| {
-                    if ty.is_none(self.db()) {
-                        KnownClass::NoneType.to_class_literal(self.db())
-                    } else {
-                        ty
-                    }
-                };
-
                 if left_ty.is_equivalent_to(self.db(), right_ty) {
                     Some(left_ty)
                 } else {
                     Some(Type::KnownInstance(KnownInstanceType::UnionType(
-                        UnionTypeInstance::new(
-                            self.db(),
-                            convert_none_type(left_ty),
-                            convert_none_type(right_ty),
-                        ),
+                        UnionTypeInstance::new(self.db(), left_ty, right_ty),
                     )))
                 }
+            }
+            (
+                Type::ClassLiteral(..)
+                | Type::SubclassOf(..)
+                | Type::GenericAlias(..)
+                | Type::KnownInstance(..)
+                | Type::SpecialForm(..),
+                Type::NominalInstance(instance),
+                ast::Operator::BitOr,
+            )
+            | (
+                Type::NominalInstance(instance),
+                Type::ClassLiteral(..)
+                | Type::SubclassOf(..)
+                | Type::GenericAlias(..)
+                | Type::KnownInstance(..)
+                | Type::SpecialForm(..),
+                ast::Operator::BitOr,
+            ) if Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY310
+                && instance.has_known_class(self.db(), KnownClass::NoneType) =>
+            {
+                Some(Type::KnownInstance(KnownInstanceType::UnionType(
+                    UnionTypeInstance::new(self.db(), left_ty, right_ty),
+                )))
+            }
+
+            // We avoid calling `type.__(r)or__`, as typeshed annotates these methods as
+            // accepting `Any` (since typeforms are inexpressable in the type system currently).
+            // This means that many common errors would not be caught if we fell back to typeshed's stubs here.
+            //
+            // Note that if a class had a custom metaclass that overrode `__(r)or__`, we would also ignore
+            // that custom method as we'd take one of the earlier branches.
+            // This seems like it's probably rare enough that it's acceptable, however.
+            (
+                Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..),
+                _,
+                ast::Operator::BitOr,
+            )
+            | (
+                _,
+                Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..),
+                ast::Operator::BitOr,
+            ) if Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY310 => {
+                Type::try_call_bin_op_with_policy(
+                    self.db(),
+                    left_ty,
+                    ast::Operator::BitOr,
+                    right_ty,
+                    MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                )
+                .ok()
+                .map(|binding| binding.return_type(self.db()))
             }
 
             // We've handled all of the special cases that we support for literals, so we need to

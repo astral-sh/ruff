@@ -135,14 +135,15 @@ def _(int_or_int: IntOrInt, list_of_int_or_list_of_int: ListOfIntOrListOfInt):
 None | None  # error: [unsupported-operator] "Operator `|` is unsupported between objects of type `None` and `None`"
 ```
 
-When constructing something non-sensical like `int | 1`, we could ideally emit a diagnostic for the
-expression itself, as it leads to a `TypeError` at runtime. No other type checker supports this, so
-for now we only emit an error when it is used in a type expression:
+When constructing something nonsensical like `int | 1`, we emit a diagnostic for the expression
+itself, as it leads to a `TypeError` at runtime. The result of the expression is then inferred as
+`Unknown`, so we permit it to be used in a type expression.
 
 ```py
-IntOrOne = int | 1
+IntOrOne = int | 1  # error: [unsupported-operator]
 
-# error: [invalid-type-form] "Variable of type `Literal[1]` is not allowed in a type expression"
+reveal_type(IntOrOne)  # revealed: Unknown
+
 def _(int_or_one: IntOrOne):
     reveal_type(int_or_one)  # revealed: Unknown
 ```
@@ -158,6 +159,77 @@ def f(SomeUnionType: UnionType):
     some_union: SomeUnionType
 
 f(int | str)
+```
+
+## `|` operator between class objects and non-class objects
+
+Using the `|` operator between a class object and a non-class object does not create a `UnionType`
+instance; it calls the relevant dunder as normal:
+
+```py
+class Foo:
+    def __or__(self, other) -> str:
+        return "foo"
+
+reveal_type(Foo() | int)  # revealed: str
+reveal_type(Foo() | list[int])  # revealed: str
+
+class Bar:
+    def __ror__(self, other) -> str:
+        return "bar"
+
+reveal_type(int | Bar())  # revealed: str
+reveal_type(list[int] | Bar())  # revealed: str
+
+class Invalid:
+    def __or__(self, other: "Invalid") -> str:
+        return "Invalid"
+
+    def __ror__(self, other: "Invalid") -> str:
+        return "Invalid"
+
+# error: [unsupported-operator]
+reveal_type(int | Invalid())  # revealed: Unknown
+# error: [unsupported-operator]
+reveal_type(Invalid() | list[int])  # revealed: Unknown
+```
+
+## Custom `__(r)or__` methods on metaclasses are only partially respected
+
+A drawback of our extensive special casing of `|` operations between class objects is that
+`__(r)or__` methods on metaclasses are completely disregarded if two classes are `|`'d together. We
+respect the metaclass dunder if a class is `|`'d with a non-class, however:
+
+```py
+class Meta(type):
+    def __or__(self, other) -> str:
+        return "Meta"
+
+class Foo(metaclass=Meta): ...
+class Bar(metaclass=Meta): ...
+
+X = Foo | Bar
+
+# In an ideal world, perhaps we would respect `Meta.__or__` here and reveal `str`?
+# But we still need to record what the elements are, since (according to the typing spec)
+# `X` is still a valid type alias
+reveal_type(X)  # revealed: types.UnionType
+
+def f(obj: X):
+    reveal_type(obj)  # revealed: Foo | Bar
+
+# We do respect the metaclass `__or__` if it's used between a class and a non-class, however:
+
+Y = Foo | 42
+reveal_type(Y)  # revealed: str
+
+Z = Bar | 56
+reveal_type(Z)  # revealed: str
+
+def g(
+    arg1: Y,  # error: [invalid-type-form]
+    arg2: Z,  # error: [invalid-type-form]
+): ...
 ```
 
 ## Generic types
@@ -191,7 +263,8 @@ From the [typing spec on type aliases](https://typing.python.org/en/latest/spec/
 > type hint is acceptable in a type alias
 
 However, no other type checker seems to support stringified annotations in implicit type aliases. We
-currently also do not support them:
+currently also do not support them, and we detect places where these attempted unions cause runtime
+errors:
 
 ```py
 AliasForStr = "str"
@@ -200,9 +273,10 @@ AliasForStr = "str"
 def _(s: AliasForStr):
     reveal_type(s)  # revealed: Unknown
 
-IntOrStr = int | "str"
+IntOrStr = int | "str"  # error: [unsupported-operator]
 
-# error: [invalid-type-form] "Variable of type `Literal["str"]` is not allowed in a type expression"
+reveal_type(IntOrStr)  # revealed: Unknown
+
 def _(int_or_str: IntOrStr):
     reveal_type(int_or_str)  # revealed: Unknown
 ```
