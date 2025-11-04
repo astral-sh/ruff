@@ -424,9 +424,9 @@ bundle for TextMate.
 
 Ruff support is now built into Zed (no separate extension required).
 
-By default, Zed uses basedpyright as the primary LSP for language features, and Ruff is used by default for formatting and linting.
+By default, Zed uses Ruff for formatting and linting.
 
-To set up editor-wide Ruff option, provide the [server settings](settings.md)
+To set up editor-wide Ruff options, provide the [server settings](settings.md)
 under the [`lsp.ruff.initialization_options.settings`](https://zed.dev/docs/configuring-zed#lsp) key of your `settings.json` file:
 
 ```json
@@ -435,7 +435,7 @@ under the [`lsp.ruff.initialization_options.settings`](https://zed.dev/docs/conf
     "ruff": {
       "initialization_options": {
         "settings": {
-          // Ruff server settings goes here
+          // Ruff server settings go here
           "lineLength": 80,
           "lint": {
             "extendSelect": ["I"],
@@ -447,10 +447,8 @@ under the [`lsp.ruff.initialization_options.settings`](https://zed.dev/docs/conf
 }
 ```
 
-Alternatively, Zed reads project configuration files (`pyproject.toml`, `ruff.toml`, or `.ruff.toml`) to apply project-specific configurations.
-
 [`format_on_save`](https://zed.dev/docs/configuring-zed#format-on-save) is enabled by default.
-You can disable it for Python by adding this to your `settings.json` file:
+You can disable it for Python by changing `format_on_save` in your `settings.json` file:
 
 ```json
 {
