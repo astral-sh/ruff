@@ -4,6 +4,7 @@ use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, PythonVersion};
 use ruff_python_stdlib::builtins::version_builtin_was_added;
@@ -1200,10 +1201,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     definition,
                 );
             }
+            DefinitionKind::ImportFromImplicit(import_from) => {
+                self.infer_import_from_implicit_definition(
+                    import_from.import(self.module()),
+                    import_from.direct_submodule_name(),
+                    definition,
+                );
+            }
             DefinitionKind::StarImport(import) => {
                 self.infer_import_from_definition(
                     import.import(self.module()),
-                    Some(import.alias(self.module())),
+                    import.alias(self.module()),
                     definition,
                 );
             }
@@ -5315,50 +5323,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_import_from_definition(
         &mut self,
         import_from: &ast::StmtImportFrom,
-        alias: Option<&ast::Alias>,
+        alias: &ast::Alias,
         definition: Definition<'db>,
     ) {
-        let def_node = || {
-            alias
-                .map(AnyNodeRef::from)
-                .unwrap_or_else(|| import_from.into())
-        };
-        let def_name = || {
-            if let Some(alias) = alias {
-                alias.name.id.clone()
-            } else {
-                let module_name = import_from
-                    .module
-                    .as_ref()
-                    .expect("must have non-empty module name in this path");
-                let module_name = module_name
-                    .split_once('.')
-                    .map(|(first, _)| first)
-                    .unwrap_or(module_name.as_str());
-                module_name.into()
-            }
-        };
-        let is_star = alias.map(|alias| &alias.name == "*").unwrap_or(false);
-        let module_name = if alias.is_some() {
-            let Ok(module_name) =
-                ModuleName::from_import_statement(self.db(), self.file(), import_from)
-            else {
-                self.add_unknown_declaration_with_binding(def_node(), definition);
-                return;
-            };
-            module_name
-        } else {
-            let Ok(module_name) =
-                ModuleName::from_identifier_parts(self.db(), self.file(), None, 1)
-            else {
-                self.add_unknown_declaration_with_binding(def_node(), definition);
-                return;
-            };
-            module_name
+        let Ok(module_name) =
+            ModuleName::from_import_statement(self.db(), self.file(), import_from)
+        else {
+            self.add_unknown_declaration_with_binding(alias.into(), definition);
+            return;
         };
 
         let Some(module) = resolve_module(self.db(), &module_name) else {
-            self.add_unknown_declaration_with_binding(def_node(), definition);
+            self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
         };
 
@@ -5369,9 +5345,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .place_table(self.scope().file_scope_id(self.db()))
                 .symbol(star_import.symbol_id())
                 .name()
-                .clone()
         } else {
-            def_name()
+            &alias.name.id
         };
 
         // Avoid looking up attributes on a module if a module imports from itself
@@ -5379,12 +5354,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let import_is_self_referential = module_ty
             .as_module_literal()
             .is_some_and(|module| Some(self.file()) == module.module(self.db()).file(self.db()));
-
-        // This isn't actually introducing a symbol here
-        if alias.is_none() && !import_is_self_referential {
-            self.add_unknown_declaration_with_binding(def_node(), definition);
-            return;
-        }
 
         // Although it isn't the runtime semantics, we go to some trouble to prioritize a submodule
         // over module `__getattr__`, because that's what other type checkers do.
@@ -5395,14 +5364,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let PlaceAndQualifiers {
                 place: Place::Defined(ty, _, boundness),
                 qualifiers,
-            } = module_ty.member(self.db(), &name)
+            } = module_ty.member(self.db(), name)
             {
-                if !is_star && boundness == Definedness::PossiblyUndefined {
+                if &alias.name != "*" && boundness == Definedness::PossiblyUndefined {
                     // TODO: Consider loading _both_ the attribute and any submodule and unioning them
                     // together if the attribute exists but is possibly-unbound.
                     if let Some(builder) = self
                         .context
-                        .report_lint(&POSSIBLY_MISSING_IMPORT, def_node())
+                        .report_lint(&POSSIBLY_MISSING_IMPORT, AnyNodeRef::Alias(alias))
                     {
                         builder.into_diagnostic(format_args!(
                             "Member `{name}` of module `{module_name}` may be missing",
@@ -5413,7 +5382,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     from_module_getattr = Some((ty, qualifiers));
                 } else {
                     self.add_declaration_with_binding(
-                        def_node(),
+                        alias.into(),
                         definition,
                         &DeclaredAndInferredType::MightBeDifferent {
                             declared_ty: TypeAndQualifiers {
@@ -5432,7 +5401,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Evaluate whether `X.Y` would constitute a valid submodule name,
         // given a `from X import Y` statement. If it is valid, this will be `Some()`;
         // else, it will be `None`.
-        let full_submodule_name = ModuleName::new(&name).map(|final_part| {
+        let full_submodule_name = ModuleName::new(name).map(|final_part| {
             let mut ret = module_name.clone();
             ret.extend(&final_part);
             ret
@@ -5458,7 +5427,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .and_then(|submodule_name| self.module_type_from_name(submodule_name))
         {
             self.add_declaration_with_binding(
-                def_node(),
+                alias.into(),
                 definition,
                 &DeclaredAndInferredType::are_the_same_type(submodule_type),
             );
@@ -5469,7 +5438,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // `__getattr__`.
         if let Some((ty, qualifiers)) = from_module_getattr {
             self.add_declaration_with_binding(
-                def_node(),
+                alias.into(),
                 definition,
                 &DeclaredAndInferredType::MightBeDifferent {
                     declared_ty: TypeAndQualifiers {
@@ -5483,9 +5452,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        self.add_unknown_declaration_with_binding(def_node(), definition);
+        self.add_unknown_declaration_with_binding(alias.into(), definition);
 
-        if is_star {
+        if &alias.name == "*" {
             return;
         }
 
@@ -5493,7 +5462,91 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        let Some(builder) = self.context.report_lint(&UNRESOLVED_IMPORT, def_node()) else {
+        let Some(builder) = self
+            .context
+            .report_lint(&UNRESOLVED_IMPORT, AnyNodeRef::Alias(alias))
+        else {
+            return;
+        };
+
+        let diagnostic = builder.into_diagnostic(format_args!(
+            "Module `{module_name}` has no member `{name}`"
+        ));
+
+        if let Some(full_submodule_name) = full_submodule_name {
+            hint_if_stdlib_submodule_exists_on_other_versions(
+                self.db(),
+                diagnostic,
+                &full_submodule_name,
+                module,
+            );
+        }
+    }
+
+    fn infer_import_from_implicit_definition(
+        &mut self,
+        import_from: &ast::StmtImportFrom,
+        direct_submodule_name: &Name,
+        definition: Definition<'db>,
+    ) {
+        let name = direct_submodule_name
+            .split_once('.')
+            .map(|(first, _)| first)
+            .unwrap_or(direct_submodule_name.as_str());
+        let Ok(module_name) = ModuleName::from_identifier_parts(self.db(), self.file(), None, 1)
+        else {
+            self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
+            return;
+        };
+
+        let Some(module) = resolve_module(self.db(), &module_name) else {
+            self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
+            return;
+        };
+
+        // Evaluate whether `X.Y` would constitute a valid submodule name,
+        // given a `from X import Y` statement. If it is valid, this will be `Some()`;
+        // else, it will be `None`.
+
+        let full_submodule_name = ModuleName::new(name).map(|final_part| {
+            let mut ret = module_name.clone();
+            ret.extend(&final_part);
+            ret
+        });
+
+        // If the module doesn't bind the symbol, check if it's a submodule.  This won't get
+        // handled by the `Type::member` call because it relies on the semantic index's
+        // `imported_modules` set.  The semantic index does not include information about
+        // `from...import` statements because there are two things it cannot determine while only
+        // inspecting the content of the current file:
+        //
+        //   - whether the imported symbol is an attribute or submodule
+        //   - whether the containing file is in a module or a package (needed to correctly resolve
+        //     relative imports)
+        //
+        // The first would be solvable by making it a _potentially_ imported modules set.  The
+        // second is not.
+        //
+        // Regardless, for now, we sidestep all of that by repeating the submodule-or-attribute
+        // check here when inferring types for a `from...import` statement.
+        if let Some(submodule_type) = full_submodule_name
+            .as_ref()
+            .and_then(|submodule_name| self.module_type_from_name(submodule_name))
+        {
+            self.add_binding(import_from.into(), definition, |_, _| submodule_type);
+            return;
+        }
+
+        self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
+
+        if !self.is_reachable(import_from) {
+            return;
+        }
+
+        let Some(builder) = self
+            .context
+            .report_lint(&UNRESOLVED_IMPORT, AnyNodeRef::StmtImportFrom(import_from))
+        else {
             return;
         };
 

@@ -26,8 +26,8 @@ use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
     DefinitionNodeRef, Definitions, ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef,
-    ImportDefinitionNodeRef, ImportFromDefinitionNodeRef, MatchPatternDefinitionNodeRef,
-    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    ImportDefinitionNodeRef, ImportFromDefinitionNodeRef, ImportFromImplicitDefinitionNodeRef,
+    MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::place::{PlaceExpr, PlaceTableBuilder, ScopedPlaceId};
@@ -1469,10 +1469,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     let symbol = self.add_symbol(direct_submodule_name);
                     self.add_definition(
                         symbol.into(),
-                        ImportFromDefinitionNodeRef {
+                        ImportFromImplicitDefinitionNodeRef {
                             node,
-                            alias_index: None,
-                            is_reexported: true,
+                            direct_submodule_name: submodule_raw,
                         },
                     );
                 }
@@ -1617,7 +1616,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         symbol.into(),
                         ImportFromDefinitionNodeRef {
                             node,
-                            alias_index: Some(alias_index),
+                            alias_index,
                             is_reexported,
                         },
                     );

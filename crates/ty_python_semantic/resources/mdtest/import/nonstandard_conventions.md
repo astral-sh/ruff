@@ -827,7 +827,6 @@ from .funcmod import funcmod
 funcmod(1)
 
 def run():
-    # error: [call-non-callable]
     funcmod(2)
 ```
 
@@ -895,8 +894,6 @@ x = funcmod(1)
 ```pyi
 from .funcmod import other
 
-# TODO: do better!
-# error: [invalid-assignment]
 funcmod = other
 ```
 
@@ -911,8 +908,6 @@ def other(x: int) -> int: ...
 ```py
 from mypackage import funcmod
 
-# TODO: do better!
-# error: [call-non-callable]
 x = funcmod(1)
 ```
 
@@ -923,8 +918,6 @@ x = funcmod(1)
 ```py
 from .funcmod import other
 
-# TODO: do better!
-# error: [invalid-assignment]
 funcmod = other
 ```
 
@@ -940,7 +933,6 @@ def other(x: int) -> int:
 ```py
 from mypackage import funcmod
 
-# error: [call-non-callable]
 x = funcmod(1)
 ```
 
