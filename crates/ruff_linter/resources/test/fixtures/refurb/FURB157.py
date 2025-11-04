@@ -85,3 +85,9 @@ Decimal("1234_5678")    # Safe fix: preserves non-thousands separators
 Decimal("0001_2345")
 Decimal("000_1_2345")
 Decimal("000_000")
+
+# Test cases for underscores before sign
+# https://github.com/astral-sh/ruff/issues/21186
+Decimal("_-1")      # Should flag as verbose
+Decimal("_+1")      # Should flag as verbose
+Decimal("_-1_000")  # Should flag as verbose

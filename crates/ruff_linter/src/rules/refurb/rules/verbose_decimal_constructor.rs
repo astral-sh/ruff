@@ -93,16 +93,21 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
             // https://github.com/python/cpython/blob/ac556a2ad1213b8bb81372fe6fb762f5fcb076de/Lib/_pydecimal.py#L6060-L6077
             // _after_ trimming whitespace from the string and removing all occurrences of "_".
             let original_str = str_literal.to_str().trim_whitespace();
+            // Strip leading underscores before extracting the sign, as Python's Decimal parser
+            // removes underscores before parsing the sign.
+            let sign_check_str = original_str.trim_start_matches('_');
             // Extract the unary sign, if any.
-            let (unary, original_str) = if let Some(trimmed) = original_str.strip_prefix('+') {
+            let (unary, sign_check_str) = if let Some(trimmed) = sign_check_str.strip_prefix('+') {
                 ("+", trimmed)
-            } else if let Some(trimmed) = original_str.strip_prefix('-') {
+            } else if let Some(trimmed) = sign_check_str.strip_prefix('-') {
                 ("-", trimmed)
             } else {
-                ("", original_str)
+                ("", sign_check_str)
             };
-            let mut rest = Cow::from(original_str);
-            let has_digit_separators = memchr::memchr(b'_', rest.as_bytes()).is_some();
+            // Save the string after the sign for normalization (before removing underscores)
+            let str_after_sign_for_normalization = sign_check_str;
+            let mut rest = Cow::from(sign_check_str);
+            let has_digit_separators = memchr::memchr(b'_', original_str.as_bytes()).is_some();
             if has_digit_separators {
                 rest = Cow::from(rest.replace('_', ""));
             }
@@ -123,7 +128,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
 
             // If the original string had digit separators, normalize them
             let rest = if has_digit_separators {
-                Cow::from(normalize_digit_separators(original_str))
+                Cow::from(normalize_digit_separators(str_after_sign_for_normalization))
             } else {
                 Cow::from(rest)
             };
