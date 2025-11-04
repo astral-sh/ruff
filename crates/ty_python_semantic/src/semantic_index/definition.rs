@@ -368,7 +368,7 @@ pub(crate) struct ImportFromDefinitionNodeRef<'ast> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromImplicitDefinitionNodeRef<'ast> {
     pub(crate) node: &'ast ast::StmtImportFrom,
-    pub(crate) direct_submodule_name: &'ast ast::Identifier,
+    pub(crate) submodule: &'ast ast::Identifier,
 }
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AssignmentDefinitionNodeRef<'ast, 'db> {
@@ -450,10 +450,10 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }),
             DefinitionNodeRef::ImportFromImplicit(ImportFromImplicitDefinitionNodeRef {
                 node,
-                direct_submodule_name,
+                submodule,
             }) => DefinitionKind::ImportFromImplicit(ImportFromImplicitDefinitionKind {
                 node: AstNodeRef::new(parsed, node),
-                direct_submodule_name: direct_submodule_name.as_str().into(),
+                submodule: submodule.as_str().into(),
             }),
             DefinitionNodeRef::ImportStar(star_import) => {
                 let StarImportDefinitionNodeRef { node, symbol_id } = star_import;
@@ -582,7 +582,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }) => (&node.names[alias_index]).into(),
             Self::ImportFromImplicit(ImportFromImplicitDefinitionNodeRef {
                 node,
-                direct_submodule_name: _,
+                submodule: _,
             }) => node.into(),
             // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
             // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
@@ -709,6 +709,7 @@ impl DefinitionKind<'_> {
         match self {
             DefinitionKind::Import(import) => import.is_reexported(),
             DefinitionKind::ImportFrom(import) => import.is_reexported(),
+            DefinitionKind::ImportFromImplicit(_) => false,
             _ => true,
         }
     }
@@ -726,6 +727,7 @@ impl DefinitionKind<'_> {
             DefinitionKind::Import(_)
                 | DefinitionKind::ImportFrom(_)
                 | DefinitionKind::StarImport(_)
+                | DefinitionKind::ImportFromImplicit(_)
         )
     }
 
@@ -1019,7 +1021,7 @@ impl ImportFromDefinitionKind {
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ImportFromImplicitDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
-    direct_submodule_name: Name,
+    submodule: Name,
 }
 
 impl ImportFromImplicitDefinitionKind {
@@ -1027,8 +1029,8 @@ impl ImportFromImplicitDefinitionKind {
         self.node.node(module)
     }
 
-    pub(crate) fn direct_submodule_name(&self) -> &Name {
-        &self.direct_submodule_name
+    pub(crate) fn submodule(&self) -> &Name {
+        &self.submodule
     }
 }
 

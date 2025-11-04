@@ -1204,7 +1204,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DefinitionKind::ImportFromImplicit(import_from) => {
                 self.infer_import_from_implicit_definition(
                     import_from.import(self.module()),
-                    import_from.direct_submodule_name(),
+                    import_from.submodule(),
                     definition,
                 );
             }
@@ -5486,13 +5486,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_import_from_implicit_definition(
         &mut self,
         import_from: &ast::StmtImportFrom,
-        direct_submodule_name: &Name,
+        submodule: &Name,
         definition: Definition<'db>,
     ) {
-        let name = direct_submodule_name
+        let name = submodule
             .split_once('.')
             .map(|(first, _)| first)
-            .unwrap_or(direct_submodule_name.as_str());
+            .unwrap_or(submodule.as_str());
         let Ok(module_name) = ModuleName::from_identifier_parts(self.db(), self.file(), None, 1)
         else {
             self.add_binding(import_from.into(), definition, |_, _| Type::unknown());

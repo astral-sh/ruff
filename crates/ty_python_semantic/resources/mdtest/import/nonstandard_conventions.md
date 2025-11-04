@@ -236,10 +236,11 @@ X: int = 42
 ```py
 import mypackage
 
-reveal_type(mypackage.submodule)  # revealed: <module 'mypackage.submodule'>
-# error: "has no member `nested`"
+# error: "has no member `submodule`"
+reveal_type(mypackage.submodule)  # revealed: Unknown
+# error: "has no member `submodule`"
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
-# error: "has no member `nested`"
+# error: "has no member `submodule`"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
 ```
 
@@ -587,7 +588,8 @@ X: int = 42
 ```py
 import mypackage
 
-reveal_type(mypackage.imported.X)  # revealed: int
+# error: "no member `imported`"
+reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
 ## `from` Import of Non-Submodule (Non-Stub Check)
@@ -695,8 +697,8 @@ import mypackage
 from mypackage import imported
 
 reveal_type(imported.X)  # revealed: int
-# TODO: uhhhh should this work!?
-reveal_type(imported.fails.Y)  # revealed: int
+# error: "has no member `fails`"
+reveal_type(imported.fails.Y)  # revealed: Unknown
 # error: "has no member `fails`"
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
@@ -828,6 +830,115 @@ funcmod(1)
 
 def run():
     funcmod(2)
+```
+
+`mypackage/funcmod.py`:
+
+```py
+def funcmod(x: int) -> int:
+    return x
+```
+
+## Re-export Nameclash Problems In Try-Blocks (Non-Stub Check)
+
+`mypackage/__init__.py`:
+
+```py
+try:
+    from .funcmod import funcmod
+
+    funcmod(1)
+
+    def run():
+        # TODO: this is a bug in how we analyze try-blocks
+        # error: [call-non-callable]
+        funcmod(2)
+
+finally:
+    x = 1
+```
+
+`mypackage/funcmod.py`:
+
+```py
+def funcmod(x: int) -> int:
+    return x
+```
+
+## XXX3 (Non-Stub Check)
+
+`mypackage/__init__.py`:
+
+```py
+def run1():
+    from .funcmod import funcmod
+
+    funcmod(1)
+
+def run2():
+    from .funcmod import funcmod
+
+    funcmod(2)
+
+def run3():
+    # error: [unresolved-reference]
+    funcmod(3)
+
+# error: [unresolved-reference]
+funcmod(4)
+```
+
+`mypackage/funcmod.py`:
+
+```py
+def funcmod(x: int) -> int:
+    return x
+```
+
+## XXX4 (Non-Stub Check)
+
+`mypackage/__init__.py`:
+
+```py
+def run1():
+    from .funcmod import other
+
+    funcmod.funcmod(1)
+
+def run2():
+    from .funcmod import other
+
+    # TODO: this is just a bug! We only register the first
+    # import of `funcmod` in the entire file, and not per-scope!
+    # error: [unresolved-reference]
+    funcmod.funcmod(2)
+
+def run3():
+    # error: [unresolved-reference]
+    funcmod.funcmod(3)
+
+# error: [unresolved-reference]
+funcmod.funcmod(4)
+```
+
+`mypackage/funcmod.py`:
+
+```py
+other: int = 1
+
+def funcmod(x: int) -> int:
+    return x
+```
+
+## XXX2 (Non-Stub Check)
+
+`mypackage/__init__.py`:
+
+```py
+funcmod = 0
+from .funcmod import funcmod
+
+funcmod(1)
 ```
 
 `mypackage/funcmod.py`:
