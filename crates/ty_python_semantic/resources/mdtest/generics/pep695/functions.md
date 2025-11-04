@@ -478,9 +478,7 @@ If the type variables is present multiple times in the union, we choose the corr
 infer against based on the argument type:
 
 ```py
-def h[T](x: list[T] | dict[T, T]) -> T | None:
-    ...
-
+def h[T](x: list[T] | dict[T, T]) -> T | None: ...
 def _(x: list[int], y: dict[int, int]):
     reveal_type(h(x))  # revealed: int | None
     reveal_type(h(y))  # revealed: int | None
