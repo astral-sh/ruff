@@ -6444,9 +6444,9 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Generic],
                     fallback_type: Type::unknown(),
                 }),
-                KnownInstanceType::UnionType(union_type) => {
+                KnownInstanceType::UnionType(list) => {
                     let mut builder = UnionBuilder::new(db);
-                    for element in union_type.elements(db) {
+                    for element in list.elements(db) {
                         builder = builder.add(element.in_type_expression(
                             db,
                             scope_id,
@@ -6455,6 +6455,7 @@ impl<'db> Type<'db> {
                     }
                     Ok(builder.build())
                 }
+                KnownInstanceType::Literal(list) => Ok(list.to_union(db)),
             },
 
             Type::SpecialForm(special_form) => match special_form {
@@ -7668,7 +7669,10 @@ pub enum KnownInstanceType<'db> {
 
     /// A single instance of `types.UnionType`, which stores the left- and
     /// right-hand sides of a PEP 604 union.
-    UnionType(UnionTypeInstance<'db>),
+    UnionType(TypeList<'db>),
+
+    /// A single instance of `typing.Literal`
+    Literal(TypeList<'db>),
 }
 
 fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -7695,9 +7699,9 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
                 visitor.visit_type(db, default_ty);
             }
         }
-        KnownInstanceType::UnionType(union_type) => {
-            for element in union_type.elements(db) {
-                visitor.visit_type(db, element);
+        KnownInstanceType::UnionType(list) | KnownInstanceType::Literal(list) => {
+            for element in list.elements(db) {
+                visitor.visit_type(db, *element);
             }
         }
     }
@@ -7736,7 +7740,8 @@ impl<'db> KnownInstanceType<'db> {
                 // Nothing to normalize
                 Self::ConstraintSet(set)
             }
-            Self::UnionType(union_type) => Self::UnionType(union_type.normalized_impl(db, visitor)),
+            Self::UnionType(list) => Self::UnionType(list.normalized_impl(db, visitor)),
+            Self::Literal(list) => Self::Literal(list.normalized_impl(db, visitor)),
         }
     }
 
@@ -7752,6 +7757,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Field(_) => KnownClass::Field,
             Self::ConstraintSet(_) => KnownClass::ConstraintSet,
             Self::UnionType(_) => KnownClass::UnionType,
+            Self::Literal(_) => KnownClass::GenericAlias,
         }
     }
 
@@ -7826,6 +7832,7 @@ impl<'db> KnownInstanceType<'db> {
                         )
                     }
                     KnownInstanceType::UnionType(_) => f.write_str("types.UnionType"),
+                    KnownInstanceType::Literal(_) => f.write_str("typing.Literal"),
                 }
             }
         }
@@ -8949,31 +8956,45 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
     }
 }
 
-/// An instance of `types.UnionType`.
+/// A salsa-interned list of types.
 ///
 /// # Ordering
 /// Ordering is based on the context's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the context was garbage collected and recreated.
 #[salsa::interned(debug)]
 #[derive(PartialOrd, Ord)]
-pub struct UnionTypeInstance<'db> {
-    left: Type<'db>,
-    right: Type<'db>,
+pub struct TypeList<'db> {
+    #[returns(deref)]
+    elements: Box<[Type<'db>]>,
 }
 
-impl get_size2::GetSize for UnionTypeInstance<'_> {}
+impl get_size2::GetSize for TypeList<'_> {}
 
-impl<'db> UnionTypeInstance<'db> {
-    pub(crate) fn elements(self, db: &'db dyn Db) -> [Type<'db>; 2] {
-        [self.left(db), self.right(db)]
+impl<'db> TypeList<'db> {
+    pub(crate) fn from_elements(
+        db: &'db dyn Db,
+        elements: impl IntoIterator<Item = Type<'db>>,
+    ) -> TypeList<'db> {
+        TypeList::new(db, elements.into_iter().collect::<Box<[_]>>())
+    }
+
+    pub(crate) fn singleton(db: &'db dyn Db, element: Type<'db>) -> TypeList<'db> {
+        TypeList::from_elements(db, [element])
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        UnionTypeInstance::new(
+        TypeList::new(
             db,
-            self.left(db).normalized_impl(db, visitor),
-            self.right(db).normalized_impl(db, visitor),
+            self.elements(db)
+                .iter()
+                .map(|ty| ty.normalized_impl(db, visitor))
+                .collect::<Box<[_]>>(),
         )
+    }
+
+    /// Turn this list of types `[T1, T2, ...]` into a union type `T1 | T2 | ...`.
+    pub(crate) fn to_union(self, db: &'db dyn Db) -> Type<'db> {
+        UnionType::from_elements(db, self.elements(db))
     }
 }
 
