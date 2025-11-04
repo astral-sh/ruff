@@ -6600,6 +6600,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) => Ok(*self),
 
             Type::NominalInstance(instance) => match instance.known_class(db) {
+                Some(KnownClass::NoneType) => Ok(Type::none(db)),
                 Some(KnownClass::TypeVar) => Ok(todo_type!(
                     "Support for `typing.TypeVar` instances in type expressions"
                 )),
