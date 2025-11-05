@@ -4201,7 +4201,6 @@ type <CURSOR>
     fn favour_imported_over_builtin() {
         let snapshot =
             completion_test_builder("from typing import Protocol\nclass Foo(P<CURSOR>: ...")
-                .type_signatures()
                 .filter(|c| c.name.starts_with('P'))
                 .build()
                 .snapshot();
@@ -4209,11 +4208,11 @@ type <CURSOR>
         // Here we favour `Protocol` over the other completions
         // because `Protocol` has been imported, and the other completions are builtin.
         assert_snapshot!(snapshot, @r"
-        Protocol :: typing.Protocol :: Current module
-        PendingDeprecationWarning :: <class 'PendingDeprecationWarning'> :: Current module
-        PermissionError :: <class 'PermissionError'> :: Current module
-        ProcessLookupError :: <class 'ProcessLookupError'> :: Current module
-        PythonFinalizationError :: <class 'PythonFinalizationError'> :: Current module
+        Protocol
+        PendingDeprecationWarning
+        PermissionError
+        ProcessLookupError
+        PythonFinalizationError
         ");
     }
 
