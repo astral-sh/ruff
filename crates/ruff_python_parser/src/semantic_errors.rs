@@ -224,9 +224,6 @@ impl SemanticSyntaxChecker {
                 // nonlocal x
                 // nonlocal x, y
 
-                // test_ok nonlocal_declaration_at_module_level
-                // def _():
-                //     nonlocal x
                 if ctx.in_module_scope() {
                     Self::add_error(
                         ctx,
@@ -237,7 +234,7 @@ impl SemanticSyntaxChecker {
 
                 if !ctx.in_module_scope() {
                     for name in names {
-                        if ctx.nonlocal(name).is_none() {
+                        if !ctx.has_nonlocal_binding(name) {
                             Self::add_error(
                                 ctx,
                                 SemanticSyntaxErrorKind::NonlocalWithoutBinding(name.to_string()),
@@ -2013,7 +2010,7 @@ pub trait SemanticSyntaxContext {
     fn global(&self, name: &str) -> Option<TextRange>;
 
     /// Return the [`TextRange`] at which a name is declared as `nonlocal` in the current scope.
-    fn nonlocal(&self, name: &str) -> Option<TextRange>;
+    fn has_nonlocal_binding(&self, name: &str) -> bool;
 
     /// Returns `true` if the visitor is currently in an async context, i.e. an async function.
     fn in_async_context(&self) -> bool;

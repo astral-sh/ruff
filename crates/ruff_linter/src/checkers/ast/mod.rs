@@ -642,10 +642,8 @@ impl SemanticSyntaxContext for Checker<'_> {
         self.semantic.global(name)
     }
 
-    fn nonlocal(&self, name: &str) -> Option<TextRange> {
-        self.semantic
-            .nonlocal(name)
-            .map(|(_scope_id, binding_id)| self.semantic.binding(binding_id).range)
+    fn has_nonlocal_binding(&self, name: &str) -> bool {
+        self.semantic.nonlocal(name).is_some()
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
