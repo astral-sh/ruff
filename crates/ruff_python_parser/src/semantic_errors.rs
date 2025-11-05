@@ -2012,7 +2012,7 @@ pub trait SemanticSyntaxContext {
     /// Return the [`TextRange`] at which a name is declared as `global` in the current scope.
     fn global(&self, name: &str) -> Option<TextRange>;
 
-    /// Return the [`TextRange`] at which a name is declared as `nonlocal` in the current scope.
+    /// Returns `true` if `name` has a binding in an enclosing scope.
     fn has_nonlocal_binding(&self, name: &str) -> bool;
 
     /// Returns `true` if the visitor is currently in an async context, i.e. an async function.
