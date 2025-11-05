@@ -5486,7 +5486,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Infer the implicit local definition `x = <module 'thispackage.x'>` that
     /// `from .x.y import z` can introduce in an `__init__.py(i)`.
     ///
-    /// For the definition `z`, see [`infer_import_from_definition`].
+    /// For the definition `z`, see [`TypeInferenceBuilder::infer_import_from_definition`].
     fn infer_import_from_implicit_definition(
         &mut self,
         import_from: &ast::StmtImportFrom,
