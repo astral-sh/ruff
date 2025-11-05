@@ -10,8 +10,9 @@ use rustc_hash::FxHashMap;
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::FileRange;
 use ruff_db::system::SystemPathBuf;
-use ty_project::{Db, ProjectDatabase};
+use ty_project::{Db as _, ProjectDatabase};
 
+use crate::Db;
 use crate::document::{FileRangeExt, ToRangeExt};
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;

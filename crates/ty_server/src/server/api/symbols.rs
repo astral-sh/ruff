@@ -3,8 +3,8 @@
 
 use lsp_types::{SymbolInformation, SymbolKind};
 use ty_ide::SymbolInfo;
-use ty_project::Db;
 
+use crate::Db;
 use crate::document::{PositionEncoding, ToRangeExt};
 
 /// Convert `ty_ide` `SymbolKind` to LSP `SymbolKind`

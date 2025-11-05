@@ -8,7 +8,7 @@ use crate::system::AnySystemPath;
 use lsp_types as types;
 use lsp_types::{FileChangeType, notification as notif};
 use rustc_hash::FxHashMap;
-use ty_project::Db;
+use ty_project::Db as _;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 
 pub(crate) struct DidChangeWatchedFiles;

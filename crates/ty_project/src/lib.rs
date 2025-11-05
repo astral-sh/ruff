@@ -124,12 +124,12 @@ pub trait ProgressReporter: Send + Sync {
     fn set_files(&mut self, files: usize);
 
     /// Report the completion of checking a given file along with its diagnostics.
-    fn report_checked_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]);
+    fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]);
 
     /// Reports settings or IO related diagnostics. The diagnostics
     /// can belong to different files or no file at all.
     /// But it's never a file for which [`Self::report_checked_file`] gets called.
-    fn report_diagnostics(&mut self, db: &dyn Db, diagnostics: Vec<Diagnostic>);
+    fn report_diagnostics(&mut self, db: &ProjectDatabase, diagnostics: Vec<Diagnostic>);
 }
 
 /// Reporter that collects all diagnostics into a `Vec`.
@@ -149,7 +149,7 @@ impl CollectReporter {
 
 impl ProgressReporter for CollectReporter {
     fn set_files(&mut self, _files: usize) {}
-    fn report_checked_file(&self, _db: &dyn Db, _file: File, diagnostics: &[Diagnostic]) {
+    fn report_checked_file(&self, _db: &ProjectDatabase, _file: File, diagnostics: &[Diagnostic]) {
         if diagnostics.is_empty() {
             return;
         }
@@ -160,7 +160,7 @@ impl ProgressReporter for CollectReporter {
             .extend(diagnostics.iter().map(Clone::clone));
     }
 
-    fn report_diagnostics(&mut self, _db: &dyn Db, diagnostics: Vec<Diagnostic>) {
+    fn report_diagnostics(&mut self, _db: &ProjectDatabase, diagnostics: Vec<Diagnostic>) {
         self.0.get_mut().unwrap().extend(diagnostics);
     }
 }

@@ -1,9 +1,10 @@
-use crate::PositionEncoding;
-use crate::document::{FileRangeExt, ToRangeExt};
 use lsp_types::Location;
 use ruff_db::files::FileRange;
 use ty_ide::{NavigationTarget, ReferenceTarget};
-use ty_python_semantic::Db;
+
+use crate::Db;
+use crate::PositionEncoding;
+use crate::document::{FileRangeExt, ToRangeExt};
 
 pub(crate) trait ToLink {
     fn to_location(&self, db: &dyn Db, encoding: PositionEncoding) -> Option<Location>;
