@@ -304,7 +304,7 @@ def bounded_by_gradual[T: Any](t: T) -> None:
 
     # revealed: ty_extensions.ConstraintSet[(T@bounded_by_gradual = Never)]
     reveal_type(is_subtype_of(T, Any))
-    static_assert(not is_subtype_of(T, Any))
+    static_assert(is_subtype_of(T, Any))
 
     # revealed: ty_extensions.ConstraintSet[(T@bounded_by_gradual = object)]
     reveal_type(is_subtype_of(Any, T))
@@ -312,7 +312,7 @@ def bounded_by_gradual[T: Any](t: T) -> None:
 
     # revealed: ty_extensions.ConstraintSet[(T@bounded_by_gradual ≤ Super)]
     reveal_type(is_subtype_of(T, Super))
-    static_assert(not is_subtype_of(T, Super))
+    static_assert(is_subtype_of(T, Super))
 
     # revealed: ty_extensions.ConstraintSet[(Super ≤ T@bounded_by_gradual)]
     reveal_type(is_subtype_of(Super, T))
@@ -320,7 +320,7 @@ def bounded_by_gradual[T: Any](t: T) -> None:
 
     # revealed: ty_extensions.ConstraintSet[(T@bounded_by_gradual ≤ Sub)]
     reveal_type(is_subtype_of(T, Sub))
-    static_assert(not is_subtype_of(T, Sub))
+    static_assert(is_subtype_of(T, Sub))
 
     # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@bounded_by_gradual)]
     reveal_type(is_subtype_of(Sub, T))
@@ -583,11 +583,11 @@ def constrained_by_gradual[T: (Base, Any)](t: T) -> None:
 
     # revealed: ty_extensions.ConstraintSet[(T@constrained_by_gradual ≤ Super)]
     reveal_type(is_subtype_of(T, Super))
-    static_assert(not is_subtype_of(T, Super))
+    static_assert(is_subtype_of(T, Super))
 
     # revealed: ty_extensions.ConstraintSet[(T@constrained_by_gradual ≤ Base)]
     reveal_type(is_subtype_of(T, Base))
-    static_assert(not is_subtype_of(T, Base))
+    static_assert(is_subtype_of(T, Base))
 
     # revealed: ty_extensions.ConstraintSet[(T@constrained_by_gradual ≤ Sub)]
     reveal_type(is_subtype_of(T, Sub))
@@ -603,11 +603,11 @@ def constrained_by_gradual[T: (Base, Any)](t: T) -> None:
 
     # revealed: ty_extensions.ConstraintSet[(T@constrained_by_gradual ≤ Super)]
     reveal_type(is_subtype_of(T, Super | Any))
-    static_assert(not is_subtype_of(T, Super | Any))
+    static_assert(is_subtype_of(T, Super | Any))
 
     # revealed: ty_extensions.ConstraintSet[(T@constrained_by_gradual ≤ Super | Unrelated)]
     reveal_type(is_subtype_of(T, Super | Unrelated))
-    static_assert(not is_subtype_of(T, Super | Unrelated))
+    static_assert(is_subtype_of(T, Super | Unrelated))
 
     # revealed: ty_extensions.ConstraintSet[(Super ≤ T@constrained_by_gradual)]
     reveal_type(is_subtype_of(Super, T))
@@ -615,7 +615,7 @@ def constrained_by_gradual[T: (Base, Any)](t: T) -> None:
 
     # revealed: ty_extensions.ConstraintSet[(Base ≤ T@constrained_by_gradual)]
     reveal_type(is_subtype_of(Base, T))
-    static_assert(not is_subtype_of(Base, T))
+    static_assert(is_subtype_of(Base, T))
 
     # revealed: ty_extensions.ConstraintSet[(Unrelated ≤ T@constrained_by_gradual)]
     reveal_type(is_subtype_of(Unrelated, T))
@@ -639,11 +639,11 @@ def constrained_by_gradual[T: (Base, Any)](t: T) -> None:
 
     # revealed: ty_extensions.ConstraintSet[(Base & Unrelated ≤ T@constrained_by_gradual)]
     reveal_type(is_subtype_of(Intersection[Base, Unrelated], T))
-    static_assert(not is_subtype_of(Intersection[Base, Unrelated], T))
+    static_assert(is_subtype_of(Intersection[Base, Unrelated], T))
 
     # revealed: ty_extensions.ConstraintSet[(Base ≤ T@constrained_by_gradual)]
     reveal_type(is_subtype_of(Intersection[Base, Any], T))
-    static_assert(not is_subtype_of(Intersection[Base, Any], T))
+    static_assert(is_subtype_of(Intersection[Base, Any], T))
 ```
 
 Two distinct fully static typevars are not subtypes of each other, even if they have the same
