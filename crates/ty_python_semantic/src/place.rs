@@ -706,23 +706,23 @@ fn place_cycle_initial<'db>(
     Place::bound(Type::divergent(id)).into()
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 fn place_cycle_recover<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
     previous_place: &PlaceAndQualifiers<'db>,
-    place: &PlaceAndQualifiers<'db>,
+    place: PlaceAndQualifiers<'db>,
     _count: u32,
     _scope: ScopeId<'db>,
     _place_id: ScopedPlaceId,
     _requires_explicit_reexport: RequiresExplicitReExport,
     _considered_definitions: ConsideredDefinitions,
-) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
+) -> PlaceAndQualifiers<'db> {
     let div = Type::divergent(id);
-    salsa::CycleRecoveryAction::Fallback(PlaceAndQualifiers {
+    PlaceAndQualifiers {
         place: join_with_previous_cycle_place(db, &previous_place.place, &place.place, div),
         qualifiers: place.qualifiers,
-    })
+    }
 }
 
 #[salsa::tracked(cycle_fn=place_cycle_recover, cycle_initial=place_cycle_initial, heap_size=ruff_memory_usage::heap_size)]

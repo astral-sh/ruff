@@ -86,27 +86,17 @@ fn scope_cycle_recover<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
     previous_inference: &ScopeInference<'db>,
-    inference: &ScopeInference<'db>,
+    mut inference: ScopeInference<'db>,
     _count: u32,
     _scope: ScopeId<'db>,
-) -> salsa::CycleRecoveryAction<ScopeInference<'db>> {
-    let ScopeInference { expressions, extra } = inference;
-    let mut expressions = expressions.clone();
-
+) -> ScopeInference<'db> {
     let div = Type::divergent(id);
-    for (expr, ty) in &mut expressions {
+    for (expr, ty) in &mut inference.expressions {
         let previous_ty = previous_inference.expression_type(*expr);
         *ty = ty.cycle_normalized(db, previous_ty, div);
     }
 
-    let extra = extra.as_ref().map(|extra| {
-        Box::new(ScopeInferenceExtra {
-            cycle_recovery: extra.cycle_recovery,
-            diagnostics: extra.diagnostics.clone(),
-        })
-    });
-
-    salsa::CycleRecoveryAction::Fallback(ScopeInference { expressions, extra })
+    inference
 }
 
 fn scope_cycle_initial<'db>(
@@ -145,10 +135,10 @@ fn definition_cycle_recover<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
     previous_inference: &DefinitionInference<'db>,
-    inference: &DefinitionInference<'db>,
+    inference: DefinitionInference<'db>,
     _count: u32,
     _definition: Definition<'db>,
-) -> salsa::CycleRecoveryAction<DefinitionInference<'db>> {
+) -> DefinitionInference<'db> {
     definition_cycle_recover_inner(db, id, previous_inference, inference)
 }
 
@@ -156,26 +146,14 @@ fn definition_cycle_recover_inner<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
     previous_inference: &DefinitionInference<'db>,
-    inference: &DefinitionInference<'db>,
-) -> salsa::CycleRecoveryAction<DefinitionInference<'db>> {
-    let DefinitionInference {
-        expressions,
-        bindings,
-        declarations,
-        #[cfg(debug_assertions)]
-        scope,
-        extra,
-    } = inference;
-    let mut expressions = expressions.clone();
-    let mut bindings = bindings.clone();
-    let mut declarations = declarations.clone();
-
+    mut inference: DefinitionInference<'db>,
+) -> DefinitionInference<'db> {
     let div = Type::divergent(id);
-    for (expr, ty) in &mut expressions {
+    for (expr, ty) in &mut inference.expressions {
         let previous_ty = previous_inference.expression_type(*expr);
         *ty = ty.cycle_normalized(db, previous_ty, div);
     }
-    for (binding, binding_ty) in &mut bindings {
+    for (binding, binding_ty) in &mut inference.bindings {
         if let Some((_, previous_binding)) = previous_inference
             .bindings
             .iter()
@@ -186,7 +164,7 @@ fn definition_cycle_recover_inner<'db>(
             *binding_ty = binding_ty.recursive_type_normalized(db, div);
         }
     }
-    for (declaration, declaration_ty) in &mut declarations {
+    for (declaration, declaration_ty) in &mut inference.declarations {
         if let Some((_, previous_declaration)) = previous_inference
             .declarations
             .iter()
@@ -201,23 +179,7 @@ fn definition_cycle_recover_inner<'db>(
         }
     }
 
-    let extra = extra.as_ref().map(|extra| {
-        Box::new(DefinitionInferenceExtra {
-            cycle_recovery: extra.cycle_recovery,
-            diagnostics: extra.diagnostics.clone(),
-            deferred: extra.deferred.clone(),
-            undecorated_type: extra.undecorated_type,
-        })
-    });
-
-    salsa::CycleRecoveryAction::Fallback(DefinitionInference {
-        expressions,
-        bindings,
-        declarations,
-        #[cfg(debug_assertions)]
-        scope: *scope,
-        extra,
-    })
+    inference
 }
 
 fn definition_cycle_initial<'db>(
@@ -257,10 +219,10 @@ fn deferred_cycle_recovery<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
     previous_inference: &DefinitionInference<'db>,
-    inference: &DefinitionInference<'db>,
+    inference: DefinitionInference<'db>,
     _count: u32,
     _definition: Definition<'db>,
-) -> salsa::CycleRecoveryAction<DefinitionInference<'db>> {
+) -> DefinitionInference<'db> {
     definition_cycle_recover_inner(db, id, previous_inference, inference)
 }
 
@@ -337,21 +299,13 @@ fn expression_cycle_recover<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
     previous_inference: &ExpressionInference<'db>,
-    inference: &ExpressionInference<'db>,
+    mut inference: ExpressionInference<'db>,
     _count: u32,
     _input: InferExpression<'db>,
-) -> salsa::CycleRecoveryAction<ExpressionInference<'db>> {
-    let ExpressionInference {
-        expressions,
-        #[cfg(debug_assertions)]
-        scope,
-        extra,
-    } = inference;
-
+) -> ExpressionInference<'db> {
     let div = Type::divergent(id);
-    let extra = extra.as_ref().map(|extra| {
-        let mut bindings = extra.bindings.clone();
-        for (binding, binding_ty) in &mut bindings {
+    if let Some(extra) = inference.extra.as_mut() {
+        for (binding, binding_ty) in &mut extra.bindings {
             if let Some((_, previous_binding)) =
                 previous_inference.extra.as_deref().and_then(|extra| {
                     extra
@@ -365,24 +319,14 @@ fn expression_cycle_recover<'db>(
                 *binding_ty = binding_ty.recursive_type_normalized(db, div);
             }
         }
-        Box::new(ExpressionInferenceExtra {
-            cycle_recovery: extra.cycle_recovery,
-            diagnostics: extra.diagnostics.clone(),
-            bindings,
-            all_definitely_bound: extra.all_definitely_bound,
-        })
-    });
-    let mut expressions = expressions.clone();
-    for (expr, ty) in &mut expressions {
+    }
+
+    for (expr, ty) in &mut inference.expressions {
         let previous_ty = previous_inference.expression_type(*expr);
         *ty = ty.cycle_normalized(db, previous_ty, div);
     }
-    salsa::CycleRecoveryAction::Fallback(ExpressionInference {
-        expressions,
-        extra,
-        #[cfg(debug_assertions)]
-        scope: *scope,
-    })
+
+    inference
 }
 
 fn expression_cycle_initial<'db>(
@@ -439,12 +383,12 @@ fn single_expression_cycle_recover<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
     previous_cycle_value: &Type<'db>,
-    result: &Type<'db>,
+    result: Type<'db>,
     _count: u32,
     _input: InferExpression<'db>,
-) -> salsa::CycleRecoveryAction<Type<'db>> {
+) -> Type<'db> {
     let div = Type::divergent(id);
-    salsa::CycleRecoveryAction::Fallback(result.cycle_normalized(db, *previous_cycle_value, div))
+    result.cycle_normalized(db, *previous_cycle_value, div)
 }
 
 fn single_expression_cycle_initial<'db>(
@@ -597,23 +541,17 @@ fn unpack_cycle_recover<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
     previous_cycle_result: &UnpackResult<'db>,
-    result: &UnpackResult<'db>,
+    mut result: UnpackResult<'db>,
     _count: u32,
     _unpack: Unpack<'db>,
-) -> salsa::CycleRecoveryAction<UnpackResult<'db>> {
-    let mut targets = result.targets().clone();
-
+) -> UnpackResult<'db> {
     let div = Type::divergent(id);
-    for (expr, ty) in &mut targets {
+    for (expr, ty) in &mut result.targets {
         let previous_ty = previous_cycle_result.expression_type(*expr);
         *ty = ty.cycle_normalized(db, previous_ty, div);
     }
 
-    salsa::CycleRecoveryAction::Fallback(UnpackResult::new(
-        targets,
-        result.diagnostics().clone(),
-        result.cycle_recovery(),
-    ))
+    result
 }
 
 /// Returns the type of the nearest enclosing class for the given scope.
@@ -758,7 +696,7 @@ pub(crate) struct DefinitionInference<'db> {
     ///
     /// Almost all definition regions have less than 10 bindings. There are very few with more than 10 (but still less than 20).
     /// Because of that, use a slice with linear search over a hash map.
-    bindings: Box<[(Definition<'db>, Type<'db>)]>,
+    pub(crate) bindings: Box<[(Definition<'db>, Type<'db>)]>,
 
     /// The types and type qualifiers of every declaration in this region.
     ///
@@ -866,7 +804,7 @@ impl<'db> DefinitionInference<'db> {
         self.declarations.iter().map(|(_, qualifiers)| *qualifiers)
     }
 
-    fn fallback_type(&self) -> Option<Type<'db>> {
+    pub(crate) fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
     }
 

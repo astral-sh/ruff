@@ -412,23 +412,23 @@ fn member_lookup_cycle_initial<'db>(
     Place::bound(Type::divergent(id)).into()
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 fn member_lookup_cycle_recover<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
     previous_member: &PlaceAndQualifiers<'db>,
-    member: &PlaceAndQualifiers<'db>,
+    member: PlaceAndQualifiers<'db>,
     _count: u32,
     _self_type: Type<'db>,
     _name: Name,
     _policy: MemberLookupPolicy,
-) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
+) -> PlaceAndQualifiers<'db> {
     let div = Type::divergent(id);
     let place = join_with_previous_cycle_place(db, &previous_member.place, &member.place, div);
-    salsa::CycleRecoveryAction::Fallback(PlaceAndQualifiers {
+    PlaceAndQualifiers {
         place,
         qualifiers: member.qualifiers,
-    })
+    }
 }
 
 fn class_lookup_cycle_initial<'db>(
@@ -462,23 +462,23 @@ pub(crate) fn join_with_previous_cycle_place<'db>(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 fn class_lookup_cycle_recover<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
     previous_member: &PlaceAndQualifiers<'db>,
-    member: &PlaceAndQualifiers<'db>,
+    member: PlaceAndQualifiers<'db>,
     _count: u32,
     _self_type: Type<'db>,
     _name: Name,
     _policy: MemberLookupPolicy,
-) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
+) -> PlaceAndQualifiers<'db> {
     let div = Type::divergent(id);
     let place = join_with_previous_cycle_place(db, &previous_member.place, &member.place, div);
-    salsa::CycleRecoveryAction::Fallback(PlaceAndQualifiers {
+    PlaceAndQualifiers {
         place,
         qualifiers: member.qualifiers,
-    })
+    }
 }
 
 fn variance_cycle_initial<'db, T>(
@@ -7677,13 +7677,13 @@ fn apply_specialization_cycle_recover<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
     previous_value: &Type<'db>,
-    value: &Type<'db>,
+    value: Type<'db>,
     _count: u32,
     _self: Type<'db>,
     _specialization: Specialization<'db>,
-) -> salsa::CycleRecoveryAction<Type<'db>> {
+) -> Type<'db> {
     let div = Type::divergent(id);
-    salsa::CycleRecoveryAction::Fallback(value.cycle_normalized(db, *previous_value, div))
+    value.cycle_normalized(db, *previous_value, div)
 }
 
 fn apply_specialization_cycle_initial<'db>(
@@ -8872,17 +8872,16 @@ fn lazy_default_cycle_recover<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
     previous_default: &Option<Type<'db>>,
-    default: &Option<Type<'db>>,
+    default: Option<Type<'db>>,
     _count: u32,
     _typevar: TypeVarInstance<'db>,
-) -> salsa::CycleRecoveryAction<Option<Type<'db>>> {
+) -> Option<Type<'db>> {
     let div = Type::divergent(id);
-    let ty = match (previous_default, default) {
+    match (previous_default, default) {
         (Some(prev), Some(default)) => Some(default.cycle_normalized(db, *prev, div)),
         (None, Some(default)) => Some(default.recursive_type_normalized(db, div)),
         (_, None) => None,
-    };
-    salsa::CycleRecoveryAction::Fallback(ty)
+    }
 }
 
 #[allow(clippy::unnecessary_wraps)]
@@ -12619,7 +12618,6 @@ pub(crate) mod tests {
         let union = UnionType::from_elements(&db, [KnownClass::Object.to_instance(&db), div]);
         assert_eq!(union.display(&db).to_string(), "object");
 
-        let visitor = RecursiveTypeNormalizedVisitor::new(div);
         let recursice = UnionType::from_elements(
             &db,
             [
@@ -12632,12 +12630,12 @@ pub(crate) mod tests {
             nested_rec.display(&db).to_string(),
             "list[list[Divergent] | None]"
         );
-        let normalized = nested_rec.recursive_type_normalized_impl(&db, &visitor);
+        let normalized = nested_rec.recursive_type_normalized(&db, div);
         assert_eq!(normalized.display(&db).to_string(), "list[Divergent]");
 
         let union = UnionType::from_elements(&db, [div, KnownClass::Int.to_instance(&db)]);
         assert_eq!(union.display(&db).to_string(), "Divergent | int");
-        let normalized = union.recursive_type_normalized_impl(&db, &visitor);
+        let normalized = union.recursive_type_normalized(&db, div);
         assert_eq!(normalized.display(&db).to_string(), "int");
 
         // The same can be said about intersections for the `Never` type.

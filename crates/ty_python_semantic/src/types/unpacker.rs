@@ -191,7 +191,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
 #[derive(Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct UnpackResult<'db> {
-    targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    pub(crate) targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
     diagnostics: TypeCheckDiagnostics,
 
     /// The fallback type for missing expressions.
@@ -201,18 +201,6 @@ pub(crate) struct UnpackResult<'db> {
 }
 
 impl<'db> UnpackResult<'db> {
-    pub(crate) fn new(
-        targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
-        diagnostics: TypeCheckDiagnostics,
-        cycle_recovery: Option<Type<'db>>,
-    ) -> Self {
-        Self {
-            targets,
-            diagnostics,
-            cycle_recovery,
-        }
-    }
-
     /// Returns the inferred type for a given sub-expression of the left-hand side target
     /// of an unpacking assignment.
     ///
@@ -238,17 +226,9 @@ impl<'db> UnpackResult<'db> {
             .or(self.cycle_recovery)
     }
 
-    pub(crate) fn targets(&self) -> &FxHashMap<ExpressionNodeKey, Type<'db>> {
-        &self.targets
-    }
-
     /// Returns the diagnostics in this unpacking assignment.
     pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
         &self.diagnostics
-    }
-
-    pub(crate) fn cycle_recovery(&self) -> Option<Type<'db>> {
-        self.cycle_recovery
     }
 
     pub(crate) fn cycle_initial(cycle_recovery: Type<'db>) -> Self {

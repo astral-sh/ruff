@@ -116,26 +116,26 @@ fn implicit_attribute_initial<'db>(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 fn implicit_attribute_cycle_recover<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
     previous_member: &Member<'db>,
-    member: &Member<'db>,
+    member: Member<'db>,
     _count: u32,
     _class_body_scope: ScopeId<'db>,
     _name: String,
     _target_method_decorator: MethodDecorator,
-) -> salsa::CycleRecoveryAction<Member<'db>> {
+) -> Member<'db> {
     let div = Type::divergent(id);
     let place =
         join_with_previous_cycle_place(db, &previous_member.inner.place, &member.inner.place, div);
-    salsa::CycleRecoveryAction::Fallback(Member {
+    Member {
         inner: PlaceAndQualifiers {
             place,
             qualifiers: member.inner.qualifiers,
         },
-    })
+    }
 }
 
 fn try_mro_cycle_initial<'db>(
