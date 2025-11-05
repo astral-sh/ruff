@@ -114,17 +114,15 @@ pub(crate) fn infer_definition_types<'db>(
 fn definition_cycle_recover<'db>(
     db: &'db dyn Db,
     _id: salsa::Id,
-    _last_provisional_value: &DefinitionInference<'db>,
-    _value: &DefinitionInference<'db>,
+    last_provisional_value: &DefinitionInference<'db>,
+    value: DefinitionInference<'db>,
     count: u32,
     definition: Definition<'db>,
-) -> salsa::CycleRecoveryAction<DefinitionInference<'db>> {
-    if count == ITERATIONS_BEFORE_FALLBACK {
-        salsa::CycleRecoveryAction::Fallback(DefinitionInference::cycle_fallback(
-            definition.scope(db),
-        ))
+) -> DefinitionInference<'db> {
+    if &value == last_provisional_value || count != ITERATIONS_BEFORE_FALLBACK {
+        value
     } else {
-        salsa::CycleRecoveryAction::Iterate
+        DefinitionInference::cycle_fallback(definition.scope(db))
     }
 }
 
@@ -230,17 +228,15 @@ pub(crate) fn infer_isolated_expression<'db>(
 fn expression_cycle_recover<'db>(
     db: &'db dyn Db,
     _id: salsa::Id,
-    _last_provisional_value: &ExpressionInference<'db>,
-    _value: &ExpressionInference<'db>,
+    last_provisional_value: &ExpressionInference<'db>,
+    value: ExpressionInference<'db>,
     count: u32,
     input: InferExpression<'db>,
-) -> salsa::CycleRecoveryAction<ExpressionInference<'db>> {
-    if count == ITERATIONS_BEFORE_FALLBACK {
-        salsa::CycleRecoveryAction::Fallback(ExpressionInference::cycle_fallback(
-            input.expression(db).scope(db),
-        ))
+) -> ExpressionInference<'db> {
+    if &value == last_provisional_value || count != ITERATIONS_BEFORE_FALLBACK {
+        value
     } else {
-        salsa::CycleRecoveryAction::Iterate
+        ExpressionInference::cycle_fallback(input.expression(db).scope(db))
     }
 }
 
