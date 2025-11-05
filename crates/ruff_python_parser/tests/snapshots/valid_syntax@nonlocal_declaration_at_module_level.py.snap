@@ -1,0 +1,55 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/nonlocal_declaration_at_module_level.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..24,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 0..23,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("_"),
+                        range: 4..5,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 5..7,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Nonlocal(
+                            StmtNonlocal {
+                                node_index: NodeIndex(None),
+                                range: 13..23,
+                                names: [
+                                    Identifier {
+                                        id: Name("x"),
+                                        range: 22..23,
+                                        node_index: NodeIndex(None),
+                                    },
+                                ],
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

@@ -220,10 +220,13 @@ impl SemanticSyntaxChecker {
                 );
             }
             Stmt::Nonlocal(ast::StmtNonlocal { names, range, .. }) => {
+                // test_ok nonlocal_declaration_at_module_level
+                // def _():
+                //     nonlocal x
+
                 // test_err nonlocal_declaration_at_module_level
                 // nonlocal x
                 // nonlocal x, y
-
                 if ctx.in_module_scope() {
                     Self::add_error(
                         ctx,
