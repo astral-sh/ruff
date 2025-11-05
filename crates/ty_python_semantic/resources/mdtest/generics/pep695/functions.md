@@ -474,7 +474,7 @@ def g(x: str):
     f(prefix=x, suffix=".tar.gz")
 ```
 
-If the type variables is present multiple times in the union, we choose the correct union element to
+If the type variable is present multiple times in the union, we choose the correct union element to
 infer against based on the argument type:
 
 ```py
