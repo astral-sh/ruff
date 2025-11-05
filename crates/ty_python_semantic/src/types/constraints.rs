@@ -871,7 +871,7 @@ impl<'db> Node<'db> {
 
         for typevar in typevars {
             // Determine which valid specializations of this typevar satisfy the constraint set.
-            let valid_specializations = typevar.valid_specializations(db).node;
+            let valid_specializations = typevar.valid_specializations(db, inferable).node;
             let when_satisfied = valid_specializations
                 .satisfies(db, self)
                 .and(db, valid_specializations);
@@ -1984,25 +1984,32 @@ impl<'db> SatisfiedClauses<'db> {
 
 /// Returns a constraint set describing the valid specializations of a typevar.
 impl<'db> BoundTypeVarInstance<'db> {
-    pub(crate) fn valid_specializations(self, db: &'db dyn Db) -> ConstraintSet<'db> {
+    pub(crate) fn valid_specializations(
+        self,
+        db: &'db dyn Db,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> ConstraintSet<'db> {
+        // For upper bounds and constraints, we are free to choose any materialization that makes
+        // the check succeed. In non-inferable positions, it is most helpful to choose a
+        // materialization that is as restrictive as possible, since that minimizes the number of
+        // valid specializations that must satisfy the check. In inferable positions, the opposite
+        // is true: it is most helpful to choose a materialization that is as permissive as
+        // possible, since that maximizes the number of valid specializations that might satisfy
+        // the check.
+        let relation = if self.is_inferable(db, inferable) {
+            TypeRelation::Assignability
+        } else {
+            TypeRelation::Subtyping
+        };
+
         match self.typevar(db).bound_or_constraints(db) {
             None => ConstraintSet::from(true),
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => ConstraintSet::constrain_typevar(
-                db,
-                self,
-                Type::Never,
-                bound,
-                TypeRelation::Assignability,
-            ),
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                ConstraintSet::constrain_typevar(db, self, Type::Never, bound, relation)
+            }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                 constraints.elements(db).iter().when_any(db, |constraint| {
-                    ConstraintSet::constrain_typevar(
-                        db,
-                        self,
-                        *constraint,
-                        *constraint,
-                        TypeRelation::Assignability,
-                    )
+                    ConstraintSet::constrain_typevar(db, self, *constraint, *constraint, relation)
                 })
             }
         }
