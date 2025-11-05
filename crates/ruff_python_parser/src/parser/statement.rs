@@ -934,6 +934,7 @@ impl<'src> Parser<'src> {
                 self.current_token_range(),
             );
         }
+
         // test_ok nonlocal_stmt
         // def _():
         //     nonlocal x
