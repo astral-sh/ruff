@@ -7,11 +7,14 @@ use ty_project::{Db as ProjectDb, ProjectDatabase};
 
 #[salsa::db]
 pub(crate) trait Db: ProjectDb {
+    /// Returns the LSP [`Document`] corresponding to `File` or
+    /// `None` if the file isn't open in the editor.
     fn document(&self, file: File) -> Option<&Document>;
 
+    /// Returns the LSP [`NotebookDocument`] corresponding to `File` or
+    /// `None` if the file isn't open in the editor or if it isn't a notebook.
     fn notebook_document(&self, file: File) -> Option<&NotebookDocument> {
-        let document = self.document(file)?;
-        document.as_notebook()
+        self.document(file)?.as_notebook()
     }
 }
 
