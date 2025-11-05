@@ -104,3 +104,13 @@ FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text()`
 51 |     # the user reads the whole file and that bit they can replace.
    |
 help: Replace with `Path("file.txt").read_text()`
+
+FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text(encoding="utf-8")`
+   --> FURB101.py:130:6
+    |
+129 | # FURB101
+130 | with open("file.txt", encoding="utf-8") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+131 |     contents: str = f.read()
+    |
+help: Replace with `Path("file.txt").read_text(encoding="utf-8")`

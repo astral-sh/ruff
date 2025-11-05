@@ -129,21 +129,43 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
                     return;
                 }
 
-                let target = match self.with_stmt.body.first() {
+                let (target, annotation) = match self.with_stmt.body.first() {
                     Some(Stmt::Assign(assign))
                         if assign.value.range().contains_range(expr.range()) =>
                     {
                         match assign.targets.first() {
-                            Some(Expr::Name(name)) => Some(name.id.as_str()),
-                            _ => None,
+                            Some(Expr::Name(name)) => (Some(name.id.as_str()), None),
+                            _ => (None, None),
                         }
                     }
-                    _ => None,
+                    Some(Stmt::AnnAssign(ann_assign))
+                        if ann_assign
+                            .value
+                            .as_ref()
+                            .is_some_and(|v| v.range().contains_range(expr.range())) =>
+                    {
+                        match ann_assign.target.as_ref() {
+                            Expr::Name(name) => {
+                                let annotation_code = self
+                                    .checker
+                                    .generator()
+                                    .expr(ann_assign.annotation.as_ref());
+                                (Some(name.id.as_str()), Some(annotation_code))
+                            }
+                            _ => (None, None),
+                        }
+                    }
+                    _ => (None, None),
                 };
 
-                if let Some(fix) =
-                    generate_fix(self.checker, &open, target, self.with_stmt, &suggestion)
-                {
+                if let Some(fix) = generate_fix(
+                    self.checker,
+                    &open,
+                    target,
+                    annotation,
+                    self.with_stmt,
+                    &suggestion,
+                ) {
                     diagnostic.set_fix(fix);
                 }
             }
@@ -195,10 +217,16 @@ fn generate_fix(
     checker: &Checker,
     open: &FileOpen,
     target: Option<&str>,
+    annotation: Option<String>,
     with_stmt: &ast::StmtWith,
     suggestion: &str,
 ) -> Option<Fix> {
-    if !(with_stmt.items.len() == 1 && matches!(with_stmt.body.as_slice(), [Stmt::Assign(_)])) {
+    if !(with_stmt.items.len() == 1
+        && matches!(
+            with_stmt.body.as_slice(),
+            [Stmt::Assign(_) | Stmt::AnnAssign(_)]
+        ))
+    {
         return None;
     }
 
@@ -214,9 +242,12 @@ fn generate_fix(
         )
         .ok()?;
 
-    let replacement = match target {
-        Some(var) => format!("{var} = {binding}({filename_code}).{suggestion}"),
-        None => format!("{binding}({filename_code}).{suggestion}"),
+    let replacement = match (target, annotation) {
+        (Some(var), Some(ann)) => {
+            format!("{var}: {ann} = {binding}({filename_code}).{suggestion}")
+        }
+        (Some(var), None) => format!("{var} = {binding}({filename_code}).{suggestion}"),
+        (None, _) => format!("{binding}({filename_code}).{suggestion}"),
     };
 
     let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {

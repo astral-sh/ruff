@@ -125,3 +125,7 @@ with open(*filename, mode="r") as f:
 # `buffering`.
 with open(*filename, file="file.txt", mode="r") as f:
     x = f.read()
+
+# FURB101
+with open("file.txt", encoding="utf-8") as f:
+    contents: str = f.read()
