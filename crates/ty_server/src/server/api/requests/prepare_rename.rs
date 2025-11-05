@@ -2,7 +2,6 @@ use std::borrow::Cow;
 
 use lsp_types::request::PrepareRenameRequest;
 use lsp_types::{PrepareRenameResponse, TextDocumentPositionParams, Url};
-use ruff_db::source::{line_index, source_text};
 use ty_ide::can_rename;
 use ty_project::ProjectDatabase;
 
@@ -41,17 +40,17 @@ impl BackgroundDocumentRequestHandler for PrepareRenameRequestHandler {
             return Ok(None);
         };
 
-        let source = source_text(db, file);
-        let line_index = line_index(db, file);
         let offset = params
             .position
-            .to_text_size(&source, &line_index, snapshot.encoding());
+            .to_text_size(db, file, snapshot.url(), snapshot.encoding());
 
         let Some(range) = can_rename(db, file, offset) else {
             return Ok(None);
         };
 
-        let lsp_range = range.to_lsp_range(&source, &line_index, snapshot.encoding());
+        let lsp_range = range
+            .as_lsp_range(db, file, snapshot.encoding())
+            .to_local_range();
 
         Ok(Some(PrepareRenameResponse::Range(lsp_range)))
     }

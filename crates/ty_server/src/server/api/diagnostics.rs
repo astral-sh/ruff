@@ -9,7 +9,6 @@ use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::FileRange;
-use ruff_db::source::{line_index, source_text};
 use ruff_db::system::SystemPathBuf;
 use ty_project::{Db, ProjectDatabase};
 
@@ -279,11 +278,9 @@ pub(super) fn to_lsp_diagnostic(
 ) -> Diagnostic {
     let range = if let Some(span) = diagnostic.primary_span() {
         let file = span.expect_ty_file();
-        let index = line_index(db, file);
-        let source = source_text(db, file);
 
         span.range()
-            .map(|range| range.to_lsp_range(&source, &index, encoding))
+            .map(|range| range.as_lsp_range(db, file, encoding).to_local_range())
             .unwrap_or_default()
     } else {
         Range::default()
@@ -365,7 +362,7 @@ fn annotation_to_related_information(
 
     let annotation_message = annotation.get_message()?;
     let range = FileRange::try_from(span).ok()?;
-    let location = range.to_location(db, encoding)?;
+    let location = range.as_lsp_range(db, encoding).to_location()?;
 
     Some(DiagnosticRelatedInformation {
         location,
@@ -383,7 +380,7 @@ fn sub_diagnostic_to_related_information(
 
     let span = primary_annotation.get_span();
     let range = FileRange::try_from(span).ok()?;
-    let location = range.to_location(db, encoding)?;
+    let location = range.as_lsp_range(db, encoding).to_location()?;
 
     Some(DiagnosticRelatedInformation {
         location,
