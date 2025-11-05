@@ -1167,7 +1167,7 @@ impl Display for SemanticSyntaxError {
                 write!(f, "alternative patterns bind different names")
             }
             SemanticSyntaxErrorKind::NonlocalWithoutBinding(name) => {
-                write!(f, "Nonlocal name `{name}` found without binding")
+                write!(f, "no binding for nonlocal `{name}` found")
             }
         }
     }
