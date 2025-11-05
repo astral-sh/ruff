@@ -762,6 +762,7 @@ pub(crate) struct CliTest {
     _temp_dir: TempDir,
     _settings_scope: SettingsBindDropGuard,
     project_dir: PathBuf,
+    ty_binary_path: PathBuf,
 }
 
 impl CliTest {
@@ -795,6 +796,7 @@ impl CliTest {
             project_dir,
             _temp_dir: temp_dir,
             _settings_scope: settings_scope,
+            ty_binary_path: get_cargo_bin("ty"),
         })
     }
 
@@ -821,6 +823,19 @@ impl CliTest {
         }
 
         Ok(())
+    }
+
+    /// Return [`Self`] with the ty binary copied to the specified path instead.
+    pub(crate) fn with_ty_at(mut self, dest_path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        let dest_path = dest_path.as_ref();
+        let dest_path = self.project_dir.join(dest_path);
+
+        Self::ensure_parent_directory(&dest_path)?;
+        std::fs::copy(&self.ty_binary_path, &dest_path)
+            .with_context(|| format!("Failed to copy ty binary to `{}`", dest_path.display()))?;
+
+        self.ty_binary_path = dest_path;
+        Ok(self)
     }
 
     fn ensure_parent_directory(path: &Path) -> anyhow::Result<()> {
@@ -868,7 +883,7 @@ impl CliTest {
     }
 
     pub(crate) fn command(&self) -> Command {
-        let mut command = Command::new(get_cargo_bin("ty"));
+        let mut command = Command::new(&self.ty_binary_path);
         command.current_dir(&self.project_dir).arg("check");
 
         // Unset all environment variables because they can affect test behavior.
