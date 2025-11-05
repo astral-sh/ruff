@@ -2712,6 +2712,12 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
         None
     }
 
+    // We handle the one syntax error that relies on this method (`NonlocalWithoutBinding`) directly
+    // in `TypeInferenceBuilder::infer_nonlocal_statement`, so this just returns `true`.
+    fn has_nonlocal_binding(&self, _name: &str) -> bool {
+        true
+    }
+
     fn in_async_context(&self) -> bool {
         for scope_info in self.scope_stack.iter().rev() {
             let scope = &self.scopes[scope_info.file_scope_id];
