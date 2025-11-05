@@ -142,12 +142,12 @@ def bounded[T: Base]():
 ```
 
 If the upper bound is a gradual type, we are free to choose any materialization of the upper bound
-that makes the test succeed. In non-inferable positions, it is most helpful to choose an upper bound
-that is as restrictive as possible, since that minimizes the number of valid specializations that
-must satisfy the constraint set. (That means we will almost always choose `Never` — or more
-precisely, the bottom specialization — as the upper bound.) In inferable positions, the opposite is
-true: it is most helpful to choose an upper bound that is as permissive as possible, since that
-maximizes the number of valid specializations that might satisfy the constraint set.
+that makes the test succeed. In non-inferable positions, it is most helpful to choose the bottom
+materialization as the upper bound. That is the most restrictive possible choice, which minimizes
+the number of valid specializations that must satisfy the constraint set. In inferable positions,
+the opposite is true: it is most helpful to choose the top materialization. That is the most
+permissive possible choice, which maximizes the number of valid specializations that might satisfy
+the constraint set.
 
 ```py
 from typing import Any
@@ -199,8 +199,8 @@ def bounded_by_gradual[T: Any]():
 ```
 
 When the upper bound is a more complex gradual type, we are still free to choose any materialization
-that causes the check to succeed, and we will still choose a restrictive materialization in
-non-inferable position, and a permissive materialization in inferable position. The variance of the
+that causes the check to succeed, and we will still choose the bottom materialization in
+non-inferable position, and the top materialization in inferable position. The variance of the
 typevar does not affect whether there is a materialization we can choose. Below, we test the most
 restrictive variance (i.e., invariance), but we get the same results for other variances as well.
 
@@ -330,12 +330,12 @@ def constrained[T: (Base, Unrelated)]():
 ```
 
 If one of the constraints is a gradual type, we are free to choose any materialization of the
-constraint that makes the test succeed. In non-inferable positions, it is most helpful to choose a
-constraint that is as restrictive as possible, since that minimizes the number of valid
-specializations that must satisfy the constraint set. (That means we will almost always choose
-`Never` — or more precisely, the bottom specialization — as the constraint.) In inferable positions,
-the opposite is true: it is most helpful to choose a constraint that is as permissive as possible,
-since that maximizes the number of valid specializations that might satisfy the constraint set.
+constraint that makes the test succeed. In non-inferable positions, it is most helpful to choose the
+bottom materialization as the constraint. That is the most restrictive possible choice, which
+minimizes the number of valid specializations that must satisfy the constraint set. In inferable
+positions, the opposite is true: it is most helpful to choose the top materialization. That is the
+most permissive possible choice, which maximizes the number of valid specializations that might
+satisfy the constraint set.
 
 ```py
 from typing import Any
@@ -370,8 +370,8 @@ def constrained_by_gradual[T: (Base, Any)]():
 ```
 
 When the constraint is a more complex gradual type, we are still free to choose any materialization
-that causes the check to succeed, and we will still choose a restrictive materialization in
-non-inferable position, and a permissive materialization in inferable position. The variance of the
+that causes the check to succeed, and we will still choose the bottom materialization in
+non-inferable position, and the top materialization in inferable position. The variance of the
 typevar does not affect whether there is a materialization we can choose. Below, we test the most
 restrictive variance (i.e., invariance), but we get the same results for other variances as well.
 
