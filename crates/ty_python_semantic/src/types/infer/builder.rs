@@ -5483,16 +5483,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Infer the implicit local definition `x = <module 'thispackage.x'>` that
+    /// `from .x.y import z` can introduce in an `__init__.py(i)`.
+    ///
+    /// For the definition `z`, see [`infer_import_from_definition`].
     fn infer_import_from_implicit_definition(
         &mut self,
         import_from: &ast::StmtImportFrom,
         submodule: &Name,
         definition: Definition<'db>,
     ) {
-        let name = submodule
-            .split_once('.')
-            .map(|(first, _)| first)
-            .unwrap_or(submodule.as_str());
+        // Although the *actual* runtime semantic of this kind of statement is to
+        // introduce a variable in the global scope of this module, we want to
+        // encourage users to write code that doesn't have dependence on execution-order.
+        //
+        // By introducing it as a local variable in the scope the import occurs in,
+        // we effectively require the developer to either do the import at the start of
+        // the file where it belongs, or to repeat the import in every function that
+        // wants to use it, which "definitely" works.
+        //
+        // (It doesn't actually "definitely" work because only the first import of `thispackage.x`
+        // will ever set `x`, and any subsequent overwrites of it will permanently clobber it.
+        // Also, a local variable `x` in a function should always shadow the submodule because
+        // the submodule is defined at file-scope. However, both of these issues are much more
+        // narrow, so this approach seems to work well in practice!)
+
+        // Get this package's module by resolving `.`
         let Ok(module_name) = ModuleName::from_identifier_parts(self.db(), self.file(), None, 1)
         else {
             self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
@@ -5504,39 +5520,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        // Evaluate whether `X.Y` would constitute a valid submodule name,
-        // given a `from X import Y` statement. If it is valid, this will be `Some()`;
-        // else, it will be `None`.
-
+        // Now construct the submodule `.x`
+        assert!(
+            !submodule.is_empty(),
+            "ImportFromImplicitDefinitionKind constructed with empty module"
+        );
+        let name = submodule
+            .split_once('.')
+            .map(|(first, _)| first)
+            .unwrap_or(submodule.as_str());
         let full_submodule_name = ModuleName::new(name).map(|final_part| {
             let mut ret = module_name.clone();
             ret.extend(&final_part);
             ret
         });
-
-        // If the module doesn't bind the symbol, check if it's a submodule.  This won't get
-        // handled by the `Type::member` call because it relies on the semantic index's
-        // `imported_modules` set.  The semantic index does not include information about
-        // `from...import` statements because there are two things it cannot determine while only
-        // inspecting the content of the current file:
-        //
-        //   - whether the imported symbol is an attribute or submodule
-        //   - whether the containing file is in a module or a package (needed to correctly resolve
-        //     relative imports)
-        //
-        // The first would be solvable by making it a _potentially_ imported modules set.  The
-        // second is not.
-        //
-        // Regardless, for now, we sidestep all of that by repeating the submodule-or-attribute
-        // check here when inferring types for a `from...import` statement.
+        // And try to import it
         if let Some(submodule_type) = full_submodule_name
             .as_ref()
             .and_then(|submodule_name| self.module_type_from_name(submodule_name))
         {
+            // Success, introduce a binding!
+            //
+            // We explicitly don't introduce a *definition* because it's actual ok
+            // (and fairly common) to overwrite this import with a function or class
+            // and we don't want it to be a type error to do so.
             self.add_binding(import_from.into(), definition, |_, _| submodule_type);
             return;
         }
 
+        // That didn't work, try to produce diagnostics
         self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
 
         if !self.is_reachable(import_from) {
