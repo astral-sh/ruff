@@ -2638,11 +2638,11 @@ And it also works for homogeneous tuples:
 def make_homogeneous_tuple(x: T) -> tuple[T, ...]:
     return (x, x)
 
-class E:
-    def f(self, other: "E"):
+class F:
+    def f(self, other: "F"):
         self.x = make_homogeneous_tuple(other.x)
 
-reveal_type(E().x)  # revealed: Unknown | tuple[Divergent, ...]
+reveal_type(F().x)  # revealed: Unknown | tuple[Divergent, ...]
 ```
 
 ## Attributes of standard library modules that aren't yet defined
