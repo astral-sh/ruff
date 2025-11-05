@@ -320,6 +320,11 @@ impl<'db> ConstraintSet<'db> {
         self
     }
 
+    /// Returns a constraint set encoding that this constraint set implies another.
+    pub(crate) fn implies(self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
+        self.negate(db).or(db, other)
+    }
+
     pub(crate) fn iff(self, db: &'db dyn Db, other: Self) -> Self {
         ConstraintSet {
             node: self.node.iff(db, other.node),
@@ -381,11 +386,57 @@ impl<'db> ConstrainedTypeVar<'db> {
     fn new_node(
         db: &'db dyn Db,
         typevar: BoundTypeVarInstance<'db>,
-        lower: Type<'db>,
-        upper: Type<'db>,
+        mut lower: Type<'db>,
+        mut upper: Type<'db>,
     ) -> Node<'db> {
         debug_assert_eq!(lower, lower.bottom_materialization(db));
         debug_assert_eq!(upper, upper.top_materialization(db));
+
+        // Two identical typevars must always solve to the same type, so it is not useful to have
+        // an upper or lower bound that is the typevar being constrained.
+        match lower {
+            Type::TypeVar(lower_bound_typevar)
+                if typevar.is_same_typevar_as(db, lower_bound_typevar) =>
+            {
+                lower = Type::Never;
+            }
+            Type::Intersection(intersection)
+                if intersection.positive(db).iter().any(|element| {
+                    element.as_typevar().is_some_and(|element_bound_typevar| {
+                        typevar.is_same_typevar_as(db, element_bound_typevar)
+                    })
+                }) =>
+            {
+                lower = Type::Never;
+            }
+            Type::Intersection(intersection)
+                if intersection.negative(db).iter().any(|element| {
+                    element.as_typevar().is_some_and(|element_bound_typevar| {
+                        typevar.is_same_typevar_as(db, element_bound_typevar)
+                    })
+                }) =>
+            {
+                return Node::AlwaysFalse;
+            }
+            _ => {}
+        }
+        match upper {
+            Type::TypeVar(upper_bound_typevar)
+                if typevar.is_same_typevar_as(db, upper_bound_typevar) =>
+            {
+                upper = Type::object();
+            }
+            Type::Union(union)
+                if union.elements(db).iter().any(|element| {
+                    element.as_typevar().is_some_and(|element_bound_typevar| {
+                        typevar.is_same_typevar_as(db, element_bound_typevar)
+                    })
+                }) =>
+            {
+                upper = Type::object();
+            }
+            _ => {}
+        }
 
         // If `lower ≰ upper`, then the constraint cannot be satisfied, since there is no type that
         // is both greater than `lower`, and less than `upper`.
