@@ -1397,11 +1397,13 @@ impl<'db> SpecializationBuilder<'db> {
             return Ok(());
         }
 
-        // Remove the union elements that are not related to `formal`.
+        // Remove the union elements from `actual` that are not related to `formal`, and vice
+        // versa.
         //
         // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to specialize `T`
-        // to `int`.
+        // to `int`, and so ignore the `None`.
         let actual = actual.filter_disjoint_elements(self.db, formal, self.inferable);
+        let formal = formal.filter_disjoint_elements(self.db, actual, self.inferable);
 
         match (formal, actual) {
             // TODO: We haven't implemented a full unification solver yet. If typevars appear in
