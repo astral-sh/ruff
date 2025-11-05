@@ -883,9 +883,10 @@ fn is_in_definition_place(db: &dyn Db, tokens: &[Token], file: File) -> bool {
 /// This has the effect of putting all dunder attributes after "normal"
 /// attributes, and all single-underscore attributes after dunder attributes.
 fn compare_suggestions(c1: &Completion, c2: &Completion) -> Ordering {
-    fn key<'a>(completion: &'a Completion) -> (bool, NameKind, bool, &'a Name) {
+    fn key<'a>(completion: &'a Completion) -> (bool, bool, NameKind, bool, &'a Name) {
         (
             completion.module_name.is_some(),
+            completion.builtin,
             NameKind::classify(&completion.name),
             completion.is_type_check_only,
             &completion.name,
@@ -4193,6 +4194,26 @@ type <CURSOR>
         assert_snapshot!(snapshot, @r"
         long_nameb :: Literal[1] :: Current module
         long_namea :: Unavailable :: foo
+        ");
+    }
+
+    #[test]
+    fn favour_imported_over_builtin() {
+        let snapshot =
+            completion_test_builder("from typing import Protocol\nclass Foo(P<CURSOR>: ...")
+                .type_signatures()
+                .filter(|c| c.name.starts_with('P'))
+                .build()
+                .snapshot();
+
+        // Here we favour `Protocol` over the other completions
+        // because `Protocol` has been imported, and the other completions are builtin.
+        assert_snapshot!(snapshot, @r"
+        Protocol :: typing.Protocol :: Current module
+        PendingDeprecationWarning :: <class 'PendingDeprecationWarning'> :: Current module
+        PermissionError :: <class 'PermissionError'> :: Current module
+        ProcessLookupError :: <class 'ProcessLookupError'> :: Current module
+        PythonFinalizationError :: <class 'PythonFinalizationError'> :: Current module
         ");
     }
 
