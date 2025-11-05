@@ -10298,7 +10298,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if Some(self.scope()) == builtins_module_scope(db) {
                     Place::Undefined.into()
                 } else {
-                    builtins_symbol(db, symbol_name)
+                    let possible_fallback = builtins_symbol(db, symbol_name);
+                    let Some(fallback_type) = possible_fallback.ignore_possibly_undefined() else {
+                        return possible_fallback;
+                    };
+                    // Exclude `TypeVar`/`ParamSpec`/`TypeVarTuple` definitions from the
+                    // builtin-scope fallback. These don't exist at runtime. And pragmatically,
+                    // unlike e.g. typeshed's protocols/typeddicts/type aliases, it's never
+                    // actually useful to reuse one of typeshed's typevarlike definitions from
+                    // `builtins.pyi`, even in an `if TYPE_CHECKING` block.
+                    match fallback_type {
+                        Type::NominalInstance(instance)
+                            if matches!(
+                                instance.known_class(db),
+                                Some(
+                                    KnownClass::TypeVar
+                                        | KnownClass::ParamSpec
+                                        | KnownClass::TypeVarTuple
+                                )
+                            ) =>
+                        {
+                            Place::Undefined.into()
+                        }
+                        Type::KnownInstance(KnownInstanceType::TypeVar(_)) => {
+                            Place::Undefined.into()
+                        }
+                        _ => possible_fallback,
+                    }
                 }
             })
             // Still not found? It might be `reveal_type`...
