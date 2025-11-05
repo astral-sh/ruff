@@ -6193,9 +6193,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let _ = builder.infer(return_ty, declared_return_ty);
                     let specialization = builder.build(generic_context, call_expression_tcx);
 
-                    // Note that we are not necessarily "preferring the declared type" here, as the
-                    // type context will only be preferred during the inference of this expression
-                    // by the same heuristics we use for the inference of the outer generic call.
                     parameter_type = parameter_type.apply_specialization(db, specialization);
                 }
 
