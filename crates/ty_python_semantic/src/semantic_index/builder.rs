@@ -2698,7 +2698,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 
     // We handle the one syntax error that relies on this method (`NonlocalWithoutBinding`) directly
-    // in `infer_nonlocal_statement`, so this just returns `true`.
+    // in `TypeInferenceBuilder::infer_nonlocal_statement`, so this just returns `true`.
     fn has_nonlocal_binding(&self, _name: &str) -> bool {
         true
     }
