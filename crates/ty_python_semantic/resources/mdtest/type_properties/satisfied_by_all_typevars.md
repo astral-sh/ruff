@@ -368,3 +368,56 @@ def constrained_by_gradual[T: (Base, Any)]():
     # specializations, both of which satisfy (T ≤ Base).
     static_assert(ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars())
 ```
+
+When the constraint is a more complex gradual type, we are still free to choose any materialization
+that causes the check to succeed, and we will still choose a restrictive materialization in
+non-inferable position, and a permissive materialization in inferable position. The variance of the
+typevar does not affect whether there is a materialization we can choose. Below, we test the most
+restrictive variance (i.e., invariance), but we get the same results for other variances as well.
+
+```py
+def constrained_by_gradual[T: (list[Base], list[Any])]():
+    static_assert(ConstraintSet.always().satisfied_by_all_typevars(inferable=tuple[T]))
+    static_assert(ConstraintSet.always().satisfied_by_all_typevars())
+
+    static_assert(not ConstraintSet.never().satisfied_by_all_typevars(inferable=tuple[T]))
+    static_assert(not ConstraintSet.never().satisfied_by_all_typevars())
+
+    # If we choose Super as the materialization, then (T = list[Super]) is a valid specialization,
+    # which satisfies (T ≤ list[Super]).
+    static_assert(ConstraintSet.range(Never, T, list[Super]).satisfied_by_all_typevars(inferable=tuple[T]))
+    # No matter which materialization we choose, (T = list[Base]) is a valid specialization, which
+    # does not satisfy (T ≤ list[Super]).
+    static_assert(not ConstraintSet.range(Never, T, list[Super]).satisfied_by_all_typevars())
+
+    # If we choose Base as the materialization, then (T = list[Base]) is a valid specialization,
+    # which satisfies (T ≤ list[Base]).
+    static_assert(ConstraintSet.range(Never, T, list[Base]).satisfied_by_all_typevars(inferable=tuple[T]))
+    # If we choose Base as the materialization, then all valid specializations must satisfy
+    # (T ≤ list[Base]).
+    static_assert(ConstraintSet.range(Never, T, list[Base]).satisfied_by_all_typevars())
+
+    # If we choose Sub as the materialization, then (T = list[Sub]) is a valid specialization, which
+    # satisfies (T ≤ list[Sub]).
+    static_assert(ConstraintSet.range(Never, T, list[Sub]).satisfied_by_all_typevars(inferable=tuple[T]))
+    # No matter which materialization we choose, (T = list[Base]) is a valid specialization, which
+    # does not satisfy (T ≤ list[Sub]).
+    static_assert(not ConstraintSet.range(Never, T, list[Sub]).satisfied_by_all_typevars())
+
+    # If we choose Unrelated as the materialization, then (T = list[Unrelated]) is a valid
+    # specialization, which satisfies (T ≤ list[Unrelated]).
+    constraints = ConstraintSet.range(Never, T, list[Unrelated])
+    static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[T]))
+    # No matter which materialization we choose, (T = list[Base]) is a valid specialization, which
+    # does not satisfy (T ≤ list[Unrelated]).
+    static_assert(not constraints.satisfied_by_all_typevars())
+
+    # If we choose Unrelated as the materialization, then (T = list[Unrelated]) is a valid
+    # specialization, which satisfies (T ≤ list[Unrelated] ∧ T ≠ Never).
+    constraints = constraints & ~ConstraintSet.range(Never, T, Never)
+    static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[T]))
+    # There is no constraint that we can choose to satisfy this constraint set in non-inferable
+    # position. (T = Never) will be a valid assignment no matter what, and that does not satisfy
+    # (T ≤ list[Unrelated] ∧ T ≠ Never).
+    static_assert(not constraints.satisfied_by_all_typevars())
+```
