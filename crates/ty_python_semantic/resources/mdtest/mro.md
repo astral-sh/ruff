@@ -291,6 +291,20 @@ class Foo(x): ...
 reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 ```
 
+## `UnionType` instances are now allowed as a base
+
+This is not legal:
+
+```py
+class A: ...
+class B: ...
+
+EitherOr = A | B
+
+# error: [invalid-base] "Invalid class base with type `types.UnionType`"
+class Foo(EitherOr): ...
+```
+
 ## `__bases__` is a union of a dynamic type and valid bases
 
 If a dynamic type such as `Any` or `Unknown` is one of the elements in the union, and all other

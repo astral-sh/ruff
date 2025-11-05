@@ -437,6 +437,8 @@ jobs:
           workspaces: "fuzz -> target"
       - name: "Install Rust toolchain"
         run: rustup show
+      - name: "Install mold"
+        uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
       - name: "Install cargo-binstall"
         uses: cargo-bins/cargo-binstall@b3f755e95653da9a2d25b99154edfdbd5b356d0a # v1.15.10
       - name: "Install cargo-fuzz"
@@ -645,7 +647,6 @@ jobs:
     name: "Fuzz for new ty panics"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
     needs:
-      - cargo-test-linux
       - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && (needs.determine_changes.outputs.ty == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true') }}
@@ -653,28 +654,29 @@ jobs:
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
+          fetch-depth: 0
           persist-credentials: false
-      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-        name: Download new ty binary
-        id: ty-new
-        with:
-          name: ty
-          path: target/debug
-      - uses: dawidd6/action-download-artifact@20319c5641d495c8a52e688b7dc5fada6c3a9fbc # v8
-        name: Download baseline ty binary
-        with:
-          name: ty
-          branch: ${{ github.event.pull_request.base.ref }}
-          workflow: "ci.yaml"
-          check_artifacts: true
       - uses: astral-sh/setup-uv@85856786d1ce8acfbcc2f13a5f3fbd6b938f9f41 # v7.1.2
+      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: "Install mold"
+        uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
       - name: Fuzz
         env:
           FORCE_COLOR: 1
-          NEW_TY: ${{ steps.ty-new.outputs.download-path }}
         run: |
-          # Make executable, since artifact download doesn't preserve this
-          chmod +x "${PWD}/ty" "${NEW_TY}/ty"
+          echo "new commit"
+          git rev-list --format=%s --max-count=1 "$GITHUB_SHA"
+          cargo build --profile=profiling --bin=ty
+          mv target/profiling/ty ty-new
+
+          MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
+          git checkout -b old_commit "$MERGE_BASE"
+          echo "old commit (merge base)"
+          git rev-list --format=%s --max-count=1 old_commit
+          cargo build --profile=profiling --bin=ty
+          mv target/profiling/ty ty-old
 
           (
             uv run \
@@ -682,8 +684,8 @@ jobs:
             --project=./python/py-fuzzer \
             --locked \
             fuzz \
-            --test-executable="${NEW_TY}/ty" \
-            --baseline-executable="${PWD}/ty" \
+            --test-executable=ty-new \
+            --baseline-executable=ty-old \
             --only-new-bugs \
             --bin=ty \
             0-1000
@@ -715,6 +717,8 @@ jobs:
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
       - name: "Install Rust toolchain"
         run: rustup show
+      - name: "Install mold"
+        uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
       - name: "Run ty completion evaluation"
         run: cargo run --release --package ty_completion_eval -- all --threshold 0.4 --tasks /tmp/completion-evaluation-tasks.csv
       - name: "Ensure there are no changes"
@@ -949,7 +953,7 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build --features "codspeed,instrumented" --no-default-features -p ruff_benchmark --bench formatter --bench lexer --bench linter --bench parser
+        run: cargo codspeed build --features "codspeed,instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench formatter --bench lexer --bench linter --bench parser
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@6b43a0cd438f6ca5ad26f9ed03ed159ed2df7da9 # v4.1.1
@@ -987,7 +991,7 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build --features "codspeed,instrumented" --no-default-features -p ruff_benchmark --bench ty
+        run: cargo codspeed build --features "codspeed,instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench ty
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@6b43a0cd438f6ca5ad26f9ed03ed159ed2df7da9 # v4.1.1
@@ -1025,7 +1029,7 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build --features "codspeed,walltime" --no-default-features -p ruff_benchmark
+        run: cargo codspeed build --features "codspeed,walltime" --profile profiling --no-default-features -p ruff_benchmark
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@6b43a0cd438f6ca5ad26f9ed03ed159ed2df7da9 # v4.1.1

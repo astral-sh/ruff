@@ -8,7 +8,7 @@ use ruff_text_size::Ranged;
 use super::class::{ClassType, CodeGeneratorKind, Field};
 use super::context::InferContext;
 use super::diagnostic::{
-    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, report_invalid_key_on_typed_dict,
+    self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, report_invalid_key_on_typed_dict,
     report_missing_typed_dict_key,
 };
 use super::{ApplyTypeMappingVisitor, Type, TypeMapping, visitor};
@@ -213,9 +213,13 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
         return true;
     }
 
+    let value_node = value_node.into();
+    if diagnostic::is_invalid_typed_dict_literal(context.db(), item.declared_ty, value_node) {
+        return false;
+    }
+
     // Invalid assignment - emit diagnostic
-    if let Some(builder) = context.report_lint(assignment_kind.diagnostic_type(), value_node.into())
-    {
+    if let Some(builder) = context.report_lint(assignment_kind.diagnostic_type(), value_node) {
         let typed_dict_ty = Type::TypedDict(typed_dict);
         let typed_dict_d = typed_dict_ty.display(db);
         let value_d = value_ty.display(db);

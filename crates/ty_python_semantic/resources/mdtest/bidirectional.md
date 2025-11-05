@@ -76,6 +76,7 @@ def _() -> TD:
 
 def _() -> TD:
     # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
+    # error: [invalid-return-type]
     return {}
 ```
 

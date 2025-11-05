@@ -103,11 +103,17 @@ function Content({
   }
 }
 
+const SANDBOX_BASE_DIRECTORY = "/playground/";
+
 function Run({ files, theme }: { files: ReadonlyFiles; theme: Theme }) {
   const [runOutput, setRunOutput] = useState<Promise<string> | null>(null);
   const handleRun = () => {
     const output = (async () => {
-      const pyodide = await loadPyodide();
+      const pyodide = await loadPyodide({
+        env: {
+          HOME: SANDBOX_BASE_DIRECTORY,
+        },
+      });
 
       let combined_output = "";
 
@@ -122,7 +128,17 @@ function Run({ files, theme }: { files: ReadonlyFiles; theme: Theme }) {
 
       let fileName = "main.py";
       for (const file of files.index) {
-        pyodide.FS.writeFile(file.name, files.contents[file.id]);
+        const last_separator = file.name.lastIndexOf("/");
+
+        if (last_separator !== -1) {
+          const directory =
+            SANDBOX_BASE_DIRECTORY + file.name.slice(0, last_separator);
+          pyodide.FS.mkdirTree(directory);
+        }
+        pyodide.FS.writeFile(
+          SANDBOX_BASE_DIRECTORY + file.name,
+          files.contents[file.id],
+        );
 
         if (file.id === files.selected) {
           fileName = file.name;
@@ -133,7 +149,7 @@ function Run({ files, theme }: { files: ReadonlyFiles; theme: Theme }) {
       const globals = dict();
 
       try {
-        // Patch up reveal types
+        // Patch `reveal_type` to print runtime values
         pyodide.runPython(`
         import builtins
 

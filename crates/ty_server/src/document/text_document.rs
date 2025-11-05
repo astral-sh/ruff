@@ -3,7 +3,7 @@ use ruff_source_file::LineIndex;
 
 use crate::PositionEncoding;
 
-use super::RangeExt;
+use super::range::lsp_range_to_text_range;
 
 pub(crate) type DocumentVersion = i32;
 
@@ -114,7 +114,7 @@ impl TextDocument {
         } in changes
         {
             if let Some(range) = range {
-                let range = range.to_text_range(&new_contents, &active_index, encoding);
+                let range = lsp_range_to_text_range(range, &new_contents, &active_index, encoding);
 
                 new_contents.replace_range(
                     usize::from(range.start())..usize::from(range.end()),

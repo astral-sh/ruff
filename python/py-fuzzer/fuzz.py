@@ -395,13 +395,14 @@ def parse_args() -> ResolvedCliArgs:
 
     if not args.test_executable:
         print(
-            "Running `cargo build --release` since no test executable was specified...",
+            "Running `cargo build --profile=profiling` since no test executable was specified...",
             flush=True,
         )
         cmd: list[str] = [
             "cargo",
             "build",
-            "--release",
+            "--profile",
+            "profiling",
             "--locked",
             "--color",
             "always",

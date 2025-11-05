@@ -9,7 +9,7 @@ use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
 use std::fmt::Write;
 use std::str::FromStr;
-use ty_project::Db;
+use ty_project::Db as _;
 
 pub(crate) struct ExecuteCommand;
 

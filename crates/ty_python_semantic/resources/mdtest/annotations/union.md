@@ -72,9 +72,6 @@ def f(x: Union) -> None:
 
 ## Implicit type aliases using new-style unions
 
-We don't recognize these as type aliases yet, but we also don't emit false-positive diagnostics if
-you use them in type expressions:
-
 ```toml
 [environment]
 python-version = "3.10"
@@ -84,5 +81,5 @@ python-version = "3.10"
 X = int | str
 
 def f(y: X):
-    reveal_type(y)  # revealed: @Todo(Support for `types.UnionType` instances in type expressions)
+    reveal_type(y)  # revealed: int | str
 ```
