@@ -168,15 +168,11 @@ pub struct ConstraintSet<'db> {
 
 impl<'db> ConstraintSet<'db> {
     fn never() -> Self {
-        Self {
-            node: Node::AlwaysFalse,
-        }
+        Node::AlwaysFalse.into()
     }
 
     fn always() -> Self {
-        Self {
-            node: Node::AlwaysTrue,
-        }
+        Node::AlwaysTrue.into()
     }
 
     /// Returns a constraint set that constraints a typevar to a particular range of types.
@@ -200,9 +196,7 @@ impl<'db> ConstraintSet<'db> {
             ),
         };
 
-        Self {
-            node: ConstrainedTypeVar::new_node(db, typevar, lower, upper),
-        }
+        ConstrainedTypeVar::new_node(db, typevar, lower, upper).into()
     }
 
     /// Returns whether this constraint set never holds
@@ -318,9 +312,7 @@ impl<'db> ConstraintSet<'db> {
         lhs: Type<'db>,
         rhs: Type<'db>,
     ) -> Self {
-        Self {
-            node: self.node.implies_subtype_of(db, lhs, rhs),
-        }
+        self.node.implies_subtype_of(db, lhs, rhs).into()
     }
 
     /// Returns whether this constraint set is satisfied by all of the typevars that it mentions.
@@ -359,9 +351,7 @@ impl<'db> ConstraintSet<'db> {
 
     /// Returns the negation of this constraint set.
     pub(crate) fn negate(self, db: &'db dyn Db) -> Self {
-        Self {
-            node: self.node.negate(db),
-        }
+        self.node.negate(db).into()
     }
 
     /// Returns the intersection of this constraint set and another. The other constraint set is
@@ -390,9 +380,7 @@ impl<'db> ConstraintSet<'db> {
     }
 
     pub(crate) fn iff(self, db: &'db dyn Db, other: Self) -> Self {
-        ConstraintSet {
-            node: self.node.iff(db, other.node),
-        }
+        self.node.iff(db, other.node).into()
     }
 
     /// Reduces the set of inferable typevars for this constraint set. You provide an iterator of
@@ -426,6 +414,12 @@ impl<'db> ConstraintSet<'db> {
 impl From<bool> for ConstraintSet<'_> {
     fn from(b: bool) -> Self {
         if b { Self::always() } else { Self::never() }
+    }
+}
+
+impl<'db> From<Node<'db>> for ConstraintSet<'db> {
+    fn from(node: Node<'db>) -> Self {
+        Self { node }
     }
 }
 
