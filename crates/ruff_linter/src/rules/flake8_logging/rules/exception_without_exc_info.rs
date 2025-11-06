@@ -31,6 +31,7 @@ use crate::checkers::ast::Checker;
 /// logging.error("...")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct ExceptionWithoutExcInfo;
 
 impl Violation for ExceptionWithoutExcInfo {

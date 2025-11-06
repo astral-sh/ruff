@@ -424,7 +424,7 @@ from dataclasses import dataclass
 class MyFrozenClass: ...
 
 frozen = MyFrozenClass()
-frozen.x = 2  # error: [invalid-assignment] "Can not assign to unresolved attribute `x` on type `MyFrozenClass`"
+frozen.x = 2  # error: [invalid-assignment] "Cannot assign to unresolved attribute `x` on type `MyFrozenClass`"
 ```
 
 A diagnostic is also emitted if a frozen dataclass is inherited, and an attempt is made to mutate an
@@ -838,6 +838,40 @@ class WrappedIntAndExtraData[T](Wrap[int]):
 reveal_type(WrappedIntAndExtraData[bytes].__init__)
 ```
 
+### Non-dataclass inheriting from generic dataclass
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/1427>.
+
+When a non-dataclass inherits from a generic dataclass, the generic type parameters should still be
+properly inferred when calling the inherited `__init__` method.
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class ParentDataclass[T]:
+    value: T
+
+# Non-dataclass inheriting from generic dataclass
+class ChildOfParentDataclass[T](ParentDataclass[T]): ...
+
+def uses_dataclass[T](x: T) -> ChildOfParentDataclass[T]:
+    return ChildOfParentDataclass(x)
+
+# TODO: ParentDataclass.__init__ should show generic types, not Unknown
+# revealed: (self: ParentDataclass[Unknown], value: Unknown) -> None
+reveal_type(ParentDataclass.__init__)
+
+# revealed: (self: ParentDataclass[T@ChildOfParentDataclass], value: T@ChildOfParentDataclass) -> None
+reveal_type(ChildOfParentDataclass.__init__)
+
+result_int = uses_dataclass(42)
+reveal_type(result_int)  # revealed: ChildOfParentDataclass[Literal[42]]
+
+result_str = uses_dataclass("hello")
+reveal_type(result_str)  # revealed: ChildOfParentDataclass[Literal["hello"]]
+```
+
 ## Descriptor-typed fields
 
 ### Same type in `__get__` and `__set__`
@@ -1173,6 +1207,7 @@ and attributes like the MRO are unchanged:
 
 ```py
 from dataclasses import dataclass
+from ty_extensions import reveal_mro
 
 @dataclass
 class Person:
@@ -1180,7 +1215,8 @@ class Person:
     age: int | None = None
 
 reveal_type(type(Person))  # revealed: <class 'type'>
-reveal_type(Person.__mro__)  # revealed: tuple[<class 'Person'>, <class 'object'>]
+reveal_type(Person.__mro__)  # revealed: tuple[type, ...]
+reveal_mro(Person)  # revealed: (<class 'Person'>, <class 'object'>)
 ```
 
 The generated methods have the following signatures:

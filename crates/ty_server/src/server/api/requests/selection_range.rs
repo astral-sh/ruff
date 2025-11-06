@@ -2,7 +2,6 @@ use std::borrow::Cow;
 
 use lsp_types::request::SelectionRangeRequest;
 use lsp_types::{SelectionRange as LspSelectionRange, SelectionRangeParams, Url};
-use ruff_db::source::{line_index, source_text};
 use ty_ide::selection_range;
 use ty_project::ProjectDatabase;
 
@@ -37,17 +36,14 @@ impl BackgroundDocumentRequestHandler for SelectionRangeRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.file(db) else {
+        let Some(file) = snapshot.to_file(db) else {
             return Ok(None);
         };
-
-        let source = source_text(db, file);
-        let line_index = line_index(db, file);
 
         let mut results = Vec::new();
 
         for position in params.positions {
-            let offset = position.to_text_size(&source, &line_index, snapshot.encoding());
+            let offset = position.to_text_size(db, file, snapshot.url(), snapshot.encoding());
 
             let ranges = selection_range(db, file, offset);
             if !ranges.is_empty() {
@@ -55,7 +51,9 @@ impl BackgroundDocumentRequestHandler for SelectionRangeRequestHandler {
                 let mut lsp_range = None;
                 for &range in &ranges {
                     lsp_range = Some(LspSelectionRange {
-                        range: range.to_lsp_range(&source, &line_index, snapshot.encoding()),
+                        range: range
+                            .as_lsp_range(db, file, snapshot.encoding())
+                            .to_local_range(),
                         parent: lsp_range.map(Box::new),
                     });
                 }

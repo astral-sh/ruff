@@ -30,20 +30,11 @@ use rustc_hash::FxHashMap;
 
 use crate::{Db, module_name::ModuleName, resolve_module};
 
-fn exports_cycle_recover(
-    _db: &dyn Db,
-    _value: &[Name],
-    _count: u32,
-    _file: File,
-) -> salsa::CycleRecoveryAction<Box<[Name]>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn exports_cycle_initial(_db: &dyn Db, _file: File) -> Box<[Name]> {
+fn exports_cycle_initial(_db: &dyn Db, _id: salsa::Id, _file: File) -> Box<[Name]> {
     Box::default()
 }
 
-#[salsa::tracked(returns(deref), cycle_fn=exports_cycle_recover, cycle_initial=exports_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(deref), cycle_initial=exports_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(super) fn exported_names(db: &dyn Db, file: File) -> Box<[Name]> {
     let module = parsed_module(db, file).load(db);
     let mut finder = ExportFinder::new(db, file);

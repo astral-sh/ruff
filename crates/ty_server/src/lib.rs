@@ -4,13 +4,15 @@ use anyhow::Context;
 use lsp_server::Connection;
 use ruff_db::system::{OsSystem, SystemPathBuf};
 
+use crate::db::Db;
 pub use crate::logging::{LogLevel, init_logging};
 pub use crate::server::{PartialWorkspaceProgress, PartialWorkspaceProgressParams, Server};
 pub use crate::session::{ClientOptions, DiagnosticMode};
 pub use document::{NotebookDocument, PositionEncoding, TextDocument};
-pub(crate) use session::{DocumentQuery, Session};
+pub(crate) use session::Session;
 
 mod capabilities;
+mod db;
 mod document;
 mod logging;
 mod server;

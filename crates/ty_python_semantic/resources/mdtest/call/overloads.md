@@ -1685,8 +1685,7 @@ def int_or_str() -> int | str:
 x = f([{"x": 1}], int_or_str())
 reveal_type(x)  # revealed: int | str
 
-# TODO: error: [no-matching-overload] "No overload of function `f` matches arguments"
-# we currently incorrectly consider `list[dict[str, int]]` a subtype of `list[T]`
+# error: [no-matching-overload] "No overload of function `f` matches arguments"
 f([{"y": 1}], int_or_str())
 ```
 

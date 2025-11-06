@@ -60,6 +60,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `decimal`](https://docs.python.org/3/library/decimal.html)
 /// - [Python documentation: `fractions`](https://docs.python.org/3/library/fractions.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.3.5")]
 pub(crate) struct UnnecessaryFromFloat {
     method_name: MethodName,
     constructor: Constructor,
@@ -148,10 +149,9 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
 
     // Check if we should suppress the fix due to type validation concerns
     let is_type_safe = is_valid_argument_type(arg_value, method_name, constructor, checker);
-    let has_keywords = !call.arguments.keywords.is_empty();
 
     // Determine fix safety
-    let applicability = if is_type_safe && !has_keywords {
+    let applicability = if is_type_safe {
         Applicability::Safe
     } else {
         Applicability::Unsafe
@@ -209,21 +209,27 @@ fn is_valid_argument_type(
             _ => false,
         },
         // Fraction.from_decimal accepts int, bool, Decimal
-        (MethodName::FromDecimal, Constructor::Fraction) => match resolved_type {
-            ResolvedPythonType::Atom(PythonType::Number(
-                NumberLike::Integer | NumberLike::Bool,
-            )) => true,
-            ResolvedPythonType::Unknown => is_int,
-            _ => {
-                // Check if it's a Decimal instance
-                arg_expr
-                    .as_call_expr()
-                    .and_then(|call| semantic.resolve_qualified_name(&call.func))
-                    .is_some_and(|qualified_name| {
-                        matches!(qualified_name.segments(), ["decimal", "Decimal"])
-                    })
+        (MethodName::FromDecimal, Constructor::Fraction) => {
+            // First check if it's a Decimal constructor call
+            let is_decimal_call = arg_expr
+                .as_call_expr()
+                .and_then(|call| semantic.resolve_qualified_name(&call.func))
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["decimal", "Decimal"])
+                });
+
+            if is_decimal_call {
+                return true;
             }
-        },
+
+            match resolved_type {
+                ResolvedPythonType::Atom(PythonType::Number(
+                    NumberLike::Integer | NumberLike::Bool,
+                )) => true,
+                ResolvedPythonType::Unknown => is_int,
+                _ => false,
+            }
+        }
         _ => false,
     }
 }
@@ -273,7 +279,7 @@ fn handle_non_finite_float_special_case(
         return None;
     }
 
-    let Expr::Call(ast::ExprCall {
+    let Expr::Call(ExprCall {
         func, arguments, ..
     }) = arg_value
     else {

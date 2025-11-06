@@ -33,6 +33,7 @@ use crate::{checkers::ast::Checker, fix::snippet::SourceCodeSnippet};
 /// ## References
 /// - [Python documentation: `dict.items`](https://docs.python.org/3/library/stdtypes.html#dict.items)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct ZipDictKeysAndValues {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,
@@ -78,13 +79,18 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
     let [arg1, arg2] = &args[..] else {
         return;
     };
-    let Some((var1, attr1)) = get_var_attr(arg1) else {
+    let Some((var1, attr1, args1)) = get_var_attr_args(arg1) else {
         return;
     };
-    let Some((var2, attr2)) = get_var_attr(arg2) else {
+    let Some((var2, attr2, args2)) = get_var_attr_args(arg2) else {
         return;
     };
-    if var1.id != var2.id || attr1 != "keys" || attr2 != "values" {
+    if var1.id != var2.id
+        || attr1 != "keys"
+        || attr2 != "values"
+        || !args1.is_empty()
+        || !args2.is_empty()
+    {
         return;
     }
     if !checker.semantic().match_builtin_expr(func, "zip") {
@@ -122,8 +128,11 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
     )));
 }
 
-fn get_var_attr(expr: &Expr) -> Option<(&ExprName, &Identifier)> {
-    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+fn get_var_attr_args(expr: &Expr) -> Option<(&ExprName, &Identifier, &Arguments)> {
+    let Expr::Call(ast::ExprCall {
+        func, arguments, ..
+    }) = expr
+    else {
         return None;
     };
     let Expr::Attribute(ExprAttribute { value, attr, .. }) = func.as_ref() else {
@@ -132,5 +141,5 @@ fn get_var_attr(expr: &Expr) -> Option<(&ExprName, &Identifier)> {
     let Expr::Name(var_name) = value.as_ref() else {
         return None;
     };
-    Some((var_name, attr))
+    Some((var_name, attr, arguments))
 }

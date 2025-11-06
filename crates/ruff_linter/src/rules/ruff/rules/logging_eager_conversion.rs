@@ -60,21 +60,47 @@ use crate::rules::flake8_logging_format::rules::{LoggingCallType, find_logging_c
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.13.2")]
 pub(crate) struct LoggingEagerConversion {
     pub(crate) format_conversion: FormatConversion,
+    pub(crate) function_name: Option<&'static str>,
 }
 
 impl Violation for LoggingEagerConversion {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let LoggingEagerConversion { format_conversion } = self;
-        let (format_str, call_arg) = match format_conversion {
-            FormatConversion::Str => ("%s", "str()"),
-            FormatConversion::Repr => ("%r", "repr()"),
-            FormatConversion::Ascii => ("%a", "ascii()"),
-            FormatConversion::Bytes => ("%b", "bytes()"),
-        };
-        format!("Unnecessary `{call_arg}` conversion when formatting with `{format_str}`")
+        let LoggingEagerConversion {
+            format_conversion,
+            function_name,
+        } = self;
+        match (format_conversion, function_name.as_deref()) {
+            (FormatConversion::Str, Some("oct")) => {
+                "Unnecessary `oct()` conversion when formatting with `%s`. \
+            Use `%#o` instead of `%s`"
+                    .to_string()
+            }
+            (FormatConversion::Str, Some("hex")) => {
+                "Unnecessary `hex()` conversion when formatting with `%s`. \
+            Use `%#x` instead of `%s`"
+                    .to_string()
+            }
+            (FormatConversion::Str, _) => {
+                "Unnecessary `str()` conversion when formatting with `%s`".to_string()
+            }
+            (FormatConversion::Repr, _) => {
+                "Unnecessary `repr()` conversion when formatting with `%s`. \
+            Use `%r` instead of `%s`"
+                    .to_string()
+            }
+            (FormatConversion::Ascii, _) => {
+                "Unnecessary `ascii()` conversion when formatting with `%s`. \
+            Use `%a` instead of `%s`"
+                    .to_string()
+            }
+            (FormatConversion::Bytes, _) => {
+                "Unnecessary `bytes()` conversion when formatting with `%b`".to_string()
+            }
+        }
     }
 }
 
@@ -117,12 +143,71 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
                 continue;
             };
 
-            // Check for use of %s with str()
-            if checker.semantic().match_builtin_expr(func.as_ref(), "str")
-                && matches!(format_conversion, FormatConversion::Str)
-            {
-                checker
-                    .report_diagnostic(LoggingEagerConversion { format_conversion }, arg.range());
+            // Check for various eager conversion patterns
+            match format_conversion {
+                // %s with str() - remove str() call
+                FormatConversion::Str
+                    if checker.semantic().match_builtin_expr(func.as_ref(), "str") =>
+                {
+                    checker.report_diagnostic(
+                        LoggingEagerConversion {
+                            format_conversion,
+                            function_name: None,
+                        },
+                        arg.range(),
+                    );
+                }
+                // %s with repr() - suggest using %r instead
+                FormatConversion::Str
+                    if checker.semantic().match_builtin_expr(func.as_ref(), "repr") =>
+                {
+                    checker.report_diagnostic(
+                        LoggingEagerConversion {
+                            format_conversion: FormatConversion::Repr,
+                            function_name: None,
+                        },
+                        arg.range(),
+                    );
+                }
+                // %s with ascii() - suggest using %a instead
+                FormatConversion::Str
+                    if checker
+                        .semantic()
+                        .match_builtin_expr(func.as_ref(), "ascii") =>
+                {
+                    checker.report_diagnostic(
+                        LoggingEagerConversion {
+                            format_conversion: FormatConversion::Ascii,
+                            function_name: None,
+                        },
+                        arg.range(),
+                    );
+                }
+                // %s with oct() - suggest using %#o instead
+                FormatConversion::Str
+                    if checker.semantic().match_builtin_expr(func.as_ref(), "oct") =>
+                {
+                    checker.report_diagnostic(
+                        LoggingEagerConversion {
+                            format_conversion: FormatConversion::Str,
+                            function_name: Some("oct"),
+                        },
+                        arg.range(),
+                    );
+                }
+                // %s with hex() - suggest using %#x instead
+                FormatConversion::Str
+                    if checker.semantic().match_builtin_expr(func.as_ref(), "hex") =>
+                {
+                    checker.report_diagnostic(
+                        LoggingEagerConversion {
+                            format_conversion: FormatConversion::Str,
+                            function_name: Some("hex"),
+                        },
+                        arg.range(),
+                    );
+                }
+                _ => {}
             }
         }
     }

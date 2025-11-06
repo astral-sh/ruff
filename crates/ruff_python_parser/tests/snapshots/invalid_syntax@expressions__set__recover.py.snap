@@ -302,7 +302,7 @@ Module(
    |
 11 | # Missing comma
 12 | {1 2}
-   |    ^ Syntax Error: Expected ',', found int
+   |    ^ Syntax Error: Expected `,`, found int
 13 |
 14 | # Dictionary element in a list
    |

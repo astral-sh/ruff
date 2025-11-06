@@ -24,7 +24,7 @@ impl From<String> for PythonPlatform {
     fn from(platform: String) -> Self {
         match platform.as_str() {
             "all" => PythonPlatform::All,
-            _ => PythonPlatform::Identifier(platform.to_string()),
+            _ => PythonPlatform::Identifier(platform.clone()),
         }
     }
 }

@@ -80,11 +80,11 @@ pub(crate) fn bind_typevar<'db>(
 /// Create a `typing.Self` type variable for a given class.
 pub(crate) fn typing_self<'db>(
     db: &'db dyn Db,
-    scope_id: ScopeId,
+    function_scope_id: ScopeId,
     typevar_binding_context: Option<Definition<'db>>,
     class: ClassLiteral<'db>,
 ) -> Option<Type<'db>> {
-    let index = semantic_index(db, scope_id.file(db));
+    let index = semantic_index(db, function_scope_id.file(db));
 
     let identity = TypeVarIdentity::new(
         db,
@@ -110,7 +110,7 @@ pub(crate) fn typing_self<'db>(
     bind_typevar(
         db,
         index,
-        scope_id.file_scope_id(db),
+        function_scope_id.file_scope_id(db),
         typevar_binding_context,
         typevar,
     )
@@ -323,7 +323,6 @@ impl<'db> GenericContext<'db> {
 
         #[salsa::tracked(
             returns(ref),
-            cycle_fn=inferable_typevars_cycle_recover,
             cycle_initial=inferable_typevars_cycle_initial,
             heap_size=ruff_memory_usage::heap_size,
         )]
@@ -626,17 +625,9 @@ impl<'db> GenericContext<'db> {
     }
 }
 
-fn inferable_typevars_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &FxHashSet<BoundTypeVarIdentity<'db>>,
-    _count: u32,
-    _self: GenericContext<'db>,
-) -> salsa::CycleRecoveryAction<FxHashSet<BoundTypeVarIdentity<'db>>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn inferable_typevars_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: GenericContext<'db>,
 ) -> FxHashSet<BoundTypeVarIdentity<'db>> {
     FxHashSet::default()
@@ -723,7 +714,7 @@ fn is_subtype_in_invariant_position<'db>(
         // TODO:
         // This should be removed and properly handled in the respective
         // `(Type::TypeVar(_), _) | (_, Type::TypeVar(_))` branch of
-        // `Type::has_relation_to_impl`. Right now, we can not generally
+        // `Type::has_relation_to_impl`. Right now, we cannot generally
         // return `ConstraintSet::from(true)` from that branch, as that
         // leads to union simplification, which means that we lose track
         // of type variables without recording the constraints under which
@@ -978,10 +969,15 @@ impl<'db> Specialization<'db> {
         let types: Box<[_]> = self
             .types(db)
             .iter()
+            .zip(self.generic_context(db).variables(db))
             .enumerate()
-            .map(|(i, ty)| {
+            .map(|(i, (ty, typevar))| {
                 let tcx = TypeContext::new(tcx.get(i).copied());
-                ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                if typevar.variance(db).is_covariant() {
+                    ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                } else {
+                    ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor)
+                }
             })
             .collect();
 
@@ -1189,7 +1185,7 @@ impl<'db> Specialization<'db> {
                 ),
                 TypeVarVariance::Bivariant => ConstraintSet::from(true),
             };
-            if result.intersect(db, compatible).is_never_satisfied() {
+            if result.intersect(db, compatible).is_never_satisfied(db) {
                 return result;
             }
         }
@@ -1231,7 +1227,7 @@ impl<'db> Specialization<'db> {
                 }
                 TypeVarVariance::Bivariant => ConstraintSet::from(true),
             };
-            if result.intersect(db, compatible).is_never_satisfied() {
+            if result.intersect(db, compatible).is_never_satisfied(db) {
                 return result;
             }
         }
@@ -1242,7 +1238,7 @@ impl<'db> Specialization<'db> {
             (Some(self_tuple), Some(other_tuple)) => {
                 let compatible =
                     self_tuple.is_equivalent_to_impl(db, other_tuple, inferable, visitor);
-                if result.intersect(db, compatible).is_never_satisfied() {
+                if result.intersect(db, compatible).is_never_satisfied(db) {
                     return result;
                 }
             }
@@ -1263,6 +1259,25 @@ impl<'db> Specialization<'db> {
         }
         // A tuple's specialization will include all of its element types, so we don't need to also
         // look in `self.tuple`.
+    }
+
+    /// Returns a copy of this specialization with the type at a given index replaced.
+    pub(crate) fn with_replaced_type(
+        self,
+        db: &'db dyn Db,
+        index: usize,
+        new_type: Type<'db>,
+    ) -> Self {
+        let mut new_types: Box<[_]> = self.types(db).to_vec().into_boxed_slice();
+        new_types[index] = new_type;
+
+        Self::new(
+            db,
+            self.generic_context(db),
+            new_types,
+            self.materialization_kind(db),
+            self.tuple_inner(db),
+        )
     }
 }
 
@@ -1377,16 +1392,18 @@ impl<'db> SpecializationBuilder<'db> {
             && !actual.is_never()
             && actual
                 .when_subtype_of(self.db, formal, self.inferable)
-                .is_always_satisfied()
+                .is_always_satisfied(self.db)
         {
             return Ok(());
         }
 
-        // Remove the union elements that are not related to `formal`.
+        // Remove the union elements from `actual` that are not related to `formal`, and vice
+        // versa.
         //
         // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to specialize `T`
-        // to `int`.
+        // to `int`, and so ignore the `None`.
         let actual = actual.filter_disjoint_elements(self.db, formal, self.inferable);
+        let formal = formal.filter_disjoint_elements(self.db, actual, self.inferable);
 
         match (formal, actual) {
             // TODO: We haven't implemented a full unification solver yet. If typevars appear in
@@ -1463,7 +1480,7 @@ impl<'db> SpecializationBuilder<'db> {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         if !ty
                             .when_assignable_to(self.db, bound, self.inferable)
-                            .is_always_satisfied()
+                            .is_always_satisfied(self.db)
                         {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
@@ -1473,10 +1490,18 @@ impl<'db> SpecializationBuilder<'db> {
                         self.add_type_mapping(bound_typevar, ty);
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        // Prefer an exact match first.
+                        for constraint in constraints.elements(self.db) {
+                            if ty == *constraint {
+                                self.add_type_mapping(bound_typevar, ty);
+                                return Ok(());
+                            }
+                        }
+
                         for constraint in constraints.elements(self.db) {
                             if ty
                                 .when_assignable_to(self.db, *constraint, self.inferable)
-                                .is_always_satisfied()
+                                .is_always_satisfied(self.db)
                             {
                                 self.add_type_mapping(bound_typevar, *constraint);
                                 return Ok(());

@@ -6,7 +6,6 @@ use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NON_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
 };
-use crate::types::enums::is_enum_class;
 use crate::types::signatures::Signature;
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
@@ -22,7 +21,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer the type of a type expression.
     pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         let mut ty = self.infer_type_expression_no_store(expression);
-        let divergent = Type::divergent(self.scope());
+        let divergent = Type::divergent(Some(self.scope()));
         if ty.has_divergent_type(self.db(), divergent) {
             ty = divergent;
         }
@@ -346,7 +345,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::DictComp(dictcomp) => {
-                self.infer_dict_comprehension_expression(dictcomp);
+                self.infer_dict_comprehension_expression(dictcomp, TypeContext::default());
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("Dict comprehensions are not allowed in type expressions"),
@@ -355,7 +354,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::ListComp(listcomp) => {
-                self.infer_list_comprehension_expression(listcomp);
+                self.infer_list_comprehension_expression(listcomp, TypeContext::default());
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("List comprehensions are not allowed in type expressions"),
@@ -364,7 +363,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::SetComp(setcomp) => {
-                self.infer_set_comprehension_expression(setcomp);
+                self.infer_set_comprehension_expression(setcomp, TypeContext::default());
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("Set comprehensions are not allowed in type expressions"),
@@ -588,7 +587,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             // TODO: emit a diagnostic
                         }
                     } else {
-                        element_types.push(element_ty);
+                        element_types.push(element_ty.fallback_to_divergent(self.db()));
                     }
                 }
 
@@ -810,6 +809,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(_)) => {
                     self.infer_type_expression(slice);
                     todo_type!("Generic manual PEP-695 type alias")
+                }
+                KnownInstanceType::UnionType(_) => {
+                    self.infer_type_expression(slice);
+                    todo_type!("Generic specialization of types.UnionType")
                 }
             },
             Type::Dynamic(DynamicType::Todo(_)) => {
@@ -1369,7 +1372,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         parameters: &'param ast::Expr,
     ) -> Result<Type<'db>, Vec<&'param ast::Expr>> {
         Ok(match parameters {
-            // TODO handle type aliases
             ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
                 if matches!(value_ty, Type::SpecialForm(SpecialFormType::Literal)) {
@@ -1421,27 +1423,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             literal @ ast::Expr::NumberLiteral(number) if number.value.is_int() => {
                 self.infer_expression(literal, TypeContext::default())
             }
-            // For enum values
-            ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
-                let value_ty = self.infer_expression(value, TypeContext::default());
-
-                if is_enum_class(self.db(), value_ty) {
-                    let ty = value_ty
-                        .member(self.db(), &attr.id)
-                        .place
-                        .ignore_possibly_undefined()
-                        .unwrap_or(Type::unknown());
-                    self.store_expression_type(parameters, ty);
-                    ty
-                } else {
-                    self.store_expression_type(parameters, Type::unknown());
-                    if value_ty.is_todo() {
-                        value_ty
-                    } else {
-                        return Err(vec![parameters]);
-                    }
-                }
-            }
             // for negative and positive numbers
             ast::Expr::UnaryOp(u)
                 if matches!(u.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
@@ -1450,6 +1431,35 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let ty = self.infer_unary_expression(u);
                 self.store_expression_type(parameters, ty);
                 ty
+            }
+            // enum members and aliases to literal types
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
+                let subscript_ty = self.infer_expression(parameters, TypeContext::default());
+                // TODO handle implicit type aliases also
+                match subscript_ty {
+                    // type aliases to literal types
+                    Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
+                        let value_ty = type_alias.value_type(self.db());
+                        if value_ty.is_literal_or_union_of_literals(self.db()) {
+                            return Ok(value_ty);
+                        }
+                    }
+                    // `Literal[SomeEnum.Member]`
+                    Type::EnumLiteral(_) => {
+                        return Ok(subscript_ty);
+                    }
+                    // `Literal[SingletonEnum.Member]`, where `SingletonEnum.Member` simplifies to
+                    // just `SingletonEnum`.
+                    Type::NominalInstance(_) if subscript_ty.is_enum(self.db()) => {
+                        return Ok(subscript_ty);
+                    }
+                    // suppress false positives for e.g. members of functional-syntax enums
+                    Type::Dynamic(DynamicType::Todo(_)) => {
+                        return Ok(subscript_ty);
+                    }
+                    _ => {}
+                }
+                return Err(vec![parameters]);
             }
             _ => {
                 self.infer_expression(parameters, TypeContext::default());

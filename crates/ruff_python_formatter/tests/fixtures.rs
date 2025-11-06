@@ -404,10 +404,18 @@ fn ensure_stability_when_formatting_twice(
     let reformatted = match format_module_source(formatted_code, options.clone()) {
         Ok(reformatted) => reformatted,
         Err(err) => {
+            let mut diag = Diagnostic::from(&err);
+            if let Some(range) = err.range() {
+                let file =
+                    SourceFileBuilder::new(input_path.to_string_lossy(), formatted_code).finish();
+                let span = Span::from(file).with_range(range);
+                diag.annotate(Annotation::primary(span));
+            }
             panic!(
                 "Expected formatted code of {} to be valid syntax: {err}:\
-                    \n---\n{formatted_code}---\n",
-                input_path.display()
+                    \n---\n{formatted_code}---\n{}",
+                input_path.display(),
+                diag.display(&DummyFileResolver, &DisplayDiagnosticConfig::default()),
             );
         }
     };

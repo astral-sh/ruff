@@ -146,7 +146,7 @@ static FREQTRADE: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    400,
+    525,
 );
 
 static PANDAS: Benchmark = Benchmark::new(
@@ -210,7 +210,7 @@ static TANJUN: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    100,
+    320,
 );
 
 static STATIC_FRAME: Benchmark = Benchmark::new(
@@ -226,7 +226,7 @@ static STATIC_FRAME: Benchmark = Benchmark::new(
         max_dep_date: "2025-08-09",
         python_version: PythonVersion::PY311,
     },
-    630,
+    800,
 );
 
 #[track_caller]

@@ -695,20 +695,9 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
     }
 }
 
-fn place_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &PlaceAndQualifiers<'db>,
-    _count: u32,
-    _scope: ScopeId<'db>,
-    _place_id: ScopedPlaceId,
-    _requires_explicit_reexport: RequiresExplicitReExport,
-    _considered_definitions: ConsideredDefinitions,
-) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn place_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _scope: ScopeId<'db>,
     _place_id: ScopedPlaceId,
     _requires_explicit_reexport: RequiresExplicitReExport,
@@ -717,7 +706,7 @@ fn place_cycle_initial<'db>(
     Place::bound(Type::Never).into()
 }
 
-#[salsa::tracked(cycle_fn=place_cycle_recover, cycle_initial=place_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(cycle_initial=place_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn place_by_id<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -744,7 +733,7 @@ pub(crate) fn place_by_id<'db>(
     };
 
     // If a symbol is undeclared, but qualified with `typing.Final`, we use the right-hand side
-    // inferred type, without unioning with `Unknown`, because it can not be modified.
+    // inferred type, without unioning with `Unknown`, because it cannot be modified.
     if let Some(qualifiers) = declared.is_bare_final() {
         let bindings = all_considered_bindings();
         return place_from_bindings_impl(db, bindings, requires_explicit_reexport)
@@ -1511,7 +1500,6 @@ mod implicit_globals {
     #[salsa::tracked(
         returns(deref),
         cycle_initial=module_type_symbols_initial,
-        cycle_fn=module_type_symbols_cycle_recover,
         heap_size=ruff_memory_usage::heap_size
     )]
     fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
@@ -1541,16 +1529,11 @@ mod implicit_globals {
             .collect()
     }
 
-    fn module_type_symbols_initial(_db: &dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
-        smallvec::SmallVec::default()
-    }
-
-    fn module_type_symbols_cycle_recover(
+    fn module_type_symbols_initial(
         _db: &dyn Db,
-        _value: &smallvec::SmallVec<[ast::name::Name; 8]>,
-        _count: u32,
-    ) -> salsa::CycleRecoveryAction<smallvec::SmallVec<[ast::name::Name; 8]>> {
-        salsa::CycleRecoveryAction::Iterate
+        _id: salsa::Id,
+    ) -> smallvec::SmallVec<[ast::name::Name; 8]> {
+        smallvec::SmallVec::default()
     }
 
     #[cfg(test)]

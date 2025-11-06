@@ -1,3 +1,4 @@
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
@@ -10,7 +11,7 @@ use ruff_formatter::{FormatError, Formatted, PrintError, Printed, SourceCode, fo
 use ruff_python_ast::{AnyNodeRef, Mod};
 use ruff_python_parser::{ParseError, ParseOptions, Parsed, parse};
 use ruff_python_trivia::CommentRanges;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{
     Comments, SourceComment, has_skip_comment, leading_comments, trailing_comments,
@@ -115,6 +116,33 @@ pub enum FormatModuleError {
     FormatError(#[from] FormatError),
     #[error(transparent)]
     PrintError(#[from] PrintError),
+}
+
+impl FormatModuleError {
+    pub fn range(&self) -> Option<TextRange> {
+        match self {
+            FormatModuleError::ParseError(parse_error) => Some(parse_error.range()),
+            FormatModuleError::FormatError(_) | FormatModuleError::PrintError(_) => None,
+        }
+    }
+}
+
+impl From<&FormatModuleError> for Diagnostic {
+    fn from(error: &FormatModuleError) -> Self {
+        match error {
+            FormatModuleError::ParseError(parse_error) => Diagnostic::new(
+                DiagnosticId::InternalError,
+                Severity::Error,
+                &parse_error.error,
+            ),
+            FormatModuleError::FormatError(format_error) => {
+                Diagnostic::new(DiagnosticId::InternalError, Severity::Error, format_error)
+            }
+            FormatModuleError::PrintError(print_error) => {
+                Diagnostic::new(DiagnosticId::InternalError, Severity::Error, print_error)
+            }
+        }
+    }
 }
 
 #[tracing::instrument(name = "format", level = Level::TRACE, skip_all)]
@@ -306,7 +334,7 @@ class A: ...
         let options = PyFormatOptions::from_source_type(source_type);
         let printed = format_range(&source, TextRange::new(start, end), options).unwrap();
 
-        let mut formatted = source.to_string();
+        let mut formatted = source.clone();
         formatted.replace_range(
             std::ops::Range::<usize>::from(printed.source_range()),
             printed.as_code(),

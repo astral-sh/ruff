@@ -11,8 +11,9 @@ use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
-    ClassLiteral, ClassType, IntersectionBuilder, KnownClass, SubclassOfInner, SubclassOfType,
-    Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
+    ClassLiteral, ClassType, IntersectionBuilder, KnownClass, SpecialFormType, SubclassOfInner,
+    SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
+    infer_expression_types,
 };
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -83,7 +84,6 @@ fn all_narrowing_constraints_for_pattern<'db>(
 
 #[salsa::tracked(
     returns(as_ref),
-    cycle_fn=constraints_for_expression_cycle_recover,
     cycle_initial=constraints_for_expression_cycle_initial,
     heap_size=ruff_memory_usage::heap_size,
 )]
@@ -98,7 +98,6 @@ fn all_narrowing_constraints_for_expression<'db>(
 
 #[salsa::tracked(
     returns(as_ref),
-    cycle_fn=negative_constraints_for_expression_cycle_recover,
     cycle_initial=negative_constraints_for_expression_cycle_initial,
     heap_size=ruff_memory_usage::heap_size,
 )]
@@ -120,35 +119,17 @@ fn all_negative_narrowing_constraints_for_pattern<'db>(
     NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern), false).finish()
 }
 
-#[expect(clippy::ref_option)]
-fn constraints_for_expression_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Option<NarrowingConstraints<'db>>,
-    _count: u32,
-    _expression: Expression<'db>,
-) -> salsa::CycleRecoveryAction<Option<NarrowingConstraints<'db>>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn constraints_for_expression_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _expression: Expression<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
     None
 }
 
-#[expect(clippy::ref_option)]
-fn negative_constraints_for_expression_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Option<NarrowingConstraints<'db>>,
-    _count: u32,
-    _expression: Expression<'db>,
-) -> salsa::CycleRecoveryAction<Option<NarrowingConstraints<'db>>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn negative_constraints_for_expression_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _expression: Expression<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
     None
@@ -982,11 +963,20 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let subject = place_expr(subject.node_ref(self.db, self.module))?;
         let place = self.expect_place(&subject);
 
-        let ty = infer_same_file_expression_type(self.db, cls, TypeContext::default(), self.module)
-            .to_instance(self.db)?;
+        let class_type =
+            infer_same_file_expression_type(self.db, cls, TypeContext::default(), self.module);
 
-        let ty = ty.negate_if(self.db, !is_positive);
-        Some(NarrowingConstraints::from_iter([(place, ty)]))
+        let narrowed_type = match class_type {
+            Type::ClassLiteral(class) => {
+                Type::instance(self.db, class.top_materialization(self.db))
+                    .negate_if(self.db, !is_positive)
+            }
+            dynamic @ Type::Dynamic(_) => dynamic,
+            Type::SpecialForm(SpecialFormType::Any) => Type::any(),
+            _ => return None,
+        };
+
+        Some(NarrowingConstraints::from_iter([(place, narrowed_type)]))
     }
 
     fn evaluate_match_pattern_value(

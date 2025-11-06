@@ -9,7 +9,7 @@ use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
 use std::fmt::Write;
 use std::str::FromStr;
-use ty_project::Db;
+use ty_project::Db as _;
 
 pub(crate) struct ExecuteCommand;
 
@@ -52,7 +52,7 @@ fn debug_information(session: &Session) -> crate::Result<String> {
     writeln!(
         buffer,
         "Open text documents: {}",
-        session.text_document_keys().count()
+        session.text_document_handles().count()
     )?;
     writeln!(buffer)?;
 

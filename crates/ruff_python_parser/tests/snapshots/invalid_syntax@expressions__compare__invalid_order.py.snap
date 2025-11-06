@@ -175,7 +175,7 @@ Module(
   |
 6 | # Same here as well, `not` without `in` is considered to be a unary operator
 7 | x not is y
-  |       ^^ Syntax Error: Expected an identifier, but found a keyword 'is' that cannot be used here
+  |       ^^ Syntax Error: Expected an identifier, but found a keyword `is` that cannot be used here
   |
 
 

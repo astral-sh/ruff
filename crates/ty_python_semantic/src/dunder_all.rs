@@ -10,23 +10,17 @@ use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::{Truthiness, Type, TypeContext, infer_expression_types};
 use crate::{Db, ModuleName, resolve_module};
 
-#[allow(clippy::ref_option)]
-fn dunder_all_names_cycle_recover(
+fn dunder_all_names_cycle_initial(
     _db: &dyn Db,
-    _value: &Option<FxHashSet<Name>>,
-    _count: u32,
+    _id: salsa::Id,
     _file: File,
-) -> salsa::CycleRecoveryAction<Option<FxHashSet<Name>>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn dunder_all_names_cycle_initial(_db: &dyn Db, _file: File) -> Option<FxHashSet<Name>> {
+) -> Option<FxHashSet<Name>> {
     None
 }
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
 /// if it contains invalid elements.
-#[salsa::tracked(returns(as_ref), cycle_fn=dunder_all_names_cycle_recover, cycle_initial=dunder_all_names_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(as_ref), cycle_initial=dunder_all_names_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<FxHashSet<Name>> {
     let _span = tracing::trace_span!("dunder_all_names", file=?file.path(db)).entered();
 

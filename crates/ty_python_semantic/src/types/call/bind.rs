@@ -9,6 +9,7 @@ use std::fmt;
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
+use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
@@ -17,6 +18,7 @@ use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{Definedness, Place};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
+use crate::types::constraints::ConstraintSet;
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, POSITIONAL_ONLY_PARAMETER_AS_KWARG,
@@ -24,8 +26,8 @@ use crate::types::diagnostic::{
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
-    DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionType,
-    KnownFunction, OverloadLiteral,
+    DataclassTransformerFlags, DataclassTransformerParams, FunctionType, KnownFunction,
+    OverloadLiteral,
 };
 use crate::types::generics::{
     InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
@@ -34,9 +36,10 @@ use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Paramete
 use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassFlags, DataclassParams, FieldInstance,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy, PropertyInstanceType,
-    SpecialFormType, TrackedConstraintSet, TypeAliasType, TypeContext, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, ide_support, infer_isolated_expression, todo_type,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy, NominalInstanceType,
+    PropertyInstanceType, SpecialFormType, TrackedConstraintSet, TypeAliasType, TypeContext,
+    UnionBuilder, UnionType, WrapperDescriptorKind, enums, ide_support, infer_isolated_expression,
+    todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
@@ -94,6 +97,18 @@ impl<'db> Bindings<'db> {
 
     pub(crate) fn argument_forms(&self) -> &[Option<ParameterForm>] {
         &self.argument_forms.values
+    }
+
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, CallableBinding<'db>> {
+        self.elements.iter()
+    }
+
+    pub(crate) fn map(self, f: impl Fn(CallableBinding<'db>) -> CallableBinding<'db>) -> Self {
+        Self {
+            callable_type: self.callable_type,
+            argument_forms: self.argument_forms,
+            elements: self.elements.into_iter().map(f).collect(),
+        }
     }
 
     /// Match the arguments of a call site against the parameters of a collection of possibly
@@ -344,9 +359,7 @@ impl<'db> Bindings<'db> {
 
                                     _ => {}
                                 }
-                            } else if function
-                                .has_known_decorator(db, FunctionDecorators::STATICMETHOD)
-                            {
+                            } else if function.is_staticmethod(db) {
                                 overload.set_return_type(*function_ty);
                             } else {
                                 match overload.parameter_types() {
@@ -997,6 +1010,7 @@ impl<'db> Bindings<'db> {
                                     class_literal.body_scope(db),
                                     class_literal.known(db),
                                     class_literal.deprecated(db),
+                                    class_literal.type_check_only(db),
                                     Some(params),
                                     class_literal.dataclass_transformer_params(db),
                                 )));
@@ -1108,6 +1122,116 @@ impl<'db> Bindings<'db> {
                         }
                     },
 
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetRange) => {
+                        let [Some(lower), Some(Type::TypeVar(typevar)), Some(upper)] =
+                            overload.parameter_types()
+                        else {
+                            return;
+                        };
+                        let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
+                        let tracked = TrackedConstraintSet::new(db, constraints);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetAlways) => {
+                        if !overload.parameter_types().is_empty() {
+                            return;
+                        }
+                        let constraints = ConstraintSet::from(true);
+                        let tracked = TrackedConstraintSet::new(db, constraints);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetNever) => {
+                        if !overload.parameter_types().is_empty() {
+                            return;
+                        }
+                        let constraints = ConstraintSet::from(false);
+                        let tracked = TrackedConstraintSet::new(db, constraints);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(
+                        KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(tracked),
+                    ) => {
+                        let [Some(ty_a), Some(ty_b)] = overload.parameter_types() else {
+                            continue;
+                        };
+
+                        let result = tracked.constraints(db).when_subtype_of_given(
+                            db,
+                            *ty_a,
+                            *ty_b,
+                            InferableTypeVars::None,
+                        );
+                        let tracked = TrackedConstraintSet::new(db, result);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetSatisfies(
+                        tracked,
+                    )) => {
+                        let [Some(other)] = overload.parameter_types() else {
+                            continue;
+                        };
+                        let Type::KnownInstance(KnownInstanceType::ConstraintSet(other)) = other
+                        else {
+                            continue;
+                        };
+
+                        let result = tracked
+                            .constraints(db)
+                            .implies(db, || other.constraints(db));
+                        let tracked = TrackedConstraintSet::new(db, result);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(
+                        KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(tracked),
+                    ) => {
+                        let extract_inferable = |instance: &NominalInstanceType<'db>| {
+                            if instance.has_known_class(db, KnownClass::NoneType) {
+                                // Caller explicitly passed None, so no typevars are inferable.
+                                return Some(FxHashSet::default());
+                            }
+                            instance
+                                .tuple_spec(db)?
+                                .fixed_elements()
+                                .map(|ty| {
+                                    ty.as_typevar()
+                                        .map(|bound_typevar| bound_typevar.identity(db))
+                                })
+                                .collect()
+                        };
+
+                        let inferable = match overload.parameter_types() {
+                            // Caller did not provide argument, so no typevars are inferable.
+                            [None] => FxHashSet::default(),
+                            [Some(Type::NominalInstance(instance))] => {
+                                match extract_inferable(instance) {
+                                    Some(inferable) => inferable,
+                                    None => continue,
+                                }
+                            }
+                            _ => continue,
+                        };
+
+                        let result = tracked
+                            .constraints(db)
+                            .satisfied_by_all_typevars(db, InferableTypeVars::One(&inferable));
+                        overload.set_return_type(Type::BooleanLiteral(result));
+                    }
+
                     Type::ClassLiteral(class) => match class.known(db) {
                         Some(KnownClass::Bool) => match overload.parameter_types() {
                             [Some(arg)] => overload.set_return_type(arg.bool(db).into_type(db)),
@@ -1178,7 +1302,16 @@ impl<'a, 'db> IntoIterator for &'a Bindings<'db> {
     type IntoIter = std::slice::Iter<'a, CallableBinding<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.elements.iter()
+        self.iter()
+    }
+}
+
+impl<'db> IntoIterator for Bindings<'db> {
+    type Item = CallableBinding<'db>;
+    type IntoIter = smallvec::IntoIter<[CallableBinding<'db>; 1]>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.elements.into_iter()
     }
 }
 
@@ -1460,7 +1593,7 @@ impl<'db> CallableBinding<'db> {
                         .unwrap_or(Type::unknown());
                     if argument_type
                         .when_assignable_to(db, parameter_type, overload.inferable_typevars)
-                        .is_always_satisfied()
+                        .is_always_satisfied(db)
                     {
                         is_argument_assignable_to_any_overload = true;
                         break 'overload;
@@ -1693,7 +1826,7 @@ impl<'db> CallableBinding<'db> {
                                 current_parameter_type,
                                 overload.inferable_typevars,
                             )
-                            .is_always_satisfied()
+                            .is_always_satisfied(db)
                         {
                             participating_parameter_indexes.insert(parameter_index);
                         }
@@ -1816,7 +1949,7 @@ impl<'db> CallableBinding<'db> {
                             first_overload_return_type,
                             overload.inferable_typevars,
                         )
-                        .is_always_satisfied()
+                        .is_always_satisfied(db)
                 })
             } else {
                 // No matching overload
@@ -2103,6 +2236,15 @@ impl<'a, 'db> IntoIterator for &'a CallableBinding<'db> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.overloads.iter()
+    }
+}
+
+impl<'db> IntoIterator for CallableBinding<'db> {
+    type Item = Binding<'db>;
+    type IntoIter = smallvec::IntoIter<[Binding<'db>; 1]>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.overloads.into_iter()
     }
 }
 
@@ -2682,7 +2824,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             // building them in an earlier separate step.
             if argument_type
                 .when_assignable_to(self.db, expected_ty, self.inferable_typevars)
-                .is_never_satisfied()
+                .is_never_satisfied(self.db)
             {
                 let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
                     && !parameter.is_variadic();
@@ -2816,7 +2958,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     KnownClass::Str.to_instance(self.db),
                     self.inferable_typevars,
                 )
-                .is_always_satisfied()
+                .is_always_satisfied(self.db)
             {
                 self.errors.push(BindingError::InvalidKeyType {
                     argument_index: adjusted_argument_index,
@@ -3460,6 +3602,11 @@ impl<'db> BindingError<'db> {
                 expected_ty,
                 provided_ty,
             } => {
+                // TODO: Ideally we would not emit diagnostics for `TypedDict` literal arguments
+                // here (see `diagnostic::is_invalid_typed_dict_literal`). However, we may have
+                // silenced diagnostics during overload evaluation, and rely on the assignability
+                // diagnostic being emitted here.
+
                 let range = Self::get_node(node, *argument_index);
                 let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
                     return;
@@ -3496,6 +3643,36 @@ impl<'db> BindingError<'db> {
                 diag.set_primary_message(format_args!(
                     "Expected `{expected_ty_display}`, found `{provided_ty_display}`"
                 ));
+
+                if let Type::Union(union) = provided_ty {
+                    let union_elements = union.elements(context.db());
+                    let invalid_elements: Vec<Type<'db>> = union
+                        .elements(context.db())
+                        .iter()
+                        .filter(|element| !element.is_assignable_to(context.db(), *expected_ty))
+                        .copied()
+                        .collect();
+                    let first_invalid_element = invalid_elements[0].display(context.db());
+                    if invalid_elements.len() < union_elements.len() {
+                        match &invalid_elements[1..] {
+                            [] => diag.info(format_args!(
+                                "Element `{first_invalid_element}` of this union \
+                                is not assignable to `{expected_ty_display}`",
+                            )),
+                            [single] => diag.info(format_args!(
+                                "Union elements `{first_invalid_element}` and `{}` \
+                                are not assignable to `{expected_ty_display}`",
+                                single.display(context.db()),
+                            )),
+                            rest => diag.info(format_args!(
+                                "Union element `{first_invalid_element}`, \
+                                and {} more union elements, \
+                                are not assignable to `{expected_ty_display}`",
+                                rest.len(),
+                            )),
+                        }
+                    }
+                }
 
                 if let Some(matching_overload) = matching_overload {
                     if let Some((name_span, parameter_span)) =

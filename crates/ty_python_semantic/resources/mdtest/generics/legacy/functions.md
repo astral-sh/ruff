@@ -545,3 +545,28 @@ def f(x: T, y: Not[T]) -> T:
     y = x  # error: [invalid-assignment]
     return x
 ```
+
+## Prefer exact matches for constrained typevars
+
+```py
+from typing import TypeVar
+
+class Base: ...
+class Sub(Base): ...
+
+# We solve to `Sub`, regardless of the order of constraints.
+T = TypeVar("T", Base, Sub)
+T2 = TypeVar("T2", Sub, Base)
+
+def f(x: T) -> list[T]:
+    return [x]
+
+def f2(x: T2) -> list[T2]:
+    return [x]
+
+x: list[Sub] = f(Sub())
+reveal_type(x)  # revealed: list[Sub]
+
+y: list[Sub] = f2(Sub())
+reveal_type(y)  # revealed: list[Sub]
+```

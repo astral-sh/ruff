@@ -35,6 +35,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [version-specifier]: https://packaging.python.org/en/latest/specifications/version-specifiers/#version-specifiers
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct MapIntVersionParsing;
 
 impl Violation for MapIntVersionParsing {

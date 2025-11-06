@@ -11,7 +11,7 @@ use ruff_python_ast::{
     AnyNodeRef, BytesLiteral, Expr, FString, InterpolatedStringElement, Stmt, StringLiteral,
     TypeParam,
 };
-use ruff_text_size::{Ranged, TextLen, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
 use ty_python_semantic::{
     HasType, SemanticModel, semantic_index::definition::DefinitionKind, types::Type,
@@ -226,7 +226,12 @@ impl<'db> SemanticTokenVisitor<'db> {
         let range = ranged.range();
         // Only emit tokens that intersect with the range filter, if one is specified
         if let Some(range_filter) = self.range_filter {
-            if range.intersect(range_filter).is_none() {
+            // Only include ranges that have a non-empty overlap. Adjacent ranges
+            // should be excluded.
+            if range
+                .intersect(range_filter)
+                .is_none_or(TextRange::is_empty)
+            {
                 return;
             }
         }
@@ -446,11 +451,11 @@ impl<'db> SemanticTokenVisitor<'db> {
         let name_start = name.start();
 
         // Split the dotted name and calculate positions for each part
-        let mut current_offset = ruff_text_size::TextSize::default();
+        let mut current_offset = TextSize::default();
         for part in name_str.split('.') {
             if !part.is_empty() {
                 self.add_token(
-                    ruff_text_size::TextRange::at(name_start + current_offset, part.text_len()),
+                    TextRange::at(name_start + current_offset, part.text_len()),
                     token_type,
                     SemanticTokenModifier::empty(),
                 );
@@ -925,87 +930,48 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::cursor_test;
+
     use insta::assert_snapshot;
-
-    /// Helper function to get semantic tokens for full file (for testing)
-    fn semantic_tokens_full_file(db: &dyn Db, file: File) -> SemanticTokens {
-        semantic_tokens(db, file, None)
-    }
-
-    /// Helper function to convert semantic tokens to a snapshot-friendly text format
-    fn semantic_tokens_to_snapshot(db: &dyn Db, file: File, tokens: &SemanticTokens) -> String {
-        use std::fmt::Write;
-        let source = ruff_db::source::source_text(db, file);
-        let mut result = String::new();
-
-        for token in tokens.iter() {
-            let token_text = &source[token.range()];
-            let modifiers_text = if token.modifiers.is_empty() {
-                String::new()
-            } else {
-                let mut mods = Vec::new();
-                if token.modifiers.contains(SemanticTokenModifier::DEFINITION) {
-                    mods.push("definition");
-                }
-                if token.modifiers.contains(SemanticTokenModifier::READONLY) {
-                    mods.push("readonly");
-                }
-                if token.modifiers.contains(SemanticTokenModifier::ASYNC) {
-                    mods.push("async");
-                }
-                format!(" [{}]", mods.join(", "))
-            };
-
-            writeln!(
-                result,
-                "{:?} @ {}..{}: {:?}{}",
-                token_text,
-                u32::from(token.range().start()),
-                u32::from(token.range().end()),
-                token.token_type,
-                modifiers_text
-            )
-            .unwrap();
-        }
-
-        result
-    }
+    use ruff_db::{
+        files::system_path_to_file,
+        system::{DbWithWritableSystem, SystemPath, SystemPathBuf},
+    };
+    use ty_project::ProjectMetadata;
 
     #[test]
     fn test_semantic_tokens_basic() {
-        let test = cursor_test("def foo(): pass<CURSOR>");
+        let test = SemanticTokenTest::new("def foo(): pass");
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "foo" @ 4..7: Function [definition]
         "###);
     }
 
     #[test]
     fn test_semantic_tokens_class() {
-        let test = cursor_test("class MyClass: pass<CURSOR>");
+        let test = SemanticTokenTest::new("class MyClass: pass");
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "MyClass" @ 6..13: Class [definition]
         "###);
     }
 
     #[test]
     fn test_semantic_tokens_variables() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 x = 42
-y = 'hello'<CURSOR>
+y = 'hello'
 ",
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "x" @ 1..2: Variable
         "42" @ 5..7: Number
         "y" @ 8..9: Variable
@@ -1015,16 +981,16 @@ y = 'hello'<CURSOR>
 
     #[test]
     fn test_semantic_tokens_self_parameter() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 class MyClass:
-    def method(self, x): pass<CURSOR>
+    def method(self, x): pass
 ",
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "MyClass" @ 7..14: Class [definition]
         "method" @ 24..30: Method [definition]
         "self" @ 31..35: SelfParameter
@@ -1034,17 +1000,17 @@ class MyClass:
 
     #[test]
     fn test_semantic_tokens_cls_parameter() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 class MyClass:
     @classmethod
-    def method(cls, x): pass<CURSOR>
+    def method(cls, x): pass
 ",
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "MyClass" @ 7..14: Class [definition]
         "classmethod" @ 21..32: Decorator
         "method" @ 41..47: Method [definition]
@@ -1055,17 +1021,17 @@ class MyClass:
 
     #[test]
     fn test_semantic_tokens_staticmethod_parameter() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 class MyClass:
     @staticmethod
-    def method(x, y): pass<CURSOR>
+    def method(x, y): pass
 ",
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "MyClass" @ 7..14: Class [definition]
         "staticmethod" @ 21..33: Decorator
         "method" @ 42..48: Method [definition]
@@ -1076,19 +1042,19 @@ class MyClass:
 
     #[test]
     fn test_semantic_tokens_custom_self_cls_names() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 class MyClass:
     def method(instance, x): pass
     @classmethod
     def other(klass, y): pass
-    def complex_method(instance, posonly, /, regular, *args, kwonly, **kwargs): pass<CURSOR>
+    def complex_method(instance, posonly, /, regular, *args, kwonly, **kwargs): pass
 ",
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "MyClass" @ 7..14: Class [definition]
         "method" @ 24..30: Method [definition]
         "instance" @ 31..39: SelfParameter
@@ -1109,17 +1075,17 @@ class MyClass:
 
     #[test]
     fn test_semantic_tokens_modifiers() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 class MyClass:
     CONSTANT = 42
-    async def method(self): pass<CURSOR>
+    async def method(self): pass
 ",
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "MyClass" @ 7..14: Class [definition]
         "CONSTANT" @ 20..28: Variable [readonly]
         "42" @ 31..33: Number
@@ -1130,7 +1096,7 @@ class MyClass:
 
     #[test]
     fn test_semantic_classification_vs_heuristic() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 import sys
 class MyClass:
@@ -1141,13 +1107,13 @@ def my_function():
 
 x = MyClass()
 y = my_function()
-z = sys.version<CURSOR>
+z = sys.version
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "sys" @ 8..11: Namespace
         "MyClass" @ 18..25: Class [definition]
         "my_function" @ 41..52: Function [definition]
@@ -1164,17 +1130,17 @@ z = sys.version<CURSOR>
 
     #[test]
     fn test_builtin_constants() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 x = True
 y = False
-z = None<CURSOR>
+z = None
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "x" @ 1..2: Variable
         "True" @ 5..9: BuiltinConstant
         "y" @ 10..11: Variable
@@ -1186,20 +1152,20 @@ z = None<CURSOR>
 
     #[test]
     fn test_builtin_constants_in_expressions() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 def check(value):
     if value is None:
         return False
     return True
 
-result = check(None)<CURSOR>
+result = check(None)
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "check" @ 5..10: Function [definition]
         "value" @ 11..16: Parameter
         "value" @ 26..31: Variable
@@ -1214,7 +1180,7 @@ result = check(None)<CURSOR>
 
     #[test]
     fn test_semantic_tokens_range() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 def function1():
     x = 42
@@ -1223,49 +1189,46 @@ def function1():
 def function2():
     y = \"hello\"
     z = True
-    return y + z<CURSOR>
+    return y + z
 ",
         );
 
-        let full_tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        let full_tokens = test.highlight_file();
 
         // Get the range that covers only the second function
         // Hardcoded offsets: function2 starts at position 42, source ends at position 108
-        let range = ruff_text_size::TextRange::new(
-            ruff_text_size::TextSize::from(42u32),
-            ruff_text_size::TextSize::from(108u32),
-        );
+        let range = TextRange::new(TextSize::from(42u32), TextSize::from(108u32));
 
-        let range_tokens = semantic_tokens(&test.db, test.cursor.file, Some(range));
+        let range_tokens = test.highlight_range(range);
 
         // Range-based tokens should have fewer tokens than full scan
         // (should exclude tokens from function1)
         assert!(range_tokens.len() < full_tokens.len());
 
         // Test both full tokens and range tokens with snapshots
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &full_tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&full_tokens), @r###"
         "function1" @ 5..14: Function [definition]
         "x" @ 22..23: Variable
         "42" @ 26..28: Number
         "x" @ 40..41: Variable
         "function2" @ 47..56: Function [definition]
         "y" @ 64..65: Variable
-        "/"hello/"" @ 68..75: String
+        "\"hello\"" @ 68..75: String
         "z" @ 80..81: Variable
         "True" @ 84..88: BuiltinConstant
         "y" @ 100..101: Variable
         "z" @ 104..105: Variable
-        "#);
+        "###);
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &range_tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&range_tokens), @r###"
         "function2" @ 47..56: Function [definition]
         "y" @ 64..65: Variable
-        "/"hello/"" @ 68..75: String
+        "\"hello\"" @ 68..75: String
         "z" @ 80..81: Variable
         "True" @ 84..88: BuiltinConstant
         "y" @ 100..101: Variable
         "z" @ 104..105: Variable
-        "#);
+        "###);
 
         // Verify that no tokens from range_tokens have ranges outside the requested range
         for token in range_tokens.iter() {
@@ -1278,20 +1241,45 @@ def function2():
         }
     }
 
+    /// When a token starts right at where the requested range ends,
+    /// don't include it in the semantic tokens.
+    #[test]
+    fn test_semantic_tokens_range_excludes_boundary_tokens() {
+        let test = SemanticTokenTest::new(
+            "
+x = 1
+y = 2
+z = 3
+",
+        );
+
+        // Range [6..13) starts where "1" ends and ends where "z" starts.
+        // Expected: only "y" @ 7..8 and "2" @ 11..12 (non-empty overlap with target range).
+        // Not included: "1" @ 5..6 and "z" @ 13..14 (adjacent, but not overlapping at offsets 6 and 13).
+        let range = TextRange::new(TextSize::from(6), TextSize::from(13));
+
+        let range_tokens = test.highlight_range(range);
+
+        assert_snapshot!(test.to_snapshot(&range_tokens), @r#"
+        "y" @ 7..8: Variable
+        "2" @ 11..12: Number
+        "#);
+    }
+
     #[test]
     fn test_dotted_module_names() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 import os.path
 import sys.version_info
 from urllib.parse import urlparse
-from collections.abc import Mapping<CURSOR>
+from collections.abc import Mapping
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "os" @ 8..10: Namespace
         "path" @ 11..15: Namespace
         "sys" @ 23..26: Namespace
@@ -1307,7 +1295,7 @@ from collections.abc import Mapping<CURSOR>
 
     #[test]
     fn test_module_type_classification() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 import os
 import sys
@@ -1315,13 +1303,13 @@ from collections import defaultdict
 
 # os and sys should be classified as namespace/module types
 x = os
-y = sys<CURSOR>
+y = sys
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "os" @ 8..10: Namespace
         "sys" @ 18..21: Namespace
         "collections" @ 27..38: Namespace
@@ -1335,18 +1323,18 @@ y = sys<CURSOR>
 
     #[test]
     fn test_import_classification() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 from os import path
 from collections import defaultdict, OrderedDict, Counter
 from typing import List, Dict, Optional
-from mymodule import CONSTANT, my_function, MyClass<CURSOR>
+from mymodule import CONSTANT, my_function, MyClass
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "os" @ 6..8: Namespace
         "path" @ 16..20: Namespace
         "collections" @ 26..37: Namespace
@@ -1366,7 +1354,7 @@ from mymodule import CONSTANT, my_function, MyClass<CURSOR>
 
     #[test]
     fn test_attribute_classification() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 import os
 import sys
@@ -1375,10 +1363,10 @@ from typing import List
 
 class MyClass:
     CONSTANT = 42
-    
+
     def method(self):
         return \"hello\"
-    
+
     @property
     def prop(self):
         return self.CONSTANT
@@ -1391,13 +1379,13 @@ y = obj.method           # method should be method (bound method)
 z = obj.CONSTANT         # CONSTANT should be variable with readonly modifier
 w = obj.prop             # prop should be property
 v = MyClass.method       # method should be method (function)
-u = List.__name__        # __name__ should be variable<CURSOR>
+u = List.__name__        # __name__ should be variable
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "os" @ 8..10: Namespace
         "sys" @ 18..21: Namespace
         "collections" @ 27..38: Namespace
@@ -1409,11 +1397,11 @@ u = List.__name__        # __name__ should be variable<CURSOR>
         "42" @ 113..115: Number
         "method" @ 125..131: Method [definition]
         "self" @ 132..136: SelfParameter
-        "/"hello/"" @ 154..161: String
+        "\"hello\"" @ 154..161: String
         "property" @ 168..176: Decorator
         "prop" @ 185..189: Method [definition]
         "self" @ 190..194: SelfParameter
-        "self" @ 212..216: Variable
+        "self" @ 212..216: TypeParameter
         "CONSTANT" @ 217..225: Variable [readonly]
         "obj" @ 227..230: Variable
         "MyClass" @ 233..240: Class
@@ -1435,29 +1423,29 @@ u = List.__name__        # __name__ should be variable<CURSOR>
         "u" @ 596..597: Variable
         "List" @ 600..604: Variable
         "__name__" @ 605..613: Variable
-        "#);
+        "###);
     }
 
     #[test]
     fn test_attribute_fallback_classification() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 class MyClass:
     some_attr = \"value\"
-    
+
 obj = MyClass()
 # Test attribute that might not have detailed semantic info
 x = obj.some_attr        # Should fall back to variable, not property
-y = obj.unknown_attr     # Should fall back to variable<CURSOR>
+y = obj.unknown_attr     # Should fall back to variable
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "MyClass" @ 7..14: Class [definition]
         "some_attr" @ 20..29: Variable
-        "/"value/"" @ 32..39: String
+        "\"value\"" @ 32..39: String
         "obj" @ 41..44: Variable
         "MyClass" @ 47..54: Class
         "x" @ 117..118: Variable
@@ -1466,30 +1454,30 @@ y = obj.unknown_attr     # Should fall back to variable<CURSOR>
         "y" @ 187..188: Variable
         "obj" @ 191..194: Variable
         "unknown_attr" @ 195..207: Variable
-        "#);
+        "###);
     }
 
     #[test]
     fn test_constant_name_detection() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 class MyClass:
     UPPER_CASE = 42
     lower_case = 24
     MixedCase = 12
     A = 1
-    
+
 obj = MyClass()
 x = obj.UPPER_CASE    # Should have readonly modifier
-y = obj.lower_case    # Should not have readonly modifier  
+y = obj.lower_case    # Should not have readonly modifier
 z = obj.MixedCase     # Should not have readonly modifier
-w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
+w = obj.A             # Should not have readonly modifier (length == 1)
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "MyClass" @ 7..14: Class [definition]
         "UPPER_CASE" @ 20..30: Variable [readonly]
         "42" @ 33..35: Number
@@ -1507,18 +1495,18 @@ w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
         "y" @ 156..157: Variable
         "obj" @ 160..163: Variable
         "lower_case" @ 164..174: Variable
-        "z" @ 216..217: Variable
-        "obj" @ 220..223: Variable
-        "MixedCase" @ 224..233: Variable
-        "w" @ 274..275: Variable
-        "obj" @ 278..281: Variable
-        "A" @ 282..283: Variable
-        "#);
+        "z" @ 214..215: Variable
+        "obj" @ 218..221: Variable
+        "MixedCase" @ 222..231: Variable
+        "w" @ 272..273: Variable
+        "obj" @ 276..279: Variable
+        "A" @ 280..281: Variable
+        "###);
     }
 
     #[test]
     fn test_type_annotations() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             r#"
 from typing import List, Optional
 
@@ -1526,13 +1514,13 @@ def function_with_annotations(param1: int, param2: str) -> Optional[List[str]]:
     pass
 
 x: int = 42
-y: Optional[str] = None<CURSOR>
+y: Optional[str] = None
 "#,
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "typing" @ 6..12: Namespace
         "List" @ 20..24: Variable
         "Optional" @ 26..34: Variable
@@ -1556,15 +1544,15 @@ y: Optional[str] = None<CURSOR>
 
     #[test]
     fn test_debug_int_classification() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
-x: int = 42<CURSOR>
+x: int = 42
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "x" @ 1..2: Variable
         "int" @ 4..7: Class
         "42" @ 10..12: Number
@@ -1573,18 +1561,18 @@ x: int = 42<CURSOR>
 
     #[test]
     fn test_debug_user_defined_type_classification() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 class MyClass:
     pass
 
-x: MyClass = MyClass()<CURSOR>
+x: MyClass = MyClass()
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "MyClass" @ 7..14: Class [definition]
         "x" @ 26..27: Variable
         "MyClass" @ 29..36: Class
@@ -1594,7 +1582,7 @@ x: MyClass = MyClass()<CURSOR>
 
     #[test]
     fn test_type_annotation_vs_variable_classification() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 from typing import List, Optional
 
@@ -1606,16 +1594,16 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
     x: int = 42
     y: MyClass = MyClass()
     z: List[str] = [\"hello\"]
-    
+
     # Type annotations should be Class tokens:
     # int, MyClass, Optional, List, str
-    return None<CURSOR>
+    return None
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "typing" @ 6..12: Namespace
         "List" @ 20..24: Variable
         "Optional" @ 26..34: Variable
@@ -1637,14 +1625,14 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
         "z" @ 233..234: Variable
         "List" @ 236..240: Variable
         "str" @ 241..244: Class
-        "/"hello/"" @ 249..256: String
+        "\"hello\"" @ 249..256: String
         "None" @ 357..361: BuiltinConstant
-        "#);
+        "###);
     }
 
     #[test]
     fn test_protocol_types_in_annotations() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 from typing import Protocol
 
@@ -1653,12 +1641,12 @@ class MyProtocol(Protocol):
 
 def test_function(param: MyProtocol) -> None:
     pass
-<CURSOR>",
+",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "typing" @ 6..12: Namespace
         "Protocol" @ 20..28: Variable
         "MyProtocol" @ 36..46: Class [definition]
@@ -1675,7 +1663,7 @@ def test_function(param: MyProtocol) -> None:
 
     #[test]
     fn test_protocol_type_annotation_vs_value_context() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 from typing import Protocol
 
@@ -1685,15 +1673,15 @@ class MyProtocol(Protocol):
 # Value context - MyProtocol is still a class literal, so should be Class
 my_protocol_var = MyProtocol
 
-# Type annotation context - should be Class  
+# Type annotation context - should be Class
 def test_function(param: MyProtocol) -> MyProtocol:
     return param
-<CURSOR>",
+",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "typing" @ 6..12: Namespace
         "Protocol" @ 20..28: Variable
         "MyProtocol" @ 36..46: Class [definition]
@@ -1703,17 +1691,17 @@ def test_function(param: MyProtocol) -> MyProtocol:
         "int" @ 82..85: Class
         "my_protocol_var" @ 166..181: Class
         "MyProtocol" @ 184..194: Class
-        "test_function" @ 246..259: Function [definition]
-        "param" @ 260..265: Parameter
-        "MyProtocol" @ 267..277: Class
-        "MyProtocol" @ 282..292: Class
-        "param" @ 305..310: Parameter
-        "#);
+        "test_function" @ 244..257: Function [definition]
+        "param" @ 258..263: Parameter
+        "MyProtocol" @ 265..275: Class
+        "MyProtocol" @ 280..290: Class
+        "param" @ 303..308: Parameter
+        "###);
     }
 
     #[test]
     fn test_type_parameters_pep695() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 # Test Python 3.12 PEP 695 type parameter syntax
 
@@ -1721,7 +1709,7 @@ def test_function(param: MyProtocol) -> MyProtocol:
 def func[T](x: T) -> T:
     return x
 
-# Generic function with TypeVarTuple  
+# Generic function with TypeVarTuple
 def func_tuple[*Ts](args: tuple[*Ts]) -> tuple[*Ts]:
     return args
 
@@ -1736,10 +1724,10 @@ class Container[T, U]:
     def __init__(self, value1: T, value2: U):
         self.value1: T = value1
         self.value2: U = value2
-    
+
     def get_first(self) -> T:
         return self.value1
-    
+
     def get_second(self) -> U:
         return self.value2
 
@@ -1747,109 +1735,109 @@ class Container[T, U]:
 class BoundedContainer[T: int, U = str]:
     def process(self, x: T, y: U) -> tuple[T, U]:
         return (x, y)
-<CURSOR>",
+",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "func" @ 87..91: Function [definition]
         "T" @ 92..93: TypeParameter [definition]
         "x" @ 95..96: Parameter
         "T" @ 98..99: TypeParameter
         "T" @ 104..105: TypeParameter
         "x" @ 118..119: Parameter
-        "func_tuple" @ 164..174: Function [definition]
-        "Ts" @ 176..178: TypeParameter [definition]
-        "args" @ 180..184: Parameter
-        "tuple" @ 186..191: Class
-        "Ts" @ 193..195: Variable
-        "tuple" @ 201..206: Class
-        "Ts" @ 208..210: Variable
-        "args" @ 224..228: Parameter
-        "func_paramspec" @ 268..282: Function [definition]
-        "P" @ 285..286: TypeParameter [definition]
-        "func" @ 288..292: Parameter
-        "Callable" @ 294..302: Variable
-        "P" @ 303..304: Variable
-        "int" @ 306..309: Class
-        "Callable" @ 315..323: Variable
-        "P" @ 324..325: Variable
-        "str" @ 327..330: Class
-        "wrapper" @ 341..348: Function [definition]
-        "args" @ 350..354: Parameter
-        "P" @ 356..357: Variable
-        "args" @ 358..362: Variable
-        "kwargs" @ 366..372: Parameter
-        "P" @ 374..375: Variable
-        "kwargs" @ 376..382: Variable
-        "str" @ 387..390: Class
-        "str" @ 407..410: Class
-        "func" @ 411..415: Variable
-        "args" @ 417..421: Parameter
-        "kwargs" @ 425..431: Parameter
-        "wrapper" @ 445..452: Function
-        "Container" @ 506..515: Class [definition]
-        "T" @ 516..517: TypeParameter [definition]
-        "U" @ 519..520: TypeParameter [definition]
-        "__init__" @ 531..539: Method [definition]
-        "self" @ 540..544: SelfParameter
-        "value1" @ 546..552: Parameter
-        "T" @ 554..555: TypeParameter
-        "value2" @ 557..563: Parameter
-        "U" @ 565..566: TypeParameter
-        "self" @ 577..581: Variable
-        "value1" @ 582..588: Variable
-        "T" @ 590..591: TypeParameter
-        "value1" @ 594..600: Parameter
-        "self" @ 609..613: Variable
-        "value2" @ 614..620: Variable
-        "U" @ 622..623: TypeParameter
-        "value2" @ 626..632: Parameter
-        "get_first" @ 642..651: Method [definition]
-        "self" @ 652..656: SelfParameter
-        "T" @ 661..662: TypeParameter
-        "self" @ 679..683: Variable
-        "value1" @ 684..690: Variable
-        "get_second" @ 700..710: Method [definition]
-        "self" @ 711..715: SelfParameter
-        "U" @ 720..721: TypeParameter
-        "self" @ 738..742: Variable
-        "value2" @ 743..749: Variable
-        "BoundedContainer" @ 798..814: Class [definition]
-        "T" @ 815..816: TypeParameter [definition]
-        "int" @ 818..821: Class
-        "U" @ 823..824: TypeParameter [definition]
-        "str" @ 827..830: Class
-        "process" @ 841..848: Method [definition]
-        "self" @ 849..853: SelfParameter
-        "x" @ 855..856: Parameter
-        "T" @ 858..859: TypeParameter
-        "y" @ 861..862: Parameter
-        "U" @ 864..865: TypeParameter
-        "tuple" @ 870..875: Class
-        "T" @ 876..877: TypeParameter
-        "U" @ 879..880: TypeParameter
-        "x" @ 899..900: Parameter
-        "y" @ 902..903: Parameter
-        "#);
+        "func_tuple" @ 162..172: Function [definition]
+        "Ts" @ 174..176: TypeParameter [definition]
+        "args" @ 178..182: Parameter
+        "tuple" @ 184..189: Class
+        "Ts" @ 191..193: Variable
+        "tuple" @ 199..204: Class
+        "Ts" @ 206..208: Variable
+        "args" @ 222..226: Parameter
+        "func_paramspec" @ 266..280: Function [definition]
+        "P" @ 283..284: TypeParameter [definition]
+        "func" @ 286..290: Parameter
+        "Callable" @ 292..300: Variable
+        "P" @ 301..302: Variable
+        "int" @ 304..307: Class
+        "Callable" @ 313..321: Variable
+        "P" @ 322..323: Variable
+        "str" @ 325..328: Class
+        "wrapper" @ 339..346: Function [definition]
+        "args" @ 348..352: Parameter
+        "P" @ 354..355: Variable
+        "args" @ 356..360: Variable
+        "kwargs" @ 364..370: Parameter
+        "P" @ 372..373: Variable
+        "kwargs" @ 374..380: Variable
+        "str" @ 385..388: Class
+        "str" @ 405..408: Class
+        "func" @ 409..413: Variable
+        "args" @ 415..419: Parameter
+        "kwargs" @ 423..429: Parameter
+        "wrapper" @ 443..450: Function
+        "Container" @ 504..513: Class [definition]
+        "T" @ 514..515: TypeParameter [definition]
+        "U" @ 517..518: TypeParameter [definition]
+        "__init__" @ 529..537: Method [definition]
+        "self" @ 538..542: SelfParameter
+        "value1" @ 544..550: Parameter
+        "T" @ 552..553: TypeParameter
+        "value2" @ 555..561: Parameter
+        "U" @ 563..564: TypeParameter
+        "self" @ 575..579: TypeParameter
+        "value1" @ 580..586: Variable
+        "T" @ 588..589: TypeParameter
+        "value1" @ 592..598: Parameter
+        "self" @ 607..611: TypeParameter
+        "value2" @ 612..618: Variable
+        "U" @ 620..621: TypeParameter
+        "value2" @ 624..630: Parameter
+        "get_first" @ 640..649: Method [definition]
+        "self" @ 650..654: SelfParameter
+        "T" @ 659..660: TypeParameter
+        "self" @ 677..681: TypeParameter
+        "value1" @ 682..688: Variable
+        "get_second" @ 698..708: Method [definition]
+        "self" @ 709..713: SelfParameter
+        "U" @ 718..719: TypeParameter
+        "self" @ 736..740: TypeParameter
+        "value2" @ 741..747: Variable
+        "BoundedContainer" @ 796..812: Class [definition]
+        "T" @ 813..814: TypeParameter [definition]
+        "int" @ 816..819: Class
+        "U" @ 821..822: TypeParameter [definition]
+        "str" @ 825..828: Class
+        "process" @ 839..846: Method [definition]
+        "self" @ 847..851: SelfParameter
+        "x" @ 853..854: Parameter
+        "T" @ 856..857: TypeParameter
+        "y" @ 859..860: Parameter
+        "U" @ 862..863: TypeParameter
+        "tuple" @ 868..873: Class
+        "T" @ 874..875: TypeParameter
+        "U" @ 877..878: TypeParameter
+        "x" @ 897..898: Parameter
+        "y" @ 900..901: Parameter
+        "###);
     }
 
     #[test]
     fn test_type_parameters_usage_in_function_body() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             "
 def generic_function[T](value: T) -> T:
     # Type parameter T should be recognized here too
     result: T = value
     temp = result  # This could potentially be T as well
     return result
-<CURSOR>",
+",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "generic_function" @ 5..21: Function [definition]
         "T" @ 22..23: TypeParameter [definition]
         "value" @ 25..30: Parameter
@@ -1866,7 +1854,7 @@ def generic_function[T](value: T) -> T:
 
     #[test]
     fn test_decorator_classification() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             r#"
 @staticmethod
 @property
@@ -1876,117 +1864,117 @@ def my_function():
 
 @dataclass
 class MyClass:
-    pass<CURSOR>
+    pass
 "#,
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "staticmethod" @ 2..14: Decorator
         "property" @ 16..24: Decorator
         "app" @ 26..29: Variable
         "route" @ 30..35: Variable
-        "/"/path/"" @ 36..43: String
+        "\"/path\"" @ 36..43: String
         "my_function" @ 49..60: Function [definition]
         "dataclass" @ 75..84: Decorator
         "MyClass" @ 91..98: Class [definition]
-        "#);
+        "###);
     }
 
     #[test]
     fn test_implicitly_concatenated_strings() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             r#"x = "hello" "world"
-y = ("multi" 
-     "line" 
+y = ("multi"
+     "line"
      "string")
-z = 'single' "mixed" 'quotes'<CURSOR>"#,
+z = 'single' "mixed" 'quotes'"#,
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "x" @ 0..1: Variable
-        "/"hello/"" @ 4..11: String
-        "/"world/"" @ 12..19: String
+        "\"hello\"" @ 4..11: String
+        "\"world\"" @ 12..19: String
         "y" @ 20..21: Variable
-        "/"multi/"" @ 25..32: String
-        "/"line/"" @ 39..45: String
-        "/"string/"" @ 52..60: String
-        "z" @ 62..63: Variable
-        "'single'" @ 66..74: String
-        "/"mixed/"" @ 75..82: String
-        "'quotes'" @ 83..91: String
-        "#);
+        "\"multi\"" @ 25..32: String
+        "\"line\"" @ 38..44: String
+        "\"string\"" @ 50..58: String
+        "z" @ 60..61: Variable
+        "'single'" @ 64..72: String
+        "\"mixed\"" @ 73..80: String
+        "'quotes'" @ 81..89: String
+        "###);
     }
 
     #[test]
     fn test_bytes_literals() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             r#"x = b"hello" b"world"
-y = (b"multi" 
-     b"line" 
+y = (b"multi"
+     b"line"
      b"bytes")
-z = b'single' b"mixed" b'quotes'<CURSOR>"#,
+z = b'single' b"mixed" b'quotes'"#,
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "x" @ 0..1: Variable
-        "b/"hello/"" @ 4..12: String
-        "b/"world/"" @ 13..21: String
+        "b\"hello\"" @ 4..12: String
+        "b\"world\"" @ 13..21: String
         "y" @ 22..23: Variable
-        "b/"multi/"" @ 27..35: String
-        "b/"line/"" @ 42..49: String
-        "b/"bytes/"" @ 56..64: String
-        "z" @ 66..67: Variable
-        "b'single'" @ 70..79: String
-        "b/"mixed/"" @ 80..88: String
-        "b'quotes'" @ 89..98: String
-        "#);
+        "b\"multi\"" @ 27..35: String
+        "b\"line\"" @ 41..48: String
+        "b\"bytes\"" @ 54..62: String
+        "z" @ 64..65: Variable
+        "b'single'" @ 68..77: String
+        "b\"mixed\"" @ 78..86: String
+        "b'quotes'" @ 87..96: String
+        "###);
     }
 
     #[test]
     fn test_mixed_string_and_bytes_literals() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             r#"# Test mixed string and bytes literals
 string_concat = "hello" "world"
 bytes_concat = b"hello" b"world"
 mixed_quotes_str = 'single' "double" 'single'
 mixed_quotes_bytes = b'single' b"double" b'single'
 regular_string = "just a string"
-regular_bytes = b"just bytes"<CURSOR>"#,
+regular_bytes = b"just bytes""#,
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "string_concat" @ 39..52: Variable
-        "/"hello/"" @ 55..62: String
-        "/"world/"" @ 63..70: String
+        "\"hello\"" @ 55..62: String
+        "\"world\"" @ 63..70: String
         "bytes_concat" @ 71..83: Variable
-        "b/"hello/"" @ 86..94: String
-        "b/"world/"" @ 95..103: String
+        "b\"hello\"" @ 86..94: String
+        "b\"world\"" @ 95..103: String
         "mixed_quotes_str" @ 104..120: Variable
         "'single'" @ 123..131: String
-        "/"double/"" @ 132..140: String
+        "\"double\"" @ 132..140: String
         "'single'" @ 141..149: String
         "mixed_quotes_bytes" @ 150..168: Variable
         "b'single'" @ 171..180: String
-        "b/"double/"" @ 181..190: String
+        "b\"double\"" @ 181..190: String
         "b'single'" @ 191..200: String
         "regular_string" @ 201..215: Variable
-        "/"just a string/"" @ 218..233: String
+        "\"just a string\"" @ 218..233: String
         "regular_bytes" @ 234..247: Variable
-        "b/"just bytes/"" @ 250..263: String
-        "#);
+        "b\"just bytes\"" @ 250..263: String
+        "###);
     }
 
     #[test]
     fn test_fstring_with_mixed_literals() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             r#"
 # Test f-strings with various literal types
 name = "Alice"
@@ -2000,17 +1988,17 @@ result = f"Hello {name}! Value: {value}, Data: {data!r}"
 mixed = f"prefix" + b"suffix"
 
 # Complex f-string with nested expressions
-complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"<CURSOR>
+complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"
 "#,
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "name" @ 45..49: Variable
-        "/"Alice/"" @ 52..59: String
+        "\"Alice\"" @ 52..59: String
         "data" @ 60..64: Variable
-        "b/"hello/"" @ 67..75: String
+        "b\"hello\"" @ 67..75: String
         "value" @ 76..81: Variable
         "42" @ 84..86: Number
         "result" @ 153..159: Variable
@@ -2022,7 +2010,7 @@ complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"<CU
         "data" @ 201..205: Variable
         "mixed" @ 266..271: Variable
         "prefix" @ 276..282: String
-        "b/"suffix/"" @ 286..295: String
+        "b\"suffix\"" @ 286..295: String
         "complex_fstring" @ 340..355: Variable
         "User: " @ 360..366: String
         "name" @ 367..371: Variable
@@ -2033,12 +2021,12 @@ complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"<CU
         ", Hex: " @ 400..407: String
         "value" @ 408..413: Variable
         "x" @ 414..415: String
-        "#);
+        "###);
     }
 
     #[test]
     fn test_nonlocal_and_global_statements() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             r#"
 x = "global_value"
 y = "another_global"
@@ -2046,47 +2034,47 @@ y = "another_global"
 def outer():
     x = "outer_value"
     z = "outer_local"
-    
+
     def inner():
         nonlocal x, z  # These should be variable tokens
         global y       # This should be a variable token
         x = "modified"
         y = "modified_global"
         z = "modified_local"
-        
+
         def deeper():
             nonlocal x    # Variable token
             global y, x   # Both should be variable tokens
             return x + y
-        
+
         return deeper
-    
-    return inner<CURSOR>
+
+    return inner
 "#,
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "x" @ 1..2: Variable
-        "/"global_value/"" @ 5..19: String
+        "\"global_value\"" @ 5..19: String
         "y" @ 20..21: Variable
-        "/"another_global/"" @ 24..40: String
+        "\"another_global\"" @ 24..40: String
         "outer" @ 46..51: Function [definition]
         "x" @ 59..60: Variable
-        "/"outer_value/"" @ 63..76: String
+        "\"outer_value\"" @ 63..76: String
         "z" @ 81..82: Variable
-        "/"outer_local/"" @ 85..98: String
+        "\"outer_local\"" @ 85..98: String
         "inner" @ 108..113: Function [definition]
         "x" @ 134..135: Variable
         "z" @ 137..138: Variable
         "y" @ 189..190: Variable
         "x" @ 239..240: Variable
-        "/"modified/"" @ 243..253: String
+        "\"modified\"" @ 243..253: String
         "y" @ 262..263: Variable
-        "/"modified_global/"" @ 266..283: String
+        "\"modified_global\"" @ 266..283: String
         "z" @ 292..293: Variable
-        "/"modified_local/"" @ 296..312: String
+        "\"modified_local\"" @ 296..312: String
         "deeper" @ 326..332: Function [definition]
         "x" @ 357..358: Variable
         "y" @ 398..399: Variable
@@ -2095,29 +2083,29 @@ def outer():
         "y" @ 461..462: Variable
         "deeper" @ 479..485: Function
         "inner" @ 498..503: Function
-        "#);
+        "###);
     }
 
     #[test]
     fn test_nonlocal_global_edge_cases() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             r#"
 # Single variable statements
 def test():
     global x
     nonlocal y
-    
+
     # Multiple variables in one statement
     global a, b, c
     nonlocal d, e, f
-    
-    return x + y + a + b + c + d + e + f<CURSOR>
+
+    return x + y + a + b + c + d + e + f
 "#,
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "test" @ 34..38: Function [definition]
         "x" @ 53..54: Variable
         "y" @ 68..69: Variable
@@ -2140,7 +2128,7 @@ def test():
 
     #[test]
     fn test_pattern_matching() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             r#"
 def process_data(data):
     match data:
@@ -2152,19 +2140,19 @@ def process_data(data):
             return sequence
         case value as fallback:
             print(f"Fallback: {fallback}")
-            return fallback<CURSOR>
+            return fallback
 "#,
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "process_data" @ 5..17: Function [definition]
         "data" @ 18..22: Parameter
         "data" @ 35..39: Variable
-        "/"name/"" @ 55..61: String
+        "\"name\"" @ 55..61: String
         "name" @ 63..67: Variable
-        "/"age/"" @ 69..74: String
+        "\"age\"" @ 69..74: String
         "age" @ 76..79: Variable
         "rest" @ 83..87: Variable
         "person" @ 92..98: Variable
@@ -2190,12 +2178,12 @@ def process_data(data):
         "Fallback: " @ 375..385: String
         "fallback" @ 386..394: Variable
         "fallback" @ 417..425: Variable
-        "#);
+        "###);
     }
 
     #[test]
     fn test_exception_handlers() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             r#"
 try:
     x = 1 / 0
@@ -2206,13 +2194,13 @@ except (TypeError, RuntimeError) as re:
 except Exception as e:
     print(e)
 finally:
-    pass<CURSOR>
+    pass
 "#,
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "x" @ 10..11: Variable
         "1" @ 14..15: Number
         "0" @ 18..19: Number
@@ -2234,7 +2222,7 @@ finally:
 
     #[test]
     fn test_self_attribute_expression() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             r#"
 from typing import Self
 
@@ -2244,15 +2232,13 @@ class C:
         self.annotated: int = 1
         self.non_annotated = 1
         self.x.test()
-        self.x()<CURSOR>
-
-
+        self.x()
 "#,
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "typing" @ 6..12: Namespace
         "Self" @ 20..24: Variable
         "C" @ 33..34: Class [definition]
@@ -2277,21 +2263,94 @@ class C:
     /// Regression test for <https://github.com/astral-sh/ty/issues/1406>
     #[test]
     fn test_invalid_kwargs() {
-        let test = cursor_test(
+        let test = SemanticTokenTest::new(
             r#"
-def foo(self, **<CURSOR>key, value=10):
+def foo(self, **key, value=10):
     return
 "#,
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        let tokens = test.highlight_file();
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "foo" @ 5..8: Function [definition]
         "self" @ 9..13: Parameter
         "key" @ 17..20: Parameter
         "value" @ 22..27: Parameter
         "10" @ 28..30: Number
         "#);
+    }
+
+    pub(super) struct SemanticTokenTest {
+        pub(super) db: ty_project::TestDb,
+        file: File,
+    }
+
+    impl SemanticTokenTest {
+        fn new(source: &str) -> Self {
+            let mut db = ty_project::TestDb::new(ProjectMetadata::new(
+                "test".into(),
+                SystemPathBuf::from("/"),
+            ));
+
+            db.init_program().unwrap();
+
+            let path = SystemPath::new("src/main.py");
+            db.write_file(path, ruff_python_trivia::textwrap::dedent(source))
+                .expect("Write to memory file system to always succeed");
+
+            let file = system_path_to_file(&db, path).expect("newly written file to existing");
+
+            Self { db, file }
+        }
+
+        /// Get semantic tokens for the entire file
+        fn highlight_file(&self) -> SemanticTokens {
+            semantic_tokens(&self.db, self.file, None)
+        }
+
+        /// Get semantic tokens for a specific range in the file
+        fn highlight_range(&self, range: TextRange) -> SemanticTokens {
+            semantic_tokens(&self.db, self.file, Some(range))
+        }
+
+        /// Helper function to convert semantic tokens to a snapshot-friendly text format
+        fn to_snapshot(&self, tokens: &SemanticTokens) -> String {
+            use std::fmt::Write;
+            let source = ruff_db::source::source_text(&self.db, self.file);
+            let mut result = String::new();
+
+            for token in tokens.iter() {
+                let token_text = &source[token.range()];
+                let modifiers_text = if token.modifiers.is_empty() {
+                    String::new()
+                } else {
+                    let mut mods = Vec::new();
+                    if token.modifiers.contains(SemanticTokenModifier::DEFINITION) {
+                        mods.push("definition");
+                    }
+                    if token.modifiers.contains(SemanticTokenModifier::READONLY) {
+                        mods.push("readonly");
+                    }
+                    if token.modifiers.contains(SemanticTokenModifier::ASYNC) {
+                        mods.push("async");
+                    }
+                    format!(" [{}]", mods.join(", "))
+                };
+
+                writeln!(
+                    result,
+                    "{:?} @ {}..{}: {:?}{}",
+                    token_text,
+                    u32::from(token.start()),
+                    u32::from(token.end()),
+                    token.token_type,
+                    modifiers_text
+                )
+                .unwrap();
+            }
+
+            result
+        }
     }
 }

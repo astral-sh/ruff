@@ -4,6 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_codegen::Generator;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
+use unicode_normalization::UnicodeNormalization;
 
 use crate::checkers::ast::Checker;
 use crate::{AlwaysFixableViolation, Edit, Fix};
@@ -28,9 +29,27 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// obj.foo = 42
 /// ```
 ///
+/// ## Fix safety
+/// The fix is marked as unsafe for attribute names that are not in NFKC (Normalization Form KC)
+/// normalization. Python normalizes identifiers using NFKC when using attribute access syntax
+/// (e.g., `obj.attr = value`), but does not normalize string arguments passed to `setattr`.
+/// Rewriting `setattr(obj, "ſ", 1)` to `obj.ſ = 1` would be interpreted as `obj.s = 1` at
+/// runtime, changing behavior.
+///
+/// For example, the long s character `"ſ"` normalizes to `"s"` under NFKC, so:
+/// ```python
+/// # This creates an attribute with the exact name "ſ"
+/// setattr(obj, "ſ", 1)
+/// getattr(obj, "ſ")  # Returns 1
+///
+/// # But this would normalize to "s" and set a different attribute
+/// obj.ſ = 1  # This is interpreted as obj.s = 1, not obj.ſ = 1
+/// ```
+///
 /// ## References
 /// - [Python documentation: `setattr`](https://docs.python.org/3/library/functions.html#setattr)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.111")]
 pub(crate) struct SetAttrWithConstant;
 
 impl AlwaysFixableViolation for SetAttrWithConstant {
@@ -88,6 +107,12 @@ pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
         return;
     }
 
+    // Mark fixes as unsafe for non-NFKC attribute names. Python normalizes identifiers using NFKC, so using
+    // attribute syntax (e.g., `obj.attr = value`) would normalize the name and potentially change
+    // program behavior.
+    let attr_name = name.to_str();
+    let is_unsafe = attr_name.nfkc().collect::<String>() != attr_name;
+
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment
     // (which is a `Stmt`) if the `Expr` is already being used as a `Stmt`
     // (i.e., it's directly within an `Stmt::Expr`).
@@ -99,10 +124,16 @@ pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     {
         if expr == child.as_ref() {
             let mut diagnostic = checker.report_diagnostic(SetAttrWithConstant, expr.range());
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            let edit = Edit::range_replacement(
                 assignment(obj, name.to_str(), value, checker.generator()),
                 expr.range(),
-            )));
+            );
+            let fix = if is_unsafe {
+                Fix::unsafe_edit(edit)
+            } else {
+                Fix::safe_edit(edit)
+            };
+            diagnostic.set_fix(fix);
         }
     }
 }

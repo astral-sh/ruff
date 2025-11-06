@@ -53,20 +53,21 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 39 |     # error: [invalid-overload]
 40 |     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
 41 |         if isinstance(x, int):
-42 |             return cls(x)
-43 |         return None
-44 | 
-45 |     @overload
-46 |     @classmethod
-47 |     def try_from4(cls, x: int) -> CheckClassMethod: ...
-48 |     @overload
-49 |     @classmethod
-50 |     def try_from4(cls, x: str) -> None: ...
-51 |     @classmethod
-52 |     def try_from4(cls, x: int | str) -> CheckClassMethod | None:
-53 |         if isinstance(x, int):
-54 |             return cls(x)
-55 |         return None
+42 |             # error: [call-non-callable]
+43 |             return cls(x)
+44 |         return None
+45 | 
+46 |     @overload
+47 |     @classmethod
+48 |     def try_from4(cls, x: int) -> CheckClassMethod: ...
+49 |     @overload
+50 |     @classmethod
+51 |     def try_from4(cls, x: str) -> None: ...
+52 |     @classmethod
+53 |     def try_from4(cls, x: int | str) -> CheckClassMethod | None:
+54 |         if isinstance(x, int):
+55 |             return cls(x)
+56 |         return None
 ```
 
 # Diagnostics
@@ -124,8 +125,22 @@ error[invalid-overload]: Overloaded function `try_from3` does not use the `@clas
    |         |
    |         Missing here
 41 |         if isinstance(x, int):
-42 |             return cls(x)
+42 |             # error: [call-non-callable]
    |
 info: rule `invalid-overload` is enabled by default
+
+```
+
+```
+error[call-non-callable]: Object of type `CheckClassMethod` is not callable
+  --> src/mdtest_snippet.py:43:20
+   |
+41 |         if isinstance(x, int):
+42 |             # error: [call-non-callable]
+43 |             return cls(x)
+   |                    ^^^^^^
+44 |         return None
+   |
+info: rule `call-non-callable` is enabled by default
 
 ```

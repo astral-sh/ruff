@@ -45,7 +45,7 @@ class C(B1, B2): ...
 # ... which lies in their intersection:
 static_assert(is_subtype_of(C, Intersection[B1, B2]))
 
-# However, if a class is marked final, it can not be subclassed ...
+# However, if a class is marked final, it cannot be subclassed ...
 @final
 class FinalSubclass(A): ...
 
@@ -85,6 +85,31 @@ static_assert(is_disjoint_from(slice, Foo))
 static_assert(is_disjoint_from(type[slice], type[Foo]))
 static_assert(is_disjoint_from(memoryview, Foo))
 static_assert(is_disjoint_from(type[memoryview], type[Foo]))
+```
+
+## Specialized `@final` types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import final
+from ty_extensions import static_assert, is_disjoint_from
+
+@final
+class Foo[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+
+static_assert(not is_disjoint_from(Foo[A], Foo[B]))
+
+# TODO: `int` and `str` are disjoint bases, so these should be disjoint.
+static_assert(not is_disjoint_from(Foo[int], Foo[str]))
 ```
 
 ## "Disjoint base" builtin types

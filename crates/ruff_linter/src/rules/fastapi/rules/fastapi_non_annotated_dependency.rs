@@ -79,6 +79,7 @@ use ruff_python_ast::PythonVersion;
 /// [typing-annotated]: https://docs.python.org/3/library/typing.html#typing.Annotated
 /// [typing-extensions]: https://typing-extensions.readthedocs.io/en/stable/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct FastApiNonAnnotatedDependency {
     py_version: PythonVersion,
 }

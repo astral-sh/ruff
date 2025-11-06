@@ -370,7 +370,7 @@ pub(crate) fn format_source(
                 let line_index = LineIndex::from_source_text(unformatted);
                 let byte_range = range.to_text_range(unformatted, &line_index);
                 format_range(unformatted, byte_range, options).map(|formatted_range| {
-                    let mut formatted = unformatted.to_string();
+                    let mut formatted = unformatted.clone();
                     formatted.replace_range(
                         std::ops::Range::<usize>::from(formatted_range.source_range()),
                         formatted_range.as_code(),
@@ -879,19 +879,7 @@ impl From<&FormatCommandError> for Diagnostic {
             | FormatCommandError::Write(_, source_error) => {
                 Diagnostic::new(DiagnosticId::Io, Severity::Error, source_error)
             }
-            FormatCommandError::Format(_, format_module_error) => match format_module_error {
-                FormatModuleError::ParseError(parse_error) => Diagnostic::new(
-                    DiagnosticId::InternalError,
-                    Severity::Error,
-                    &parse_error.error,
-                ),
-                FormatModuleError::FormatError(format_error) => {
-                    Diagnostic::new(DiagnosticId::InternalError, Severity::Error, format_error)
-                }
-                FormatModuleError::PrintError(print_error) => {
-                    Diagnostic::new(DiagnosticId::InternalError, Severity::Error, print_error)
-                }
-            },
+            FormatCommandError::Format(_, format_module_error) => format_module_error.into(),
             FormatCommandError::RangeFormatNotebook(_) => Diagnostic::new(
                 DiagnosticId::InvalidCliOption,
                 Severity::Error,

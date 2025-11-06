@@ -1,4 +1,6 @@
+# ruff: noqa: PYI021
 import sys
+import types
 from collections.abc import Iterable
 from enum import Enum
 from typing import (
@@ -42,28 +44,87 @@ type JustComplex = TypeOf[1.0j]
 
 # Constraints
 class ConstraintSet:
+    @staticmethod
+    def range(lower_bound: Any, typevar: Any, upper_bound: Any) -> Self:
+        """
+        Returns a constraint set that requires `typevar` to specialize to a type
+        that is a supertype of `lower_bound` and a subtype of `upper_bound`.
+        """
+
+    @staticmethod
+    def always() -> Self:
+        """Returns a constraint set that is always satisfied"""
+
+    @staticmethod
+    def never() -> Self:
+        """Returns a constraint set that is never satisfied"""
+
+    def implies_subtype_of(self, ty: Any, of: Any) -> Self:
+        """
+        Returns a constraint set that is satisfied when `ty` is a `subtype`_ of
+        `of`, assuming that all of the constraints in `self` hold.
+
+        .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
+        """
+
+    def satisfies(self, other: Self) -> Self:
+        """
+        Returns whether this constraint set satisfies another — that is, whether
+        every specialization that satisfies this constraint set also satisfies
+        `other`.
+        """
+
+    def satisfied_by_all_typevars(
+        self, *, inferable: tuple[Any, ...] | None = None
+    ) -> bool:
+        """
+        Returns whether this constraint set is satisfied by all of the typevars
+        that it mentions. You must provide a tuple of the typevars that should
+        be considered `inferable`. All other typevars mentioned in the
+        constraint set will be considered non-inferable.
+        """
+
     def __bool__(self) -> bool: ...
+    def __eq__(self, other: ConstraintSet) -> bool: ...
+    def __ne__(self, other: ConstraintSet) -> bool: ...
     def __and__(self, other: ConstraintSet) -> ConstraintSet: ...
     def __or__(self, other: ConstraintSet) -> ConstraintSet: ...
     def __invert__(self) -> ConstraintSet: ...
-
-def range_constraint(
-    lower_bound: Any, typevar: Any, upper_bound: Any
-) -> ConstraintSet: ...
-def negated_range_constraint(
-    lower_bound: Any, typevar: Any, upper_bound: Any
-) -> ConstraintSet: ...
 
 # Predicates on types
 #
 # Ideally, these would be annotated using `TypeForm`, but that has not been
 # standardized yet (https://peps.python.org/pep-0747).
-def is_equivalent_to(type_a: Any, type_b: Any) -> ConstraintSet: ...
-def is_subtype_of(type_a: Any, type_b: Any) -> ConstraintSet: ...
-def is_assignable_to(type_a: Any, type_b: Any) -> ConstraintSet: ...
-def is_disjoint_from(type_a: Any, type_b: Any) -> ConstraintSet: ...
-def is_singleton(ty: Any) -> bool: ...
-def is_single_valued(ty: Any) -> bool: ...
+def is_equivalent_to(type_a: Any, type_b: Any) -> ConstraintSet:
+    """Returns a constraint set that is satisfied when `type_a` and `type_b` are
+    `equivalent`_ types.
+
+    .. _equivalent: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
+    """
+
+def is_subtype_of(ty: Any, of: Any) -> ConstraintSet:
+    """Returns a constraint set that is satisfied when `ty` is a `subtype`_ of `of`.
+
+    .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
+    """
+
+def is_assignable_to(ty: Any, to: Any) -> ConstraintSet:
+    """Returns a constraint set that is satisfied when `ty` is `assignable`_ to `to`.
+
+    .. _assignable: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
+    """
+
+def is_disjoint_from(type_a: Any, type_b: Any) -> ConstraintSet:
+    """Returns a constraint set that is satisfied when `type_a` and `type_b` are disjoint types.
+
+    Two types are disjoint if they have no inhabitants in common.
+    """
+
+def is_singleton(ty: Any) -> bool:
+    """Returns `True` if `ty` is a singleton type with exactly one inhabitant."""
+
+def is_single_valued(ty: Any) -> bool:
+    """Returns `True` if `ty` is non-empty and all inhabitants compare equal to each other."""
 
 # Returns the generic context of a type as a tuple of typevars, or `None` if the
 # type is not generic.
@@ -88,11 +149,16 @@ def all_members(obj: Any) -> tuple[str, ...]: ...
 
 # Returns `True` if the given object has a member with the given name.
 def has_member(obj: Any, name: str) -> bool: ...
+def reveal_protocol_interface(protocol: type) -> None:
+    """
+    Passing a protocol type to this function will cause ty to emit an info-level
+    diagnostic describing the protocol's interface.
 
-# Passing a protocol type to this function will cause ty to emit an info-level
-# diagnostic describing the protocol's interface. Passing a non-protocol type
-# will cause ty to emit an error diagnostic.
-def reveal_protocol_interface(protocol: type) -> None: ...
+    Passing a non-protocol type will cause ty to emit an error diagnostic.
+    """
+
+def reveal_mro(cls: type | types.GenericAlias) -> None:
+    """Reveal the MRO that ty infers for the given class or generic alias."""
 
 # A protocol describing an interface that should be satisfied by all named tuples
 # created using `typing.NamedTuple` or `collections.namedtuple`.

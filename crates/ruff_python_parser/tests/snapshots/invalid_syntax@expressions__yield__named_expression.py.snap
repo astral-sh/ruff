@@ -125,5 +125,5 @@ Module(
 2 | yield x := 1
 3 |
 4 | yield 1, x := 2, 3
-  |            ^^ Syntax Error: Expected ',', found ':='
+  |            ^^ Syntax Error: Expected `,`, found `:=`
   |

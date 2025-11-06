@@ -133,6 +133,17 @@ impl SemanticSyntaxChecker {
                 }
                 Self::duplicate_parameter_name(parameters, ctx);
             }
+            Stmt::Global(ast::StmtGlobal { names, .. }) => {
+                for name in names {
+                    if ctx.is_bound_parameter(name) {
+                        Self::add_error(
+                            ctx,
+                            SemanticSyntaxErrorKind::GlobalParameter(name.to_string()),
+                            name.range,
+                        );
+                    }
+                }
+            }
             Stmt::ClassDef(ast::StmtClassDef { type_params, .. })
             | Stmt::TypeAlias(ast::StmtTypeAlias { type_params, .. }) => {
                 if let Some(type_params) = type_params {
@@ -208,7 +219,7 @@ impl SemanticSyntaxChecker {
                     AwaitOutsideAsyncFunctionKind::AsyncWith,
                 );
             }
-            Stmt::Nonlocal(ast::StmtNonlocal { range, .. }) => {
+            Stmt::Nonlocal(ast::StmtNonlocal { names, range, .. }) => {
                 // test_ok nonlocal_declaration_at_module_level
                 // def _():
                 //     nonlocal x
@@ -222,6 +233,18 @@ impl SemanticSyntaxChecker {
                         SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel,
                         *range,
                     );
+                }
+
+                if !ctx.in_module_scope() {
+                    for name in names {
+                        if !ctx.has_nonlocal_binding(name) {
+                            Self::add_error(
+                                ctx,
+                                SemanticSyntaxErrorKind::NonlocalWithoutBinding(name.to_string()),
+                                name.range,
+                            );
+                        }
+                    }
                 }
             }
             Stmt::Break(ast::StmtBreak { range, .. }) => {
@@ -1137,8 +1160,14 @@ impl Display for SemanticSyntaxError {
             }
             SemanticSyntaxErrorKind::BreakOutsideLoop => f.write_str("`break` outside loop"),
             SemanticSyntaxErrorKind::ContinueOutsideLoop => f.write_str("`continue` outside loop"),
+            SemanticSyntaxErrorKind::GlobalParameter(name) => {
+                write!(f, "name `{name}` is parameter and global")
+            }
             SemanticSyntaxErrorKind::DifferentMatchPatternBindings => {
                 write!(f, "alternative patterns bind different names")
+            }
+            SemanticSyntaxErrorKind::NonlocalWithoutBinding(name) => {
+                write!(f, "no binding for nonlocal `{name}` found")
             }
         }
     }
@@ -1520,6 +1549,13 @@ pub enum SemanticSyntaxErrorKind {
     /// Represents the use of a `continue` statement outside of a loop.
     ContinueOutsideLoop,
 
+    /// Represents a function parameter that is also declared as `global`.
+    ///
+    /// Declaring a parameter as `global` is invalid, since parameters are already
+    /// bound in the local scope of the function. Using `global` on them introduces
+    /// ambiguity and will result in a `SyntaxError`.
+    GlobalParameter(String),
+
     /// Represents the use of alternative patterns in a `match` statement that bind different names.
     ///
     /// Python requires all alternatives in an OR pattern (`|`) to bind the same set of names.
@@ -1533,6 +1569,9 @@ pub enum SemanticSyntaxErrorKind {
     ///         ...
     /// ```
     DifferentMatchPatternBindings,
+
+    /// Represents a nonlocal statement for a name that has no binding in an enclosing scope.
+    NonlocalWithoutBinding(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -1820,6 +1859,15 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         //     case (x, (y | y)): ...
                         //     case [a, _] | [a, _]: ...
                         //     case [a] | [C(a)]: ...
+
+                        // test_ok nested_alternative_patterns
+                        // match ruff:
+                        //     case {"lint": {"select": x} | {"extend-select": x}} | {"select": x}:
+                        //         ...
+                        // match 42:
+                        //     case [[x] | [x]] | x: ...
+                        // match 42:
+                        //     case [[x | x] | [x]] | x: ...
                         SemanticSyntaxChecker::add_error(
                             self.ctx,
                             SemanticSyntaxErrorKind::DifferentMatchPatternBindings,
@@ -1827,6 +1875,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         );
                         break;
                     }
+                    self.names = visitor.names;
                 }
             }
         }
@@ -1973,6 +2022,9 @@ pub trait SemanticSyntaxContext {
     /// Return the [`TextRange`] at which a name is declared as `global` in the current scope.
     fn global(&self, name: &str) -> Option<TextRange>;
 
+    /// Returns `true` if `name` has a binding in an enclosing scope.
+    fn has_nonlocal_binding(&self, name: &str) -> bool;
+
     /// Returns `true` if the visitor is currently in an async context, i.e. an async function.
     fn in_async_context(&self) -> bool;
 
@@ -2054,6 +2106,8 @@ pub trait SemanticSyntaxContext {
     fn report_semantic_error(&self, error: SemanticSyntaxError);
 
     fn in_loop_context(&self) -> bool;
+
+    fn is_bound_parameter(&self, name: &str) -> bool;
 }
 
 /// Modified version of [`std::str::EscapeDefault`] that does not escape single or double quotes.

@@ -234,7 +234,7 @@ Module(
 
   |
 1 | def foo(a: int, b:
-  |                   ^ Syntax Error: Expected ')', found newline
+  |                   ^ Syntax Error: Expected `)`, found newline
 2 | def foo():
 3 |     return 42
 4 | def foo(a: int, b: str
@@ -254,7 +254,7 @@ Module(
 3 |     return 42
 4 | def foo(a: int, b: str
 5 | x = 10
-  | ^ Syntax Error: Expected ',', found name
+  | ^ Syntax Error: Expected `,`, found name
   |
 
 

@@ -47,7 +47,9 @@ use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
-use crate::semantic_index::{ExpressionsScopeMap, SemanticIndex, VisibleAncestorsIter};
+use crate::semantic_index::{
+    ExpressionsScopeMap, MaybeModuleImport, SemanticIndex, VisibleAncestorsIter,
+};
 use crate::semantic_model::HasTrackedScope;
 use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
@@ -111,6 +113,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
+    maybe_imported_modules: FxHashSet<MaybeModuleImport>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
@@ -148,6 +151,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
 
+            maybe_imported_modules: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
 
@@ -1262,6 +1266,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scopes_by_node.shrink_to_fit();
         self.generator_functions.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
+        self.maybe_imported_modules.shrink_to_fit();
 
         SemanticIndex {
             place_tables,
@@ -1274,6 +1279,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes_by_node: self.scopes_by_node,
             use_def_maps,
             imported_modules: Arc::new(self.imported_modules),
+            maybe_imported_modules: self.maybe_imported_modules,
             has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: self.enclosing_snapshots,
             semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
@@ -1557,6 +1563,15 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     } else {
                         (&alias.name.id, false)
                     };
+
+                    // If there's no alias or a redundant alias, record this as a potential import of a submodule
+                    if alias.asname.is_none() || is_reexported {
+                        self.maybe_imported_modules.insert(MaybeModuleImport {
+                            level: node.level,
+                            from_module: node.module.clone().map(Into::into),
+                            submodule: alias.name.clone().into(),
+                        });
+                    }
 
                     // Look for imports `from __future__ import annotations`, ignore `as ...`
                     // We intentionally don't enforce the rules about location of `__future__`
@@ -2697,6 +2712,12 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
         None
     }
 
+    // We handle the one syntax error that relies on this method (`NonlocalWithoutBinding`) directly
+    // in `TypeInferenceBuilder::infer_nonlocal_statement`, so this just returns `true`.
+    fn has_nonlocal_binding(&self, _name: &str) -> bool {
+        true
+    }
+
     fn in_async_context(&self) -> bool {
         for scope_info in self.scope_stack.iter().rev() {
             let scope = &self.scopes[scope_info.file_scope_id];
@@ -2788,6 +2809,9 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
 
     fn in_loop_context(&self) -> bool {
         self.current_scope_info().current_loop.is_some()
+    }
+    fn is_bound_parameter(&self, _name: &str) -> bool {
+        false
     }
 }
 

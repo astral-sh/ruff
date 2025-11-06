@@ -76,6 +76,7 @@ def _() -> TD:
 
 def _() -> TD:
     # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
+    # error: [invalid-return-type]
     return {}
 ```
 
@@ -144,4 +145,207 @@ def h[T](x: T, cond: bool) -> T | list[T]:
 
 def i[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
+```
+
+## Type context sources
+
+Type context is sourced from various places, including annotated assignments:
+
+```py
+from typing import Literal
+
+a: list[Literal[1]] = [1]
+```
+
+Function parameter annotations:
+
+```py
+def b(x: list[Literal[1]]): ...
+
+b([1])
+```
+
+Bound method parameter annotations:
+
+```py
+class C:
+    def __init__(self, x: list[Literal[1]]): ...
+    def foo(self, x: list[Literal[1]]): ...
+
+C([1]).foo([1])
+```
+
+Declared variable types:
+
+```py
+d: list[Literal[1]]
+d = [1]
+```
+
+Declared attribute types:
+
+```py
+class E:
+    a: list[Literal[1]]
+    b: list[Literal[1]]
+
+def _(e: E):
+    e.a = [1]
+    E.b = [1]
+```
+
+Function return types:
+
+```py
+def f() -> list[Literal[1]]:
+    return [1]
+```
+
+## Instance attributes
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Both meta and class/instance attribute annotations are used as type context:
+
+```py
+from typing import Literal, Any
+
+class DataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> list[Literal[1]]:
+        return []
+
+    def __set__(self, instance: object, value: list[Literal[1]]) -> None:
+        pass
+
+def lst[T](x: T) -> list[T]:
+    return [x]
+
+def _(flag: bool):
+    class Meta(type):
+        if flag:
+            x: DataDescriptor = DataDescriptor()
+
+    class C(metaclass=Meta):
+        x: list[int | None]
+
+    def _(c: C):
+        c.x = lst(1)
+        C.x = lst(1)
+```
+
+For union targets, each element of the union is considered as a separate type context:
+
+```py
+from typing import Literal
+
+class X:
+    x: list[int | str]
+
+class Y:
+    x: list[int | None]
+
+def lst[T](x: T) -> list[T]:
+    return [x]
+
+def _(xy: X | Y):
+    xy.x = lst(1)
+```
+
+## Class constructor parameters
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+The parameters of both `__init__` and `__new__` are used as type context sources for constructor
+calls:
+
+```py
+def f[T](x: T) -> list[T]:
+    return [x]
+
+class A:
+    def __new__(cls, value: list[int | str]):
+        return super().__new__(cls, value)
+
+    def __init__(self, value: list[int | None]): ...
+
+A(f(1))
+
+# error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `list[int | str]`, found `list[list[Unknown]]`"
+# error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `list[int | None]`, found `list[list[Unknown]]`"
+A(f([]))
+```
+
+## Multi-inference diagnostics
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Diagnostics unrelated to the type-context are only reported once:
+
+`call.py`:
+
+```py
+def f[T](x: T) -> list[T]:
+    return [x]
+
+def a(x: list[bool], y: list[bool]): ...
+def b(x: list[int], y: list[int]): ...
+def c(x: list[int], y: list[int]): ...
+def _(x: int):
+    if x == 0:
+        y = a
+    elif x == 1:
+        y = b
+    else:
+        y = c
+
+    if x == 0:
+        z = True
+
+    y(f(True), [True])
+
+    # error: [possibly-unresolved-reference] "Name `z` used when possibly not defined"
+    y(f(True), [z])
+```
+
+`call_standalone_expression.py`:
+
+```py
+def f(_: str): ...
+def g(_: str): ...
+def _(a: object, b: object, flag: bool):
+    if flag:
+        x = f
+    else:
+        x = g
+
+    # error: [unsupported-operator] "Operator `>` is not supported for types `object` and `object`"
+    x(f"{'a' if a > b else 'b'}")
+```
+
+`attribute_assignment.py`:
+
+```py
+from typing import TypedDict
+
+class TD(TypedDict):
+    y: int
+
+class X:
+    td: TD
+
+def _(x: X, flag: bool):
+    if flag:
+        y = 1
+
+    # error: [possibly-unresolved-reference] "Name `y` used when possibly not defined"
+    x.td = {"y": y}
 ```

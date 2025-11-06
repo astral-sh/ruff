@@ -114,6 +114,7 @@ The aliases can be inherited from. Some of these are still partially or wholly T
 
 ```py
 import typing
+from ty_extensions import reveal_mro
 
 ####################
 ### Built-ins
@@ -121,23 +122,23 @@ import typing
 
 class ListSubclass(typing.List): ...
 
-# revealed: tuple[<class 'ListSubclass'>, <class 'list[Unknown]'>, <class 'MutableSequence[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(ListSubclass.__mro__)
+# revealed: (<class 'ListSubclass'>, <class 'list[Unknown]'>, <class 'MutableSequence[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(ListSubclass)
 
 class DictSubclass(typing.Dict): ...
 
-# revealed: tuple[<class 'DictSubclass'>, <class 'dict[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(DictSubclass.__mro__)
+# revealed: (<class 'DictSubclass'>, <class 'dict[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(DictSubclass)
 
 class SetSubclass(typing.Set): ...
 
-# revealed: tuple[<class 'SetSubclass'>, <class 'set[Unknown]'>, <class 'MutableSet[Unknown]'>, <class 'AbstractSet[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(SetSubclass.__mro__)
+# revealed: (<class 'SetSubclass'>, <class 'set[Unknown]'>, <class 'MutableSet[Unknown]'>, <class 'AbstractSet[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(SetSubclass)
 
 class FrozenSetSubclass(typing.FrozenSet): ...
 
-# revealed: tuple[<class 'FrozenSetSubclass'>, <class 'frozenset[Unknown]'>, <class 'AbstractSet[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(FrozenSetSubclass.__mro__)
+# revealed: (<class 'FrozenSetSubclass'>, <class 'frozenset[Unknown]'>, <class 'AbstractSet[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(FrozenSetSubclass)
 
 ####################
 ### `collections`
@@ -145,26 +146,26 @@ reveal_type(FrozenSetSubclass.__mro__)
 
 class ChainMapSubclass(typing.ChainMap): ...
 
-# revealed: tuple[<class 'ChainMapSubclass'>, <class 'ChainMap[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(ChainMapSubclass.__mro__)
+# revealed: (<class 'ChainMapSubclass'>, <class 'ChainMap[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(ChainMapSubclass)
 
 class CounterSubclass(typing.Counter): ...
 
-# revealed: tuple[<class 'CounterSubclass'>, <class 'Counter[Unknown]'>, <class 'dict[Unknown, int]'>, <class 'MutableMapping[Unknown, int]'>, <class 'Mapping[Unknown, int]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(CounterSubclass.__mro__)
+# revealed: (<class 'CounterSubclass'>, <class 'Counter[Unknown]'>, <class 'dict[Unknown, int]'>, <class 'MutableMapping[Unknown, int]'>, <class 'Mapping[Unknown, int]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(CounterSubclass)
 
 class DefaultDictSubclass(typing.DefaultDict): ...
 
-# revealed: tuple[<class 'DefaultDictSubclass'>, <class 'defaultdict[Unknown, Unknown]'>, <class 'dict[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(DefaultDictSubclass.__mro__)
+# revealed: (<class 'DefaultDictSubclass'>, <class 'defaultdict[Unknown, Unknown]'>, <class 'dict[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(DefaultDictSubclass)
 
 class DequeSubclass(typing.Deque): ...
 
-# revealed: tuple[<class 'DequeSubclass'>, <class 'deque[Unknown]'>, <class 'MutableSequence[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(DequeSubclass.__mro__)
+# revealed: (<class 'DequeSubclass'>, <class 'deque[Unknown]'>, <class 'MutableSequence[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(DequeSubclass)
 
 class OrderedDictSubclass(typing.OrderedDict): ...
 
-# revealed: tuple[<class 'OrderedDictSubclass'>, <class 'OrderedDict[Unknown, Unknown]'>, <class 'dict[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(OrderedDictSubclass.__mro__)
+# revealed: (<class 'OrderedDictSubclass'>, <class 'OrderedDict[Unknown, Unknown]'>, <class 'dict[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(OrderedDictSubclass)
 ```

@@ -308,7 +308,7 @@ reveal_type(C.f)  # revealed: bound method <class 'C'>.f(arg: int) -> str
 reveal_type(C.f(1))  # revealed: str
 ```
 
-The method `f` can not be accessed from an instance of the class:
+The method `f` cannot be accessed from an instance of the class:
 
 ```py
 # error: [unresolved-attribute] "Object of type `C` has no attribute `f`"
@@ -586,6 +586,28 @@ reveal_type(C.f1(1))  # revealed: str
 reveal_type(C().f1(1))  # revealed: str
 reveal_type(C.f2(1))  # revealed: str
 reveal_type(C().f2(1))  # revealed: str
+```
+
+### `__new__`
+
+`__new__` is an implicit `@staticmethod`; accessing it on an instance does not bind the `cls`
+argument:
+
+```py
+from typing_extensions import Self
+
+reveal_type(object.__new__)  # revealed: def __new__(cls) -> Self@__new__
+reveal_type(object().__new__)  # revealed: def __new__(cls) -> Self@__new__
+# revealed: Overload[(cls, x: @Todo(Support for `typing.TypeAlias`) = Literal[0], /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
+reveal_type(int.__new__)
+# revealed: Overload[(cls, x: @Todo(Support for `typing.TypeAlias`) = Literal[0], /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
+reveal_type((42).__new__)
+
+class X:
+    def __init__(self, val: int): ...
+    def make_another(self) -> Self:
+        reveal_type(self.__new__)  # revealed: def __new__(cls) -> Self@__new__
+        return self.__new__(X)
 ```
 
 ## Builtin functions and methods

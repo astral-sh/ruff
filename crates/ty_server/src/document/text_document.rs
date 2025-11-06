@@ -1,9 +1,9 @@
-use lsp_types::TextDocumentContentChangeEvent;
+use lsp_types::{TextDocumentContentChangeEvent, Url};
 use ruff_source_file::LineIndex;
 
 use crate::PositionEncoding;
 
-use super::RangeExt;
+use super::range::lsp_range_to_text_range;
 
 pub(crate) type DocumentVersion = i32;
 
@@ -11,6 +11,9 @@ pub(crate) type DocumentVersion = i32;
 /// with changes made by the user, including unsaved changes.
 #[derive(Debug, Clone)]
 pub struct TextDocument {
+    /// The URL as sent by the client
+    url: Url,
+
     /// The string contents of the document.
     contents: String,
     /// A computed line index for the document. This should always reflect
@@ -40,9 +43,10 @@ impl From<&str> for LanguageId {
 }
 
 impl TextDocument {
-    pub fn new(contents: String, version: DocumentVersion) -> Self {
+    pub fn new(url: Url, contents: String, version: DocumentVersion) -> Self {
         let index = LineIndex::from_source_text(&contents);
         Self {
+            url,
             contents,
             index,
             version,
@@ -58,6 +62,10 @@ impl TextDocument {
 
     pub fn into_contents(self) -> String {
         self.contents
+    }
+
+    pub(crate) fn url(&self) -> &Url {
+        &self.url
     }
 
     pub fn contents(&self) -> &str {
@@ -106,7 +114,7 @@ impl TextDocument {
         } in changes
         {
             if let Some(range) = range {
-                let range = range.to_text_range(&new_contents, &active_index, encoding);
+                let range = lsp_range_to_text_range(range, &new_contents, &active_index, encoding);
 
                 new_contents.replace_range(
                     usize::from(range.start())..usize::from(range.end()),
@@ -154,11 +162,12 @@ impl TextDocument {
 #[cfg(test)]
 mod tests {
     use crate::{PositionEncoding, TextDocument};
-    use lsp_types::{Position, TextDocumentContentChangeEvent};
+    use lsp_types::{Position, TextDocumentContentChangeEvent, Url};
 
     #[test]
     fn redo_edit() {
         let mut document = TextDocument::new(
+            Url::parse("file:///test").unwrap(),
             r#""""
 测试comment
 一些测试内容

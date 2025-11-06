@@ -20,19 +20,15 @@ use super::categorize::ImportSection;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(Default)]
 pub enum RelativeImportsOrder {
     /// Place "closer" imports (fewer `.` characters, most local) before
     /// "further" imports (more `.` characters, least local).
     ClosestToFurthest,
     /// Place "further" imports (more `.` characters, least local) imports
     /// before "closer" imports (fewer `.` characters, most local).
+    #[default]
     FurthestToClosest,
-}
-
-impl Default for RelativeImportsOrder {
-    fn default() -> Self {
-        Self::FurthestToClosest
-    }
 }
 
 impl Display for RelativeImportsOrder {

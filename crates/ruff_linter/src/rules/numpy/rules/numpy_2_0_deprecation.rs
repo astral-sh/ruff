@@ -50,6 +50,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// np.round(arr2)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct Numpy2Deprecation {
     existing: String,
     migration_guide: Option<String>,
