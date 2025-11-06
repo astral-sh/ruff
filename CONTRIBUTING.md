@@ -280,6 +280,62 @@ Note that plugin-specific configuration options are defined in their own modules
 
 Finally, regenerate the documentation and generated code with `cargo dev generate-all`.
 
+### Opening a PR
+
+After you finish your changes, the next step is to open a PR. By default, two
+sections will be filled into the PR body: the summary and the test plan.
+
+#### The summary
+
+The summary is intended to give us as maintainers information about your PR.
+This should typically include a link to the relevant issue(s) you're addressing
+in your PR, as well as a summary of the issue and your approach to fixing it. If
+you have any questions about your approach or design, or if you considered
+alternative approaches, that can also be helpful to include.
+
+We don't currently have any rules around AI usage or disclosure, but remember
+that this PR summary will be our first impression of your PR. The higher its
+quality and accuracy, the more easily we can start reviewing your PR. However
+you generate the contents of this summary, please ensure that it corresponds to
+the code and doesn't include extraneous or misleading information.
+
+You can find examples of excellent issues and PRs by searching for the
+[`great writeup`](https://github.com/astral-sh/ruff/issues?q=label%3A%22great%20writeup%22)
+label.
+
+#### The test plan
+
+The test plan is likely to be shorter than the summary and can be as simple as
+"Added new snapshot tests for `RUF123`," at least for rule bugs. For LSP or some
+types of CLI changes, in particular, it can also be helpful to include
+screenshots or recordings of your change in action.
+
+#### Ecosystem report
+
+You should fill in the sections above before opening your PR. After opening the
+PR, an ecosystem report will be run as part of CI. This shows a diff of linter
+and formatter behavior before and after the changes in your PR. If any
+differences are reported, you should go through them and make sure they look
+correct. After going through the results of the ecosystem check, you should
+either add a note to the PR summary or an additional comment indicating your
+assessment. And if you do find issues, these should be added as new test cases
+and inform the implementation in your PR.
+
+These steps will help us to review your PR quickly and effectively. Of course,
+if you run into any problems or have questions, feel free to ask them on the
+issue, in a draft PR, or on Discord!
+
+#### PR status
+
+To help us know when your PR is ready for review again, please either move your
+PR back to a draft while working on it (marking it ready for review afterwards
+will ping the previous reviewers) or explicitly re-request a review. This helps
+us to avoid re-reviewing a PR while you're still working on it and also to
+prioritize PRs that are definitely ready for review.
+
+You can also thumbs-up or mark as resolved any comments we leave to let us know
+you addressed them.
+
 ## MkDocs
 
 > [!NOTE]
