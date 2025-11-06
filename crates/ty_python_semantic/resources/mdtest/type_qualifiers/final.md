@@ -88,7 +88,7 @@ class C:
         self.FINAL_C: Final[int] = 1
         self.FINAL_D: Final = 1
         self.FINAL_E: Final
-        self.FINAL_E = 1  # OK: Final can be initialized in __init__
+        self.FINAL_E = 1
 
 reveal_type(C.FINAL_A)  # revealed: int
 reveal_type(C.FINAL_B)  # revealed: Literal[1]
@@ -184,7 +184,7 @@ class C(metaclass=Meta):
         self.INSTANCE_FINAL_A: Final[int] = 1
         self.INSTANCE_FINAL_B: Final = 1
         self.INSTANCE_FINAL_C: Final[int]
-        self.INSTANCE_FINAL_C = 1  # OK: First assignment to Final in __init__
+        self.INSTANCE_FINAL_C = 1
 
 # error: [invalid-assignment] "Cannot assign to final attribute `META_FINAL_A` on type `<class 'C'>`"
 C.META_FINAL_A = 2
@@ -279,7 +279,7 @@ class C:
     def __init__(self):
         self.LEGAL_H: Final[int] = 1
         self.LEGAL_I: Final[int]
-        self.LEGAL_I = 1  # OK: Final can be initialized in __init__
+        self.LEGAL_I = 1
 
 # error: [invalid-type-form] "`Final` is not allowed in function parameter annotations"
 def f(ILLEGAL: Final[int]) -> None:
@@ -387,11 +387,10 @@ class C:
     # TODO: This should be an error
     NO_ASSIGNMENT_B: Final[int]
 
-    # This is okay. `DEFINED_IN_INIT` is defined in `__init__`.
     DEFINED_IN_INIT: Final[int]
 
     def __init__(self):
-        self.DEFINED_IN_INIT = 1  # OK: Final can be initialized in __init__
+        self.DEFINED_IN_INIT = 1
 ```
 
 ## Final attributes with Self annotation in `__init__`
@@ -476,6 +475,43 @@ class AssignmentOutsideInit:
     def other_method(self):
         # error: [invalid-assignment] "Cannot assign to final attribute `attr6`"
         self.attr6 = 1  # Error: Not in __init__
+```
+
+## Final assignment restrictions in `__init__`
+
+Per carljm's feedback, `__init__` can only assign Final attributes on the class it's defining, and
+only to the first parameter (`self`).
+
+```py
+from typing import Final
+
+class C:
+    x: Final[int] = 100
+
+# Assignment from standalone function (even named __init__)
+def _(c: C):
+    # error: [invalid-assignment] "Cannot assign to final attribute `x`"
+    c.x = 1  # Error: Not in C.__init__
+
+def __init__(c: C):
+    # error: [invalid-assignment] "Cannot assign to final attribute `x`"
+    c.x = 1  # Error: Not a method
+
+# Assignment from another class's __init__
+class A:
+    def __init__(self, c: C):
+        # error: [invalid-assignment] "Cannot assign to final attribute `x`"
+        c.x = 1  # Error: Not C's __init__
+
+# Assignment to non-self parameter in __init__
+class D:
+    y: Final[int]
+
+    def __init__(self, other: "D"):
+        self.y = 1  # OK: Assigning to self
+        # TODO: Should error - assigning to non-self parameter
+        # Requires tracking which parameter the base expression refers to
+        other.y = 2
 ```
 
 ## Conditional assignments in `__init__`

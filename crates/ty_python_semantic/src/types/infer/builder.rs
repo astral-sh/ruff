@@ -3660,8 +3660,54 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return true;
             }
 
-            // We're in __init__ - check if class-level attribute already has a value
-            if let Some(class_ty) = builder.class_context_of_current_method() {
+            // We're in __init__ - verify we're in a method of the class being mutated
+            let Some(class_ty) = builder.class_context_of_current_method() else {
+                // Not a method (standalone function named __init__)
+                if emit_diagnostics {
+                    if let Some(diag_builder) =
+                        builder.context.report_lint(&INVALID_ASSIGNMENT, target)
+                    {
+                        diag_builder.into_diagnostic(format_args!(
+                            "Cannot assign to final attribute `{attribute}` \
+                                         on type `{}`",
+                            object_ty.display(db)
+                        ));
+                    }
+                }
+                return true;
+            };
+
+            // Check that object_ty is an instance of the class we're in
+            // Handle both NominalInstance and Self types
+            let is_same_class = match object_ty {
+                Type::NominalInstance(instance) => {
+                    instance.class(db).class_literal(db) == class_ty.class_literal(db)
+                }
+                _ => {
+                    // For Self types or other cases, check if the display representation suggests same class
+                    // Self@__init__ means it's the Self type within this method
+                    let type_display = format!("{}", object_ty.display(db));
+                    type_display.contains("Self@")
+                }
+            };
+
+            if !is_same_class {
+                // Assigning to a different class's Final attribute
+                if emit_diagnostics {
+                    if let Some(diag_builder) =
+                        builder.context.report_lint(&INVALID_ASSIGNMENT, target)
+                    {
+                        diag_builder.into_diagnostic(format_args!(
+                            "Cannot assign to final attribute `{attribute}` on type `{}`",
+                            object_ty.display(db)
+                        ));
+                    }
+                }
+                return true;
+            }
+
+            // Check if class-level attribute already has a value
+            {
                 let class_definition = class_ty.class_literal(db).0;
                 let class_scope_id = class_definition.body_scope(db).file_scope_id(db);
                 let place_table = builder.index.place_table(class_scope_id);
