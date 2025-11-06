@@ -1,7 +1,7 @@
 use insta_cmd::assert_cmd_snapshot;
 use ruff_python_ast::PythonVersion;
 
-use crate::CliTest;
+use crate::{CliTest, site_packages_filter};
 
 /// Specifying an option on the CLI should take precedence over the same setting in the
 /// project's configuration. Here, this is tested for the Python version.
@@ -1838,13 +1838,13 @@ fn ty_environment_and_active_environment() -> anyhow::Result<()> {
             ",
         ),
     ])?
-    .with_ty_at(ty_executable_path)?;
+    .with_ty_at(ty_executable_path)?
+    .with_filter(&site_packages_filter("3.13"), "<site-packages>");
 
-    // `ty_package` should not be found
     assert_cmd_snapshot!(
         case.command()
             .env("VIRTUAL_ENV", case.root().join("active-venv")),
-        @r###"
+        @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1858,14 +1858,14 @@ fn ty_environment_and_active_environment() -> anyhow::Result<()> {
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-    info:   3. <temp_dir>/active-venv/lib/python3.13/site-packages (site-packages)
+    info:   3. <temp_dir>/active-venv/<site-packages> (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "###
+    "
     );
 
     Ok(())
