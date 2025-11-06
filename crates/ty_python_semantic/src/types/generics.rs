@@ -1506,8 +1506,8 @@ impl<'db> SpecializationBuilder<'db> {
                 if !actual.is_never() {
                     let assignable_elements = (formal.elements(self.db).iter()).filter(|ty| {
                         actual
-                            .when_subtype_of(self.db, **ty, self.inferable)
-                            .satisfied_by_all_typevars(self.db, self.inferable)
+                            .when_subtype_of(self.db, **ty, InferableTypeVars::None)
+                            .satisfied_by_all_typevars(self.db, InferableTypeVars::None)
                     });
                     if assignable_elements.exactly_one().is_ok() {
                         return Ok(());
