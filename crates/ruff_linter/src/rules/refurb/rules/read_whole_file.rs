@@ -129,43 +129,9 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
                     return;
                 }
 
-                let (target, annotation) = match self.with_stmt.body.first() {
-                    Some(Stmt::Assign(assign))
-                        if assign.value.range().contains_range(expr.range()) =>
-                    {
-                        match assign.targets.first() {
-                            Some(Expr::Name(name)) => (Some(name.id.as_str()), None),
-                            _ => (None, None),
-                        }
-                    }
-                    Some(Stmt::AnnAssign(ann_assign))
-                        if ann_assign
-                            .value
-                            .as_ref()
-                            .is_some_and(|v| v.range().contains_range(expr.range())) =>
-                    {
-                        match ann_assign.target.as_ref() {
-                            Expr::Name(name) => {
-                                let annotation_code = self
-                                    .checker
-                                    .generator()
-                                    .expr(ann_assign.annotation.as_ref());
-                                (Some(name.id.as_str()), Some(annotation_code))
-                            }
-                            _ => (None, None),
-                        }
-                    }
-                    _ => (None, None),
-                };
-
-                if let Some(fix) = generate_fix(
-                    self.checker,
-                    &open,
-                    target,
-                    annotation,
-                    self.with_stmt,
-                    &suggestion,
-                ) {
+                if let Some(fix) =
+                    generate_fix(self.checker, &open, expr, self.with_stmt, &suggestion)
+                {
                     diagnostic.set_fix(fix);
                 }
             }
@@ -216,8 +182,7 @@ fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> String {
 fn generate_fix(
     checker: &Checker,
     open: &FileOpen,
-    target: Option<&str>,
-    annotation: Option<String>,
+    expr: &Expr,
     with_stmt: &ast::StmtWith,
     suggestion: &str,
 ) -> Option<Fix> {
@@ -231,6 +196,31 @@ fn generate_fix(
     }
 
     let locator = checker.locator();
+
+    let (target, annotation) = match with_stmt.body.first() {
+        Some(Stmt::Assign(assign)) if assign.value.range().contains_range(expr.range()) => {
+            match assign.targets.first() {
+                Some(Expr::Name(name)) => (Some(name.id.as_str()), None),
+                _ => (None, None),
+            }
+        }
+        Some(Stmt::AnnAssign(ann_assign))
+            if ann_assign
+                .value
+                .as_ref()
+                .is_some_and(|v| v.range().contains_range(expr.range())) =>
+        {
+            match ann_assign.target.as_ref() {
+                Expr::Name(name) => {
+                    let annotation_code = locator.slice(ann_assign.annotation.range());
+                    (Some(name.id.as_str()), Some(annotation_code.to_string()))
+                }
+                _ => (None, None),
+            }
+        }
+        _ => (None, None),
+    };
+
     let filename_code = locator.slice(open.filename.range());
 
     let (import_edit, binding) = checker
