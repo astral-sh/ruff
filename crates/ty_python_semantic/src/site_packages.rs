@@ -1616,8 +1616,14 @@ impl SysPrefixPathOrigin {
             | Self::PythonCliFlag
             | Self::Editor
             | Self::DerivedFromPyvenvCfg
-            | Self::SelfEnvironment
             | Self::CondaPrefixVar => false,
+            // It's not strictly true that the self environment must be virtual, e.g., ty could be
+            // installed in a system Python environment and users may expect us to respect
+            // dependencies installed alongside it. However, we're intentionally excluding support
+            // for this to start. Note a change here has downstream implications, i.e., we probably
+            // don't want the packages in a system environment to take precedence over those in a
+            // virtual environment and would need to reverse the ordering in that case.
+            Self::SelfEnvironment => true,
         }
     }
 

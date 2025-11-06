@@ -1654,13 +1654,57 @@ home = ./
     Ok(())
 }
 
-/// Test that ty can discover site-packages from the environment it's installed in.
-///
-/// This simulates installing ty into a virtual environment (ty-venv) and running it
-/// from there with a local `.venv` present. Since `LocalVenv` origin allows self-environment
-/// extension, ty should discover site-packages from both locations.
+/// ty should include site packages from its own environment when no other environment is found.
 #[test]
-fn discovers_site_packages_from_ty_environment() -> anyhow::Result<()> {
+fn ty_environment_is_only_environment() -> anyhow::Result<()> {
+    let ty_venv_site_packages = if cfg!(windows) {
+        "ty-venv/Lib/site-packages"
+    } else {
+        "ty-venv/lib/python3.13/site-packages"
+    };
+
+    let ty_executable_path = if cfg!(windows) {
+        "ty-venv/Scripts/ty.exe"
+    } else {
+        "ty-venv/bin/ty"
+    };
+
+    let ty_package_path = format!("{ty_venv_site_packages}/ty_package/__init__.py");
+
+    let case = CliTest::with_files([
+        (ty_package_path.as_str(), "class TyEnvClass: ..."),
+        (
+            "ty-venv/pyvenv.cfg",
+            r"
+            home = ./
+            version = 3.13
+            ",
+        ),
+        (
+            "test.py",
+            r"
+            from ty_package import TyEnvClass
+            ",
+        ),
+    ])?;
+
+    let case = case.with_ty_at(ty_executable_path)?;
+    assert_cmd_snapshot!(case.command(), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+/// ty should include site packages from both its own environment and a local `.venv`. The packages
+/// from ty's environment should take precedence.
+#[test]
+fn ty_environment_and_discovered_venv() -> anyhow::Result<()> {
     let ty_venv_site_packages = if cfg!(windows) {
         "ty-venv/Lib/site-packages"
     } else {
@@ -1679,11 +1723,20 @@ fn discovers_site_packages_from_ty_environment() -> anyhow::Result<()> {
         ".venv/lib/python3.13/site-packages"
     };
 
-    let ty_package_path = format!("{}/ty_package/__init__.py", ty_venv_site_packages);
-    let local_package_path = format!("{}/local_package/__init__.py", local_venv_site_packages);
+    let ty_unique_package = format!("{ty_venv_site_packages}/ty_package/__init__.py");
+    let local_unique_package = format!("{local_venv_site_packages}/local_package/__init__.py");
+    let ty_conflicting_package = format!("{ty_venv_site_packages}/shared_package/__init__.py");
+    let local_conflicting_package =
+        format!("{local_venv_site_packages}/shared_package/__init__.py");
 
     let case = CliTest::with_files([
-        (ty_package_path.as_str(), "class TyEnvClass: ..."),
+        (ty_unique_package.as_str(), "class TyEnvClass: ..."),
+        (local_unique_package.as_str(), "class LocalClass: ..."),
+        (ty_conflicting_package.as_str(), "class FromTyEnv: ..."),
+        (
+            local_conflicting_package.as_str(),
+            "class FromLocalVenv: ...",
+        ),
         (
             "ty-venv/pyvenv.cfg",
             r"
@@ -1691,7 +1744,6 @@ fn discovers_site_packages_from_ty_environment() -> anyhow::Result<()> {
             version = 3.13
             ",
         ),
-        (local_package_path.as_str(), "class LocalClass: ..."),
         (
             ".venv/pyvenv.cfg",
             r"
@@ -1702,19 +1754,34 @@ fn discovers_site_packages_from_ty_environment() -> anyhow::Result<()> {
         (
             "test.py",
             r"
+            # Should resolve from ty's environment
             from ty_package import TyEnvClass
+            # Should resolve from local .venv
             from local_package import LocalClass
+            # Should resolve from ty's environment (takes precedence)
+            from shared_package import FromTyEnv
+            # Should NOT resolve (shadowed by ty's environment version)
+            from shared_package import FromLocalVenv
             ",
         ),
-    ])?;
+    ])?
+    .with_ty_at(ty_executable_path)?;
 
-    // Both imports should succeed because ty discovers site-packages from both environments
-    let case = case.with_ty_at(ty_executable_path)?;
     assert_cmd_snapshot!(case.command(), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
-    All checks passed!
+    error[unresolved-import]: Module `shared_package` has no member `FromLocalVenv`
+     --> test.py:9:28
+      |
+    7 | from shared_package import FromTyEnv
+    8 | # Should NOT resolve (shadowed by ty's environment version)
+    9 | from shared_package import FromLocalVenv
+      |                            ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
 
     ----- stderr -----
     "###);
@@ -1722,9 +1789,9 @@ fn discovers_site_packages_from_ty_environment() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// When `VIRTUAL_ENV` is set, ty should **not** discover its own environment's site-packages.
+/// When `VIRTUAL_ENV` is set, ty should *not* discover its own environment's site-packages.
 #[test]
-fn virtual_env_set_does_not_discover_ty_environment() -> anyhow::Result<()> {
+fn ty_environment_and_active_environment() -> anyhow::Result<()> {
     let ty_venv_site_packages = if cfg!(windows) {
         "ty-venv/Lib/site-packages"
     } else {
@@ -1743,8 +1810,8 @@ fn virtual_env_set_does_not_discover_ty_environment() -> anyhow::Result<()> {
         "active-venv/lib/python3.13/site-packages"
     };
 
-    let ty_package_path = format!("{}/ty_package/__init__.py", ty_venv_site_packages);
-    let active_package_path = format!("{}/active_package/__init__.py", active_venv_site_packages);
+    let ty_package_path = format!("{ty_venv_site_packages}/ty_package/__init__.py");
+    let active_package_path = format!("{active_venv_site_packages}/active_package/__init__.py");
 
     let case = CliTest::with_files([
         (ty_package_path.as_str(), "class TyEnvClass: ..."),
@@ -1770,10 +1837,10 @@ fn virtual_env_set_does_not_discover_ty_environment() -> anyhow::Result<()> {
             from active_package import ActiveClass
             ",
         ),
-    ])?;
+    ])?
+    .with_ty_at(ty_executable_path)?;
 
-    // ty_package should not be found because VIRTUAL_ENV is set
-    let case = case.with_ty_at(ty_executable_path)?;
+    // `ty_package` should not be found
     assert_cmd_snapshot!(
         case.command()
             .env("VIRTUAL_ENV", case.root().join("active-venv")),
@@ -1804,78 +1871,57 @@ fn virtual_env_set_does_not_discover_ty_environment() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// When a `.venv` is present, ty's environment site-packages are prepended to the search path and
-/// take precedence.
+/// When ty is installed in a system environment rather than a virtual environment, it should
+/// not include the environment's site-packages in its search path.
 #[test]
-fn ty_environment_takes_precedence_over_local_venv() -> anyhow::Result<()> {
-    let ty_venv_site_packages = if cfg!(windows) {
-        "ty-venv/Lib/site-packages"
+fn ty_environment_is_system_not_virtual() -> anyhow::Result<()> {
+    let ty_system_site_packages = if cfg!(windows) {
+        "system-python/Lib/site-packages"
     } else {
-        "ty-venv/lib/python3.13/site-packages"
+        "system-python/lib/python3.13/site-packages"
     };
 
     let ty_executable_path = if cfg!(windows) {
-        "ty-venv/Scripts/ty.exe"
+        "system-python/Scripts/ty.exe"
     } else {
-        "ty-venv/bin/ty"
+        "system-python/bin/ty"
     };
 
-    let local_venv_site_packages = if cfg!(windows) {
-        ".venv/Lib/site-packages"
-    } else {
-        ".venv/lib/python3.13/site-packages"
-    };
-
-    let ty_package_path = format!("{}/conflicting_package/__init__.py", ty_venv_site_packages);
-    let local_package_path = format!(
-        "{}/conflicting_package/__init__.py",
-        local_venv_site_packages
-    );
+    let ty_package_path = format!("{ty_system_site_packages}/system_package/__init__.py");
 
     let case = CliTest::with_files([
-        (ty_package_path.as_str(), "class FromTyEnv: ..."),
-        (
-            "ty-venv/pyvenv.cfg",
-            r"
-            home = ./
-            version = 3.13
-            ",
-        ),
-        (local_package_path.as_str(), "class FromLocalVenv: ..."),
-        (
-            ".venv/pyvenv.cfg",
-            r"
-            home = ./
-            version = 3.13
-            ",
-        ),
+        // Package in system Python installation (should NOT be discovered)
+        (ty_package_path.as_str(), "class SystemClass: ..."),
+        // Note: NO pyvenv.cfg - this is a system installation, not a venv
         (
             "test.py",
             r"
-            from conflicting_package import FromTyEnv
-            from conflicting_package import FromLocalVenv
+            from system_package import SystemClass
             ",
         ),
-    ])?;
+    ])?
+    .with_ty_at(ty_executable_path)?;
 
-    let case = case.with_ty_at(ty_executable_path)?;
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `conflicting_package` has no member `FromLocalVenv`
-     --> test.py:3:33
+    error[unresolved-import]: Cannot resolve imported module `system_package`
+     --> test.py:2:6
       |
-    2 | from conflicting_package import FromTyEnv
-    3 | from conflicting_package import FromLocalVenv
-      |                                 ^^^^^^^^^^^^^
+    2 | from system_package import SystemClass
+      |      ^^^^^^^^^^^^^^
       |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
-    ");
+    "###);
 
     Ok(())
 }
