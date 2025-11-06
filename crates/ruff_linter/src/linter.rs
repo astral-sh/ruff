@@ -377,6 +377,7 @@ pub fn add_noqa_to_path(
     source_kind: &SourceKind,
     source_type: PySourceType,
     settings: &LinterSettings,
+    reason: Option<&str>,
 ) -> Result<usize> {
     // Parse once.
     let target_version = settings.resolve_target_version(path);
@@ -425,6 +426,7 @@ pub fn add_noqa_to_path(
         &settings.external,
         &directives.noqa_line_for,
         stylist.line_ending(),
+        reason,
     )
 }
 
