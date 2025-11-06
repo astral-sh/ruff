@@ -6,15 +6,15 @@ Released on 2025-11-06.
 
 ### Preview features
 
-- Allow newlines after function headers without docstrings ([#21110](https://github.com/astral-sh/ruff/pull/21110))
-- Avoid extra parentheses for long `match` patterns with `as` captures ([#21176](https://github.com/astral-sh/ruff/pull/21176))
+- [formatter] Allow newlines after function headers without docstrings ([#21110](https://github.com/astral-sh/ruff/pull/21110))
+- [formatter] Avoid extra parentheses for long `match` patterns with `as` captures ([#21176](https://github.com/astral-sh/ruff/pull/21176))
 - \[`refurb`\] Expand fix safety for keyword arguments and `Decimal`s (`FURB164`) ([#21259](https://github.com/astral-sh/ruff/pull/21259))
 - \[`refurb`\] Preserve argument ordering in autofix (`FURB103`) ([#20790](https://github.com/astral-sh/ruff/pull/20790))
 
 ### Bug fixes
 
-- Fix missing diagnostics for notebooks ([#21156](https://github.com/astral-sh/ruff/pull/21156))
-- \[`flake8-bugbear`\] Ignore non-NFKC attribute names in B009 and B010 (`B009`, `B010`) ([#21131](https://github.com/astral-sh/ruff/pull/21131))
+- [server] Fix missing diagnostics for notebooks ([#21156](https://github.com/astral-sh/ruff/pull/21156))
+- \[`flake8-bugbear`\] Ignore non-NFKC attribute names in `B009` and `B010` ([#21131](https://github.com/astral-sh/ruff/pull/21131))
 - \[`refurb`\] Fix false negative for underscores before sign in `Decimal` constructor (`FURB157`) ([#21190](https://github.com/astral-sh/ruff/pull/21190))
 - \[`ruff`\] Fix false positives on starred arguments (`RUF057`) ([#21256](https://github.com/astral-sh/ruff/pull/21256))
 
@@ -26,14 +26,11 @@ Released on 2025-11-06.
 
 - Improve `extend` docs ([#21135](https://github.com/astral-sh/ruff/pull/21135))
 - \[`flake8-comprehensions`\] Fix typo in `C416` documentation ([#21184](https://github.com/astral-sh/ruff/pull/21184))
-- docs: revise Ruff setup instructions for Zed editor ([#20935](https://github.com/astral-sh/ruff/pull/20935))
+- Revise Ruff setup instructions for Zed editor ([#20935](https://github.com/astral-sh/ruff/pull/20935))
 
 ### Other changes
 
-- Bump MSRV to Rust 1.89 ([#21180](https://github.com/astral-sh/ruff/pull/21180))
-- Require ignore 0.4.24 in `Cargo.toml` ([#21292](https://github.com/astral-sh/ruff/pull/21292))
-- Update to unicode 17 for line-width calculations ([#21231](https://github.com/astral-sh/ruff/pull/21231))
-- \[ruff\]: Make `ruff analyze graph` work with jupyter notebooks ([#21161](https://github.com/astral-sh/ruff/pull/21161))
+- Make `ruff analyze graph` work with jupyter notebooks ([#21161](https://github.com/astral-sh/ruff/pull/21161))
 
 ### Contributors
 
