@@ -871,13 +871,19 @@ impl<'db> Node<'db> {
 
         // Returns if some specialization satisfies this constraint set.
         let some_specialization_satisfies = move |specializations: Node<'db>| {
-            let when_satisfied = specializations.satisfies(db, self).and(db, specializations);
+            let when_satisfied = specializations
+                .satisfies(db, self)
+                .and(db, specializations)
+                .simplify(db);
             !when_satisfied.is_never_satisfied()
         };
 
         // Returns if all specializations satisfy this constraint set.
         let all_specializations_satisfy = move |specializations: Node<'db>| {
-            let when_satisfied = specializations.satisfies(db, self).and(db, specializations);
+            let when_satisfied = specializations
+                .satisfies(db, self)
+                .and(db, specializations)
+                .simplify(db);
             when_satisfied
                 .iff(db, specializations)
                 .is_always_satisfied(db)
