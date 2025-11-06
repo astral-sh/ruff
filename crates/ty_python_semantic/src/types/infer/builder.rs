@@ -5916,13 +5916,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // this type of Definition is only created when a `from..import` is in global scope.)
 
         // Get this package's module by resolving `.`
-        let Ok(module_name) = ModuleName::from_identifier_parts(self.db(), self.file(), None, 1)
+        let Ok(thispackage_name) =
+            ModuleName::from_identifier_parts(self.db(), self.file(), None, 1)
         else {
             self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
             return;
         };
 
-        let Some(module) = resolve_module(self.db(), &module_name) else {
+        let Some(module) = resolve_module(self.db(), &thispackage_name) else {
             self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
             return;
         };
@@ -5932,12 +5933,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             !submodule.is_empty(),
             "ImportFromSubmoduleDefinitionKind constructed with empty module"
         );
-        let name = submodule
-            .split_once('.')
-            .map(|(first, _)| first)
-            .unwrap_or(submodule.as_str());
+
+        let Ok(submodule_name) = ModuleName::from_identifier_parts(
+            self.db(),
+            self.file(),
+            import_from.module.as_deref(),
+            import_from.level,
+        ) else {
+            self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
+            return;
+        };
+        let Some(relative_submodule_name) = submodule_name.relative_to(&thispackage_name) else {
+            self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
+            return;
+        };
+        let Some(name) = relative_submodule_name.components().next() else {
+            self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
+            return;
+        };
         let full_submodule_name = ModuleName::new(name).map(|final_part| {
-            let mut ret = module_name.clone();
+            let mut ret = thispackage_name.clone();
             ret.extend(&final_part);
             ret
         });
@@ -5970,7 +5985,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let diagnostic = builder.into_diagnostic(format_args!(
-            "Module `{module_name}` has no submodule `{name}`"
+            "Module `{thispackage_name}` has no submodule `{name}`"
         ));
 
         if let Some(full_submodule_name) = full_submodule_name {
