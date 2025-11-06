@@ -1818,21 +1818,16 @@ impl<'db> Type<'db> {
             // However, there is one exception to this general rule: for any given typevar `T`,
             // `T` will always be a subtype of any union containing `T`.
             // A similar rule applies in reverse to intersection types.
-            (Type::TypeVar(bound_typevar), Type::Union(union))
-                if !bound_typevar.is_inferable(db, inferable)
-                    && union.elements(db).contains(&self) =>
+            (Type::TypeVar(_), Type::Union(union)) if union.elements(db).contains(&self) => {
+                ConstraintSet::from(true)
+            }
+            (Type::Intersection(intersection), Type::TypeVar(_))
+                if intersection.positive(db).contains(&target) =>
             {
                 ConstraintSet::from(true)
             }
-            (Type::Intersection(intersection), Type::TypeVar(bound_typevar))
-                if !bound_typevar.is_inferable(db, inferable)
-                    && intersection.positive(db).contains(&target) =>
-            {
-                ConstraintSet::from(true)
-            }
-            (Type::Intersection(intersection), Type::TypeVar(bound_typevar))
-                if !bound_typevar.is_inferable(db, inferable)
-                    && intersection.negative(db).contains(&target) =>
+            (Type::Intersection(intersection), Type::TypeVar(_))
+                if intersection.negative(db).contains(&target) =>
             {
                 ConstraintSet::from(false)
             }
