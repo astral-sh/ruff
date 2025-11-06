@@ -1838,8 +1838,7 @@ impl<'db> Type<'db> {
             // Note that this is not handled by the early return at the beginning of this method,
             // since subtyping between a TypeVar and an arbitrary other type cannot be guaranteed to be reflexive.
             (Type::TypeVar(lhs_bound_typevar), Type::TypeVar(rhs_bound_typevar))
-                if !lhs_bound_typevar.is_inferable(db, inferable)
-                    && lhs_bound_typevar.is_same_typevar_as(db, rhs_bound_typevar) =>
+                if lhs_bound_typevar.is_same_typevar_as(db, rhs_bound_typevar) =>
             {
                 ConstraintSet::from(true)
             }
