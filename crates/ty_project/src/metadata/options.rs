@@ -483,7 +483,7 @@ fn self_environment_search_paths(
     existing_origin: Option<SysPrefixPathOrigin>,
     system: &dyn System,
 ) -> Option<SitePackagesPaths> {
-    if existing_origin.is_some_and(|origin| !origin.allows_extension_with_self_environment()) {
+    if existing_origin.is_some_and(|origin| !origin.allows_concatenation_with_self_environment()) {
         return None;
     }
 

@@ -1644,7 +1644,9 @@ impl SysPrefixPathOrigin {
         }
     }
 
-    pub const fn allows_extension_with_self_environment(&self) -> bool {
+    /// Whether paths with this origin should allow combination with paths with a
+    /// [`SysPrefixPathOrigin::SelfEnvironment`] origin.
+    pub const fn allows_concatenation_with_self_environment(&self) -> bool {
         match self {
             Self::SelfEnvironment
             | Self::CondaPrefixVar
