@@ -4401,6 +4401,14 @@ impl<'db> Type<'db> {
                 .into()
             }
             Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                if name == "satisfies" =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetSatisfies(tracked),
+                ))
+                .into()
+            }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
                 if name == "satisfied_by_all_typevars" =>
             {
                 Place::bound(Type::KnownBoundMethod(
@@ -7175,6 +7183,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
             )
             | Type::DataclassDecorator(_)
@@ -7328,6 +7337,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
             )
             | Type::DataclassDecorator(_)
@@ -10830,6 +10840,7 @@ pub enum KnownBoundMethodType<'db> {
     ConstraintSetAlways,
     ConstraintSetNever,
     ConstraintSetImpliesSubtypeOf(TrackedConstraintSet<'db>),
+    ConstraintSetSatisfies(TrackedConstraintSet<'db>),
     ConstraintSetSatisfiedByAllTypeVars(TrackedConstraintSet<'db>),
 }
 
@@ -10859,6 +10870,7 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         | KnownBoundMethodType::ConstraintSetAlways
         | KnownBoundMethodType::ConstraintSetNever
         | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+        | KnownBoundMethodType::ConstraintSetSatisfies(_)
         | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {}
     }
 }
@@ -10929,6 +10941,10 @@ impl<'db> KnownBoundMethodType<'db> {
                 KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
             )
             | (
+                KnownBoundMethodType::ConstraintSetSatisfies(_),
+                KnownBoundMethodType::ConstraintSetSatisfies(_),
+            )
+            | (
                 KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
                 KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
             ) => ConstraintSet::from(true),
@@ -10944,6 +10960,7 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
@@ -10955,6 +10972,7 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
             ) => ConstraintSet::from(false),
         }
@@ -11010,6 +11028,10 @@ impl<'db> KnownBoundMethodType<'db> {
                 KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(right_constraints),
             )
             | (
+                KnownBoundMethodType::ConstraintSetSatisfies(left_constraints),
+                KnownBoundMethodType::ConstraintSetSatisfies(right_constraints),
+            )
+            | (
                 KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(left_constraints),
                 KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(right_constraints),
             ) => left_constraints
@@ -11027,6 +11049,7 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
@@ -11038,6 +11061,7 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
             ) => ConstraintSet::from(false),
         }
@@ -11063,6 +11087,7 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::ConstraintSetAlways
             | KnownBoundMethodType::ConstraintSetNever
             | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+            | KnownBoundMethodType::ConstraintSetSatisfies(_)
             | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => self,
         }
     }
@@ -11099,6 +11124,7 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::ConstraintSetAlways
             | KnownBoundMethodType::ConstraintSetNever
             | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+            | KnownBoundMethodType::ConstraintSetSatisfies(_)
             | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => self,
         }
     }
@@ -11116,6 +11142,7 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::ConstraintSetAlways
             | KnownBoundMethodType::ConstraintSetNever
             | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+            | KnownBoundMethodType::ConstraintSetSatisfies(_)
             | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {
                 KnownClass::ConstraintSet
             }
@@ -11254,6 +11281,14 @@ impl<'db> KnownBoundMethodType<'db> {
                             .type_form()
                             .with_annotated_type(Type::any()),
                     ]),
+                    Some(KnownClass::ConstraintSet.to_instance(db)),
+                )))
+            }
+
+            KnownBoundMethodType::ConstraintSetSatisfies(_) => {
+                Either::Right(std::iter::once(Signature::new(
+                    Parameters::new([Parameter::positional_only(Some(Name::new_static("other")))
+                        .with_annotated_type(KnownClass::ConstraintSet.to_instance(db))]),
                     Some(KnownClass::ConstraintSet.to_instance(db)),
                 )))
             }
