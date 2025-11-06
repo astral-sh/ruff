@@ -47,6 +47,7 @@ mod tests {
     #[test_case(Rule::HashlibDigestHex, Path::new("FURB181.py"))]
     #[test_case(Rule::ListReverseCopy, Path::new("FURB187.py"))]
     #[test_case(Rule::WriteWholeFile, Path::new("FURB103.py"))]
+    #[test_case(Rule::WriteWholeFile, Path::new("FURB103_EXT.py"))]
     #[test_case(Rule::FStringNumberFormat, Path::new("FURB116.py"))]
     #[test_case(Rule::SortedMinMax, Path::new("FURB192.py"))]
     #[test_case(Rule::SliceToRemovePrefixOrSuffix, Path::new("FURB188.py"))]

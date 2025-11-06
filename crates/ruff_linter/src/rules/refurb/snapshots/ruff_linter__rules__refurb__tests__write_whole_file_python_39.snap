@@ -2,182 +2,116 @@
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
 FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text("test")`
-  --> FURB103.py:13:6
+  --> FURB103.py:12:6
    |
-12 | # FURB103
-13 | with open("file.txt", "w") as f:
+11 | # FURB103
+12 | with open("file.txt", "w") as f:
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^
-14 |     f.write("test")
+13 |     f.write("test")
    |
 help: Replace with `Path("file.txt").write_text("test")`
 
 FURB103 `open` and `write` should be replaced by `Path("file.txt").write_bytes(foobar)`
-  --> FURB103.py:17:6
+  --> FURB103.py:16:6
    |
-16 | # FURB103
-17 | with open("file.txt", "wb") as f:
+15 | # FURB103
+16 | with open("file.txt", "wb") as f:
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-18 |     f.write(foobar)
+17 |     f.write(foobar)
    |
 help: Replace with `Path("file.txt").write_bytes(foobar)`
 
 FURB103 `open` and `write` should be replaced by `Path("file.txt").write_bytes(b"abc")`
-  --> FURB103.py:21:6
+  --> FURB103.py:20:6
    |
-20 | # FURB103
-21 | with open("file.txt", mode="wb") as f:
+19 | # FURB103
+20 | with open("file.txt", mode="wb") as f:
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-22 |     f.write(b"abc")
+21 |     f.write(b"abc")
    |
 help: Replace with `Path("file.txt").write_bytes(b"abc")`
 
 FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, encoding="utf8")`
-  --> FURB103.py:25:6
+  --> FURB103.py:24:6
    |
-24 | # FURB103
-25 | with open("file.txt", "w", encoding="utf8") as f:
+23 | # FURB103
+24 | with open("file.txt", "w", encoding="utf8") as f:
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-26 |     f.write(foobar)
+25 |     f.write(foobar)
    |
 help: Replace with `Path("file.txt").write_text(foobar, encoding="utf8")`
 
 FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, errors="ignore")`
-  --> FURB103.py:29:6
+  --> FURB103.py:28:6
    |
-28 | # FURB103
-29 | with open("file.txt", "w", errors="ignore") as f:
+27 | # FURB103
+28 | with open("file.txt", "w", errors="ignore") as f:
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-30 |     f.write(foobar)
+29 |     f.write(foobar)
    |
 help: Replace with `Path("file.txt").write_text(foobar, errors="ignore")`
 
 FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(foobar)`
-  --> FURB103.py:33:6
+  --> FURB103.py:32:6
    |
-32 | # FURB103
-33 | with open("file.txt", mode="w") as f:
+31 | # FURB103
+32 | with open("file.txt", mode="w") as f:
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-34 |     f.write(foobar)
+33 |     f.write(foobar)
    |
 help: Replace with `Path("file.txt").write_text(foobar)`
 
 FURB103 `open` and `write` should be replaced by `Path(foo()).write_bytes(bar())`
-  --> FURB103.py:37:6
+  --> FURB103.py:36:6
    |
-36 | # FURB103
-37 | with open(foo(), "wb") as f:
+35 | # FURB103
+36 | with open(foo(), "wb") as f:
    |      ^^^^^^^^^^^^^^^^^^^^^^
-38 |     # The body of `with` is non-trivial, but the recommendation holds.
-39 |     bar("pre")
+37 |     # The body of `with` is non-trivial, but the recommendation holds.
+38 |     bar("pre")
    |
 help: Replace with `Path(foo()).write_bytes(bar())`
 
 FURB103 `open` and `write` should be replaced by `Path("a.txt").write_text(x)`
-  --> FURB103.py:45:6
+  --> FURB103.py:44:6
    |
-44 | # FURB103
-45 | with open("a.txt", "w") as a, open("b.txt", "wb") as b:
+43 | # FURB103
+44 | with open("a.txt", "w") as a, open("b.txt", "wb") as b:
    |      ^^^^^^^^^^^^^^^^^^^^^^^
-46 |     a.write(x)
-47 |     b.write(y)
+45 |     a.write(x)
+46 |     b.write(y)
    |
 help: Replace with `Path("a.txt").write_text(x)`
 
 FURB103 `open` and `write` should be replaced by `Path("b.txt").write_bytes(y)`
-  --> FURB103.py:45:31
+  --> FURB103.py:44:31
    |
-44 | # FURB103
-45 | with open("a.txt", "w") as a, open("b.txt", "wb") as b:
+43 | # FURB103
+44 | with open("a.txt", "w") as a, open("b.txt", "wb") as b:
    |                               ^^^^^^^^^^^^^^^^^^^^^^^^
-46 |     a.write(x)
-47 |     b.write(y)
+45 |     a.write(x)
+46 |     b.write(y)
    |
 help: Replace with `Path("b.txt").write_bytes(y)`
 
 FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(bar(bar(a + x)))`
-  --> FURB103.py:50:18
+  --> FURB103.py:49:18
    |
-49 | # FURB103
-50 | with foo() as a, open("file.txt", "w") as b, foo() as c:
+48 | # FURB103
+49 | with foo() as a, open("file.txt", "w") as b, foo() as c:
    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
-51 |     # We have other things in here, multiple with items, but the user
-52 |     # writes a single time to file and that bit they can replace.
+50 |     # We have other things in here, multiple with items, but the user
+51 |     # writes a single time to file and that bit they can replace.
    |
 help: Replace with `Path("file.txt").write_text(bar(bar(a + x)))`
 
 FURB103 `open` and `write` should be replaced by `Path("test.json")....`
-   --> FURB103.py:155:6
+   --> FURB103.py:154:6
     |
-153 | data = {"price": 100}
-154 |
-155 | with open("test.json", "wb") as f:
+152 | data = {"price": 100}
+153 |
+154 | with open("test.json", "wb") as f:
     |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-156 |     f.write(json.dumps(data, indent=4).encode("utf-8"))
+155 |     f.write(json.dumps(data, indent=4).encode("utf-8"))
     |
 help: Replace with `Path("test.json")....`
-
-FURB103 `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test")`
-   --> FURB103.py:158:6
-    |
-156 |     f.write(json.dumps(data, indent=4).encode("utf-8"))
-157 |
-158 | with Path("file.txt").open("w") as f:
-    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-159 |     f.write("test")
-    |
-help: Replace with `Path("file.txt").write_text("test")`
-
-FURB103 `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_bytes(b"test")`
-   --> FURB103.py:161:6
-    |
-159 |     f.write("test")
-160 |
-161 | with Path("file.txt").open("wb") as f:
-    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-162 |     f.write(b"test")
-    |
-help: Replace with `Path("file.txt").write_bytes(b"test")`
-
-FURB103 `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test")`
-   --> FURB103.py:164:6
-    |
-162 |     f.write(b"test")
-163 |
-164 | with Path("file.txt").open(mode="w") as f:
-    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-165 |     f.write("test")
-    |
-help: Replace with `Path("file.txt").write_text("test")`
-
-FURB103 `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test", encoding="utf8")`
-   --> FURB103.py:167:6
-    |
-165 |     f.write("test")
-166 |
-167 | with Path("file.txt").open("w", encoding="utf8") as f:
-    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-168 |     f.write("test")
-    |
-help: Replace with `Path("file.txt").write_text("test", encoding="utf8")`
-
-FURB103 `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test", errors="ignore")`
-   --> FURB103.py:170:6
-    |
-168 |     f.write("test")
-169 |
-170 | with Path("file.txt").open("w", errors="ignore") as f:
-    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-171 |     f.write("test")
-    |
-help: Replace with `Path("file.txt").write_text("test", errors="ignore")`
-
-FURB103 `Path.open()` followed by `write()` can be replaced by `Path(foo()).write_text("test")`
-   --> FURB103.py:173:6
-    |
-171 |     f.write("test")
-172 |
-173 | with Path(foo()).open("w") as f:
-    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^
-174 |     f.write("test")
-    |
-help: Replace with `Path(foo()).write_text("test")`

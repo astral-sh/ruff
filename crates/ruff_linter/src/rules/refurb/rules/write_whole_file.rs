@@ -48,6 +48,7 @@ pub(crate) struct WriteWholeFile {
     filename: SourceCodeSnippet,
     suggestion: SourceCodeSnippet,
     is_path_open: bool,
+    has_filename: bool,
 }
 
 impl Violation for WriteWholeFile {
@@ -58,19 +59,35 @@ impl Violation for WriteWholeFile {
         let filename = self.filename.truncated_display();
         let suggestion = self.suggestion.truncated_display();
         if self.is_path_open {
-            format!(
-                "`Path.open()` followed by `write()` can be replaced by `Path({filename}).{suggestion}`"
-            )
+            if self.has_filename {
+                format!(
+                    "`Path().open()` followed by `write()` can be replaced by `Path({filename}).{suggestion}`"
+                )
+            } else {
+                format!(
+                    "`Path.open()` followed by `write()` can be replaced by `{filename}.{suggestion}`"
+                )
+            }
         } else {
             format!("`open` and `write` should be replaced by `Path({filename}).{suggestion}`")
         }
     }
     fn fix_title(&self) -> Option<String> {
-        Some(format!(
-            "Replace with `Path({}).{}`",
-            self.filename.truncated_display(),
-            self.suggestion.truncated_display(),
-        ))
+        let formatted = if self.has_filename {
+            format!(
+                "Replace with `Path({}).{}`",
+                self.filename.truncated_display(),
+                self.suggestion.truncated_display(),
+            )
+        } else {
+            format!(
+                "Replace with `{}.{}`",
+                self.filename.truncated_display(),
+                self.suggestion.truncated_display(),
+            )
+        };
+
+        Some(formatted)
     }
 }
 
@@ -134,17 +151,27 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
                 .position(|open| open.is_ref(write_to))
             {
                 let open = self.candidates.remove(open);
-
+                let has_filename: bool;
+                let filename_display: String;
                 if self.loop_counter == 0 {
+                    if let Some(filename) = open.filename {
+                        filename_display = self.checker.generator().expr(filename);
+                        has_filename = true;
+                    } else if let Some(path_obj) = open.path_obj {
+                        filename_display =
+                            self.checker.locator().slice(path_obj.range()).to_string();
+                        has_filename = false;
+                    } else {
+                        return;
+                    }
                     let suggestion = make_suggestion(&open, content, self.checker.generator());
 
                     let mut diagnostic = self.checker.report_diagnostic(
                         WriteWholeFile {
-                            filename: SourceCodeSnippet::from_str(
-                                &self.checker.generator().expr(open.filename),
-                            ),
+                            filename: SourceCodeSnippet::from_str(&filename_display),
                             suggestion: SourceCodeSnippet::from_str(&suggestion),
                             is_path_open: open.path_obj.is_some(),
+                            has_filename,
                         },
                         open.item.range(),
                     );
@@ -214,7 +241,8 @@ fn generate_fix(
     }
 
     let locator = checker.locator();
-    let filename_code = locator.slice(open.filename.range());
+    let filename = open.filename?;
+    let filename_code = locator.slice(filename.range());
 
     let (import_edit, binding) = checker
         .importer()

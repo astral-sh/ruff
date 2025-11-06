@@ -1,13 +1,14 @@
 use std::borrow::Cow;
 
-use crate::checkers::ast::Checker;
-use crate::rules::flake8_async::rules::blocking_open_call::is_open_call_from_pathlib;
-use crate::{Applicability, Edit, Fix};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{self as ast, Expr, name::Name, parenthesize::parenthesized_range};
 use ruff_python_codegen::Generator;
-use ruff_python_semantic::{BindingId, ResolvedReference, SemanticModel};
+use ruff_python_semantic::{ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
+
+use crate::checkers::ast::Checker;
+use crate::rules::flake8_async::rules::blocking_open_call::is_open_call_from_pathlib;
+use crate::{Applicability, Edit, Fix};
 
 /// Format a code snippet to call `name.method()`.
 pub(super) fn generate_method_call(name: Name, method: &str, generator: Generator) -> String {
@@ -120,14 +121,14 @@ pub(super) struct FileOpen<'a> {
     /// With item where the open happens, we use it for the reporting range.
     pub(super) item: &'a ast::WithItem,
     /// Filename expression used as the first argument in `open`, we use it in the diagnostic message.
-    pub(super) filename: &'a Expr,
+    pub(super) filename: Option<&'a Expr>,
     /// The file open mode.
     pub(super) mode: OpenMode,
     /// The file open keywords.
     pub(super) keywords: Vec<&'a ast::Keyword>,
     /// We only check `open` operations whose file handles are used exactly once.
     pub(super) reference: &'a ResolvedReference,
-    /// `Path().open()` call
+    /// Pathlib Path object used to open the file, if any.
     pub(super) path_obj: Option<&'a Expr>,
 }
 
@@ -155,12 +156,13 @@ pub(super) fn find_file_opens<'a>(
         .collect()
 }
 
+#[expect(clippy::too_many_arguments)]
 fn resolve_file_open<'a>(
     item: &'a ast::WithItem,
     with: &'a ast::StmtWith,
     semantic: &'a SemanticModel<'a>,
     read_mode: bool,
-    filename: &'a Expr,
+    filename: Option<&'a Expr>,
     mode: OpenMode,
     keywords: Vec<&'a ast::Keyword>,
     path_obj: Option<&'a Expr>,
@@ -181,7 +183,6 @@ fn resolve_file_open<'a>(
     if matches!(mode, OpenMode::ReadBytes | OpenMode::WriteBytes) && !keywords.is_empty() {
         return None;
     }
-
     let var = item.optional_vars.as_deref()?.as_name_expr()?;
     let scope = semantic.current_scope();
 
@@ -189,7 +190,6 @@ fn resolve_file_open<'a>(
         let b = semantic.binding(id);
         (b.range() == var.range()).then_some(b)
     })?;
-
     let references: Vec<&ResolvedReference> = binding
         .references
         .iter()
@@ -247,7 +247,14 @@ fn find_file_open<'a>(
 
     let mode = kw_mode.unwrap_or(pos_mode);
     resolve_file_open(
-        item, with, semantic, read_mode, filename, mode, keywords, None,
+        item,
+        with,
+        semantic,
+        read_mode,
+        Some(filename),
+        mode,
+        keywords,
+        None,
     )
 }
 
@@ -263,17 +270,26 @@ fn find_path_open<'a>(
         arguments: ast::Arguments { args, keywords, .. },
         ..
     } = item.context_expr.as_call_expr()?;
+    if args.iter().any(Expr::is_starred_expr)
+        || keywords.iter().any(|keyword| keyword.arg.is_none())
+    {
+        return None;
+    }
     if !is_open_call_from_pathlib(func, semantic) {
         return None;
     }
     let attr = func.as_attribute_expr()?;
-    let path_call = attr.value.as_call_expr()?;
-    let filename = path_call.arguments.args.first()?;
+    let filename = if let Expr::Call(path_call) = attr.value.as_ref() {
+        path_call.arguments.args.first()
+    } else {
+        None
+    };
     let mode = if args.is_empty() {
         OpenMode::ReadText
     } else {
         match_open_mode(args.first()?)?
     };
+
     let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
     let mode = kw_mode.unwrap_or(mode);
     resolve_file_open(
