@@ -105,8 +105,7 @@ use crate::types::{
     SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
     TypeContext, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
     TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
-    UnionType, UnionTypeInstance, binding_type, infer_expression_type, infer_scope_types,
-    todo_type,
+    UnionType, UnionTypeInstance, binding_type, infer_scope_types, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -6987,7 +6986,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut infer_iterable_type = || {
             let expression = self.index.expression(iterable);
             let result = infer_expression_types(self.db(), expression, TypeContext::default());
-            let iterable = infer_expression_type(self.db(), expression, TypeContext::default());
 
             // Two things are different if it's the first comprehension:
             // (1) We must lookup the `ScopedExpressionId` of the iterable expression in the outer scope,
@@ -6996,10 +6994,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             //     because `ScopedExpressionId`s are only meaningful within their own scope, so
             //     we'd add types for random wrong expressions in the current scope
             if comprehension.is_first() && target.is_name_expr() {
-                iterable
+                result.expression_type(iterable)
             } else {
                 self.extend_expression_unchecked(result);
-                iterable
+                result.expression_type(iterable)
             }
         };
 
@@ -7038,7 +7036,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let definition = self.index.expect_single_definition(named);
             let result = infer_definition_types(self.db(), definition);
             self.extend_definition(result);
-            binding_type(self.db(), definition)
+            result.binding_type(definition)
         } else {
             // For syntactically invalid targets, we still need to run type inference:
             self.infer_expression(&named.target, TypeContext::default());
@@ -8321,7 +8319,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         match ctx {
             ExprContext::Load => self.infer_attribute_load(attribute),
             ExprContext::Store => {
-                self.infer_maybe_standalone_expression(value, TypeContext::default());
+                self.infer_expression(value, TypeContext::default());
                 Type::Never
             }
             ExprContext::Del => {

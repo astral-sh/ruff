@@ -66,8 +66,6 @@ mod tests;
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.
-/// When using types ​​in [`ScopeInference`], you must use [`ScopeInference::cycle_recovery`].
-/// Alternatively, consider using a cycle-safe function such as [`infer_scope_expression_type`].
 #[salsa::tracked(returns(ref), cycle_fn=scope_cycle_recover, cycle_initial=scope_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> ScopeInference<'db> {
     let file = scope.file(db);
@@ -110,8 +108,6 @@ fn scope_cycle_initial<'db>(
 
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a place use or public type of a place.
-/// When using types ​​in [`DefinitionInference`], you must use [`DefinitionInference::cycle_recovery`].
-/// Alternatively, consider using a cycle-safe function such as [`crate::types::binding_type`].
 #[salsa::tracked(returns(ref), cycle_fn=definition_cycle_recover, cycle_initial=definition_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn infer_definition_types<'db>(
     db: &'db dyn Db,
@@ -242,8 +238,6 @@ fn deferred_cycle_initial<'db>(
 /// Use rarely; only for cases where we'd otherwise risk double-inferring an expression: RHS of an
 /// assignment, which might be unpacking/multi-target and thus part of multiple definitions, or a
 /// type narrowing guard expression (e.g. if statement test node).
-/// When using types ​​in [`ExpressionInference`], you must use [`ExpressionInference::cycle_recovery`].
-/// Alternatively, consider using a cycle-safe function such as [`infer_expression_type`].
 pub(crate) fn infer_expression_types<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
@@ -252,7 +246,6 @@ pub(crate) fn infer_expression_types<'db>(
     infer_expression_types_impl(db, InferExpression::new(db, expression, tcx))
 }
 
-/// When using types ​​in [`ExpressionInference`], you must use [`ExpressionInference::cycle_recovery`].
 #[salsa::tracked(returns(ref), cycle_fn=expression_cycle_recover, cycle_initial=expression_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(super) fn infer_expression_types_impl<'db>(
     db: &'db dyn Db,
