@@ -3204,7 +3204,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             default,
         } = node;
         if default.is_some() {
-            self.deferred.insert(definition);
+            self.deferred.insert(definition, self.multi_inference_state);
         }
         let identity = TypeVarIdentity::new(
             self.db(),
@@ -4637,7 +4637,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if default.is_some() {
-            self.deferred.insert(definition);
+            self.deferred.insert(definition, self.multi_inference_state);
         }
 
         let identity =

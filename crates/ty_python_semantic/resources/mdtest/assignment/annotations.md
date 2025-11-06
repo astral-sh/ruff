@@ -417,6 +417,8 @@ reveal_type(x) # revealed: Literal[1]
 python-version = "3.12"
 ```
 
+`generic_list.py`:
+
 ```py
 from typing import Literal
 
@@ -456,6 +458,8 @@ reveal_type(j)  # revealed: Literal[True]
 
 The function arguments are also inferred using the type context:
 
+`typed_dict.py`:
+
 ```py
 from typing import TypedDict
 
@@ -480,6 +484,48 @@ c: TD = f([{"y": 0}, {"x": 1}])
 # error: [invalid-key] "Invalid key for TypedDict `TD`: Unknown key "y""
 # error: [invalid-assignment] "Object of type `Unknown | dict[Unknown | str, Unknown | int]` is not assignable to `TD | None`"
 c: TD | None = f([{"y": 0}, {"x": 1}])
+```
+
+But not in a way that leads to assignability errors:
+
+`dict_any.py`:
+
+```py
+from typing import TypedDict, Any
+
+class TD(TypedDict, total=False):
+    x: str
+
+class TD2(TypedDict):
+    x: str
+
+def f(self, dt: dict[str, Any], key: str):
+    # TODO: This should not error once typed dict assignability is implemented.
+    # error: [invalid-assignment]
+    x1: TD = dt.get(key, {})
+    reveal_type(x1)  # revealed: TD
+
+    x2: TD = dt.get(key, {"x": 0})
+    reveal_type(x2)  # revealed: Any
+
+    x3: TD | None = dt.get(key, {})
+    # TODO: This should reveal `Any` once typed dict assignability is implemented.
+    reveal_type(x3)  # revealed: Any | None
+
+    x4: TD | None = dt.get(key, {"x": 0})
+    reveal_type(x4)  # revealed: Any
+
+    x5: TD2 = dt.get(key, {})
+    reveal_type(x5)  # revealed: Any
+
+    x6: TD2 = dt.get(key, {"x": 0})
+    reveal_type(x6)  # revealed: Any
+
+    x7: TD2 | None = dt.get(key, {})
+    reveal_type(x7)  # revealed: Any
+
+    x8: TD2 | None = dt.get(key, {"x": 0})
+    reveal_type(x8)  # revealed: Any
 ```
 
 ## Prefer the declared type of generic classes
