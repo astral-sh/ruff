@@ -466,6 +466,7 @@ wrong_innards: C[int] = C("five", 1)
 from typing_extensions import overload, Generic, TypeVar
 
 T = TypeVar("T")
+U = TypeVar("U")
 
 class C(Generic[T]):
     @overload
@@ -497,6 +498,17 @@ C[int](12)
 C[None]("string")  # error: [no-matching-overload]
 C[None](b"bytes")  # error: [no-matching-overload]
 C[None](12)
+
+class D(Generic[T, U]):
+    @overload
+    def __init__(self: "D[str, U]", u: U) -> None: ...
+    @overload
+    def __init__(self, t: T, u: U) -> None: ...
+    def __init__(self, *args) -> None: ...
+
+reveal_type(D("string"))  # revealed: D[str, str]
+reveal_type(D(1))  # revealed: D[str, int]
+reveal_type(D(1, "string"))  # revealed: D[int, str]
 ```
 
 ### Synthesized methods with dataclasses
