@@ -103,7 +103,7 @@ hashbrown = { version = "0.16.0", default-features = false, features = [
     "inline-more",
 ] }
 heck = "0.5.0"
-ignore = { version = "0.4.22" }
+ignore = { version = "0.4.24" }
 imara-diff = { version = "0.1.5" }
 imperative = { version = "1.0.4" }
 indexmap = { version = "2.6.0" }
