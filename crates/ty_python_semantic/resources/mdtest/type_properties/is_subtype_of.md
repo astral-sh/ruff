@@ -2207,6 +2207,50 @@ static_assert(is_subtype_of(CallableTypeOf[overload_ab], CallableTypeOf[overload
 static_assert(is_subtype_of(CallableTypeOf[overload_ba], CallableTypeOf[overload_ab]))
 ```
 
+### Generic callables
+
+A generic callable can be considered equivalent to an intersection of all of its possible
+specializations. That means that a generic callable is a subtype of any particular specialization.
+(If someone expects a function that works with a particular specialization, it's fine to hand them
+the generic callable.)
+
+```py
+from typing import Callable
+from ty_extensions import CallableTypeOf, TypeOf, is_subtype_of, static_assert
+
+def identity[T](t: T) -> T:
+    return t
+
+# TODO: no error
+# error: [static-assert-error]
+static_assert(is_subtype_of(TypeOf[identity], Callable[[int], int]))
+# TODO: no error
+# error: [static-assert-error]
+static_assert(is_subtype_of(TypeOf[identity], Callable[[str], str]))
+static_assert(not is_subtype_of(TypeOf[identity], Callable[[str], int]))
+
+# TODO: no error
+# error: [static-assert-error]
+static_assert(is_subtype_of(CallableTypeOf[identity], Callable[[int], int]))
+# TODO: no error
+# error: [static-assert-error]
+static_assert(is_subtype_of(CallableTypeOf[identity], Callable[[str], str]))
+static_assert(not is_subtype_of(CallableTypeOf[identity], Callable[[str], int]))
+```
+
+The reverse is not true — if someone expects a generic function that can be called with any
+specialization, we cannot hand them a function that only works with one specialization.
+
+```py
+static_assert(not is_subtype_of(Callable[[int], int], TypeOf[identity]))
+static_assert(not is_subtype_of(Callable[[str], str], TypeOf[identity]))
+static_assert(not is_subtype_of(Callable[[str], int], TypeOf[identity]))
+
+static_assert(not is_subtype_of(Callable[[int], int], CallableTypeOf[identity]))
+static_assert(not is_subtype_of(Callable[[str], str], CallableTypeOf[identity]))
+static_assert(not is_subtype_of(Callable[[str], int], CallableTypeOf[identity]))
+```
+
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form
 [gradual tuple]: https://typing.python.org/en/latest/spec/tuples.html#tuple-type-form
 [special case for float and complex]: https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
