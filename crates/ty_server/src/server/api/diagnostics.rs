@@ -281,8 +281,9 @@ pub(super) fn to_lsp_diagnostic(
         let file = span.expect_ty_file();
 
         span.range()
-            .map(|range| range.as_lsp_range(db, file, encoding).to_local_range())
+            .and_then(|range| range.to_lsp_range(db, file, encoding))
             .unwrap_or_default()
+            .local_range()
     } else {
         Range::default()
     };
@@ -363,7 +364,7 @@ fn annotation_to_related_information(
 
     let annotation_message = annotation.get_message()?;
     let range = FileRange::try_from(span).ok()?;
-    let location = range.as_lsp_range(db, encoding).to_location()?;
+    let location = range.to_lsp_range(db, encoding)?.into_location()?;
 
     Some(DiagnosticRelatedInformation {
         location,
@@ -381,7 +382,7 @@ fn sub_diagnostic_to_related_information(
 
     let span = primary_annotation.get_span();
     let range = FileRange::try_from(span).ok()?;
-    let location = range.as_lsp_range(db, encoding).to_location()?;
+    let location = range.to_lsp_range(db, encoding)?.into_location()?;
 
     Some(DiagnosticRelatedInformation {
         location,
