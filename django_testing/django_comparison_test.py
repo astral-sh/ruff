@@ -2,7 +2,10 @@
 Django type checking comparison test.
 This file will be tested with mypy+django-stubs, pyright, and ty.
 """
+
 from __future__ import annotations
+
+import contextlib
 
 from django.db import models
 from django.db.models.manager import Manager
@@ -59,7 +62,5 @@ filtered = User.objects.filter(age=25).exclude(name="test")
 reveal_type(filtered)
 
 # Test 10: DoesNotExist exception
-try:
+with contextlib.suppress(User.DoesNotExist):
     User.objects.get(id=999)
-except User.DoesNotExist:
-    pass
