@@ -1,6 +1,8 @@
 # Django Type Checking Testing
 
-This directory contains files for testing and comparing Django type checking across different type checkers (mypy, pyright, and ty).
+This directory contains files for comparing Django type checking across different type checkers (mypy, pyright, and ty) **using real Django and real stubs**.
+
+**Note**: The mdtest files in `crates/ty_python_semantic/resources/mdtest/django/` use **inline custom stubs** and don't require django-stubs. This comparison directory tests with real Django to see how ty performs with actual django-stubs in practice.
 
 ## Files
 
@@ -69,17 +71,20 @@ cargo run -p ty -- check django_comparison_test.py
 
 ## Key Findings
 
-### ty Strengths
-- ✅ Can read and use real django-stubs from Python environment
-- ✅ Correctly infers `QuerySet[User, User]` (matches mypy!)
-- ✅ Generic Manager/QuerySet types work
+### ty Strengths (with custom stubs in mdtest)
+- ✅ Descriptor protocol **partially works** - returns `Unknown | str` for CharField
+- ✅ Generic Manager/QuerySet types work with manual annotations
 - ✅ Method chaining preserves type information
 
-### ty Gaps
-- ⚠️ Returns `Unknown | T` unions instead of just `T` (less precise, but shows descriptor protocol **partially works!**)
-- ⚠️ Field access returns `Unknown | str` instead of `str` (descriptor protocol works but needs better type narrowing)
-- ⚠️ Warnings instead of errors for invalid attributes (less strict)
-- ❌ Self type not supported - `Manager[Self]` fails with type error (needs PEP 673)
+### ty Gaps (discovered in mdtest)
+- ⚠️ Returns `Unknown | T` unions instead of just `T` (descriptor protocol works but needs type narrowing)
+- ❌ Self type not supported - `Manager[Self]` fails with "Expected `Model`, found `typing.Self`" (needs PEP 673)
+
+### Real django-stubs Testing
+When tested with real Django code and django-stubs (django_comparison_test.py):
+- ✅ Can read and use real django-stubs from Python environment
+- ⚠️ Same Unknown union behavior as with custom stubs
+- ⚠️ Warnings instead of errors for invalid attributes (less strict than mypy/pyright)
 
 ### Mypy + django-stubs
 - ✅ Most comprehensive Django support via mypy plugin
