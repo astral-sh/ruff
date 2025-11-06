@@ -1171,9 +1171,7 @@ class EggsLegacy(Generic[T, P]): ...
 static_assert(not is_assignable_to(Spam, Callable[..., Any]))
 static_assert(not is_assignable_to(SpamLegacy, Callable[..., Any]))
 static_assert(not is_assignable_to(Eggs, Callable[..., Any]))
-
-# TODO: should pass
-static_assert(not is_assignable_to(EggsLegacy, Callable[..., Any]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(EggsLegacy, Callable[..., Any]))
 ```
 
 ### Classes with `__call__` as attribute
