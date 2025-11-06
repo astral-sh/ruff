@@ -39,3 +39,41 @@ help: Add a call to `.items()`
 18 | 
 19 | 
 note: This is an unsafe fix and may change runtime behavior
+
+PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
+  --> dict_iter_missing_items.py:37:13
+   |
+35 | empty_dict = {}
+36 | empty_dict["x"] = 1
+37 | for k, v in empty_dict:
+   |             ^^^^^^^^^^
+38 |     pass
+   |
+help: Add a call to `.items()`
+34 | # Empty dict cases
+35 | empty_dict = {}
+36 | empty_dict["x"] = 1
+   - for k, v in empty_dict:
+37 + for k, v in empty_dict.items():
+38 |     pass
+39 | 
+40 | empty_dict_annotated_tuple_keys: dict[tuple[int, str], bool] = {}
+note: This is an unsafe fix and may change runtime behavior
+
+PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
+  --> dict_iter_missing_items.py:47:13
+   |
+45 | empty_dict_annotated_str_keys: dict[str, int] = {}
+46 | empty_dict_annotated_str_keys["x"] = 1
+47 | for k, v in empty_dict_annotated_str_keys:
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+48 |     pass
+   |
+help: Add a call to `.items()`
+44 | 
+45 | empty_dict_annotated_str_keys: dict[str, int] = {}
+46 | empty_dict_annotated_str_keys["x"] = 1
+   - for k, v in empty_dict_annotated_str_keys:
+47 + for k, v in empty_dict_annotated_str_keys.items():
+48 |     pass
+note: This is an unsafe fix and may change runtime behavior
