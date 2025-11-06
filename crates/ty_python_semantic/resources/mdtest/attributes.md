@@ -385,19 +385,9 @@ class TupleIterable:
 
 class C:
     def __init__(self) -> None:
-        # TODO: Should not emit this diagnostic
-        # error: [unresolved-attribute]
         [... for self.a in range(3)]
-        # TODO: Should not emit this diagnostic
-        # error: [unresolved-attribute]
-        # error: [unresolved-attribute]
         [... for (self.b, self.c) in TupleIterable()]
-        # TODO: Should not emit this diagnostic
-        # error: [unresolved-attribute]
-        # error: [unresolved-attribute]
         [... for self.d in range(3) for self.e in range(3)]
-        # TODO: Should not emit this diagnostic
-        # error: [unresolved-attribute]
         [[... for self.f in range(3)] for _ in range(3)]
         [[... for self.g in range(3)] for self in [D()]]
 
@@ -445,10 +435,12 @@ If the comprehension is inside another scope like function then that attribute i
 class C:
     def __init__(self):
         def f():
-            [... for self.a in IntIterable()]
+            # error: [unresolved-attribute]
+            [... for self.a in [1]]
 
         def g():
-            [... for self.b in IntIterable()]
+            # error: [unresolved-attribute]
+            [... for self.b in [1]]
         g()
 
 c_instance = C()
@@ -468,7 +460,7 @@ If the comprehension is nested in any other eager scope it still can assign attr
 class C:
     def __init__(self):
         class D:
-            [[... for self.a in IntIterable()] for _ in IntIterable()]
+            [[... for self.a in [1]] for _ in [1]]
 
 reveal_type(C().a)  # revealed: Unknown | int
 ```
