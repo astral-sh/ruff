@@ -160,6 +160,20 @@ impl<'db> Completion<'db> {
                 .and_then(|ty| imp(db, ty, &CompletionKindVisitor::default()))
         })
     }
+
+    fn keyword(name: &str) -> Self {
+        Completion {
+            name: name.into(),
+            insert: None,
+            ty: None,
+            kind: Some(CompletionKind::Keyword),
+            module_name: None,
+            import: None,
+            builtin: false,
+            is_type_check_only: false,
+            documentation: None,
+        }
+    }
 }
 
 /// The "kind" of a completion.
@@ -212,14 +226,16 @@ pub fn completion<'db>(
     offset: TextSize,
 ) -> Vec<Completion<'db>> {
     let parsed = parsed_module(db, file).load(db);
-
     let tokens = tokens_start_before(parsed.tokens(), offset);
+    let typed = find_typed_text(db, file, &parsed, offset);
 
-    if is_in_comment(tokens) || is_in_string(tokens) || is_in_definition_place(db, tokens, file) {
+    if is_in_no_completions_place(db, tokens, file) {
         return vec![];
     }
+    if let Some(completions) = only_keyword_completion(tokens, typed.as_deref()) {
+        return vec![completions];
+    }
 
-    let typed = find_typed_text(db, file, &parsed, offset);
     let typed_query = typed
         .as_deref()
         .map(QueryPattern::new)
@@ -307,6 +323,17 @@ fn add_keyword_value_completions<'db>(
             documentation: None,
         });
     }
+}
+
+/// When the tokens indicate that the last token should be precisely one
+/// possible keyword, we provide a single completion for it.
+///
+/// `typed` should be the text that we think the user has typed so far.
+fn only_keyword_completion<'db>(tokens: &[Token], typed: Option<&str>) -> Option<Completion<'db>> {
+    if is_import_from_incomplete(tokens, typed) {
+        return Some(Completion::keyword("import"));
+    }
+    None
 }
 
 /// Adds completions not in scope.
@@ -801,6 +828,67 @@ fn import_tokens(tokens: &[Token]) -> Option<(&Token, &Token)> {
     None
 }
 
+/// Looks for the start of a `from module <CURSOR>` statement.
+///
+/// If found, `true` is returned.
+///
+/// `typed` should be the text that we think the user has typed so far.
+fn is_import_from_incomplete(tokens: &[Token], typed: Option<&str>) -> bool {
+    // N.B. The implementation here is very similar to
+    // `from_import_tokens`. The main difference is that
+    // we're just looking for whether we should suggest
+    // the `import` keyword. So this is a little simpler.
+
+    use TokenKind as TK;
+
+    const LIMIT: usize = 1_000;
+
+    /// A state used to "parse" the tokens preceding the user's cursor,
+    /// in reverse, to detect a "from import" statement.
+    enum S {
+        Start,
+        ImportKeyword,
+        ModulePossiblyDotted,
+        ModuleOnlyDotted,
+    }
+
+    let mut state = S::Start;
+    if typed.is_none() {
+        state = S::ImportKeyword;
+    }
+    // Move backward through the tokens until we get to
+    // the `from` token.
+    for token in tokens.iter().rev().take(LIMIT) {
+        state = match (state, token.kind()) {
+            // Match an incomplete `import` keyword.
+            //
+            // It's okay to pop off a newline token here initially,
+            // since it may occur before the user starts typing
+            // `import` but after the module name.
+            (S::Start, TK::Newline | TK::Name | TK::Import) => S::ImportKeyword,
+            // We are a bit more careful with how we parse the module
+            // here than in `from_import_tokens`. In particular, we
+            // want to make sure we don't incorrectly suggest `import`
+            // for `from os.i<CURSOR>`. If we aren't careful, then
+            // `i` could be considered an incomplete `import` keyword
+            // and `os.` is the module. But of course, ending with a
+            // `.` (unless the entire module is dots) is invalid.
+            (S::ImportKeyword, TK::Dot | TK::Ellipsis) => S::ModuleOnlyDotted,
+            (S::ImportKeyword, TK::Name | TK::Case | TK::Match | TK::Type | TK::Unknown) => {
+                S::ModulePossiblyDotted
+            }
+            (S::ModuleOnlyDotted, TK::Dot | TK::Ellipsis) => S::ModuleOnlyDotted,
+            (
+                S::ModulePossiblyDotted,
+                TK::Name | TK::Dot | TK::Ellipsis | TK::Case | TK::Match | TK::Type | TK::Unknown,
+            ) => S::ModulePossiblyDotted,
+            (S::ModulePossiblyDotted | S::ModuleOnlyDotted, TK::From) => return true,
+            _ => return false,
+        };
+    }
+    false
+}
+
 /// Looks for the text typed immediately before the cursor offset
 /// given.
 ///
@@ -815,7 +903,10 @@ fn find_typed_text(
     let source = source_text(db, file);
     let tokens = tokens_start_before(parsed.tokens(), offset);
     let last = tokens.last()?;
-    if !matches!(last.kind(), TokenKind::Name) {
+    // It's odd to include `TokenKind::Import` here, but it
+    // indicates that the user has typed `import`. This is
+    // useful to know in some contexts.
+    if !matches!(last.kind(), TokenKind::Name | TokenKind::Import) {
         return None;
     }
     // This one's weird, but if the cursor is beyond
@@ -828,6 +919,11 @@ fn find_typed_text(
         return None;
     }
     Some(source[last.range()].to_string())
+}
+
+/// Whether the last token is in a place where we should not provide completions.
+fn is_in_no_completions_place(db: &dyn Db, tokens: &[Token], file: File) -> bool {
+    is_in_comment(tokens) || is_in_string(tokens) || is_in_definition_place(db, tokens, file)
 }
 
 /// Whether the last token is within a comment or not.
@@ -4214,6 +4310,138 @@ type <CURSOR>
         ProcessLookupError
         PythonFinalizationError
         ");
+    }
+
+    #[test]
+    fn from_import_i_suggests_import() {
+        let builder = completion_test_builder("from typing i<CURSOR>");
+        assert_snapshot!(builder.build().snapshot(), @"import");
+    }
+
+    #[test]
+    fn from_import_import_suggests_nothing() {
+        let builder = completion_test_builder("from typing import<CURSOR>");
+        assert_snapshot!(builder.build().snapshot(), @"import");
+    }
+
+    #[test]
+    fn from_import_importt_suggests_import() {
+        let builder = completion_test_builder("from typing importt<CURSOR>");
+        assert_snapshot!(builder.build().snapshot(), @"import");
+    }
+
+    #[test]
+    fn from_import_space_suggests_import() {
+        let builder = completion_test_builder("from typing <CURSOR>");
+        assert_snapshot!(builder.build().snapshot(), @"import");
+    }
+
+    #[test]
+    fn from_import_no_space_not_suggests_import() {
+        let builder = completion_test_builder("from typing<CURSOR>");
+        assert_snapshot!(builder.build().snapshot(), @r"
+        typing
+        typing_extensions
+        ");
+    }
+
+    #[test]
+    fn from_import_two_imports_suggests_import() {
+        let builder = completion_test_builder(
+            "from collections.abc import Sequence
+            from typing i<CURSOR>",
+        );
+        assert_snapshot!(builder.build().snapshot(), @"import");
+    }
+
+    /// The following behaviour may not be reflected in editors, since LSP
+    /// clients may do their own filtering of completion suggestions.
+    #[test]
+    fn from_import_random_name_suggests_import() {
+        let builder = completion_test_builder("from typing aa<CURSOR>");
+        assert_snapshot!(builder.build().snapshot(), @"import");
+    }
+
+    #[test]
+    fn from_import_dotted_name_suggests_import() {
+        let builder = completion_test_builder("from collections.abc i<CURSOR>");
+        assert_snapshot!(builder.build().snapshot(), @"import");
+    }
+
+    #[test]
+    fn from_import_relative_import_suggests_import() {
+        let builder = CursorTest::builder()
+            .source("main.py", "from .foo i<CURSOR>")
+            .source("foo.py", "")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @"import");
+    }
+
+    #[test]
+    fn from_import_dotted_name_relative_import_suggests_import() {
+        let builder = CursorTest::builder()
+            .source("main.py", "from .foo.bar i<CURSOR>")
+            .source("foo/bar.py", "")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @"import");
+    }
+
+    #[test]
+    fn from_import_nested_dotted_name_relative_import_suggests_import() {
+        let builder = CursorTest::builder()
+            .source("src/main.py", "from ..foo i<CURSOR>")
+            .source("foo.py", "")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @"import");
+    }
+
+    #[test]
+    fn from_import_nested_very_dotted_name_relative_import_suggests_import() {
+        let builder = CursorTest::builder()
+            // N.B. the `...` tokenizes as `TokenKind::Ellipsis`
+            .source("src/main.py", "from ...foo i<CURSOR>")
+            .source("foo.py", "")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @"import");
+    }
+
+    #[test]
+    fn from_import_only_dot() {
+        let builder = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+                import_zqzqzq = 1
+                from .<CURSOR>
+                ",
+            )
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @"import");
+    }
+
+    #[test]
+    fn from_import_only_dot_incomplete() {
+        let builder = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+                import_zqzqzq = 1
+                from .imp<CURSOR>
+                ",
+            )
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @"import");
+    }
+
+    #[test]
+    fn from_import_incomplete() {
+        let builder = completion_test_builder(
+            "from collections.abc i
+
+             ZQZQZQ = 1
+             ZQ<CURSOR>",
+        );
+        assert_snapshot!(builder.build().snapshot(), @"ZQZQZQ");
     }
 
     /// A way to create a simple single-file (named `main.py`) completion test
