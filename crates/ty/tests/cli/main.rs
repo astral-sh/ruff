@@ -5,6 +5,7 @@ mod python_environment;
 mod rule_selection;
 
 use anyhow::Context as _;
+use insta::Settings;
 use insta::internals::SettingsBindDropGuard;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 use std::{
@@ -760,8 +761,10 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
 
 pub(crate) struct CliTest {
     _temp_dir: TempDir,
-    _settings_scope: SettingsBindDropGuard,
+    settings: Settings,
+    settings_scope: Option<SettingsBindDropGuard>,
     project_dir: PathBuf,
+    ty_binary_path: PathBuf,
 }
 
 impl CliTest {
@@ -794,7 +797,9 @@ impl CliTest {
         Ok(Self {
             project_dir,
             _temp_dir: temp_dir,
-            _settings_scope: settings_scope,
+            settings,
+            settings_scope: Some(settings_scope),
+            ty_binary_path: get_cargo_bin("ty"),
         })
     }
 
@@ -821,6 +826,30 @@ impl CliTest {
         }
 
         Ok(())
+    }
+
+    /// Return [`Self`] with the ty binary copied to the specified path instead.
+    pub(crate) fn with_ty_at(mut self, dest_path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        let dest_path = dest_path.as_ref();
+        let dest_path = self.project_dir.join(dest_path);
+
+        Self::ensure_parent_directory(&dest_path)?;
+        std::fs::copy(&self.ty_binary_path, &dest_path)
+            .with_context(|| format!("Failed to copy ty binary to `{}`", dest_path.display()))?;
+
+        self.ty_binary_path = dest_path;
+        Ok(self)
+    }
+
+    /// Add a filter to the settings and rebind them.
+    pub(crate) fn with_filter(mut self, pattern: &str, replacement: &str) -> Self {
+        self.settings.add_filter(pattern, replacement);
+        // Drop the old scope before binding a new one, otherwise the old scope is dropped _after_
+        // binding and assigning the new one, restoring the settings to their state before the old
+        // scope was bound.
+        drop(self.settings_scope.take());
+        self.settings_scope = Some(self.settings.bind_to_scope());
+        self
     }
 
     fn ensure_parent_directory(path: &Path) -> anyhow::Result<()> {
@@ -868,7 +897,7 @@ impl CliTest {
     }
 
     pub(crate) fn command(&self) -> Command {
-        let mut command = Command::new(get_cargo_bin("ty"));
+        let mut command = Command::new(&self.ty_binary_path);
         command.current_dir(&self.project_dir).arg("check");
 
         // Unset all environment variables because they can affect test behavior.
@@ -880,4 +909,12 @@ impl CliTest {
 
 fn tempdir_filter(path: &Path) -> String {
     format!(r"{}\\?/?", regex::escape(path.to_str().unwrap()))
+}
+
+fn site_packages_filter(python_version: &str) -> String {
+    if cfg!(windows) {
+        "Lib/site-packages".to_string()
+    } else {
+        format!("lib/python{}/site-packages", regex::escape(python_version))
+    }
 }
