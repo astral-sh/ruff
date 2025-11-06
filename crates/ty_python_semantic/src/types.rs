@@ -921,7 +921,8 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn cycle_normalized(self, db: &'db dyn Db, previous: Self, div: Self) -> Self {
-        UnionType::join_provisional_types(db, previous, self).recursive_type_normalized(db, div)
+        UnionType::from_elements_cycle_recovery(db, [self, previous])
+            .recursive_type_normalized(db, div)
     }
 
     fn is_none(&self, db: &'db dyn Db) -> bool {
@@ -11931,18 +11932,18 @@ impl<'db> UnionType<'db> {
             .build()
     }
 
-    /// To keep queries monotonic, cycle recovery functions should union the previous provisional type and the current provisional type.
-    /// Use this function, not `UnionBuilder` to union them, because a cycle recovery function cannot create a query cycle.
-    /// (`UnionBuilder` calls query functions to simplify the union type)
-    fn join_provisional_types(
-        db: &'db dyn Db,
-        previous_type: Type<'db>,
-        current_type: Type<'db>,
-    ) -> Type<'db> {
-        Type::Union(UnionType::new(
-            db,
-            Box::from_iter([previous_type, current_type]),
-        ))
+    fn from_elements_cycle_recovery<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
+        elements
+            .into_iter()
+            .fold(
+                UnionBuilder::new(db).cycle_recovery(true),
+                |builder, element| builder.add(element.into()),
+            )
+            .build()
     }
 
     /// A fallible version of [`UnionType::from_elements`].
