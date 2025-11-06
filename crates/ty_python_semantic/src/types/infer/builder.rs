@@ -5981,14 +5981,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_expression_tcx: TypeContext<'db>,
     ) -> Result<(), CallErrorKind> {
         let db = self.db();
+
         // If the type context is a union, attempt to narrow to a specific element.
         let narrow_targets: &[_] = match call_expression_tcx.annotation {
-            None => &[],
             // TODO: We could theoretically attempt to narrow to every element of
             // the power set of this union. However, this leads to an exponential
             // explosion of inference attempts, and is rarely needed in practice.
             Some(Type::Union(union)) => union.elements(db),
-            Some(ty) => &[ty],
+            _ => &[],
         };
 
         // We silence diagnostics until we successfully narrow to a specific type.
