@@ -284,25 +284,25 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
 ///
 /// [escape-sequences]: https://docs.python.org/3/reference/lexical_analysis.html#escape-sequences
 fn string_contains_string_only_escapes(string: &StringLiteralValue, locator: &Locator) -> bool {
-    for fragment in string {
-        let flags = fragment.flags;
+    for literal in string {
+        let flags = literal.flags;
 
         if flags.prefix().is_raw() {
             continue;
         }
 
-        if fragment.content_range().len() > fragment.as_str().text_len() {
-            if literal_contains_string_only_escapes(fragment, locator) {
-                return true;
-            }
+        if literal.content_range().len() > literal.as_str().text_len()
+            && literal_contains_string_only_escapes(literal, locator)
+        {
+            return true;
         }
     }
 
     false
 }
 
-fn literal_contains_string_only_escapes(fragment: &StringLiteral, locator: &Locator) -> bool {
-    let inner_in_source = locator.slice(fragment.content_range());
+fn literal_contains_string_only_escapes(literal: &StringLiteral, locator: &Locator) -> bool {
+    let inner_in_source = locator.slice(literal.content_range());
 
     let mut cursor = Cursor::new(inner_in_source);
 
@@ -329,7 +329,7 @@ fn literal_contains_string_only_escapes(fragment: &StringLiteral, locator: &Loca
 
                 if octal_codepoint.parse::<u8>().is_err() {
                     return true;
-                };
+                }
 
                 cursor.skip_bytes(octal_codepoint.len());
             }
