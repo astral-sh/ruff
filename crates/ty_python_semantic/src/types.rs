@@ -12129,7 +12129,8 @@ impl<'db> UnionType<'db> {
             .fold(
                 UnionBuilder::new(db)
                     .order_elements(false)
-                    .unpack_aliases(false),
+                    .unpack_aliases(false)
+                    .cycle_recovery(true),
                 UnionBuilder::add,
             )
             .build()

@@ -242,6 +242,9 @@ impl<'db> UnionBuilder<'db> {
 
     pub(crate) fn cycle_recovery(mut self, val: bool) -> Self {
         self.cycle_recovery = val;
+        if self.cycle_recovery {
+            self.unpack_aliases = false;
+        }
         self
     }
 

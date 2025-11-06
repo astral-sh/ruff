@@ -11,7 +11,7 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::walk_protocol_interface;
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor,
@@ -196,7 +196,15 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
     nominal: NominalInstanceType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, nominal.class(db).into());
+    match nominal.0 {
+        NominalInstanceInner::ExactTuple(tuple) => {
+            walk_tuple_type(db, tuple, visitor);
+        }
+        NominalInstanceInner::Object => {}
+        NominalInstanceInner::NonTuple(class) => {
+            visitor.visit_type(db, class.into());
+        }
+    }
 }
 
 impl<'db> NominalInstanceType<'db> {
