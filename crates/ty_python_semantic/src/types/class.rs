@@ -120,6 +120,7 @@ fn implicit_attribute_initial<'db>(
 fn implicit_attribute_cycle_recover<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
+    cycle_heads: &salsa::CycleHeads,
     previous_member: &Member<'db>,
     member: Member<'db>,
     _count: u32,
@@ -128,8 +129,13 @@ fn implicit_attribute_cycle_recover<'db>(
     _target_method_decorator: MethodDecorator,
 ) -> Member<'db> {
     let div = Type::divergent(id);
-    let place =
-        join_with_previous_cycle_place(db, &previous_member.inner.place, &member.inner.place, div);
+    let place = join_with_previous_cycle_place(
+        db,
+        &previous_member.inner.place,
+        &member.inner.place,
+        div,
+        cycle_heads,
+    );
     Member {
         inner: PlaceAndQualifiers {
             place,

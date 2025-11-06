@@ -710,6 +710,7 @@ fn place_cycle_initial<'db>(
 fn place_cycle_recover<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
+    cycle_heads: &salsa::CycleHeads,
     previous_place: &PlaceAndQualifiers<'db>,
     place: PlaceAndQualifiers<'db>,
     _count: u32,
@@ -720,7 +721,13 @@ fn place_cycle_recover<'db>(
 ) -> PlaceAndQualifiers<'db> {
     let div = Type::divergent(id);
     PlaceAndQualifiers {
-        place: join_with_previous_cycle_place(db, &previous_place.place, &place.place, div),
+        place: join_with_previous_cycle_place(
+            db,
+            &previous_place.place,
+            &place.place,
+            div,
+            cycle_heads,
+        ),
         qualifiers: place.qualifiers,
     }
 }

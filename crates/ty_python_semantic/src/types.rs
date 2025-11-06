@@ -416,6 +416,7 @@ fn member_lookup_cycle_initial<'db>(
 fn member_lookup_cycle_recover<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
+    cycle_heads: &salsa::CycleHeads,
     previous_member: &PlaceAndQualifiers<'db>,
     member: PlaceAndQualifiers<'db>,
     _count: u32,
@@ -424,7 +425,8 @@ fn member_lookup_cycle_recover<'db>(
     _policy: MemberLookupPolicy,
 ) -> PlaceAndQualifiers<'db> {
     let div = Type::divergent(id);
-    let place = join_with_previous_cycle_place(db, &previous_member.place, &member.place, div);
+    let place =
+        join_with_previous_cycle_place(db, &previous_member.place, &member.place, div, cycle_heads);
     PlaceAndQualifiers {
         place,
         qualifiers: member.qualifiers,
@@ -446,12 +448,13 @@ pub(crate) fn join_with_previous_cycle_place<'db>(
     previous_place: &Place<'db>,
     place: &Place<'db>,
     div: Type<'db>,
+    cycle_heads: &salsa::CycleHeads,
 ) -> Place<'db> {
     match (previous_place, place) {
         // In fixed-point iteration of type inference, the member type must be monotonically widened and not "oscillate".
         // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
         (Place::Defined(prev_ty, _, _), Place::Defined(ty, origin, definedness)) => Place::Defined(
-            ty.cycle_normalized(db, *prev_ty, div),
+            ty.cycle_normalized(db, *prev_ty, div, cycle_heads),
             *origin,
             *definedness,
         ),
@@ -466,6 +469,7 @@ pub(crate) fn join_with_previous_cycle_place<'db>(
 fn class_lookup_cycle_recover<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
+    cycle_heads: &salsa::CycleHeads,
     previous_member: &PlaceAndQualifiers<'db>,
     member: PlaceAndQualifiers<'db>,
     _count: u32,
@@ -474,7 +478,8 @@ fn class_lookup_cycle_recover<'db>(
     _policy: MemberLookupPolicy,
 ) -> PlaceAndQualifiers<'db> {
     let div = Type::divergent(id);
-    let place = join_with_previous_cycle_place(db, &previous_member.place, &member.place, div);
+    let place =
+        join_with_previous_cycle_place(db, &previous_member.place, &member.place, div, cycle_heads);
     PlaceAndQualifiers {
         place,
         qualifiers: member.qualifiers,
@@ -920,9 +925,18 @@ impl<'db> Type<'db> {
         matches!(self, Type::Callable(..))
     }
 
-    pub(crate) fn cycle_normalized(self, db: &'db dyn Db, previous: Self, div: Self) -> Self {
-        UnionType::from_elements_cycle_recovery(db, [self, previous])
-            .recursive_type_normalized(db, div)
+    pub(crate) fn cycle_normalized(
+        self,
+        db: &'db dyn Db,
+        previous: Self,
+        div: Self,
+        cycle_heads: &salsa::CycleHeads,
+    ) -> Self {
+        let normalized = UnionType::from_elements_cycle_recovery(db, [self, previous])
+            .recursive_type_normalized(db, div);
+        cycle_heads.ids().fold(normalized, |ty, id| {
+            ty.recursive_type_normalized(db, Type::divergent(id))
+        })
     }
 
     fn is_none(&self, db: &'db dyn Db) -> bool {
@@ -7692,9 +7706,11 @@ fn is_redundant_with_cycle_initial<'db>(
     true
 }
 
+#[allow(clippy::too_many_arguments)]
 fn apply_specialization_cycle_recover<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
+    cycle_heads: &salsa::CycleHeads,
     previous_value: &Type<'db>,
     value: Type<'db>,
     _count: u32,
@@ -7702,7 +7718,7 @@ fn apply_specialization_cycle_recover<'db>(
     _specialization: Specialization<'db>,
 ) -> Type<'db> {
     let div = Type::divergent(id);
-    value.cycle_normalized(db, *previous_value, div)
+    value.cycle_normalized(db, *previous_value, div, cycle_heads)
 }
 
 fn apply_specialization_cycle_initial<'db>(
@@ -8909,6 +8925,7 @@ fn lazy_bound_or_constraints_cycle_initial<'db>(
 fn lazy_default_cycle_recover<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
+    cycle_heads: &salsa::CycleHeads,
     previous_default: &Option<Type<'db>>,
     default: Option<Type<'db>>,
     _count: u32,
@@ -8916,7 +8933,7 @@ fn lazy_default_cycle_recover<'db>(
 ) -> Option<Type<'db>> {
     let div = Type::divergent(id);
     match (previous_default, default) {
-        (Some(prev), Some(default)) => Some(default.cycle_normalized(db, *prev, div)),
+        (Some(prev), Some(default)) => Some(default.cycle_normalized(db, *prev, div, cycle_heads)),
         (None, Some(default)) => Some(default.recursive_type_normalized(db, div)),
         (_, None) => None,
     }
