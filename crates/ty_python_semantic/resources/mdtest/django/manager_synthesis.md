@@ -65,7 +65,9 @@ class User(models.Model):
     name: str
     # Note: In real Django, .objects is auto-synthesized by metaclass
     # For now, we manually annotate it (like mypy/pyright require)
-    objects: models.Manager[Self]  # error: [invalid-argument-type] "Argument to class `Manager` is incorrect: Expected `Model`, found `typing.Self`"
+    objects: models.Manager[
+        Self
+    ]  # error: [invalid-argument-type] "Argument to class `Manager` is incorrect: Expected `Model`, found `typing.Self`"
 
 # Manager type inference
 reveal_type(User.objects)  # revealed: Unknown
@@ -118,8 +120,8 @@ reveal_type(maybe_user)  # revealed: Unknown
 
 ## QuerySet Method Chaining
 
-TODO: [Phase 2] These tests require Self type resolution to work.
-Currently commented out because Self resolves to Unknown in class body.
+TODO: [Phase 2] These tests require Self type resolution to work. Currently commented out because
+Self resolves to Unknown in class body.
 
 ## Custom Manager
 

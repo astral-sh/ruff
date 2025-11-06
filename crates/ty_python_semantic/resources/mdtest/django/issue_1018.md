@@ -108,10 +108,11 @@ reveal_type(demo.pk)  # revealed: Any
 ## Related Issue
 
 This test directly addresses GitHub issue #1018 where users reported:
+
 - `m.id` not recognized
 - `m.demo_name` not recognized
 - `Demo.objects` not recognized
 - `m.save` works (inherited from Model base class)
 
-The root cause is Django's metaclass-based attribute synthesis, which requires
-dedicated Django support in the type checker.
+The root cause is Django's metaclass-based attribute synthesis, which requires dedicated Django
+support in the type checker.

@@ -2,9 +2,12 @@
 Django type checking comparison test.
 This file will be tested with mypy+django-stubs, pyright, and ty.
 """
+from __future__ import annotations
 
 from django.db import models
 from django.db.models.manager import Manager
+
+# ruff: noqa: F821 - reveal_type is provided by type checkers
 
 
 class User(models.Model):
