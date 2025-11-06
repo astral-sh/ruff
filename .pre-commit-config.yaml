@@ -64,7 +64,8 @@ repos:
         files: '^crates/.*/resources/mdtest/.*\.md'
         exclude: |
           (?x)^(
-            .*?invalid(_.+)*_syntax\.md
+            .*?invalid(_.+)*_syntax\.md|
+            crates/ty_python_semantic/resources/mdtest/django/manager_synthesis\.md
           )$
         additional_dependencies:
           - black==25.1.0

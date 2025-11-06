@@ -65,9 +65,7 @@ class User(models.Model):
     name: str
     # Note: In real Django, .objects is auto-synthesized by metaclass
     # For now, we manually annotate it (like mypy/pyright require)
-    objects: models.Manager[
-        Self
-    ]  # error: [invalid-argument-type] "Argument to class `Manager` is incorrect: Expected `Model`, found `typing.Self`"
+    objects: models.Manager[Self]  # error: [invalid-argument-type] "Expected `Model`, found `typing.Self`"
 
 # Manager type inference
 reveal_type(User.objects)  # revealed: Unknown
