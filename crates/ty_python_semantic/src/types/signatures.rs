@@ -628,6 +628,13 @@ impl<'db> Signature<'db> {
         }
     }
 
+    fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db, 'db> {
+        match self.generic_context {
+            Some(generic_context) => generic_context.inferable_typevars(db),
+            None => InferableTypeVars::None,
+        }
+    }
+
     /// Return `true` if `self` has exactly the same set of possible static materializations as
     /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
     /// `other`).
@@ -640,12 +647,8 @@ impl<'db> Signature<'db> {
     ) -> ConstraintSet<'db> {
         // The typevars in self and other should also be considered inferable when checking whether
         // two signatures are equivalent.
-        let self_inferable =
-            (self.generic_context).map(|generic_context| generic_context.inferable_typevars(db));
-        let other_inferable =
-            (other.generic_context).map(|generic_context| generic_context.inferable_typevars(db));
-        let inferable = inferable.merge(self_inferable.as_ref());
-        let inferable = inferable.merge(other_inferable.as_ref());
+        let inferable = inferable.merge(db, self.inferable_typevars(db));
+        let inferable = inferable.merge(db, other.inferable_typevars(db));
 
         let mut result = ConstraintSet::from(true);
         let mut check_types = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
@@ -799,12 +802,8 @@ impl<'db> Signature<'db> {
 
         // The typevars in self and other should also be considered inferable when checking whether
         // two signatures are equivalent.
-        let self_inferable =
-            (self.generic_context).map(|generic_context| generic_context.inferable_typevars(db));
-        let other_inferable =
-            (other.generic_context).map(|generic_context| generic_context.inferable_typevars(db));
-        let inferable = inferable.merge(self_inferable.as_ref());
-        let inferable = inferable.merge(other_inferable.as_ref());
+        let inferable = inferable.merge(db, self.inferable_typevars(db));
+        let inferable = inferable.merge(db, other.inferable_typevars(db));
 
         let mut result = ConstraintSet::from(true);
         let mut check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {

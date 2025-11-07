@@ -9,7 +9,6 @@ use std::fmt;
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
-use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
@@ -1217,21 +1216,20 @@ impl<'db> Bindings<'db> {
                         let extract_inferable = |instance: &NominalInstanceType<'db>| {
                             if instance.has_known_class(db, KnownClass::NoneType) {
                                 // Caller explicitly passed None, so no typevars are inferable.
-                                return Some(FxHashSet::default());
+                                return Some(InferableTypeVars::None);
                             }
-                            instance
-                                .tuple_spec(db)?
-                                .fixed_elements()
-                                .map(|ty| {
+                            Some(InferableTypeVars::from_bound_typevars(
+                                db,
+                                instance.tuple_spec(db)?.fixed_elements().filter_map(|ty| {
                                     ty.as_typevar()
                                         .map(|bound_typevar| bound_typevar.identity(db))
-                                })
-                                .collect()
+                                }),
+                            ))
                         };
 
                         let inferable = match overload.parameter_types() {
                             // Caller did not provide argument, so no typevars are inferable.
-                            [None] => FxHashSet::default(),
+                            [None] => InferableTypeVars::None,
                             [Some(Type::NominalInstance(instance))] => {
                                 match extract_inferable(instance) {
                                     Some(inferable) => inferable,
@@ -1243,7 +1241,7 @@ impl<'db> Bindings<'db> {
 
                         let result = tracked
                             .constraints(db)
-                            .satisfied_by_all_typevars(db, InferableTypeVars::One(&inferable));
+                            .satisfied_by_all_typevars(db, inferable);
                         overload.set_return_type(Type::BooleanLiteral(result));
                     }
 
