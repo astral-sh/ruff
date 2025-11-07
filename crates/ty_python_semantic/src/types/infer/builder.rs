@@ -103,10 +103,10 @@ use crate::types::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
     MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
     Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeList, TypeQualifiers,
     TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
     TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
-    UnionTypeInstance, binding_type, todo_type,
+    binding_type, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -8754,19 +8754,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::SubclassOf(..)
                 | Type::GenericAlias(..)
                 | Type::SpecialForm(_)
-                | Type::KnownInstance(KnownInstanceType::UnionType(_)),
+                | Type::KnownInstance(
+                    KnownInstanceType::UnionType(_) | KnownInstanceType::Literal(_),
+                ),
                 Type::ClassLiteral(..)
                 | Type::SubclassOf(..)
                 | Type::GenericAlias(..)
                 | Type::SpecialForm(_)
-                | Type::KnownInstance(KnownInstanceType::UnionType(_)),
+                | Type::KnownInstance(
+                    KnownInstanceType::UnionType(_) | KnownInstanceType::Literal(_),
+                ),
                 ast::Operator::BitOr,
             ) if Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY310 => {
                 if left_ty.is_equivalent_to(self.db(), right_ty) {
                     Some(left_ty)
                 } else {
                     Some(Type::KnownInstance(KnownInstanceType::UnionType(
-                        UnionTypeInstance::new(self.db(), left_ty, right_ty),
+                        TypeList::from_elements(self.db(), [left_ty, right_ty]),
                     )))
                 }
             }
@@ -8791,7 +8795,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 && instance.has_known_class(self.db(), KnownClass::NoneType) =>
             {
                 Some(Type::KnownInstance(KnownInstanceType::UnionType(
-                    UnionTypeInstance::new(self.db(), left_ty, right_ty),
+                    TypeList::from_elements(self.db(), [left_ty, right_ty]),
                 )))
             }
 
@@ -9922,6 +9926,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     type_alias,
                     generic_context,
                 );
+            }
+        }
+        if value_ty == Type::SpecialForm(SpecialFormType::Literal) {
+            match self.infer_literal_parameter_type(slice) {
+                Ok(result) => {
+                    return Type::KnownInstance(KnownInstanceType::Literal(TypeList::singleton(
+                        self.db(),
+                        result,
+                    )));
+                }
+                Err(nodes) => {
+                    for node in nodes {
+                        let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, node)
+                        else {
+                            continue;
+                        };
+                        builder.into_diagnostic(
+                            "Type arguments for `Literal` must be `None`, \
+                            a literal value (int, bool, str, or bytes), or an enum member",
+                        );
+                    }
+                    return Type::unknown();
+                }
             }
         }
 
