@@ -1,6 +1,6 @@
 name: PR comment (typing_conformance)
 
-on: # zizmor: ignore[dangerous-triggers]
+on:
   workflow_run:
     workflows: [Run typing conformance]
     types: [completed]

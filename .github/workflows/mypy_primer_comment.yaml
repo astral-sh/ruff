@@ -1,6 +1,6 @@
 name: PR comment (mypy_primer)
 
-on: # zizmor: ignore[dangerous-triggers]
+on:
   workflow_run:
     workflows: [Run mypy_primer]
     types: [completed]

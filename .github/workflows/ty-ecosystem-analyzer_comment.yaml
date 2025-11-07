@@ -1,6 +1,6 @@
 name: PR comment (ty ecosystem-analyzer)
 
-on: # zizmor: ignore[dangerous-triggers]
+on:
   workflow_run:
     workflows: [ty ecosystem-analyzer]
     types: [completed]
