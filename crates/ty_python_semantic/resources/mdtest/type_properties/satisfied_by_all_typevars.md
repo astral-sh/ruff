@@ -159,26 +159,16 @@ def bounded_by_gradual[T: Any]():
     static_assert(not ConstraintSet.never().satisfied_by_all_typevars(inferable=tuple[T]))
     static_assert(not ConstraintSet.never().satisfied_by_all_typevars())
 
-    # If we choose Super as the materialization, then (T = Super) is a valid specialization, which
-    # satisfies (T ≤ Super).
-    static_assert(ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars(inferable=tuple[T]))
-    # If we choose Never as the materialization, then (T = Never) is the only valid specialization,
-    # which satisfies (T ≤ Super).
-    static_assert(ConstraintSet.range(Never, T, Super).satisfied_by_all_typevars())
-
-    # If we choose Base as the materialization, then (T = Base) is a valid specialization, which
-    # satisfies (T ≤ Base).
+    # If we choose Base as the materialization for the upper bound, then (T = Base) is a valid
+    # specialization, which satisfies (T ≤ Base).
     static_assert(ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars(inferable=tuple[T]))
-    # If we choose Never as the materialization, then (T = Never) is the only valid specialization,
+    # We are free to choose any materialization of the upper bound, and only have to show that the
+    # constraint set holds for that one materialization. Having chosen one materialization, we then
+    # have to show that the constraint set holds for all valid specializations of that
+    # materialization. If we choose Never as the materialization, then all valid specializations
+    # must satisfy (T ≤ Never). That means there is only one valid specialization, (T = Never),
     # which satisfies (T ≤ Base).
     static_assert(ConstraintSet.range(Never, T, Base).satisfied_by_all_typevars())
-
-    # If we choose Sub as the materialization, then (T = Sub) is a valid specialization, which
-    # satisfies (T ≤ Sub).
-    static_assert(ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars(inferable=tuple[T]))
-    # If we choose Never as the materialization, then (T = Never) is the only valid specialization,
-    # which satisfies (T ≤ Sub).
-    static_assert(ConstraintSet.range(Never, T, Sub).satisfied_by_all_typevars())
 
     # If we choose Unrelated as the materialization, then (T = Unrelated) is a valid specialization,
     # which satisfies (T ≤ Unrelated).
