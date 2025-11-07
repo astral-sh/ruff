@@ -41,12 +41,14 @@ impl BackgroundDocumentRequestHandler for RenameRequestHandler {
             return Ok(None);
         };
 
-        let offset = params.text_document_position.position.to_text_size(
+        let Some(offset) = params.text_document_position.position.to_text_size(
             db,
             file,
             snapshot.url(),
             snapshot.encoding(),
-        );
+        ) else {
+            return Ok(None);
+        };
 
         let Some(rename_results) = rename(db, file, offset, &params.new_name) else {
             return Ok(None);

@@ -307,8 +307,9 @@ Using a `ParamSpec` in a `Callable` annotation:
 from typing_extensions import Callable
 
 def _[**P1](c: Callable[P1, int]):
-    reveal_type(P1.args)  # revealed: @Todo(ParamSpec)
-    reveal_type(P1.kwargs)  # revealed: @Todo(ParamSpec)
+    # TODO: Should reveal `ParamSpecArgs` and `ParamSpecKwargs`
+    reveal_type(P1.args)  # revealed: @Todo(ParamSpecArgs / ParamSpecKwargs)
+    reveal_type(P1.kwargs)  # revealed: @Todo(ParamSpecArgs / ParamSpecKwargs)
 
     # TODO: Signature should be (**P1) -> int
     reveal_type(c)  # revealed: (...) -> int

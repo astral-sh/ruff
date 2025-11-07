@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.14.4
+
+Released on 2025-11-06.
+
+### Preview features
+
+- [formatter] Allow newlines after function headers without docstrings ([#21110](https://github.com/astral-sh/ruff/pull/21110))
+- [formatter] Avoid extra parentheses for long `match` patterns with `as` captures ([#21176](https://github.com/astral-sh/ruff/pull/21176))
+- \[`refurb`\] Expand fix safety for keyword arguments and `Decimal`s (`FURB164`) ([#21259](https://github.com/astral-sh/ruff/pull/21259))
+- \[`refurb`\] Preserve argument ordering in autofix (`FURB103`) ([#20790](https://github.com/astral-sh/ruff/pull/20790))
+
+### Bug fixes
+
+- [server] Fix missing diagnostics for notebooks ([#21156](https://github.com/astral-sh/ruff/pull/21156))
+- \[`flake8-bugbear`\] Ignore non-NFKC attribute names in `B009` and `B010` ([#21131](https://github.com/astral-sh/ruff/pull/21131))
+- \[`refurb`\] Fix false negative for underscores before sign in `Decimal` constructor (`FURB157`) ([#21190](https://github.com/astral-sh/ruff/pull/21190))
+- \[`ruff`\] Fix false positives on starred arguments (`RUF057`) ([#21256](https://github.com/astral-sh/ruff/pull/21256))
+
+### Rule changes
+
+- \[`airflow`\] extend deprecated argument `concurrency` in `airflow..DAG` (`AIR301`) ([#21220](https://github.com/astral-sh/ruff/pull/21220))
+
+### Documentation
+
+- Improve `extend` docs ([#21135](https://github.com/astral-sh/ruff/pull/21135))
+- \[`flake8-comprehensions`\] Fix typo in `C416` documentation ([#21184](https://github.com/astral-sh/ruff/pull/21184))
+- Revise Ruff setup instructions for Zed editor ([#20935](https://github.com/astral-sh/ruff/pull/20935))
+
+### Other changes
+
+- Make `ruff analyze graph` work with jupyter notebooks ([#21161](https://github.com/astral-sh/ruff/pull/21161))
+
+### Contributors
+
+- [@chirizxc](https://github.com/chirizxc)
+- [@Lee-W](https://github.com/Lee-W)
+- [@musicinmybrain](https://github.com/musicinmybrain)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@tjkuson](https://github.com/tjkuson)
+- [@danparizher](https://github.com/danparizher)
+- [@renovate](https://github.com/renovate)
+- [@ntBre](https://github.com/ntBre)
+- [@gauthsvenkat](https://github.com/gauthsvenkat)
+- [@LoicRiegel](https://github.com/LoicRiegel)
+
 ## 0.14.3
 
 Released on 2025-10-30.
