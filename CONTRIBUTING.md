@@ -293,11 +293,10 @@ in your PR, as well as a summary of the issue and your approach to fixing it. If
 you have any questions about your approach or design, or if you considered
 alternative approaches, that can also be helpful to include.
 
-We don't currently have any rules around AI usage or disclosure, but remember
-that this PR summary will be our first impression of your PR. The higher its
-quality and accuracy, the more easily we can start reviewing your PR. However
-you generate the contents of this summary, please ensure that it corresponds to
-the code and doesn't include extraneous or misleading information.
+AI can be helpful in generating both the code and summary of your PR, but a
+successful contribution should still be carefully reviewed by you and the
+summary editorialized before submitting a PR. A great summary is thorough but
+also succinct and gives us the context we need to review your PR.
 
 You can find examples of excellent issues and PRs by searching for the
 [`great writeup`](https://github.com/astral-sh/ruff/issues?q=label%3A%22great%20writeup%22)
@@ -312,13 +311,12 @@ screenshots or recordings of your change in action.
 
 #### Ecosystem report
 
-After opening the PR, an ecosystem report will be run as part of CI. This shows a diff of linter
-and formatter behavior before and after the changes in your PR. If any
-differences are reported, you should go through them and make sure they look
-correct. After going through the results of the ecosystem check, you should
-either add a note to the PR summary or an additional comment indicating your
-assessment. And if you do find issues, these should be added as new test cases
-and inform the implementation in your PR.
+After opening the PR, an ecosystem report will be run as part of CI. This shows
+a diff of linter and formatter behavior before and after the changes in your PR.
+Going through these changes and reporting your findings in the PR summary or an
+additional comment help us to review your PR more efficiently. It's also a great
+way to find new test cases to incorporate into your PR if you identify any
+issues.
 
 These steps will help us to review your PR quickly and effectively. Of course,
 if you run into any problems or have questions, feel free to ask them on the
