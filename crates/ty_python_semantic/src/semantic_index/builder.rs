@@ -188,8 +188,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_scope_info().file_scope_id
     }
 
-    /// Returns the scope ID of the method scope if the current scope
-    /// is a method inside a class body or current scope is in eagerly executed scope in a method.
+    /// Returns the scope ID of the current scope if the current scope
+    /// is a method inside a class body or an eagerly executed scope inside a method.
     /// Returns `None` otherwise, e.g. if the current scope is a function body outside of a class, or if the current scope is not a
     /// function body.
     fn is_method_or_eagerly_executed_in_method(&self) -> Option<FileScopeId> {
