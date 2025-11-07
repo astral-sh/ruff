@@ -1,0 +1,296 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: semantic_syntax_errors.md - Semantic syntax error diagnostics - name is parameter and global
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/semantic_syntax_errors.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def f1(a):
+ 2 |     global a # error: [invalid-syntax]
+ 3 | def f2(a):
+ 4 |     if True:
+ 5 |         global a # error: [invalid-syntax]
+ 6 | def f3(a):
+ 7 |     def inner():
+ 8 |         global a # error: [invalid-syntax]
+ 9 | def f4(a):
+10 |     try:
+11 |         global a # error: [invalid-syntax]
+12 |     except Exception:
+13 |         pass
+14 | def f5(a):
+15 |     a = 1
+16 |     global a # error: [invalid-syntax]
+17 | 
+18 | def f6(a):
+19 |     a = 1
+20 |     a = 2
+21 |     global a # error: [invalid-syntax]
+22 | 
+23 | def f7(a):
+24 |     class Inner:
+25 |         global a # fine
+```
+
+# Diagnostics
+
+```
+error[invalid-syntax]: name `a` is parameter and global
+ --> src/mdtest_snippet.py:2:12
+  |
+1 | def f1(a):
+2 |     global a # error: [invalid-syntax]
+  |            ^
+3 | def f2(a):
+4 |     if True:
+  |
+
+```
+
+```
+error[invalid-syntax]: name `a` is used prior to global declaration
+ --> src/mdtest_snippet.py:2:12
+  |
+1 | def f1(a):
+2 |     global a # error: [invalid-syntax]
+  |            ^
+3 | def f2(a):
+4 |     if True:
+  |
+
+```
+
+```
+warning[unresolved-global]: Invalid global declaration of `a`
+ --> src/mdtest_snippet.py:2:12
+  |
+1 | def f1(a):
+2 |     global a # error: [invalid-syntax]
+  |            ^ `a` has no declarations or bindings in the global scope
+3 | def f2(a):
+4 |     if True:
+  |
+info: This limits ty's ability to make accurate inferences about the boundness and types of global-scope symbols
+info: Consider adding a declaration to the global scope, e.g. `a: int`
+info: rule `unresolved-global` is enabled by default
+
+```
+
+```
+error[invalid-syntax]: name `a` is parameter and global
+ --> src/mdtest_snippet.py:5:16
+  |
+3 | def f2(a):
+4 |     if True:
+5 |         global a # error: [invalid-syntax]
+  |                ^
+6 | def f3(a):
+7 |     def inner():
+  |
+
+```
+
+```
+error[invalid-syntax]: name `a` is used prior to global declaration
+ --> src/mdtest_snippet.py:5:16
+  |
+3 | def f2(a):
+4 |     if True:
+5 |         global a # error: [invalid-syntax]
+  |                ^
+6 | def f3(a):
+7 |     def inner():
+  |
+
+```
+
+```
+warning[unresolved-global]: Invalid global declaration of `a`
+ --> src/mdtest_snippet.py:5:16
+  |
+3 | def f2(a):
+4 |     if True:
+5 |         global a # error: [invalid-syntax]
+  |                ^ `a` has no declarations or bindings in the global scope
+6 | def f3(a):
+7 |     def inner():
+  |
+info: This limits ty's ability to make accurate inferences about the boundness and types of global-scope symbols
+info: Consider adding a declaration to the global scope, e.g. `a: int`
+info: rule `unresolved-global` is enabled by default
+
+```
+
+```
+warning[unresolved-global]: Invalid global declaration of `a`
+  --> src/mdtest_snippet.py:8:16
+   |
+ 6 | def f3(a):
+ 7 |     def inner():
+ 8 |         global a # error: [invalid-syntax]
+   |                ^ `a` has no declarations or bindings in the global scope
+ 9 | def f4(a):
+10 |     try:
+   |
+info: This limits ty's ability to make accurate inferences about the boundness and types of global-scope symbols
+info: Consider adding a declaration to the global scope, e.g. `a: int`
+info: rule `unresolved-global` is enabled by default
+
+```
+
+```
+error[invalid-syntax]: name `a` is parameter and global
+  --> src/mdtest_snippet.py:11:16
+   |
+ 9 | def f4(a):
+10 |     try:
+11 |         global a # error: [invalid-syntax]
+   |                ^
+12 |     except Exception:
+13 |         pass
+   |
+
+```
+
+```
+error[invalid-syntax]: name `a` is used prior to global declaration
+  --> src/mdtest_snippet.py:11:16
+   |
+ 9 | def f4(a):
+10 |     try:
+11 |         global a # error: [invalid-syntax]
+   |                ^
+12 |     except Exception:
+13 |         pass
+   |
+
+```
+
+```
+warning[unresolved-global]: Invalid global declaration of `a`
+  --> src/mdtest_snippet.py:11:16
+   |
+ 9 | def f4(a):
+10 |     try:
+11 |         global a # error: [invalid-syntax]
+   |                ^ `a` has no declarations or bindings in the global scope
+12 |     except Exception:
+13 |         pass
+   |
+info: This limits ty's ability to make accurate inferences about the boundness and types of global-scope symbols
+info: Consider adding a declaration to the global scope, e.g. `a: int`
+info: rule `unresolved-global` is enabled by default
+
+```
+
+```
+error[invalid-syntax]: name `a` is parameter and global
+  --> src/mdtest_snippet.py:16:12
+   |
+14 | def f5(a):
+15 |     a = 1
+16 |     global a # error: [invalid-syntax]
+   |            ^
+17 |
+18 | def f6(a):
+   |
+
+```
+
+```
+error[invalid-syntax]: name `a` is used prior to global declaration
+  --> src/mdtest_snippet.py:16:12
+   |
+14 | def f5(a):
+15 |     a = 1
+16 |     global a # error: [invalid-syntax]
+   |            ^
+17 |
+18 | def f6(a):
+   |
+
+```
+
+```
+warning[unresolved-global]: Invalid global declaration of `a`
+  --> src/mdtest_snippet.py:16:12
+   |
+14 | def f5(a):
+15 |     a = 1
+16 |     global a # error: [invalid-syntax]
+   |            ^ `a` has no declarations or bindings in the global scope
+17 |
+18 | def f6(a):
+   |
+info: This limits ty's ability to make accurate inferences about the boundness and types of global-scope symbols
+info: Consider adding a declaration to the global scope, e.g. `a: int`
+info: rule `unresolved-global` is enabled by default
+
+```
+
+```
+error[invalid-syntax]: name `a` is parameter and global
+  --> src/mdtest_snippet.py:21:12
+   |
+19 |     a = 1
+20 |     a = 2
+21 |     global a # error: [invalid-syntax]
+   |            ^
+22 |
+23 | def f7(a):
+   |
+
+```
+
+```
+error[invalid-syntax]: name `a` is used prior to global declaration
+  --> src/mdtest_snippet.py:21:12
+   |
+19 |     a = 1
+20 |     a = 2
+21 |     global a # error: [invalid-syntax]
+   |            ^
+22 |
+23 | def f7(a):
+   |
+
+```
+
+```
+warning[unresolved-global]: Invalid global declaration of `a`
+  --> src/mdtest_snippet.py:21:12
+   |
+19 |     a = 1
+20 |     a = 2
+21 |     global a # error: [invalid-syntax]
+   |            ^ `a` has no declarations or bindings in the global scope
+22 |
+23 | def f7(a):
+   |
+info: This limits ty's ability to make accurate inferences about the boundness and types of global-scope symbols
+info: Consider adding a declaration to the global scope, e.g. `a: int`
+info: rule `unresolved-global` is enabled by default
+
+```
+
+```
+warning[unresolved-global]: Invalid global declaration of `a`
+  --> src/mdtest_snippet.py:25:16
+   |
+23 | def f7(a):
+24 |     class Inner:
+25 |         global a # fine
+   |                ^ `a` has no declarations or bindings in the global scope
+   |
+info: This limits ty's ability to make accurate inferences about the boundness and types of global-scope symbols
+info: Consider adding a declaration to the global scope, e.g. `a: int`
+info: rule `unresolved-global` is enabled by default
+
+```
