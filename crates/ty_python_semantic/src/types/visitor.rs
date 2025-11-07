@@ -242,6 +242,33 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
     }
 }
 
+pub(crate) fn walk_type_with_recursion_guard<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    visitor: &impl TypeVisitor<'db>,
+    recursion_guard: &TypeCollector<'db>,
+) {
+    match TypeKind::from(ty) {
+        TypeKind::Atomic => {}
+        TypeKind::NonAtomic(non_atomic_type) => {
+            if recursion_guard.type_was_already_seen(ty) {
+                // If we have already seen this type, we can skip it.
+                return;
+            }
+            walk_non_atomic_type(db, non_atomic_type, visitor);
+        }
+    }
+}
+
+#[derive(Default, Debug)]
+pub(crate) struct TypeCollector<'db>(RefCell<FxIndexSet<Type<'db>>>);
+
+impl<'db> TypeCollector<'db> {
+    pub(crate) fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
+        !self.0.borrow_mut().insert(ty)
+    }
+}
+
 /// Return `true` if `ty`, or any of the types contained in `ty`, match the closure passed in.
 ///
 /// The function guards against infinite recursion
@@ -258,7 +285,7 @@ pub(super) fn any_over_type<'db>(
 ) -> bool {
     struct AnyOverTypeVisitor<'db, 'a> {
         query: &'a dyn Fn(Type<'db>) -> bool,
-        seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
+        recursion_guard: TypeCollector<'db>,
         found_matching_type: Cell<bool>,
         should_visit_lazy_type_attributes: bool,
     }
@@ -278,22 +305,13 @@ pub(super) fn any_over_type<'db>(
             if found {
                 return;
             }
-            match TypeKind::from(ty) {
-                TypeKind::Atomic => {}
-                TypeKind::NonAtomic(non_atomic_type) => {
-                    if !self.seen_types.borrow_mut().insert(non_atomic_type) {
-                        // If we have already seen this type, we can skip it.
-                        return;
-                    }
-                    walk_non_atomic_type(db, non_atomic_type, self);
-                }
-            }
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
         }
     }
 
     let visitor = AnyOverTypeVisitor {
         query,
-        seen_types: RefCell::new(FxIndexSet::default()),
+        recursion_guard: TypeCollector::default(),
         found_matching_type: Cell::new(false),
         should_visit_lazy_type_attributes,
     };
