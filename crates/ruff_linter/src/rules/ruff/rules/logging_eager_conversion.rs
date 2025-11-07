@@ -138,7 +138,12 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
         .zip(call.arguments.args.iter().skip(msg_pos + 1))
     {
         // Check if the argument is a call to eagerly format a value
-        if let Expr::Call(ast::ExprCall { func, .. }) = arg {
+        if let Expr::Call(ast::ExprCall {
+            func,
+            arguments: str_call_args,
+            ..
+        }) = arg
+        {
             let CFormatType::String(format_conversion) = spec.format_type else {
                 continue;
             };
@@ -146,8 +151,12 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
             // Check for various eager conversion patterns
             match format_conversion {
                 // %s with str() - remove str() call
+                // Only flag if str() has exactly one non-starred positional argument and no keyword arguments
                 FormatConversion::Str
-                    if checker.semantic().match_builtin_expr(func.as_ref(), "str") =>
+                    if checker.semantic().match_builtin_expr(func.as_ref(), "str")
+                        && str_call_args.args.len() == 1
+                        && !str_call_args.args[0].is_starred_expr()
+                        && str_call_args.keywords.is_empty() =>
                 {
                     checker.report_diagnostic(
                         LoggingEagerConversion {
