@@ -584,8 +584,8 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
         false
     }
 
-    fn has_return(&self) -> bool {
-        false
+    fn has_return(&self) -> Option<TextRange> {
+        None
     }
 }
 

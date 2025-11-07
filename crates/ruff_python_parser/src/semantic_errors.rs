@@ -822,12 +822,14 @@ impl SemanticSyntaxChecker {
                     // def f(): yield *x
                     Self::invalid_star_expression(value, ctx);
                 }
-                if ctx.in_function_scope() && ctx.in_async_context() && ctx.has_return() {
-                    Self::add_error(
-                        ctx,
-                        SemanticSyntaxErrorKind::ReturnInAsyncGenerator,
-                        expr.range(),
-                    );
+                if ctx.in_function_scope() && ctx.in_async_context() {
+                    if let Some(return_range) = ctx.has_return() {
+                        Self::add_error(
+                            ctx,
+                            SemanticSyntaxErrorKind::ReturnInAsyncGenerator,
+                            return_range,
+                        );
+                    }
                 }
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Yield);
             }
@@ -2127,7 +2129,7 @@ pub trait SemanticSyntaxContext {
 
     fn is_bound_parameter(&self, name: &str) -> bool;
 
-    fn has_return(&self) -> bool;
+    fn has_return(&self) -> Option<TextRange>;
 }
 
 /// Modified version of [`std::str::EscapeDefault`] that does not escape single or double quotes.
