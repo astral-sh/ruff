@@ -9,10 +9,10 @@ use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::FileRange;
-use ruff_db::source::{line_index, source_text};
 use ruff_db::system::SystemPathBuf;
-use ty_project::{Db, ProjectDatabase};
+use ty_project::{Db as _, ProjectDatabase};
 
+use crate::Db;
 use crate::document::{FileRangeExt, ToRangeExt};
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
@@ -279,12 +279,11 @@ pub(super) fn to_lsp_diagnostic(
 ) -> Diagnostic {
     let range = if let Some(span) = diagnostic.primary_span() {
         let file = span.expect_ty_file();
-        let index = line_index(db, file);
-        let source = source_text(db, file);
 
         span.range()
-            .map(|range| range.to_lsp_range(&source, &index, encoding))
+            .and_then(|range| range.to_lsp_range(db, file, encoding))
             .unwrap_or_default()
+            .local_range()
     } else {
         Range::default()
     };
@@ -365,7 +364,7 @@ fn annotation_to_related_information(
 
     let annotation_message = annotation.get_message()?;
     let range = FileRange::try_from(span).ok()?;
-    let location = range.to_location(db, encoding)?;
+    let location = range.to_lsp_range(db, encoding)?.into_location()?;
 
     Some(DiagnosticRelatedInformation {
         location,
@@ -383,7 +382,7 @@ fn sub_diagnostic_to_related_information(
 
     let span = primary_annotation.get_span();
     let range = FileRange::try_from(span).ok()?;
-    let location = range.to_location(db, encoding)?;
+    let location = range.to_lsp_range(db, encoding)?.into_location()?;
 
     Some(DiagnosticRelatedInformation {
         location,

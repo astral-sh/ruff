@@ -125,10 +125,6 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
                     open.item.range(),
                 );
 
-                if !crate::preview::is_fix_read_whole_file_enabled(self.checker.settings()) {
-                    return;
-                }
-
                 if let Some(fix) =
                     generate_fix(self.checker, &open, expr, self.with_stmt, &suggestion)
                 {

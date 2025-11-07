@@ -1028,6 +1028,11 @@ impl DocumentSnapshot {
         &self.document
     }
 
+    /// Returns the URL of the document.
+    pub(crate) fn url(&self) -> &lsp_types::Url {
+        self.document.url()
+    }
+
     pub(crate) fn notebook(&self) -> Option<&NotebookDocument> {
         self.notebook.as_deref()
     }

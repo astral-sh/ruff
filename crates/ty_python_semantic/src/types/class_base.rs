@@ -49,10 +49,7 @@ impl<'db> ClassBase<'db> {
             ClassBase::Dynamic(DynamicType::Any) => "Any",
             ClassBase::Dynamic(DynamicType::Unknown) => "Unknown",
             ClassBase::Dynamic(
-                DynamicType::Todo(_)
-                | DynamicType::TodoPEP695ParamSpec
-                | DynamicType::TodoTypeAlias
-                | DynamicType::TodoUnpack,
+                DynamicType::Todo(_) | DynamicType::TodoTypeAlias | DynamicType::TodoUnpack,
             ) => "@Todo",
             ClassBase::Dynamic(DynamicType::Divergent(_)) => "Divergent",
             ClassBase::Protocol => "Protocol",
@@ -171,7 +168,8 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Deprecated(_)
                 | KnownInstanceType::Field(_)
                 | KnownInstanceType::ConstraintSet(_)
-                | KnownInstanceType::UnionType(_) => None,
+                | KnownInstanceType::UnionType(_)
+                | KnownInstanceType::Literal(_) => None,
             },
 
             Type::SpecialForm(special_form) => match special_form {

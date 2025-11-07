@@ -33,7 +33,7 @@ g(None)
 We also support unions in type aliases:
 
 ```py
-from typing_extensions import Any, Never
+from typing_extensions import Any, Never, Literal
 from ty_extensions import Unknown
 
 IntOrStr = int | str
@@ -54,6 +54,8 @@ NeverOrAny = Never | Any
 AnyOrNever = Any | Never
 UnknownOrInt = Unknown | int
 IntOrUnknown = int | Unknown
+StrOrZero = str | Literal[0]
+ZeroOrStr = Literal[0] | str
 
 reveal_type(IntOrStr)  # revealed: types.UnionType
 reveal_type(IntOrStrOrBytes1)  # revealed: types.UnionType
@@ -73,6 +75,8 @@ reveal_type(NeverOrAny)  # revealed: types.UnionType
 reveal_type(AnyOrNever)  # revealed: types.UnionType
 reveal_type(UnknownOrInt)  # revealed: types.UnionType
 reveal_type(IntOrUnknown)  # revealed: types.UnionType
+reveal_type(StrOrZero)  # revealed: types.UnionType
+reveal_type(ZeroOrStr)  # revealed: types.UnionType
 
 def _(
     int_or_str: IntOrStr,
@@ -93,6 +97,8 @@ def _(
     any_or_never: AnyOrNever,
     unknown_or_int: UnknownOrInt,
     int_or_unknown: IntOrUnknown,
+    str_or_zero: StrOrZero,
+    zero_or_str: ZeroOrStr,
 ):
     reveal_type(int_or_str)  # revealed: int | str
     reveal_type(int_or_str_or_bytes1)  # revealed: int | str | bytes
@@ -112,6 +118,8 @@ def _(
     reveal_type(any_or_never)  # revealed: Any
     reveal_type(unknown_or_int)  # revealed: Unknown | int
     reveal_type(int_or_unknown)  # revealed: int | Unknown
+    reveal_type(str_or_zero)  # revealed: str | Literal[0]
+    reveal_type(zero_or_str)  # revealed: Literal[0] | str
 ```
 
 If a type is unioned with itself in a value expression, the result is just that type. No
@@ -135,14 +143,15 @@ def _(int_or_int: IntOrInt, list_of_int_or_list_of_int: ListOfIntOrListOfInt):
 None | None  # error: [unsupported-operator] "Operator `|` is unsupported between objects of type `None` and `None`"
 ```
 
-When constructing something non-sensical like `int | 1`, we could ideally emit a diagnostic for the
-expression itself, as it leads to a `TypeError` at runtime. No other type checker supports this, so
-for now we only emit an error when it is used in a type expression:
+When constructing something nonsensical like `int | 1`, we emit a diagnostic for the expression
+itself, as it leads to a `TypeError` at runtime. The result of the expression is then inferred as
+`Unknown`, so we permit it to be used in a type expression.
 
 ```py
-IntOrOne = int | 1
+IntOrOne = int | 1  # error: [unsupported-operator]
 
-# error: [invalid-type-form] "Variable of type `Literal[1]` is not allowed in a type expression"
+reveal_type(IntOrOne)  # revealed: Unknown
+
 def _(int_or_one: IntOrOne):
     reveal_type(int_or_one)  # revealed: Unknown
 ```
@@ -158,6 +167,77 @@ def f(SomeUnionType: UnionType):
     some_union: SomeUnionType
 
 f(int | str)
+```
+
+## `|` operator between class objects and non-class objects
+
+Using the `|` operator between a class object and a non-class object does not create a `UnionType`
+instance; it calls the relevant dunder as normal:
+
+```py
+class Foo:
+    def __or__(self, other) -> str:
+        return "foo"
+
+reveal_type(Foo() | int)  # revealed: str
+reveal_type(Foo() | list[int])  # revealed: str
+
+class Bar:
+    def __ror__(self, other) -> str:
+        return "bar"
+
+reveal_type(int | Bar())  # revealed: str
+reveal_type(list[int] | Bar())  # revealed: str
+
+class Invalid:
+    def __or__(self, other: "Invalid") -> str:
+        return "Invalid"
+
+    def __ror__(self, other: "Invalid") -> str:
+        return "Invalid"
+
+# error: [unsupported-operator]
+reveal_type(int | Invalid())  # revealed: Unknown
+# error: [unsupported-operator]
+reveal_type(Invalid() | list[int])  # revealed: Unknown
+```
+
+## Custom `__(r)or__` methods on metaclasses are only partially respected
+
+A drawback of our extensive special casing of `|` operations between class objects is that
+`__(r)or__` methods on metaclasses are completely disregarded if two classes are `|`'d together. We
+respect the metaclass dunder if a class is `|`'d with a non-class, however:
+
+```py
+class Meta(type):
+    def __or__(self, other) -> str:
+        return "Meta"
+
+class Foo(metaclass=Meta): ...
+class Bar(metaclass=Meta): ...
+
+X = Foo | Bar
+
+# In an ideal world, perhaps we would respect `Meta.__or__` here and reveal `str`?
+# But we still need to record what the elements are, since (according to the typing spec)
+# `X` is still a valid type alias
+reveal_type(X)  # revealed: types.UnionType
+
+def f(obj: X):
+    reveal_type(obj)  # revealed: Foo | Bar
+
+# We do respect the metaclass `__or__` if it's used between a class and a non-class, however:
+
+Y = Foo | 42
+reveal_type(Y)  # revealed: str
+
+Z = Bar | 56
+reveal_type(Z)  # revealed: str
+
+def g(
+    arg1: Y,  # error: [invalid-type-form]
+    arg2: Z,  # error: [invalid-type-form]
+): ...
 ```
 
 ## Generic types
@@ -183,6 +263,68 @@ def _(list_or_tuple: ListOrTuple[int]):
     reveal_type(list_or_tuple)  # revealed: @Todo(Generic specialization of types.UnionType)
 ```
 
+## `Literal`s
+
+We also support `typing.Literal` in implicit type aliases.
+
+```py
+from typing import Literal
+from enum import Enum
+
+IntLiteral1 = Literal[26]
+IntLiteral2 = Literal[0x1A]
+IntLiterals = Literal[-1, 0, 1]
+NestedLiteral = Literal[Literal[1]]
+StringLiteral = Literal["a"]
+BytesLiteral = Literal[b"b"]
+BoolLiteral = Literal[True]
+MixedLiterals = Literal[1, "a", True, None]
+
+class Color(Enum):
+    RED = 0
+    GREEN = 1
+    BLUE = 2
+
+EnumLiteral = Literal[Color.RED]
+
+def _(
+    int_literal1: IntLiteral1,
+    int_literal2: IntLiteral2,
+    int_literals: IntLiterals,
+    nested_literal: NestedLiteral,
+    string_literal: StringLiteral,
+    bytes_literal: BytesLiteral,
+    bool_literal: BoolLiteral,
+    mixed_literals: MixedLiterals,
+    enum_literal: EnumLiteral,
+):
+    reveal_type(int_literal1)  # revealed: Literal[26]
+    reveal_type(int_literal2)  # revealed: Literal[26]
+    reveal_type(int_literals)  # revealed: Literal[-1, 0, 1]
+    reveal_type(nested_literal)  # revealed: Literal[1]
+    reveal_type(string_literal)  # revealed: Literal["a"]
+    reveal_type(bytes_literal)  # revealed: Literal[b"b"]
+    reveal_type(bool_literal)  # revealed: Literal[True]
+    reveal_type(mixed_literals)  # revealed: Literal[1, "a", True] | None
+    reveal_type(enum_literal)  # revealed: Literal[Color.RED]
+```
+
+We reject invalid uses:
+
+```py
+# error: [invalid-type-form] "Type arguments for `Literal` must be `None`, a literal value (int, bool, str, or bytes), or an enum member"
+LiteralInt = Literal[int]
+
+reveal_type(LiteralInt)  # revealed: Unknown
+
+def _(weird: LiteralInt):
+    reveal_type(weird)  # revealed: Unknown
+
+# error: [invalid-type-form] "`Literal[26]` is not a generic class"
+def _(weird: IntLiteral1[int]):
+    reveal_type(weird)  # revealed: Unknown
+```
+
 ## Stringified annotations?
 
 From the [typing spec on type aliases](https://typing.python.org/en/latest/spec/aliases.html):
@@ -191,7 +333,8 @@ From the [typing spec on type aliases](https://typing.python.org/en/latest/spec/
 > type hint is acceptable in a type alias
 
 However, no other type checker seems to support stringified annotations in implicit type aliases. We
-currently also do not support them:
+currently also do not support them, and we detect places where these attempted unions cause runtime
+errors:
 
 ```py
 AliasForStr = "str"
@@ -200,9 +343,10 @@ AliasForStr = "str"
 def _(s: AliasForStr):
     reveal_type(s)  # revealed: Unknown
 
-IntOrStr = int | "str"
+IntOrStr = int | "str"  # error: [unsupported-operator]
 
-# error: [invalid-type-form] "Variable of type `Literal["str"]` is not allowed in a type expression"
+reveal_type(IntOrStr)  # revealed: Unknown
+
 def _(int_or_str: IntOrStr):
     reveal_type(int_or_str)  # revealed: Unknown
 ```

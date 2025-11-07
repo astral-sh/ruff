@@ -474,6 +474,16 @@ def g(x: str):
     f(prefix=x, suffix=".tar.gz")
 ```
 
+If the type variable is present multiple times in the union, we choose the correct union element to
+infer against based on the argument type:
+
+```py
+def h[T](x: list[T] | dict[T, T]) -> T | None: ...
+def _(x: list[int], y: dict[int, int]):
+    reveal_type(h(x))  # revealed: int | None
+    reveal_type(h(y))  # revealed: int | None
+```
+
 ## Nested functions see typevars bound in outer function
 
 ```py
