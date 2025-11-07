@@ -2690,7 +2690,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
 
-    inferable_typevars: InferableTypeVars<'db, 'db>,
+    inferable_typevars: InferableTypeVars<'db>,
     specialization: Option<Specialization<'db>>,
 }
 
@@ -3039,7 +3039,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     fn finish(
         self,
     ) -> (
-        InferableTypeVars<'db, 'db>,
+        InferableTypeVars<'db>,
         Option<Specialization<'db>>,
         Type<'db>,
     ) {
@@ -3109,7 +3109,7 @@ pub(crate) struct Binding<'db> {
     return_ty: Type<'db>,
 
     /// The inferable typevars in this signature.
-    inferable_typevars: InferableTypeVars<'db, 'db>,
+    inferable_typevars: InferableTypeVars<'db>,
 
     /// The specialization that was inferred from the argument types, if the callable is generic.
     specialization: Option<Specialization<'db>>,
@@ -3361,7 +3361,7 @@ impl<'db> Binding<'db> {
 #[derive(Clone, Debug)]
 struct BindingSnapshot<'db> {
     return_ty: Type<'db>,
-    inferable_typevars: InferableTypeVars<'db, 'db>,
+    inferable_typevars: InferableTypeVars<'db>,
     specialization: Option<Specialization<'db>>,
     argument_matches: Box<[MatchedArgument<'db>]>,
     parameter_tys: Box<[Option<Type<'db>>]>,

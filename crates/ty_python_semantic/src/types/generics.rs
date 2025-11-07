@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::fmt::Display;
-use std::marker::PhantomData;
 
 use itertools::Itertools;
 use ruff_python_ast as ast;
@@ -121,9 +120,9 @@ pub(crate) fn typing_self<'db>(
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) enum InferableTypeVars<'a, 'db> {
+pub(crate) enum InferableTypeVars<'db> {
     None,
-    One(InferableTypeVarsInner<'db>, PhantomData<&'a ()>),
+    One(InferableTypeVarsInner<'db>),
 }
 
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -136,14 +135,10 @@ pub(crate) struct InferableTypeVarsInner<'db> {
 impl get_size2::GetSize for InferableTypeVarsInner<'_> {}
 
 impl<'db> BoundTypeVarInstance<'db> {
-    pub(crate) fn is_inferable(
-        self,
-        db: &'db dyn Db,
-        inferable: InferableTypeVars<'_, 'db>,
-    ) -> bool {
+    pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: InferableTypeVars<'db>) -> bool {
         match inferable {
             InferableTypeVars::None => false,
-            InferableTypeVars::One(inner, _) => inner
+            InferableTypeVars::One(inner) => inner
                 .inferable(db)
                 .binary_search(&self.identity(db))
                 .is_ok(),
@@ -151,24 +146,24 @@ impl<'db> BoundTypeVarInstance<'db> {
     }
 }
 
-impl<'db> InferableTypeVars<'_, 'db> {
+impl<'db> InferableTypeVars<'db> {
     pub(crate) fn from_bound_typevars(
         db: &'db dyn Db,
         bound_typevars: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
     ) -> Self {
-        InferableTypeVars::One(
-            InferableTypeVarsInner::from_bound_typevars(db, bound_typevars),
-            PhantomData,
-        )
+        InferableTypeVars::One(InferableTypeVarsInner::from_bound_typevars(
+            db,
+            bound_typevars,
+        ))
     }
 
     pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
             (InferableTypeVars::None, InferableTypeVars::None) => self,
-            (InferableTypeVars::One(_, _), InferableTypeVars::None) => self,
-            (InferableTypeVars::None, InferableTypeVars::One(_, _)) => other,
-            (InferableTypeVars::One(self_inner, _), InferableTypeVars::One(other_inner, _)) => {
-                InferableTypeVars::One(self_inner.merge(db, other_inner), PhantomData)
+            (InferableTypeVars::One(_), InferableTypeVars::None) => self,
+            (InferableTypeVars::None, InferableTypeVars::One(_)) => other,
+            (InferableTypeVars::One(self_inner), InferableTypeVars::One(other_inner)) => {
+                InferableTypeVars::One(self_inner.merge(db, other_inner))
             }
         }
     }
@@ -177,7 +172,7 @@ impl<'db> InferableTypeVars<'_, 'db> {
     #[expect(dead_code)]
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         let inferable = match self {
-            InferableTypeVars::One(inner, _) => inner.inferable(db),
+            InferableTypeVars::One(inner) => inner.inferable(db),
             InferableTypeVars::None => return String::from("[]"),
         };
         format!(
@@ -319,7 +314,7 @@ impl<'db> GenericContext<'db> {
         )
     }
 
-    pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> InferableTypeVars<'db, 'db> {
+    pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> InferableTypeVars<'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
             typevars: RefCell<SmallVec<[BoundTypeVarIdentity<'db>; 4]>>,
@@ -366,7 +361,7 @@ impl<'db> GenericContext<'db> {
         // This ensures that salsa caches the InferableTypeVarsInner, not the InferableTypeVars
         // that wraps it. (That way InferableTypeVars can contain a reference, and doesn't need to
         // impl salsa::Update.)
-        InferableTypeVars::One(inferable_typevars_inner(db, self), PhantomData)
+        InferableTypeVars::One(inferable_typevars_inner(db, self))
     }
 
     pub(crate) fn variables(
@@ -727,7 +722,7 @@ fn is_subtype_in_invariant_position<'db>(
     derived_materialization: MaterializationKind,
     base_type: &Type<'db>,
     base_materialization: MaterializationKind,
-    inferable: InferableTypeVars<'_, 'db>,
+    inferable: InferableTypeVars<'db>,
     relation_visitor: &HasRelationToVisitor<'db>,
     disjointness_visitor: &IsDisjointVisitor<'db>,
 ) -> ConstraintSet<'db> {
@@ -805,7 +800,7 @@ fn has_relation_in_invariant_position<'db>(
     derived_materialization: Option<MaterializationKind>,
     base_type: &Type<'db>,
     base_materialization: Option<MaterializationKind>,
-    inferable: InferableTypeVars<'_, 'db>,
+    inferable: InferableTypeVars<'db>,
     relation: TypeRelation<'db>,
     relation_visitor: &HasRelationToVisitor<'db>,
     disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -1153,7 +1148,7 @@ impl<'db> Specialization<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: InferableTypeVars<'db>,
         relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -1231,7 +1226,7 @@ impl<'db> Specialization<'db> {
         self,
         db: &'db dyn Db,
         other: Specialization<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.materialization_kind(db) != other.materialization_kind(db) {
@@ -1345,12 +1340,12 @@ impl<'db> PartialSpecialization<'_, 'db> {
 /// specialization of a generic function.
 pub(crate) struct SpecializationBuilder<'db> {
     db: &'db dyn Db,
-    inferable: InferableTypeVars<'db, 'db>,
+    inferable: InferableTypeVars<'db>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
 }
 
 impl<'db> SpecializationBuilder<'db> {
-    pub(crate) fn new(db: &'db dyn Db, inferable: InferableTypeVars<'db, 'db>) -> Self {
+    pub(crate) fn new(db: &'db dyn Db, inferable: InferableTypeVars<'db>) -> Self {
         Self {
             db,
             inferable,
