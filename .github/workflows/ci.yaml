@@ -629,7 +629,9 @@ jobs:
 
       - name: Export pull request number
         run: |
-          echo ${{ github.event.number }} > pr-number
+          echo "${PR_NUMBER}" > pr-number
+        env:
+          PR_NUMBER: ${{ github.event.number }}
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         name: Upload PR Number
