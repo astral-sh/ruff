@@ -5,7 +5,7 @@ packages = ["ruff"]
 # Config for 'dist'
 [dist]
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.30.0"
+cargo-dist-version = "0.30.2"
 # Whether to consider the binaries in a package for distribution (defaults true)
 dist = false
 # CI backends to support
