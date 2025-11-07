@@ -1,13 +1,7 @@
-# Documentation of two fuzzer panics involving comprehensions
+# Regression test for https://github.com/astral-sh/ruff/pull/20962
+# error message:
+# `place_by_id: execute: too many cycle iterations`
 
-Type inference for comprehensions was added in <https://github.com/astral-sh/ruff/pull/20962>. It
-added two new fuzzer panics that are documented here for regression testing.
-
-## Too many cycle iterations in `place_by_id`
-
-<!-- expect-panic: too many cycle iterations -->
-
-```py
 name_5(name_3)
 [0 for unique_name_0 in unique_name_1 for unique_name_2 in name_3]
 
@@ -34,4 +28,3 @@ else:
 @name_3
 async def name_5():
     pass
-```
