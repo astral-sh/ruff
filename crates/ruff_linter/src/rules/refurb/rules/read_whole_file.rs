@@ -182,40 +182,11 @@ fn generate_fix(
     with_stmt: &ast::StmtWith,
     suggestion: &str,
 ) -> Option<Fix> {
-    if !(with_stmt.items.len() == 1
-        && matches!(
-            with_stmt.body.as_slice(),
-            [Stmt::Assign(_) | Stmt::AnnAssign(_)]
-        ))
-    {
+    if with_stmt.items.len() != 1 {
         return None;
     }
 
     let locator = checker.locator();
-
-    let (target, annotation) = match with_stmt.body.first() {
-        Some(Stmt::Assign(assign)) if assign.value.range().contains_range(expr.range()) => {
-            match assign.targets.first() {
-                Some(Expr::Name(name)) => (Some(name.id.as_str()), None),
-                _ => (None, None),
-            }
-        }
-        Some(Stmt::AnnAssign(ann_assign))
-            if ann_assign
-                .value
-                .as_ref()
-                .is_some_and(|v| v.range().contains_range(expr.range())) =>
-        {
-            match ann_assign.target.as_ref() {
-                Expr::Name(name) => {
-                    let annotation_code = locator.slice(ann_assign.annotation.range());
-                    (Some(name.id.as_str()), Some(annotation_code.to_string()))
-                }
-                _ => (None, None),
-            }
-        }
-        _ => (None, None),
-    };
 
     let filename_code = locator.slice(open.filename.range());
 
@@ -228,12 +199,39 @@ fn generate_fix(
         )
         .ok()?;
 
-    let replacement = match (target, annotation) {
-        (Some(var), Some(ann)) => {
-            format!("{var}: {ann} = {binding}({filename_code}).{suggestion}")
+    // Only replace context managers with a single assignment or annotated assignment in the body.
+    // The assignment's RHS must also be the same as the `read` call in `expr`, otherwise this fix
+    // would remove the rest of the expression.
+    let replacement = match with_stmt.body.as_slice() {
+        [Stmt::Assign(ast::StmtAssign { targets, value, .. })] if value.range() == expr.range() => {
+            match targets.as_slice() {
+                [Expr::Name(name)] => {
+                    format!(
+                        "{name} = {binding}({filename_code}).{suggestion}",
+                        name = name.id
+                    )
+                }
+                _ => return None,
+            }
         }
-        (Some(var), None) => format!("{var} = {binding}({filename_code}).{suggestion}"),
-        (None, _) => format!("{binding}({filename_code}).{suggestion}"),
+        [
+            Stmt::AnnAssign(ast::StmtAnnAssign {
+                target,
+                annotation,
+                value: Some(value),
+                ..
+            }),
+        ] if value.range() == expr.range() => match target.as_ref() {
+            Expr::Name(name) => {
+                format!(
+                    "{var}: {ann} = {binding}({filename_code}).{suggestion}",
+                    var = name.id,
+                    ann = locator.slice(annotation.range())
+                )
+            }
+            _ => return None,
+        },
+        _ => return None,
     };
 
     let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
