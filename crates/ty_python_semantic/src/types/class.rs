@@ -294,7 +294,7 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
 
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
-    #[salsa::tracked]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         let origin = self.origin(db);
 
@@ -3547,7 +3547,7 @@ impl<'db> From<ClassLiteral<'db>> for ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
-    #[salsa::tracked(cycle_initial=crate::types::variance_cycle_initial)]
+    #[salsa::tracked(cycle_initial=crate::types::variance_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         let typevar_in_generic_context = self
             .generic_context(db)
