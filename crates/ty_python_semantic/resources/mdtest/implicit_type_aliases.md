@@ -313,10 +313,14 @@ We reject invalid uses:
 
 ```py
 # error: [invalid-type-form] "Type arguments for `Literal` must be `None`, a literal value (int, bool, str, or bytes), or an enum member"
-def _(weird: Literal[int]):
+LiteralInt = Literal[int]
+
+reveal_type(LiteralInt)  # revealed: Unknown
+
+def _(weird: LiteralInt):
     reveal_type(weird)  # revealed: Unknown
 
-# error: [invalid-type-form] "`typing.Literal` instances are not allowed in type expressions"
+# error: [invalid-type-form] "`Literal[26]` is not a generic class"
 def _(weird: IntLiteral1[int]):
     reveal_type(weird)  # revealed: Unknown
 ```
