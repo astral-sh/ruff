@@ -66,7 +66,7 @@ pub(crate) fn invalid_index_return(checker: &Checker, function_def: &ast::StmtFu
     }
 
     // Determine the terminal behavior (i.e., implicit return, no return, etc.).
-    let terminal = Terminal::from_function(function_def);
+    let terminal = Terminal::from_function(function_def, checker.semantic());
 
     // If every control flow path raises an exception, ignore the function.
     if terminal == Terminal::Raise {

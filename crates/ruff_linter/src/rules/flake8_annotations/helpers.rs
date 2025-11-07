@@ -2,7 +2,7 @@ use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
 use ruff_python_ast::helpers::{
-    ReturnStatementVisitor, map_callable, pep_604_union, typing_optional, typing_union,
+    ReturnStatementVisitor, pep_604_union, typing_optional, typing_union,
 };
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::Visitor;
@@ -47,90 +47,6 @@ pub(crate) fn is_overload_impl(
     }
 }
 
-/// Returns `true` if all raise statements in the function body are `NotImplementedError`.
-fn only_raises_not_implemented_error(
-    function: &ast::StmtFunctionDef,
-    semantic: &SemanticModel,
-) -> bool {
-    use ruff_python_ast::statement_visitor::{StatementVisitor, walk_body};
-
-    struct NotImplementedErrorVisitor<'a> {
-        raises: Vec<&'a ast::StmtRaise>,
-    }
-
-    impl<'a> StatementVisitor<'a> for NotImplementedErrorVisitor<'a> {
-        fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
-            match stmt {
-                ast::Stmt::Raise(raise) => {
-                    self.raises.push(raise);
-                }
-                ast::Stmt::ClassDef(_) | ast::Stmt::FunctionDef(_) => {
-                    // Don't recurse into nested classes/functions
-                }
-                ast::Stmt::If(ast::StmtIf {
-                    body,
-                    elif_else_clauses,
-                    ..
-                }) => {
-                    walk_body(self, body);
-                    for clause in elif_else_clauses {
-                        walk_body(self, &clause.body);
-                    }
-                }
-                ast::Stmt::For(ast::StmtFor { body, orelse, .. })
-                | ast::Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-                    walk_body(self, body);
-                    walk_body(self, orelse);
-                }
-                ast::Stmt::With(ast::StmtWith { body, .. }) => {
-                    walk_body(self, body);
-                }
-                ast::Stmt::Match(ast::StmtMatch { cases, .. }) => {
-                    for case in cases {
-                        walk_body(self, &case.body);
-                    }
-                }
-                ast::Stmt::Try(ast::StmtTry {
-                    body,
-                    handlers,
-                    orelse,
-                    finalbody,
-                    ..
-                }) => {
-                    walk_body(self, body);
-                    for handler in handlers {
-                        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                            body,
-                            ..
-                        }) = handler;
-                        walk_body(self, body);
-                    }
-                    walk_body(self, orelse);
-                    walk_body(self, finalbody);
-                }
-                _ => {}
-            }
-        }
-    }
-
-    let mut visitor = NotImplementedErrorVisitor { raises: Vec::new() };
-    walk_body(&mut visitor, &function.body);
-
-    // If there are no raises, return false
-    if visitor.raises.is_empty() {
-        return false;
-    }
-
-    // Check if all raises are NotImplementedError
-    visitor.raises.iter().all(|raise| {
-        raise.exc.as_ref().is_some_and(|exc| {
-            semantic
-                .resolve_builtin_symbol(map_callable(exc))
-                .is_some_and(|name| matches!(name, "NotImplementedError" | "NotImplemented"))
-        })
-    })
-}
-
 /// Given a function, guess its return type.
 pub(crate) fn auto_return_type(
     function: &ast::StmtFunctionDef,
@@ -150,15 +66,17 @@ pub(crate) fn auto_return_type(
     };
 
     // Determine the terminal behavior (i.e., implicit return, no return, etc.).
-    let terminal = Terminal::from_function(function);
+    let terminal = Terminal::from_function(function, semantic);
 
-    // If every control flow path raises an exception, check if it's NotImplementedError.
-    // If all raises are NotImplementedError, don't suggest NoReturn since these are
-    // abstract methods that should have the actual return type.
+    // If every control flow path raises NotImplementedError, don't suggest NoReturn
+    // since these are abstract methods that should have the actual return type.
+    if terminal == Terminal::RaiseNotImplemented {
+        return None;
+    }
+
+    // If every control flow path raises an exception (other than NotImplementedError),
+    // suggest NoReturn.
     if terminal == Terminal::Raise {
-        if only_raises_not_implemented_error(function, semantic) {
-            return None;
-        }
         return Some(AutoPythonType::Never);
     }
 
