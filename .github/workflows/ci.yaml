@@ -1033,11 +1033,6 @@ jobs:
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@bb005fe1c1eea036d3894f02c049cb6b154a1c27 # v4.3.3
-        env:
-          # enabling walltime flamegraphs adds ~6 minutes to the CI time, and they don't
-          # appear to provide much useful insight for our walltime benchmarks right now
-          # (see https://github.com/astral-sh/ruff/pull/20419)
-          CODSPEED_PERF_ENABLED: false
         with:
           mode: walltime
           run: cargo codspeed run --bench ty_walltime "${{ matrix.benchmarks }}"
