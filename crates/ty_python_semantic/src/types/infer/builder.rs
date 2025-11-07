@@ -4901,7 +4901,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_type_expression(&bound.value);
         }
         if let Some(default) = arguments.find_keyword("default") {
-            let func_ty = self.infer_expression(func, TypeContext::default());
+            let func_ty = self
+                .try_expression_type(func)
+                .unwrap_or_else(|| self.infer_expression(func, TypeContext::default()));
             if func_ty.as_class_literal().is_some_and(|class_literal| {
                 class_literal.is_known(self.db(), KnownClass::ParamSpec)
             }) {
