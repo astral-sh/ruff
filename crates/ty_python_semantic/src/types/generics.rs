@@ -14,7 +14,7 @@ use crate::types::constraints::ConstraintSet;
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
-use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
@@ -22,7 +22,7 @@ use crate::types::{
     TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance,
     TypeVarKind, TypeVarVariance, UnionType, declaration_type, walk_bound_type_var_type,
 };
-use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet};
+use crate::{Db, FxOrderMap, FxOrderSet};
 
 /// Returns an iterator of any generic context introduced by the given scope or any enclosing
 /// scope.
@@ -288,7 +288,7 @@ impl<'db> GenericContext<'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
             typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
-            seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
+            recursion_guard: TypeCollector<'db>,
         }
 
         impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
@@ -308,16 +308,7 @@ impl<'db> GenericContext<'db> {
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                match TypeKind::from(ty) {
-                    TypeKind::Atomic => {}
-                    TypeKind::NonAtomic(non_atomic_type) => {
-                        if !self.seen_types.borrow_mut().insert(non_atomic_type) {
-                            // If we have already seen this type, we can skip it.
-                            return;
-                        }
-                        walk_non_atomic_type(db, non_atomic_type, self);
-                    }
-                }
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
             }
         }
 

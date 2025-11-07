@@ -30,7 +30,7 @@ use crate::types::member::{Member, class_member};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
-use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, DataclassFlags,
     DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
@@ -1437,7 +1437,7 @@ impl<'db> ClassLiteral<'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
             typevars: RefCell<FxIndexSet<BoundTypeVarInstance<'db>>>,
-            seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
+            recursion_guard: TypeCollector<'db>,
         }
 
         impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
@@ -1454,16 +1454,7 @@ impl<'db> ClassLiteral<'db> {
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                match TypeKind::from(ty) {
-                    TypeKind::Atomic => {}
-                    TypeKind::NonAtomic(non_atomic_type) => {
-                        if !self.seen_types.borrow_mut().insert(non_atomic_type) {
-                            // If we have already seen this type, we can skip it.
-                            return;
-                        }
-                        walk_non_atomic_type(db, non_atomic_type, self);
-                    }
-                }
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
             }
         }
 
