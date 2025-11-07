@@ -70,7 +70,7 @@ impl LspPosition {
         self.position
     }
 
-    /// Returns the uri of the text document this position belongs.
+    /// Returns the uri of the text document this position belongs to.
     #[expect(unused)]
     pub(crate) fn uri(&self) -> Option<&lsp_types::Url> {
         self.uri.as_ref()
