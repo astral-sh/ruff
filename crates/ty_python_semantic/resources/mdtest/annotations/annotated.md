@@ -76,8 +76,7 @@ from ty_extensions import reveal_mro
 
 class C(Annotated[int, "foo"]): ...
 
-# TODO: Should be `(<class 'C'>, <class 'int'>, <class 'object'>)`
-reveal_mro(C)  # revealed: (<class 'C'>, @Todo(Inference of subscript on special form), <class 'object'>)
+reveal_mro(C)  # revealed: (<class 'C'>, <class 'int'>, <class 'object'>)
 ```
 
 ### Not parameterized

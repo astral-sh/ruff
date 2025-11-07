@@ -819,10 +819,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "`{ty}` is not a generic class",
-                            ty = ty.to_union(self.db()).display(self.db())
+                            ty = ty.inner(self.db()).display(self.db())
                         ));
                     }
                     Type::unknown()
+                }
+                KnownInstanceType::Annotated(_) => {
+                    self.infer_type_expression(slice);
+                    todo_type!("Generic specialization of typing.Annotated")
                 }
             },
             Type::Dynamic(DynamicType::Todo(_)) => {
@@ -900,7 +904,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         ty
     }
 
-    fn infer_parameterized_special_form_type_expression(
+    pub(crate) fn infer_parameterized_special_form_type_expression(
         &mut self,
         subscript: &ast::ExprSubscript,
         special_form: SpecialFormType,
@@ -1453,8 +1457,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             return Ok(value_ty);
                         }
                     }
-                    Type::KnownInstance(KnownInstanceType::Literal(list)) => {
-                        return Ok(list.to_union(self.db()));
+                    Type::KnownInstance(KnownInstanceType::Literal(ty)) => {
+                        return Ok(ty.inner(self.db()));
                     }
                     // `Literal[SomeEnum.Member]`
                     Type::EnumLiteral(_) => {
