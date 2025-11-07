@@ -112,16 +112,16 @@ impl std::fmt::Display for Diff<'_> {
         // `None`, indicating a regular script file, all the lines will be in one "cell" under the
         // `None` key.
         let cells = if let Some(notebook_index) = &self.notebook_index {
-            let mut last_cell = OneIndexed::MIN;
+            let mut last_cell_index = OneIndexed::MIN;
             let mut cells: Vec<(Option<OneIndexed>, TextSize)> = Vec::new();
-            for (row, cell) in notebook_index.iter() {
-                if cell != last_cell {
-                    let offset = source_code.line_start(row);
-                    cells.push((Some(last_cell), offset));
-                    last_cell = cell;
+            for cell in notebook_index.iter() {
+                if cell.cell_index() != last_cell_index {
+                    let offset = source_code.line_start(cell.start_row());
+                    cells.push((Some(last_cell_index), offset));
+                    last_cell_index = cell.cell_index();
                 }
             }
-            cells.push((Some(last_cell), source_text.text_len()));
+            cells.push((Some(last_cell_index), source_text.text_len()));
             cells
         } else {
             vec![(None, source_text.text_len())]
