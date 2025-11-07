@@ -449,7 +449,6 @@ c_instance = C()
 # error: [unresolved-attribute]
 reveal_type(c_instance.a)  # revealed: Unknown
 
-# TODO: Even though g method is called and is reachable we do not record this attribute assignment
 # error: [unresolved-attribute]
 reveal_type(c_instance.b)  # revealed: Unknown
 ```
