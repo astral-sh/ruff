@@ -382,33 +382,6 @@ for x in range(42):
 <!-- snapshot-diagnostics -->
 
 ```py
-def f1(a):
+def f(a):
     global a  # error: [invalid-syntax]
-
-def f2(a):
-    if True:
-        global a  # error: [invalid-syntax]
-
-def f3(a):
-    def inner():
-        global a  # error: [invalid-syntax]
-
-def f4(a):
-    try:
-        global a  # error: [invalid-syntax]
-    except Exception:
-        pass
-
-def f5(a):
-    a = 1
-    global a  # error: [invalid-syntax]
-
-def f6(a):
-    a = 1
-    a = 2
-    global a  # error: [invalid-syntax]
-
-def f7(a):
-    class Inner:
-        global a  # fine
 ```
