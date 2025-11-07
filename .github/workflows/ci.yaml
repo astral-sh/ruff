@@ -627,18 +627,8 @@ jobs:
           cat ecosystem-result-format-preview >> ecosystem-result
           echo "" >> ecosystem-result
 
-      - name: Export pull request number
-        run: |
-          echo "${PR_NUMBER}" > pr-number
-        env:
-          PR_NUMBER: ${{ github.event.number }}
-
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        name: Upload PR Number
-        with:
-          name: pr-number
-          path: pr-number
-
+      # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
+      # Make sure to update the bot if you rename the artifact.
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         name: Upload Results
         with:
