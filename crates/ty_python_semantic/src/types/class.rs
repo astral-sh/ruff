@@ -516,7 +516,7 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.when_subclass_of(db, other, InferableTypeVars::None)
+        self.when_subclass_of(db, other, InferableTypeVars::none())
             .is_always_satisfied(db)
     }
 

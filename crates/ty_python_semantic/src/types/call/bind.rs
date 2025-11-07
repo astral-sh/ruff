@@ -700,7 +700,7 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::IsEquivalentTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
-                                    ty_a.when_equivalent_to(db, *ty_b, InferableTypeVars::None);
+                                    ty_a.when_equivalent_to(db, *ty_b, InferableTypeVars::none());
                                 let tracked = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -711,7 +711,7 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::IsSubtypeOf) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
-                                    ty_a.when_subtype_of(db, *ty_b, InferableTypeVars::None);
+                                    ty_a.when_subtype_of(db, *ty_b, InferableTypeVars::none());
                                 let tracked = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -722,7 +722,7 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::IsAssignableTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
-                                    ty_a.when_assignable_to(db, *ty_b, InferableTypeVars::None);
+                                    ty_a.when_assignable_to(db, *ty_b, InferableTypeVars::none());
                                 let tracked = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -733,7 +733,7 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::IsDisjointFrom) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
-                                    ty_a.when_disjoint_from(db, *ty_b, InferableTypeVars::None);
+                                    ty_a.when_disjoint_from(db, *ty_b, InferableTypeVars::none());
                                 let tracked = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -1182,7 +1182,7 @@ impl<'db> Bindings<'db> {
                             db,
                             *ty_b,
                             tracked.constraints(db),
-                            InferableTypeVars::None,
+                            InferableTypeVars::none(),
                         );
                         let tracked = TrackedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
@@ -1216,7 +1216,7 @@ impl<'db> Bindings<'db> {
                         let extract_inferable = |instance: &NominalInstanceType<'db>| {
                             if instance.has_known_class(db, KnownClass::NoneType) {
                                 // Caller explicitly passed None, so no typevars are inferable.
-                                return Some(InferableTypeVars::None);
+                                return Some(InferableTypeVars::none());
                             }
                             Some(InferableTypeVars::from_bound_typevars(
                                 db,
@@ -1229,7 +1229,7 @@ impl<'db> Bindings<'db> {
 
                         let inferable = match overload.parameter_types() {
                             // Caller did not provide argument, so no typevars are inferable.
-                            [None] => InferableTypeVars::None,
+                            [None] => InferableTypeVars::none(),
                             [Some(Type::NominalInstance(instance))] => {
                                 match extract_inferable(instance) {
                                     Some(inferable) => inferable,
@@ -2717,7 +2717,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             call_expression_tcx,
             return_ty,
             errors,
-            inferable_typevars: InferableTypeVars::None,
+            inferable_typevars: InferableTypeVars::none(),
             specialization: None,
         }
     }
@@ -3137,7 +3137,7 @@ impl<'db> Binding<'db> {
             callable_type: signature_type,
             signature_type,
             return_ty: Type::unknown(),
-            inferable_typevars: InferableTypeVars::None,
+            inferable_typevars: InferableTypeVars::none(),
             specialization: None,
             argument_matches: Box::from([]),
             variadic_argument_matched_to_variadic_parameter: false,
@@ -3350,7 +3350,7 @@ impl<'db> Binding<'db> {
     /// Resets the state of this binding to its initial state.
     fn reset(&mut self) {
         self.return_ty = Type::unknown();
-        self.inferable_typevars = InferableTypeVars::None;
+        self.inferable_typevars = InferableTypeVars::none();
         self.specialization = None;
         self.argument_matches = Box::from([]);
         self.parameter_tys = Box::from([]);

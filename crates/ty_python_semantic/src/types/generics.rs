@@ -120,13 +120,12 @@ pub(crate) fn typing_self<'db>(
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) enum InferableTypeVars<'db> {
-    None,
-    One(InferableTypeVarsInner<'db>),
+pub(crate) struct InferableTypeVars<'db> {
+    inner: Option<InferableTypeVarsInner<'db>>,
 }
 
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
-pub(crate) struct InferableTypeVarsInner<'db> {
+struct InferableTypeVarsInner<'db> {
     // The _set_ of typevars that are inferable. This will always be sorted and deduped.
     inferable: SmallVec<[BoundTypeVarIdentity<'db>; 4]>,
 }
@@ -136,9 +135,9 @@ impl get_size2::GetSize for InferableTypeVarsInner<'_> {}
 
 impl<'db> BoundTypeVarInstance<'db> {
     pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: InferableTypeVars<'db>) -> bool {
-        match inferable {
-            InferableTypeVars::None => false,
-            InferableTypeVars::One(inner) => inner
+        match inferable.inner {
+            None => false,
+            Some(inner) => inner
                 .inferable(db)
                 .binary_search(&self.identity(db))
                 .is_ok(),
@@ -147,33 +146,39 @@ impl<'db> BoundTypeVarInstance<'db> {
 }
 
 impl<'db> InferableTypeVars<'db> {
+    pub(crate) const fn none() -> Self {
+        InferableTypeVars { inner: None }
+    }
+
     pub(crate) fn from_bound_typevars(
         db: &'db dyn Db,
         bound_typevars: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
     ) -> Self {
-        InferableTypeVars::One(InferableTypeVarsInner::from_bound_typevars(
-            db,
-            bound_typevars,
-        ))
+        InferableTypeVars {
+            inner: Some(InferableTypeVarsInner::from_bound_typevars(
+                db,
+                bound_typevars,
+            )),
+        }
     }
 
     pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
-        match (self, other) {
-            (InferableTypeVars::None, InferableTypeVars::None) => self,
-            (InferableTypeVars::One(_), InferableTypeVars::None) => self,
-            (InferableTypeVars::None, InferableTypeVars::One(_)) => other,
-            (InferableTypeVars::One(self_inner), InferableTypeVars::One(other_inner)) => {
-                InferableTypeVars::One(self_inner.merge(db, other_inner))
-            }
+        match (self.inner, other.inner) {
+            (None, None) => self,
+            (Some(_), None) => self,
+            (None, Some(_)) => other,
+            (Some(self_inner), Some(other_inner)) => InferableTypeVars {
+                inner: Some(self_inner.merge(db, other_inner)),
+            },
         }
     }
 
     // Keep this around for debugging purposes
     #[expect(dead_code)]
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
-        let inferable = match self {
-            InferableTypeVars::One(inner) => inner.inferable(db),
-            InferableTypeVars::None => return String::from("[]"),
+        let inferable = match self.inner {
+            Some(inner) => inner.inferable(db),
+            None => return String::from("[]"),
         };
         format!(
             "[{}]",
@@ -361,7 +366,9 @@ impl<'db> GenericContext<'db> {
         // This ensures that salsa caches the InferableTypeVarsInner, not the InferableTypeVars
         // that wraps it. (That way InferableTypeVars can contain a reference, and doesn't need to
         // impl salsa::Update.)
-        InferableTypeVars::One(inferable_typevars_inner(db, self))
+        InferableTypeVars {
+            inner: Some(inferable_typevars_inner(db, self)),
+        }
     }
 
     pub(crate) fn variables(

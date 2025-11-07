@@ -666,7 +666,7 @@ impl<'db> ProtocolInstanceType<'db> {
                 .satisfies_protocol(
                     db,
                     protocol,
-                    InferableTypeVars::None,
+                    InferableTypeVars::none(),
                     TypeRelation::Subtyping,
                     &HasRelationToVisitor::default(),
                     &IsDisjointVisitor::default(),

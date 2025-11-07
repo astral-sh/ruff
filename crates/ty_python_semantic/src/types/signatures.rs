@@ -631,7 +631,7 @@ impl<'db> Signature<'db> {
     fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
         match self.generic_context {
             Some(generic_context) => generic_context.inferable_typevars(db),
-            None => InferableTypeVars::None,
+            None => InferableTypeVars::none(),
         }
     }
 

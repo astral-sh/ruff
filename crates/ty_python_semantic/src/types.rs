@@ -1605,7 +1605,7 @@ impl<'db> Type<'db> {
     ///
     /// See [`TypeRelation::Subtyping`] for more details.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.when_subtype_of(db, target, InferableTypeVars::None)
+        self.when_subtype_of(db, target, InferableTypeVars::none())
             .is_always_satisfied(db)
     }
 
@@ -1641,7 +1641,7 @@ impl<'db> Type<'db> {
     ///
     /// See [`TypeRelation::Assignability`] for more details.
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.when_assignable_to(db, target, InferableTypeVars::None)
+        self.when_assignable_to(db, target, InferableTypeVars::none())
             .is_always_satisfied(db)
     }
 
@@ -1659,8 +1659,13 @@ impl<'db> Type<'db> {
     /// See [`TypeRelation::Redundancy`] for more details.
     #[salsa::tracked(cycle_initial=is_redundant_with_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn is_redundant_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.has_relation_to(db, other, InferableTypeVars::None, TypeRelation::Redundancy)
-            .is_always_satisfied(db)
+        self.has_relation_to(
+            db,
+            other,
+            InferableTypeVars::none(),
+            TypeRelation::Redundancy,
+        )
+        .is_always_satisfied(db)
     }
 
     fn has_relation_to(
@@ -2544,7 +2549,7 @@ impl<'db> Type<'db> {
     ///
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.when_equivalent_to(db, other, InferableTypeVars::None)
+        self.when_equivalent_to(db, other, InferableTypeVars::none())
             .is_always_satisfied(db)
     }
 
@@ -2671,7 +2676,7 @@ impl<'db> Type<'db> {
     /// This function aims to have no false positives, but might return wrong
     /// `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.when_disjoint_from(db, other, InferableTypeVars::None)
+        self.when_disjoint_from(db, other, InferableTypeVars::none())
             .is_always_satisfied(db)
     }
 
