@@ -63,6 +63,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
     registry.register_lint(&INVALID_GENERIC_CLASS);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
+    registry.register_lint(&INVALID_PARAMSPEC);
     registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
@@ -875,6 +876,30 @@ declare_lint! {
     /// - [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)
     pub(crate) static INVALID_LEGACY_TYPE_VARIABLE = {
         summary: "detects invalid legacy type variables",
+        status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for the creation of invalid `ParamSpec`s
+    ///
+    /// ## Why is this bad?
+    /// There are several requirements that you must follow when creating a `ParamSpec`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import ParamSpec
+    ///
+    /// P1 = ParamSpec("P1")  # okay
+    /// P2 = ParamSpec("S2")  # error: ParamSpec name must match the variable it's assigned to
+    /// ```
+    ///
+    /// ## References
+    /// - [Typing spec: ParamSpec](https://typing.python.org/en/latest/spec/generics.html#paramspec)
+    pub(crate) static INVALID_PARAMSPEC = {
+        summary: "detects invalid ParamSpec usage",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
     }

@@ -57,7 +57,7 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
             let symbols = symbols.to_hierarchical();
             let lsp_symbols: Vec<DocumentSymbol> = symbols
                 .iter()
-                .map(|(id, symbol)| {
+                .filter_map(|(id, symbol)| {
                     convert_to_lsp_document_symbol(
                         db,
                         file,
@@ -93,10 +93,10 @@ fn convert_to_lsp_document_symbol(
     id: SymbolId,
     symbol: SymbolInfo<'_>,
     encoding: PositionEncoding,
-) -> DocumentSymbol {
+) -> Option<DocumentSymbol> {
     let symbol_kind = convert_symbol_kind(symbol.kind);
 
-    DocumentSymbol {
+    Some(DocumentSymbol {
         name: symbol.name.into_owned(),
         detail: None,
         kind: symbol_kind,
@@ -105,19 +105,19 @@ fn convert_to_lsp_document_symbol(
         deprecated: None,
         range: symbol
             .full_range
-            .as_lsp_range(db, file, encoding)
-            .to_local_range(),
+            .to_lsp_range(db, file, encoding)?
+            .local_range(),
         selection_range: symbol
             .name_range
-            .as_lsp_range(db, file, encoding)
-            .to_local_range(),
+            .to_lsp_range(db, file, encoding)?
+            .local_range(),
         children: Some(
             symbols
                 .children(id)
-                .map(|(child_id, child)| {
+                .filter_map(|(child_id, child)| {
                     convert_to_lsp_document_symbol(db, file, symbols, child_id, child, encoding)
                 })
                 .collect(),
         ),
-    }
+    })
 }

@@ -43,17 +43,25 @@ impl BackgroundDocumentRequestHandler for SelectionRangeRequestHandler {
         let mut results = Vec::new();
 
         for position in params.positions {
-            let offset = position.to_text_size(db, file, snapshot.url(), snapshot.encoding());
+            let Some(offset) = position.to_text_size(db, file, snapshot.url(), snapshot.encoding())
+            else {
+                continue;
+            };
 
             let ranges = selection_range(db, file, offset);
             if !ranges.is_empty() {
                 // Convert ranges to nested LSP SelectionRange structure
                 let mut lsp_range = None;
                 for &range in &ranges {
+                    let Some(range) = range
+                        .to_lsp_range(db, file, snapshot.encoding())
+                        .map(|lsp_range| lsp_range.local_range())
+                    else {
+                        break;
+                    };
+
                     lsp_range = Some(LspSelectionRange {
-                        range: range
-                            .as_lsp_range(db, file, snapshot.encoding())
-                            .to_local_range(),
+                        range,
                         parent: lsp_range.map(Box::new),
                     });
                 }

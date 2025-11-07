@@ -99,6 +99,7 @@ mod tests {
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_many_empty_lines.py"))]
     #[test_case(Rule::UnicodeKindPrefix, Path::new("UP025.py"))]
     #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029_0.py"))]
+    #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029_2.py"))]
     #[test_case(Rule::UnnecessaryClassParentheses, Path::new("UP039.py"))]
     #[test_case(Rule::UnnecessaryDefaultTypeArgs, Path::new("UP043.py"))]
     #[test_case(Rule::UnnecessaryEncodeUTF8, Path::new("UP012.py"))]

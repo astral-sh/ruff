@@ -40,12 +40,14 @@ impl BackgroundDocumentRequestHandler for GotoDefinitionRequestHandler {
             return Ok(None);
         };
 
-        let offset = params.text_document_position_params.position.to_text_size(
+        let Some(offset) = params.text_document_position_params.position.to_text_size(
             db,
             file,
             snapshot.url(),
             snapshot.encoding(),
-        );
+        ) else {
+            return Ok(None);
+        };
 
         let Some(ranged) = goto_definition(db, file, offset) else {
             return Ok(None);
