@@ -39,12 +39,14 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
             return Ok(None);
         };
 
-        let offset = params.text_document_position_params.position.to_text_size(
+        let Some(offset) = params.text_document_position_params.position.to_text_size(
             db,
             file,
             snapshot.url(),
             snapshot.encoding(),
-        );
+        ) else {
+            return Ok(None);
+        };
 
         let Some(range_info) = hover(db, file, offset) else {
             return Ok(None);
@@ -66,12 +68,10 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
                 kind: lsp_markup_kind,
                 value: contents,
             }),
-            range: Some(
-                range_info
-                    .file_range()
-                    .as_lsp_range(db, snapshot.encoding())
-                    .to_local_range(),
-            ),
+            range: range_info
+                .file_range()
+                .to_lsp_range(db, snapshot.encoding())
+                .map(|lsp_range| lsp_range.local_range()),
         }))
     }
 }
