@@ -119,7 +119,7 @@ pub(crate) fn typing_self<'db>(
     .map(Type::TypeVar)
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct InferableTypeVars<'db> {
     inner: Option<InferableTypeVarsInner<'db>>,
 }
@@ -167,6 +167,7 @@ impl<'db> InferableTypeVars<'db> {
             (None, None) => self,
             (Some(_), None) => self,
             (None, Some(_)) => other,
+            (Some(self_inner), Some(other_inner)) if self_inner == other_inner => self,
             (Some(self_inner), Some(other_inner)) => InferableTypeVars {
                 inner: Some(self_inner.merge(db, other_inner)),
             },

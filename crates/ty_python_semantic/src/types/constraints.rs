@@ -164,18 +164,23 @@ where
 pub struct ConstraintSet<'db> {
     /// The BDD representing this constraint set
     node: Node<'db>,
+
+    /// The typevars that were inferable when constructing this constraint set
+    pub(crate) inferable: InferableTypeVars<'db>,
 }
 
 impl<'db> ConstraintSet<'db> {
     fn never() -> Self {
         Self {
             node: Node::AlwaysFalse,
+            inferable: InferableTypeVars::none(),
         }
     }
 
     fn always() -> Self {
         Self {
             node: Node::AlwaysTrue,
+            inferable: InferableTypeVars::none(),
         }
     }
 
@@ -185,6 +190,7 @@ impl<'db> ConstraintSet<'db> {
         typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
         upper: Type<'db>,
+        inferable: InferableTypeVars<'db>,
         relation: TypeRelation<'db>,
     ) -> Self {
         let (lower, upper) = match relation {
@@ -202,6 +208,14 @@ impl<'db> ConstraintSet<'db> {
 
         Self {
             node: ConstrainedTypeVar::new_node(db, typevar, lower, upper),
+            inferable,
+        }
+    }
+
+    pub(crate) fn with_inferable(self, inferable: InferableTypeVars<'db>) -> Self {
+        Self {
+            node: self.node,
+            inferable,
         }
     }
 
@@ -226,6 +240,7 @@ impl<'db> ConstraintSet<'db> {
     ) -> Self {
         Self {
             node: self.node.when_subtype_of_given(db, lhs, rhs),
+            inferable: self.inferable,
         }
     }
 
@@ -243,22 +258,20 @@ impl<'db> ConstraintSet<'db> {
     /// since the constraint set cannot be affected by any typevars that it does not mention. That
     /// means that those additional typevars trivially satisfy the constraint set, regardless of
     /// whether they are inferable or not.
-    pub(crate) fn satisfied_by_all_typevars(
-        self,
-        db: &'db dyn Db,
-        inferable: InferableTypeVars<'db>,
-    ) -> bool {
-        self.node.satisfied_by_all_typevars(db, inferable)
+    pub(crate) fn satisfied_by_all_typevars(self, db: &'db dyn Db) -> bool {
+        self.node.satisfied_by_all_typevars(db, self.inferable)
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
     pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
+        debug_assert!(self.inferable == other.inferable);
         self.node = self.node.or(db, other.node);
         *self
     }
 
     /// Updates this constraint set to hold the intersection of itself and another constraint set.
     pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: Self) -> Self {
+        debug_assert!(self.inferable == other.inferable);
         self.node = self.node.and(db, other.node);
         *self
     }
@@ -267,6 +280,7 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn negate(self, db: &'db dyn Db) -> Self {
         Self {
             node: self.node.negate(db),
+            inferable: self.inferable,
         }
     }
 
@@ -296,8 +310,10 @@ impl<'db> ConstraintSet<'db> {
     }
 
     pub(crate) fn iff(self, db: &'db dyn Db, other: Self) -> Self {
+        debug_assert!(self.inferable == other.inferable);
         ConstraintSet {
             node: self.node.iff(db, other.node),
+            inferable: self.inferable,
         }
     }
 
@@ -306,8 +322,16 @@ impl<'db> ConstraintSet<'db> {
         lower: Type<'db>,
         typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
+        inferable: InferableTypeVars<'db>,
     ) -> Self {
-        Self::constrain_typevar(db, typevar, lower, upper, TypeRelation::Assignability)
+        Self::constrain_typevar(
+            db,
+            typevar,
+            lower,
+            upper,
+            inferable,
+            TypeRelation::Assignability,
+        )
     }
 
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
@@ -2106,10 +2130,10 @@ mod tests {
         let u = BoundTypeVarInstance::synthetic(&db, "U", TypeVarVariance::Invariant);
         let bool_type = KnownClass::Bool.to_instance(&db);
         let str_type = KnownClass::Str.to_instance(&db);
-        let t_str = ConstraintSet::range(&db, str_type, t, str_type);
-        let t_bool = ConstraintSet::range(&db, bool_type, t, bool_type);
-        let u_str = ConstraintSet::range(&db, str_type, u, str_type);
-        let u_bool = ConstraintSet::range(&db, bool_type, u, bool_type);
+        let t_str = ConstraintSet::range(&db, str_type, t, str_type, InferableTypeVars::none());
+        let t_bool = ConstraintSet::range(&db, bool_type, t, bool_type, InferableTypeVars::none());
+        let u_str = ConstraintSet::range(&db, str_type, u, str_type, InferableTypeVars::none());
+        let u_bool = ConstraintSet::range(&db, bool_type, u, bool_type, InferableTypeVars::none());
         let constraints = (t_str.or(&db, || t_bool)).and(&db, || u_str.or(&db, || u_bool));
         let actual = constraints.node.display_graph(&db, &"").to_string();
         assert_eq!(actual, expected);

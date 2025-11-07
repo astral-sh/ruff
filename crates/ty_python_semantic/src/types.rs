@@ -1627,12 +1627,11 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         target: Type<'db>,
         constraints: ConstraintSet<'db>,
-        inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db> {
         self.has_relation_to(
             db,
             target,
-            inferable,
+            constraints.inferable,
             TypeRelation::ConstraintImplication(constraints),
         )
     }

@@ -1142,7 +1142,13 @@ impl<'db> Bindings<'db> {
                         else {
                             return;
                         };
-                        let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
+                        let constraints = ConstraintSet::range(
+                            db,
+                            *lower,
+                            *typevar,
+                            *upper,
+                            InferableTypeVars::none(),
+                        );
                         let tracked = TrackedConstraintSet::new(db, constraints);
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),
@@ -1178,12 +1184,7 @@ impl<'db> Bindings<'db> {
                             continue;
                         };
 
-                        let result = ty_a.when_subtype_of_given(
-                            db,
-                            *ty_b,
-                            tracked.constraints(db),
-                            InferableTypeVars::none(),
-                        );
+                        let result = ty_a.when_subtype_of_given(db, *ty_b, tracked.constraints(db));
                         let tracked = TrackedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),
@@ -1241,7 +1242,8 @@ impl<'db> Bindings<'db> {
 
                         let result = tracked
                             .constraints(db)
-                            .satisfied_by_all_typevars(db, inferable);
+                            .with_inferable(inferable)
+                            .satisfied_by_all_typevars(db);
                         overload.set_return_type(Type::BooleanLiteral(result));
                     }
 
