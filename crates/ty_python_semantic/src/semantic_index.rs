@@ -845,10 +845,7 @@ mod tests {
     use crate::semantic_index::scope::{FileScopeId, Scope, ScopeKind};
     use crate::semantic_index::symbol::ScopedSymbolId;
     use crate::semantic_index::use_def::UseDefMap;
-    use crate::semantic_index::{
-        attribute_declarations, attribute_scopes, global_scope, place_table, semantic_index,
-        use_def_map,
-    };
+    use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
 
     impl UseDefMap<'_> {
         fn first_public_binding(&self, symbol: ScopedSymbolId) -> Option<Definition<'_>> {
