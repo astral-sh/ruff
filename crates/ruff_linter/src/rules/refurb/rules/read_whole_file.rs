@@ -125,10 +125,6 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
                     open.item.range(),
                 );
 
-                if !crate::preview::is_fix_read_whole_file_enabled(self.checker.settings()) {
-                    return;
-                }
-
                 let target = match self.with_stmt.body.first() {
                     Some(Stmt::Assign(assign))
                         if assign.value.range().contains_range(expr.range()) =>

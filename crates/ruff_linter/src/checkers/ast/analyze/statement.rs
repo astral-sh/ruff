@@ -717,7 +717,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::UnnecessaryBuiltinImport) {
                 if let Some(module) = module {
-                    pyupgrade::rules::unnecessary_builtin_import(checker, stmt, module, names);
+                    pyupgrade::rules::unnecessary_builtin_import(
+                        checker, stmt, module, names, level,
+                    );
                 }
             }
             if checker.any_rule_enabled(&[

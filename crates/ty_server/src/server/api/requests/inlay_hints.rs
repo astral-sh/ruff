@@ -39,26 +39,31 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
             return Ok(None);
         };
 
-        let range = params
+        let Some(range) = params
             .range
-            .to_text_range(db, file, snapshot.url(), snapshot.encoding());
+            .to_text_range(db, file, snapshot.url(), snapshot.encoding())
+        else {
+            return Ok(None);
+        };
 
         let inlay_hints = inlay_hints(db, file, range, workspace_settings.inlay_hints());
 
         let inlay_hints = inlay_hints
             .into_iter()
-            .map(|hint| lsp_types::InlayHint {
-                position: hint
-                    .position
-                    .as_lsp_position(db, file, snapshot.encoding())
-                    .to_local_position(),
-                label: inlay_hint_label(&hint.label),
-                kind: Some(inlay_hint_kind(&hint.kind)),
-                tooltip: None,
-                padding_left: None,
-                padding_right: None,
-                data: None,
-                text_edits: None,
+            .filter_map(|hint| {
+                Some(lsp_types::InlayHint {
+                    position: hint
+                        .position
+                        .to_lsp_position(db, file, snapshot.encoding())?
+                        .local_position(),
+                    label: inlay_hint_label(&hint.label),
+                    kind: Some(inlay_hint_kind(&hint.kind)),
+                    tooltip: None,
+                    padding_left: None,
+                    padding_right: None,
+                    data: None,
+                    text_edits: None,
+                })
             })
             .collect();
 
