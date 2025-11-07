@@ -312,8 +312,7 @@ screenshots or recordings of your change in action.
 
 #### Ecosystem report
 
-You should fill in the sections above before opening your PR. After opening the
-PR, an ecosystem report will be run as part of CI. This shows a diff of linter
+After opening the PR, an ecosystem report will be run as part of CI. This shows a diff of linter
 and formatter behavior before and after the changes in your PR. If any
 differences are reported, you should go through them and make sure they look
 correct. After going through the results of the ecosystem check, you should
