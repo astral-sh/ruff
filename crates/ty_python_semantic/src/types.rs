@@ -1925,9 +1925,7 @@ impl<'db> Type<'db> {
                     })
             }
 
-            (Type::TypeVar(bound_typevar), _)
-                if bound_typevar.is_inferable(db, inferable) && relation.is_assignability() =>
-            {
+            (Type::TypeVar(bound_typevar), _) if bound_typevar.is_inferable(db, inferable) => {
                 // The implicit lower bound of a typevar is `Never`, which means
                 // that it is always assignable to any other type.
 
@@ -2067,9 +2065,12 @@ impl<'db> Type<'db> {
             }
 
             // TODO: Infer specializations here
-            (Type::TypeVar(bound_typevar), _) | (_, Type::TypeVar(bound_typevar))
-                if bound_typevar.is_inferable(db, inferable) =>
-            {
+            (_, Type::TypeVar(bound_typevar)) if bound_typevar.is_inferable(db, inferable) => {
+                ConstraintSet::from(false)
+            }
+            (Type::TypeVar(bound_typevar), _) => {
+                // All inferable cases should have been handled above
+                assert!(!bound_typevar.is_inferable(db, inferable));
                 ConstraintSet::from(false)
             }
 
@@ -2523,13 +2524,8 @@ impl<'db> Type<'db> {
                 disjointness_visitor,
             ),
 
-            // Other than the special cases enumerated above, nominal-instance types,
-            // newtype-instance types, and typevars are never subtypes of any other variants
-            (Type::TypeVar(bound_typevar), _) => {
-                // All inferable cases should have been handled above
-                assert!(!bound_typevar.is_inferable(db, inferable));
-                ConstraintSet::from(false)
-            }
+            // Other than the special cases enumerated above, nominal-instance types, and
+            // newtype-instance types are never subtypes of any other variants
             (Type::NominalInstance(_), _) => ConstraintSet::from(false),
             (Type::NewTypeInstance(_), _) => ConstraintSet::from(false),
         }
