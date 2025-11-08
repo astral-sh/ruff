@@ -8471,10 +8471,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             file_scope_id,
                         ) {
                             EnclosingSnapshotResult::FoundConstraint(constraint) => {
-                                constraint_keys.push((
+                                // The constraint should already have been added in the iteration over `ancestor_scopes` above.
+                                debug_assert!(constraint_keys.contains(&(
                                     FileScopeId::global(),
                                     ConstraintKey::NarrowingConstraint(constraint),
-                                ));
+                                )));
                                 // Reaching here means that no bindings are found in any scope.
                                 // Since `explicit_global_symbol` may return a cycle initial value, we return `Place::Undefined` here.
                                 return Place::Undefined.into();
@@ -8487,10 +8488,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         &constraint_keys,
                                     )
                                 });
-                                constraint_keys.push((
+                                debug_assert!(constraint_keys.contains(&(
                                     FileScopeId::global(),
                                     ConstraintKey::NestedScope(file_scope_id),
-                                ));
+                                )));
                                 return place.into();
                             }
                             // There are no visible bindings / constraint here.
