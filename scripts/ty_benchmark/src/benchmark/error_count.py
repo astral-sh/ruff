@@ -35,7 +35,7 @@ class ErrorCountSummary:
             "error_counts": self.error_counts,
         }
         with open(file_path, "w") as f:
-            json.dump(dictionary, f)
+            json.dump(dictionary, f, indent=4)
 
     @classmethod
     def from_json(cls, file_path: Path) -> ErrorCountSummary:
