@@ -1,7 +1,9 @@
 use configuration_file::{ConfigurationFile, ConfigurationFileError};
+use ruff_db::system::walk_directory::WalkState;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::name::Name;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
@@ -141,90 +143,25 @@ impl ProjectMetadata {
         let mut closest_project: Option<ProjectMetadata> = None;
 
         for project_root in path.ancestors() {
-            let pyproject_path = project_root.join("pyproject.toml");
-
-            let pyproject = if let Ok(pyproject_str) = system.read_to_string(&pyproject_path) {
-                match PyProject::from_toml_str(
-                    &pyproject_str,
-                    ValueSource::File(Arc::new(pyproject_path.clone())),
-                ) {
-                    Ok(pyproject) => Some(pyproject),
-                    Err(error) => {
-                        return Err(ProjectMetadataError::InvalidPyProject {
-                            path: pyproject_path,
-                            source: Box::new(error),
-                        });
-                    }
-                }
-            } else {
-                None
+            let Some(discovered) = Self::discover_in(project_root, system)? else {
+                continue;
             };
 
-            // A `ty.toml` takes precedence over a `pyproject.toml`.
-            let ty_toml_path = project_root.join("ty.toml");
-            if let Ok(ty_str) = system.read_to_string(&ty_toml_path) {
-                let options = match Options::from_toml_str(
-                    &ty_str,
-                    ValueSource::File(Arc::new(ty_toml_path.clone())),
-                ) {
-                    Ok(options) => options,
-                    Err(error) => {
-                        return Err(ProjectMetadataError::InvalidTyToml {
-                            path: ty_toml_path,
-                            source: Box::new(error),
-                        });
-                    }
-                };
-
-                if pyproject
-                    .as_ref()
-                    .is_some_and(|project| project.ty().is_some())
-                {
-                    // TODO: Consider using a diagnostic here
-                    tracing::warn!(
-                        "Ignoring the `tool.ty` section in `{pyproject_path}` because `{ty_toml_path}` takes precedence."
-                    );
+            match discovered {
+                DiscoveredProject::PyProject {
+                    has_ty_section: true,
+                    metadata,
                 }
-
-                tracing::debug!("Found project at '{}'", project_root);
-
-                let metadata = ProjectMetadata::from_options(
-                    options,
-                    project_root.to_path_buf(),
-                    pyproject
-                        .as_ref()
-                        .and_then(|pyproject| pyproject.project.as_ref()),
-                )
-                .map_err(|err| {
-                    ProjectMetadataError::InvalidRequiresPythonConstraint {
-                        source: err,
-                        path: pyproject_path,
-                    }
-                })?;
-
-                return Ok(metadata);
-            }
-
-            if let Some(pyproject) = pyproject {
-                let has_ty_section = pyproject.ty().is_some();
-                let metadata =
-                    ProjectMetadata::from_pyproject(pyproject, project_root.to_path_buf())
-                        .map_err(
-                            |err| ProjectMetadataError::InvalidRequiresPythonConstraint {
-                                source: err,
-                                path: pyproject_path,
-                            },
-                        )?;
-
-                if has_ty_section {
+                | DiscoveredProject::Ty { metadata } => {
                     tracing::debug!("Found project at '{}'", project_root);
 
                     return Ok(metadata);
                 }
-
-                // Not a project itself, keep looking for an enclosing project.
-                if closest_project.is_none() {
-                    closest_project = Some(metadata);
+                DiscoveredProject::PyProject { metadata, .. } => {
+                    // Not a project itself, keep looking for an enclosing project.
+                    if closest_project.is_none() {
+                        closest_project = Some(metadata);
+                    }
                 }
             }
         }
@@ -250,6 +187,101 @@ impl ProjectMetadata {
         };
 
         Ok(metadata)
+    }
+
+    fn discover_in(
+        project_root: &SystemPath,
+        system: &dyn System,
+    ) -> Result<Option<DiscoveredProject>, ProjectMetadataError> {
+        tracing::debug!("Searching for a project in '{project_root}'");
+
+        if !system.is_directory(project_root) {
+            return Err(ProjectMetadataError::NotADirectory(
+                project_root.to_path_buf(),
+            ));
+        }
+
+        let pyproject_path = project_root.join("pyproject.toml");
+
+        let pyproject = if let Ok(pyproject_str) = system.read_to_string(&pyproject_path) {
+            match PyProject::from_toml_str(
+                &pyproject_str,
+                ValueSource::File(Arc::new(pyproject_path.clone())),
+            ) {
+                Ok(pyproject) => Some(pyproject),
+                Err(error) => {
+                    return Err(ProjectMetadataError::InvalidPyProject {
+                        path: pyproject_path,
+                        source: Box::new(error),
+                    });
+                }
+            }
+        } else {
+            None
+        };
+
+        // A `ty.toml` takes precedence over a `pyproject.toml`.
+        let ty_toml_path = project_root.join("ty.toml");
+        if let Ok(ty_str) = system.read_to_string(&ty_toml_path) {
+            let options = match Options::from_toml_str(
+                &ty_str,
+                ValueSource::File(Arc::new(ty_toml_path.clone())),
+            ) {
+                Ok(options) => options,
+                Err(error) => {
+                    return Err(ProjectMetadataError::InvalidTyToml {
+                        path: ty_toml_path,
+                        source: Box::new(error),
+                    });
+                }
+            };
+
+            if pyproject
+                .as_ref()
+                .is_some_and(|project| project.ty().is_some())
+            {
+                // TODO: Consider using a diagnostic here
+                tracing::warn!(
+                    "Ignoring the `tool.ty` section in `{pyproject_path}` because `{ty_toml_path}` takes precedence."
+                );
+            }
+
+            tracing::debug!("Found project at '{}'", project_root);
+
+            let metadata = ProjectMetadata::from_options(
+                options,
+                project_root.to_path_buf(),
+                pyproject
+                    .as_ref()
+                    .and_then(|pyproject| pyproject.project.as_ref()),
+            )
+            .map_err(
+                |err| ProjectMetadataError::InvalidRequiresPythonConstraint {
+                    source: err,
+                    path: pyproject_path,
+                },
+            )?;
+
+            return Ok(Some(DiscoveredProject::Ty { metadata }));
+        }
+
+        if let Some(pyproject) = pyproject {
+            let has_ty_section = pyproject.ty().is_some();
+            let metadata = ProjectMetadata::from_pyproject(pyproject, project_root.to_path_buf())
+                .map_err(|err| {
+                ProjectMetadataError::InvalidRequiresPythonConstraint {
+                    source: err,
+                    path: pyproject_path,
+                }
+            })?;
+
+            return Ok(Some(DiscoveredProject::PyProject {
+                has_ty_section,
+                metadata,
+            }));
+        }
+
+        Ok(None)
     }
 
     pub fn root(&self) -> &SystemPath {
@@ -342,6 +374,36 @@ pub enum ProjectMetadataError {
         source: Box<ConfigurationFileError>,
         path: SystemPathBuf,
     },
+}
+
+#[derive(Debug)]
+enum DiscoveredProject {
+    PyProject {
+        has_ty_section: bool,
+        metadata: ProjectMetadata,
+    },
+    Ty {
+        metadata: ProjectMetadata,
+    },
+}
+
+impl DiscoveredProject {
+    fn is_ty_or_project_with_ty_section(&self) -> bool {
+        match self {
+            DiscoveredProject::PyProject {
+                has_ty_section: tool_ty,
+                ..
+            } => *tool_ty,
+            DiscoveredProject::Ty { .. } => true,
+        }
+    }
+
+    fn into_metadata(self) -> ProjectMetadata {
+        match self {
+            DiscoveredProject::PyProject { metadata, .. } => metadata,
+            DiscoveredProject::Ty { metadata } => metadata,
+        }
+    }
 }
 
 #[cfg(test)]

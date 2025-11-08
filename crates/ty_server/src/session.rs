@@ -499,6 +499,9 @@ impl Session {
                 continue;
             };
 
+            // TODO: Discover all projects within this workspace, starting from root.
+            //
+
             // For now, create one project database per workspace.
             // In the future, index the workspace directories to find all projects
             // and create a project database for each.
@@ -1175,8 +1178,7 @@ impl Workspaces {
     ) -> Option<(SystemPathBuf, &mut Workspace)> {
         let path = url.to_file_path().ok()?;
 
-        // Realistically I don't think this can fail because we got the path from a Url
-        let system_path = SystemPathBuf::from_path_buf(path).ok()?;
+        let system_path = SystemPathBuf::from_path_buf(path).expect("URL to be valid UTF-8");
 
         if let Some(workspace) = self.workspaces.get_mut(&system_path) {
             workspace.settings = Arc::new(settings);
