@@ -215,10 +215,17 @@ impl ClassInfoConstraintFunction {
             Type::KnownInstance(KnownInstanceType::UnionType(elements)) => {
                 UnionType::try_from_elements(
                     db,
-                    elements
-                        .elements(db)
-                        .iter()
-                        .map(|element| self.generate_constraint(db, *element)),
+                    elements.elements(db).iter().map(|element| {
+                        // A special case is made for `None` at runtime
+                        // (it's implicitly converted to `NoneType` in `int | None`)
+                        // which means that `isinstance(x, int | None)` works even though
+                        // `None` is not a class literal.
+                        if element.is_none(db) {
+                            self.generate_constraint(db, KnownClass::NoneType.to_class_literal(db))
+                        } else {
+                            self.generate_constraint(db, *element)
+                        }
+                    }),
                 )
             }
 

@@ -148,11 +148,22 @@ def f(x: type[int | str | bytes | range]):
         reveal_type(x)  # revealed: <class 'range'>
 ```
 
+Although `issubclass()` usually only works if all elements in the `UnionType` are class objects, at
+runtime a special exception is made for `None` so that `issubclass(x, int | None)` can work:
+
+```py
+def _(x: type):
+    if issubclass(x, int | str | None):
+        reveal_type(x)  # revealed: type[int] | type[str] | <class 'NoneType'>
+    else:
+        reveal_type(x)  # revealed: type & ~type[int] & ~type[str] & ~<class 'NoneType'>
+```
+
 ## `classinfo` is an invalid PEP-604 union of types
 
-Narrowing can only take place if all elements in the PEP-604 union are class literals. If any
-elements are generic aliases or other types, the `issubclass()` call will fail at runtime, so no
-narrowing can take place:
+Except for the `None` special case mentioned above, narrowing can only take place if all elements in
+the PEP-604 union are class literals. If any elements are generic aliases or other types, the
+`issubclass()` call may fail at runtime, so no narrowing can take place:
 
 ```toml
 [environment]

@@ -87,11 +87,22 @@ def _(x: int | str | bytes | memoryview | range):
         reveal_type(x)  # revealed: range
 ```
 
+Although `isinstance()` usually only works if all elements in the `UnionType` are class objects, at
+runtime a special exception is made for `None` so that `isinstance(x, int | None)` can work:
+
+```py
+def _(x: int | str | bytes | range | None):
+    if isinstance(x, int | str | None):
+        reveal_type(x)  # revealed: int | str | None
+    else:
+        reveal_type(x)  # revealed: bytes | range
+```
+
 ## `classinfo` is an invalid PEP-604 union of types
 
-Narrowing can only take place if all elements in the PEP-604 union are class literals. If any
-elements are generic aliases or other types, the `isinstance()` call will fail at runtime, so no
-narrowing can take place:
+Except for the `None` special case mentioned above, narrowing can only take place if all elements in
+the PEP-604 union are class literals. If any elements are generic aliases or other types, the
+`isinstance()` call may fail at runtime, so no narrowing can take place:
 
 ```toml
 [environment]
