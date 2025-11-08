@@ -4,7 +4,8 @@ from pathlib import Path
 
 from stdlibs import stdlib_module_names
 
-PATH = Path("crates") / "ruff_python_stdlib" / "src" / "sys" / "known_stdlib.rs"
+CRATES_PATH = Path(__file__).parents[1] / "crates"
+PATH = CRATES_PATH / "ruff_python_stdlib" / "src" / "sys" / "known_stdlib.rs"
 VERSIONS: list[tuple[int, int]] = [
     (3, 7),
     (3, 8),
