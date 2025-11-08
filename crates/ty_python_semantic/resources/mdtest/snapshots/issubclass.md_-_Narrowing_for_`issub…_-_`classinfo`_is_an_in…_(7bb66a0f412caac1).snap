@@ -1,0 +1,42 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: issubclass.md - Narrowing for `issubclass` checks - `classinfo` is an invalid PEP-604 union of types
+mdtest path: crates/ty_python_semantic/resources/mdtest/narrow/issubclass.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | def _(x: type[int | list | bytes]):
+2 |     # error: [invalid-argument-type]
+3 |     if issubclass(x, int | list[int]):
+4 |         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+5 |     else:
+6 |         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Invalid second argument to `issubclass`
+ --> src/mdtest_snippet.py:3:8
+  |
+1 | def _(x: type[int | list | bytes]):
+2 |     # error: [invalid-argument-type]
+3 |     if issubclass(x, int | list[int]):
+  |        ^^^^^^^^^^^^^^---------------^
+  |                      |
+  |                      This `UnionType` instance contains non-class elements
+4 |         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+5 |     else:
+  |
+info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union is not a class object
+info: rule `invalid-argument-type` is enabled by default
+
+```

@@ -165,6 +165,8 @@ Except for the `None` special case mentioned above, narrowing can only take plac
 the PEP-604 union are class literals. If any elements are generic aliases or other types, the
 `issubclass()` call may fail at runtime, so no narrowing can take place:
 
+<!-- snapshot-diagnostics -->
+
 ```toml
 [environment]
 python-version = "3.10"
@@ -172,8 +174,7 @@ python-version = "3.10"
 
 ```py
 def _(x: type[int | list | bytes]):
-    # TODO: this fails at runtime; we should emit a diagnostic
-    # (requires special-casing of the `issubclass()` signature)
+    # error: [invalid-argument-type]
     if issubclass(x, int | list[int]):
         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
     else:
