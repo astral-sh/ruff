@@ -151,12 +151,15 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
             // Check for various eager conversion patterns
             match format_conversion {
                 // %s with str() - remove str() call
-                // Only flag if str() has exactly one non-starred positional argument and no keyword arguments
+                // Only flag if str() has exactly one argument (positional or keyword) that is not unpacked
                 FormatConversion::Str
                     if checker.semantic().match_builtin_expr(func.as_ref(), "str")
-                        && str_call_args.args.len() == 1
-                        && !str_call_args.args[0].is_starred_expr()
-                        && str_call_args.keywords.is_empty() =>
+                        && ((str_call_args.args.len() == 1
+                            && !str_call_args.args[0].is_starred_expr()
+                            && str_call_args.keywords.is_empty())
+                            || (str_call_args.args.is_empty()
+                                && str_call_args.keywords.len() == 1
+                                && str_call_args.keywords[0].arg.is_some())) =>
                 {
                     checker.report_diagnostic(
                         LoggingEagerConversion {

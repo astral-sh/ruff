@@ -82,3 +82,6 @@ logging.warning("%s", str(*(b"\xf0\x9f\x9a\xa7", "utf-8")))
 # str() with keyword unpacking - should not be flagged
 logging.warning("%s", str(**{"object": b"\xf0\x9f\x9a\xa8", "encoding": "utf-8"}))
 
+# str() with single keyword argument - should be flagged (equivalent to str("!"))
+logging.warning("%s", str(object="!"))
+
