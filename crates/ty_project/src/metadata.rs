@@ -21,7 +21,7 @@ pub mod pyproject;
 pub mod settings;
 pub mod value;
 
-#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 #[cfg_attr(test, derive(serde::Serialize))]
 pub struct ProjectMetadata {
     pub(super) name: Name,
@@ -134,13 +134,25 @@ impl ProjectMetadata {
         path: &SystemPath,
         system: &dyn System,
     ) -> Result<ProjectMetadata, ProjectMetadataError> {
+        if !system.is_directory(path) {
+            return Err(ProjectMetadataError::NotADirectory(path.to_path_buf()));
+        }
+
+        let closest = Self::discover_closest(path, system)?;
+        Ok(closest.into_metadata())
+    }
+
+    fn discover_closest(
+        path: &SystemPath,
+        system: &dyn System,
+    ) -> Result<DiscoveredProject, ProjectMetadataError> {
         tracing::debug!("Searching for a project in '{path}'");
 
         if !system.is_directory(path) {
             return Err(ProjectMetadataError::NotADirectory(path.to_path_buf()));
         }
 
-        let mut closest_project: Option<ProjectMetadata> = None;
+        let mut closest_project: Option<DiscoveredProject> = None;
 
         for project_root in path.ancestors() {
             let Some(discovered) = Self::discover_in(project_root, system)? else {
@@ -150,51 +162,52 @@ impl ProjectMetadata {
             match discovered {
                 DiscoveredProject::PyProject {
                     has_ty_section: true,
-                    metadata,
+                    ..
                 }
-                | DiscoveredProject::Ty { metadata } => {
+                | DiscoveredProject::Ty { .. } => {
                     tracing::debug!("Found project at '{}'", project_root);
 
-                    return Ok(metadata);
+                    return Ok(discovered);
                 }
-                DiscoveredProject::PyProject { metadata, .. } => {
+                DiscoveredProject::PyProject { .. } => {
                     // Not a project itself, keep looking for an enclosing project.
                     if closest_project.is_none() {
-                        closest_project = Some(metadata);
+                        closest_project = Some(discovered);
                     }
                 }
             }
         }
 
-        // No project found, but maybe a pyproject.toml was found.
-        let metadata = if let Some(closest_project) = closest_project {
+        if let Some(closest_project) = closest_project {
             tracing::debug!(
                 "Project without `tool.ty` section: '{}'",
                 closest_project.root()
             );
 
-            closest_project
-        } else {
-            tracing::debug!(
-                "The ancestor directories contain no `pyproject.toml`. Falling back to a virtual project."
-            );
+            return Ok(closest_project);
+        }
 
-            // Create a project with a default configuration
-            Self::new(
+        tracing::debug!(
+            "The ancestor directories contain no `pyproject.toml`. Falling back to a virtual project."
+        );
+
+        // Create a project with a default configuration
+        Ok(DiscoveredProject::PyProject {
+            metadata: Self::new(
                 path.file_name().unwrap_or("root").into(),
                 path.to_path_buf(),
-            )
-        };
-
-        Ok(metadata)
+            ),
+            has_ty_section: false,
+        })
     }
 
+    /// Discovers a project in `project_root`. Unlike [`Self::discover`], this function
+    /// only searches for a configuration in `project_root`
+    /// without traversing the ancestor directories.
     fn discover_in(
         project_root: &SystemPath,
         system: &dyn System,
     ) -> Result<Option<DiscoveredProject>, ProjectMetadataError> {
-        tracing::debug!("Searching for a project in '{project_root}'");
-
         if !system.is_directory(project_root) {
             return Err(ProjectMetadataError::NotADirectory(
                 project_root.to_path_buf(),
@@ -282,6 +295,89 @@ impl ProjectMetadata {
         }
 
         Ok(None)
+    }
+
+    /// Discovers all project in `root`, recursively.
+    pub fn discover_all(
+        root: &SystemPath,
+        system: &dyn System,
+    ) -> Result<BTreeMap<SystemPathBuf, ProjectMetadata>, ProjectMetadataError> {
+        tracing::debug!("Searching for all projects in '{root}'");
+
+        // FIXME: We need to know if it is a pyproject toml or not :(
+        let root_project = Self::discover_closest(root, system)?;
+
+        let projects: BTreeMap<_, _> = [(root.to_path_buf(), root_project)].into_iter().collect();
+
+        // Hmm, what's complicated about this is that
+        // `check_project` now descends into sub directories so that
+        // a single file now belongs to multiple projects.
+        // We would need to exclude the inner projects from the outer project,
+        // but that seems annoying.
+        // The alternative is that we skip a directory as soon as we've found a project. But that
+        // still doesn't solve the case where we have sub folders that each are a project
+        // with an outermost default database
+        let projects = std::sync::Mutex::new(projects);
+
+        system
+            .walk_directory(root)
+            .standard_filters(true)
+            .ignore_hidden(true)
+            .run(|| {
+                Box::new(|entry| {
+                    let entry = match entry {
+                        Ok(entry) => entry,
+                        Err(error) => {
+                            tracing::debug!("Failed to walk directory {error}'");
+                            return WalkState::Skip;
+                        }
+                    };
+
+                    if entry.depth() == 0 {
+                        return WalkState::Continue;
+                    }
+
+                    if !entry.file_type().is_directory() {
+                        return WalkState::Skip;
+                    }
+
+                    // TODO: Do propage the error somehow
+                    let discovered = match Self::discover_in(entry.path(), system) {
+                        Ok(Some(discovered)) => discovered,
+                        Ok(None) => return WalkState::Continue,
+                        Err(error) => {
+                            tracing::debug!(
+                                "Failed to discover project in {path}: {error}",
+                                path = entry.path()
+                            );
+
+                            return WalkState::Skip;
+                        }
+                    };
+
+                    let mut projects  = projects.lock().unwrap();
+
+                    // Skip the project if there's an outer project that uses either a `ty.toml` or
+                    // `pyproject.toml` with a `tool.ty` section.
+                    if let Some((parent_path, parent_project)) = projects.range(..entry.path().to_path_buf()).last() {
+                        if parent_project.takes_priority_over(&discovered) {
+                            tracing::debug!("Ignoring project at {path} because the parent configuration at {parent_path} takes priority", path = entry.path());
+                            return WalkState::Continue;
+                        }
+                    }
+
+                    projects.insert(entry.path().to_path_buf(), discovered);
+
+                    WalkState::Continue
+                })
+            });
+
+        Ok(projects
+            .into_inner()
+            .unwrap()
+            .into_iter()
+            .map(|(path, discovered)| (path, discovered.into_metadata()))
+            .collect())
     }
 
     pub fn root(&self) -> &SystemPath {
@@ -388,19 +484,36 @@ enum DiscoveredProject {
 }
 
 impl DiscoveredProject {
-    fn is_ty_or_project_with_ty_section(&self) -> bool {
+    fn is_ty_or_has_ty_seciton(&self) -> bool {
         match self {
             DiscoveredProject::PyProject {
-                has_ty_section: tool_ty,
-                ..
-            } => *tool_ty,
+                has_ty_section,
+                metadata: _,
+            } => *has_ty_section,
             DiscoveredProject::Ty { .. } => true,
+        }
+    }
+
+    fn takes_priority_over(&self, other: &DiscoveredProject) -> bool {
+        self.is_ty_or_has_ty_seciton() && !other.is_ty_or_has_ty_seciton()
+    }
+
+    fn root(&self) -> &SystemPath {
+        match self {
+            DiscoveredProject::PyProject {
+                has_ty_section: _,
+                metadata,
+            } => &metadata.root(),
+            DiscoveredProject::Ty { metadata } => metadata.root(),
         }
     }
 
     fn into_metadata(self) -> ProjectMetadata {
         match self {
-            DiscoveredProject::PyProject { metadata, .. } => metadata,
+            DiscoveredProject::PyProject {
+                has_ty_section: _,
+                metadata,
+            } => metadata,
             DiscoveredProject::Ty { metadata } => metadata,
         }
     }
@@ -432,7 +545,7 @@ mod tests {
 
         assert_eq!(project.root(), &*root);
 
-        with_escaped_paths(|| {
+        with_sanitized_paths(|| {
             assert_ron_snapshot!(&project, @r#"
             ProjectMetadata(
               name: Name("app"),
@@ -470,7 +583,7 @@ mod tests {
 
         assert_eq!(project.root(), &*root);
 
-        with_escaped_paths(|| {
+        with_sanitized_paths(|| {
             assert_ron_snapshot!(&project, @r#"
             ProjectMetadata(
               name: Name("backend"),
@@ -562,7 +675,7 @@ unclosed table, expected `]`
 
         let sub_project = ProjectMetadata::discover(&root.join("packages/a"), &system)?;
 
-        with_escaped_paths(|| {
+        with_sanitized_paths(|| {
             assert_ron_snapshot!(sub_project, @r#"
             ProjectMetadata(
               name: Name("nested-project"),
@@ -612,7 +725,7 @@ unclosed table, expected `]`
 
         let root = ProjectMetadata::discover(&root, &system)?;
 
-        with_escaped_paths(|| {
+        with_sanitized_paths(|| {
             assert_ron_snapshot!(root, @r#"
             ProjectMetadata(
               name: Name("project-root"),
@@ -656,7 +769,7 @@ unclosed table, expected `]`
 
         let sub_project = ProjectMetadata::discover(&root.join("packages/a"), &system)?;
 
-        with_escaped_paths(|| {
+        with_sanitized_paths(|| {
             assert_ron_snapshot!(sub_project, @r#"
             ProjectMetadata(
               name: Name("nested-project"),
@@ -699,7 +812,7 @@ unclosed table, expected `]`
 
         let root = ProjectMetadata::discover(&root.join("packages/a"), &system)?;
 
-        with_escaped_paths(|| {
+        with_sanitized_paths(|| {
             assert_ron_snapshot!(root, @r#"
             ProjectMetadata(
               name: Name("project-root"),
@@ -751,7 +864,7 @@ unclosed table, expected `]`
 
         let root = ProjectMetadata::discover(&root, &system)?;
 
-        with_escaped_paths(|| {
+        with_sanitized_paths(|| {
             assert_ron_snapshot!(root, @r#"
             ProjectMetadata(
               name: Name("super-app"),
@@ -770,6 +883,266 @@ unclosed table, expected `]`
 
         Ok(())
     }
+
+    #[test]
+    fn discover_all_nested_projects_with_ty_sections() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_files_all([
+                (
+                    root.join("pyproject.toml"),
+                    r#"
+                    [project]
+                    name = "project-root"
+
+                    [tool.ty.src]
+                    root = "src"
+                    "#,
+                ),
+                (
+                    root.join("packages/a/pyproject.toml"),
+                    r#"
+                    [project]
+                    name = "nested-project"
+
+                    [tool.ty.src]
+                    root = "src"
+                    "#,
+                ),
+            ])
+            .context("Failed to write files")?;
+
+        let projects = ProjectMetadata::discover_all(&root, &system)?;
+
+        with_sanitized_paths(|| {
+            assert_ron_snapshot!(projects, @r###"
+            {
+              "/app": ProjectMetadata(
+                name: Name("project-root"),
+                root: "/app",
+                options: Options(
+                  src: Some(SrcOptions(
+                    root: Some("src"),
+                  )),
+                ),
+              ),
+              "/app/packages/a": ProjectMetadata(
+                name: Name("nested-project"),
+                root: "/app/packages/a",
+                options: Options(
+                  src: Some(SrcOptions(
+                    root: Some("src"),
+                  )),
+                ),
+              ),
+            }
+            "###);
+        });
+
+        Ok(())
+    }
+
+    #[test]
+    fn discover_all_nested_project_without_ty_section() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_files_all([
+                (
+                    root.join("pyproject.toml"),
+                    r#"
+                    [project]
+                    name = "project-root"
+
+                    [tool.ty.src]
+                    root = "src"
+                    "#,
+                ),
+                (
+                    root.join("packages/a/pyproject.toml"),
+                    r#"
+                    [project]
+                    name = "nested-project"
+                    "#,
+                ),
+            ])
+            .context("Failed to write files")?;
+
+        let projects = ProjectMetadata::discover_all(&root, &system)?;
+
+        with_sanitized_paths(|| {
+            assert_ron_snapshot!(projects, @r###"
+            {
+              "/app": ProjectMetadata(
+                name: Name("project-root"),
+                root: "/app",
+                options: Options(
+                  src: Some(SrcOptions(
+                    root: Some("src"),
+                  )),
+                ),
+              ),
+            }
+            "###);
+        });
+
+        Ok(())
+    }
+
+    #[test]
+    fn discover_all_nested_projects_with_ty_toml() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_files_all([
+                (
+                    root.join("pyproject.toml"),
+                    r#"
+                    [project]
+                    name = "project-root"
+
+                    [tool.ty.src]
+                    root = "src"
+                    "#,
+                ),
+                (
+                    root.join("packages/a/ty.toml"),
+                    r#"
+                    [src]
+                    root = "src"
+                    "#,
+                ),
+            ])
+            .context("Failed to write files")?;
+
+        let projects = ProjectMetadata::discover_all(&root, &system)?;
+
+        with_sanitized_paths(|| {
+            assert_ron_snapshot!(projects, @r###"
+            {
+              "/app": ProjectMetadata(
+                name: Name("project-root"),
+                root: "/app",
+                options: Options(
+                  src: Some(SrcOptions(
+                    root: Some("src"),
+                  )),
+                ),
+              ),
+              "/app/packages/a": ProjectMetadata(
+                name: Name("a"),
+                root: "/app/packages/a",
+                options: Options(
+                  src: Some(SrcOptions(
+                    root: Some("src"),
+                  )),
+                ),
+              ),
+            }
+            "###);
+        });
+
+        Ok(())
+    }
+
+    #[test]
+    fn discover_all_nested_without_ty_sections() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_files_all([
+                (
+                    root.join("pyproject.toml"),
+                    r#"
+                    [project]
+                    name = "project-root"
+
+                    [tool.ty]
+                    "#,
+                ),
+                (
+                    root.join("packages/a/pyproject.toml"),
+                    r#"
+                    [project]
+                    name = "sub-project"
+                    "#,
+                ),
+            ])
+            .context("Failed to write files")?;
+
+        let projects = ProjectMetadata::discover_all(&root, &system)?;
+
+        with_sanitized_paths(|| {
+            assert_ron_snapshot!(projects, @r###"
+            {
+              "/app": ProjectMetadata(
+                name: Name("project-root"),
+                root: "/app",
+                options: Options(),
+              ),
+            }
+            "###);
+        });
+
+        Ok(())
+    }
+
+    #[test]
+    fn discover_all_nested_all_projects_without_ty_sections() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_files_all([
+                (
+                    root.join("pyproject.toml"),
+                    r#"
+                    [project]
+                    name = "project-root"
+                    "#,
+                ),
+                (
+                    root.join("packages/a/pyproject.toml"),
+                    r#"
+                    [project]
+                    name = "sub-project"
+                    "#,
+                ),
+            ])
+            .context("Failed to write files")?;
+
+        let projects = ProjectMetadata::discover_all(&root, &system)?;
+
+        with_sanitized_paths(|| {
+            assert_ron_snapshot!(projects, @r###"
+            {
+              "/app": ProjectMetadata(
+                name: Name("project-root"),
+                root: "/app",
+                options: Options(),
+              ),
+              "/app/packages/a": ProjectMetadata(
+                name: Name("sub-project"),
+                root: "/app/packages/a",
+                options: Options(),
+              ),
+            }
+            "###);
+        });
+
+        Ok(())
+    }
+
     #[test]
     fn requires_python_major_minor() -> anyhow::Result<()> {
         let system = TestSystem::default();
@@ -1053,7 +1426,7 @@ unclosed table, expected `]`
         assert_eq!(error.to_string().replace('\\', "/"), message);
     }
 
-    fn with_escaped_paths<R>(f: impl FnOnce() -> R) -> R {
+    fn with_sanitized_paths<R>(f: impl FnOnce() -> R) -> R {
         let mut settings = insta::Settings::clone_current();
         settings.add_dynamic_redaction(".root", |content, _path| {
             content.as_str().unwrap().replace('\\', "/")
