@@ -131,6 +131,63 @@ def _(flag1: bool, flag2: bool):
         reveal_type(t)  # revealed: <class 'str'>
 ```
 
+## `classinfo` is a PEP-604 union of types
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+def f(x: type[int | str | bytes | range]):
+    if issubclass(x, int | str):
+        reveal_type(x)  # revealed: type[int] | type[str]
+    elif issubclass(x, bytes | memoryview):
+        reveal_type(x)  # revealed: type[bytes]
+    else:
+        reveal_type(x)  # revealed: <class 'range'>
+```
+
+## `classinfo` is an invalid PEP-604 union of types
+
+Narrowing can only take place if all elements in the PEP-604 union are class literals. If any
+elements are generic aliases or other types, the `issubclass()` call will fail at runtime, so no
+narrowing can take place:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+def _(x: type[int | list | bytes]):
+    # TODO: this fails at runtime; we should emit a diagnostic
+    # (requires special-casing of the `issubclass()` signature)
+    if issubclass(x, int | list[int]):
+        reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+    else:
+        reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+```
+
+## PEP-604 unions on Python \<3.10
+
+PEP-604 unions were added in Python 3.10, so attempting to use them on Python 3.9 does not lead to
+any type narrowing.
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+def _(x: type[int | str | bytes]):
+    # error: [unsupported-operator]
+    if issubclass(x, int | str):
+        reveal_type(x)  # revealed: (type[int] & Unknown) | (type[str] & Unknown) | (type[bytes] & Unknown)
+    else:
+        reveal_type(x)  # revealed: (type[int] & Unknown) | (type[str] & Unknown) | (type[bytes] & Unknown)
+```
+
 ## Special cases
 
 ### Emit a diagnostic if the first argument is of wrong type
