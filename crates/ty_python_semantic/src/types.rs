@@ -7400,7 +7400,7 @@ impl<'db> From<&Type<'db>> for Type<'db> {
 
 impl<'db> VarianceInferable<'db> for Type<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
-        tracing::debug!(
+        tracing::trace!(
             "Checking variance of '{tvar}' in `{ty:?}`",
             tvar = typevar.typevar(db).name(db),
             ty = self.display(db),
