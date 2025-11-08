@@ -53,10 +53,16 @@ fn infer_method_information<'db>(
     let class_scope = index.scope(class_scope_id.file_scope_id(db));
     let class_node = class_scope.node().as_class()?;
 
-    let method = infer_definition_types(db, definition)
+    let method = match infer_definition_types(db, definition)
         .declaration_type(definition)
         .inner_type()
-        .as_function_literal()?;
+    {
+        Type::FunctionLiteral(f) => f,
+        Type::PropertyInstance(property) => property.getter(db)?.as_function_literal()?,
+        _ => {
+            return None;
+        }
+    };
 
     let class_def = index.expect_single_definition(class_node);
     let (class_literal, class_is_generic) = match infer_definition_types(db, class_def)

@@ -190,8 +190,7 @@ reveal_type(B().positional_only(1))  # revealed: B
 reveal_type(B().keyword_only(x=1))  # revealed: B
 reveal_type(B().decorated_method())  # revealed: Unknown
 
-# TODO: this should be B
-reveal_type(B().a_property)  # revealed: Unknown
+reveal_type(B().a_property)  # revealed: B
 
 async def _():
     reveal_type(await B().async_method())  # revealed: B
