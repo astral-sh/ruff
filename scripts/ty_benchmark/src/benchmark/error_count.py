@@ -88,14 +88,11 @@ class ErrorCountSummary:
             ],
             widths,
         )
-        self._print_line(widths)
 
         old_datetime = old.date_time.strftime("%Y-%m-%d %H:%M:%S")
         new_datetime = new.date_time.strftime("%Y-%m-%d %H:%M:%S")
-        datetime_difference = str(new.date_time - old.date_time)
-        self._print_row(
-            ["datetime", old_datetime, new_datetime, datetime_difference], widths
-        )
+        self._print_row(["", old_datetime, new_datetime, ""], widths)
+        self._print_line(widths)
 
         all_benchmark_names = list(old.error_counts.keys()) + list(
             new.error_counts.keys()
