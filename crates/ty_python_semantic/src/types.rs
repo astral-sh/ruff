@@ -7488,7 +7488,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::TypeAlias(_) => TypeVarVariance::Bivariant,
         };
 
-        tracing::debug!(
+        tracing::trace!(
             "Result of variance of '{tvar}' in `{ty:?}` is `{v:?}`",
             tvar = typevar.typevar(db).name(db),
             ty = self.display(db),
