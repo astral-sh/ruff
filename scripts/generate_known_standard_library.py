@@ -14,6 +14,7 @@ VERSIONS: list[tuple[int, int]] = [
     (3, 12),
     (3, 13),
     (3, 14),
+    (3, 15),
 ]
 
 with PATH.open("w") as f:
