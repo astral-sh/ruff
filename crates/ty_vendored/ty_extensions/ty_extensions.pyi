@@ -59,6 +59,12 @@ class ConstraintSet:
     def never() -> Self:
         """Returns a constraint set that is never satisfied"""
 
+    def with_inferable(self, *inferable: Any) -> Self:
+        """
+        Returns a copy of this constraint set with some typevars marked as being
+        in inferable position.
+        """
+
     def implies_subtype_of(self, ty: Any, of: Any) -> Self:
         """
         Returns a constraint set that is satisfied when `ty` is a `subtype`_ of
