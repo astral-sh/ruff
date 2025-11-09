@@ -1,4 +1,3 @@
-use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
 
@@ -60,13 +59,13 @@ use crate::types::function::{
 };
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{
-    InferableTypeVars, PartialSpecialization, Specialization, bind_typevar, typing_self,
-    walk_generic_context,
+    InferableTypeVars, PartialSpecialization, Specialization, bind_typevar, walk_generic_context,
 };
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{ParameterForm, walk_signature};
+use crate::types::special_form::SpecialFormCategory;
 use crate::types::tuple::{TupleSpec, TupleSpecBuilder};
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 pub use crate::types::variance::TypeVarVariance;
@@ -6465,127 +6464,17 @@ impl<'db> Type<'db> {
                 KnownInstanceType::Literal(list) => Ok(list.to_union(db)),
             },
 
-            Type::SpecialForm(special_form) => match special_form {
-                SpecialFormType::Never | SpecialFormType::NoReturn => Ok(Type::Never),
-                SpecialFormType::LiteralString => Ok(Type::LiteralString),
-                SpecialFormType::Any => Ok(Type::any()),
-                SpecialFormType::Unknown => Ok(Type::unknown()),
-                SpecialFormType::AlwaysTruthy => Ok(Type::AlwaysTruthy),
-                SpecialFormType::AlwaysFalsy => Ok(Type::AlwaysFalsy),
-
+            Type::SpecialForm(special_form) => match special_form.kind() {
                 // We treat `typing.Type` exactly the same as `builtins.type`:
-                SpecialFormType::Type => Ok(KnownClass::Type.to_instance(db)),
-                SpecialFormType::Tuple => Ok(Type::homogeneous_tuple(db, Type::unknown())),
-
-                // Legacy `typing` aliases
-                SpecialFormType::List => Ok(KnownClass::List.to_instance(db)),
-                SpecialFormType::Dict => Ok(KnownClass::Dict.to_instance(db)),
-                SpecialFormType::Set => Ok(KnownClass::Set.to_instance(db)),
-                SpecialFormType::FrozenSet => Ok(KnownClass::FrozenSet.to_instance(db)),
-                SpecialFormType::ChainMap => Ok(KnownClass::ChainMap.to_instance(db)),
-                SpecialFormType::Counter => Ok(KnownClass::Counter.to_instance(db)),
-                SpecialFormType::DefaultDict => Ok(KnownClass::DefaultDict.to_instance(db)),
-                SpecialFormType::Deque => Ok(KnownClass::Deque.to_instance(db)),
-                SpecialFormType::OrderedDict => Ok(KnownClass::OrderedDict.to_instance(db)),
-
-                // TODO: Use an opt-in rule for a bare `Callable`
-                SpecialFormType::Callable => Ok(CallableType::unknown(db)),
-
-                // Special case: `NamedTuple` in a type expression is understood to describe the type
-                // `tuple[object, ...] & <a protocol that any `NamedTuple` class would satisfy>`.
-                // This isn't very principled (since at runtime, `NamedTuple` is just a function),
-                // but it appears to be what users often expect, and it improves compatibility with
-                // other type checkers such as mypy.
-                // See conversation in https://github.com/astral-sh/ruff/pull/19915.
-                SpecialFormType::NamedTuple => Ok(IntersectionBuilder::new(db)
-                    .positive_elements([
-                        Type::homogeneous_tuple(db, Type::object()),
-                        KnownClass::NamedTupleLike.to_instance(db),
-                    ])
-                    .build()),
-
-                SpecialFormType::TypingSelf => {
-                    let index = semantic_index(db, scope_id.file(db));
-                    let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
-                        return Err(InvalidTypeExpressionError {
-                            fallback_type: Type::unknown(),
-                            invalid_expressions: smallvec::smallvec_inline![
-                                InvalidTypeExpression::InvalidType(*self, scope_id)
-                            ],
-                        });
-                    };
-
-                    Ok(typing_self(db, scope_id, typevar_binding_context, class).unwrap_or(*self))
+                SpecialFormCategory::Type => Ok(KnownClass::Type.to_instance(db)),
+                SpecialFormCategory::Tuple => Ok(Type::homogeneous_tuple(db, Type::unknown())),
+                SpecialFormCategory::Callable => Ok(CallableType::unknown(db)),
+                SpecialFormCategory::LegacyStdlibAlias(alias) => {
+                    Ok(alias.aliased_class().to_instance(db))
                 }
-                SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),
-                SpecialFormType::TypedDict => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec_inline![
-                        InvalidTypeExpression::TypedDict
-                    ],
-                    fallback_type: Type::unknown(),
-                }),
-
-                SpecialFormType::Literal
-                | SpecialFormType::Union
-                | SpecialFormType::Intersection => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec_inline![
-                        InvalidTypeExpression::RequiresArguments(*self)
-                    ],
-                    fallback_type: Type::unknown(),
-                }),
-
-                SpecialFormType::Protocol => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec_inline![
-                        InvalidTypeExpression::Protocol
-                    ],
-                    fallback_type: Type::unknown(),
-                }),
-                SpecialFormType::Generic => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Generic],
-                    fallback_type: Type::unknown(),
-                }),
-
-                SpecialFormType::Optional
-                | SpecialFormType::Not
-                | SpecialFormType::Top
-                | SpecialFormType::Bottom
-                | SpecialFormType::TypeOf
-                | SpecialFormType::TypeIs
-                | SpecialFormType::TypeGuard
-                | SpecialFormType::Unpack
-                | SpecialFormType::CallableTypeOf => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec_inline![
-                        InvalidTypeExpression::RequiresOneArgument(*self)
-                    ],
-                    fallback_type: Type::unknown(),
-                }),
-
-                SpecialFormType::Annotated | SpecialFormType::Concatenate => {
-                    Err(InvalidTypeExpressionError {
-                        invalid_expressions: smallvec::smallvec_inline![
-                            InvalidTypeExpression::RequiresTwoArguments(*self)
-                        ],
-                        fallback_type: Type::unknown(),
-                    })
+                SpecialFormCategory::NonStdlibAlias(alias) => {
+                    alias.in_type_expression(db, scope_id, typevar_binding_context)
                 }
-
-                SpecialFormType::ClassVar | SpecialFormType::Final => {
-                    Err(InvalidTypeExpressionError {
-                        invalid_expressions: smallvec::smallvec_inline![
-                            InvalidTypeExpression::TypeQualifier(*special_form)
-                        ],
-                        fallback_type: Type::unknown(),
-                    })
-                }
-
-                SpecialFormType::ReadOnly
-                | SpecialFormType::NotRequired
-                | SpecialFormType::Required => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec_inline![
-                        InvalidTypeExpression::TypeQualifierRequiresOneArgument(*special_form)
-                    ],
-                    fallback_type: Type::unknown(),
-                }),
             },
 
             Type::Union(union) => {
@@ -8088,10 +7977,10 @@ enum InvalidTypeExpression<'db> {
     TypedDict,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
-    TypeQualifier(SpecialFormType),
+    TypeQualifier(special_form::NonStdlibAlias),
     /// Type qualifiers that are invalid in type expressions,
     /// and which would require exactly one argument even if they appeared in an annotation expression
-    TypeQualifierRequiresOneArgument(SpecialFormType),
+    TypeQualifierRequiresOneArgument(special_form::NonStdlibAlias),
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
 }

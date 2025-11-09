@@ -4,6 +4,11 @@
 use super::{ClassType, Type, class::KnownClass};
 use crate::db::Db;
 use crate::module_resolver::{KnownModule, file_to_module};
+use crate::semantic_index::{definition::Definition, scope::ScopeId, semantic_index};
+use crate::types::{
+    DynamicType, IntersectionBuilder, InvalidTypeExpression, InvalidTypeExpressionError,
+    generics::typing_self, infer::nearest_enclosing_class,
+};
 use ruff_db::files::File;
 use std::str::FromStr;
 
@@ -582,6 +587,113 @@ pub(super) enum NonStdlibAlias {
     NamedTuple,
 }
 
+impl NonStdlibAlias {
+    pub(super) fn in_type_expression<'db>(
+        self,
+        db: &'db dyn Db,
+        scope_id: ScopeId<'db>,
+        typevar_binding_context: Option<Definition<'db>>,
+    ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
+        match self {
+            Self::Never | Self::NoReturn => Ok(Type::Never),
+            Self::LiteralString => Ok(Type::LiteralString),
+            Self::Any => Ok(Type::any()),
+            Self::Unknown => Ok(Type::unknown()),
+            Self::AlwaysTruthy => Ok(Type::AlwaysTruthy),
+            Self::AlwaysFalsy => Ok(Type::AlwaysFalsy),
+
+            // Special case: `NamedTuple` in a type expression is understood to describe the type
+            // `tuple[object, ...] & <a protocol that any `NamedTuple` class would satisfy>`.
+            // This isn't very principled (since at runtime, `NamedTuple` is just a function),
+            // but it appears to be what users often expect, and it improves compatibility with
+            // other type checkers such as mypy.
+            // See conversation in https://github.com/astral-sh/ruff/pull/19915.
+            Self::NamedTuple => Ok(IntersectionBuilder::new(db)
+                .positive_elements([
+                    Type::homogeneous_tuple(db, Type::object()),
+                    KnownClass::NamedTupleLike.to_instance(db),
+                ])
+                .build()),
+
+            Self::TypingSelf => {
+                let index = semantic_index(db, scope_id.file(db));
+                let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
+                    return Err(InvalidTypeExpressionError {
+                        fallback_type: Type::unknown(),
+                        invalid_expressions: smallvec::smallvec_inline![
+                            InvalidTypeExpression::InvalidType(self.into(), scope_id)
+                        ],
+                    });
+                };
+
+                Ok(
+                    typing_self(db, scope_id, typevar_binding_context, class)
+                        .unwrap_or(self.into()),
+                )
+            }
+            Self::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),
+            Self::TypedDict => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::TypedDict],
+                fallback_type: Type::unknown(),
+            }),
+
+            Self::Literal | Self::Union | Self::Intersection => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![
+                    InvalidTypeExpression::RequiresArguments(self.into())
+                ],
+                fallback_type: Type::unknown(),
+            }),
+
+            Self::Protocol => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Protocol],
+                fallback_type: Type::unknown(),
+            }),
+            Self::Generic => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Generic],
+                fallback_type: Type::unknown(),
+            }),
+
+            Self::Optional
+            | Self::Not
+            | Self::Top
+            | Self::Bottom
+            | Self::TypeOf
+            | Self::TypeIs
+            | Self::TypeGuard
+            | Self::Unpack
+            | Self::CallableTypeOf => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![
+                    InvalidTypeExpression::RequiresOneArgument(self.into())
+                ],
+                fallback_type: Type::unknown(),
+            }),
+
+            Self::Annotated | Self::Concatenate => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![
+                    InvalidTypeExpression::RequiresTwoArguments(self.into())
+                ],
+                fallback_type: Type::unknown(),
+            }),
+
+            Self::ClassVar | Self::Final => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![
+                    InvalidTypeExpression::TypeQualifier(self)
+                ],
+                fallback_type: Type::unknown(),
+            }),
+
+            Self::ReadOnly | Self::NotRequired | Self::Required => {
+                Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec_inline![
+                        InvalidTypeExpression::TypeQualifierRequiresOneArgument(self)
+                    ],
+                    fallback_type: Type::unknown(),
+                })
+            }
+        }
+    }
+}
+
 impl From<NonStdlibAlias> for SpecialFormType {
     fn from(value: NonStdlibAlias) -> Self {
         match value {
@@ -618,6 +730,12 @@ impl From<NonStdlibAlias> for SpecialFormType {
             NonStdlibAlias::Generic => SpecialFormType::Generic,
             NonStdlibAlias::NamedTuple => SpecialFormType::NamedTuple,
         }
+    }
+}
+
+impl From<NonStdlibAlias> for Type<'_> {
+    fn from(value: NonStdlibAlias) -> Self {
+        Type::SpecialForm(SpecialFormType::from(value))
     }
 }
 
