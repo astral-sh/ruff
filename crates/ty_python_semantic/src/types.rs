@@ -65,7 +65,7 @@ use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{ParameterForm, walk_signature};
-use crate::types::special_form::SpecialFormCategory;
+use crate::types::special_form::{SpecialFormCategory, TypeQualifier};
 use crate::types::tuple::{TupleSpec, TupleSpecBuilder};
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 pub use crate::types::variance::TypeVarVariance;
@@ -6472,8 +6472,24 @@ impl<'db> Type<'db> {
                 SpecialFormCategory::LegacyStdlibAlias(alias) => {
                     Ok(alias.aliased_class().to_instance(db))
                 }
-                SpecialFormCategory::NonStdlibAlias(alias) => {
+                SpecialFormCategory::Other(alias) => {
                     alias.in_type_expression(db, scope_id, typevar_binding_context)
+                }
+                SpecialFormCategory::TypeQualifier(qualifier) => {
+                    let err = match qualifier {
+                        TypeQualifier::Final | TypeQualifier::ClassVar => {
+                            InvalidTypeExpression::TypeQualifier(qualifier)
+                        }
+                        TypeQualifier::ReadOnly
+                        | TypeQualifier::NotRequired
+                        | TypeQualifier::Required => {
+                            InvalidTypeExpression::TypeQualifierRequiresOneArgument(qualifier)
+                        }
+                    };
+                    Err(InvalidTypeExpressionError {
+                        invalid_expressions: smallvec::smallvec_inline![err],
+                        fallback_type: Type::unknown(),
+                    })
                 }
             },
 
@@ -7911,8 +7927,9 @@ impl<'db> TypeAndQualifiers<'db> {
     }
 
     /// Insert/add an additional type qualifier.
-    pub(crate) fn add_qualifier(&mut self, qualifier: TypeQualifiers) {
+    pub(crate) fn with_qualifier(mut self, qualifier: TypeQualifiers) -> Self {
         self.qualifiers |= qualifier;
+        self
     }
 
     /// Return the set of type qualifiers.
@@ -7977,10 +7994,10 @@ enum InvalidTypeExpression<'db> {
     TypedDict,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
-    TypeQualifier(special_form::NonStdlibAlias),
+    TypeQualifier(TypeQualifier),
     /// Type qualifiers that are invalid in type expressions,
     /// and which would require exactly one argument even if they appeared in an annotation expression
-    TypeQualifierRequiresOneArgument(special_form::NonStdlibAlias),
+    TypeQualifierRequiresOneArgument(TypeQualifier),
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
 }

@@ -48,32 +48,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             annotation: &ast::Expr,
             builder: &TypeInferenceBuilder<'db, '_>,
         ) -> TypeAndQualifiers<'db> {
-            match ty {
-                Type::SpecialForm(SpecialFormType::ClassVar) => TypeAndQualifiers::new(
-                    Type::unknown(),
-                    TypeOrigin::Declared,
-                    TypeQualifiers::CLASS_VAR,
-                ),
-                Type::SpecialForm(SpecialFormType::Final) => TypeAndQualifiers::new(
-                    Type::unknown(),
-                    TypeOrigin::Declared,
-                    TypeQualifiers::FINAL,
-                ),
-                Type::SpecialForm(SpecialFormType::Required) => TypeAndQualifiers::new(
-                    Type::unknown(),
-                    TypeOrigin::Declared,
-                    TypeQualifiers::REQUIRED,
-                ),
-                Type::SpecialForm(SpecialFormType::NotRequired) => TypeAndQualifiers::new(
-                    Type::unknown(),
-                    TypeOrigin::Declared,
-                    TypeQualifiers::NOT_REQUIRED,
-                ),
-                Type::SpecialForm(SpecialFormType::ReadOnly) => TypeAndQualifiers::new(
-                    Type::unknown(),
-                    TypeOrigin::Declared,
-                    TypeQualifiers::READ_ONLY,
-                ),
+            let special_case = match ty {
+                Type::SpecialForm(special_form) => {
+                    special_form.as_type_qualifier().map(|qualifier| {
+                        TypeAndQualifiers::new(
+                            Type::unknown(),
+                            TypeOrigin::Declared,
+                            TypeQualifiers::from(qualifier),
+                        )
+                    })
+                }
                 Type::ClassLiteral(class) if class.is_known(builder.db(), KnownClass::InitVar) => {
                     if let Some(builder) =
                         builder.context.report_lint(&INVALID_TYPE_FORM, annotation)
@@ -81,13 +65,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         builder
                             .into_diagnostic("`InitVar` may not be used without a type argument");
                     }
-                    TypeAndQualifiers::new(
+                    Some(TypeAndQualifiers::new(
                         Type::unknown(),
                         TypeOrigin::Declared,
                         TypeQualifiers::INIT_VAR,
-                    )
+                    ))
                 }
-                _ => TypeAndQualifiers::declared(
+                _ => None,
+            };
+
+            special_case.unwrap_or_else(|| {
+                TypeAndQualifiers::declared(
                     ty.in_type_expression(
                         builder.db(),
                         builder.scope(),
@@ -100,8 +88,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             builder.is_reachable(annotation),
                         )
                     }),
-                ),
-            }
+                )
+            })
         }
 
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
@@ -159,12 +147,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let slice = &**slice;
 
-                match value_ty {
+                let special_case = match value_ty {
                     Type::SpecialForm(SpecialFormType::Annotated) => {
                         // This branch is similar to the corresponding branch in `infer_parameterized_special_form_type_expression`, but
                         // `Annotated[…]` can appear both in annotation expressions and in type expressions, and needs to be handled slightly
                         // differently in each case (calling either `infer_type_expression_*` or `infer_annotation_expression_*`).
-                        if let ast::Expr::Tuple(ast::ExprTuple {
+                        let ty = if let ast::Expr::Tuple(ast::ExprTuple {
                             elts: arguments, ..
                         }) = slice
                         {
@@ -192,62 +180,39 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         } else {
                             report_invalid_arguments_to_annotated(&self.context, subscript);
                             self.infer_annotation_expression_impl(slice)
-                        }
-                    }
-                    Type::SpecialForm(
-                        type_qualifier @ (SpecialFormType::ClassVar
-                        | SpecialFormType::Final
-                        | SpecialFormType::Required
-                        | SpecialFormType::NotRequired
-                        | SpecialFormType::ReadOnly),
-                    ) => {
-                        let arguments = if let ast::Expr::Tuple(tuple) = slice {
-                            &*tuple.elts
-                        } else {
-                            std::slice::from_ref(slice)
                         };
-                        let num_arguments = arguments.len();
-                        let type_and_qualifiers = if num_arguments == 1 {
-                            let mut type_and_qualifiers =
-                                self.infer_annotation_expression_impl(slice);
-
-                            match type_qualifier {
-                                SpecialFormType::ClassVar => {
-                                    type_and_qualifiers.add_qualifier(TypeQualifiers::CLASS_VAR);
+                        Some(ty)
+                    }
+                    Type::SpecialForm(special_form) => {
+                        special_form.as_type_qualifier().map(|qualifier| {
+                            let arguments = if let ast::Expr::Tuple(tuple) = slice {
+                                &*tuple.elts
+                            } else {
+                                std::slice::from_ref(slice)
+                            };
+                            let num_arguments = arguments.len();
+                            let type_and_qualifiers = if num_arguments == 1 {
+                                self.infer_annotation_expression_impl(slice)
+                                    .with_qualifier(TypeQualifiers::from(qualifier))
+                            } else {
+                                for element in arguments {
+                                    self.infer_annotation_expression_impl(element);
                                 }
-                                SpecialFormType::Final => {
-                                    type_and_qualifiers.add_qualifier(TypeQualifiers::FINAL);
+                                if let Some(builder) =
+                                    self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "Type qualifier `{qualifier}` expected exactly 1 argument, \
+                                    got {num_arguments}",
+                                    ));
                                 }
-                                SpecialFormType::Required => {
-                                    type_and_qualifiers.add_qualifier(TypeQualifiers::REQUIRED);
-                                }
-                                SpecialFormType::NotRequired => {
-                                    type_and_qualifiers.add_qualifier(TypeQualifiers::NOT_REQUIRED);
-                                }
-                                SpecialFormType::ReadOnly => {
-                                    type_and_qualifiers.add_qualifier(TypeQualifiers::READ_ONLY);
-                                }
-                                _ => unreachable!(),
+                                TypeAndQualifiers::declared(Type::unknown())
+                            };
+                            if slice.is_tuple_expr() {
+                                self.store_expression_type(slice, type_and_qualifiers.inner_type());
                             }
                             type_and_qualifiers
-                        } else {
-                            for element in arguments {
-                                self.infer_annotation_expression_impl(element);
-                            }
-                            if let Some(builder) =
-                                self.context.report_lint(&INVALID_TYPE_FORM, subscript)
-                            {
-                                builder.into_diagnostic(format_args!(
-                                    "Type qualifier `{type_qualifier}` expected exactly 1 argument, \
-                                    got {num_arguments}",
-                                ));
-                            }
-                            TypeAndQualifiers::declared(Type::unknown())
-                        };
-                        if slice.is_tuple_expr() {
-                            self.store_expression_type(slice, type_and_qualifiers.inner_type());
-                        }
-                        type_and_qualifiers
+                        })
                     }
                     Type::ClassLiteral(class) if class.is_known(self.db(), KnownClass::InitVar) => {
                         let arguments = if let ast::Expr::Tuple(tuple) = slice {
@@ -257,10 +222,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         };
                         let num_arguments = arguments.len();
                         let type_and_qualifiers = if num_arguments == 1 {
-                            let mut type_and_qualifiers =
-                                self.infer_annotation_expression_impl(slice);
-                            type_and_qualifiers.add_qualifier(TypeQualifiers::INIT_VAR);
-                            type_and_qualifiers
+                            self.infer_annotation_expression_impl(slice)
+                                .with_qualifier(TypeQualifiers::INIT_VAR)
                         } else {
                             for element in arguments {
                                 self.infer_annotation_expression_impl(element);
@@ -278,12 +241,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         if slice.is_tuple_expr() {
                             self.store_expression_type(slice, type_and_qualifiers.inner_type());
                         }
-                        type_and_qualifiers
+                        Some(type_and_qualifiers)
                     }
-                    _ => TypeAndQualifiers::declared(
+                    _ => None,
+                };
+
+                special_case.unwrap_or_else(|| {
+                    TypeAndQualifiers::declared(
                         self.infer_subscript_type_expression_no_store(subscript, slice, value_ty),
-                    ),
-                }
+                    )
+                })
             }
 
             // All other annotation expressions are (possibly) valid type expressions, so handle

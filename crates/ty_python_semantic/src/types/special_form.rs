@@ -5,6 +5,7 @@ use super::{ClassType, Type, class::KnownClass};
 use crate::db::Db;
 use crate::module_resolver::{KnownModule, file_to_module};
 use crate::semantic_index::{definition::Definition, scope::ScopeId, semantic_index};
+use crate::types::TypeQualifiers;
 use crate::types::{
     DynamicType, IntersectionBuilder, InvalidTypeExpression, InvalidTypeExpressionError,
     generics::typing_self, infer::nearest_enclosing_class,
@@ -391,6 +392,13 @@ impl SpecialFormType {
             Self::Tuple => SpecialFormCategory::Tuple,
             Self::Type => SpecialFormCategory::Type,
 
+            // Type qualifiers
+            Self::Final => SpecialFormCategory::TypeQualifier(TypeQualifier::Final),
+            Self::ClassVar => SpecialFormCategory::TypeQualifier(TypeQualifier::ClassVar),
+            Self::ReadOnly => SpecialFormCategory::TypeQualifier(TypeQualifier::ReadOnly),
+            Self::Required => SpecialFormCategory::TypeQualifier(TypeQualifier::Required),
+            Self::NotRequired => SpecialFormCategory::TypeQualifier(TypeQualifier::NotRequired),
+
             // Legacy standard library aliases
             Self::List => SpecialFormCategory::LegacyStdlibAlias(LegacyStdlibAlias::List),
             Self::Dict => SpecialFormCategory::LegacyStdlibAlias(LegacyStdlibAlias::Dict),
@@ -407,42 +415,40 @@ impl SpecialFormType {
             }
 
             // Non-standard-library aliases
-            Self::AlwaysFalsy => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::AlwaysFalsy),
-            Self::Unknown => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::Unknown),
-            Self::Not => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::Not),
-            Self::TypeOf => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::TypeOf),
-            Self::Top => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::Top),
-            Self::Bottom => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::Bottom),
-            Self::Annotated => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::Annotated),
-            Self::Any => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::Any),
-            Self::Literal => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::Literal),
-            Self::Optional => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::Optional),
-            Self::Union => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::Union),
-            Self::NoReturn => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::NoReturn),
-            Self::Never => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::Never),
-            Self::Final => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::Final),
-            Self::ClassVar => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::ClassVar),
-            Self::Concatenate => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::Concatenate),
-            Self::Unpack => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::Unpack),
-            Self::Required => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::Required),
-            Self::NotRequired => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::NotRequired),
-            Self::TypeAlias => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::TypeAlias),
-            Self::TypeGuard => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::TypeGuard),
-            Self::TypedDict => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::TypedDict),
-            Self::TypeIs => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::TypeIs),
-            Self::ReadOnly => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::ReadOnly),
-            Self::Protocol => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::Protocol),
-            Self::Generic => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::Generic),
-            Self::NamedTuple => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::NamedTuple),
-            Self::AlwaysTruthy => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::AlwaysTruthy),
-            Self::Intersection => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::Intersection),
-            Self::TypingSelf => SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::TypingSelf),
-            Self::LiteralString => {
-                SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::LiteralString)
-            }
-            Self::CallableTypeOf => {
-                SpecialFormCategory::NonStdlibAlias(NonStdlibAlias::CallableTypeOf)
-            }
+            Self::AlwaysFalsy => SpecialFormCategory::Other(MiscSpecialForm::AlwaysFalsy),
+            Self::Unknown => SpecialFormCategory::Other(MiscSpecialForm::Unknown),
+            Self::Not => SpecialFormCategory::Other(MiscSpecialForm::Not),
+            Self::TypeOf => SpecialFormCategory::Other(MiscSpecialForm::TypeOf),
+            Self::Top => SpecialFormCategory::Other(MiscSpecialForm::Top),
+            Self::Bottom => SpecialFormCategory::Other(MiscSpecialForm::Bottom),
+            Self::Annotated => SpecialFormCategory::Other(MiscSpecialForm::Annotated),
+            Self::Any => SpecialFormCategory::Other(MiscSpecialForm::Any),
+            Self::Literal => SpecialFormCategory::Other(MiscSpecialForm::Literal),
+            Self::Optional => SpecialFormCategory::Other(MiscSpecialForm::Optional),
+            Self::Union => SpecialFormCategory::Other(MiscSpecialForm::Union),
+            Self::NoReturn => SpecialFormCategory::Other(MiscSpecialForm::NoReturn),
+            Self::Never => SpecialFormCategory::Other(MiscSpecialForm::Never),
+            Self::Concatenate => SpecialFormCategory::Other(MiscSpecialForm::Concatenate),
+            Self::Unpack => SpecialFormCategory::Other(MiscSpecialForm::Unpack),
+            Self::TypeAlias => SpecialFormCategory::Other(MiscSpecialForm::TypeAlias),
+            Self::TypeGuard => SpecialFormCategory::Other(MiscSpecialForm::TypeGuard),
+            Self::TypedDict => SpecialFormCategory::Other(MiscSpecialForm::TypedDict),
+            Self::TypeIs => SpecialFormCategory::Other(MiscSpecialForm::TypeIs),
+            Self::Protocol => SpecialFormCategory::Other(MiscSpecialForm::Protocol),
+            Self::Generic => SpecialFormCategory::Other(MiscSpecialForm::Generic),
+            Self::NamedTuple => SpecialFormCategory::Other(MiscSpecialForm::NamedTuple),
+            Self::AlwaysTruthy => SpecialFormCategory::Other(MiscSpecialForm::AlwaysTruthy),
+            Self::Intersection => SpecialFormCategory::Other(MiscSpecialForm::Intersection),
+            Self::TypingSelf => SpecialFormCategory::Other(MiscSpecialForm::TypingSelf),
+            Self::LiteralString => SpecialFormCategory::Other(MiscSpecialForm::LiteralString),
+            Self::CallableTypeOf => SpecialFormCategory::Other(MiscSpecialForm::CallableTypeOf),
+        }
+    }
+
+    pub(super) const fn as_type_qualifier(self) -> Option<TypeQualifier> {
+        match self.kind() {
+            SpecialFormCategory::TypeQualifier(qualifier) => Some(qualifier),
+            _ => None,
         }
     }
 }
@@ -459,8 +465,8 @@ pub(super) enum SpecialFormCategory {
     /// Special forms that are simple aliases to classes elsewhere in the standard library.
     LegacyStdlibAlias(LegacyStdlibAlias),
 
-    /// Special forms that are not aliases to classes elsewhere in the standard library.
-    NonStdlibAlias(NonStdlibAlias),
+    /// Special forms that are type qualifiers
+    TypeQualifier(TypeQualifier),
 
     /// The special form `typing.Tuple`.
     ///
@@ -481,6 +487,9 @@ pub(super) enum SpecialFormCategory {
     /// special handling for both type-expression parsing and `isinstance`/`issubclass`
     /// narrowing.
     Callable,
+
+    /// Everything else...
+    Other(MiscSpecialForm),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -543,6 +552,45 @@ impl std::fmt::Display for LegacyStdlibAlias {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(super) enum TypeQualifier {
+    ReadOnly,
+    Final,
+    ClassVar,
+    Required,
+    NotRequired,
+}
+
+impl From<TypeQualifier> for SpecialFormType {
+    fn from(value: TypeQualifier) -> Self {
+        match value {
+            TypeQualifier::ReadOnly => SpecialFormType::ReadOnly,
+            TypeQualifier::Final => SpecialFormType::Final,
+            TypeQualifier::ClassVar => SpecialFormType::ClassVar,
+            TypeQualifier::Required => SpecialFormType::Required,
+            TypeQualifier::NotRequired => SpecialFormType::NotRequired,
+        }
+    }
+}
+
+impl From<TypeQualifier> for TypeQualifiers {
+    fn from(value: TypeQualifier) -> Self {
+        match value {
+            TypeQualifier::ReadOnly => TypeQualifiers::READ_ONLY,
+            TypeQualifier::Final => TypeQualifiers::FINAL,
+            TypeQualifier::ClassVar => TypeQualifiers::CLASS_VAR,
+            TypeQualifier::Required => TypeQualifiers::REQUIRED,
+            TypeQualifier::NotRequired => TypeQualifiers::NOT_REQUIRED,
+        }
+    }
+}
+
+impl std::fmt::Display for TypeQualifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        SpecialFormType::from(*self).fmt(f)
+    }
+}
+
 /// Information regarding the [`KnownClass`] a [`LegacyStdlibAlias`] refers to.
 pub(super) struct AliasSpec {
     pub(super) class: KnownClass,
@@ -552,7 +600,7 @@ pub(super) struct AliasSpec {
 /// Enumeration of special forms that are not aliases to classes or special constructs
 /// elsewhere in the Python standard library.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(super) enum NonStdlibAlias {
+pub(super) enum MiscSpecialForm {
     Any,
     Annotated,
     Literal,
@@ -571,23 +619,18 @@ pub(super) enum NonStdlibAlias {
     Top,
     Bottom,
     TypingSelf,
-    Final,
-    ClassVar,
     Concatenate,
     Unpack,
-    Required,
-    NotRequired,
     TypeAlias,
     TypeGuard,
     TypedDict,
     TypeIs,
-    ReadOnly,
     Protocol,
     Generic,
     NamedTuple,
 }
 
-impl NonStdlibAlias {
+impl MiscSpecialForm {
     pub(super) fn in_type_expression<'db>(
         self,
         db: &'db dyn Db,
@@ -674,72 +717,51 @@ impl NonStdlibAlias {
                 ],
                 fallback_type: Type::unknown(),
             }),
-
-            Self::ClassVar | Self::Final => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec_inline![
-                    InvalidTypeExpression::TypeQualifier(self)
-                ],
-                fallback_type: Type::unknown(),
-            }),
-
-            Self::ReadOnly | Self::NotRequired | Self::Required => {
-                Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec_inline![
-                        InvalidTypeExpression::TypeQualifierRequiresOneArgument(self)
-                    ],
-                    fallback_type: Type::unknown(),
-                })
-            }
         }
     }
 }
 
-impl From<NonStdlibAlias> for SpecialFormType {
-    fn from(value: NonStdlibAlias) -> Self {
+impl From<MiscSpecialForm> for SpecialFormType {
+    fn from(value: MiscSpecialForm) -> Self {
         match value {
-            NonStdlibAlias::Any => SpecialFormType::Any,
-            NonStdlibAlias::Annotated => SpecialFormType::Annotated,
-            NonStdlibAlias::Literal => SpecialFormType::Literal,
-            NonStdlibAlias::LiteralString => SpecialFormType::LiteralString,
-            NonStdlibAlias::Optional => SpecialFormType::Optional,
-            NonStdlibAlias::Union => SpecialFormType::Union,
-            NonStdlibAlias::NoReturn => SpecialFormType::NoReturn,
-            NonStdlibAlias::Never => SpecialFormType::Never,
-            NonStdlibAlias::Unknown => SpecialFormType::Unknown,
-            NonStdlibAlias::AlwaysTruthy => SpecialFormType::AlwaysTruthy,
-            NonStdlibAlias::AlwaysFalsy => SpecialFormType::AlwaysFalsy,
-            NonStdlibAlias::Not => SpecialFormType::Not,
-            NonStdlibAlias::Intersection => SpecialFormType::Intersection,
-            NonStdlibAlias::TypeOf => SpecialFormType::TypeOf,
-            NonStdlibAlias::CallableTypeOf => SpecialFormType::CallableTypeOf,
-            NonStdlibAlias::Top => SpecialFormType::Top,
-            NonStdlibAlias::Bottom => SpecialFormType::Bottom,
-            NonStdlibAlias::TypingSelf => SpecialFormType::TypingSelf,
-            NonStdlibAlias::Final => SpecialFormType::Final,
-            NonStdlibAlias::ClassVar => SpecialFormType::ClassVar,
-            NonStdlibAlias::Concatenate => SpecialFormType::Concatenate,
-            NonStdlibAlias::Unpack => SpecialFormType::Unpack,
-            NonStdlibAlias::Required => SpecialFormType::Required,
-            NonStdlibAlias::NotRequired => SpecialFormType::NotRequired,
-            NonStdlibAlias::TypeAlias => SpecialFormType::TypeAlias,
-            NonStdlibAlias::TypeGuard => SpecialFormType::TypeGuard,
-            NonStdlibAlias::TypedDict => SpecialFormType::TypedDict,
-            NonStdlibAlias::TypeIs => SpecialFormType::TypeIs,
-            NonStdlibAlias::ReadOnly => SpecialFormType::ReadOnly,
-            NonStdlibAlias::Protocol => SpecialFormType::Protocol,
-            NonStdlibAlias::Generic => SpecialFormType::Generic,
-            NonStdlibAlias::NamedTuple => SpecialFormType::NamedTuple,
+            MiscSpecialForm::Any => SpecialFormType::Any,
+            MiscSpecialForm::Annotated => SpecialFormType::Annotated,
+            MiscSpecialForm::Literal => SpecialFormType::Literal,
+            MiscSpecialForm::LiteralString => SpecialFormType::LiteralString,
+            MiscSpecialForm::Optional => SpecialFormType::Optional,
+            MiscSpecialForm::Union => SpecialFormType::Union,
+            MiscSpecialForm::NoReturn => SpecialFormType::NoReturn,
+            MiscSpecialForm::Never => SpecialFormType::Never,
+            MiscSpecialForm::Unknown => SpecialFormType::Unknown,
+            MiscSpecialForm::AlwaysTruthy => SpecialFormType::AlwaysTruthy,
+            MiscSpecialForm::AlwaysFalsy => SpecialFormType::AlwaysFalsy,
+            MiscSpecialForm::Not => SpecialFormType::Not,
+            MiscSpecialForm::Intersection => SpecialFormType::Intersection,
+            MiscSpecialForm::TypeOf => SpecialFormType::TypeOf,
+            MiscSpecialForm::CallableTypeOf => SpecialFormType::CallableTypeOf,
+            MiscSpecialForm::Top => SpecialFormType::Top,
+            MiscSpecialForm::Bottom => SpecialFormType::Bottom,
+            MiscSpecialForm::TypingSelf => SpecialFormType::TypingSelf,
+            MiscSpecialForm::Concatenate => SpecialFormType::Concatenate,
+            MiscSpecialForm::Unpack => SpecialFormType::Unpack,
+            MiscSpecialForm::TypeAlias => SpecialFormType::TypeAlias,
+            MiscSpecialForm::TypeGuard => SpecialFormType::TypeGuard,
+            MiscSpecialForm::TypedDict => SpecialFormType::TypedDict,
+            MiscSpecialForm::TypeIs => SpecialFormType::TypeIs,
+            MiscSpecialForm::Protocol => SpecialFormType::Protocol,
+            MiscSpecialForm::Generic => SpecialFormType::Generic,
+            MiscSpecialForm::NamedTuple => SpecialFormType::NamedTuple,
         }
     }
 }
 
-impl From<NonStdlibAlias> for Type<'_> {
-    fn from(value: NonStdlibAlias) -> Self {
+impl From<MiscSpecialForm> for Type<'_> {
+    fn from(value: MiscSpecialForm) -> Self {
         Type::SpecialForm(SpecialFormType::from(value))
     }
 }
 
-impl std::fmt::Display for NonStdlibAlias {
+impl std::fmt::Display for MiscSpecialForm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         SpecialFormType::from(*self).fmt(f)
     }

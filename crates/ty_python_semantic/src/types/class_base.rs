@@ -174,55 +174,6 @@ impl<'db> ClassBase<'db> {
             },
 
             Type::SpecialForm(special_form) => match special_form.kind() {
-                SpecialFormCategory::NonStdlibAlias(alias) => match alias {
-                    special_form::NonStdlibAlias::Any => Some(Self::Dynamic(DynamicType::Any)),
-                    special_form::NonStdlibAlias::Unknown => Some(Self::unknown()),
-                    special_form::NonStdlibAlias::Protocol => Some(Self::Protocol),
-                    special_form::NonStdlibAlias::Generic => Some(Self::Generic),
-                    special_form::NonStdlibAlias::TypedDict => Some(Self::TypedDict),
-
-                    special_form::NonStdlibAlias::NamedTuple => {
-                        let fields = subclass.own_fields(db, None, CodeGeneratorKind::NamedTuple);
-                        Self::try_from_type(
-                            db,
-                            TupleType::heterogeneous(
-                                db,
-                                fields.values().map(|field| field.declared_ty),
-                            )?
-                            .to_class_type(db)
-                            .into(),
-                            subclass,
-                        )
-                    }
-
-                    special_form::NonStdlibAlias::AlwaysFalsy
-                    | special_form::NonStdlibAlias::AlwaysTruthy
-                    | special_form::NonStdlibAlias::TypeOf
-                    | special_form::NonStdlibAlias::CallableTypeOf
-                    | special_form::NonStdlibAlias::TypeIs
-                    | special_form::NonStdlibAlias::TypingSelf
-                    | special_form::NonStdlibAlias::Not
-                    | special_form::NonStdlibAlias::Top
-                    | special_form::NonStdlibAlias::Bottom
-                    | special_form::NonStdlibAlias::Intersection
-                    | special_form::NonStdlibAlias::Literal
-                    | special_form::NonStdlibAlias::LiteralString
-                    | special_form::NonStdlibAlias::Annotated
-                    | special_form::NonStdlibAlias::Final
-                    | special_form::NonStdlibAlias::NotRequired
-                    | special_form::NonStdlibAlias::Required
-                    | special_form::NonStdlibAlias::TypeAlias
-                    | special_form::NonStdlibAlias::ReadOnly
-                    | special_form::NonStdlibAlias::Optional
-                    | special_form::NonStdlibAlias::Unpack
-                    | special_form::NonStdlibAlias::ClassVar
-                    | special_form::NonStdlibAlias::Concatenate
-                    | special_form::NonStdlibAlias::Never
-                    | special_form::NonStdlibAlias::NoReturn
-                    | special_form::NonStdlibAlias::Union
-                    | special_form::NonStdlibAlias::TypeGuard => None,
-                },
-
                 SpecialFormCategory::LegacyStdlibAlias(alias) => {
                     Self::try_from_type(db, alias.aliased_class().to_class_literal(db), subclass)
                 }
@@ -241,6 +192,52 @@ impl<'db> ClassBase<'db> {
                 SpecialFormCategory::Type => {
                     Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
                 }
+
+                SpecialFormCategory::TypeQualifier(_) => None,
+
+                SpecialFormCategory::Other(alias) => match alias {
+                    special_form::MiscSpecialForm::Any => Some(Self::Dynamic(DynamicType::Any)),
+                    special_form::MiscSpecialForm::Unknown => Some(Self::unknown()),
+                    special_form::MiscSpecialForm::Protocol => Some(Self::Protocol),
+                    special_form::MiscSpecialForm::Generic => Some(Self::Generic),
+                    special_form::MiscSpecialForm::TypedDict => Some(Self::TypedDict),
+
+                    special_form::MiscSpecialForm::NamedTuple => {
+                        let fields = subclass.own_fields(db, None, CodeGeneratorKind::NamedTuple);
+                        Self::try_from_type(
+                            db,
+                            TupleType::heterogeneous(
+                                db,
+                                fields.values().map(|field| field.declared_ty),
+                            )?
+                            .to_class_type(db)
+                            .into(),
+                            subclass,
+                        )
+                    }
+
+                    special_form::MiscSpecialForm::AlwaysFalsy
+                    | special_form::MiscSpecialForm::AlwaysTruthy
+                    | special_form::MiscSpecialForm::TypeOf
+                    | special_form::MiscSpecialForm::CallableTypeOf
+                    | special_form::MiscSpecialForm::TypeIs
+                    | special_form::MiscSpecialForm::TypingSelf
+                    | special_form::MiscSpecialForm::Not
+                    | special_form::MiscSpecialForm::Top
+                    | special_form::MiscSpecialForm::Bottom
+                    | special_form::MiscSpecialForm::Intersection
+                    | special_form::MiscSpecialForm::Literal
+                    | special_form::MiscSpecialForm::LiteralString
+                    | special_form::MiscSpecialForm::Annotated
+                    | special_form::MiscSpecialForm::TypeAlias
+                    | special_form::MiscSpecialForm::Optional
+                    | special_form::MiscSpecialForm::Unpack
+                    | special_form::MiscSpecialForm::Concatenate
+                    | special_form::MiscSpecialForm::Never
+                    | special_form::MiscSpecialForm::NoReturn
+                    | special_form::MiscSpecialForm::Union
+                    | special_form::MiscSpecialForm::TypeGuard => None,
+                },
             },
         }
     }
