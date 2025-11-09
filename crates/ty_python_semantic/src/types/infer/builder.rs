@@ -8319,6 +8319,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut nonlocal_union_builder = UnionBuilder::new(db);
             let mut found_some_definition = false;
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
+                // If the current enclosing scope is global, no place lookup is performed here,
+                // instead falling back to the module's explicit global lookup below.
+                if enclosing_scope_file_id == FileScopeId::global() {
+                    break;
+                }
+
                 // Class scopes are not visible to nested scopes, and we need to handle global
                 // scope differently (because an unbound name there falls back to builtins), so
                 // check only function-like scopes.
@@ -8411,11 +8417,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if enclosing_place.as_symbol().is_some_and(Symbol::is_global) {
                     break;
                 }
-                // If the current enclosing scope is global, no place lookup is performed here,
-                // instead falling back to the module's explicit global lookup below.
-                if enclosing_scope_file_id == FileScopeId::global() && !found_some_definition {
-                    break;
-                }
 
                 let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, self.file());
 
@@ -8476,11 +8477,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             file_scope_id,
                         ) {
                             EnclosingSnapshotResult::FoundConstraint(constraint) => {
-                                // The constraint should already have been added in the iteration over `ancestor_scopes` above.
-                                debug_assert!(constraint_keys.contains(&(
+                                constraint_keys.push((
                                     FileScopeId::global(),
                                     ConstraintKey::NarrowingConstraint(constraint),
-                                )));
+                                ));
                                 // Reaching here means that no bindings are found in any scope.
                                 // Since `explicit_global_symbol` may return a cycle initial value, we return `Place::Undefined` here.
                                 return Place::Undefined.into();
@@ -8493,10 +8493,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         &constraint_keys,
                                     )
                                 });
-                                debug_assert!(constraint_keys.contains(&(
+                                constraint_keys.push((
                                     FileScopeId::global(),
                                     ConstraintKey::NestedScope(file_scope_id),
-                                )));
+                                ));
                                 return place.into();
                             }
                             // There are no visible bindings / constraint here.
