@@ -373,6 +373,19 @@ reveal_type(Answer.YES.value)  # revealed: Literal[1]
 reveal_type(Answer.NO.value)  # revealed: Literal[2]
 ```
 
+As does using `auto()` for other enums that use `int` as a mixin:
+
+```py
+from enum import Enum, auto
+
+class Answer(int, Enum):
+    YES = auto()
+    NO = auto()
+
+reveal_type(Answer.YES.value)  # revealed: Literal[1]
+reveal_type(Answer.NO.value)  # revealed: Literal[2]
+```
+
 Using `auto()` with non-integer mixins:
 
 ```python

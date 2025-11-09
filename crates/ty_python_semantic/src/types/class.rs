@@ -3778,7 +3778,6 @@ pub enum KnownClass {
     Member,
     Nonmember,
     StrEnum,
-    IntEnum,
     // abc
     ABCMeta,
     // Types
@@ -3926,7 +3925,6 @@ impl KnownClass {
             | Self::Member
             | Self::Nonmember
             | Self::StrEnum
-            | Self::IntEnum
             | Self::ABCMeta
             | Self::Iterable
             | Self::Iterator
@@ -3988,7 +3986,6 @@ impl KnownClass {
             | KnownClass::Member
             | KnownClass::Nonmember
             | KnownClass::StrEnum
-            | KnownClass::IntEnum
             | KnownClass::ABCMeta
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
@@ -4072,7 +4069,6 @@ impl KnownClass {
             | KnownClass::Member
             | KnownClass::Nonmember
             | KnownClass::StrEnum
-            | KnownClass::IntEnum
             | KnownClass::ABCMeta
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
@@ -4156,7 +4152,6 @@ impl KnownClass {
             | KnownClass::Member
             | KnownClass::Nonmember
             | KnownClass::StrEnum
-            | KnownClass::IntEnum
             | KnownClass::ABCMeta
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
@@ -4279,7 +4274,6 @@ impl KnownClass {
             | Self::Member
             | Self::Nonmember
             | Self::StrEnum
-            | Self::IntEnum
             | Self::ABCMeta
             | Self::Super
             | Self::StdlibAlias
@@ -4336,7 +4330,6 @@ impl KnownClass {
             | KnownClass::Member
             | KnownClass::Nonmember
             | KnownClass::StrEnum
-            | KnownClass::IntEnum
             | KnownClass::ABCMeta
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
@@ -4454,7 +4447,6 @@ impl KnownClass {
             Self::Member => "member",
             Self::Nonmember => "nonmember",
             Self::StrEnum => "StrEnum",
-            Self::IntEnum => "IntEnum",
             Self::ABCMeta => "ABCMeta",
             Self::Super => "super",
             Self::Iterable => "Iterable",
@@ -4727,8 +4719,7 @@ impl KnownClass {
             | Self::Auto
             | Self::Member
             | Self::Nonmember
-            | Self::StrEnum
-            | Self::IntEnum => KnownModule::Enum,
+            | Self::StrEnum => KnownModule::Enum,
             Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
@@ -4859,7 +4850,6 @@ impl KnownClass {
             | Self::Member
             | Self::Nonmember
             | Self::StrEnum
-            | Self::IntEnum
             | Self::ABCMeta
             | Self::Super
             | Self::NewType
@@ -4947,7 +4937,6 @@ impl KnownClass {
             | Self::Member
             | Self::Nonmember
             | Self::StrEnum
-            | Self::IntEnum
             | Self::ABCMeta
             | Self::Super
             | Self::UnionType
@@ -5039,9 +5028,6 @@ impl KnownClass {
             "StrEnum" if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
                 &[Self::StrEnum]
             }
-            "IntEnum" if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
-                &[Self::IntEnum]
-            }
             "auto" => &[Self::Auto],
             "member" => &[Self::Member],
             "nonmember" => &[Self::Nonmember],
@@ -5120,7 +5106,6 @@ impl KnownClass {
             | Self::Member
             | Self::Nonmember
             | Self::StrEnum
-            | Self::IntEnum
             | Self::ABCMeta
             | Self::Super
             | Self::NotImplementedType
