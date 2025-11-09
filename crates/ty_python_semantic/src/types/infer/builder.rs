@@ -8355,6 +8355,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // registering eager bindings for nested scopes that are actually eager, and for
                 // enclosing scopes that actually contain bindings that we should use when
                 // resolving the reference.)
+                let mut eagerly_resolved_place = None;
                 if !self.is_deferred() {
                     match self.index.enclosing_snapshot(
                         enclosing_scope_file_id,
@@ -8366,6 +8367,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 enclosing_scope_file_id,
                                 ConstraintKey::NarrowingConstraint(constraint),
                             ));
+                            // If the current scope is eager, it is certain that the place is undefined in the current scope.
+                            // Do not call the `place` query below as a fallback.
+                            if scope.scope(db).is_eager() {
+                                eagerly_resolved_place = Some(Place::Undefined.into());
+                            }
                         }
                         EnclosingSnapshotResult::FoundBindings(bindings) => {
                             let place = place_from_bindings(db, bindings).map_type(|ty| {
@@ -8427,18 +8433,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // `nonlocal` variable, but we don't enforce that here. See the
                 // `ast::Stmt::AnnAssign` handling in `SemanticIndexBuilder::visit_stmt`.)
                 if enclosing_place.is_bound() || enclosing_place.is_declared() {
-                    let local_place_and_qualifiers = place(
-                        db,
-                        enclosing_scope_id,
-                        place_expr,
-                        ConsideredDefinitions::AllReachable,
-                    )
-                    .map_type(|ty| {
-                        self.narrow_place_with_applicable_constraints(
+                    let local_place_and_qualifiers = eagerly_resolved_place.unwrap_or_else(|| {
+                        place(
+                            db,
+                            enclosing_scope_id,
                             place_expr,
-                            ty,
-                            &constraint_keys,
+                            ConsideredDefinitions::AllReachable,
                         )
+                        .map_type(|ty| {
+                            self.narrow_place_with_applicable_constraints(
+                                place_expr,
+                                ty,
+                                &constraint_keys,
+                            )
+                        })
                     });
                     // We could have `Place::Undefined` here, despite the checks above, for example if
                     // this scope contains a `del` statement but no binding or declaration.

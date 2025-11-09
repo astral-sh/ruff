@@ -311,6 +311,18 @@ F
 
 # error: [unresolved-reference] "Name `F` used when not defined"
 class F[_T](F): ...
+
+def foo():
+    class G[_T](
+        # error: [unresolved-reference] "Name `G` used when not defined"
+        G
+    ): ...
+    # error: [unresolved-reference] "Name `H` used when not defined"
+    if H:
+        class H[_T](
+            # error: [unresolved-reference] "Name `H` used when not defined"
+            H
+        ): ...
 ```
 
 ## Class scopes do not cover inner scopes
