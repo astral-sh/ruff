@@ -1,6 +1,7 @@
 use crate::Db;
 use crate::types::class::CodeGeneratorKind;
 use crate::types::generics::Specialization;
+use crate::types::special_form::{self, SpecialFormCategory};
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
@@ -172,94 +173,74 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Literal(_) => None,
             },
 
-            Type::SpecialForm(special_form) => match special_form {
-                SpecialFormType::Annotated
-                | SpecialFormType::Literal
-                | SpecialFormType::LiteralString
-                | SpecialFormType::Union
-                | SpecialFormType::NoReturn
-                | SpecialFormType::Never
-                | SpecialFormType::Final
-                | SpecialFormType::NotRequired
-                | SpecialFormType::TypeGuard
-                | SpecialFormType::TypeIs
-                | SpecialFormType::TypingSelf
-                | SpecialFormType::Unpack
-                | SpecialFormType::ClassVar
-                | SpecialFormType::Concatenate
-                | SpecialFormType::Required
-                | SpecialFormType::TypeAlias
-                | SpecialFormType::ReadOnly
-                | SpecialFormType::Optional
-                | SpecialFormType::Not
-                | SpecialFormType::Top
-                | SpecialFormType::Bottom
-                | SpecialFormType::Intersection
-                | SpecialFormType::TypeOf
-                | SpecialFormType::CallableTypeOf
-                | SpecialFormType::AlwaysTruthy
-                | SpecialFormType::AlwaysFalsy => None,
+            Type::SpecialForm(special_form) => match special_form.kind() {
+                SpecialFormCategory::NonStdlibAlias(alias) => match alias {
+                    special_form::NonStdlibAlias::Any => Some(Self::Dynamic(DynamicType::Any)),
+                    special_form::NonStdlibAlias::Unknown => Some(Self::unknown()),
+                    special_form::NonStdlibAlias::Protocol => Some(Self::Protocol),
+                    special_form::NonStdlibAlias::Generic => Some(Self::Generic),
+                    special_form::NonStdlibAlias::TypedDict => Some(Self::TypedDict),
 
-                SpecialFormType::Any => Some(Self::Dynamic(DynamicType::Any)),
-                SpecialFormType::Unknown => Some(Self::unknown()),
-
-                SpecialFormType::Protocol => Some(Self::Protocol),
-                SpecialFormType::Generic => Some(Self::Generic),
-
-                SpecialFormType::NamedTuple => {
-                    let fields = subclass.own_fields(db, None, CodeGeneratorKind::NamedTuple);
-                    Self::try_from_type(
-                        db,
-                        TupleType::heterogeneous(
+                    special_form::NonStdlibAlias::NamedTuple => {
+                        let fields = subclass.own_fields(db, None, CodeGeneratorKind::NamedTuple);
+                        Self::try_from_type(
                             db,
-                            fields.values().map(|field| field.declared_ty),
-                        )?
-                        .to_class_type(db)
-                        .into(),
-                        subclass,
-                    )
+                            TupleType::heterogeneous(
+                                db,
+                                fields.values().map(|field| field.declared_ty),
+                            )?
+                            .to_class_type(db)
+                            .into(),
+                            subclass,
+                        )
+                    }
+
+                    special_form::NonStdlibAlias::AlwaysFalsy
+                    | special_form::NonStdlibAlias::AlwaysTruthy
+                    | special_form::NonStdlibAlias::TypeOf
+                    | special_form::NonStdlibAlias::CallableTypeOf
+                    | special_form::NonStdlibAlias::TypeIs
+                    | special_form::NonStdlibAlias::TypingSelf
+                    | special_form::NonStdlibAlias::Not
+                    | special_form::NonStdlibAlias::Top
+                    | special_form::NonStdlibAlias::Bottom
+                    | special_form::NonStdlibAlias::Intersection
+                    | special_form::NonStdlibAlias::Literal
+                    | special_form::NonStdlibAlias::LiteralString
+                    | special_form::NonStdlibAlias::Annotated
+                    | special_form::NonStdlibAlias::Final
+                    | special_form::NonStdlibAlias::NotRequired
+                    | special_form::NonStdlibAlias::Required
+                    | special_form::NonStdlibAlias::TypeAlias
+                    | special_form::NonStdlibAlias::ReadOnly
+                    | special_form::NonStdlibAlias::Optional
+                    | special_form::NonStdlibAlias::Unpack
+                    | special_form::NonStdlibAlias::ClassVar
+                    | special_form::NonStdlibAlias::Concatenate
+                    | special_form::NonStdlibAlias::Never
+                    | special_form::NonStdlibAlias::NoReturn
+                    | special_form::NonStdlibAlias::Union
+                    | special_form::NonStdlibAlias::TypeGuard => None,
+                },
+
+                SpecialFormCategory::LegacyStdlibAlias(alias) => {
+                    Self::try_from_type(db, alias.aliased_class().to_class_literal(db), subclass)
                 }
 
-                // TODO: Classes inheriting from `typing.Type` et al. also have `Generic` in their MRO
-                SpecialFormType::Dict => {
-                    Self::try_from_type(db, KnownClass::Dict.to_class_literal(db), subclass)
-                }
-                SpecialFormType::List => {
-                    Self::try_from_type(db, KnownClass::List.to_class_literal(db), subclass)
-                }
-                SpecialFormType::Type => {
-                    Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
-                }
-                SpecialFormType::Tuple => {
-                    Self::try_from_type(db, KnownClass::Tuple.to_class_literal(db), subclass)
-                }
-                SpecialFormType::Set => {
-                    Self::try_from_type(db, KnownClass::Set.to_class_literal(db), subclass)
-                }
-                SpecialFormType::FrozenSet => {
-                    Self::try_from_type(db, KnownClass::FrozenSet.to_class_literal(db), subclass)
-                }
-                SpecialFormType::ChainMap => {
-                    Self::try_from_type(db, KnownClass::ChainMap.to_class_literal(db), subclass)
-                }
-                SpecialFormType::Counter => {
-                    Self::try_from_type(db, KnownClass::Counter.to_class_literal(db), subclass)
-                }
-                SpecialFormType::DefaultDict => {
-                    Self::try_from_type(db, KnownClass::DefaultDict.to_class_literal(db), subclass)
-                }
-                SpecialFormType::Deque => {
-                    Self::try_from_type(db, KnownClass::Deque.to_class_literal(db), subclass)
-                }
-                SpecialFormType::OrderedDict => {
-                    Self::try_from_type(db, KnownClass::OrderedDict.to_class_literal(db), subclass)
-                }
-                SpecialFormType::TypedDict => Some(Self::TypedDict),
-                SpecialFormType::Callable => Self::try_from_type(
+                SpecialFormCategory::Callable => Self::try_from_type(
                     db,
                     todo_type!("Support for Callable as a base class"),
                     subclass,
                 ),
+
+                SpecialFormCategory::Tuple => {
+                    Self::try_from_type(db, KnownClass::Tuple.to_class_literal(db), subclass)
+                }
+
+                // TODO: Classes inheriting from `typing.Type` also have `Generic` in their MRO
+                SpecialFormCategory::Type => {
+                    Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
+                }
             },
         }
     }
