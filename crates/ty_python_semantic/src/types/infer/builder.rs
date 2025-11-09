@@ -8411,6 +8411,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if enclosing_place.as_symbol().is_some_and(Symbol::is_global) {
                     break;
                 }
+                // If the current enclosing scope is global, no place lookup is performed here,
+                // instead falling back to the module's explicit global lookup below.
+                if enclosing_scope_file_id == FileScopeId::global() && !found_some_definition {
+                    break;
+                }
 
                 let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, self.file());
 
