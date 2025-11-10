@@ -11636,7 +11636,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     }
 
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
-    #[salsa::tracked(cycle_initial=value_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_fn=value_type_cycle_recover, cycle_initial=value_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
         let module = parsed_module(db, scope.file(db)).load(db);
@@ -11732,6 +11732,17 @@ fn value_type_cycle_initial<'db>(
     _self: PEP695TypeAliasType<'db>,
 ) -> Type<'db> {
     Type::divergent(id)
+}
+
+fn value_type_cycle_recover<'db>(
+    db: &'db dyn Db,
+    cycle_heads: &salsa::CycleHeads,
+    previous_value: &Type<'db>,
+    value: Type<'db>,
+    _count: u32,
+    _self: PEP695TypeAliasType<'db>,
+) -> Type<'db> {
+    value.cycle_normalized(db, *previous_value, cycle_heads)
 }
 
 /// A PEP 695 `types.TypeAliasType` created by manually calling the constructor.
