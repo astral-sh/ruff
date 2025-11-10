@@ -555,19 +555,20 @@ jobs:
           workspaces: |-
             .
             baseline
+          shared-key: ruff-linux-debug
           save-if: false
-
-      - name: Build comparison Ruff binary
-        run: |
-          cargo build -p ruff --bin ruff
-          mkdir -p target-comparison
-          cp target/debug/ruff target-comparison/ruff
 
       - name: Build baseline Ruff binary
         run: |
           cd baseline
           cargo build -p ruff --bin ruff
           cp target/debug/ruff ../ruff
+
+      - name: Build comparison Ruff binary
+        run: |
+          cargo build -p ruff --bin ruff
+          mkdir -p target-comparison
+          cp target/debug/ruff target-comparison/ruff
 
       - name: Install ruff-ecosystem
         run: |
