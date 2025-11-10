@@ -664,26 +664,30 @@ fn parse_parameters_numpy(content: &str, content_start: TextSize) -> Vec<Paramet
                     let param_line = before_colon.trim_end();
 
                     // Split on commas to handle comma-separated parameters
+                    let mut current_offset = TextSize::from(0);
                     for param_part in param_line.split(',') {
                         let param_part_trimmed = param_part.trim();
                         let param_name = param_part_trimmed.trim_start_matches('*');
                         if is_identifier(param_name) {
                             // Calculate the position of this specific parameter part within the line
-                            // Safety: searching for a substring we just split above
-                            let param_start_in_line = param_line.find(param_part_trimmed).unwrap();
-                            let param_start = line_start
-                                + indentation.text_len()
-                                + TextSize::try_from(param_start_in_line).unwrap();
-                            let param_end = param_start + param_part_trimmed.text_len();
+                            // Account for leading whitespace that gets trimmed
+                            let param_start_in_line = current_offset
+                                + TextSize::from(u32::from(
+                                    param_part.text_len() - param_part_trimmed.text_len(),
+                                ));
+                            let param_start =
+                                line_start + indentation.text_len() + param_start_in_line;
 
                             entries.push(ParameterEntry {
                                 name: param_name,
-                                range: TextRange::new(
+                                range: TextRange::at(
                                     content_start + param_start,
-                                    content_start + param_end,
+                                    param_part_trimmed.text_len(),
                                 ),
                             });
                         }
+                        // Update offset for next iteration: add the part length plus comma length
+                        current_offset = current_offset + param_part.text_len() + ','.text_len();
                     }
                 }
             }
