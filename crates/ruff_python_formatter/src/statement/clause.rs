@@ -490,13 +490,13 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatClauseHeader<'_, 'ast> {
     }
 }
 
-pub(crate) struct FormatClauseBody<'a> {
+struct FormatClauseBody<'a> {
     body: &'a Suite,
     kind: SuiteKind,
     trailing_comments: &'a [SourceComment],
 }
 
-pub(crate) fn clause_body<'a>(
+fn clause_body<'a>(
     body: &'a Suite,
     kind: SuiteKind,
     trailing_comments: &'a [SourceComment],
