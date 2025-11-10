@@ -154,12 +154,10 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
                 // Only flag if str() has exactly one argument (positional or keyword) that is not unpacked
                 FormatConversion::Str
                     if checker.semantic().match_builtin_expr(func.as_ref(), "str")
-                        && ((str_call_args.args.len() == 1
-                            && !str_call_args.args[0].is_starred_expr()
-                            && str_call_args.keywords.is_empty())
-                            || (str_call_args.args.is_empty()
-                                && str_call_args.keywords.len() == 1
-                                && str_call_args.keywords[0].arg.is_some())) =>
+                        && str_call_args.len() == 1
+                        && str_call_args
+                            .find_argument("object", 0)
+                            .is_some_and(|arg| !arg.is_variadic()) =>
                 {
                     checker.report_diagnostic(
                         LoggingEagerConversion {
