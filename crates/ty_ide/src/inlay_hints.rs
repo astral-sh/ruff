@@ -4,7 +4,7 @@ use crate::Db;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
-use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, Stmt};
+use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Stmt, UnaryOp};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::inlay_hint_function_argument_details;
@@ -345,6 +345,9 @@ fn type_hint_is_excessive_for_expr(expr: &Expr) -> bool {
         // This one expands to `Template` which isn't verbose but is redundant
         | Expr::TString(_)=> true,
 
+        // You too `+1 and `-1`, get back here  
+        Expr::UnaryOp(ExprUnaryOp { op: UnaryOp::UAdd | UnaryOp::USub, operand, .. }) => matches!(**operand, Expr::NumberLiteral(_)),
+
         // Everything else is reasonable
         _ => false,
     }
@@ -659,6 +662,8 @@ mod tests {
             g = f"{e} {f}"
             h = t"wow %d"
             i = b'\x00'
+            j = +1
+            k = -1.0
             "#,
         );
 
@@ -672,6 +677,8 @@ mod tests {
         g = f"{e} {f}"
         h = t"wow %d"
         i = b'\x00'
+        j = +1
+        k = -1.0
         "#);
     }
 
@@ -688,6 +695,8 @@ mod tests {
             g = (f"{ft}", f"{ft}")
             h = (t"wow %d", t"wow %d")
             i = (b'\x01', b'\x02')
+            j = (+1, +2.0)
+            k = (-1, -2.0)
             "#,
         );
 
@@ -701,6 +710,8 @@ mod tests {
         g = (f"{ft}", f"{ft}")
         h = (t"wow %d", t"wow %d")
         i = (b'\x01', b'\x02')
+        j = (+1, +2.0)
+        k = (-1, -2.0)
         "#);
     }
 
@@ -717,6 +728,8 @@ mod tests {
             g1, g2 = (f"{ft}", f"{ft}")
             h1, h2 = (t"wow %d", t"wow %d")
             i1, i2 = (b'\x01', b'\x02')
+            j1, j2 = (+1, +2.0)
+            k1, k2 = (-1, -2.0)
             "#,
         );
 
@@ -730,6 +743,8 @@ mod tests {
         g1, g2 = (f"{ft}", f"{ft}")
         h1, h2 = (t"wow %d", t"wow %d")
         i1, i2 = (b'\x01', b'\x02')
+        j1, j2 = (+1, +2.0)
+        k1, k2 = (-1, -2.0)
         "#);
     }
 
@@ -746,6 +761,8 @@ mod tests {
             g1, g2 = f"{ft}", f"{ft}"
             h1, h2 = t"wow %d", t"wow %d"
             i1, i2 = b'\x01', b'\x02'
+            j1, j2 = +1, +2.0
+            k1, k2 = -1, -2.0
             "#,
         );
 
@@ -759,6 +776,8 @@ mod tests {
         g1, g2 = f"{ft}", f"{ft}"
         h1, h2 = t"wow %d", t"wow %d"
         i1, i2 = b'\x01', b'\x02'
+        j1, j2 = +1, +2.0
+        k1, k2 = -1, -2.0
         "#);
     }
 
@@ -775,6 +794,8 @@ mod tests {
             g = [f"{ft}", f"{ft}"]
             h = [t"wow %d", t"wow %d"]
             i = [b'\x01', b'\x02']
+            j = [+1, +2.0]
+            k = [-1, -2.0]
             "#,
         );
 
@@ -788,6 +809,8 @@ mod tests {
         g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
         h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
         i[: list[Unknown | bytes]] = [b'\x01', b'\x02']
+        j[: list[Unknown | int | float]] = [+1, +2.0]
+        k[: list[Unknown | int | float]] = [-1, -2.0]
         "#);
     }
 
