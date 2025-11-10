@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB103 `Path().open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test")`
+FURB103 [*] `Path().open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test")`
  --> FURB103_EXT.py:3:6
   |
 1 | from pathlib import Path
@@ -11,8 +11,16 @@ FURB103 `Path().open()` followed by `write()` can be replaced by `Path("file.txt
 4 |     f.write("test")
   |
 help: Replace with `Path("file.txt").write_text("test")`
+1 | from pathlib import Path
+2 | 
+  - with Path("file.txt").open("w") as f:
+  -     f.write("test")
+3 + Path("file.txt").write_text("test")
+4 | 
+5 | with Path("file.txt").open("wb") as f:
+6 |     f.write(b"test")
 
-FURB103 `Path().open()` followed by `write()` can be replaced by `Path("file.txt").write_bytes(b"test")`
+FURB103 [*] `Path().open()` followed by `write()` can be replaced by `Path("file.txt").write_bytes(b"test")`
  --> FURB103_EXT.py:6:6
   |
 4 |     f.write("test")
@@ -22,8 +30,17 @@ FURB103 `Path().open()` followed by `write()` can be replaced by `Path("file.txt
 7 |     f.write(b"test")
   |
 help: Replace with `Path("file.txt").write_bytes(b"test")`
+3 | with Path("file.txt").open("w") as f:
+4 |     f.write("test")
+5 | 
+  - with Path("file.txt").open("wb") as f:
+  -     f.write(b"test")
+6 + Path("file.txt").write_bytes(b"test")
+7 | 
+8 | with Path("file.txt").open(mode="w") as f:
+9 |     f.write("test")
 
-FURB103 `Path().open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test")`
+FURB103 [*] `Path().open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test")`
   --> FURB103_EXT.py:9:6
    |
  7 |     f.write(b"test")
@@ -33,8 +50,17 @@ FURB103 `Path().open()` followed by `write()` can be replaced by `Path("file.txt
 10 |     f.write("test")
    |
 help: Replace with `Path("file.txt").write_text("test")`
+6  | with Path("file.txt").open("wb") as f:
+7  |     f.write(b"test")
+8  | 
+   - with Path("file.txt").open(mode="w") as f:
+   -     f.write("test")
+9  + Path("file.txt").write_text("test")
+10 | 
+11 | with Path("file.txt").open("w", encoding="utf8") as f:
+12 |     f.write("test")
 
-FURB103 `Path().open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test", encoding="utf8")`
+FURB103 [*] `Path().open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test", encoding="utf8")`
   --> FURB103_EXT.py:12:6
    |
 10 |     f.write("test")
@@ -44,8 +70,17 @@ FURB103 `Path().open()` followed by `write()` can be replaced by `Path("file.txt
 13 |     f.write("test")
    |
 help: Replace with `Path("file.txt").write_text("test", encoding="utf8")`
+9  | with Path("file.txt").open(mode="w") as f:
+10 |     f.write("test")
+11 | 
+   - with Path("file.txt").open("w", encoding="utf8") as f:
+   -     f.write("test")
+12 + Path("file.txt").write_text("test", encoding="utf8")
+13 | 
+14 | with Path("file.txt").open("w", errors="ignore") as f:
+15 |     f.write("test")
 
-FURB103 `Path().open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test", errors="ignore")`
+FURB103 [*] `Path().open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test", errors="ignore")`
   --> FURB103_EXT.py:15:6
    |
 13 |     f.write("test")
@@ -55,8 +90,17 @@ FURB103 `Path().open()` followed by `write()` can be replaced by `Path("file.txt
 16 |     f.write("test")
    |
 help: Replace with `Path("file.txt").write_text("test", errors="ignore")`
+12 | with Path("file.txt").open("w", encoding="utf8") as f:
+13 |     f.write("test")
+14 | 
+   - with Path("file.txt").open("w", errors="ignore") as f:
+   -     f.write("test")
+15 + Path("file.txt").write_text("test", errors="ignore")
+16 | 
+17 | with Path(foo()).open("w") as f:
+18 |     f.write("test")
 
-FURB103 `Path().open()` followed by `write()` can be replaced by `Path(foo()).write_text("test")`
+FURB103 [*] `Path().open()` followed by `write()` can be replaced by `Path(foo()).write_text("test")`
   --> FURB103_EXT.py:18:6
    |
 16 |     f.write("test")
@@ -66,6 +110,15 @@ FURB103 `Path().open()` followed by `write()` can be replaced by `Path(foo()).wr
 19 |     f.write("test")
    |
 help: Replace with `Path(foo()).write_text("test")`
+15 | with Path("file.txt").open("w", errors="ignore") as f:
+16 |     f.write("test")
+17 | 
+   - with Path(foo()).open("w") as f:
+   -     f.write("test")
+18 + Path(foo()).write_text("test")
+19 | 
+20 | p = Path("file.txt")
+21 | with p.open("w") as f:
 
 FURB103 `Path.open()` followed by `write()` can be replaced by `p.write_text("test")`
   --> FURB103_EXT.py:22:6
