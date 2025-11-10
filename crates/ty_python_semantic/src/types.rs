@@ -6462,7 +6462,12 @@ impl<'db> Type<'db> {
                     }
                     Ok(builder.build())
                 }
-                KnownInstanceType::Literal(list) => Ok(list.to_union(db)),
+                KnownInstanceType::Literal(ty) => Ok(ty.inner(db)),
+                KnownInstanceType::Annotated(ty) => {
+                    Ok(ty
+                        .inner(db)
+                        .in_type_expression(db, scope_id, typevar_binding_context)?)
+                }
             },
 
             Type::SpecialForm(special_form) => match special_form {
@@ -7676,10 +7681,13 @@ pub enum KnownInstanceType<'db> {
 
     /// A single instance of `types.UnionType`, which stores the left- and
     /// right-hand sides of a PEP 604 union.
-    UnionType(TypeList<'db>),
+    UnionType(InternedTypes<'db>),
 
     /// A single instance of `typing.Literal`
-    Literal(TypeList<'db>),
+    Literal(InternedType<'db>),
+
+    /// A single instance of `typing.Annotated`
+    Annotated(InternedType<'db>),
 }
 
 fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -7706,10 +7714,13 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
                 visitor.visit_type(db, default_ty);
             }
         }
-        KnownInstanceType::UnionType(list) | KnownInstanceType::Literal(list) => {
+        KnownInstanceType::UnionType(list) => {
             for element in list.elements(db) {
                 visitor.visit_type(db, *element);
             }
+        }
+        KnownInstanceType::Literal(ty) | KnownInstanceType::Annotated(ty) => {
+            visitor.visit_type(db, ty.inner(db));
         }
     }
 }
@@ -7748,7 +7759,8 @@ impl<'db> KnownInstanceType<'db> {
                 Self::ConstraintSet(set)
             }
             Self::UnionType(list) => Self::UnionType(list.normalized_impl(db, visitor)),
-            Self::Literal(list) => Self::Literal(list.normalized_impl(db, visitor)),
+            Self::Literal(ty) => Self::Literal(ty.normalized_impl(db, visitor)),
+            Self::Annotated(ty) => Self::Annotated(ty.normalized_impl(db, visitor)),
         }
     }
 
@@ -7768,6 +7780,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::ConstraintSet(_) => KnownClass::ConstraintSet,
             Self::UnionType(_) => KnownClass::UnionType,
             Self::Literal(_) => KnownClass::GenericAlias,
+            Self::Annotated(_) => KnownClass::GenericAlias,
         }
     }
 
@@ -7848,7 +7861,10 @@ impl<'db> KnownInstanceType<'db> {
                         )
                     }
                     KnownInstanceType::UnionType(_) => f.write_str("types.UnionType"),
-                    KnownInstanceType::Literal(_) => f.write_str("typing.Literal"),
+                    KnownInstanceType::Literal(_) => f.write_str("<typing.Literal special form>"),
+                    KnownInstanceType::Annotated(_) => {
+                        f.write_str("<typing.Annotated special form>")
+                    }
                 }
             }
         }
@@ -8045,7 +8061,7 @@ impl<'db> InvalidTypeExpressionError<'db> {
     fn into_fallback_type(
         self,
         context: &InferContext,
-        node: &ast::Expr,
+        node: &impl Ranged,
         is_reachable: bool,
     ) -> Type<'db> {
         let InvalidTypeExpressionError {
@@ -8984,29 +9000,25 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
 /// # Ordering
 /// Ordering is based on the context's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the context was garbage collected and recreated.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
-pub struct TypeList<'db> {
+pub struct InternedTypes<'db> {
     #[returns(deref)]
     elements: Box<[Type<'db>]>,
 }
 
-impl get_size2::GetSize for TypeList<'_> {}
+impl get_size2::GetSize for InternedTypes<'_> {}
 
-impl<'db> TypeList<'db> {
+impl<'db> InternedTypes<'db> {
     pub(crate) fn from_elements(
         db: &'db dyn Db,
         elements: impl IntoIterator<Item = Type<'db>>,
-    ) -> TypeList<'db> {
-        TypeList::new(db, elements.into_iter().collect::<Box<[_]>>())
-    }
-
-    pub(crate) fn singleton(db: &'db dyn Db, element: Type<'db>) -> TypeList<'db> {
-        TypeList::from_elements(db, [element])
+    ) -> InternedTypes<'db> {
+        InternedTypes::new(db, elements.into_iter().collect::<Box<[_]>>())
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        TypeList::new(
+        InternedTypes::new(
             db,
             self.elements(db)
                 .iter()
@@ -9014,10 +9026,24 @@ impl<'db> TypeList<'db> {
                 .collect::<Box<[_]>>(),
         )
     }
+}
 
-    /// Turn this list of types `[T1, T2, ...]` into a union type `T1 | T2 | ...`.
-    pub(crate) fn to_union(self, db: &'db dyn Db) -> Type<'db> {
-        UnionType::from_elements(db, self.elements(db))
+/// A salsa-interned `Type`
+///
+/// # Ordering
+/// Ordering is based on the context's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the context was garbage collected and recreated.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct InternedType<'db> {
+    inner: Type<'db>,
+}
+
+impl get_size2::GetSize for InternedType<'_> {}
+
+impl<'db> InternedType<'db> {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        InternedType::new(db, self.inner(db).normalized_impl(db, visitor))
     }
 }
 

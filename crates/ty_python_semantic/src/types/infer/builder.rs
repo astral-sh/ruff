@@ -69,12 +69,12 @@ use crate::types::diagnostic::{
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_cannot_pop_required_field_on_typed_dict,
     report_duplicate_bases, report_implicit_return_type, report_index_out_of_bounds,
-    report_instance_layout_conflict, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_exception_caught,
-    report_invalid_exception_cause, report_invalid_exception_raised,
-    report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
-    report_invalid_or_unsupported_base, report_invalid_return_type,
-    report_invalid_type_checking_constant,
+    report_instance_layout_conflict, report_invalid_arguments_to_annotated,
+    report_invalid_assignment, report_invalid_attribute_assignment,
+    report_invalid_exception_caught, report_invalid_exception_cause,
+    report_invalid_exception_raised, report_invalid_generator_function_return_type,
+    report_invalid_key_on_typed_dict, report_invalid_or_unsupported_base,
+    report_invalid_return_type, report_invalid_type_checking_constant,
     report_namedtuple_field_without_default_after_field_with_default, report_non_subscriptable,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
     report_rebound_typevar, report_slice_step_size_zero,
@@ -100,10 +100,10 @@ use crate::types::typed_dict::{
 use crate::types::visitor::any_over_type;
 use crate::types::{
     CallDunderError, CallableBinding, CallableType, ClassLiteral, ClassType, DataclassParams,
-    DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
-    Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeList, TypeQualifiers,
+    DynamicType, InternedType, InternedTypes, IntersectionBuilder, IntersectionType, KnownClass,
+    KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter,
+    ParameterForm, Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness,
+    Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
     TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
     TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
     binding_type, todo_type,
@@ -8755,14 +8755,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::GenericAlias(..)
                 | Type::SpecialForm(_)
                 | Type::KnownInstance(
-                    KnownInstanceType::UnionType(_) | KnownInstanceType::Literal(_),
+                    KnownInstanceType::UnionType(_)
+                    | KnownInstanceType::Literal(_)
+                    | KnownInstanceType::Annotated(_),
                 ),
                 Type::ClassLiteral(..)
                 | Type::SubclassOf(..)
                 | Type::GenericAlias(..)
                 | Type::SpecialForm(_)
                 | Type::KnownInstance(
-                    KnownInstanceType::UnionType(_) | KnownInstanceType::Literal(_),
+                    KnownInstanceType::UnionType(_)
+                    | KnownInstanceType::Literal(_)
+                    | KnownInstanceType::Annotated(_),
                 ),
                 ast::Operator::BitOr,
             ) if Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY310 => {
@@ -8770,7 +8774,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Some(left_ty)
                 } else {
                     Some(Type::KnownInstance(KnownInstanceType::UnionType(
-                        TypeList::from_elements(self.db(), [left_ty, right_ty]),
+                        InternedTypes::from_elements(self.db(), [left_ty, right_ty]),
                     )))
                 }
             }
@@ -8795,7 +8799,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 && instance.has_known_class(self.db(), KnownClass::NoneType) =>
             {
                 Some(Type::KnownInstance(KnownInstanceType::UnionType(
-                    TypeList::from_elements(self.db(), [left_ty, right_ty]),
+                    InternedTypes::from_elements(self.db(), [left_ty, right_ty]),
                 )))
             }
 
@@ -9863,14 +9867,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_subscript_load(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
+        let value_ty = self.infer_expression(&subscript.value, TypeContext::default());
+        self.infer_subscript_load_impl(value_ty, subscript)
+    }
+
+    fn infer_subscript_load_impl(
+        &mut self,
+        value_ty: Type<'db>,
+        subscript: &ast::ExprSubscript,
+    ) -> Type<'db> {
         let ast::ExprSubscript {
             range: _,
             node_index: _,
-            value,
+            value: _,
             slice,
             ctx,
         } = subscript;
-        let value_ty = self.infer_expression(value, TypeContext::default());
+
         let mut constraint_keys = vec![];
 
         // If `value` is a valid reference, we attempt type narrowing by assignment.
@@ -9896,60 +9909,117 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::from(tuple.to_class_type(db))
         };
 
-        // HACK ALERT: If we are subscripting a generic class, short-circuit the rest of the
-        // subscript inference logic and treat this as an explicit specialization.
-        // TODO: Move this logic into a custom callable, and update `find_name_in_mro` to return
-        // this callable as the `__class_getitem__` method on `type`. That probably requires
-        // updating all of the subscript logic below to use custom callables for all of the _other_
-        // special cases, too.
-        if let Type::ClassLiteral(class) = value_ty {
-            if class.is_tuple(self.db()) {
+        match value_ty {
+            Type::ClassLiteral(class) => {
+                // HACK ALERT: If we are subscripting a generic class, short-circuit the rest of the
+                // subscript inference logic and treat this as an explicit specialization.
+                // TODO: Move this logic into a custom callable, and update `find_name_in_mro` to return
+                // this callable as the `__class_getitem__` method on `type`. That probably requires
+                // updating all of the subscript logic below to use custom callables for all of the _other_
+                // special cases, too.
+                if class.is_tuple(self.db()) {
+                    return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(slice));
+                }
+                if let Some(generic_context) = class.generic_context(self.db()) {
+                    return self.infer_explicit_class_specialization(
+                        subscript,
+                        value_ty,
+                        class,
+                        generic_context,
+                    );
+                }
+            }
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
+                if let Some(generic_context) = type_alias.generic_context(self.db()) {
+                    return self.infer_explicit_type_alias_specialization(
+                        subscript,
+                        value_ty,
+                        type_alias,
+                        generic_context,
+                    );
+                }
+            }
+            Type::SpecialForm(SpecialFormType::Tuple) => {
                 return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(slice));
             }
-            if let Some(generic_context) = class.generic_context(self.db()) {
-                return self.infer_explicit_class_specialization(
-                    subscript,
-                    value_ty,
-                    class,
-                    generic_context,
-                );
-            }
-        }
-        if let Type::SpecialForm(SpecialFormType::Tuple) = value_ty {
-            return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(slice));
-        }
-        if let Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) = value_ty {
-            if let Some(generic_context) = type_alias.generic_context(self.db()) {
-                return self.infer_explicit_type_alias_specialization(
-                    subscript,
-                    value_ty,
-                    type_alias,
-                    generic_context,
-                );
-            }
-        }
-        if value_ty == Type::SpecialForm(SpecialFormType::Literal) {
-            match self.infer_literal_parameter_type(slice) {
-                Ok(result) => {
-                    return Type::KnownInstance(KnownInstanceType::Literal(TypeList::singleton(
-                        self.db(),
-                        result,
-                    )));
-                }
-                Err(nodes) => {
-                    for node in nodes {
-                        let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, node)
-                        else {
-                            continue;
-                        };
-                        builder.into_diagnostic(
-                            "Type arguments for `Literal` must be `None`, \
-                            a literal value (int, bool, str, or bytes), or an enum member",
-                        );
+            Type::SpecialForm(SpecialFormType::Literal) => {
+                match self.infer_literal_parameter_type(slice) {
+                    Ok(result) => {
+                        return Type::KnownInstance(KnownInstanceType::Literal(InternedType::new(
+                            self.db(),
+                            result,
+                        )));
                     }
-                    return Type::unknown();
+                    Err(nodes) => {
+                        for node in nodes {
+                            let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, node)
+                            else {
+                                continue;
+                            };
+                            builder.into_diagnostic(
+                                "Type arguments for `Literal` must be `None`, \
+                            a literal value (int, bool, str, or bytes), or an enum member",
+                            );
+                        }
+                        return Type::unknown();
+                    }
                 }
             }
+            Type::SpecialForm(SpecialFormType::Annotated) => {
+                let ast::Expr::Tuple(ast::ExprTuple {
+                    elts: ref arguments,
+                    ..
+                }) = **slice
+                else {
+                    report_invalid_arguments_to_annotated(&self.context, subscript);
+
+                    return self.infer_expression(slice, TypeContext::default());
+                };
+
+                if arguments.len() < 2 {
+                    report_invalid_arguments_to_annotated(&self.context, subscript);
+                }
+
+                let [type_expr, metadata @ ..] = &arguments[..] else {
+                    for argument in arguments {
+                        self.infer_expression(argument, TypeContext::default());
+                    }
+                    self.store_expression_type(slice, Type::unknown());
+                    return Type::unknown();
+                };
+
+                for element in metadata {
+                    self.infer_expression(element, TypeContext::default());
+                }
+
+                let ty = self.infer_expression(type_expr, TypeContext::default());
+
+                return Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(
+                    self.db(),
+                    ty,
+                )));
+            }
+            Type::SpecialForm(SpecialFormType::Optional) => {
+                if matches!(**slice, ast::Expr::Tuple(_)) {
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "`typing.Optional` requires exactly one argument"
+                        ));
+                    }
+                }
+
+                let ty = self.infer_expression(slice, TypeContext::default());
+
+                // `Optional[None]` is equivalent to `None`:
+                if ty.is_none(self.db()) {
+                    return ty;
+                }
+
+                return Type::KnownInstance(KnownInstanceType::UnionType(
+                    InternedTypes::from_elements(self.db(), [ty, Type::none(self.db())]),
+                ));
+            }
+            _ => {}
         }
 
         let slice_ty = self.infer_expression(slice, TypeContext::default());
