@@ -1618,6 +1618,25 @@ impl<'db> Type<'db> {
         self.has_relation_to(db, target, inferable, TypeRelation::Subtyping)
     }
 
+    /// Return the constraints under which this type is a subtype of type `target`, assuming that
+    /// all of the restrictions in `constraints` hold.
+    ///
+    /// See [`TypeRelation::ConstraintImplication`] for more details.
+    fn when_subtype_of_given(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+        constraints: ConstraintSet<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> ConstraintSet<'db> {
+        self.has_relation_to(
+            db,
+            target,
+            inferable,
+            TypeRelation::ConstraintImplication(constraints),
+        )
+    }
+
     /// Return true if this type is assignable to type `target`.
     ///
     /// See [`TypeRelation::Assignability`] for more details.
@@ -1677,6 +1696,14 @@ impl<'db> Type<'db> {
         // and unnecessary. This early return is only an optimisation.
         if (!relation.is_subtyping() || self.subtyping_is_always_reflexive()) && self == target {
             return ConstraintSet::from(true);
+        }
+
+        // Handle constraint implication first. If either `self` or `target` is a typevar, check
+        // the constraint set to see if the corresponding constraint is satisfied.
+        if let TypeRelation::ConstraintImplication(constraints) = relation
+            && (self.is_type_var() || target.is_type_var())
+        {
+            return constraints.when_subtype_of_given(db, self, target);
         }
 
         match (self, target) {
@@ -10319,21 +10346,36 @@ pub(crate) enum TypeRelation<'db> {
     /// This relationship tests whether one type is a [subtype][Self::Subtyping] of another,
     /// assuming that the constraints in a particular constraint set hold.
     ///
-    /// For concrete types, constraint implication is exactly the same as subtyping. (A concrete
-    /// type is any fully static type that does not contain a typevar.) Moreover, for concrete
-    /// types, the answer does not depend on which constraint set we are considering. `bool` is a
-    /// subtype of `int` no matter what types any typevars are specialized to — and even if
-    /// there isn't a valid specialization for the typevars we are considering.
+    /// For concrete types (types that do not contain typevars), this relationship is the same as
+    /// [subtyping][Self::Subtyping]. (Constraint sets place restrictions on typevars, so if you
+    /// are not comparing typevars, the constraint set can have no effect on whether subtyping
+    /// holds.)
     ///
-    /// The interesting case is typevars. The other typing relationships (TODO: will) all "punt" on
-    /// the question when considering a typevar, by translating the desired relationship into a
-    /// constraint set. At some point, though, we need to resolve a constraint set; at that point,
-    /// we can no longer punt on the question. Unlike with concrete types, the answer will depend
-    /// on the constraint set that we are considering. For instance, a constraint set that requires
-    /// `T ≤ bool` implies that `T` is a subtype of `int`, since every valid specialization
-    /// satisfies `T ≤ int`. But the reverse is not true: the constraint set `T ≤ int` does _not_
-    /// imply that `T` is a subtype of `bool`, since `T = int` is a valid specialization, and `int`
-    /// is not a subtype of `bool`.
+    /// If you're comparing a typevar, we have to consider what restrictions the constraint set
+    /// places on that typevar to determine if subtyping holds. For instance, if you want to check
+    /// whether `T ≤ int`, then answer will depend on what constraint set you are considering:
+    ///
+    /// ```text
+    /// when_subtype_of_given(T ≤ bool, T, int) ⇒ true
+    /// when_subtype_of_given(T ≤ int, T, int)  ⇒ true
+    /// when_subtype_of_given(T ≤ str, T, int)  ⇒ false
+    /// ```
+    ///
+    /// In the first two cases, the constraint set ensures that `T` will always specialize to a
+    /// type that is a subtype of `int`. In the final case, the constraint set requires `T` to
+    /// specialize to a subtype of `str`, and there is no such type that is also a subtype of
+    /// `int`.
+    ///
+    /// There are two constraint sets that deserve special consideration.
+    ///
+    /// - The "always true" constraint set does not place any restrictions on any typevar. In this
+    ///   case, `when_subtype_of_given` will return the same result as `when_subtype_of`, even if
+    ///   you're comparing against a typevar.
+    ///
+    /// - The "always false" constraint set represents an impossible situation. In this case, every
+    ///   subtype check will be vacuously true, even if you're comparing two concrete types that
+    ///   are not actually subtypes of each other. (That is,
+    ///   `when_subtype_of_given(false, int, str)` will return true!)
     ConstraintImplication(ConstraintSet<'db>),
 }
 

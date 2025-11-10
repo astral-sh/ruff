@@ -216,47 +216,16 @@ impl<'db> ConstraintSet<'db> {
     }
 
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
-    /// constraints in this constraint set hold.
-    ///
-    /// For concrete types (types that are not typevars), this returns the same result as
-    /// [`when_subtype_of`][Type::when_subtype_of]. (Constraint sets place restrictions on
-    /// typevars, so if you are not comparing typevars, the constraint set can have no effect on
-    /// whether subtyping holds.)
-    ///
-    /// If you're comparing a typevar, we have to consider what restrictions the constraint set
-    /// places on that typevar to determine if subtyping holds. For instance, if you want to check
-    /// whether `T ≤ int`, then answer will depend on what constraint set you are considering:
-    ///
-    /// ```text
-    /// when_subtype_of_given(T ≤ bool, T, int) ⇒ true
-    /// when_subtype_of_given(T ≤ int, T, int)  ⇒ true
-    /// when_subtype_of_given(T ≤ str, T, int)  ⇒ false
-    /// ```
-    ///
-    /// In the first two cases, the constraint set ensures that `T` will always specialize to a
-    /// type that is a subtype of `int`. In the final case, the constraint set requires `T` to
-    /// specialize to a subtype of `str`, and there is no such type that is also a subtype of
-    /// `int`.
-    ///
-    /// There are two constraint sets that deserve special consideration.
-    ///
-    /// - The "always true" constraint set does not place any restrictions on any typevar. In this
-    ///   case, `when_subtype_of_given` will return the same result as `when_subtype_of`, even if
-    ///   you're comparing against a typevar.
-    ///
-    /// - The "always false" constraint set represents an impossible situation. In this case, every
-    ///   subtype check will be vacuously true, even if you're comparing two concrete types that
-    ///   are not actually subtypes of each other. (That is,
-    ///   `when_subtype_of_given(false, int, str)` will return true!)
+    /// constraints in this constraint set hold. Panics if neither of the types being compared are
+    /// a typevar. (That case is handled by `Type::has_relation_to`.)
     pub(crate) fn when_subtype_of_given(
         self,
         db: &'db dyn Db,
         lhs: Type<'db>,
         rhs: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
     ) -> Self {
         Self {
-            node: self.node.when_subtype_of_given(db, lhs, rhs, inferable),
+            node: self.node.when_subtype_of_given(db, lhs, rhs),
         }
     }
 
@@ -830,13 +799,7 @@ impl<'db> Node<'db> {
         simplified.and(db, domain)
     }
 
-    fn when_subtype_of_given(
-        self,
-        db: &'db dyn Db,
-        lhs: Type<'db>,
-        rhs: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-    ) -> Self {
+    fn when_subtype_of_given(self, db: &'db dyn Db, lhs: Type<'db>, rhs: Type<'db>) -> Self {
         // When checking subtyping involving a typevar, we can turn the subtyping check into a
         // constraint (i.e, "is `T` a subtype of `int` becomes the constraint `T ≤ int`), and then
         // check when the BDD implies that constraint.
@@ -847,8 +810,7 @@ impl<'db> Node<'db> {
             (_, Type::TypeVar(bound_typevar)) => {
                 ConstrainedTypeVar::new_node(db, bound_typevar, lhs, Type::object())
             }
-            // If neither type is a typevar, then we fall back on a normal subtyping check.
-            _ => return lhs.when_subtype_of(db, rhs, inferable).node,
+            _ => panic!("at least one type should be a typevar"),
         };
 
         self.satisfies(db, constraint)
