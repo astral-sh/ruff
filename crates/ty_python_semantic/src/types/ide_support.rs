@@ -1619,7 +1619,7 @@ mod resolve_definition {
             DefinitionKind::TypeAlias(_)
             | DefinitionKind::Import(_)
             | DefinitionKind::ImportFrom(_)
-            | DefinitionKind::ImportFromImplicit(_)
+            | DefinitionKind::ImportFromSubmodule(_)
             | DefinitionKind::StarImport(_)
             | DefinitionKind::NamedExpression(_)
             | DefinitionKind::Assignment(_)

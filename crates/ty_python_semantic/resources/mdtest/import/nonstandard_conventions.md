@@ -28,8 +28,7 @@ This file currently covers the following details:
 
 ## Relative `from` Import of Direct Submodule in `__init__`
 
-The `from . import submodule` idiom in an `__init__.pyi` should definitely be considered an explicit
-re-export.
+We consider the `from . import submodule` idiom in an `__init__.pyi` an explicit re-export.
 
 `mypackage/__init__.pyi`:
 
@@ -653,6 +652,7 @@ import mypackage
 from mypackage import imported
 
 # TODO: this would be nice to support, but it's dangerous with available_submodule_attributes
+# for details, see: https://github.com/astral-sh/ty/issues/1488
 reveal_type(imported.X)  # revealed: int
 # error: "has no member `imported`"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
@@ -764,8 +764,9 @@ Can easily result in the typechecker getting "confused" and thinking imports of 
 top-level package are referring to the subpackage and not the function/class. This issue can be
 found with the `lobpcg` function in `scipy.sparse.linalg`.
 
-We avoid this by ~desugarring the imports into two definitions, with the RHS occuring second, so
-that it can freely overwrite the LHS.
+We avoid this by ensuring that the imported name (the right-hand `funcmod` in
+`from .funcmod import funcmod`) overwrites the submodule attribute (the left-hand `funcmod`), as it
+does at runtime.
 
 `mypackage/__init__.pyi`:
 

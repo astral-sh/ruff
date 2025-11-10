@@ -210,7 +210,7 @@ impl<'db> DefinitionState<'db> {
 pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     Import(ImportDefinitionNodeRef<'ast>),
     ImportFrom(ImportFromDefinitionNodeRef<'ast>),
-    ImportFromImplicit(ImportFromImplicitDefinitionNodeRef<'ast>),
+    ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef<'ast>),
     ImportStar(StarImportDefinitionNodeRef<'ast>),
     For(ForStmtDefinitionNodeRef<'ast, 'db>),
     Function(&'ast ast::StmtFunctionDef),
@@ -292,9 +292,9 @@ impl<'ast> From<ImportFromDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '
     }
 }
 
-impl<'ast> From<ImportFromImplicitDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
-    fn from(node_ref: ImportFromImplicitDefinitionNodeRef<'ast>) -> Self {
-        Self::ImportFromImplicit(node_ref)
+impl<'ast> From<ImportFromSubmoduleDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(node_ref: ImportFromSubmoduleDefinitionNodeRef<'ast>) -> Self {
+        Self::ImportFromSubmodule(node_ref)
     }
 }
 
@@ -366,7 +366,7 @@ pub(crate) struct ImportFromDefinitionNodeRef<'ast> {
     pub(crate) is_reexported: bool,
 }
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct ImportFromImplicitDefinitionNodeRef<'ast> {
+pub(crate) struct ImportFromSubmoduleDefinitionNodeRef<'ast> {
     pub(crate) node: &'ast ast::StmtImportFrom,
     pub(crate) submodule: &'ast ast::Identifier,
 }
@@ -448,10 +448,10 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 alias_index,
                 is_reexported,
             }),
-            DefinitionNodeRef::ImportFromImplicit(ImportFromImplicitDefinitionNodeRef {
+            DefinitionNodeRef::ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef {
                 node,
                 submodule,
-            }) => DefinitionKind::ImportFromImplicit(ImportFromImplicitDefinitionKind {
+            }) => DefinitionKind::ImportFromSubmodule(ImportFromSubmoduleDefinitionKind {
                 node: AstNodeRef::new(parsed, node),
                 submodule: submodule.as_str().into(),
             }),
@@ -580,7 +580,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 alias_index,
                 is_reexported: _,
             }) => (&node.names[alias_index]).into(),
-            Self::ImportFromImplicit(ImportFromImplicitDefinitionNodeRef {
+            Self::ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef {
                 node,
                 submodule: _,
             }) => node.into(),
@@ -682,7 +682,7 @@ impl DefinitionCategory {
 pub enum DefinitionKind<'db> {
     Import(ImportDefinitionKind),
     ImportFrom(ImportFromDefinitionKind),
-    ImportFromImplicit(ImportFromImplicitDefinitionKind),
+    ImportFromSubmodule(ImportFromSubmoduleDefinitionKind),
     StarImport(StarImportDefinitionKind),
     Function(AstNodeRef<ast::StmtFunctionDef>),
     Class(AstNodeRef<ast::StmtClassDef>),
@@ -709,7 +709,7 @@ impl DefinitionKind<'_> {
         match self {
             DefinitionKind::Import(import) => import.is_reexported(),
             DefinitionKind::ImportFrom(import) => import.is_reexported(),
-            DefinitionKind::ImportFromImplicit(_) => false,
+            DefinitionKind::ImportFromSubmodule(_) => false,
             _ => true,
         }
     }
@@ -727,7 +727,7 @@ impl DefinitionKind<'_> {
             DefinitionKind::Import(_)
                 | DefinitionKind::ImportFrom(_)
                 | DefinitionKind::StarImport(_)
-                | DefinitionKind::ImportFromImplicit(_)
+                | DefinitionKind::ImportFromSubmodule(_)
         )
     }
 
@@ -743,7 +743,7 @@ impl DefinitionKind<'_> {
         match self {
             DefinitionKind::Import(import) => import.alias(module).range(),
             DefinitionKind::ImportFrom(import) => import.alias(module).range(),
-            DefinitionKind::ImportFromImplicit(import) => import.import(module).range(),
+            DefinitionKind::ImportFromSubmodule(import) => import.import(module).range(),
             DefinitionKind::StarImport(import) => import.alias(module).range(),
             DefinitionKind::Function(function) => function.node(module).name.range(),
             DefinitionKind::Class(class) => class.node(module).name.range(),
@@ -781,7 +781,7 @@ impl DefinitionKind<'_> {
         match self {
             DefinitionKind::Import(import) => import.alias(module).range(),
             DefinitionKind::ImportFrom(import) => import.alias(module).range(),
-            DefinitionKind::ImportFromImplicit(import) => import.import(module).range(),
+            DefinitionKind::ImportFromSubmodule(import) => import.import(module).range(),
             DefinitionKind::StarImport(import) => import.import(module).range(),
             DefinitionKind::Function(function) => function.node(module).range(),
             DefinitionKind::Class(class) => class.node(module).range(),
@@ -872,7 +872,7 @@ impl DefinitionKind<'_> {
             | DefinitionKind::Comprehension(_)
             | DefinitionKind::WithItem(_)
             | DefinitionKind::MatchPattern(_)
-            | DefinitionKind::ImportFromImplicit(_)
+            | DefinitionKind::ImportFromSubmodule(_)
             | DefinitionKind::ExceptHandler(_) => DefinitionCategory::Binding,
         }
     }
@@ -1019,12 +1019,12 @@ impl ImportFromDefinitionKind {
     }
 }
 #[derive(Clone, Debug, get_size2::GetSize)]
-pub struct ImportFromImplicitDefinitionKind {
+pub struct ImportFromSubmoduleDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
     submodule: Name,
 }
 
-impl ImportFromImplicitDefinitionKind {
+impl ImportFromSubmoduleDefinitionKind {
     pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
         self.node.node(module)
     }

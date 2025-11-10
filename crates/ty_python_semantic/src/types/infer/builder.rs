@@ -1201,8 +1201,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     definition,
                 );
             }
-            DefinitionKind::ImportFromImplicit(import_from) => {
-                self.infer_import_from_implicit_definition(
+            DefinitionKind::ImportFromSubmodule(import_from) => {
+                self.infer_import_from_submodule_definition(
                     import_from.import(self.module()),
                     import_from.submodule(),
                     definition,
@@ -5487,7 +5487,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// `from .x.y import z` can introduce in an `__init__.py(i)`.
     ///
     /// For the definition `z`, see [`TypeInferenceBuilder::infer_import_from_definition`].
-    fn infer_import_from_implicit_definition(
+    fn infer_import_from_submodule_definition(
         &mut self,
         import_from: &ast::StmtImportFrom,
         submodule: &Name,
@@ -5523,7 +5523,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Now construct the submodule `.x`
         assert!(
             !submodule.is_empty(),
-            "ImportFromImplicitDefinitionKind constructed with empty module"
+            "ImportFromSubmoduleDefinitionKind constructed with empty module"
         );
         let name = submodule
             .split_once('.')
@@ -5541,7 +5541,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             // Success, introduce a binding!
             //
-            // We explicitly don't introduce a *definition* because it's actual ok
+            // We explicitly don't introduce a *declaration* because it's actual ok
             // (and fairly common) to overwrite this import with a function or class
             // and we don't want it to be a type error to do so.
             self.add_binding(import_from.into(), definition, |_, _| submodule_type);
@@ -5563,7 +5563,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let diagnostic = builder.into_diagnostic(format_args!(
-            "Module `{module_name}` has no member `{name}`"
+            "Module `{module_name}` has no submodule `{name}`"
         ));
 
         if let Some(full_submodule_name) = full_submodule_name {

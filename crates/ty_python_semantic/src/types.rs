@@ -10989,7 +10989,7 @@ impl<'db> ModuleLiteralType<'db> {
     ///   only reason to do it is to explicitly introduce those submodules and attributes, so it
     ///   *should* shadow any non-submodule of the same name.
     ///
-    /// `import x.y from z` instances are currently ignored because the `x.y` part may not be a
+    /// `from x.y import z` instances are currently ignored because the `x.y` part may not be a
     /// side-effect the user actually cares about, and the `z` component may not be a submodule.
     ///
     /// We instead prefer handling most other import effects as definitions in the scope of
