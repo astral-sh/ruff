@@ -39,9 +39,7 @@ use crate::place::{
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::{
-    imported_modules, imported_relative_submodules_of_stub_package, place_table, semantic_index,
-};
+use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
@@ -11302,29 +11300,23 @@ impl<'db> ModuleLiteralType<'db> {
     ///
     /// # Rules
     ///
-    /// We have two rules for whether a submodule attribute is defined:
+    /// Because of the excessive power and danger of this method, we currently have only one rule:
     ///
-    /// * If the importing file include `import x.y` then `x.y` is defined in the importing file.
-    ///   This is an easy rule to justify because `import` can only ever import a module, and so
+    /// * If the importing file includes `import x.y` then `x.y` is defined in the importing file.
+    ///   This is an easy rule to justify because `import` can only ever import a module, and the
+    ///   only reason to do it is to explicitly introduce those submodules and attributes, so it
     ///   *should* shadow any non-submodule of the same name.
     ///
-    /// * If the module is an `__init__.pyi` for `mypackage`, and it contains a `from...import`
-    ///   that normalizes to `from mypackage import submodule`, then `mypackage.submodule` is
-    ///   defined in all files. This supports the `from . import submodule` idiom. Critically,
-    ///   we do *not* allow `from mypackage.nested import submodule` to affect `mypackage`.
-    ///   The idea here is that `from mypackage import submodule` *from mypackage itself* can
-    ///   only ever reasonably be an import of a submodule. It doesn't make any sense to import
-    ///   a function or class from yourself! (You *can* do it but... why? Don't? Please?)
+    /// `from x.y import z` instances are currently ignored because the `x.y` part may not be a
+    /// side-effect the user actually cares about, and the `z` component may not be a submodule.
+    ///
+    /// We instead prefer handling most other import effects as definitions in the scope of
+    /// the current file (i.e. [`crate::semantic_index::definition::ImportFromDefinitionNodeRef`]).
     fn available_submodule_attributes(&self, db: &'db dyn Db) -> impl Iterator<Item = Name> {
         self.importing_file(db)
             .into_iter()
             .flat_map(|file| imported_modules(db, file))
             .filter_map(|submodule_name| submodule_name.relative_to(self.module(db).name(db)))
-            .chain(
-                imported_relative_submodules_of_stub_package(db, self.module(db))
-                    .iter()
-                    .cloned(),
-            )
             .filter_map(|relative_submodule| relative_submodule.components().next().map(Name::from))
     }
 

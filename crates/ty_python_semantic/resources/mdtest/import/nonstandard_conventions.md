@@ -1,39 +1,39 @@
 # Nonstandard Import Conventions
 
 This document covers ty-specific extensions to the
-[standard import conventions](https://typing.python.org/en/latest/spec/distributing.html#import-conventions).
+[standard import conventions](https://typing.python.org/en/latest/spec/distributing.html#import-conventions),
+and other intentional deviations from actual python semantics.
 
-It's a common idiom for a package's `__init__.py(i)` to include several imports like
-`from . import mysubmodule`, with the intent that the `mypackage.mysubmodule` attribute should work
-for anyone who only imports `mypackage`.
+This file currently covers the following details:
 
-In the context of a `.py` we handle this well through our general attempts to faithfully implement
-import side-effects. However for `.pyi` files we are expected to apply
-[a more strict set of rules](https://typing.python.org/en/latest/spec/distributing.html#import-conventions)
-to encourage intentional API design. Although `.pyi` files are explicitly designed to work with
-typecheckers, which ostensibly should all enforce these strict rules, every typechecker has its own
-defacto "extensions" to them and so a few idioms like `from . import mysubmodule` have found their
-way into `.pyi` files too.
+- **froms are locals**: a `from..import` can only define locals, it does not have global
+    side-effects. Specifically any submodule attribute `a` that's implicitly introduced by either
+    `from .a import b` or `from . import a as b` (in an `__init__.py(i)`) is a local and not a
+    global. If you do such an import at the top of a file you won't notice this. However if you do
+    such an import in a function, that means it will only be function-scoped (so you'll need to do
+    it in every function that wants to access it, making your code less sensitive to execution
+    order).
 
-Thus for the sake of compatibility, we need to define our own "extensions". Any extensions we define
-here have several competing concerns:
+- **first from first serve**: only the *first* `from..import` in an `__init__.py(i)` that imports a
+    particular direct submodule of the current package introduces that submodule as a local.
+    Subsequent imports of the submodule will not introduce that local. This reflects the fact that
+    in actual python only the first import of a submodule (in the entire execution of the program)
+    introduces it as an attribute of the package. By "first" we mean "the first time in this scope
+    (or any parent scope)". This pairs well with the fact that we are specifically introducing a
+    local (as long as you don't accidentally shadow or overwrite the local).
 
-- Extensions should ideally be kept narrow to continue to encourage explicit API design
-- Extensions should be easy to explain, document, and understand
-- Extensions should ideally still be a subset of runtime behaviour (if it works in a stub, it works
-    at runtime)
-- Extensions should ideally not make `.pyi` files more permissive than `.py` files (if it works in a
-    stub, it works in an impl)
+- **dot re-exports**: `from . import a` in an `__init__.pyi` is considered a re-export of `a`
+    (equivalent to `from . import a as a`). This is required to properly handle many stubs in the
+    wild. Currently it must be *exactly* `from . import ...`.
 
-To that end we define the following extension:
-
-> If an `__init__.pyi` for `mypackage` contains a `from...import` targetting a direct submodule of
-> `mypackage`, then that submodule should be available as an attribute of `mypackage`.
+Note: almost all tests in here have a stub and non-stub version, because we're interested in both
+defining symbols *at all* and re-exporting them.
 
 ## Relative `from` Import of Direct Submodule in `__init__`
 
-The `from . import submodule` idiom in an `__init__.pyi` is fairly explicit and we should definitely
-support it.
+We consider the `from . import submodule` idiom in an `__init__.pyi` an explicit re-export.
+
+### In Stub
 
 `mypackage/__init__.pyi`:
 
@@ -63,7 +63,7 @@ reveal_type(mypackage.imported.X)  # revealed: int
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
-## Relative `from` Import of Direct Submodule in `__init__` (Non-Stub Check)
+### In Non-Stub
 
 `mypackage/__init__.py`:
 
@@ -95,8 +95,11 @@ reveal_type(mypackage.fails.Y)  # revealed: Unknown
 
 ## Absolute `from` Import of Direct Submodule in `__init__`
 
-If an absolute `from...import` happens to import a submodule, it works just as well as a relative
-one.
+If an absolute `from...import` happens to import a submodule (i.e. it's equivalent to
+`from . import y`) we do not treat it as a re-export. We could, but we don't. (This is an arbitrary
+decision and can be changed!)
+
+### In Stub
 
 `mypackage/__init__.pyi`:
 
@@ -121,12 +124,14 @@ Y: int = 47
 ```py
 import mypackage
 
-reveal_type(mypackage.imported.X)  # revealed: int
+# TODO: this could work and would be nice to have?
+# error: "has no member `imported`"
+reveal_type(mypackage.imported.X)  # revealed: Unknown
 # error: "has no member `fails`"
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
-## Absolute `from` Import of Direct Submodule in `__init__` (Non-Stub Check)
+### In Non-Stub
 
 `mypackage/__init__.py`:
 
@@ -159,7 +164,9 @@ reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ## Import of Direct Submodule in `__init__`
 
 An `import` that happens to import a submodule does not expose the submodule as an attribute. (This
-is an arbitrary decision and can be changed easily!)
+is an arbitrary decision and can be changed!)
+
+### In Stub
 
 `mypackage/__init__.pyi`:
 
@@ -178,12 +185,12 @@ X: int = 42
 ```py
 import mypackage
 
-# TODO: this is probably safe to allow, as it's an unambiguous import of a submodule
+# TODO: this could work and would be nice to have?
 # error: "has no member `imported`"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
-## Import of Direct Submodule in `__init__` (Non-Stub Check)
+### In Non-Stub
 
 `mypackage/__init__.py`:
 
@@ -202,15 +209,17 @@ X: int = 42
 ```py
 import mypackage
 
-# TODO: this is probably safe to allow, as it's an unambiguous import of a submodule
+# TODO: this could work and would be nice to have
 # error: "has no member `imported`"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
 ## Relative `from` Import of Nested Submodule in `__init__`
 
-`from .submodule import nested` in an `__init__.pyi` is currently not supported as a way to expose
-`mypackage.submodule` or `mypackage.submodule.nested` but it could be.
+`from .submodule import nested` in an `__init__.pyi` does not re-export `mypackage.submodule`,
+`mypackage.submodule.nested`, or `nested`.
+
+### In Stub
 
 `mypackage/__init__.pyi`:
 
@@ -234,16 +243,21 @@ X: int = 42
 ```py
 import mypackage
 
-# TODO: this would be nice to allow
 # error: "has no member `submodule`"
 reveal_type(mypackage.submodule)  # revealed: Unknown
 # error: "has no member `submodule`"
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
 # error: "has no member `submodule`"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
+# error: "has no member `nested`"
+reveal_type(mypackage.nested)  # revealed: Unknown
+# error: "has no member `nested`"
+reveal_type(mypackage.nested.X)  # revealed: Unknown
 ```
 
-## Relative `from` Import of Nested Submodule in `__init__` (Non-Stub Check)
+### In Non-Stub
+
+`from .submodule import nested` in an `__init__.py` exposes `mypackage.submodule` and `nested`.
 
 `mypackage/__init__.py`:
 
@@ -267,19 +281,22 @@ X: int = 42
 ```py
 import mypackage
 
+reveal_type(mypackage.submodule)  # revealed: <module 'mypackage.submodule'>
 # TODO: this would be nice to support
-# error: "has no member `submodule`"
-reveal_type(mypackage.submodule)  # revealed: Unknown
-# error: "has no member `submodule`"
+# error: "has no member `nested`"
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
-# error: "has no member `submodule`"
+# error: "has no member `nested`"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
+reveal_type(mypackage.nested)  # revealed: <module 'mypackage.submodule.nested'>
+reveal_type(mypackage.nested.X)  # revealed: int
 ```
 
 ## Absolute `from` Import of Nested Submodule in `__init__`
 
-`from mypackage.submodule import nested` in an `__init__.pyi` is currently not supported as a way to
-expose `mypackage.submodule` or `mypackage.submodule.nested` but it could be.
+`from mypackage.submodule import nested` in an `__init__.pyi` does not re-export
+`mypackage.submodule`, `mypackage.submodule.nested`, or `nested`.
+
+### In Stub
 
 `mypackage/__init__.pyi`:
 
@@ -303,16 +320,22 @@ X: int = 42
 ```py
 import mypackage
 
-# TODO: this would be nice to support
+# TODO: this could work and would be nice to have
 # error: "has no member `submodule`"
 reveal_type(mypackage.submodule)  # revealed: Unknown
 # error: "has no member `submodule`"
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
 # error: "has no member `submodule`"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
+# error: "has no member `nested`"
+reveal_type(mypackage.nested)  # revealed: Unknown
+# error: "has no member `nested`"
+reveal_type(mypackage.nested.X)  # revealed: Unknown
 ```
 
-## Absolute `from` Import of Nested Submodule in `__init__` (Non-Stub Check)
+### In Non-Stub
+
+`from mypackage.submodule import nested` in an `__init__.py` only creates `nested`.
 
 `mypackage/__init__.py`:
 
@@ -343,12 +366,16 @@ reveal_type(mypackage.submodule)  # revealed: Unknown
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
 # error: "has no member `submodule`"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
+reveal_type(mypackage.nested)  # revealed: <module 'mypackage.submodule.nested'>
+reveal_type(mypackage.nested.X)  # revealed: int
 ```
 
 ## Import of Nested Submodule in `__init__`
 
-`import mypackage.submodule.nested` in an `__init__.pyi` is currently not supported as a way to
-expose `mypackage.submodule` or `mypackage.submodule.nested` but it could be.
+`import mypackage.submodule.nested` in an `__init__.pyi` does not re-export `mypackage.submodule` or
+`mypackage.submodule.nested`.
+
+### In Stub
 
 `mypackage/__init__.pyi`:
 
@@ -372,7 +399,6 @@ X: int = 42
 ```py
 import mypackage
 
-# TODO: this would be nice to support, and is probably safe to do as it's unambiguous
 # error: "has no member `submodule`"
 reveal_type(mypackage.submodule)  # revealed: Unknown
 # error: "has no member `submodule`"
@@ -381,7 +407,10 @@ reveal_type(mypackage.submodule.nested)  # revealed: Unknown
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
 ```
 
-## Import of Nested Submodule in `__init__` (Non-Stub Check)
+### In Non-Stub
+
+`import mypackage.submodule.nested` in an `__init__.py` does not define `mypackage.submodule` or
+`mypackage.submodule.nested` outside the package.
 
 `mypackage/__init__.py`:
 
@@ -405,7 +434,7 @@ X: int = 42
 ```py
 import mypackage
 
-# TODO: this would be nice to support, and is probably safe to do as it's unambiguous
+# TODO: this would be nice to support
 # error: "has no member `submodule`"
 reveal_type(mypackage.submodule)  # revealed: Unknown
 # error: "has no member `submodule`"
@@ -417,6 +446,8 @@ reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
 ## Relative `from` Import of Direct Submodule in `__init__`, Mismatched Alias
 
 Renaming the submodule to something else disables the `__init__.pyi` idiom.
+
+### In Stub
 
 `mypackage/__init__.pyi`:
 
@@ -441,7 +472,7 @@ reveal_type(mypackage.imported.X)  # revealed: Unknown
 reveal_type(mypackage.imported_m.X)  # revealed: Unknown
 ```
 
-## Relative `from` Import of Direct Submodule in `__init__`, Mismatched Alias (Non-Stub Check)
+### In Non-Stub
 
 `mypackage/__init__.py`:
 
@@ -471,6 +502,8 @@ reveal_type(mypackage.imported_m.X)  # revealed: int
 The `__init__.pyi` idiom should definitely always work if the submodule is renamed to itself, as
 this is the re-export idiom.
 
+### In Stub
+
 `mypackage/__init__.pyi`:
 
 ```pyi
@@ -491,7 +524,7 @@ import mypackage
 reveal_type(mypackage.imported.X)  # revealed: int
 ```
 
-## Relative `from` Import of Direct Submodule in `__init__`, Matched Alias (Non-Stub Check)
+### In Non-Stub
 
 `mypackage/__init__.py`:
 
@@ -518,6 +551,8 @@ reveal_type(mypackage.imported.X)  # revealed: int
 Even if the `__init__` idiom is in effect, star imports do not pick it up. (This is an arbitrary
 decision that mostly fell out of the implementation details and can be changed!)
 
+### In Stub
+
 `mypackage/__init__.pyi`:
 
 ```pyi
@@ -536,13 +571,13 @@ X: int = 42
 ```py
 from mypackage import *
 
-# TODO: this would be nice to support (available_submodule_attributes isn't visible to `*` imports)
+# TODO: this would be nice to support
 # error: "`imported` used when not defined"
 reveal_type(imported.X)  # revealed: Unknown
 reveal_type(Z)  # revealed: int
 ```
 
-## Star Import Unaffected (Non-Stub Check)
+### In Non-Stub
 
 `mypackage/__init__.py`:
 
@@ -569,9 +604,10 @@ reveal_type(Z)  # revealed: int
 
 ## `from` Import of Non-Submodule
 
-A from import that terminates in a non-submodule should not expose the intermediate submodules as
-attributes. This is an arbitrary decision but on balance probably safe and correct, as otherwise it
-would be hard for a stub author to be intentional about the submodules being exposed as attributes.
+A `from` import that imports a non-submodule isn't currently a special case here (various
+proposed/tested approaches did treat this specially).
+
+### In Stub
 
 `mypackage/__init__.pyi`:
 
@@ -590,11 +626,11 @@ X: int = 42
 ```py
 import mypackage
 
-# error: "has no member `imported`"
+# error: "no member `imported`"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
-## `from` Import of Non-Submodule (Non-Stub Check)
+### In Non-Stub
 
 `mypackage/__init__.py`:
 
@@ -613,15 +649,15 @@ X: int = 42
 ```py
 import mypackage
 
-# TODO: this would be nice to support, as it works at runtime
-# error: "has no member `imported`"
-reveal_type(mypackage.imported.X)  # revealed: Unknown
+reveal_type(mypackage.imported.X)  # revealed: int
 ```
 
 ## `from` Import of Other Package's Submodule
 
 `from mypackage import submodule` from outside the package is not modeled as a side-effect on
 `mypackage`, even in the importing file (this could be changed!).
+
+### In Stub
 
 `mypackage/__init__.pyi`:
 
@@ -641,12 +677,13 @@ import mypackage
 from mypackage import imported
 
 # TODO: this would be nice to support, but it's dangerous with available_submodule_attributes
+# for details, see: https://github.com/astral-sh/ty/issues/1488
 reveal_type(imported.X)  # revealed: int
 # error: "has no member `imported`"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
-## `from` Import of Other Package's Submodule (Non-Stub Check)
+### In Non-Stub
 
 `mypackage/__init__.py`:
 
@@ -675,6 +712,8 @@ reveal_type(mypackage.imported.X)  # revealed: Unknown
 
 `from . import submodule` from a sibling module is not modeled as a side-effect on `mypackage` or a
 re-export from `submodule`.
+
+### In Stub
 
 `mypackage/__init__.pyi`:
 
@@ -707,7 +746,7 @@ reveal_type(imported.fails.Y)  # revealed: Unknown
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
-## `from` Import of Sibling Module (Non-Stub Check)
+### In Non-Stub
 
 `mypackage/__init__.py`:
 
@@ -752,9 +791,11 @@ Can easily result in the typechecker getting "confused" and thinking imports of 
 top-level package are referring to the subpackage and not the function/class. This issue can be
 found with the `lobpcg` function in `scipy.sparse.linalg`.
 
-This kind of failure mode is why the rule is restricted to *direct* submodule imports, as anything
-more powerful than that in the current implementation strategy quickly gets the functions and
-submodules mixed up.
+We avoid this by ensuring that the imported name (the right-hand `funcmod` in
+`from .funcmod import funcmod`) overwrites the submodule attribute (the left-hand `funcmod`), as it
+does at runtime.
+
+### In Stub
 
 `mypackage/__init__.pyi`:
 
@@ -788,7 +829,7 @@ from mypackage import funcmod
 x = funcmod(1)
 ```
 
-## Fractal Re-export Nameclash Problems (Non-Stub Check)
+### In Non-Stub
 
 `mypackage/__init__.py`:
 
@@ -810,6 +851,314 @@ __all__ = ["funcmod"]
 
 ```py
 __all__ = ["funcmod"]
+
+def funcmod(x: int) -> int:
+    return x
+```
+
+`main.py`:
+
+```py
+from mypackage import funcmod
+
+x = funcmod(1)
+```
+
+## Re-export Nameclash Problems In Functions
+
+`from` imports in an `__init__.py` at file scope should be visible to functions defined in the file:
+
+`mypackage/__init__.py`:
+
+```py
+from .funcmod import funcmod
+
+funcmod(1)
+
+def run():
+    funcmod(2)
+```
+
+`mypackage/funcmod.py`:
+
+```py
+def funcmod(x: int) -> int:
+    return x
+```
+
+## Re-export Nameclash Problems In Try-Blocks
+
+`from` imports in an `__init__.py` at file scope in a `try` block should be visible to functions
+defined in the `try` block (regression test for a bug):
+
+`mypackage/__init__.py`:
+
+```py
+try:
+    from .funcmod import funcmod
+
+    funcmod(1)
+
+    def run():
+        # TODO: this is a bug in how we analyze try-blocks
+        # error: [call-non-callable]
+        funcmod(2)
+
+finally:
+    x = 1
+```
+
+`mypackage/funcmod.py`:
+
+```py
+def funcmod(x: int) -> int:
+    return x
+```
+
+## RHS `from` Imports In Functions
+
+If a `from` import occurs in a function, the RHS symbols should only be visible in that function.
+
+`mypackage/__init__.py`:
+
+```py
+def run1():
+    from .funcmod import funcmod
+
+    funcmod(1)
+
+def run2():
+    from .funcmod import funcmod
+
+    funcmod(2)
+
+def run3():
+    # error: [unresolved-reference]
+    funcmod(3)
+
+# error: [unresolved-reference]
+funcmod(4)
+```
+
+`mypackage/funcmod.py`:
+
+```py
+def funcmod(x: int) -> int:
+    return x
+```
+
+## LHS `from` Imports In Functions
+
+If a `from` import occurs in a function, LHS symbols should only be visible in that function. This
+very blatantly is not runtime-accurate, but exists to try to force you to write "obviously
+deterministically correct" imports instead of relying on execution order.
+
+`mypackage/__init__.py`:
+
+```py
+def run1():
+    from .funcmod import other
+
+    funcmod.funcmod(1)
+
+def run2():
+    from .funcmod import other
+
+    # TODO: this is just a bug! We only register the first
+    # import of `funcmod` in the entire file, and not per-scope!
+    # error: [unresolved-reference]
+    funcmod.funcmod(2)
+
+def run3():
+    # error: [unresolved-reference]
+    funcmod.funcmod(3)
+
+# error: [unresolved-reference]
+funcmod.funcmod(4)
+```
+
+`mypackage/funcmod.py`:
+
+```py
+other: int = 1
+
+def funcmod(x: int) -> int:
+    return x
+```
+
+## LHS `from` Imports Overwrite Locals
+
+The LHS of a `from..import` introduces a local symbol that overwrites any local with the same name.
+This reflects actual runtime behaviour, although we're kinda assuming it hasn't been imported
+already.
+
+`mypackage/__init__.py`:
+
+```py
+funcmod = 0
+from .funcmod import funcmod
+
+funcmod(1)
+```
+
+`mypackage/funcmod.py`:
+
+```py
+def funcmod(x: int) -> int:
+    return x
+```
+
+## LHS `from` Imports Overwritten By Local Function
+
+The LHS of a `from..import` introduces a local symbol that can be overwritten by defining a function
+(or class) with the same name.
+
+### In Stub
+
+`mypackage/__init__.pyi`:
+
+```pyi
+from .funcmod import other
+
+def funcmod(x: int) -> int: ...
+```
+
+`mypackage/funcmod/__init__.pyi`:
+
+```pyi
+def other(int) -> int: ...
+```
+
+`main.py`:
+
+```py
+from mypackage import funcmod
+
+x = funcmod(1)
+```
+
+### In Non-Stub
+
+`mypackage/__init__.py`:
+
+```py
+from .funcmod import other
+
+def funcmod(x: int) -> int:
+    return x
+```
+
+`mypackage/funcmod/__init__.py`:
+
+```py
+def other(x: int) -> int:
+    return x
+```
+
+`main.py`:
+
+```py
+from mypackage import funcmod
+
+x = funcmod(1)
+```
+
+## LHS `from` Imports Overwritten By Local Assignment
+
+The LHS of a `from..import` introduces a local symbol that can be overwritten by assigning to it.
+
+### In Stub
+
+`mypackage/__init__.pyi`:
+
+```pyi
+from .funcmod import other
+
+funcmod = other
+```
+
+`mypackage/funcmod/__init__.pyi`:
+
+```pyi
+def other(x: int) -> int: ...
+```
+
+`main.py`:
+
+```py
+from mypackage import funcmod
+
+x = funcmod(1)
+```
+
+### In Non-Stub
+
+`mypackage/__init__.py`:
+
+```py
+from .funcmod import other
+
+funcmod = other
+```
+
+`mypackage/funcmod/__init__.py`:
+
+```py
+def other(x: int) -> int:
+    return x
+```
+
+`main.py`:
+
+```py
+from mypackage import funcmod
+
+x = funcmod(1)
+```
+
+## LHS `from` Imports Only Apply The First Time
+
+The LHS of a `from..import` of a submodule introduces a local symbol only the first time it
+introduces a direct submodule. The second time does nothing.
+
+### In Stub
+
+`mypackage/__init__.pyi`:
+
+```pyi
+from .funcmod import funcmod as funcmod
+from .funcmod import other
+```
+
+`mypackage/funcmod/__init__.pyi`:
+
+```pyi
+def other(x: int) -> int: ...
+def funcmod(x: int) -> int: ...
+```
+
+`main.py`:
+
+```py
+from mypackage import funcmod
+
+x = funcmod(1)
+```
+
+### In Non-Stub
+
+`mypackage/__init__.py`:
+
+```py
+from .funcmod import funcmod
+from .funcmod import other
+```
+
+`mypackage/funcmod/__init__.py`:
+
+```py
+def other(x: int) -> int:
+    return x
 
 def funcmod(x: int) -> int:
     return x

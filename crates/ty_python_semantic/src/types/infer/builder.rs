@@ -4,6 +4,7 @@ use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ExprContext, HasNodeIndex, NodeIndex, PythonVersion,
@@ -1211,6 +1212,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_import_from_definition(
                     import_from.import(self.module()),
                     import_from.alias(self.module()),
+                    definition,
+                );
+            }
+            DefinitionKind::ImportFromSubmodule(import_from) => {
+                self.infer_import_from_submodule_definition(
+                    import_from.import(self.module()),
+                    import_from.submodule(),
                     definition,
                 );
             }
@@ -5881,6 +5889,99 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let diagnostic = builder.into_diagnostic(format_args!(
             "Module `{module_name}` has no member `{name}`"
+        ));
+
+        if let Some(full_submodule_name) = full_submodule_name {
+            hint_if_stdlib_submodule_exists_on_other_versions(
+                self.db(),
+                diagnostic,
+                &full_submodule_name,
+                module,
+            );
+        }
+    }
+
+    /// Infer the implicit local definition `x = <module 'thispackage.x'>` that
+    /// `from .x.y import z` can introduce in an `__init__.py(i)`.
+    ///
+    /// For the definition `z`, see [`TypeInferenceBuilder::infer_import_from_definition`].
+    fn infer_import_from_submodule_definition(
+        &mut self,
+        import_from: &ast::StmtImportFrom,
+        submodule: &Name,
+        definition: Definition<'db>,
+    ) {
+        // Although the *actual* runtime semantic of this kind of statement is to
+        // introduce a variable in the global scope of this module, we want to
+        // encourage users to write code that doesn't have dependence on execution-order.
+        //
+        // By introducing it as a local variable in the scope the import occurs in,
+        // we effectively require the developer to either do the import at the start of
+        // the file where it belongs, or to repeat the import in every function that
+        // wants to use it, which "definitely" works.
+        //
+        // (It doesn't actually "definitely" work because only the first import of `thispackage.x`
+        // will ever set `x`, and any subsequent overwrites of it will permanently clobber it.
+        // Also, a local variable `x` in a function should always shadow the submodule because
+        // the submodule is defined at file-scope. However, both of these issues are much more
+        // narrow, so this approach seems to work well in practice!)
+
+        // Get this package's module by resolving `.`
+        let Ok(module_name) = ModuleName::from_identifier_parts(self.db(), self.file(), None, 1)
+        else {
+            self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
+            return;
+        };
+
+        let Some(module) = resolve_module(self.db(), &module_name) else {
+            self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
+            return;
+        };
+
+        // Now construct the submodule `.x`
+        assert!(
+            !submodule.is_empty(),
+            "ImportFromSubmoduleDefinitionKind constructed with empty module"
+        );
+        let name = submodule
+            .split_once('.')
+            .map(|(first, _)| first)
+            .unwrap_or(submodule.as_str());
+        let full_submodule_name = ModuleName::new(name).map(|final_part| {
+            let mut ret = module_name.clone();
+            ret.extend(&final_part);
+            ret
+        });
+        // And try to import it
+        if let Some(submodule_type) = full_submodule_name
+            .as_ref()
+            .and_then(|submodule_name| self.module_type_from_name(submodule_name))
+        {
+            // Success, introduce a binding!
+            //
+            // We explicitly don't introduce a *declaration* because it's actual ok
+            // (and fairly common) to overwrite this import with a function or class
+            // and we don't want it to be a type error to do so.
+            self.add_binding(import_from.into(), definition, |_, _| submodule_type);
+            return;
+        }
+
+        // That didn't work, try to produce diagnostics
+        self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
+
+        if !self.is_reachable(import_from) {
+            return;
+        }
+
+        let Some(builder) = self
+            .context
+            .report_lint(&UNRESOLVED_IMPORT, AnyNodeRef::StmtImportFrom(import_from))
+        else {
+            return;
+        };
+
+        let diagnostic = builder.into_diagnostic(format_args!(
+            "Module `{module_name}` has no submodule `{name}`"
         ));
 
         if let Some(full_submodule_name) = full_submodule_name {
