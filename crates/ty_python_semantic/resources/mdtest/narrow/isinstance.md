@@ -104,16 +104,25 @@ Except for the `None` special case mentioned above, narrowing can only take plac
 the PEP-604 union are class literals. If any elements are generic aliases or other types, the
 `isinstance()` call may fail at runtime, so no narrowing can take place:
 
+<!-- snapshot-diagnostics -->
+
 ```toml
 [environment]
 python-version = "3.10"
 ```
 
 ```py
+from typing import Any, Literal, NamedTuple
+
 def _(x: int | list[int] | bytes):
-    # TODO: this fails at runtime; we should emit a diagnostic
-    # (requires special-casing of the `isinstance()` signature)
-    if isinstance(x, int | list[int]):
+    # error: [invalid-argument-type]
+    if isinstance(x, list[int] | int):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+    # error: [invalid-argument-type]
+    elif isinstance(x, Literal[42] | list[int] | bytes):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+    # error: [invalid-argument-type]
+    elif isinstance(x, Any | NamedTuple | list[int]):
         reveal_type(x)  # revealed: int | list[int] | bytes
     else:
         reveal_type(x)  # revealed: int | list[int] | bytes
