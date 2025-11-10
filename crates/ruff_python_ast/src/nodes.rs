@@ -3269,6 +3269,13 @@ impl<'a> ArgOrKeyword<'a> {
             ArgOrKeyword::Keyword(keyword) => &keyword.value,
         }
     }
+
+    pub const fn is_variadic(self) -> bool {
+        match self {
+            ArgOrKeyword::Arg(expr) => expr.is_starred_expr(),
+            ArgOrKeyword::Keyword(keyword) => keyword.arg.is_none(),
+        }
+    }
 }
 
 impl<'a> From<&'a Expr> for ArgOrKeyword<'a> {
