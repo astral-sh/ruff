@@ -9,18 +9,16 @@ This file currently covers the following details:
 - **froms are locals**: a `from..import` can only define locals, it does not have global
     side-effects. Specifically any submodule attribute `a` that's implicitly introduced by either
     `from .a import b` or `from . import a as b` (in an `__init__.py(i)`) is a local and not a
-    global. If you do such an import at the top of a file you won't notice this. However if you do
-    such an import in a function, that means it will only be function-scoped (so you'll need to do
-    it in every function that wants to access it, making your code less sensitive to execution
-    order).
+    global. However we only introduce this symbol if the `from..import` is in global-scope. This
+    means imports at the start of a file work as you'd expect, while imports in a function don't
+    introduce submodule attributes.
 
 - **first from first serve**: only the *first* `from..import` in an `__init__.py(i)` that imports a
     particular direct submodule of the current package introduces that submodule as a local.
     Subsequent imports of the submodule will not introduce that local. This reflects the fact that
     in actual python only the first import of a submodule (in the entire execution of the program)
-    introduces it as an attribute of the package. By "first" we mean "the first time in this scope
-    (or any parent scope)". This pairs well with the fact that we are specifically introducing a
-    local (as long as you don't accidentally shadow or overwrite the local).
+    introduces it as an attribute of the package. By "first" we mean "the first time in global
+    scope".
 
 - **dot re-exports**: `from . import a` in an `__init__.pyi` is considered a re-export of `a`
     (equivalent to `from . import a as a`). This is required to properly handle many stubs in the
@@ -949,9 +947,8 @@ def funcmod(x: int) -> int:
 
 ## LHS `from` Imports In Functions
 
-If a `from` import occurs in a function, LHS symbols should only be visible in that function. This
-very blatantly is not runtime-accurate, but exists to try to force you to write "obviously
-deterministically correct" imports instead of relying on execution order.
+If a `from` import occurs in a function, we simply ignore its LHS effects to avoid modeling
+execution-order-specific behaviour (and to discourage people writing code that has it).
 
 `mypackage/__init__.py`:
 
@@ -959,13 +956,14 @@ deterministically correct" imports instead of relying on execution order.
 def run1():
     from .funcmod import other
 
+    # TODO: this would be nice to support
+    # error: [unresolved-reference]
     funcmod.funcmod(1)
 
 def run2():
     from .funcmod import other
 
-    # TODO: this is just a bug! We only register the first
-    # import of `funcmod` in the entire file, and not per-scope!
+    # TODO: this would be nice to support
     # error: [unresolved-reference]
     funcmod.funcmod(2)
 

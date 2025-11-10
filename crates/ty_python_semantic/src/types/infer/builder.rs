@@ -5911,20 +5911,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         submodule: &Name,
         definition: Definition<'db>,
     ) {
-        // Although the *actual* runtime semantic of this kind of statement is to
-        // introduce a variable in the global scope of this module, we want to
-        // encourage users to write code that doesn't have dependence on execution-order.
-        //
-        // By introducing it as a local variable in the scope the import occurs in,
-        // we effectively require the developer to either do the import at the start of
-        // the file where it belongs, or to repeat the import in every function that
-        // wants to use it, which "definitely" works.
-        //
-        // (It doesn't actually "definitely" work because only the first import of `thispackage.x`
-        // will ever set `x`, and any subsequent overwrites of it will permanently clobber it.
-        // Also, a local variable `x` in a function should always shadow the submodule because
-        // the submodule is defined at file-scope. However, both of these issues are much more
-        // narrow, so this approach seems to work well in practice!)
+        // The runtime semantic of this kind of statement is to introduce a variable in the global
+        // scope of this module, so we do just that. (Actually we introduce a local variable, but
+        // this type of Definition is only created when a `from..import` is in global scope.)
 
         // Get this package's module by resolving `.`
         let Ok(module_name) = ModuleName::from_identifier_parts(self.db(), self.file(), None, 1)
