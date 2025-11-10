@@ -113,6 +113,7 @@ mod tests {
     #[test_case(Rule::LegacyFormPytestRaises, Path::new("RUF061_deprecated_call.py"))]
     #[test_case(Rule::NonOctalPermissions, Path::new("RUF064.py"))]
     #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065.py"))]
+    #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065_str_edge_cases.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
