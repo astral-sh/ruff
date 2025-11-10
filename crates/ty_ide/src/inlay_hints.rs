@@ -849,7 +849,14 @@ mod tests {
 
     #[test]
     fn test_disabled_variable_types() {
-        let test = inlay_hint_test("x = 1");
+        let test = inlay_hint_test(
+            "
+            def i(x: int, /) -> int:
+                return x
+
+            x = i(1)
+            ",
+        );
 
         assert_snapshot!(
             test.inlay_hints_with_settings(&InlayHintSettings {
@@ -857,7 +864,10 @@ mod tests {
                 ..Default::default()
             }),
             @r"
-        x = 1
+        def i(x: int, /) -> int:
+            return x
+
+        x = i(1)
         "
         );
     }
