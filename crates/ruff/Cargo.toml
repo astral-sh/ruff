@@ -96,3 +96,10 @@ workspace = true
 
 [lib]
 doctest = false
+
+[features]
+default = []
+ext-lint = [
+    "ruff_linter/ext-lint",
+    "ruff_workspace/ext-lint",
+]

@@ -89,7 +89,7 @@ mod decimal_from_float_literal;
 mod default_factory_kwarg;
 mod duplicate_entry_in_dunder_all;
 mod explicit_f_string_type_conversion;
-mod external_ast;
+pub(crate) mod external_ast;
 mod fallible_context_manager;
 mod falsy_dict_get_fallback;
 mod float_equality_comparison;

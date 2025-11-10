@@ -1,5 +1,6 @@
 pub mod ast;
 pub mod error;
+pub mod runtime;
 
 use serde::Deserialize;
 use std::path::PathBuf;
@@ -21,6 +22,7 @@ pub use ast::registry::{ExternalLintRegistry, LinterIndex, RuleLocator};
 pub use ast::rule::{
     ExternalAstLinter, ExternalAstRule, ExternalAstRuleSpec, ExternalRuleCode, ExternalRuleScript,
 };
-pub use ast::runtime::ExternalLintRuntimeHandle;
 pub use ast::target::{AstNodeClass, AstTarget, AstTargetSpec, ExprKind, StmtKind};
 pub use error::ExternalLinterError;
+pub use runtime::ExternalLintRuntimeHandle;
+pub use runtime::verify_registry_scripts;
