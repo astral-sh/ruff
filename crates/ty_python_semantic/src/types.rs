@@ -885,20 +885,31 @@ impl<'db> Type<'db> {
         }
     }
 
-    // If the type is a specialized instance of the given `KnownClass`, returns the specialization.
+    /// If the type is a specialized instance of the given `KnownClass`, returns the specialization.
     pub(crate) fn known_specialization(
         &self,
         db: &'db dyn Db,
         known_class: KnownClass,
     ) -> Option<Specialization<'db>> {
         let class_literal = known_class.try_to_class_literal(db)?;
-        self.specialization_of(db, Some(class_literal))
+        self.specialization_of(db, class_literal)
     }
 
-    // If the type is a specialized instance of the given class, returns the specialization.
-    //
-    // If no class is provided, returns the specialization of any class instance.
+    /// If this type is a class instance, returns its specialization.
+    pub(crate) fn class_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+        self.specialization_of_optional(db, None)
+    }
+
+    /// If the type is a specialized instance of the given class, returns the specialization.
     pub(crate) fn specialization_of(
+        self,
+        db: &'db dyn Db,
+        expected_class: ClassLiteral<'_>,
+    ) -> Option<Specialization<'db>> {
+        self.specialization_of_optional(db, Some(expected_class))
+    }
+
+    fn specialization_of_optional(
         self,
         db: &'db dyn Db,
         expected_class: Option<ClassLiteral<'_>>,
@@ -5588,7 +5599,7 @@ impl<'db> Type<'db> {
     ) -> Result<Bindings<'db>, CallError<'db>> {
         self.bindings(db)
             .match_parameters(db, argument_types)
-            .check_types(db, argument_types, &TypeContext::default(), &[])
+            .check_types(db, argument_types, TypeContext::default(), &[])
     }
 
     /// Look up a dunder method on the meta-type of `self` and call it.
@@ -5640,7 +5651,8 @@ impl<'db> Type<'db> {
                 let bindings = dunder_callable
                     .bindings(db)
                     .match_parameters(db, argument_types)
-                    .check_types(db, argument_types, &tcx, &[])?;
+                    .check_types(db, argument_types, tcx, &[])?;
+
                 if boundness == Definedness::PossiblyUndefined {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
                 }
