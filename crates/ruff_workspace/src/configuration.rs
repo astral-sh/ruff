@@ -343,6 +343,7 @@ impl Configuration {
         };
 
         if let Some(registry) = external_ast_registry.as_ref() {
+            ruff_linter::external::verify_registry_scripts(registry)?;
             for rule in registry.iter_enabled_rules() {
                 let code = rule.code.as_str().to_owned();
                 if seen_external_codes.insert(code.clone()) {

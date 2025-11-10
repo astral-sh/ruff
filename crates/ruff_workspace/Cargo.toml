@@ -70,6 +70,7 @@ schemars = [
     "ruff_python_formatter/schemars",
     "ruff_python_semantic/schemars",
 ]
+ext-lint = ["ruff_linter/ext-lint"]
 
 [lints]
 workspace = true
