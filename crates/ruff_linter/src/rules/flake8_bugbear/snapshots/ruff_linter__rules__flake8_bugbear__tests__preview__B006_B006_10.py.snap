@@ -2,27 +2,6 @@
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
 B006 [*] Do not use mutable data structures for argument defaults
- --> B006_10.py:7:26
-  |
-6 | # NOT triggering B006 (should trigger)
-7 | def func_A(s: set[str] = MY_SET):
-  |                          ^^^^^^
-8 |     return s
-  |
-help: Replace with `None`; initialize within function
-4  | MY_DICT = {"key": "value"}  # plain dict
-5  | 
-6  | # NOT triggering B006 (should trigger)
-   - def func_A(s: set[str] = MY_SET):
-7  + def func_A(s: set[str] = None):
-8  +     if s is None:
-9  +         s = MY_SET
-10 |     return s
-11 | 
-12 | # Triggering B006 (correct)
-note: This is an unsafe fix and may change runtime behavior
-
-B006 [*] Do not use mutable data structures for argument defaults
   --> B006_10.py:11:26
    |
 10 | # Triggering B006 (correct)
@@ -40,46 +19,5 @@ help: Replace with `None`; initialize within function
 13 +         s = {"ABC", "DEF"}
 14 |     return s
 15 | 
-16 | # Should trigger B006
-note: This is an unsafe fix and may change runtime behavior
-
-B006 [*] Do not use mutable data structures for argument defaults
-  --> B006_10.py:15:31
-   |
-14 | # Should trigger B006
-15 | def func_C(items: list[int] = MY_LIST):
-   |                               ^^^^^^^
-16 |     return items
-   |
-help: Replace with `None`; initialize within function
-12 |     return s
-13 | 
-14 | # Should trigger B006
-   - def func_C(items: list[int] = MY_LIST):
-15 + def func_C(items: list[int] = None):
-16 +     if items is None:
-17 +         items = MY_LIST
-18 |     return items
-19 | 
-20 | # Should trigger B006
-note: This is an unsafe fix and may change runtime behavior
-
-B006 [*] Do not use mutable data structures for argument defaults
-  --> B006_10.py:19:35
-   |
-18 | # Should trigger B006
-19 | def func_D(data: dict[str, str] = MY_DICT):
-   |                                   ^^^^^^^
-20 |     return data
-   |
-help: Replace with `None`; initialize within function
-16 |     return items
-17 | 
-18 | # Should trigger B006
-   - def func_D(data: dict[str, str] = MY_DICT):
-19 + def func_D(data: dict[str, str] = None):
-20 +     if data is None:
-21 +         data = MY_DICT
-22 |     return data
-23 | 
+16 | # NOT triggering B006 (correct - UPPER_CASE constants are excluded per PEP 8)
 note: This is an unsafe fix and may change runtime behavior

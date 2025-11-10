@@ -10,6 +10,7 @@ use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::typing::{
     find_binding_value, is_immutable_annotation, is_mutable_expr,
 };
+use ruff_python_stdlib::str;
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
@@ -145,6 +146,10 @@ fn is_guaranteed_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
         }
         Expr::Named(ast::ExprNamed { value, .. }) => is_guaranteed_mutable_expr(value, semantic),
         Expr::Name(name) => {
+            // Exclude UPPER_CASE constants (PEP 8 convention - meant to be read-only)
+            if str::is_cased_uppercase(&name.id) {
+                return false;
+            }
             // Resolve module-level constants that are bound to mutable objects
             let Some(binding_id) = semantic.only_binding(name) else {
                 return false;
