@@ -254,6 +254,7 @@ jobs:
           persist-credentials: false
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
         with:
+          shared-key: ruff-linux-debug
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup show
@@ -295,14 +296,6 @@ jobs:
         env:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: ruff
-          path: target/debug/ruff
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: ty
-          path: target/debug/ty
 
   cargo-test-linux-release:
     name: "cargo test (linux, release)"
@@ -462,9 +455,7 @@ jobs:
   fuzz-parser:
     name: "fuzz parser"
     runs-on: ubuntu-latest
-    needs:
-      - cargo-test-linux
-      - determine_changes
+    needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.parser == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true') }}
     timeout-minutes: 20
     env:
@@ -474,26 +465,23 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@85856786d1ce8acfbcc2f13a5f3fbd6b938f9f41 # v7.1.2
-      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-        name: Download Ruff binary to test
-        id: download-cached-binary
+      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
         with:
-          name: ruff
-          path: ruff-to-test
+          shared-key: ruff-linux-debug
+          save-if: false
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: Build Ruff binary
+        run: cargo build -p ruff --bin ruff
       - name: Fuzz
-        env:
-          DOWNLOAD_PATH: ${{ steps.download-cached-binary.outputs.download-path }}
         run: |
-          # Make executable, since artifact download doesn't preserve this
-          chmod +x "${DOWNLOAD_PATH}/ruff"
-
           (
             uv run \
             --python="${PYTHON_VERSION}" \
             --project=./python/py-fuzzer \
             --locked \
             fuzz \
-            --test-executable="${DOWNLOAD_PATH}/ruff" \
+            --test-executable=target/debug/ruff \
             --bin=ruff \
             0-500
           )
@@ -535,9 +523,7 @@ jobs:
   ecosystem:
     name: "ecosystem"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-latest-8' || 'ubuntu-latest' }}
-    needs:
-      - cargo-test-linux
-      - determine_changes
+    needs: determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     # Ecosystem check needs linter and/or formatter changes.
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && needs.determine_changes.outputs.code == 'true' }}
@@ -551,20 +537,41 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           activate-environment: true
 
-      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-        name: Download comparison Ruff binary
-        id: ruff-target
+      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
         with:
-          name: ruff
-          path: target/debug
+          shared-key: ruff-linux-debug
+          save-if: false
 
-      - uses: dawidd6/action-download-artifact@20319c5641d495c8a52e688b7dc5fada6c3a9fbc # v8
-        name: Download baseline Ruff binary
+      - name: "Install Rust toolchain"
+        run: rustup show
+
+      - name: "Install mold"
+        uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
+
+      - name: Build comparison Ruff binary
+        run: |
+          cargo build -p ruff --bin ruff
+          mkdir -p target-comparison
+          cp target/debug/ruff target-comparison/ruff
+
+      - name: Checkout baseline version
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          name: ruff
-          branch: ${{ github.event.pull_request.base.ref }}
-          workflow: "ci.yaml"
-          check_artifacts: true
+          ref: ${{ github.event.pull_request.base.ref }}
+          path: baseline
+          persist-credentials: false
+
+      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+        with:
+          workspaces: baseline
+          shared-key: ruff-linux-debug-baseline
+          save-if: false
+
+      - name: Build baseline Ruff binary
+        run: |
+          cd baseline
+          cargo build -p ruff --bin ruff
+          cp target/debug/ruff ../ruff
 
       - name: Install ruff-ecosystem
         run: |
@@ -572,16 +579,11 @@ jobs:
 
       - name: Run `ruff check` stable ecosystem check
         if: ${{ needs.determine_changes.outputs.linter == 'true' }}
-        env:
-          DOWNLOAD_PATH: ${{ steps.ruff-target.outputs.download-path }}
         run: |
-          # Make executable, since artifact download doesn't preserve this
-          chmod +x ./ruff "${DOWNLOAD_PATH}/ruff"
-
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem check ./ruff "${DOWNLOAD_PATH}/ruff" --cache ./checkouts --output-format markdown | tee ecosystem-result-check-stable
+          ruff-ecosystem check ./ruff ./target-comparison/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-check-stable
 
           cat ecosystem-result-check-stable > "$GITHUB_STEP_SUMMARY"
           echo "### Linter (stable)"  > ecosystem-result
@@ -590,16 +592,11 @@ jobs:
 
       - name: Run `ruff check` preview ecosystem check
         if: ${{ needs.determine_changes.outputs.linter == 'true' }}
-        env:
-          DOWNLOAD_PATH: ${{ steps.ruff-target.outputs.download-path }}
         run: |
-          # Make executable, since artifact download doesn't preserve this
-          chmod +x ./ruff "${DOWNLOAD_PATH}/ruff"
-
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem check ./ruff "${DOWNLOAD_PATH}/ruff" --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-check-preview
+          ruff-ecosystem check ./ruff ./target-comparison/ruff --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-check-preview
 
           cat ecosystem-result-check-preview > "$GITHUB_STEP_SUMMARY"
           echo "### Linter (preview)" >> ecosystem-result
@@ -608,16 +605,11 @@ jobs:
 
       - name: Run `ruff format` stable ecosystem check
         if: ${{ needs.determine_changes.outputs.formatter == 'true' }}
-        env:
-          DOWNLOAD_PATH: ${{ steps.ruff-target.outputs.download-path }}
         run: |
-          # Make executable, since artifact download doesn't preserve this
-          chmod +x ./ruff "${DOWNLOAD_PATH}/ruff"
-
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem format ./ruff "${DOWNLOAD_PATH}/ruff" --cache ./checkouts --output-format markdown | tee ecosystem-result-format-stable
+          ruff-ecosystem format ./ruff ./target-comparison/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-format-stable
 
           cat ecosystem-result-format-stable > "$GITHUB_STEP_SUMMARY"
           echo "### Formatter (stable)" >> ecosystem-result
@@ -626,16 +618,11 @@ jobs:
 
       - name: Run `ruff format` preview ecosystem check
         if: ${{ needs.determine_changes.outputs.formatter == 'true' }}
-        env:
-          DOWNLOAD_PATH: ${{ steps.ruff-target.outputs.download-path }}
         run: |
-          # Make executable, since artifact download doesn't preserve this
-          chmod +x ./ruff "${DOWNLOAD_PATH}/ruff"
-
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem format ./ruff "${DOWNLOAD_PATH}/ruff" --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-format-preview
+          ruff-ecosystem format ./ruff ./target-comparison/ruff --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-format-preview
 
           cat ecosystem-result-format-preview > "$GITHUB_STEP_SUMMARY"
           echo "### Formatter (preview)" >> ecosystem-result
@@ -866,9 +853,7 @@ jobs:
     name: "test ruff-lsp"
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs:
-      - cargo-test-linux
-      - determine_changes
+    needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     steps:
       - uses: extractions/setup-just@e33e0265a09d6d736e2ee1e0eb685ef1de4669ff # v3.0.0
@@ -876,37 +861,46 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        name: "Download ruff-lsp source"
+        name: "Checkout ruff source"
+        with:
+          persist-credentials: false
+
+      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+        with:
+          shared-key: ruff-linux-debug
+          save-if: false
+
+      - name: "Install Rust toolchain"
+        run: rustup show
+
+      - name: Build Ruff binary
+        run: cargo build -p ruff --bin ruff
+
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        name: "Checkout ruff-lsp source"
         with:
           persist-credentials: false
           repository: "astral-sh/ruff-lsp"
+          path: ruff-lsp
 
       - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
         with:
           # installation fails on 3.13 and newer
           python-version: "3.12"
 
-      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-        name: Download development ruff binary
-        id: ruff-target
-        with:
-          name: ruff
-          path: target/debug
-
       - name: Install ruff-lsp dependencies
         run: |
+          cd ruff-lsp
           just install
 
       - name: Run ruff-lsp tests
-        env:
-          DOWNLOAD_PATH: ${{ steps.ruff-target.outputs.download-path }}
         run: |
           # Setup development binary
           pip uninstall --yes ruff
-          chmod +x "${DOWNLOAD_PATH}/ruff"
-          export PATH="${DOWNLOAD_PATH}:${PATH}"
+          export PATH="${PWD}/target/debug:${PATH}"
           ruff version
 
+          cd ruff-lsp
           just test
 
   check-playground:
