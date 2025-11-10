@@ -280,6 +280,55 @@ Note that plugin-specific configuration options are defined in their own modules
 
 Finally, regenerate the documentation and generated code with `cargo dev generate-all`.
 
+### Opening a PR
+
+After you finish your changes, the next step is to open a PR. By default, two
+sections will be filled into the PR body: the summary and the test plan.
+
+#### The summary
+
+The summary is intended to give us as maintainers information about your PR.
+This should typically include a link to the relevant issue(s) you're addressing
+in your PR, as well as a summary of the issue and your approach to fixing it. If
+you have any questions about your approach or design, or if you considered
+alternative approaches, that can also be helpful to include.
+
+AI can be helpful in generating both the code and summary of your PR, but a
+successful contribution should still be carefully reviewed by you and the
+summary editorialized before submitting a PR. A great summary is thorough but
+also succinct and gives us the context we need to review your PR.
+
+You can find examples of excellent issues and PRs by searching for the
+[`great writeup`](https://github.com/astral-sh/ruff/issues?q=label%3A%22great%20writeup%22)
+label.
+
+#### The test plan
+
+The test plan is likely to be shorter than the summary and can be as simple as
+"Added new snapshot tests for `RUF123`," at least for rule bugs. For LSP or some
+types of CLI changes, in particular, it can also be helpful to include
+screenshots or recordings of your change in action.
+
+#### Ecosystem report
+
+After opening the PR, an ecosystem report will be run as part of CI. This shows
+a diff of linter and formatter behavior before and after the changes in your PR.
+Going through these changes and reporting your findings in the PR summary or an
+additional comment help us to review your PR more efficiently. It's also a great
+way to find new test cases to incorporate into your PR if you identify any
+issues.
+
+#### PR status
+
+To help us know when your PR is ready for review again, please either move your
+PR back to a draft while working on it (marking it ready for review afterwards
+will ping the previous reviewers) or explicitly re-request a review. This helps
+us to avoid re-reviewing a PR while you're still working on it and also to
+prioritize PRs that are definitely ready for review.
+
+You can also thumbs-up or mark as resolved any comments we leave to let us know
+you addressed them.
+
 ## MkDocs
 
 > [!NOTE]
