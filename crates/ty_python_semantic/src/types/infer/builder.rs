@@ -6034,16 +6034,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Successfully narrowed to an element of the union.
             //
-            // Infer the argument types again with diagnostics enabled.
-            self.context.set_multi_inference(was_in_multi_inference);
+            // If necessary, infer the argument types again with diagnostics enabled.
+            if !was_in_multi_inference {
+                self.context.set_multi_inference(was_in_multi_inference);
 
-            self.infer_all_argument_types(
-                ast_arguments,
-                argument_types,
-                bindings,
-                narrowed_tcx,
-                MultiInferenceState::Intersect,
-            );
+                self.infer_all_argument_types(
+                    ast_arguments,
+                    argument_types,
+                    bindings,
+                    narrowed_tcx,
+                    MultiInferenceState::Intersect,
+                );
+            }
 
             Some(bindings.check_types_impl(
                 db,
@@ -6108,10 +6110,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_expression_tcx: TypeContext<'db>,
         multi_inference_state: MultiInferenceState,
     ) {
-        debug_assert!(
-            ast_arguments.len() == arguments_types.len()
-                && arguments_types.len() == bindings.argument_forms().len()
-        );
+        debug_assert_eq!(ast_arguments.len(), arguments_types.len());
+        debug_assert_eq!(arguments_types.len(), bindings.argument_forms().len());
 
         let db = self.db();
         let iter = itertools::izip!(
@@ -10923,9 +10923,8 @@ enum MultiInferenceState {
 
     /// Overwrite the previously inferred value.
     ///
-    // Note that `MultiInferenceState::Overwrite` does not play well with nested
-    // expressions. Note that `Overwrite` does not interact well with nested inferences,
-    // overwriting values that were written with `MultiInferenceState::Intersect`.
+    /// Note that `Overwrite` does not interact well with nested inferences:
+    /// it overwrites values that were written with `MultiInferenceState::Intersect`.
     Overwrite,
 
     /// Ignore the newly inferred value.

@@ -884,7 +884,8 @@ impl<'db> Type<'db> {
             _ => false,
         }
     }
-    // If the type is a specialized instance of the given `KnownClass`, returns the specialization.
+
+    /// If the type is a specialized instance of the given `KnownClass`, returns the specialization.
     pub(crate) fn known_specialization(
         &self,
         db: &'db dyn Db,
@@ -894,12 +895,12 @@ impl<'db> Type<'db> {
         self.specialization_of(db, class_literal)
     }
 
-    // If this type is a class instance, returns its specialization.
+    /// If this type is a class instance, returns its specialization.
     pub(crate) fn class_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         self.specialization_of_optional(db, None)
     }
 
-    // If the type is a specialized instance of the given class, returns the specialization.
+    /// If the type is a specialized instance of the given class, returns the specialization.
     pub(crate) fn specialization_of(
         self,
         db: &'db dyn Db,

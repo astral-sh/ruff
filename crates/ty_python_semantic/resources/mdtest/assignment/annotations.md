@@ -456,7 +456,7 @@ j: int | str = f2(True)
 reveal_type(j)  # revealed: Literal[True]
 ```
 
-The function arguments are also inferred using the type context:
+A function's arguments are also inferred using the type context:
 
 `typed_dict.py`:
 
@@ -571,6 +571,57 @@ g: list[Any] | dict[Any, Any] = f3(1)
 reveal_type(g)  # revealed: list[Literal[1]] | dict[Literal[1], Literal[1]]
 ```
 
+We currently prefer the generic declared type regardless of its variance:
+
+```py
+class Bivariant[T]:
+    pass
+
+class Covariant[T]:
+    def pop(self) -> T:
+        raise NotImplementedError
+
+class Contravariant[T]:
+    def push(self, value: T) -> None:
+        pass
+
+class Invariant[T]:
+    x: T
+
+def bivariant[T](x: T) -> Bivariant[T]:
+    return Bivariant()
+
+def covariant[T](x: T) -> Covariant[T]:
+    return Covariant()
+
+def contravariant[T](x: T) -> Contravariant[T]:
+    return Contravariant()
+
+def invariant[T](x: T) -> Invariant[T]:
+    return Invariant()
+
+x1 = bivariant(1)
+x2 = covariant(1)
+x3 = contravariant(1)
+x4 = invariant(1)
+
+reveal_type(x1)  # revealed: Bivariant[Literal[1]]
+reveal_type(x2)  # revealed: Covariant[Literal[1]]
+reveal_type(x3)  # revealed: Contravariant[Literal[1]]
+reveal_type(x4)  # revealed: Invariant[Literal[1]]
+
+x5: Bivariant[Any] = bivariant(1)
+x6: Covariant[Any] = covariant(1)
+x7: Contravariant[Any] = contravariant(1)
+x8: Invariant[Any] = invariant(1)
+
+# TODO: This could reveal `Bivariant[Any]`.
+reveal_type(x5)  # revealed: Bivariant[Literal[1]]
+reveal_type(x6)  # revealed: Covariant[Any]
+reveal_type(x7)  # revealed: Contravariant[Any]
+reveal_type(x8)  # revealed: Invariant[Any]
+```
+
 ## Narrow generic unions
 
 ```toml
@@ -581,30 +632,30 @@ python-version = "3.12"
 ```py
 from typing import reveal_type, TypedDict
 
-def id[T](x: T) -> T:
+def identity[T](x: T) -> T:
     return x
 
 def _(narrow: dict[str, str], target: list[str] | dict[str, str] | None):
-    target = id(narrow)
+    target = identity(narrow)
     reveal_type(target)  # revealed: dict[str, str]
 
 def _(narrow: list[str], target: list[str] | dict[str, str] | None):
-    target = id(narrow)
+    target = identity(narrow)
     reveal_type(target)  # revealed: list[str]
 
 def _(narrow: list[str] | dict[str, str], target: list[str] | dict[str, str] | None):
-    target = id(narrow)
+    target = identity(narrow)
     reveal_type(target)  # revealed: list[str] | dict[str, str]
 
 class TD(TypedDict):
     x: int
 
 def _(target: list[TD] | dict[str, TD] | None):
-    target = id([{"x": 1}])
+    target = identity([{"x": 1}])
     reveal_type(target)  # revealed: list[TD]
 
 def _(target: list[TD] | dict[str, TD] | None):
-    target = id({"x": {"x": 1}})
+    target = identity({"x": {"x": 1}})
     reveal_type(target)  # revealed: dict[str, TD]
 ```
 
@@ -616,7 +667,7 @@ python-version = "3.12"
 ```
 
 ```py
-def id[T](x: T) -> T:
+def identity[T](x: T) -> T:
     return x
 
 def lst[T](x: T) -> list[T]:
@@ -624,15 +675,15 @@ def lst[T](x: T) -> list[T]:
 
 def _(i: int):
     a: int | None = i
-    b: int | None = id(i)
-    c: int | str | None = id(i)
+    b: int | None = identity(i)
+    c: int | str | None = identity(i)
     reveal_type(a)  # revealed: int
     reveal_type(b)  # revealed: int
     reveal_type(c)  # revealed: int
 
     a: list[int | None] | None = [i]
-    b: list[int | None] | None = id([i])
-    c: list[int | None] | int | None = id([i])
+    b: list[int | None] | None = identity([i])
+    c: list[int | None] | int | None = identity([i])
     reveal_type(a)  # revealed: list[int | None]
     reveal_type(b)  # revealed: list[int | None]
     reveal_type(c)  # revealed: list[int | None]
@@ -645,8 +696,8 @@ def _(i: int):
     reveal_type(c)  # revealed: list[int | None]
 
     a: list | None = []
-    b: list | None = id([])
-    c: list | int | None = id([])
+    b: list | None = identity([])
+    c: list | int | None = identity([])
     reveal_type(a)  # revealed: list[Unknown]
     reveal_type(b)  # revealed: list[Unknown]
     reveal_type(c)  # revealed: list[Unknown]
