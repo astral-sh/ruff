@@ -346,7 +346,7 @@ fn type_hint_is_excessive_for_expr(expr: &Expr) -> bool {
         | Expr::TString(_)=> true,
 
         // You too `+1 and `-1`, get back here  
-        | Expr::UnaryOp(ExprUnaryOp { op: UnaryOp::UAdd | UnaryOp::USub, operand, .. }) => matches!(**operand, Expr::NumberLiteral(_)),
+        Expr::UnaryOp(ExprUnaryOp { op: UnaryOp::UAdd | UnaryOp::USub, operand, .. }) => matches!(**operand, Expr::NumberLiteral(_)),
 
         // Everything else is reasonable
         _ => false,
