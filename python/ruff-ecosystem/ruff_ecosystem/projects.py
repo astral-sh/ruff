@@ -206,9 +206,6 @@ class CheckOptions(CommandOptions):
             "check",
             "--no-cache",
             "--exit-zero",
-            # Ignore internal test rules
-            "--ignore",
-            "RUF9",
             # Never apply fixes, as they pollute the comparison results
             "--no-fix",
             # Use the concise format for comparing violations
