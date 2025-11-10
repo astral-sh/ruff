@@ -15,6 +15,8 @@ use std::{
 };
 use tempfile::TempDir;
 
+#[cfg(feature = "ext-lint")]
+mod ext_lint;
 mod format;
 mod lint;
 

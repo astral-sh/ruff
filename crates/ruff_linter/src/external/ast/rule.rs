@@ -90,7 +90,7 @@ pub struct ExternalAstRuleSpec {
     pub summary: Option<String>,
     #[serde(default)]
     pub targets: Vec<AstTargetSpec>,
-    #[serde(default, rename = "call-callee-regex")]
+    #[serde(default, rename = "call_callee_regex", alias = "call-callee-regex")]
     pub call_callee_regex: Option<String>,
     pub script: PathBuf,
 }

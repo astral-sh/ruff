@@ -78,10 +78,46 @@ pub enum ExternalLinterError {
 
     #[error("{message}")]
     ScriptCompile { message: String },
+
+    #[error(
+        "missing `{handler}` handler for external rule `{rule}` in linter `{linter}` (required to process {target})"
+    )]
+    MissingHandler {
+        linter: String,
+        rule: String,
+        handler: String,
+        target: String,
+    },
+
+    #[error(
+        "handler `{handler}` for external rule `{rule}` in linter `{linter}` has an incompatible signature: {details}"
+    )]
+    InvalidHandler {
+        linter: String,
+        rule: String,
+        handler: String,
+        details: String,
+    },
+
+    #[error("runtime error while executing external rule `{rule}` in linter `{linter}`: {message}")]
+    Runtime {
+        linter: String,
+        rule: String,
+        message: String,
+    },
+
+    #[error(
+        "invalid diagnostic reported by external rule `{rule}` in linter `{linter}`: {message}"
+    )]
+    InvalidReport {
+        linter: String,
+        rule: String,
+        message: String,
+    },
 }
 
 impl ExternalLinterError {
-    #[allow(dead_code)]
+    #[cfg_attr(not(feature = "ext-lint"), allow(dead_code))]
     pub(crate) fn format_script_compile_message(
         linter: &str,
         rule: &str,
