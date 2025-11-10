@@ -1454,6 +1454,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // * `from .x.y import z` (must be relative!)
                 // * And we are in an `__init__.py(i)` (hereafter `thispackage`)
                 // * And this is the first time we've seen `from .x` in this module
+                // * And we're in the global scope
                 //
                 // We introduce a local definition `x = <module 'thispackage.x'>` that occurs
                 // before the `z = ...` declaration the import introduces. This models the fact
@@ -1466,9 +1467,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // in one function is visible in another function.
                 //
                 // TODO: Also support `from thispackage.x.y import z`?
-                // TODO: `seen_submodule_imports` should be per-scope and not per-file
-                // (if two functions import `.x`, they both should believe `x` is defined)
-                if node.level == 1
+                if self.current_scope() == FileScopeId::global()
+                    && node.level == 1
                     && let Some(submodule) = &node.module
                     && let Some(parsed_submodule) = ModuleName::new(submodule.as_str())
                     && let Some(direct_submodule) = parsed_submodule.components().next()
