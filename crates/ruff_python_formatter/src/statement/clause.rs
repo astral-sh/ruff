@@ -36,7 +36,41 @@ pub(crate) enum ClauseHeader<'a> {
     OrElse(ElseClause<'a>),
 }
 
-impl ClauseHeader<'_> {
+impl<'a> ClauseHeader<'a> {
+    /// Returns the last child in the clause body immediately following this clause header.
+    ///
+    /// For most clauses, this is the last statement in
+    /// the primary body. For clauses like `try`, it specifically returns the last child
+    /// in the `try` body, not the `except`/`else`/`finally` clauses.
+    ///
+    /// This is similar to [`ruff_python_ast::AnyNodeRef::last_child_in_body`]
+    /// but restricted to the clause.
+    pub(crate) fn last_child_in_clause(self) -> Option<AnyNodeRef<'a>> {
+        match self {
+            ClauseHeader::Class(StmtClassDef { body, .. })
+            | ClauseHeader::Function(StmtFunctionDef { body, .. })
+            | ClauseHeader::If(StmtIf { body, .. })
+            | ClauseHeader::ElifElse(ElifElseClause { body, .. })
+            | ClauseHeader::Try(StmtTry { body, .. })
+            | ClauseHeader::MatchCase(MatchCase { body, .. })
+            | ClauseHeader::For(StmtFor { body, .. })
+            | ClauseHeader::While(StmtWhile { body, .. })
+            | ClauseHeader::With(StmtWith { body, .. })
+            | ClauseHeader::ExceptHandler(ExceptHandlerExceptHandler { body, .. })
+            | ClauseHeader::OrElse(
+                ElseClause::Try(StmtTry { orelse: body, .. })
+                | ElseClause::For(StmtFor { orelse: body, .. })
+                | ElseClause::While(StmtWhile { orelse: body, .. }),
+            )
+            | ClauseHeader::TryFinally(StmtTry {
+                finalbody: body, ..
+            }) => body.last().map(AnyNodeRef::from),
+            ClauseHeader::Match(StmtMatch { cases, .. }) => cases
+                .last()
+                .and_then(|case| case.body.last().map(AnyNodeRef::from)),
+        }
+    }
+
     /// The range from the clause keyword up to and including the final colon.
     pub(crate) fn range(self, source: &str) -> FormatResult<TextRange> {
         let keyword_range = self.first_keyword_range(source)?;
@@ -338,11 +372,43 @@ impl ClauseHeader<'_> {
     }
 }
 
+impl<'a> From<ClauseHeader<'a>> for AnyNodeRef<'a> {
+    fn from(value: ClauseHeader<'a>) -> Self {
+        match value {
+            ClauseHeader::Class(stmt_class_def) => stmt_class_def.into(),
+            ClauseHeader::Function(stmt_function_def) => stmt_function_def.into(),
+            ClauseHeader::If(stmt_if) => stmt_if.into(),
+            ClauseHeader::ElifElse(elif_else_clause) => elif_else_clause.into(),
+            ClauseHeader::Try(stmt_try) => stmt_try.into(),
+            ClauseHeader::ExceptHandler(except_handler_except_handler) => {
+                except_handler_except_handler.into()
+            }
+            ClauseHeader::TryFinally(stmt_try) => stmt_try.into(),
+            ClauseHeader::Match(stmt_match) => stmt_match.into(),
+            ClauseHeader::MatchCase(match_case) => match_case.into(),
+            ClauseHeader::For(stmt_for) => stmt_for.into(),
+            ClauseHeader::While(stmt_while) => stmt_while.into(),
+            ClauseHeader::With(stmt_with) => stmt_with.into(),
+            ClauseHeader::OrElse(else_clause) => else_clause.into(),
+        }
+    }
+}
+
 #[derive(Copy, Clone)]
 pub(crate) enum ElseClause<'a> {
     Try(&'a StmtTry),
     For(&'a StmtFor),
     While(&'a StmtWhile),
+}
+
+impl<'a> From<ElseClause<'a>> for AnyNodeRef<'a> {
+    fn from(value: ElseClause<'a>) -> Self {
+        match value {
+            ElseClause::Try(stmt_try) => stmt_try.into(),
+            ElseClause::For(stmt_for) => stmt_for.into(),
+            ElseClause::While(stmt_while) => stmt_while.into(),
+        }
+    }
 }
 
 pub(crate) struct FormatClauseHeader<'a, 'ast> {
