@@ -386,7 +386,10 @@ reveal_type(Answer.YES.value)  # revealed: Literal[1]
 reveal_type(Answer.NO.value)  # revealed: Literal[2]
 ```
 
-Using `auto()` with non-integer mixins:
+It's [hard to predict](https://github.com/astral-sh/ruff/pull/20541#discussion_r2381878613) what the
+effect of using `auto()` will be for an arbitrary non-integer mixin, so for anything that isn't a
+`StrEnum` and has a non-`int` mixin, we simply fallback to typeshed's annotation of `Any` for the
+`value` property:
 
 ```python
 from enum import Enum, auto
