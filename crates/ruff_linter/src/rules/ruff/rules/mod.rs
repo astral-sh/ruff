@@ -78,7 +78,7 @@ mod dataclass_enum;
 mod decimal_from_float_literal;
 mod default_factory_kwarg;
 mod explicit_f_string_type_conversion;
-mod external_ast;
+pub(crate) mod external_ast;
 mod falsy_dict_get_fallback;
 mod function_call_in_dataclass_default;
 mod if_key_in_dict_del;

@@ -58,6 +58,7 @@ pep440_rs = { workspace = true }
 pyproject-toml = { workspace = true }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
+pyo3 = { version = "0.23.0", optional = true, features = ["macros"] }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -80,11 +81,15 @@ insta = { workspace = true, features = ["filters", "json", "redactions"] }
 tempfile = { workspace = true }
 test-case = { workspace = true }
 
+[build-dependencies]
+pyo3-build-config = { version = "0.23.5", features = ["resolve-config"] }
+
 [features]
 default = []
 schemars = ["dep:schemars", "ruff_python_ast/schemars"]
 # Enables rules for internal integration tests
 test-rules = []
+ext-lint = ["dep:pyo3"]
 
 [lints]
 workspace = true

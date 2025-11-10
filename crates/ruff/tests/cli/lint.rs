@@ -233,8 +233,10 @@ script = "rules/example.py"
     test.write_file(
         "lint/external/rules/example.py",
         r#"
-def check():
-    # placeholder script body
+def check_stmt(node, ctx):
+    pass
+
+def check_expr(node, ctx):
     pass
 "#,
     )?;
@@ -243,6 +245,9 @@ def check():
         r#"
 [lint.external-ast.demo]
 path = "{}"
+
+[lint]
+select-external = ["EXT001"]
 "#,
         toml_path(&linter_path)
     );
@@ -294,8 +299,10 @@ script = "rules/example.py"
     test.write_file(
         "lint/external/rules/example.py",
         r#"
-def check():
-    # placeholder script body
+def check_stmt(node, ctx):
+    pass
+
+def check_expr(node, ctx):
     pass
 "#,
     )?;
@@ -353,7 +360,7 @@ script = "rules/example.py"
     test.write_file(
         "lint/external/rules/example.py",
         r#"
-def check():
+def check_stmt(node, ctx):
     # placeholder script body
     pass
 "#,
@@ -730,11 +737,24 @@ path = "{}"
             "nested/example.py",
         ])
         .output()?;
-    assert!(
-        output.status.success(),
-        "command failed unexpectedly: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    if cfg!(feature = "ext-lint") {
+        assert!(
+            !output.status.success(),
+            "expected EXT001 diagnostics but command succeeded: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains("EXT001"),
+            "stdout missing EXT001 diagnostics: {stdout}"
+        );
+    } else {
+        assert!(
+            output.status.success(),
+            "command failed unexpectedly without ext-lint: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 
     Ok(())
 }

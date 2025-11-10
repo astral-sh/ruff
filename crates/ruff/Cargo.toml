@@ -91,3 +91,10 @@ test-case = { workspace = true }
 
 [lints]
 workspace = true
+
+[features]
+default = []
+ext-lint = [
+    "ruff_linter/ext-lint",
+    "ruff_workspace/ext-lint",
+]
