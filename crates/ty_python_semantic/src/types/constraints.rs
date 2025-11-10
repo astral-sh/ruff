@@ -185,11 +185,12 @@ impl<'db> ConstraintSet<'db> {
         typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
         upper: Type<'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
     ) -> Self {
         let (lower, upper) = match relation {
-            // TODO: Is this the correct constraint for redundancy?
-            TypeRelation::Subtyping | TypeRelation::Redundancy => (
+            TypeRelation::Subtyping
+            | TypeRelation::Redundancy
+            | TypeRelation::ConstraintImplication(_) => (
                 lower.top_materialization(db),
                 upper.bottom_materialization(db),
             ),

@@ -686,6 +686,7 @@ pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Si
     }
 }
 
+// XXX: take in relation to pass it on
 #[expect(clippy::too_many_arguments)]
 fn is_subtype_in_invariant_position<'db>(
     db: &'db dyn Db,
@@ -772,7 +773,7 @@ fn has_relation_in_invariant_position<'db>(
     base_type: &Type<'db>,
     base_materialization: Option<MaterializationKind>,
     inferable: InferableTypeVars<'_, 'db>,
-    relation: TypeRelation,
+    relation: TypeRelation<'db>,
     relation_visitor: &HasRelationToVisitor<'db>,
     disjointness_visitor: &IsDisjointVisitor<'db>,
 ) -> ConstraintSet<'db> {
@@ -821,30 +822,38 @@ fn has_relation_in_invariant_position<'db>(
                 )
             }),
         // For gradual types, A <: B (subtyping) is defined as Top[A] <: Bottom[B]
-        (None, Some(base_mat), TypeRelation::Subtyping | TypeRelation::Redundancy) => {
-            is_subtype_in_invariant_position(
-                db,
-                derived_type,
-                MaterializationKind::Top,
-                base_type,
-                base_mat,
-                inferable,
-                relation_visitor,
-                disjointness_visitor,
-            )
-        }
-        (Some(derived_mat), None, TypeRelation::Subtyping | TypeRelation::Redundancy) => {
-            is_subtype_in_invariant_position(
-                db,
-                derived_type,
-                derived_mat,
-                base_type,
-                MaterializationKind::Bottom,
-                inferable,
-                relation_visitor,
-                disjointness_visitor,
-            )
-        }
+        (
+            None,
+            Some(base_mat),
+            TypeRelation::Subtyping
+            | TypeRelation::Redundancy
+            | TypeRelation::ConstraintImplication(_),
+        ) => is_subtype_in_invariant_position(
+            db,
+            derived_type,
+            MaterializationKind::Top,
+            base_type,
+            base_mat,
+            inferable,
+            relation_visitor,
+            disjointness_visitor,
+        ),
+        (
+            Some(derived_mat),
+            None,
+            TypeRelation::Subtyping
+            | TypeRelation::Redundancy
+            | TypeRelation::ConstraintImplication(_),
+        ) => is_subtype_in_invariant_position(
+            db,
+            derived_type,
+            derived_mat,
+            base_type,
+            MaterializationKind::Bottom,
+            inferable,
+            relation_visitor,
+            disjointness_visitor,
+        ),
         // And A <~ B (assignability) is Bottom[A] <: Top[B]
         (None, Some(base_mat), TypeRelation::Assignability) => is_subtype_in_invariant_position(
             db,
@@ -1112,7 +1121,7 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {

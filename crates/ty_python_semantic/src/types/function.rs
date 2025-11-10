@@ -971,7 +971,7 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -979,8 +979,12 @@ impl<'db> FunctionType<'db> {
         // our representation of a function type includes any specialization that should be applied
         // to the signature. Different specializations of the same function type are only subtypes
         // of each other if they result in subtype signatures.
-        if matches!(relation, TypeRelation::Subtyping | TypeRelation::Redundancy)
-            && self.normalized(db) == other.normalized(db)
+        if matches!(
+            relation,
+            TypeRelation::Subtyping
+                | TypeRelation::Redundancy
+                | TypeRelation::ConstraintImplication(_)
+        ) && self.normalized(db) == other.normalized(db)
         {
             return ConstraintSet::from(true);
         }
