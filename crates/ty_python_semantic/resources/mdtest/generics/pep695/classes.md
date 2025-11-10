@@ -315,8 +315,6 @@ If either method comes from a generic base class, we don't currently use its inf
 to specialize the class.
 
 ```py
-from typing import Literal
-
 class C[T, U]:
     def __new__(cls, *args, **kwargs) -> "C[T, U]":
         return object.__new__(cls)
@@ -330,8 +328,6 @@ reveal_type(D(1))  # revealed: D[Literal[1]]
 ### Generic class inherits `__init__` from generic base class
 
 ```py
-from typing import Literal
-
 class C[T, U]:
     def __init__(self, t: T, u: U) -> None: ...
 

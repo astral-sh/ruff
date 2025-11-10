@@ -195,6 +195,8 @@ impl<'db> GenericContextTypeVar<'db> {
         }
     }
 
+    /// Returns `true` if this type variable is inherited from the generic context of an
+    /// outer class.
     pub fn is_inherited(&self) -> bool {
         self.is_inherited
     }
