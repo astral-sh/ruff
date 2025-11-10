@@ -537,22 +537,11 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           activate-environment: true
 
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
-        with:
-          shared-key: ruff-linux-debug
-          save-if: false
-
       - name: "Install Rust toolchain"
         run: rustup show
 
       - name: "Install mold"
         uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
-
-      - name: Build comparison Ruff binary
-        run: |
-          cargo build -p ruff --bin ruff
-          mkdir -p target-comparison
-          cp target/debug/ruff target-comparison/ruff
 
       - name: Checkout baseline version
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -563,9 +552,16 @@ jobs:
 
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
         with:
-          workspaces: baseline
-          shared-key: ruff-linux-debug-baseline
+          workspaces: |-
+            .
+            baseline
           save-if: false
+
+      - name: Build comparison Ruff binary
+        run: |
+          cargo build -p ruff --bin ruff
+          mkdir -p target-comparison
+          cp target/debug/ruff target-comparison/ruff
 
       - name: Build baseline Ruff binary
         run: |
