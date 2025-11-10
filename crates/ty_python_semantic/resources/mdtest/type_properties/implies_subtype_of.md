@@ -335,9 +335,7 @@ def mutually_constrained[T, U]():
 
     # If (T = U ∧ U = int), then (T = int) must be true as well. That is an equality constraint, so
     # even though T is invariant, it does imply that (Invariant[T] ≤ Invariant[int]).
-    given_int = ConstraintSet.range(Never, T, U) & ConstraintSet.range(Never, U, int)
-    # TODO: no error
-    # error: [static-assert-error]
+    given_int = ConstraintSet.range(U, T, U) & ConstraintSet.range(int, U, int)
     static_assert(given_int.implies_subtype_of(Invariant[T], Invariant[int]))
     static_assert(not given_int.implies_subtype_of(Invariant[T], Invariant[bool]))
     static_assert(not given_int.implies_subtype_of(Invariant[T], Invariant[str]))

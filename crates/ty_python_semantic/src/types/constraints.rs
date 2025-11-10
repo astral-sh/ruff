@@ -1427,10 +1427,12 @@ impl<'db> InteriorNode<'db> {
                     _ => continue,
                 };
 
-                let new_node = Node::new_constraint(
-                    db,
-                    ConstrainedTypeVar::new(db, constrained_typevar, new_lower, new_upper),
-                );
+                let new_constraint =
+                    ConstrainedTypeVar::new(db, constrained_typevar, new_lower, new_upper);
+                if seen_constraints.contains(&new_constraint) {
+                    continue;
+                }
+                let new_node = Node::new_constraint(db, new_constraint);
                 let positive_left_node =
                     Node::new_satisfied_constraint(db, left_constraint.when_true());
                 let positive_right_node =
@@ -1444,7 +1446,18 @@ impl<'db> InteriorNode<'db> {
                 continue;
             }
 
-            // From here on out we know that both constraints constrain the same typevar.
+            // From here on out we know that both constraints constrain the same typevar. The
+            // clause above will propagate all that we know about the current typevar relative to
+            // other typevars, producing constraints on this typevar that have concrete lower/upper
+            // bounds. That means we can skip the simplifications below if any bound is another
+            // typevar.
+            if left_constraint.lower(db).is_type_var()
+                || left_constraint.upper(db).is_type_var()
+                || right_constraint.lower(db).is_type_var()
+                || right_constraint.upper(db).is_type_var()
+            {
+                continue;
+            }
 
             // Containment: The range of one constraint might completely contain the range of the
             // other. If so, there are several potential simplifications.
