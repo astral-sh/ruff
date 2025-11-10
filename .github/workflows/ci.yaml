@@ -440,7 +440,6 @@ jobs:
       - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
         with:
           workspaces: "fuzz -> target"
-          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
@@ -472,7 +471,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: Build Ruff binary
-        run: cargo build -p ruff --bin ruff
+        run: cargo build --bin ruff
       - name: Fuzz
         run: |
           (
@@ -554,21 +553,18 @@ jobs:
         with:
           workspaces: |-
             .
-            baseline
+            baseline -> target-baseline
           shared-key: ruff-linux-debug
           save-if: false
 
       - name: Build baseline Ruff binary
         run: |
           cd baseline
-          cargo build -p ruff --bin ruff
-          cp target/debug/ruff ../ruff
+          cargo build --bin ruff
 
       - name: Build comparison Ruff binary
         run: |
-          cargo build -p ruff --bin ruff
-          mkdir -p target-comparison
-          cp target/debug/ruff target-comparison/ruff
+          cargo build --bin ruff
 
       - name: Install ruff-ecosystem
         run: |
@@ -580,7 +576,7 @@ jobs:
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem check ./ruff ./target-comparison/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-check-stable
+          ruff-ecosystem check ./target-baseline/ruff ./target/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-check-stable
 
           cat ecosystem-result-check-stable > "$GITHUB_STEP_SUMMARY"
           echo "### Linter (stable)"  > ecosystem-result
@@ -593,7 +589,7 @@ jobs:
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem check ./ruff ./target-comparison/ruff --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-check-preview
+          ruff-ecosystem check ./target-baseline/ruff ./target/ruff --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-check-preview
 
           cat ecosystem-result-check-preview > "$GITHUB_STEP_SUMMARY"
           echo "### Linter (preview)" >> ecosystem-result
@@ -606,7 +602,7 @@ jobs:
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem format ./ruff ./target-comparison/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-format-stable
+          ruff-ecosystem format ./target-baseline/ruff ./target/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-format-stable
 
           cat ecosystem-result-format-stable > "$GITHUB_STEP_SUMMARY"
           echo "### Formatter (stable)" >> ecosystem-result
@@ -619,7 +615,7 @@ jobs:
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem format ./ruff ./target-comparison/ruff --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-format-preview
+          ruff-ecosystem format ./target-baseline/ruff ./target/ruff --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-format-preview
 
           cat ecosystem-result-format-preview > "$GITHUB_STEP_SUMMARY"
           echo "### Formatter (preview)" >> ecosystem-result
@@ -715,7 +711,7 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
       - name: "Run ty completion evaluation"
-        run: cargo run --release --package ty_completion_eval -- all --threshold 0.4 --tasks /tmp/completion-evaluation-tasks.csv
+        run: cargo run --profile profiling --package ty_completion_eval -- all --threshold 0.4 --tasks /tmp/completion-evaluation-tasks.csv
       - name: "Ensure there are no changes"
         run: diff ./crates/ty_completion_eval/completion-evaluation-tasks.csv /tmp/completion-evaluation-tasks.csv
 
