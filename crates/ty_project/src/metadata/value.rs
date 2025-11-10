@@ -179,14 +179,13 @@ impl<T> RangedValue<T> {
     }
 }
 
-impl<T> Combine for RangedValue<T> {
-    fn combine(self, _other: Self) -> Self
-    where
-        Self: Sized,
-    {
-        self
+impl<T> Combine for RangedValue<T>
+where
+    T: Combine,
+{
+    fn combine_with(&mut self, other: Self) {
+        self.value.combine_with(other.value);
     }
-    fn combine_with(&mut self, _other: Self) {}
 }
 
 impl<T> IntoIterator for RangedValue<T>

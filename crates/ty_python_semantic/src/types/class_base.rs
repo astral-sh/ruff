@@ -170,6 +170,7 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::ConstraintSet(_)
                 | KnownInstanceType::UnionType(_)
                 | KnownInstanceType::Literal(_) => None,
+                KnownInstanceType::Annotated(ty) => Self::try_from_type(db, ty.inner(db), subclass),
             },
 
             Type::SpecialForm(special_form) => match special_form {

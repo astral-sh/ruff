@@ -7,6 +7,8 @@ use std::sync::Arc;
 
 use crate::commands::completions::config::{OptionString, OptionStringParser};
 use anyhow::bail;
+use clap::builder::Styles;
+use clap::builder::styling::{AnsiColor, Effects};
 use clap::builder::{TypedValueParser, ValueParserFactory};
 use clap::{Parser, Subcommand, command};
 use colored::Colorize;
@@ -78,6 +80,13 @@ impl GlobalConfigArgs {
     }
 }
 
+// Configures Clap v3-style help menu colors
+const STYLES: Styles = Styles::styled()
+    .header(AnsiColor::Green.on_default().effects(Effects::BOLD))
+    .usage(AnsiColor::Green.on_default().effects(Effects::BOLD))
+    .literal(AnsiColor::Cyan.on_default().effects(Effects::BOLD))
+    .placeholder(AnsiColor::Cyan.on_default());
+
 #[derive(Debug, Parser)]
 #[command(
     author,
@@ -86,6 +95,7 @@ impl GlobalConfigArgs {
     after_help = "For help with a specific command, see: `ruff help <command>`."
 )]
 #[command(version)]
+#[command(styles = STYLES)]
 pub struct Args {
     #[command(subcommand)]
     pub(crate) command: Command,

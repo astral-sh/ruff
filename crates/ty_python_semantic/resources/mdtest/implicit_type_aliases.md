@@ -33,7 +33,7 @@ g(None)
 We also support unions in type aliases:
 
 ```py
-from typing_extensions import Any, Never, Literal
+from typing_extensions import Any, Never, Literal, LiteralString, Tuple, Annotated, Optional
 from ty_extensions import Unknown
 
 IntOrStr = int | str
@@ -56,6 +56,14 @@ UnknownOrInt = Unknown | int
 IntOrUnknown = int | Unknown
 StrOrZero = str | Literal[0]
 ZeroOrStr = Literal[0] | str
+LiteralStringOrInt = LiteralString | int
+IntOrLiteralString = int | LiteralString
+NoneOrTuple = None | Tuple[int, str]
+TupleOrNone = Tuple[int, str] | None
+IntOrAnnotated = int | Annotated[str, "meta"]
+AnnotatedOrInt = Annotated[str, "meta"] | int
+IntOrOptional = int | Optional[str]
+OptionalOrInt = Optional[str] | int
 
 reveal_type(IntOrStr)  # revealed: types.UnionType
 reveal_type(IntOrStrOrBytes1)  # revealed: types.UnionType
@@ -77,6 +85,14 @@ reveal_type(UnknownOrInt)  # revealed: types.UnionType
 reveal_type(IntOrUnknown)  # revealed: types.UnionType
 reveal_type(StrOrZero)  # revealed: types.UnionType
 reveal_type(ZeroOrStr)  # revealed: types.UnionType
+reveal_type(IntOrLiteralString)  # revealed: types.UnionType
+reveal_type(LiteralStringOrInt)  # revealed: types.UnionType
+reveal_type(NoneOrTuple)  # revealed: types.UnionType
+reveal_type(TupleOrNone)  # revealed: types.UnionType
+reveal_type(IntOrAnnotated)  # revealed: types.UnionType
+reveal_type(AnnotatedOrInt)  # revealed: types.UnionType
+reveal_type(IntOrOptional)  # revealed: types.UnionType
+reveal_type(OptionalOrInt)  # revealed: types.UnionType
 
 def _(
     int_or_str: IntOrStr,
@@ -99,6 +115,14 @@ def _(
     int_or_unknown: IntOrUnknown,
     str_or_zero: StrOrZero,
     zero_or_str: ZeroOrStr,
+    literal_string_or_int: LiteralStringOrInt,
+    int_or_literal_string: IntOrLiteralString,
+    none_or_tuple: NoneOrTuple,
+    tuple_or_none: TupleOrNone,
+    int_or_annotated: IntOrAnnotated,
+    annotated_or_int: AnnotatedOrInt,
+    int_or_optional: IntOrOptional,
+    optional_or_int: OptionalOrInt,
 ):
     reveal_type(int_or_str)  # revealed: int | str
     reveal_type(int_or_str_or_bytes1)  # revealed: int | str | bytes
@@ -120,6 +144,14 @@ def _(
     reveal_type(int_or_unknown)  # revealed: int | Unknown
     reveal_type(str_or_zero)  # revealed: str | Literal[0]
     reveal_type(zero_or_str)  # revealed: Literal[0] | str
+    reveal_type(literal_string_or_int)  # revealed: LiteralString | int
+    reveal_type(int_or_literal_string)  # revealed: int | LiteralString
+    reveal_type(none_or_tuple)  # revealed: None | tuple[int, str]
+    reveal_type(tuple_or_none)  # revealed: tuple[int, str] | None
+    reveal_type(int_or_annotated)  # revealed: int | str
+    reveal_type(annotated_or_int)  # revealed: str | int
+    reveal_type(int_or_optional)  # revealed: int | str | None
+    reveal_type(optional_or_int)  # revealed: str | None | int
 ```
 
 If a type is unioned with itself in a value expression, the result is just that type. No
@@ -323,6 +355,115 @@ def _(weird: LiteralInt):
 # error: [invalid-type-form] "`Literal[26]` is not a generic class"
 def _(weird: IntLiteral1[int]):
     reveal_type(weird)  # revealed: Unknown
+```
+
+## `Annotated`
+
+Basic usage:
+
+```py
+from typing import Annotated
+
+MyAnnotatedInt = Annotated[int, "some metadata", 1, 2, 3]
+
+def _(annotated_int: MyAnnotatedInt):
+    reveal_type(annotated_int)  # revealed: int
+```
+
+Usage with generics:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+Deprecated = Annotated[T, "deprecated attribute"]
+
+class C:
+    old: Deprecated[int]
+
+# TODO: Should be `int`
+reveal_type(C().old)  # revealed: @Todo(Generic specialization of typing.Annotated)
+```
+
+If the metadata argument is missing, we emit an error (because this code fails at runtime), but
+still use the first element as the type, when used in annotations:
+
+```py
+# error: [invalid-type-form] "Special form `typing.Annotated` expected at least 2 arguments (one type and at least one metadata element)"
+WronglyAnnotatedInt = Annotated[int]
+
+def _(wrongly_annotated_int: WronglyAnnotatedInt):
+    reveal_type(wrongly_annotated_int)  # revealed: int
+```
+
+## `Optional`
+
+Starting with Python 3.14, `Optional[int]` creates an instance of `typing.Union`, which is an alias
+for `types.UnionType`. We only support this new behavior and do not attempt to model the details of
+the pre-3.14 behavior:
+
+```py
+from typing import Optional
+
+MyOptionalInt = Optional[int]
+
+reveal_type(MyOptionalInt)  # revealed: types.UnionType
+
+def _(optional_int: MyOptionalInt):
+    reveal_type(optional_int)  # revealed: int | None
+```
+
+A special case is `Optional[None]`, which is equivalent to `None`:
+
+```py
+JustNone = Optional[None]
+
+reveal_type(JustNone)  # revealed: None
+
+def _(just_none: JustNone):
+    reveal_type(just_none)  # revealed: None
+```
+
+Invalid uses:
+
+```py
+# error: [invalid-type-form] "`typing.Optional` requires exactly one argument"
+Optional[int, str]
+```
+
+## `LiteralString`, `NoReturn`, `Never`
+
+```py
+from typing_extensions import LiteralString, NoReturn, Never
+
+MyLiteralString = LiteralString
+MyNoReturn = NoReturn
+MyNever = Never
+
+reveal_type(MyLiteralString)  # revealed: typing.LiteralString
+reveal_type(MyNoReturn)  # revealed: typing.NoReturn
+reveal_type(MyNever)  # revealed: typing.Never
+
+def _(
+    ls: MyLiteralString,
+    nr: MyNoReturn,
+    nv: MyNever,
+):
+    reveal_type(ls)  # revealed: LiteralString
+    reveal_type(nr)  # revealed: Never
+    reveal_type(nv)  # revealed: Never
+```
+
+## `Tuple`
+
+```py
+from typing import Tuple
+
+IntAndStr = Tuple[int, str]
+
+def _(int_and_str: IntAndStr):
+    reveal_type(int_and_str)  # revealed: tuple[int, str]
 ```
 
 ## Stringified annotations?
