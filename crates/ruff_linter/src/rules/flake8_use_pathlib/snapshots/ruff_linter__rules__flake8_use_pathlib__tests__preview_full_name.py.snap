@@ -1037,5 +1037,106 @@ PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
 138 |
 139 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
     | ^^^^^^^^^^^^^^^^
+140 |
+141 | # https://github.com/astral-sh/ruff/issues/21342
     |
 help: Replace with `Path(...).samefile()`
+
+PTH115 [*] `os.readlink()` should be replaced by `Path.readlink()`
+   --> full_name.py:143:1
+    |
+141 | # https://github.com/astral-sh/ruff/issues/21342
+142 | # if `dir_fd=None` is explicitly set, should still trigger the diagnostic
+143 | os.readlink(p, dir_fd=None)
+    | ^^^^^^^^^^^
+144 | os.unlink(p, dir_fd=None)
+145 | os.remove(p, dir_fd=None)
+    |
+help: Replace with `Path(...).readlink()`
+1   | import os
+2   | import os.path
+3   + import pathlib
+4   | 
+5   | p = "/foo"
+6   | q = "bar"
+--------------------------------------------------------------------------------
+141 | 
+142 | # https://github.com/astral-sh/ruff/issues/21342
+143 | # if `dir_fd=None` is explicitly set, should still trigger the diagnostic
+    - os.readlink(p, dir_fd=None)
+144 + pathlib.Path(p).readlink()
+145 | os.unlink(p, dir_fd=None)
+146 | os.remove(p, dir_fd=None)
+147 | os.rmdir(p, dir_fd=None)
+
+PTH108 [*] `os.unlink()` should be replaced by `Path.unlink()`
+   --> full_name.py:144:1
+    |
+142 | # if `dir_fd=None` is explicitly set, should still trigger the diagnostic
+143 | os.readlink(p, dir_fd=None)
+144 | os.unlink(p, dir_fd=None)
+    | ^^^^^^^^^
+145 | os.remove(p, dir_fd=None)
+146 | os.rmdir(p, dir_fd=None)
+    |
+help: Replace with `Path(...).unlink()`
+1   | import os
+2   | import os.path
+3   + import pathlib
+4   | 
+5   | p = "/foo"
+6   | q = "bar"
+--------------------------------------------------------------------------------
+142 | # https://github.com/astral-sh/ruff/issues/21342
+143 | # if `dir_fd=None` is explicitly set, should still trigger the diagnostic
+144 | os.readlink(p, dir_fd=None)
+    - os.unlink(p, dir_fd=None)
+145 + pathlib.Path(p).unlink()
+146 | os.remove(p, dir_fd=None)
+147 | os.rmdir(p, dir_fd=None)
+
+PTH107 [*] `os.remove()` should be replaced by `Path.unlink()`
+   --> full_name.py:145:1
+    |
+143 | os.readlink(p, dir_fd=None)
+144 | os.unlink(p, dir_fd=None)
+145 | os.remove(p, dir_fd=None)
+    | ^^^^^^^^^
+146 | os.rmdir(p, dir_fd=None)
+    |
+help: Replace with `Path(...).unlink()`
+1   | import os
+2   | import os.path
+3   + import pathlib
+4   | 
+5   | p = "/foo"
+6   | q = "bar"
+--------------------------------------------------------------------------------
+143 | # if `dir_fd=None` is explicitly set, should still trigger the diagnostic
+144 | os.readlink(p, dir_fd=None)
+145 | os.unlink(p, dir_fd=None)
+    - os.remove(p, dir_fd=None)
+146 + pathlib.Path(p).unlink()
+147 | os.rmdir(p, dir_fd=None)
+
+PTH106 [*] `os.rmdir()` should be replaced by `Path.rmdir()`
+   --> full_name.py:146:1
+    |
+144 | os.unlink(p, dir_fd=None)
+145 | os.remove(p, dir_fd=None)
+146 | os.rmdir(p, dir_fd=None)
+    | ^^^^^^^^
+    |
+help: Replace with `Path(...).rmdir()`
+1   | import os
+2   | import os.path
+3   + import pathlib
+4   | 
+5   | p = "/foo"
+6   | q = "bar"
+--------------------------------------------------------------------------------
+144 | os.readlink(p, dir_fd=None)
+145 | os.unlink(p, dir_fd=None)
+146 | os.remove(p, dir_fd=None)
+    - os.rmdir(p, dir_fd=None)
+147 + pathlib.Path(p).rmdir()

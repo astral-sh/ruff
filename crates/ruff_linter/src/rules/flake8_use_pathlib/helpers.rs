@@ -59,7 +59,33 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
     violation: impl Violation,
     applicability: Option<Applicability>,
 ) {
-    if call.arguments.len() != 1 {
+    // Check that we have exactly 1 positional argument OR the argument is passed as a keyword
+    // This allows: func(arg), func(name=arg), and func(arg, dir_fd=None)
+    let has_positional_arg = call.arguments.args.len() == 1;
+    let has_keyword_arg = call.arguments.find_keyword(fn_argument).is_some();
+    
+    if !has_positional_arg && !has_keyword_arg {
+        return;
+    }
+    
+    // If we have both positional and keyword for the main argument, that's invalid
+    if has_positional_arg && has_keyword_arg {
+        return;
+    }
+
+    // If `dir_fd` is set to a non-default value, skip (pathlib doesn't support it)
+    if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
+        return;
+    }
+
+    // If there are keyword arguments other than `dir_fd` or the main argument, skip
+    // We need to allow the main argument to be passed as a keyword, and `dir_fd=None`
+    let allowed_keywords = if has_keyword_arg {
+        &[fn_argument, "dir_fd"][..]
+    } else {
+        &["dir_fd"][..]
+    };
+    if has_unknown_keywords_or_starred_expr(&call.arguments, allowed_keywords) {
         return;
     }
 
