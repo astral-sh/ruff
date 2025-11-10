@@ -368,7 +368,7 @@ class Z[T]:
 
 z1: Z[Any] = Z(1)
 # TODO: This should reveal `Z[Any]`.
-reveal_type(z1)  # revealed: Z[int]
+reveal_type(z1)  # revealed: Z[Literal[1]]
 ```
 
 ## PEP-604 annotations are supported
@@ -669,7 +669,7 @@ x4 = invariant(1)
 reveal_type(x1)  # revealed: Bivariant[Literal[1]]
 reveal_type(x2)  # revealed: Covariant[Literal[1]]
 reveal_type(x3)  # revealed: Contravariant[Literal[1]]
-reveal_type(x4)  # revealed: Invariant[Literal[1]]
+reveal_type(x4)  # revealed: Invariant[int]
 
 x5: Bivariant[Any] = bivariant(1)
 x6: Covariant[Any] = covariant(1)
