@@ -686,7 +686,6 @@ pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Si
     }
 }
 
-// XXX: take in relation to pass it on
 #[expect(clippy::too_many_arguments)]
 fn is_subtype_in_invariant_position<'db>(
     db: &'db dyn Db,
@@ -695,6 +694,7 @@ fn is_subtype_in_invariant_position<'db>(
     base_type: &Type<'db>,
     base_materialization: MaterializationKind,
     inferable: InferableTypeVars<'_, 'db>,
+    relation: TypeRelation<'db>,
     relation_visitor: &HasRelationToVisitor<'db>,
     disjointness_visitor: &IsDisjointVisitor<'db>,
 ) -> ConstraintSet<'db> {
@@ -720,7 +720,7 @@ fn is_subtype_in_invariant_position<'db>(
             db,
             base,
             inferable,
-            TypeRelation::Subtyping,
+            relation,
             relation_visitor,
             disjointness_visitor,
         )
@@ -787,6 +787,7 @@ fn has_relation_in_invariant_position<'db>(
             base_type,
             base_mat,
             inferable,
+            relation,
             relation_visitor,
             disjointness_visitor,
         ),
@@ -835,6 +836,7 @@ fn has_relation_in_invariant_position<'db>(
             base_type,
             base_mat,
             inferable,
+            relation,
             relation_visitor,
             disjointness_visitor,
         ),
@@ -851,6 +853,7 @@ fn has_relation_in_invariant_position<'db>(
             base_type,
             MaterializationKind::Bottom,
             inferable,
+            relation,
             relation_visitor,
             disjointness_visitor,
         ),
@@ -862,6 +865,7 @@ fn has_relation_in_invariant_position<'db>(
             base_type,
             base_mat,
             inferable,
+            relation,
             relation_visitor,
             disjointness_visitor,
         ),
@@ -872,6 +876,7 @@ fn has_relation_in_invariant_position<'db>(
             base_type,
             MaterializationKind::Top,
             inferable,
+            relation,
             relation_visitor,
             disjointness_visitor,
         ),
