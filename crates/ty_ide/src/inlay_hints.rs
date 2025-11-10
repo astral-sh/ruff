@@ -4,7 +4,7 @@ use crate::Db;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
-use ruff_python_ast::{AnyNodeRef, Expr, Stmt};
+use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::inlay_hint_function_argument_details;
@@ -283,7 +283,9 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
                 self.visit_expr(&call.func);
 
                 for (index, arg_or_keyword) in call.arguments.arguments_source_order().enumerate() {
-                    if let Some(name) = argument_names.get(&index) {
+                    if let Some(name) = argument_names.get(&index)
+                        && !arg_matches_name(&arg_or_keyword, name)
+                    {
                         self.add_call_argument_name(arg_or_keyword.range().start(), name);
                     }
                     self.visit_expr(arg_or_keyword.value());
@@ -292,6 +294,32 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
             _ => {
                 source_order::walk_expr(self, expr);
             }
+        }
+    }
+}
+
+/// Given a positional argument, check if the expression is the "same name"
+/// as the function argument itself.
+///
+/// This allows us to filter out reptitive inlay hints like `x=x`, `x=y.x`, etc.
+fn arg_matches_name(arg_or_keyword: &ArgOrKeyword, name: &str) -> bool {
+    // Only care about positional args
+    let ArgOrKeyword::Arg(arg) = arg_or_keyword else {
+        return false;
+    };
+
+    let mut expr = *arg;
+    loop {
+        match expr {
+            // `x=x(1, 2)` counts as a match, recurse for it
+            Expr::Call(expr_call) => expr = &expr_call.func,
+            // `x=x[0]` is a match, recurse for it
+            Expr::Subscript(expr_subscript) => expr = &expr_subscript.value,
+            // `x=x` is a match
+            Expr::Name(expr_name) => return expr_name.id.as_str() == name,
+            // `x=y.x` is a match
+            Expr::Attribute(expr_attribute) => return expr_attribute.attr.as_str() == name,
+            _ => return false,
         }
     }
 }
@@ -482,6 +510,137 @@ mod tests {
         assert_snapshot!(test.inlay_hints(), @r"
         def foo(x: int): pass
         foo([x=]1)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_positional_or_keyword_parameter_redundant_name() {
+        let test = inlay_hint_test(
+            "
+            def foo(x: int): pass
+            x = 1
+            y = 2
+            foo(x)
+            foo(y)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int): pass
+        x[: Literal[1]] = 1
+        y[: Literal[2]] = 2
+        foo(x)
+        foo([x=]y)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_positional_or_keyword_parameter_redundant_attribute() {
+        let test = inlay_hint_test(
+            "
+            def foo(x: int): pass
+            class MyClass:
+                def __init__():
+                    self.x: int = 1
+                    self.y: int = 2
+            val = MyClass()
+
+            foo(val.x)
+            foo(val.y)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int): pass
+        class MyClass:
+            def __init__():
+                self.x: int = 1
+                self.y: int = 2
+        val[: MyClass] = MyClass()
+
+        foo(val.x)
+        foo([x=]val.y)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_positional_or_keyword_parameter_redundant_attribute_not() {
+        // This one checks that we don't allow elide `x=` for `x.y`
+        let test = inlay_hint_test(
+            "
+            def foo(x: int): pass
+            class MyClass:
+                def __init__():
+                    self.x: int = 1
+                    self.y: int = 2
+            x = MyClass()
+
+            foo(x.x)
+            foo(x.y)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int): pass
+        class MyClass:
+            def __init__():
+                self.x: int = 1
+                self.y: int = 2
+        x[: MyClass] = MyClass()
+
+        foo(x.x)
+        foo([x=]x.y)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_positional_or_keyword_parameter_redundant_call() {
+        let test = inlay_hint_test(
+            "
+            def foo(x: int): pass
+            class MyClass:
+                def __init__():
+                def x() -> int:
+                    return 1
+                def y() -> int:
+                    return 2
+            val = MyClass()
+
+            foo(val.x())
+            foo(val.y())",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int): pass
+        class MyClass:
+            def __init__():
+            def x() -> int:
+                return 1
+            def y() -> int:
+                return 2
+        val[: MyClass] = MyClass()
+
+        foo(val.x())
+        foo([x=]val.y())
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_positional_or_keyword_parameter_redundant_subscript() {
+        let test = inlay_hint_test(
+            "
+            def foo(x: int): pass
+            x = [1]
+            y = [2]
+
+            foo(x[0])
+            foo(y[0])",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int): pass
+        x[: list[Unknown | int]] = [1]
+        y[: list[Unknown | int]] = [2]
+
+        foo(x[0])
+        foo([x=]y[0])
         ");
     }
 
