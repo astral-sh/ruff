@@ -265,9 +265,7 @@ def given_constraints[T]():
 
     given_bool = ConstraintSet.range(Never, T, int)
     static_assert(given_bool.implies_subtype_of(Contravariant[int], Contravariant[T]))
-    # TODO: no error
-    # error: [static-assert-error]
-    static_assert(given_bool.implies_subtype_of(Contravariant[bool], Contravariant[T]))
+    static_assert(not given_bool.implies_subtype_of(Contravariant[bool], Contravariant[T]))
     static_assert(not given_bool.implies_subtype_of(Contravariant[str], Contravariant[T]))
 
 def mutually_constrained[T, U]():
