@@ -318,10 +318,6 @@ additional comment help us to review your PR more efficiently. It's also a great
 way to find new test cases to incorporate into your PR if you identify any
 issues.
 
-These steps will help us to review your PR quickly and effectively. Of course,
-if you run into any problems or have questions, feel free to ask them on the
-issue, in a draft PR, or on Discord!
-
 #### PR status
 
 To help us know when your PR is ready for review again, please either move your
