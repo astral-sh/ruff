@@ -554,7 +554,7 @@ jobs:
         with:
           workspaces: |-
             .
-            baseline -> target-baseline
+            baseline -> ../target-baseline
           shared-key: ruff-linux-debug
           save-if: false
 
