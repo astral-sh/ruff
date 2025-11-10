@@ -9867,14 +9867,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_subscript_load(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
+        let value_ty = self.infer_expression(&subscript.value, TypeContext::default());
+        self.infer_subscript_load_impl(value_ty, subscript)
+    }
+
+    fn infer_subscript_load_impl(
+        &mut self,
+        value_ty: Type<'db>,
+        subscript: &ast::ExprSubscript,
+    ) -> Type<'db> {
         let ast::ExprSubscript {
             range: _,
             node_index: _,
-            value,
+            value: _,
             slice,
             ctx,
         } = subscript;
-        let value_ty = self.infer_expression(value, TypeContext::default());
+
         let mut constraint_keys = vec![];
 
         // If `value` is a valid reference, we attempt type narrowing by assignment.

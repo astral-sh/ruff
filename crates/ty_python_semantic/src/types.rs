@@ -7861,8 +7861,10 @@ impl<'db> KnownInstanceType<'db> {
                         )
                     }
                     KnownInstanceType::UnionType(_) => f.write_str("types.UnionType"),
-                    KnownInstanceType::Literal(_) => f.write_str("typing.Literal"),
-                    KnownInstanceType::Annotated(_) => f.write_str("typing.Annotated"),
+                    KnownInstanceType::Literal(_) => f.write_str("<typing.Literal special form>"),
+                    KnownInstanceType::Annotated(_) => {
+                        f.write_str("<typing.Annotated special form>")
+                    }
                 }
             }
         }
@@ -8059,7 +8061,7 @@ impl<'db> InvalidTypeExpressionError<'db> {
     fn into_fallback_type(
         self,
         context: &InferContext,
-        node: &ast::Expr,
+        node: &impl Ranged,
         is_reachable: bool,
     ) -> Type<'db> {
         let InvalidTypeExpressionError {

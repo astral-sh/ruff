@@ -4,7 +4,7 @@ use ruff_python_ast as ast;
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NON_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
-    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
+    report_invalid_arguments_to_callable,
 };
 use crate::types::signatures::Signature;
 use crate::types::string_annotation::parse_string_annotation;
@@ -913,36 +913,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let arguments_slice = &*subscript.slice;
         match special_form {
             SpecialFormType::Annotated => {
-                let ast::Expr::Tuple(ast::ExprTuple {
-                    elts: arguments, ..
-                }) = arguments_slice
-                else {
-                    report_invalid_arguments_to_annotated(&self.context, subscript);
-
-                    // `Annotated[]` with less than two arguments is an error at runtime.
-                    // However, we still treat `Annotated[T]` as `T` here for the purpose of
-                    // giving better diagnostics later on.
-                    // Pyright also does this. Mypy doesn't; it falls back to `Any` instead.
-                    return self.infer_type_expression(arguments_slice);
-                };
-
-                if arguments.len() < 2 {
-                    report_invalid_arguments_to_annotated(&self.context, subscript);
-                }
-
-                let [type_expr, metadata @ ..] = &arguments[..] else {
-                    for argument in arguments {
-                        self.infer_expression(argument, TypeContext::default());
-                    }
-                    self.store_expression_type(arguments_slice, Type::unknown());
-                    return Type::unknown();
-                };
-
-                for element in metadata {
-                    self.infer_expression(element, TypeContext::default());
-                }
-
-                let ty = self.infer_type_expression(type_expr);
+                let ty = self
+                    .infer_subscript_load_impl(
+                        Type::SpecialForm(SpecialFormType::Annotated),
+                        subscript,
+                    )
+                    .in_type_expression(db, self.scope(), None)
+                    .unwrap_or_else(|err| err.into_fallback_type(&self.context, subscript, true));
                 self.store_expression_type(arguments_slice, ty);
                 ty
             }
