@@ -1318,16 +1318,18 @@ impl Truthiness {
                         if arguments.is_empty() {
                             // Ex) `list()`
                             Self::Falsey
-                        } else if arguments.args.len() == 1 && arguments.keywords.is_empty() {
+                        } else if let [argument] = &*arguments.args
+                            && arguments.keywords.is_empty()
+                        {
                             // Ex) `list([1, 2, 3])`
                             // For tuple(generator), we can't determine statically if the result will
                             // be empty or not, so return Unknown. The generator itself is truthy, but
                             // tuple(empty_generator) is falsy. ListComp and SetComp are handled by
                             // recursing into Self::from_expr below, which returns Unknown for them.
-                            if matches!(&arguments.args[0], Expr::Generator(_)) {
+                            if argument.is_generator_expr() {
                                 Self::Unknown
                             } else {
-                                Self::from_expr(&arguments.args[0], is_builtin)
+                                Self::from_expr(argument, is_builtin)
                             }
                         } else {
                             Self::Unknown
