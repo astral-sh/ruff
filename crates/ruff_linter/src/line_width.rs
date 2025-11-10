@@ -51,25 +51,23 @@ impl<'de> serde::Deserialize<'de> for LineLength {
     where
         D: serde::Deserializer<'de>,
     {
-        let value = u64::deserialize(deserializer)?;
+        let value = i64::deserialize(deserializer)?;
 
-        // Check if value exceeds u16::MAX
-        if value > u64::from(u16::MAX) {
-            return Err(serde::de::Error::custom(format!(
-                "line-length must be between 1 and {} (got {value})",
-                Self::MAX,
-            )));
-        }
-
-        // Convert to u16 and validate range
-        // Safe to unwrap since we've already checked value <= u16::MAX
-        let value = u16::try_from(value).expect("value should fit in u16");
-        Self::try_from(value).map_err(|_| {
-            serde::de::Error::custom(format!(
-                "line-length must be between 1 and {} (got {value})",
-                Self::MAX,
-            ))
-        })
+        u16::try_from(value)
+            .map_err(|_| {
+                serde::de::Error::custom(format!(
+                    "line-length must be between 1 and {} (got {value})",
+                    Self::MAX,
+                ))
+            })
+            .and_then(|u16_value| {
+                Self::try_from(u16_value).map_err(|_| {
+                    serde::de::Error::custom(format!(
+                        "line-length must be between 1 and {} (got {value})",
+                        Self::MAX,
+                    ))
+                })
+            })
     }
 }
 

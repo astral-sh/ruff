@@ -510,6 +510,20 @@ line-length = 99_999
             "line-length must be between 1 and 320 (got 99999)"
         );
 
+        // Test negative value - should show clear error
+        let invalid_line_length_negative = toml::from_str::<Pyproject>(
+            r"
+[tool.ruff]
+line-length = -5
+",
+        )
+        .expect_err("Deserialization should have failed for negative line-length");
+
+        assert_eq!(
+            invalid_line_length_negative.message(),
+            "line-length must be between 1 and 320 (got -5)"
+        );
+
         Ok(())
     }
 
