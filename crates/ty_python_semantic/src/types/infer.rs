@@ -82,17 +82,15 @@ pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Sc
 
 fn scope_cycle_recover<'db>(
     db: &'db dyn Db,
-    id: salsa::Id,
     cycle_heads: &salsa::CycleHeads,
     previous_inference: &ScopeInference<'db>,
     mut inference: ScopeInference<'db>,
     _count: u32,
     _scope: ScopeId<'db>,
 ) -> ScopeInference<'db> {
-    let div = Type::divergent(id);
     for (expr, ty) in &mut inference.expressions {
         let previous_ty = previous_inference.expression_type(*expr);
-        *ty = ty.cycle_normalized(db, previous_ty, div, cycle_heads);
+        *ty = ty.cycle_normalized(db, previous_ty, cycle_heads);
     }
 
     inference
@@ -130,27 +128,24 @@ pub(crate) fn infer_definition_types<'db>(
 
 fn definition_cycle_recover<'db>(
     db: &'db dyn Db,
-    id: salsa::Id,
     cycle_heads: &salsa::CycleHeads,
     previous_inference: &DefinitionInference<'db>,
     inference: DefinitionInference<'db>,
     _count: u32,
     _definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
-    definition_cycle_recover_inner(db, id, cycle_heads, previous_inference, inference)
+    definition_cycle_recover_inner(db, cycle_heads, previous_inference, inference)
 }
 
 fn definition_cycle_recover_inner<'db>(
     db: &'db dyn Db,
-    id: salsa::Id,
     cycle_heads: &salsa::CycleHeads,
     previous_inference: &DefinitionInference<'db>,
     mut inference: DefinitionInference<'db>,
 ) -> DefinitionInference<'db> {
-    let div = Type::divergent(id);
     for (expr, ty) in &mut inference.expressions {
         let previous_ty = previous_inference.expression_type(*expr);
-        *ty = ty.cycle_normalized(db, previous_ty, div, cycle_heads);
+        *ty = ty.cycle_normalized(db, previous_ty, cycle_heads);
     }
     for (binding, binding_ty) in &mut inference.bindings {
         if let Some((_, previous_binding)) = previous_inference
@@ -158,9 +153,9 @@ fn definition_cycle_recover_inner<'db>(
             .iter()
             .find(|(previous_binding, _)| previous_binding == binding)
         {
-            *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, div, cycle_heads);
+            *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, cycle_heads);
         } else {
-            *binding_ty = binding_ty.recursive_type_normalized(db, div);
+            *binding_ty = binding_ty.recursive_type_normalized(db, cycle_heads);
         }
     }
     for (declaration, declaration_ty) in &mut inference.declarations {
@@ -170,11 +165,11 @@ fn definition_cycle_recover_inner<'db>(
             .find(|(previous_declaration, _)| previous_declaration == declaration)
         {
             *declaration_ty = declaration_ty.map_type(|decl_ty| {
-                decl_ty.cycle_normalized(db, previous_declaration.inner_type(), div, cycle_heads)
+                decl_ty.cycle_normalized(db, previous_declaration.inner_type(), cycle_heads)
             });
         } else {
-            *declaration_ty =
-                declaration_ty.map_type(|decl_ty| decl_ty.recursive_type_normalized(db, div));
+            *declaration_ty = declaration_ty
+                .map_type(|decl_ty| decl_ty.recursive_type_normalized(db, cycle_heads));
         }
     }
 
@@ -216,14 +211,13 @@ pub(crate) fn infer_deferred_types<'db>(
 
 fn deferred_cycle_recovery<'db>(
     db: &'db dyn Db,
-    id: salsa::Id,
     cycle_heads: &salsa::CycleHeads,
     previous_inference: &DefinitionInference<'db>,
     inference: DefinitionInference<'db>,
     _count: u32,
     _definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
-    definition_cycle_recover_inner(db, id, cycle_heads, previous_inference, inference)
+    definition_cycle_recover_inner(db, cycle_heads, previous_inference, inference)
 }
 
 fn deferred_cycle_initial<'db>(
@@ -294,14 +288,12 @@ pub(crate) fn infer_isolated_expression<'db>(
 
 fn expression_cycle_recover<'db>(
     db: &'db dyn Db,
-    id: salsa::Id,
     cycle_heads: &salsa::CycleHeads,
     previous_inference: &ExpressionInference<'db>,
     mut inference: ExpressionInference<'db>,
     _count: u32,
     _input: InferExpression<'db>,
 ) -> ExpressionInference<'db> {
-    let div = Type::divergent(id);
     if let Some(extra) = inference.extra.as_mut() {
         for (binding, binding_ty) in &mut extra.bindings {
             if let Some((_, previous_binding)) =
@@ -312,16 +304,16 @@ fn expression_cycle_recover<'db>(
                         .find(|(previous_binding, _)| previous_binding == binding)
                 })
             {
-                *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, div, cycle_heads);
+                *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, cycle_heads);
             } else {
-                *binding_ty = binding_ty.recursive_type_normalized(db, div);
+                *binding_ty = binding_ty.recursive_type_normalized(db, cycle_heads);
             }
         }
     }
 
     for (expr, ty) in &mut inference.expressions {
         let previous_ty = previous_inference.expression_type(*expr);
-        *ty = ty.cycle_normalized(db, previous_ty, div, cycle_heads);
+        *ty = ty.cycle_normalized(db, previous_ty, cycle_heads);
     }
 
     inference
@@ -379,15 +371,13 @@ fn infer_expression_type_impl<'db>(db: &'db dyn Db, input: InferExpression<'db>)
 
 fn single_expression_cycle_recover<'db>(
     db: &'db dyn Db,
-    id: salsa::Id,
     cycle_heads: &salsa::CycleHeads,
     previous_cycle_value: &Type<'db>,
     result: Type<'db>,
     _count: u32,
     _input: InferExpression<'db>,
 ) -> Type<'db> {
-    let div = Type::divergent(id);
-    result.cycle_normalized(db, *previous_cycle_value, div, cycle_heads)
+    result.cycle_normalized(db, *previous_cycle_value, cycle_heads)
 }
 
 fn single_expression_cycle_initial<'db>(
@@ -538,17 +528,15 @@ fn unpack_cycle_initial<'db>(
 
 fn unpack_cycle_recover<'db>(
     db: &'db dyn Db,
-    id: salsa::Id,
     cycle_heads: &salsa::CycleHeads,
     previous_cycle_result: &UnpackResult<'db>,
     mut result: UnpackResult<'db>,
     _count: u32,
     _unpack: Unpack<'db>,
 ) -> UnpackResult<'db> {
-    let div = Type::divergent(id);
     for (expr, ty) in &mut result.targets {
         let previous_ty = previous_cycle_result.expression_type(*expr);
-        *ty = ty.cycle_normalized(db, previous_ty, div, cycle_heads);
+        *ty = ty.cycle_normalized(db, previous_ty, cycle_heads);
     }
 
     result

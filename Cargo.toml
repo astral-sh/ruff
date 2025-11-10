@@ -146,7 +146,7 @@ regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/mtshiba/salsa.git", rev = "11f2ec8629e46b391c41aef5d770de92760a4f01", default-features = false, features = [
+salsa = { git = "https://github.com/mtshiba/salsa.git", rev = "aeb592d2c143b9c4d1747e5223371ac6b43b12ac", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",

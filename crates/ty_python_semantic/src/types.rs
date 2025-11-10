@@ -415,7 +415,6 @@ fn member_lookup_cycle_initial<'db>(
 #[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 fn member_lookup_cycle_recover<'db>(
     db: &'db dyn Db,
-    id: salsa::Id,
     cycle_heads: &salsa::CycleHeads,
     previous_member: &PlaceAndQualifiers<'db>,
     member: PlaceAndQualifiers<'db>,
@@ -424,9 +423,8 @@ fn member_lookup_cycle_recover<'db>(
     _name: Name,
     _policy: MemberLookupPolicy,
 ) -> PlaceAndQualifiers<'db> {
-    let div = Type::divergent(id);
     let place =
-        join_with_previous_cycle_place(db, &previous_member.place, &member.place, div, cycle_heads);
+        join_with_previous_cycle_place(db, &previous_member.place, &member.place, cycle_heads);
     PlaceAndQualifiers {
         place,
         qualifiers: member.qualifiers,
@@ -447,20 +445,21 @@ pub(crate) fn join_with_previous_cycle_place<'db>(
     db: &'db dyn Db,
     previous_place: &Place<'db>,
     place: &Place<'db>,
-    div: Type<'db>,
     cycle_heads: &salsa::CycleHeads,
 ) -> Place<'db> {
     match (previous_place, place) {
         // In fixed-point iteration of type inference, the member type must be monotonically widened and not "oscillate".
         // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
         (Place::Defined(prev_ty, _, _), Place::Defined(ty, origin, definedness)) => Place::Defined(
-            ty.cycle_normalized(db, *prev_ty, div, cycle_heads),
+            ty.cycle_normalized(db, *prev_ty, cycle_heads),
             *origin,
             *definedness,
         ),
-        (_, Place::Defined(ty, origin, definedness)) => {
-            Place::Defined(ty.recursive_type_normalized(db, div), *origin, *definedness)
-        }
+        (_, Place::Defined(ty, origin, definedness)) => Place::Defined(
+            ty.recursive_type_normalized(db, cycle_heads),
+            *origin,
+            *definedness,
+        ),
         (_, Place::Undefined) => Place::Undefined,
     }
 }
@@ -468,7 +467,6 @@ pub(crate) fn join_with_previous_cycle_place<'db>(
 #[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 fn class_lookup_cycle_recover<'db>(
     db: &'db dyn Db,
-    id: salsa::Id,
     cycle_heads: &salsa::CycleHeads,
     previous_member: &PlaceAndQualifiers<'db>,
     member: PlaceAndQualifiers<'db>,
@@ -477,9 +475,8 @@ fn class_lookup_cycle_recover<'db>(
     _name: Name,
     _policy: MemberLookupPolicy,
 ) -> PlaceAndQualifiers<'db> {
-    let div = Type::divergent(id);
     let place =
-        join_with_previous_cycle_place(db, &previous_member.place, &member.place, div, cycle_heads);
+        join_with_previous_cycle_place(db, &previous_member.place, &member.place, cycle_heads);
     PlaceAndQualifiers {
         place,
         qualifiers: member.qualifiers,
@@ -929,14 +926,10 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         previous: Self,
-        div: Self,
         cycle_heads: &salsa::CycleHeads,
     ) -> Self {
-        let normalized = UnionType::from_elements_cycle_recovery(db, [self, previous])
-            .recursive_type_normalized(db, div);
-        cycle_heads.ids().fold(normalized, |ty, id| {
-            ty.recursive_type_normalized(db, Type::divergent(id))
-        })
+        UnionType::from_elements_cycle_recovery(db, [self, previous])
+            .recursive_type_normalized(db, cycle_heads)
     }
 
     fn is_none(&self, db: &'db dyn Db) -> bool {
@@ -1535,9 +1528,15 @@ impl<'db> Type<'db> {
     }
 
     #[must_use]
-    pub(crate) fn recursive_type_normalized(self, db: &'db dyn Db, div: Type<'db>) -> Self {
-        let visitor = RecursiveTypeNormalizedVisitor::new(div);
-        self.recursive_type_normalized_impl(db, &visitor)
+    pub(crate) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        cycle_heads: &salsa::CycleHeads,
+    ) -> Self {
+        cycle_heads.ids().fold(self, |ty, id| {
+            let visitor = RecursiveTypeNormalizedVisitor::new(Type::divergent(id));
+            ty.recursive_type_normalized_impl(db, &visitor)
+        })
     }
 
     fn recursive_type_normalized_impl(
@@ -7716,7 +7715,6 @@ fn is_redundant_with_cycle_initial<'db>(
 #[allow(clippy::too_many_arguments)]
 fn apply_specialization_cycle_recover<'db>(
     db: &'db dyn Db,
-    id: salsa::Id,
     cycle_heads: &salsa::CycleHeads,
     previous_value: &Type<'db>,
     value: Type<'db>,
@@ -7724,8 +7722,7 @@ fn apply_specialization_cycle_recover<'db>(
     _self: Type<'db>,
     _specialization: Specialization<'db>,
 ) -> Type<'db> {
-    let div = Type::divergent(id);
-    value.cycle_normalized(db, *previous_value, div, cycle_heads)
+    value.cycle_normalized(db, *previous_value, cycle_heads)
 }
 
 fn apply_specialization_cycle_initial<'db>(
@@ -8947,17 +8944,15 @@ fn lazy_bound_or_constraints_cycle_initial<'db>(
 #[allow(clippy::ref_option)]
 fn lazy_default_cycle_recover<'db>(
     db: &'db dyn Db,
-    id: salsa::Id,
     cycle_heads: &salsa::CycleHeads,
     previous_default: &Option<Type<'db>>,
     default: Option<Type<'db>>,
     _count: u32,
     _typevar: TypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
-    let div = Type::divergent(id);
     match (previous_default, default) {
-        (Some(prev), Some(default)) => Some(default.cycle_normalized(db, *prev, div, cycle_heads)),
-        (None, Some(default)) => Some(default.recursive_type_normalized(db, div)),
+        (Some(prev), Some(default)) => Some(default.cycle_normalized(db, *prev, cycle_heads)),
+        (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle_heads)),
         (_, None) => None,
     }
 }
@@ -12777,12 +12772,13 @@ pub(crate) mod tests {
             nested_rec.display(&db).to_string(),
             "list[list[Divergent] | None]"
         );
-        let normalized = nested_rec.recursive_type_normalized(&db, div);
+        let visitor = RecursiveTypeNormalizedVisitor::new(div);
+        let normalized = nested_rec.recursive_type_normalized_impl(&db, &visitor);
         assert_eq!(normalized.display(&db).to_string(), "list[Divergent]");
 
         let union = UnionType::from_elements(&db, [div, KnownClass::Int.to_instance(&db)]);
         assert_eq!(union.display(&db).to_string(), "Divergent | int");
-        let normalized = union.recursive_type_normalized(&db, div);
+        let normalized = union.recursive_type_normalized_impl(&db, &visitor);
         assert_eq!(normalized.display(&db).to_string(), "int");
 
         // The same can be said about intersections for the `Never` type.

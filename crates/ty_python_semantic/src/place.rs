@@ -709,7 +709,6 @@ fn place_cycle_initial<'db>(
 #[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 fn place_cycle_recover<'db>(
     db: &'db dyn Db,
-    id: salsa::Id,
     cycle_heads: &salsa::CycleHeads,
     previous_place: &PlaceAndQualifiers<'db>,
     place: PlaceAndQualifiers<'db>,
@@ -719,15 +718,8 @@ fn place_cycle_recover<'db>(
     _requires_explicit_reexport: RequiresExplicitReExport,
     _considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
-    let div = Type::divergent(id);
     PlaceAndQualifiers {
-        place: join_with_previous_cycle_place(
-            db,
-            &previous_place.place,
-            &place.place,
-            div,
-            cycle_heads,
-        ),
+        place: join_with_previous_cycle_place(db, &previous_place.place, &place.place, cycle_heads),
         qualifiers: place.qualifiers,
     }
 }

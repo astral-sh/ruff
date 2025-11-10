@@ -119,7 +119,6 @@ fn implicit_attribute_initial<'db>(
 #[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 fn implicit_attribute_cycle_recover<'db>(
     db: &'db dyn Db,
-    id: salsa::Id,
     cycle_heads: &salsa::CycleHeads,
     previous_member: &Member<'db>,
     member: Member<'db>,
@@ -128,12 +127,10 @@ fn implicit_attribute_cycle_recover<'db>(
     _name: String,
     _target_method_decorator: MethodDecorator,
 ) -> Member<'db> {
-    let div = Type::divergent(id);
     let place = join_with_previous_cycle_place(
         db,
         &previous_member.inner.place,
         &member.inner.place,
-        div,
         cycle_heads,
     );
     Member {
