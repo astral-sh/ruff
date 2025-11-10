@@ -1868,6 +1868,8 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         //     case [[x] | [x]] | x: ...
                         // match 42:
                         //     case [[x | x] | [x]] | x: ...
+                        // match 42:
+                        //     case ast.Subscript(n, ast.Constant() | ast.Slice()) | ast.Attribute(n): ...
                         SemanticSyntaxChecker::add_error(
                             self.ctx,
                             SemanticSyntaxErrorKind::DifferentMatchPatternBindings,
@@ -1875,7 +1877,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         );
                         break;
                     }
-                    self.names = visitor.names;
+                    self.names.extend(visitor.names);
                 }
             }
         }
