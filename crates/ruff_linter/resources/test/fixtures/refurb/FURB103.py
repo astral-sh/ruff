@@ -153,5 +153,3 @@ data = {"price": 100}
 
 with open("test.json", "wb") as f:
     f.write(json.dumps(data, indent=4).encode("utf-8"))
-
-

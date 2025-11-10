@@ -209,5 +209,3 @@ help: Replace with `Path("test.json")....`
     - with open("test.json", "wb") as f:
     -     f.write(json.dumps(data, indent=4).encode("utf-8"))
 155 + pathlib.Path("test.json").write_bytes(json.dumps(data, indent=4).encode("utf-8"))
-156 | 
-157 |
