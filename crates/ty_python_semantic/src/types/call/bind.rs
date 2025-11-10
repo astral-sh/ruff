@@ -1164,7 +1164,7 @@ impl<'db> Bindings<'db> {
                         if !overload.parameter_types().is_empty() {
                             return;
                         }
-                        let constraints = ConstraintSet::from(true);
+                        let constraints = ConstraintSet::always(InferableTypeVars::none());
                         let tracked = TrackedConstraintSet::new(db, constraints);
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),
@@ -1175,7 +1175,7 @@ impl<'db> Bindings<'db> {
                         if !overload.parameter_types().is_empty() {
                             return;
                         }
-                        let constraints = ConstraintSet::from(false);
+                        let constraints = ConstraintSet::never(InferableTypeVars::none());
                         let tracked = TrackedConstraintSet::new(db, constraints);
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),

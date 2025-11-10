@@ -74,25 +74,41 @@ use crate::types::{
 pub(crate) trait OptionConstraintsExtension<T> {
     /// Returns a constraint set that is always satisfiable if the option is `None`; otherwise
     /// applies a function to determine under what constraints the value inside of it holds.
-    fn when_none_or<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db>;
+    fn when_none_or<'db>(
+        self,
+        inferable: InferableTypeVars<'db>,
+        f: impl FnOnce(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db>;
 
     /// Returns a constraint set that is never satisfiable if the option is `None`; otherwise
     /// applies a function to determine under what constraints the value inside of it holds.
-    fn when_some_and<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db>;
+    fn when_some_and<'db>(
+        self,
+        inferable: InferableTypeVars<'db>,
+        f: impl FnOnce(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db>;
 }
 
 impl<T> OptionConstraintsExtension<T> for Option<T> {
-    fn when_none_or<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db> {
+    fn when_none_or<'db>(
+        self,
+        inferable: InferableTypeVars<'db>,
+        f: impl FnOnce(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db> {
         match self {
             Some(value) => f(value),
-            None => ConstraintSet::always(),
+            None => ConstraintSet::always(inferable),
         }
     }
 
-    fn when_some_and<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db> {
+    fn when_some_and<'db>(
+        self,
+        inferable: InferableTypeVars<'db>,
+        f: impl FnOnce(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db> {
         match self {
             Some(value) => f(value),
-            None => ConstraintSet::never(),
+            None => ConstraintSet::never(inferable),
         }
     }
 }
@@ -107,6 +123,7 @@ pub(crate) trait IteratorConstraintsExtension<T> {
     fn when_any<'db>(
         self,
         db: &'db dyn Db,
+        inferable: InferableTypeVars<'db>,
         f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db>;
 
@@ -118,6 +135,7 @@ pub(crate) trait IteratorConstraintsExtension<T> {
     fn when_all<'db>(
         self,
         db: &'db dyn Db,
+        inferable: InferableTypeVars<'db>,
         f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db>;
 }
@@ -129,9 +147,10 @@ where
     fn when_any<'db>(
         self,
         db: &'db dyn Db,
+        inferable: InferableTypeVars<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::never();
+        let mut result = ConstraintSet::never(inferable);
         for child in self {
             if result.union(db, f(child)).is_always_satisfied(db) {
                 return result;
@@ -143,9 +162,10 @@ where
     fn when_all<'db>(
         self,
         db: &'db dyn Db,
+        inferable: InferableTypeVars<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::always();
+        let mut result = ConstraintSet::always(inferable);
         for child in self {
             if result.intersect(db, f(child)).is_never_satisfied(db) {
                 return result;
@@ -170,17 +190,28 @@ pub struct ConstraintSet<'db> {
 }
 
 impl<'db> ConstraintSet<'db> {
-    fn never() -> Self {
+    pub(crate) fn never(inferable: InferableTypeVars<'db>) -> Self {
         Self {
             node: Node::AlwaysFalse,
-            inferable: InferableTypeVars::none(),
+            inferable,
         }
     }
 
-    fn always() -> Self {
+    pub(crate) fn always(inferable: InferableTypeVars<'db>) -> Self {
         Self {
             node: Node::AlwaysTrue,
-            inferable: InferableTypeVars::none(),
+            inferable,
+        }
+    }
+
+    pub(crate) fn from_bool(b: bool, inferable: InferableTypeVars<'db>) -> Self {
+        Self {
+            node: if b {
+                Node::AlwaysTrue
+            } else {
+                Node::AlwaysFalse
+            },
+            inferable,
         }
     }
 
@@ -264,15 +295,15 @@ impl<'db> ConstraintSet<'db> {
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
     pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        debug_assert!(self.inferable == other.inferable);
         self.node = self.node.or(db, other.node);
+        self.inferable = self.inferable.merge(db, other.inferable);
         *self
     }
 
     /// Updates this constraint set to hold the intersection of itself and another constraint set.
     pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        debug_assert!(self.inferable == other.inferable);
         self.node = self.node.and(db, other.node);
+        self.inferable = self.inferable.merge(db, other.inferable);
         *self
     }
 
@@ -310,10 +341,9 @@ impl<'db> ConstraintSet<'db> {
     }
 
     pub(crate) fn iff(self, db: &'db dyn Db, other: Self) -> Self {
-        debug_assert!(self.inferable == other.inferable);
         ConstraintSet {
             node: self.node.iff(db, other.node),
-            inferable: self.inferable,
+            inferable: self.inferable.merge(db, other.inferable),
         }
     }
 
@@ -336,12 +366,6 @@ impl<'db> ConstraintSet<'db> {
 
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         self.node.simplify(db).display(db)
-    }
-}
-
-impl From<bool> for ConstraintSet<'_> {
-    fn from(b: bool) -> Self {
-        if b { Self::always() } else { Self::never() }
     }
 }
 

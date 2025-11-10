@@ -357,19 +357,11 @@ def identity[T](t: T) -> T:
 
 constraints = ConstraintSet.always()
 
-# TODO: no error
-# error: [static-assert-error]
 static_assert(constraints.implies_subtype_of(TypeOf[identity], Callable[[int], int]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(constraints.implies_subtype_of(TypeOf[identity], Callable[[str], str]))
 static_assert(not constraints.implies_subtype_of(TypeOf[identity], Callable[[str], int]))
 
-# TODO: no error
-# error: [static-assert-error]
 static_assert(constraints.implies_subtype_of(CallableTypeOf[identity], Callable[[int], int]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(constraints.implies_subtype_of(CallableTypeOf[identity], Callable[[str], str]))
 static_assert(not constraints.implies_subtype_of(CallableTypeOf[identity], Callable[[str], int]))
 ```
@@ -415,12 +407,10 @@ def identity2[T](t: T) -> T:
     # This constraint set refers to the same typevar as the generic function types below!
     constraints = ConstraintSet.range(bool, T, int)
 
-    # TODO: no error
-    # error: [static-assert-error]
     static_assert(constraints.implies_subtype_of(TypeOf[identity2], Callable[[int], int]))
+    static_assert(constraints.implies_subtype_of(TypeOf[identity2], Callable[[str], str]))
     # TODO: no error
     # error: [static-assert-error]
-    static_assert(constraints.implies_subtype_of(TypeOf[identity2], Callable[[str], str]))
     static_assert(not constraints.implies_subtype_of(TypeOf[identity2], Callable[[str], int]))
 
     static_assert(not constraints.implies_subtype_of(Callable[[int], int], TypeOf[identity2]))
