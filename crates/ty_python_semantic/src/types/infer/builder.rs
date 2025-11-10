@@ -6748,21 +6748,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ast::ExprGenerator {
             range: _,
             node_index: _,
-            elt,
+            elt: _,
             generators,
             parenthesized: _,
         } = generator;
 
         self.infer_first_comprehension_iter(generators);
-
-        // We haven't implemented inference for generator expressions yet, but the type of `elt` needs to be inferred,
-        // otherwise we can't detect recursive structures in generator expressions.
-        let scope_id = self
-            .index
-            .node_scope(NodeWithScopeRef::GeneratorExpression(generator));
-        let scope = scope_id.to_scope_id(self.db(), self.file());
-        let inference = infer_scope_types(self.db(), scope);
-        let _element_ty = inference.expression_type(elt.as_ref());
 
         KnownClass::GeneratorType.to_specialized_instance(
             self.db(),
