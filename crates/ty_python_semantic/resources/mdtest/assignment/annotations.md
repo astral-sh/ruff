@@ -310,6 +310,65 @@ reveal_type(s)  # revealed: list[Literal[1]]
 reveal_type(s)  # revealed: list[Literal[1]]
 ```
 
+## Generic constructor annotations are understood
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+class X[T]:
+    def __init__(self, value: T):
+        self.value = value
+
+a: X[int] = X(1)
+reveal_type(a)  # revealed: X[int]
+
+b: X[int | None] = X(1)
+reveal_type(b)  # revealed: X[int | None]
+
+c: X[int | None] | None = X(1)
+reveal_type(c)  # revealed: X[int | None]
+
+def _[T](a: X[T]):
+    b: X[T | int] = X(a.value)
+    reveal_type(b)  # revealed: X[T@_ | int]
+
+d: X[Any] = X(1)
+reveal_type(d)  # revealed: X[Any]
+
+def _(flag: bool):
+    # TODO: Handle unions correctly.
+    # error: [invalid-assignment] "Object of type `X[int]` is not assignable to `X[int | None]`"
+    a: X[int | None] = X(1) if flag else X(2)
+    reveal_type(a)  # revealed: X[int | None]
+```
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class Y[T]:
+    value: T
+
+y1: Y[Any] = Y(value=1)
+# TODO: This should reveal `Y[Any]`.
+reveal_type(y1)  # revealed: Y[int]
+```
+
+```py
+class Z[T]:
+    def __new__(cls, value: T):
+        return super().__new__(cls)
+
+z1: Z[Any] = Z(1)
+# TODO: This should reveal `Z[Any]`.
+reveal_type(z1)  # revealed: Z[int]
+```
+
 ## PEP-604 annotations are supported
 
 ```py

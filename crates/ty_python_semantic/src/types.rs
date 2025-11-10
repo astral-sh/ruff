@@ -1111,6 +1111,22 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// If the type is a generic class constructor, returns the class instance type.
+    pub(crate) fn synthesized_constructor_return_ty(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        // TODO: This does not correctly handle unions or intersections. It also does not handle
+        // constructors that are not represented as bound methods, e.g. `__new__`, or synthesized
+        // dataclass initializers.
+        if let Type::BoundMethod(method) = self
+            && let Type::NominalInstance(instance) = method.self_instance(db)
+            && method.function(db).name(db).as_str() == "__init__"
+        {
+            let class_ty = instance.class_literal(db).identity_specialization(db);
+            Some(Type::instance(db, class_ty))
+        } else {
+            None
+        }
+    }
+
     pub const fn is_property_instance(&self) -> bool {
         matches!(self, Type::PropertyInstance(..))
     }
