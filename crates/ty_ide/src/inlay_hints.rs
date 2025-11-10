@@ -623,6 +623,42 @@ mod tests {
     }
 
     #[test]
+    fn test_function_call_with_positional_or_keyword_parameter_redundant_complex() {
+        let test = inlay_hint_test(
+            "
+            from typing import List
+
+            def foo(x: int): pass
+            class MyClass:
+                def __init__():
+                def x() -> List[int]:
+                    return 1
+                def y() -> List[int]:
+                    return 2
+            val = MyClass()
+
+            foo(val.x()[0])
+            foo(val.y()[1])",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        from typing import List
+
+        def foo(x: int): pass
+        class MyClass:
+            def __init__():
+            def x() -> List[int]:
+                return 1
+            def y() -> List[int]:
+                return 2
+        val[: MyClass] = MyClass()
+
+        foo(val.x()[0])
+        foo([x=]val.y()[1])
+        ");
+    }
+
+    #[test]
     fn test_function_call_with_positional_or_keyword_parameter_redundant_subscript() {
         let test = inlay_hint_test(
             "
