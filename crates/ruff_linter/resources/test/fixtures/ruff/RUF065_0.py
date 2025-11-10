@@ -68,3 +68,4 @@ log(logging.INFO, "Octal: %s", oct(255))
 
 info("Hex: %s", hex(42))
 log(logging.INFO, "Hex: %s", hex(255))
+
