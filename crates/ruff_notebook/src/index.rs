@@ -39,7 +39,7 @@ impl NotebookIndex {
 
     /// Returns an iterator over the starting rows of each cell (1-based).
     ///
-    /// This yields one entry per Python cell (skipping over Makrdown cell).
+    /// This yields one entry per Python cell (skipping over Markdown cell).
     pub fn iter(&self) -> impl Iterator<Item = CellStart> + '_ {
         self.cell_starts.iter().copied()
     }
