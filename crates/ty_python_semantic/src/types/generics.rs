@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::fmt::Display;
 
-use itertools::Itertools;
+use itertools::{Either, EitherOrBoth, Itertools};
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec};
@@ -127,6 +127,7 @@ pub(crate) struct InferableTypeVars<'db> {
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 struct InferableTypeVarsInner<'db> {
     // The _set_ of typevars that are inferable. This will always be sorted and deduped.
+    #[returns(ref)]
     inferable: SmallVec<[BoundTypeVarIdentity<'db>; 4]>,
 }
 
@@ -172,6 +173,31 @@ impl<'db> InferableTypeVars<'db> {
                 inner: Some(self_inner.merge(db, other_inner)),
             },
         }
+    }
+
+    /// Returns an iterator of the typevars that are in this inferable set but not in another.
+    pub(crate) fn subtract(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+    ) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> + 'db {
+        let (self_inner, other_inner) = match (self.inner, other.inner) {
+            (None, _) => return Either::Left(Either::Left(std::iter::empty())),
+            (Some(self_inner), None) => {
+                return Either::Left(Either::Right(self_inner.inferable(db).into_iter().copied()));
+            }
+            (Some(self_inner), Some(other_inner)) => (self_inner, other_inner),
+        };
+        let self_inferable = self_inner.inferable(db).into_iter().copied();
+        let other_inferable = other_inner.inferable(db).into_iter().copied();
+        Either::Right(
+            self_inferable
+                .merge_join_by(other_inferable, BoundTypeVarIdentity::cmp)
+                .filter_map(|merged| match merged {
+                    EitherOrBoth::Left(bound_typevar) => Some(bound_typevar),
+                    EitherOrBoth::Right(_) | EitherOrBoth::Both(_, _) => None,
+                }),
+        )
     }
 
     // Keep this around for debugging purposes
