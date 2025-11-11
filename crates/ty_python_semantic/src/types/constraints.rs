@@ -66,8 +66,8 @@ use salsa::plumbing::AsId;
 use crate::Db;
 use crate::types::generics::InferableTypeVars;
 use crate::types::{
-    BoundTypeVarInstance, IntersectionType, Type, TypeRelation, TypeVarBoundOrConstraints,
-    UnionType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation,
+    TypeVarBoundOrConstraints, UnionType,
 };
 
 /// An extension trait for building constraint sets from [`Option`] values.
@@ -294,16 +294,20 @@ impl<'db> ConstraintSet<'db> {
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
+    /// XXX: Document not commutative
     pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        self.node = self.node.or(db, other.node);
-        self.inferable = self.inferable.merge(db, other.inferable);
+        let to_abstract = other.inferable.subtract(db, self.inferable);
+        let other = other.node.exists(db, to_abstract);
+        self.node = self.node.or(db, other);
         *self
     }
 
     /// Updates this constraint set to hold the intersection of itself and another constraint set.
+    /// XXX: Document not commutative
     pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        self.node = self.node.and(db, other.node);
-        self.inferable = self.inferable.merge(db, other.inferable);
+        let to_abstract = other.inferable.subtract(db, self.inferable);
+        let other = other.node.exists(db, to_abstract);
+        self.node = self.node.and(db, other);
         *self
     }
 
@@ -932,6 +936,29 @@ impl<'db> Node<'db> {
         true
     }
 
+    /// Returns a new BDD that is the _existential abstraction_ of `self` for a set of typevars.
+    /// The result will return true whenever `self` returns true for _any_ assignment of those
+    /// typevars. The result will not contain any constraints that mention those typevars.
+    fn exists(
+        self,
+        db: &'db dyn Db,
+        bound_typevars: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
+    ) -> Self {
+        bound_typevars
+            .into_iter()
+            .fold(self.simplify(db), |abstracted, bound_typevar| {
+                abstracted.exists_one(db, bound_typevar)
+            })
+    }
+
+    fn exists_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Self {
+        match self {
+            Node::AlwaysTrue => Node::AlwaysTrue,
+            Node::AlwaysFalse => Node::AlwaysFalse,
+            Node::Interior(interior) => interior.exists_one(db, bound_typevar),
+        }
+    }
+
     /// Returns a new BDD that returns the same results as `self`, but with some inputs fixed to
     /// particular values. (Those variables will not be checked when evaluating the result, and
     /// will not be present in the result.)
@@ -1342,6 +1369,32 @@ impl<'db> InteriorNode<'db> {
                 Node::Interior(self).iff(db, other.if_true(db)),
                 Node::Interior(self).iff(db, other.if_false(db)),
             ),
+        }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn exists_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
+        let self_constraint = self.constraint(db);
+        let self_typevar = self_constraint.typevar(db).identity(db);
+        match bound_typevar.cmp(&self_typevar) {
+            // If the typevar that this node checks is "later" than the typevar we're abstracting
+            // over, then we have reached a point in the BDD where the abstraction can no longer
+            // affect the result, and we can return early.
+            Ordering::Less => Node::Interior(self),
+            // If the typevar that this node checks _is_ the typevar we're abstracting over, then
+            // we replace this node with the OR of its if_false/if_true edges. That is, the result
+            // is true if there's any assignment of this node's constraint that is true.
+            Ordering::Equal => {
+                let if_true = self.if_true(db).exists_one(db, bound_typevar);
+                let if_false = self.if_false(db).exists_one(db, bound_typevar);
+                if_true.or(db, if_false)
+            }
+            // Otherwise, we abstract the if_false/if_true edges recursively.
+            Ordering::Greater => {
+                let if_true = self.if_true(db).exists_one(db, bound_typevar);
+                let if_false = self.if_false(db).exists_one(db, bound_typevar);
+                Node::new(db, self_constraint, if_true, if_false)
+            }
         }
     }
 
