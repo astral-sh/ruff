@@ -8,7 +8,7 @@ use ruff_python_trivia::{
     find_only_token_in_range, first_non_trivia_token, indentation_at_offset,
 };
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextLen, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::cmp::Ordering;
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
@@ -602,9 +602,30 @@ fn handle_own_line_comment_between_branches<'a>(
     // following branch or if it a trailing comment of the previous body's last statement.
     let comment_indentation = comment_indentation_after(preceding, comment.range(), source);
 
-    let preceding_indentation = indentation(source, &preceding)
-        .unwrap_or_default()
-        .text_len();
+    let preceding_indentation = indentation(source, &preceding).map_or_else(
+        // If `indentation` returns `None`, then there is leading
+        // content before the preceding node. In this case, we
+        // always treat the comment as being less-indented than the
+        // preceding. For example:
+        //
+        // ```python
+        // if True: pass
+        // # leading on `else`
+        // else:
+        //     pass
+        // ```
+        // Note we even do this if the comment is very indented
+        // (which matches `black`'s behavior as of 2025.11.11)
+        //
+        // ```python
+        // if True: pass
+        //          # leading on `else`
+        // else:
+        //     pass
+        // ```
+        || comment_indentation + TextSize::new(1),
+        |indent| indent.text_len(),
+    );
 
     // Compare to the last statement in the body
     match comment_indentation.cmp(&preceding_indentation) {
