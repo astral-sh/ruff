@@ -513,6 +513,9 @@ impl Violation for MissingReturnTypeClassMethod {
 /// def foo(x: MyAny): ...
 /// ```
 ///
+/// ## Options
+/// - `lint.flake8-annotations.allow-star-arg-any`
+///
 /// ## References
 /// - [Typing spec: `Any`](https://typing.python.org/en/latest/spec/special-types.html#any)
 /// - [Python documentation: `typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)

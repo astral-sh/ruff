@@ -6,12 +6,12 @@ use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
 
 use ruff_python_ast::NodeIndex;
-use ruff_python_ast::name::Name;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Update;
 use salsa::plumbing::AsId;
 
+use crate::Db;
 use crate::module_name::ModuleName;
 use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::AstIds;
@@ -28,7 +28,6 @@ use crate::semantic_index::scope::{
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
 use crate::semantic_model::HasTrackedScope;
-use crate::{Db, Module, resolve_module};
 
 pub mod ast_ids;
 mod builder;
@@ -82,65 +81,6 @@ pub(crate) fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<Plac
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSet<ModuleName>> {
     semantic_index(db, file).imported_modules.clone()
-}
-
-/// Returns the set of relative submodules that are explicitly imported anywhere in
-/// `importing_module`.
-///
-/// This set only considers `from...import` statements (but it could also include `import`).
-/// It also only returns a non-empty result for `__init__.pyi` files.
-/// See [`ModuleLiteralType::available_submodule_attributes`] for discussion
-/// of why this analysis is intentionally limited.
-///
-/// This function specifically implements the rule that if an `__init__.pyi` file
-/// contains a `from...import` that imports a direct submodule of the package,
-/// that submodule should be available as an attribute of the package.
-///
-/// While we endeavour to accurately model import side-effects for `.py` files, we intentionally
-/// limit them for `.pyi` files to encourage more intentional API design. The standard escape
-/// hatches for this are the `import x as x` idiom or listing them in `__all__`, but in practice
-/// some other idioms are popular.
-///
-/// In particular, many packages have their `__init__` include lines like
-/// `from . import subpackage`, with the intent that `mypackage.subpackage` should be
-/// available for anyone who only does `import mypackage`.
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn imported_relative_submodules_of_stub_package<'db>(
-    db: &'db dyn Db,
-    importing_module: Module<'db>,
-) -> Box<[ModuleName]> {
-    let Some(file) = importing_module.file(db) else {
-        return Box::default();
-    };
-    if !file.is_package_stub(db) {
-        return Box::default();
-    }
-    semantic_index(db, file)
-        .maybe_imported_modules
-        .iter()
-        .filter_map(|import| {
-            let mut submodule = ModuleName::from_identifier_parts(
-                db,
-                file,
-                import.from_module.as_deref(),
-                import.level,
-            )
-            .ok()?;
-            // We only actually care if this is a direct submodule of the package
-            // so this part should actually be exactly the importing module.
-            let importing_module_name = importing_module.name(db);
-            if importing_module_name != &submodule {
-                return None;
-            }
-            submodule.extend(&ModuleName::new(import.submodule.as_str())?);
-            // Throw out the result if this doesn't resolve to an actual module.
-            // This is quite expensive, but we've gone through a lot of hoops to
-            // get here so it won't happen too much.
-            resolve_module(db, &submodule)?;
-            // Return only the relative part
-            submodule.relative_to(importing_module_name)
-        })
-        .collect()
 }
 
 /// Returns the use-def map for a specific `scope`.
@@ -284,9 +224,6 @@ pub(crate) struct SemanticIndex<'db> {
     /// The set of modules that are imported anywhere within this file.
     imported_modules: Arc<FxHashSet<ModuleName>>,
 
-    /// `from...import` statements within this file that might import a submodule.
-    maybe_imported_modules: FxHashSet<MaybeModuleImport>,
-
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
 
@@ -298,16 +235,6 @@ pub(crate) struct SemanticIndex<'db> {
 
     /// Set of all generator functions in this file.
     generator_functions: FxHashSet<FileScopeId>,
-}
-
-/// A `from...import` that may be an import of a module
-///
-/// Later analysis will determine if it is.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, get_size2::GetSize)]
-pub(crate) struct MaybeModuleImport {
-    level: u32,
-    from_module: Option<Name>,
-    submodule: Name,
 }
 
 impl<'db> SemanticIndex<'db> {

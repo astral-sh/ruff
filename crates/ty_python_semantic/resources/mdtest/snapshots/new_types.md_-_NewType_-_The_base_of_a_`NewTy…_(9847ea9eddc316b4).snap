@@ -1,0 +1,58 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: new_types.md - NewType - The base of a `NewType` can't be a protocol class or a `TypedDict`
+mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/new_types.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import NewType, Protocol, TypedDict
+ 2 | 
+ 3 | class Id(Protocol):
+ 4 |     code: int
+ 5 | 
+ 6 | UserId = NewType("UserId", Id)  # error: [invalid-newtype]
+ 7 | 
+ 8 | class Foo(TypedDict):
+ 9 |     a: int
+10 | 
+11 | Bar = NewType("Bar", Foo)  # error: [invalid-newtype]
+```
+
+# Diagnostics
+
+```
+error[invalid-newtype]: invalid base for `typing.NewType`
+ --> src/mdtest_snippet.py:6:28
+  |
+4 |     code: int
+5 |
+6 | UserId = NewType("UserId", Id)  # error: [invalid-newtype]
+  |                            ^^ type `Id`
+7 |
+8 | class Foo(TypedDict):
+  |
+info: The base of a `NewType` is not allowed to be a protocol class.
+info: rule `invalid-newtype` is enabled by default
+
+```
+
+```
+error[invalid-newtype]: invalid base for `typing.NewType`
+  --> src/mdtest_snippet.py:11:22
+   |
+ 9 |     a: int
+10 |
+11 | Bar = NewType("Bar", Foo)  # error: [invalid-newtype]
+   |                      ^^^ type `Foo`
+   |
+info: The base of a `NewType` is not allowed to be a `TypedDict`.
+info: rule `invalid-newtype` is enabled by default
+
+```

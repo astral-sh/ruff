@@ -81,9 +81,9 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, NormalizedVisitor,
-    SpecialFormType, Truthiness, Type, TypeContext, TypeMapping, TypeRelation, UnionBuilder,
-    binding_type, todo_type, walk_signature,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
+    NormalizedVisitor, SpecialFormType, Truthiness, Type, TypeContext, TypeMapping, TypeRelation,
+    UnionBuilder, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -1101,6 +1101,11 @@ fn is_instance_truthiness<'db>(
 
         Type::NominalInstance(..) => always_true_if(is_instance(&ty)),
 
+        Type::NewTypeInstance(newtype) => always_true_if(is_instance(&Type::instance(
+            db,
+            newtype.base_class_type(db),
+        ))),
+
         Type::BooleanLiteral(..)
         | Type::BytesLiteral(..)
         | Type::IntLiteral(..)
@@ -1754,6 +1759,71 @@ impl KnownFunction {
                         ));
                         diagnostic
                             .set_primary_message("This call will raise `TypeError` at runtime");
+                    }
+
+                    Type::KnownInstance(KnownInstanceType::UnionType(_)) => {
+                        fn find_invalid_elements<'db>(
+                            db: &'db dyn Db,
+                            ty: Type<'db>,
+                            invalid_elements: &mut Vec<Type<'db>>,
+                        ) {
+                            match ty {
+                                Type::ClassLiteral(_) => {}
+                                Type::NominalInstance(instance)
+                                    if instance.has_known_class(db, KnownClass::NoneType) => {}
+                                Type::KnownInstance(KnownInstanceType::UnionType(union)) => {
+                                    for element in union.elements(db) {
+                                        find_invalid_elements(db, *element, invalid_elements);
+                                    }
+                                }
+                                _ => invalid_elements.push(ty),
+                            }
+                        }
+
+                        let mut invalid_elements = vec![];
+                        find_invalid_elements(db, *second_argument, &mut invalid_elements);
+
+                        let Some((first_invalid_element, other_invalid_elements)) =
+                            invalid_elements.split_first()
+                        else {
+                            return;
+                        };
+
+                        let Some(builder) =
+                            context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
+                        else {
+                            return;
+                        };
+
+                        let function_name: &str = self.into();
+
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Invalid second argument to `{function_name}`"
+                        ));
+                        diagnostic.info(format_args!(
+                            "A `UnionType` instance can only be used as the second argument to \
+                            `{function_name}` if all elements are class objects"
+                        ));
+                        diagnostic.annotate(
+                            Annotation::secondary(context.span(&call_expression.arguments.args[1]))
+                                .message("This `UnionType` instance contains non-class elements"),
+                        );
+                        match other_invalid_elements {
+                            [] => diagnostic.info(format_args!(
+                                "Element `{}` in the union is not a class object",
+                                first_invalid_element.display(db)
+                            )),
+                            [single] => diagnostic.info(format_args!(
+                                "Elements `{}` and `{}` in the union are not class objects",
+                                first_invalid_element.display(db),
+                                single.display(db),
+                            )),
+                            _ => diagnostic.info(format_args!(
+                                "Element `{}` in the union, and {} more elements, are not class objects",
+                                first_invalid_element.display(db),
+                                other_invalid_elements.len(),
+                            ))
+                        }
                     }
                     _ => {}
                 }

@@ -26,8 +26,8 @@ use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
     DefinitionNodeRef, Definitions, ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef,
-    ImportDefinitionNodeRef, ImportFromDefinitionNodeRef, MatchPatternDefinitionNodeRef,
-    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    ImportDefinitionNodeRef, ImportFromDefinitionNodeRef, ImportFromSubmoduleDefinitionNodeRef,
+    MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::place::{PlaceExpr, PlaceTableBuilder, ScopedPlaceId};
@@ -47,9 +47,7 @@ use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
-use crate::semantic_index::{
-    ExpressionsScopeMap, MaybeModuleImport, SemanticIndex, VisibleAncestorsIter,
-};
+use crate::semantic_index::{ExpressionsScopeMap, SemanticIndex, VisibleAncestorsIter};
 use crate::semantic_model::HasTrackedScope;
 use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
@@ -113,7 +111,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
-    maybe_imported_modules: FxHashSet<MaybeModuleImport>,
+    seen_submodule_imports: FxHashSet<String>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
@@ -151,7 +149,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
 
-            maybe_imported_modules: FxHashSet::default(),
+            seen_submodule_imports: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
 
@@ -1266,7 +1264,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scopes_by_node.shrink_to_fit();
         self.generator_functions.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
-        self.maybe_imported_modules.shrink_to_fit();
 
         SemanticIndex {
             place_tables,
@@ -1279,7 +1276,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes_by_node: self.scopes_by_node,
             use_def_maps,
             imported_modules: Arc::new(self.imported_modules),
-            maybe_imported_modules: self.maybe_imported_modules,
             has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: self.enclosing_snapshots,
             semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
@@ -1453,6 +1449,43 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.current_use_def_map_mut()
                     .record_node_reachability(NodeKey::from_node(node));
 
+                // If we see:
+                //
+                // * `from .x.y import z` (must be relative!)
+                // * And we are in an `__init__.py(i)` (hereafter `thispackage`)
+                // * And this is the first time we've seen `from .x` in this module
+                // * And we're in the global scope
+                //
+                // We introduce a local definition `x = <module 'thispackage.x'>` that occurs
+                // before the `z = ...` declaration the import introduces. This models the fact
+                // that the *first* time that you import 'thispackage.x' the python runtime creates
+                // `x` as a variable in the global scope of `thispackage`.
+                //
+                // This is not a perfect simulation of actual runtime behaviour for *various*
+                // reasons but it works well for most practical purposes. In particular it's nice
+                // that `x` can be freely overwritten, and that we don't assume that an import
+                // in one function is visible in another function.
+                //
+                // TODO: Also support `from thispackage.x.y import z`?
+                if self.current_scope() == FileScopeId::global()
+                    && node.level == 1
+                    && let Some(submodule) = &node.module
+                    && let Some(parsed_submodule) = ModuleName::new(submodule.as_str())
+                    && let Some(direct_submodule) = parsed_submodule.components().next()
+                    && self.file.is_package(self.db)
+                    && !self.seen_submodule_imports.contains(direct_submodule)
+                {
+                    self.seen_submodule_imports
+                        .insert(direct_submodule.to_owned());
+
+                    let direct_submodule_name = Name::new(direct_submodule);
+                    let symbol = self.add_symbol(direct_submodule_name);
+                    self.add_definition(
+                        symbol.into(),
+                        ImportFromSubmoduleDefinitionNodeRef { node, submodule },
+                    );
+                }
+
                 let mut found_star = false;
                 for (alias_index, alias) in node.names.iter().enumerate() {
                     if &alias.name == "*" {
@@ -1559,19 +1592,17 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     }
 
                     let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
+                        // It's re-exported if it's `from ... import x as x`
                         (&asname.id, asname.id == alias.name.id)
                     } else {
-                        (&alias.name.id, false)
+                        // It's re-exported if it's `from . import x` in an `__init__.pyi`
+                        (
+                            &alias.name.id,
+                            node.level == 1
+                                && node.module.is_none()
+                                && self.file.is_package(self.db),
+                        )
                     };
-
-                    // If there's no alias or a redundant alias, record this as a potential import of a submodule
-                    if alias.asname.is_none() || is_reexported {
-                        self.maybe_imported_modules.insert(MaybeModuleImport {
-                            level: node.level,
-                            from_module: node.module.clone().map(Into::into),
-                            submodule: alias.name.clone().into(),
-                        });
-                    }
 
                     // Look for imports `from __future__ import annotations`, ignore `as ...`
                     // We intentionally don't enforce the rules about location of `__future__`

@@ -468,6 +468,62 @@ line-length = 500
             "line-length must be between 1 and 320 (got 500)"
         );
 
+        // Test value at u16::MAX boundary (65535) - should show range error
+        let invalid_line_length_65535 = toml::from_str::<Pyproject>(
+            r"
+[tool.ruff]
+line-length = 65535
+",
+        )
+        .expect_err("Deserialization should have failed for line-length at u16::MAX");
+
+        assert_eq!(
+            invalid_line_length_65535.message(),
+            "line-length must be between 1 and 320 (got 65535)"
+        );
+
+        // Test value exceeding u16::MAX (65536) - should show clear error
+        let invalid_line_length_65536 = toml::from_str::<Pyproject>(
+            r"
+[tool.ruff]
+line-length = 65536
+",
+        )
+        .expect_err("Deserialization should have failed for line-length exceeding u16::MAX");
+
+        assert_eq!(
+            invalid_line_length_65536.message(),
+            "line-length must be between 1 and 320 (got 65536)"
+        );
+
+        // Test value far exceeding u16::MAX (99_999) - should show clear error
+        let invalid_line_length_99999 = toml::from_str::<Pyproject>(
+            r"
+[tool.ruff]
+line-length = 99_999
+",
+        )
+        .expect_err("Deserialization should have failed for line-length far exceeding u16::MAX");
+
+        assert_eq!(
+            invalid_line_length_99999.message(),
+            "line-length must be between 1 and 320 (got 99999)"
+        );
+
+        // Test negative value - should show clear error
+        let invalid_line_length_negative = toml::from_str::<Pyproject>(
+            r"
+[tool.ruff]
+line-length = -5
+",
+        )
+        .expect_err("Deserialization should have failed for negative line-length");
+
+        assert_eq!(
+            invalid_line_length_negative.message(),
+            "line-length must be between 1 and 320 (got -5)"
+        );
+
         Ok(())
     }
 

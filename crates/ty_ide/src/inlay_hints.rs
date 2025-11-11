@@ -4,7 +4,7 @@ use crate::Db;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
-use ruff_python_ast::{AnyNodeRef, Expr, Stmt};
+use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Stmt, UnaryOp};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::inlay_hint_function_argument_details;
@@ -231,7 +231,7 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
 
         match stmt {
             Stmt::Assign(assign) => {
-                self.in_assignment = true;
+                self.in_assignment = !type_hint_is_excessive_for_expr(&assign.value);
                 for target in &assign.targets {
                     self.visit_expr(target);
                 }
@@ -283,7 +283,9 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
                 self.visit_expr(&call.func);
 
                 for (index, arg_or_keyword) in call.arguments.arguments_source_order().enumerate() {
-                    if let Some(name) = argument_names.get(&index) {
+                    if let Some(name) = argument_names.get(&index)
+                        && !arg_matches_name(&arg_or_keyword, name)
+                    {
                         self.add_call_argument_name(arg_or_keyword.range().start(), name);
                     }
                     self.visit_expr(arg_or_keyword.value());
@@ -293,6 +295,61 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
                 source_order::walk_expr(self, expr);
             }
         }
+    }
+}
+
+/// Given a positional argument, check if the expression is the "same name"
+/// as the function argument itself.
+///
+/// This allows us to filter out reptitive inlay hints like `x=x`, `x=y.x`, etc.
+fn arg_matches_name(arg_or_keyword: &ArgOrKeyword, name: &str) -> bool {
+    // Only care about positional args
+    let ArgOrKeyword::Arg(arg) = arg_or_keyword else {
+        return false;
+    };
+
+    let mut expr = *arg;
+    loop {
+        match expr {
+            // `x=x(1, 2)` counts as a match, recurse for it
+            Expr::Call(expr_call) => expr = &expr_call.func,
+            // `x=x[0]` is a match, recurse for it
+            Expr::Subscript(expr_subscript) => expr = &expr_subscript.value,
+            // `x=x` is a match
+            Expr::Name(expr_name) => return expr_name.id.as_str() == name,
+            // `x=y.x` is a match
+            Expr::Attribute(expr_attribute) => return expr_attribute.attr.as_str() == name,
+            _ => return false,
+        }
+    }
+}
+
+/// Given an expression that's the RHS of an assignment, would it be excessive to
+/// emit an inlay type hint for the variable assigned to it?
+///
+/// This is used to suppress inlay hints for things like `x = 1`, `x, y = (1, 2)`, etc.
+fn type_hint_is_excessive_for_expr(expr: &Expr) -> bool {
+    match expr {
+        // A tuple of all literals is excessive to typehint
+        Expr::Tuple(expr_tuple) => expr_tuple.elts.iter().all(type_hint_is_excessive_for_expr),
+
+        // Various Literal[...] types which are always excessive to hint
+        | Expr::BytesLiteral(_)
+        | Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::StringLiteral(_)
+        // `None` isn't terribly verbose, but still redundant
+        | Expr::NoneLiteral(_)
+        // This one expands to `str` which isn't verbose but is redundant
+        | Expr::FString(_)
+        // This one expands to `Template` which isn't verbose but is redundant
+        | Expr::TString(_)=> true,
+
+        // You too `+1 and `-1`, get back here  
+        Expr::UnaryOp(ExprUnaryOp { op: UnaryOp::UAdd | UnaryOp::USub, operand, .. }) => matches!(**operand, Expr::NumberLiteral(_)),
+
+        // Everything else is reasonable
+        _ => false,
     }
 }
 
@@ -387,47 +444,183 @@ mod tests {
 
     #[test]
     fn test_assign_statement() {
-        let test = inlay_hint_test("x = 1");
+        let test = inlay_hint_test(
+            "
+            def i(x: int, /) -> int:
+                return x
+
+            x = 1
+            y = x
+            z = i(1)
+            w = z
+            ",
+        );
 
         assert_snapshot!(test.inlay_hints(), @r"
-        x[: Literal[1]] = 1
+        def i(x: int, /) -> int:
+            return x
+
+        x = 1
+        y[: Literal[1]] = x
+        z[: int] = i(1)
+        w[: int] = z
         ");
     }
 
     #[test]
-    fn test_tuple_assignment() {
-        let test = inlay_hint_test("x, y = (1, 'abc')");
+    fn test_unpacked_tuple_assignment() {
+        let test = inlay_hint_test(
+            "
+            def i(x: int, /) -> int:
+                return x
+            def s(x: str, /) -> str:
+                return x
+
+            x1, y1 = (1, 'abc')
+            x2, y2 = (x1, y1)
+            x3, y3 = (i(1), s('abc'))
+            x4, y4 = (x3, y3)
+            ",
+        );
 
         assert_snapshot!(test.inlay_hints(), @r#"
-        x[: Literal[1]], y[: Literal["abc"]] = (1, 'abc')
+        def i(x: int, /) -> int:
+            return x
+        def s(x: str, /) -> str:
+            return x
+
+        x1, y1 = (1, 'abc')
+        x2[: Literal[1]], y2[: Literal["abc"]] = (x1, y1)
+        x3[: int], y3[: str] = (i(1), s('abc'))
+        x4[: int], y4[: str] = (x3, y3)
+        "#);
+    }
+
+    #[test]
+    fn test_multiple_assignment() {
+        let test = inlay_hint_test(
+            "
+            def i(x: int, /) -> int:
+                return x
+            def s(x: str, /) -> str:
+                return x
+
+            x1, y1 = 1, 'abc'
+            x2, y2 = x1, y1
+            x3, y3 = i(1), s('abc')
+            x4, y4 = x3, y3
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        def i(x: int, /) -> int:
+            return x
+        def s(x: str, /) -> str:
+            return x
+
+        x1, y1 = 1, 'abc'
+        x2[: Literal[1]], y2[: Literal["abc"]] = x1, y1
+        x3[: int], y3[: str] = i(1), s('abc')
+        x4[: int], y4[: str] = x3, y3
+        "#);
+    }
+
+    #[test]
+    fn test_tuple_assignment() {
+        let test = inlay_hint_test(
+            "
+            def i(x: int, /) -> int:
+                return x
+            def s(x: str, /) -> str:
+                return x
+
+            x = (1, 'abc')
+            y = x
+            z = (i(1), s('abc'))
+            w = z
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        def i(x: int, /) -> int:
+            return x
+        def s(x: str, /) -> str:
+            return x
+
+        x = (1, 'abc')
+        y[: tuple[Literal[1], Literal["abc"]]] = x
+        z[: tuple[int, str]] = (i(1), s('abc'))
+        w[: tuple[int, str]] = z
         "#);
     }
 
     #[test]
     fn test_nested_tuple_assignment() {
-        let test = inlay_hint_test("x, (y, z) = (1, ('abc', 2))");
+        let test = inlay_hint_test(
+            "
+            def i(x: int, /) -> int:
+                return x
+            def s(x: str, /) -> str:
+                return x
+
+            x1, (y1, z1) = (1, ('abc', 2))
+            x2, (y2, z2) = (x1, (y1, z1))
+            x3, (y3, z3) = (i(1), (s('abc'), i(2)))
+            x4, (y4, z4) = (x3, (y3, z3))",
+        );
 
         assert_snapshot!(test.inlay_hints(), @r#"
-        x[: Literal[1]], (y[: Literal["abc"]], z[: Literal[2]]) = (1, ('abc', 2))
+        def i(x: int, /) -> int:
+            return x
+        def s(x: str, /) -> str:
+            return x
+
+        x1, (y1, z1) = (1, ('abc', 2))
+        x2[: Literal[1]], (y2[: Literal["abc"]], z2[: Literal[2]]) = (x1, (y1, z1))
+        x3[: int], (y3[: str], z3[: int]) = (i(1), (s('abc'), i(2)))
+        x4[: int], (y4[: str], z4[: int]) = (x3, (y3, z3))
         "#);
     }
 
     #[test]
     fn test_assign_statement_with_type_annotation() {
-        let test = inlay_hint_test("x: int = 1");
+        let test = inlay_hint_test(
+            "
+            def i(x: int, /) -> int:
+                return x
+            
+            x: int = 1
+            y = x
+            z: int = i(1)
+            w = z",
+        );
 
         assert_snapshot!(test.inlay_hints(), @r"
+        def i(x: int, /) -> int:
+            return x
+
         x: int = 1
+        y[: Literal[1]] = x
+        z: int = i(1)
+        w[: int] = z
         ");
     }
 
     #[test]
     fn test_assign_statement_out_of_range() {
-        let test = inlay_hint_test("<START>x = 1<END>\ny = 2");
+        let test = inlay_hint_test(
+            "
+            def i(x: int, /) -> int:
+                return x
+            <START>x = i(1)<END>
+            z = x",
+        );
 
         assert_snapshot!(test.inlay_hints(), @r"
-        x[: Literal[1]] = 1
-        y = 2
+        def i(x: int, /) -> int:
+            return x
+        x[: int] = i(1)
+        z = x
         ");
     }
 
@@ -437,28 +630,256 @@ mod tests {
             "
             class A:
                 def __init__(self, y):
-                    self.x = 1
+                    self.x = int(1)
                     self.y = y
 
             a = A(2)
-            a.y = 3
+            a.y = int(3)
             ",
         );
 
         assert_snapshot!(test.inlay_hints(), @r"
         class A:
             def __init__(self, y):
-                self.x[: Literal[1]] = 1
+                self.x[: int] = int(1)
                 self.y[: Unknown] = y
 
         a[: A] = A([y=]2)
-        a.y[: Literal[3]] = 3
+        a.y[: int] = int(3)
         ");
     }
 
     #[test]
+    fn test_many_literals() {
+        let test = inlay_hint_test(
+            r#"
+            a = 1
+            b = 1.0
+            c = True
+            d = None
+            e = "hello"
+            f = 'there'
+            g = f"{e} {f}"
+            h = t"wow %d"
+            i = b'\x00'
+            j = +1
+            k = -1.0
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        a = 1
+        b = 1.0
+        c = True
+        d = None
+        e = "hello"
+        f = 'there'
+        g = f"{e} {f}"
+        h = t"wow %d"
+        i = b'\x00'
+        j = +1
+        k = -1.0
+        "#);
+    }
+
+    #[test]
+    fn test_many_literals_tuple() {
+        let test = inlay_hint_test(
+            r#"
+            a = (1, 2)
+            b = (1.0, 2.0)
+            c = (True, False)
+            d = (None, None)
+            e = ("hel", "lo")
+            f = ('the', 're')
+            g = (f"{ft}", f"{ft}")
+            h = (t"wow %d", t"wow %d")
+            i = (b'\x01', b'\x02')
+            j = (+1, +2.0)
+            k = (-1, -2.0)
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        a = (1, 2)
+        b = (1.0, 2.0)
+        c = (True, False)
+        d = (None, None)
+        e = ("hel", "lo")
+        f = ('the', 're')
+        g = (f"{ft}", f"{ft}")
+        h = (t"wow %d", t"wow %d")
+        i = (b'\x01', b'\x02')
+        j = (+1, +2.0)
+        k = (-1, -2.0)
+        "#);
+    }
+
+    #[test]
+    fn test_many_literals_unpacked_tuple() {
+        let test = inlay_hint_test(
+            r#"
+            a1, a2 = (1, 2)
+            b1, b2 = (1.0, 2.0)
+            c1, c2 = (True, False)
+            d1, d2 = (None, None)
+            e1, e2 = ("hel", "lo")
+            f1, f2 = ('the', 're')
+            g1, g2 = (f"{ft}", f"{ft}")
+            h1, h2 = (t"wow %d", t"wow %d")
+            i1, i2 = (b'\x01', b'\x02')
+            j1, j2 = (+1, +2.0)
+            k1, k2 = (-1, -2.0)
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        a1, a2 = (1, 2)
+        b1, b2 = (1.0, 2.0)
+        c1, c2 = (True, False)
+        d1, d2 = (None, None)
+        e1, e2 = ("hel", "lo")
+        f1, f2 = ('the', 're')
+        g1, g2 = (f"{ft}", f"{ft}")
+        h1, h2 = (t"wow %d", t"wow %d")
+        i1, i2 = (b'\x01', b'\x02')
+        j1, j2 = (+1, +2.0)
+        k1, k2 = (-1, -2.0)
+        "#);
+    }
+
+    #[test]
+    fn test_many_literals_multiple() {
+        let test = inlay_hint_test(
+            r#"
+            a1, a2 = 1, 2
+            b1, b2 = 1.0, 2.0
+            c1, c2 = True, False
+            d1, d2 = None, None
+            e1, e2 = "hel", "lo"
+            f1, f2 = 'the', 're'
+            g1, g2 = f"{ft}", f"{ft}"
+            h1, h2 = t"wow %d", t"wow %d"
+            i1, i2 = b'\x01', b'\x02'
+            j1, j2 = +1, +2.0
+            k1, k2 = -1, -2.0
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        a1, a2 = 1, 2
+        b1, b2 = 1.0, 2.0
+        c1, c2 = True, False
+        d1, d2 = None, None
+        e1, e2 = "hel", "lo"
+        f1, f2 = 'the', 're'
+        g1, g2 = f"{ft}", f"{ft}"
+        h1, h2 = t"wow %d", t"wow %d"
+        i1, i2 = b'\x01', b'\x02'
+        j1, j2 = +1, +2.0
+        k1, k2 = -1, -2.0
+        "#);
+    }
+
+    #[test]
+    fn test_many_literals_list() {
+        let test = inlay_hint_test(
+            r#"
+            a = [1, 2]
+            b = [1.0, 2.0]
+            c = [True, False]
+            d = [None, None]
+            e = ["hel", "lo"]
+            f = ['the', 're']
+            g = [f"{ft}", f"{ft}"]
+            h = [t"wow %d", t"wow %d"]
+            i = [b'\x01', b'\x02']
+            j = [+1, +2.0]
+            k = [-1, -2.0]
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        a[: list[Unknown | int]] = [1, 2]
+        b[: list[Unknown | float]] = [1.0, 2.0]
+        c[: list[Unknown | bool]] = [True, False]
+        d[: list[Unknown | None]] = [None, None]
+        e[: list[Unknown | str]] = ["hel", "lo"]
+        f[: list[Unknown | str]] = ['the', 're']
+        g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
+        h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
+        i[: list[Unknown | bytes]] = [b'\x01', b'\x02']
+        j[: list[Unknown | int | float]] = [+1, +2.0]
+        k[: list[Unknown | int | float]] = [-1, -2.0]
+        "#);
+    }
+
+    #[test]
+    fn test_simple_init_call() {
+        let test = inlay_hint_test(
+            r#"
+            class MyClass:
+                def __init__(self):
+                    self.x: int = 1
+            
+            x = MyClass()
+            y = (MyClass(), MyClass())
+            a, b = MyClass(), MyClass()
+            c, d = (MyClass(), MyClass())
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        class MyClass:
+            def __init__(self):
+                self.x: int = 1
+
+        x[: MyClass] = MyClass()
+        y[: tuple[MyClass, MyClass]] = (MyClass(), MyClass())
+        a[: MyClass], b[: MyClass] = MyClass(), MyClass()
+        c[: MyClass], d[: MyClass] = (MyClass(), MyClass())
+        ");
+    }
+
+    #[test]
+    fn test_generic_init_call() {
+        let test = inlay_hint_test(
+            r#"
+            class MyClass[T, U]:
+                def __init__(self, x: list[T], y: tuple[U, U]):
+                    self.x = x
+                    self.y = y
+            
+            x = MyClass([42], ("a", "b"))
+            y = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
+            a, b = MyClass([42], ("a", "b")), MyClass([42], ("a", "b"))
+            c, d = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        class MyClass[T, U]:
+            def __init__(self, x: list[T], y: tuple[U, U]):
+                self.x[: list[T@MyClass]] = x
+                self.y[: tuple[U@MyClass, U@MyClass]] = y
+
+        x[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b"))
+        y[: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+        a[: MyClass[Unknown | int, str]], b[: MyClass[Unknown | int, str]] = MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b"))
+        c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "b")))
+        "#);
+    }
+
+    #[test]
     fn test_disabled_variable_types() {
-        let test = inlay_hint_test("x = 1");
+        let test = inlay_hint_test(
+            "
+            def i(x: int, /) -> int:
+                return x
+
+            x = i(1)
+            ",
+        );
 
         assert_snapshot!(
             test.inlay_hints_with_settings(&InlayHintSettings {
@@ -466,7 +887,10 @@ mod tests {
                 ..Default::default()
             }),
             @r"
-        x = 1
+        def i(x: int, /) -> int:
+            return x
+
+        x = i(1)
         "
         );
     }
@@ -482,6 +906,173 @@ mod tests {
         assert_snapshot!(test.inlay_hints(), @r"
         def foo(x: int): pass
         foo([x=]1)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_positional_or_keyword_parameter_redundant_name() {
+        let test = inlay_hint_test(
+            "
+            def foo(x: int): pass
+            x = 1
+            y = 2
+            foo(x)
+            foo(y)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int): pass
+        x = 1
+        y = 2
+        foo(x)
+        foo([x=]y)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_positional_or_keyword_parameter_redundant_attribute() {
+        let test = inlay_hint_test(
+            "
+            def foo(x: int): pass
+            class MyClass:
+                def __init__(self):
+                    self.x: int = 1
+                    self.y: int = 2
+            val = MyClass()
+
+            foo(val.x)
+            foo(val.y)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int): pass
+        class MyClass:
+            def __init__(self):
+                self.x: int = 1
+                self.y: int = 2
+        val[: MyClass] = MyClass()
+
+        foo(val.x)
+        foo([x=]val.y)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_positional_or_keyword_parameter_redundant_attribute_not() {
+        // This one checks that we don't allow elide `x=` for `x.y`
+        let test = inlay_hint_test(
+            "
+            def foo(x: int): pass
+            class MyClass:
+                def __init__(self):
+                    self.x: int = 1
+                    self.y: int = 2
+            x = MyClass()
+
+            foo(x.x)
+            foo(x.y)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int): pass
+        class MyClass:
+            def __init__(self):
+                self.x: int = 1
+                self.y: int = 2
+        x[: MyClass] = MyClass()
+
+        foo(x.x)
+        foo([x=]x.y)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_positional_or_keyword_parameter_redundant_call() {
+        let test = inlay_hint_test(
+            "
+            def foo(x: int): pass
+            class MyClass:
+                def __init__(self):
+                def x() -> int:
+                    return 1
+                def y() -> int:
+                    return 2
+            val = MyClass()
+
+            foo(val.x())
+            foo(val.y())",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int): pass
+        class MyClass:
+            def __init__(self):
+            def x() -> int:
+                return 1
+            def y() -> int:
+                return 2
+        val[: MyClass] = MyClass()
+
+        foo(val.x())
+        foo([x=]val.y())
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_positional_or_keyword_parameter_redundant_complex() {
+        let test = inlay_hint_test(
+            "
+            from typing import List
+
+            def foo(x: int): pass
+            class MyClass:
+                def __init__(self):
+                def x() -> List[int]:
+                    return 1
+                def y() -> List[int]:
+                    return 2
+            val = MyClass()
+
+            foo(val.x()[0])
+            foo(val.y()[1])",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        from typing import List
+
+        def foo(x: int): pass
+        class MyClass:
+            def __init__(self):
+            def x() -> List[int]:
+                return 1
+            def y() -> List[int]:
+                return 2
+        val[: MyClass] = MyClass()
+
+        foo(val.x()[0])
+        foo([x=]val.y()[1])
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_positional_or_keyword_parameter_redundant_subscript() {
+        let test = inlay_hint_test(
+            "
+            def foo(x: int): pass
+            x = [1]
+            y = [2]
+
+            foo(x[0])
+            foo(y[0])",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int): pass
+        x[: list[Unknown | int]] = [1]
+        y[: list[Unknown | int]] = [2]
+
+        foo(x[0])
+        foo([x=]y[0])
         ");
     }
 

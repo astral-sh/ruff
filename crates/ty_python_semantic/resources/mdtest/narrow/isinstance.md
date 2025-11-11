@@ -70,6 +70,83 @@ def _(flag: bool):
         reveal_type(x)  # revealed: Literal["a"]
 ```
 
+## `classinfo` is a PEP-604 union of types
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+def _(x: int | str | bytes | memoryview | range):
+    if isinstance(x, int | str):
+        reveal_type(x)  # revealed: int | str
+    elif isinstance(x, bytes | memoryview):
+        reveal_type(x)  # revealed: bytes | memoryview[Unknown]
+    else:
+        reveal_type(x)  # revealed: range
+```
+
+Although `isinstance()` usually only works if all elements in the `UnionType` are class objects, at
+runtime a special exception is made for `None` so that `isinstance(x, int | None)` can work:
+
+```py
+def _(x: int | str | bytes | range | None):
+    if isinstance(x, int | str | None):
+        reveal_type(x)  # revealed: int | str | None
+    else:
+        reveal_type(x)  # revealed: bytes | range
+```
+
+## `classinfo` is an invalid PEP-604 union of types
+
+Except for the `None` special case mentioned above, narrowing can only take place if all elements in
+the PEP-604 union are class literals. If any elements are generic aliases or other types, the
+`isinstance()` call may fail at runtime, so no narrowing can take place:
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from typing import Any, Literal, NamedTuple
+
+def _(x: int | list[int] | bytes):
+    # error: [invalid-argument-type]
+    if isinstance(x, list[int] | int):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+    # error: [invalid-argument-type]
+    elif isinstance(x, Literal[42] | list[int] | bytes):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+    # error: [invalid-argument-type]
+    elif isinstance(x, Any | NamedTuple | list[int]):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+    else:
+        reveal_type(x)  # revealed: int | list[int] | bytes
+```
+
+## PEP-604 unions on Python \<3.10
+
+PEP-604 unions were added in Python 3.10, so attempting to use them on Python 3.9 does not lead to
+any type narrowing.
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+def _(x: int | str | bytes):
+    # error: [unsupported-operator]
+    if isinstance(x, int | str):
+        reveal_type(x)  # revealed: (int & Unknown) | (str & Unknown) | (bytes & Unknown)
+    else:
+        reveal_type(x)  # revealed: (int & Unknown) | (str & Unknown) | (bytes & Unknown)
+```
+
 ## Class types
 
 ```py
