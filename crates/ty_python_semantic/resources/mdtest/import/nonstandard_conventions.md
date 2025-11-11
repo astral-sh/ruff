@@ -22,8 +22,10 @@ This file currently covers the following details:
 
 - **dot re-exports**: `from . import a` in an `__init__.pyi` is considered a re-export of `a`
     (equivalent to `from . import a as a`). This is required to properly handle many stubs in the
-    wild. Equivalent imports like `from whatever.thispackage import a` also introduce a re-export.
-    `from .a import b` and equivalent does not introduce a re-export.
+    wild. Equivalent imports like `from whatever.thispackage import a` also introduce a re-export
+    (this has essentially zero ecosystem impact, we just felt it was more consistent). The only way
+    to opt out of this is to rename the import to something else (`from . import a as b`).
+    `from .a import b` and equivalent does *not* introduce a re-export.
 
 Note: almost all tests in here have a stub and non-stub version, because we're interested in both
 defining symbols *at all* and re-exporting them.
