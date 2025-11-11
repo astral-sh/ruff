@@ -47,9 +47,9 @@ pub(crate) fn is_pure_path_subclass_with_preview(checker: &Checker, segments: &[
     false
 }
 
-/// We check functions that take only 1 argument,  this does not apply to functions
-/// with `dir_fd` argument, because `dir_fd` is not supported by pathlib,
-/// so check if it's set to non-default values
+/// We check functions that take only 1 argument.
+/// The caller is responsible for checking that `dir_fd` is not set to a non-default value
+/// (since `dir_fd` is not supported by pathlib), but this helper allows `dir_fd=None` to pass through.
 pub(crate) fn check_os_pathlib_single_arg_calls(
     checker: &Checker,
     call: &ExprCall,
@@ -73,13 +73,9 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
         return;
     }
 
-    // If `dir_fd` is set to a non-default value, skip (pathlib doesn't support it)
-    if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
-        return;
-    }
-
     // If there are keyword arguments other than `dir_fd` or the main argument, skip
     // We need to allow the main argument to be passed as a keyword, and `dir_fd=None`
+    // Note: `dir_fd` non-default value checking is done by the caller before invoking this helper
     let allowed_keywords = if has_keyword_arg {
         &[fn_argument, "dir_fd"][..]
     } else {
