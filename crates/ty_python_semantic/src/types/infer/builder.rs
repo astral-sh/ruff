@@ -3670,20 +3670,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
 
             // Check that object_ty is an instance of the class we're in
-            // Handle both NominalInstance and Self types
-            let is_same_class = match object_ty {
-                Type::NominalInstance(instance) => {
-                    instance.class(db).class_literal(db) == class_ty.class_literal(db)
-                }
-                _ => {
-                    // For Self types or other cases, check if the display representation suggests same class
-                    // Self@__init__ means it's the Self type within this method
-                    let type_display = format!("{}", object_ty.display(db));
-                    type_display.contains("Self@")
-                }
-            };
-
-            if !is_same_class {
+            if !object_ty.is_subtype_of(builder.db(), Type::instance(builder.db(), class_ty)) {
                 // Assigning to a different class's Final attribute
                 emit_invalid_final(builder);
                 return true;
@@ -3695,33 +3682,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let class_scope_id = class_definition.body_scope(db).file_scope_id(db);
                 let place_table = builder.index.place_table(class_scope_id);
 
-                if let Some(symbol_id) = place_table.symbol_id(attribute) {
-                    let use_def = builder.index.use_def_map(class_scope_id);
-                    let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
-
-                    // Check if any declaration is an annotated assignment with a value
-                    for decl_with_constraint in declarations {
-                        if let Some(definition) = decl_with_constraint.declaration.definition() {
-                            if let DefinitionKind::AnnotatedAssignment(ann_assign) =
-                                definition.kind(db)
+                if let Some(symbol) = place_table.symbol_by_name(attribute) {
+                    if symbol.is_bound() {
+                        if emit_diagnostics {
+                            if let Some(diag_builder) =
+                                builder.context.report_lint(&INVALID_ASSIGNMENT, target)
                             {
-                                // Check if the annotated assignment has a value
-                                if ann_assign.value(builder.module()).is_some() {
-                                    // Class-level Final has a value - disallow reassignment
-                                    if emit_diagnostics {
-                                        if let Some(diag_builder) =
-                                            builder.context.report_lint(&INVALID_ASSIGNMENT, target)
-                                        {
-                                            diag_builder.into_diagnostic(format_args!(
-                                                    "Cannot assign to final attribute `{attribute}` in `__init__` \
+                                diag_builder.into_diagnostic(format_args!(
+                                    "Cannot assign to final attribute `{attribute}` in `__init__` \
                                                      because it already has a value at class level"
-                                                ));
-                                        }
-                                    }
-                                    return true;
-                                }
+                                ));
                             }
                         }
+                        return true;
                     }
                 }
             }
