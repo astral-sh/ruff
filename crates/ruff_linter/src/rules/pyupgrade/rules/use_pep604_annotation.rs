@@ -205,6 +205,12 @@ pub(crate) fn non_pep604_annotation(
                 return;
             }
 
+            // Skip dynamic Union creation (e.g., `Union[types]` where `types` is a variable).
+            // This cannot be converted to PEP 604 syntax because the types are determined at runtime.
+            if matches!(slice, Expr::Name(_)) {
+                return;
+            }
+
             let mut diagnostic = checker.report_diagnostic(NonPEP604AnnotationUnion, expr.range());
             if fixable {
                 match slice {

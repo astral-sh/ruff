@@ -139,3 +139,15 @@ b_string_te_1: "UnionTE[NamedTupleTE]" = None
 b_string_te_2: "UnionTE[NamedTupleTE, None]" = None
 b_string_typing_1: "typing.Union[typing.NamedTuple]" = None
 b_string_typing_2: "typing.Union[typing.NamedTuple, None]" = None
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/21347
+# Don't emit lint for dynamic Union creation (e.g., Union[types] where types is a variable)
+def f(types: tuple[type, ...]):
+    return Union[types]
+
+
+if __name__ == "__main__":
+    u = f((int, str, float))
+    print(u)  # typing.Union[int, str, float]
+    print(type(u))  # <class 'types.UnionType'>
