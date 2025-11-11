@@ -10775,10 +10775,10 @@ fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 fn into_callable_type_cycle_initial<'db>(
     db: &'db dyn Db,
-    id: salsa::Id,
+    _id: salsa::Id,
     _self: BoundMethodType<'db>,
 ) -> CallableType<'db> {
-    CallableType::divergent(db, id)
+    CallableType::bottom(db)
 }
 
 #[salsa::tracked]
@@ -10972,17 +10972,8 @@ impl<'db> CallableType<'db> {
     ///
     /// Specifically, this represents a callable type with a single signature:
     /// `(*args: object, **kwargs: object) -> Never`.
-    #[allow(unused)]
     pub(crate) fn bottom(db: &'db dyn Db) -> CallableType<'db> {
         Self::new(db, CallableSignature::bottom(), false)
-    }
-
-    /// Create a callable type which represents a divergent "bottom" callable.
-    ///
-    /// Specifically, this represents a callable type with a single signature:
-    /// `(*args: object, **kwargs: object) -> Divergent`.
-    pub(crate) fn divergent(db: &'db dyn Db, id: salsa::Id) -> CallableType<'db> {
-        Self::new(db, CallableSignature::divergent(id), false)
     }
 
     /// Return a "normalized" version of this `Callable` type.
@@ -11948,11 +11939,11 @@ impl<'db> PEP695TypeAliasType<'db> {
 
 #[allow(clippy::unnecessary_wraps)]
 fn generic_context_cycle_initial<'db>(
-    db: &'db dyn Db,
-    id: salsa::Id,
+    _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: PEP695TypeAliasType<'db>,
 ) -> Option<GenericContext<'db>> {
-    Some(GenericContext::cycle_initial(db, id))
+    None
 }
 
 fn value_type_cycle_initial<'db>(

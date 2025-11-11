@@ -212,7 +212,6 @@ impl<'db> GenericContextTypeVar<'db> {
 pub struct GenericContext<'db> {
     #[returns(ref)]
     variables_inner: FxOrderMap<BoundTypeVarIdentity<'db>, GenericContextTypeVar<'db>>,
-    cycle_recovery: Option<Type<'db>>,
 }
 
 pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -229,10 +228,6 @@ pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?S
 impl get_size2::GetSize for GenericContext<'_> {}
 
 impl<'db> GenericContext<'db> {
-    pub(crate) fn cycle_initial(db: &'db dyn Db, id: salsa::Id) -> Self {
-        Self::new_internal(db, FxOrderMap::default(), Some(Type::divergent(id)))
-    }
-
     fn from_variables(
         db: &'db dyn Db,
         variables: impl IntoIterator<Item = GenericContextTypeVar<'db>>,
@@ -243,7 +238,6 @@ impl<'db> GenericContext<'db> {
                 .into_iter()
                 .map(|variable| (variable.bound_typevar.identity(db), variable))
                 .collect::<FxOrderMap<_, _>>(),
-            None,
         )
     }
 
@@ -630,14 +624,9 @@ impl<'db> GenericContext<'db> {
     }
 
     fn heap_size(
-        (variables, cycle_recovery): &(
-            FxOrderMap<BoundTypeVarIdentity<'db>, GenericContextTypeVar<'db>>,
-            Option<Type<'db>>,
-        ),
+        (variables,): &(FxOrderMap<BoundTypeVarIdentity<'db>, GenericContextTypeVar<'db>>,),
     ) -> usize {
-        use get_size2::GetSize;
-
-        ruff_memory_usage::order_map_heap_size(variables) + cycle_recovery.get_heap_size()
+        ruff_memory_usage::order_map_heap_size(variables)
     }
 }
 

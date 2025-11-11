@@ -1236,18 +1236,18 @@ fn is_mode_with_nontrivial_return_type<'db>(db: &'db dyn Db, mode: Type<'db>) ->
 
 fn signature_cycle_initial<'db>(
     _db: &'db dyn Db,
-    id: salsa::Id,
+    _id: salsa::Id,
     _function: FunctionType<'db>,
 ) -> CallableSignature<'db> {
-    CallableSignature::single(Signature::divergent(id))
+    CallableSignature::single(Signature::bottom())
 }
 
 fn last_definition_signature_cycle_initial<'db>(
     _db: &'db dyn Db,
-    id: salsa::Id,
+    _id: salsa::Id,
     _function: FunctionType<'db>,
 ) -> Signature<'db> {
-    Signature::divergent(id)
+    Signature::bottom()
 }
 
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might

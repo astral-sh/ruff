@@ -70,28 +70,11 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
 fn explicit_bases_cycle_initial<'db>(
-    db: &'db dyn Db,
-    id: salsa::Id,
-    class: ClassLiteral<'db>,
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _class: ClassLiteral<'db>,
 ) -> Box<[Type<'db>]> {
-    let module = parsed_module(db, class.file(db)).load(db);
-    let class_stmt = class.node(db, &module);
-
-    if class.is_known(db, KnownClass::VersionInfo) {
-        let tuple_type = TupleType::new(db, &TupleSpec::version_info_spec(db))
-            .expect("sys.version_info tuple spec should always be a valid tuple");
-
-        Box::new([
-            Type::divergent(id),
-            Type::from(tuple_type.to_class_type(db)),
-        ])
-    } else {
-        class_stmt
-            .bases()
-            .iter()
-            .map(|_| Type::divergent(id))
-            .collect()
-    }
+    Box::default()
 }
 
 fn inheritance_cycle_initial<'db>(
@@ -99,7 +82,6 @@ fn inheritance_cycle_initial<'db>(
     _id: salsa::Id,
     _self: ClassLiteral<'db>,
 ) -> Option<InheritanceCycle> {
-    // Some(InheritanceCycle::Participant)?
     None
 }
 
@@ -1272,10 +1254,10 @@ impl<'db> ClassType<'db> {
 
 fn into_callable_cycle_initial<'db>(
     db: &'db dyn Db,
-    id: salsa::Id,
+    _id: salsa::Id,
     _self: ClassType<'db>,
 ) -> Type<'db> {
-    Type::Callable(CallableType::divergent(db, id))
+    Type::Callable(CallableType::bottom(db))
 }
 
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
@@ -1425,11 +1407,11 @@ impl get_size2::GetSize for ClassLiteral<'_> {}
 
 #[allow(clippy::unnecessary_wraps)]
 fn generic_context_cycle_initial<'db>(
-    db: &'db dyn Db,
-    id: salsa::Id,
+    _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: ClassLiteral<'db>,
 ) -> Option<GenericContext<'db>> {
-    Some(GenericContext::cycle_initial(db, id))
+    None
 }
 
 #[salsa::tracked]
