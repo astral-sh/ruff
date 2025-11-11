@@ -296,18 +296,16 @@ impl<'db> ConstraintSet<'db> {
     /// Updates this constraint set to hold the union of itself and another constraint set.
     /// XXX: Document not commutative
     pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        let to_abstract = other.inferable.subtract(db, self.inferable);
-        let other = other.node.exists(db, to_abstract);
-        self.node = self.node.or(db, other);
+        let other = other.reduce_inferable(db, self.inferable);
+        self.node = self.node.or(db, other.node);
         *self
     }
 
     /// Updates this constraint set to hold the intersection of itself and another constraint set.
     /// XXX: Document not commutative
     pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        let to_abstract = other.inferable.subtract(db, self.inferable);
-        let other = other.node.exists(db, to_abstract);
-        self.node = self.node.and(db, other);
+        let other = other.reduce_inferable(db, self.inferable);
+        self.node = self.node.and(db, other.node);
         *self
     }
 
@@ -349,6 +347,21 @@ impl<'db> ConstraintSet<'db> {
             node: self.node.iff(db, other.node),
             inferable: self.inferable.merge(db, other.inferable),
         }
+    }
+
+    /// Reduces the set of inferable typevars for this constraint set. Any typevars that were
+    /// previously inferable but aren't in the new inferable set will be existentially quantified
+    /// away. (That is, those typevars will be removed from the constraint set, and the constraint
+    /// set will return true whenever there was _any_ specialization of those typevars that
+    /// returned true before.)
+    pub(crate) fn reduce_inferable(
+        self,
+        db: &'db dyn Db,
+        inferable: InferableTypeVars<'db>,
+    ) -> Self {
+        let to_abstract = self.inferable.subtract(db, inferable);
+        let node = self.node.exists(db, to_abstract);
+        Self { node, inferable }
     }
 
     pub(crate) fn range(

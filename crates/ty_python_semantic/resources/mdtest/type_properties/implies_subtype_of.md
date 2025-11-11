@@ -387,11 +387,7 @@ def unrelated[T]():
     # Note that even though this typevar is also named T, it is not the same typevar as T@identity!
     constraints = ConstraintSet.range(bool, T, int)
 
-    # TODO: no error
-    # error: [static-assert-error]
     static_assert(constraints.implies_subtype_of(TypeOf[identity], Callable[[int], int]))
-    # TODO: no error
-    # error: [static-assert-error]
     static_assert(constraints.implies_subtype_of(TypeOf[identity], Callable[[str], str]))
     static_assert(not constraints.implies_subtype_of(TypeOf[identity], Callable[[str], int]))
 

@@ -651,6 +651,17 @@ impl<'db> Signature<'db> {
         inferable: InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
+        self.is_equivalent_to_inner(db, other, inferable, visitor)
+            .reduce_inferable(db, inferable)
+    }
+
+    fn is_equivalent_to_inner(
+        &self,
+        db: &'db dyn Db,
+        other: &Signature<'db>,
+        inferable: InferableTypeVars<'db>,
+        visitor: &IsEquivalentVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         // The typevars in self and other should also be considered inferable when checking whether
         // two signatures are equivalent.
         let inferable = inferable.merge(db, self.inferable_typevars(db));
@@ -737,6 +748,26 @@ impl<'db> Signature<'db> {
 
     /// Implementation of subtyping and assignability for signature.
     fn has_relation_to_impl(
+        &self,
+        db: &'db dyn Db,
+        other: &Signature<'db>,
+        inferable: InferableTypeVars<'db>,
+        relation: TypeRelation<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        self.has_relation_to_inner(
+            db,
+            other,
+            inferable,
+            relation,
+            relation_visitor,
+            disjointness_visitor,
+        )
+        .reduce_inferable(db, inferable)
+    }
+
+    fn has_relation_to_inner(
         &self,
         db: &'db dyn Db,
         other: &Signature<'db>,
