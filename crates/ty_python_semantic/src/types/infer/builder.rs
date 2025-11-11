@@ -3538,71 +3538,68 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Make sure that the subscript assignment `obj[slice] = value` is valid.
-    fn validate_subscript_assignment(
-        &mut self,
-        target: &ast::ExprSubscript,
-        rhs: &ast::Expr,
+    /// Validate a subscript assignment of the form `object[key] = value` where `object` is a `TypedDict`,
+    /// or a union/intersection containing `TypedDict`s.
+    ///
+    /// Returns `Some(true)` if the assignment is valid, `Some(false)` if invalid, or `None` if this is an
+    /// assignment to something else.
+    #[expect(clippy::too_many_arguments)]
+    fn is_valid_typed_dict_assignment(
+        &self,
+        value_ty: Type<'db>,
+        slice_ty: Type<'db>,
         assigned_ty: Type<'db>,
-    ) -> bool {
-        /// Given a string literal or a union of string literals, return an iterator over the contained strings.
+        typed_dict_node: impl Into<AnyNodeRef<'ast>> + Copy,
+        key_node: impl Into<AnyNodeRef<'ast>> + Copy,
+        value_node: impl Into<AnyNodeRef<'ast>> + Copy,
+        emit_diagnostic: bool,
+    ) -> Option<bool> {
+        /// Given a string literal or a union of string literals, return an iterator over the contained
+        /// strings, or `None`, if the type is neither.
         fn key_literals<'db>(
             db: &'db dyn Db,
             slice_ty: Type<'db>,
-        ) -> impl Iterator<Item = &'db str> + 'db {
+        ) -> Option<impl Iterator<Item = &'db str> + 'db> {
             if let Some(literal) = slice_ty.as_string_literal() {
-                Either::Left(Either::Left(std::iter::once(literal.value(db))))
-            } else if let Some(union) = slice_ty.as_union() {
-                Either::Left(Either::Right(
-                    union
-                        .elements(db)
-                        .iter()
-                        .filter_map(|ty| ty.as_string_literal().map(|lit| lit.value(db))),
-                ))
+                Some(Either::Left(std::iter::once(literal.value(db))))
             } else {
-                Either::Right(std::iter::empty())
+                slice_ty.as_union().map(|union| {
+                    Either::Right(
+                        union
+                            .elements(db)
+                            .iter()
+                            .filter_map(|ty| ty.as_string_literal().map(|lit| lit.value(db))),
+                    )
+                })
             }
         }
 
-        #[allow(clippy::too_many_arguments)]
-        fn is_valid_typed_dict_assignment<'db, 'ast>(
-            db: &'db dyn Db,
-            context: &InferContext<'db, 'ast>,
-            value_ty: Type<'db>,
-            slice_ty: Type<'db>,
-            assigned_ty: Type<'db>,
-            typed_dict_node: impl Into<AnyNodeRef<'ast>> + Copy,
-            key_node: impl Into<AnyNodeRef<'ast>> + Copy,
-            value_node: impl Into<AnyNodeRef<'ast>> + Copy,
-            emit_diagnostic: bool,
-        ) -> bool {
-            match value_ty {
-                Type::Union(union) => {
-                    // Note that we use a loop here instead of .all(…) to avoid short-circuiting.
-                    // We need to keep iterating to emit all diagnostics.
-                    let mut valid = true;
-                    for element in union.elements(db) {
-                        valid &= is_valid_typed_dict_assignment(
-                            db,
-                            context,
-                            *element,
-                            slice_ty,
-                            assigned_ty,
-                            typed_dict_node,
-                            key_node,
-                            value_node,
-                            emit_diagnostic,
-                        );
-                    }
-                    valid
+        let db = self.db();
+
+        match value_ty {
+            Type::Union(union) => {
+                // Note that we use a loop here instead of .all(…) to avoid short-circuiting.
+                // We need to keep iterating to emit all diagnostics.
+                let mut valid = true;
+                for element in union.elements(db) {
+                    valid &= self.is_valid_typed_dict_assignment(
+                        *element,
+                        slice_ty,
+                        assigned_ty,
+                        typed_dict_node,
+                        key_node,
+                        value_node,
+                        emit_diagnostic,
+                    )?;
                 }
-                Type::Intersection(intersection) => {
-                    let check_positive_elements = |emit_diagnostic_and_short_circuit| {
-                        let mut valid = false;
-                        for element in intersection.positive(db) {
-                            valid |= is_valid_typed_dict_assignment(
-                                db,
-                                context,
+                Some(valid)
+            }
+            Type::Intersection(intersection) => {
+                let check_positive_elements = |emit_diagnostic_and_short_circuit| {
+                    let mut valid = false;
+                    for element in intersection.positive(db) {
+                        valid |= self
+                            .is_valid_typed_dict_assignment(
                                 *element,
                                 slice_ty,
                                 assigned_ty,
@@ -3610,47 +3607,96 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 key_node,
                                 value_node,
                                 emit_diagnostic_and_short_circuit,
-                            );
-                            if !valid && emit_diagnostic_and_short_circuit {
-                                break;
-                            }
+                            )
+                            .unwrap_or(false);
+
+                        if !valid && emit_diagnostic_and_short_circuit {
+                            break;
                         }
-
-                        valid
-                    };
-
-                    // Perform an initial check of all elements. If the assignment is valid
-                    // for at least one element, we do not emit any diagnostics. Otherwise,
-                    // we re-run the check and emit a diagnostic on the first failing element.
-                    let valid = check_positive_elements(false);
-
-                    if !valid {
-                        check_positive_elements(true);
                     }
 
                     valid
+                };
+
+                // Perform an initial check of all elements. If the assignment is valid
+                // for at least one element, we do not emit any diagnostics. Otherwise,
+                // we re-run the check and emit a diagnostic on the first failing element.
+                let valid = check_positive_elements(false);
+
+                if !valid {
+                    check_positive_elements(true);
                 }
-                Type::TypedDict(typed_dict) => {
-                    let mut valid = true;
-                    for key in key_literals(db, slice_ty) {
-                        valid &= validate_typed_dict_key_assignment(
-                            context,
-                            typed_dict,
-                            key,
-                            assigned_ty,
-                            typed_dict_node,
-                            key_node,
-                            value_node,
-                            TypedDictAssignmentKind::Subscript,
-                            emit_diagnostic,
-                        );
-                    }
-                    valid
-                }
-                _ => true,
+
+                Some(valid)
             }
-        }
+            Type::TypedDict(typed_dict) => {
+                let mut valid = true;
+                let Some(keys) = key_literals(db, slice_ty) else {
+                    // Check if the key has a valid type. We only allow string literals, a union of string literals,
+                    // or a dynamic type like `Any`. We can do this by checking assignability to `LiteralString`,
+                    // but we need to exclude `LiteralString` itself. This check would technically allow weird key
+                    // types like `LiteralString & Any` to pass, but it does not need to be perfect. We would just
+                    // fail to provide the "Only string literals are allowed" hint in that case.
 
+                    if slice_ty.is_dynamic() {
+                        return Some(true);
+                    }
+
+                    let assigned_d = assigned_ty.display(db);
+                    let value_d = value_ty.display(db);
+
+                    if slice_ty.is_assignable_to(db, Type::LiteralString)
+                        && !slice_ty.is_equivalent_to(db, Type::LiteralString)
+                    {
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_ASSIGNMENT, key_node.into())
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Cannot assign value of type `{assigned_d}` to key of type `{}` on TypedDict `{value_d}`",
+                                slice_ty.display(db)
+                            ));
+                        }
+                    } else {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_KEY, key_node.into())
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Cannot access `{value_d}` with a key of type `{}`. Only string literals are allowed as keys on TypedDicts.",
+                                slice_ty.display(db)
+                            ));
+                        }
+                    }
+
+                    return Some(false);
+                };
+
+                for key in keys {
+                    valid &= validate_typed_dict_key_assignment(
+                        &self.context,
+                        typed_dict,
+                        key,
+                        assigned_ty,
+                        typed_dict_node,
+                        key_node,
+                        value_node,
+                        TypedDictAssignmentKind::Subscript,
+                        emit_diagnostic,
+                    );
+                }
+                Some(valid)
+            }
+            _ => None,
+        }
+    }
+
+    /// Make sure that the subscript assignment `obj[slice] = value` is valid.
+    fn validate_subscript_assignment(
+        &mut self,
+        target: &ast::ExprSubscript,
+        rhs: &ast::Expr,
+        assigned_ty: Type<'db>,
+    ) -> bool {
         let ast::ExprSubscript {
             range: _,
             node_index: _,
@@ -3665,27 +3711,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let context = &self.context;
 
+        // As an optimization, prevent calling `__setitem__` on (unions of) large `TypedDict`s, and
+        // validate the assignment ourselves. This also allows us to emit better diagnostics.
+        if let Some(valid) = self.is_valid_typed_dict_assignment(
+            value_ty,
+            slice_ty,
+            assigned_ty,
+            value.as_ref(),
+            slice.as_ref(),
+            rhs,
+            true,
+        ) {
+            return valid;
+        }
+
         match value_ty.try_call_dunder(
             db,
             "__setitem__",
             CallArguments::positional([slice_ty, assigned_ty]),
             TypeContext::default(),
         ) {
-            Ok(_) => {
-                // We do not synthesize precise `__setitem__` methods for `TypedDict`s for performance reasons,
-                // so we need to post-validate the assignment here.
-                is_valid_typed_dict_assignment(
-                    db,
-                    context,
-                    value_ty,
-                    slice_ty,
-                    assigned_ty,
-                    value.as_ref(),
-                    slice.as_ref(),
-                    rhs,
-                    true,
-                )
-            }
+            Ok(_) => true,
             Err(err) => match err {
                 CallDunderError::PossiblyUnbound { .. } => {
                     if let Some(builder) =
@@ -3712,9 +3758,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                         CallErrorKind::BindingError => {
-                            let assigned_d = assigned_ty.display(db);
-                            let value_d = value_ty.display(db);
-
                             if let Some(typed_dict) = value_ty.as_typed_dict() {
                                 if let Some(key) = slice_ty.as_string_literal() {
                                     let key = key.value(self.db());
@@ -3729,38 +3772,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         TypedDictAssignmentKind::Subscript,
                                         true,
                                     );
-                                } else {
-                                    // Check if the key has a valid type. We only allow string literals, a union of string literals,
-                                    // or a dynamic type like `Any`. We can do this by checking assignability to `LiteralString`,
-                                    // but we need to exclude `LiteralString` itself. This check would technically allow weird key
-                                    // types like `LiteralString & Any` to pass, but it does not need to be perfect. We would just
-                                    // fail to provide the "Only string literals are allowed" hint in that case.
-                                    if slice_ty.is_assignable_to(db, Type::LiteralString)
-                                        && !slice_ty.is_equivalent_to(db, Type::LiteralString)
-                                    {
-                                        if let Some(builder) =
-                                            context.report_lint(&INVALID_ASSIGNMENT, &**slice)
-                                        {
-                                            builder.into_diagnostic(format_args!(
-                                                "Cannot assign value of type `{assigned_d}` to key of type `{}` on TypedDict `{value_d}`",
-                                                slice_ty.display(db)
-                                            ));
-                                        }
-                                    } else {
-                                        if let Some(builder) =
-                                            context.report_lint(&INVALID_KEY, &**slice)
-                                        {
-                                            builder.into_diagnostic(format_args!(
-                                                "Cannot access `{value_d}` with a key of type `{}`. Only string literals are allowed as keys on TypedDicts.",
-                                                slice_ty.display(db)
-                                            ));
-                                        }
-                                    }
                                 }
                             } else {
                                 if let Some(builder) =
                                     context.report_lint(&INVALID_ASSIGNMENT, &**value)
                                 {
+                                    let assigned_d = assigned_ty.display(db);
+                                    let value_d = value_ty.display(db);
+
                                     builder.into_diagnostic(format_args!(
                                         "Method `__setitem__` of type `{}` cannot be called with \
                                         a key of type `{}` and a value of type `{assigned_d}` on object of type `{value_d}`",
