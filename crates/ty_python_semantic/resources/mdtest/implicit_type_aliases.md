@@ -272,6 +272,54 @@ def g(
 ): ...
 ```
 
+## `|` unions in stubs and `TYPE_CHECKING` blocks
+
+In runtime contexts, `|` unions are only permitted on Python 3.10+. But in suites of code that are
+never executed at runtime (stub files, `if TYPE_CHECKING` blocks, and stringified annotations), they
+are permitted even if the target version is set to Python \<=3.9.
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+`bar.pyi`:
+
+```pyi
+Z = int | str
+GLOBAL_CONSTANT: Z
+```
+
+`foo.py`:
+
+```py
+from typing import TYPE_CHECKING
+from bar import GLOBAL_CONSTANT
+
+reveal_type(GLOBAL_CONSTANT)  # revealed: int | str
+
+if TYPE_CHECKING:
+    class ItsQuiteCloudyInManchester:
+        X = int | str
+
+        def f(obj: X):
+            reveal_type(obj)  # revealed: int | str
+
+    # TODO: we currently only understand code as being inside a `TYPE_CHECKING` block
+    # if a whole *scope* is inside the `if TYPE_CHECKING` block
+    # (like the `ItsQuiteCloudyInManchester` class above); this is a false-positive
+    Y = int | str  # error: [unsupported-operator]
+
+    def g(obj: Y):
+        # TODO: should be `int | str`
+        reveal_type(obj)  # revealed: Unknown
+
+Y = list["int | str"]
+
+def g(obj: Y):
+    reveal_type(obj)  # revealed: list[int | str]
+```
+
 ## Generic types
 
 Implicit type aliases can also refer to generic types:
