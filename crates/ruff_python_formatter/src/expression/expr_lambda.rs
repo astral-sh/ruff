@@ -85,7 +85,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
         if f.context().is_stable() || has_own_parentheses(body, f.context()).is_some() {
             body.format().fmt(f)
         } else {
-            maybe_parenthesize_expression(body, item, Parenthesize::IfBreaksOrIfRequired).fmt(f)
+            maybe_parenthesize_expression(body, item, Parenthesize::IfBreaksParenthesized).fmt(f)
         }
     }
 }
