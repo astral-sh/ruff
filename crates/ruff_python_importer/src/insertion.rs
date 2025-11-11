@@ -51,9 +51,9 @@ impl<'a> Insertion<'a> {
     /// include a trailing newline.
     ///
     /// If `within_range` is set, the insertion will be limited to the specified range. That is,
-    /// the insertion is contraint to the given range rather than the start of the file.
+    /// the insertion is constrained to the given range rather than the start of the file.
     /// This is used for insertions in notebook cells where the source code and AST are for
-    /// the entire notebook but the insertion should be constraint to a specific cell.
+    /// the entire notebook but the insertion should be constrained to a specific cell.
     pub fn start_of_file(
         body: &[Stmt],
         contents: &str,
