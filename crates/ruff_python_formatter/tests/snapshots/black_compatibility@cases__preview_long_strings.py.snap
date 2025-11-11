@@ -436,10 +436,6 @@ x = {
 -    "A long and ridiculous {}".format(string_key): (
 -        "This is a really really really long string that has to go i,side of a"
 -        " dictionary. It is soooo bad."
--    ),
--    some_func("calling", "some", "stuff"): (
--        "This is a really really really long string that has to go inside of a"
--        " dictionary. It is {soooo} bad (#{x}).".format(sooo="soooo", x=2)
 +    "A long and ridiculous {}".format(
 +        string_key
 +    ): "This is a really really really long string that has to go i,side of a dictionary. It is soooo bad.",
@@ -448,6 +444,10 @@ x = {
 +    ): "This is a really really really long string that has to go inside of a dictionary. It is {soooo} bad (#{x}).".format(
 +        sooo="soooo", x=2
      ),
+-    some_func("calling", "some", "stuff"): (
+-        "This is a really really really long string that has to go inside of a"
+-        " dictionary. It is {soooo} bad (#{x}).".format(sooo="soooo", x=2)
+-    ),
      "A %s %s"
 -    % ("formatted", "string"): (
 -        "This is a really really really long string that has to go inside of a"
@@ -854,7 +854,7 @@ x = {
  
  long_unmergable_string_with_pragma = (
      "This is a really long string that can't be merged because it has a likely pragma at the end"  # type: ignore
-@@ -468,49 +358,24 @@
+@@ -468,119 +358,85 @@
      " of it."
  )
  
@@ -914,7 +914,13 @@ x = {
  )
  
  dict_with_lambda_values = {
-@@ -522,65 +387,58 @@
+-    "join": lambda j: (
+-        f"{j.__class__.__name__}({some_function_call(j.left)}, "
+-        f"{some_function_call(j.right)})"
+-    ),
++    "join": lambda j: f"{j.__class__.__name__}({some_function_call(j.left)}, "
++    f"{some_function_call(j.right)})",
+ }
  
  # Complex string concatenations with a method call in the middle.
  code = (
@@ -998,7 +1004,7 @@ x = {
  )
  
  log.info(
-@@ -588,7 +446,7 @@
+@@ -588,7 +444,7 @@
  )
  
  log.info(
@@ -1007,7 +1013,7 @@ x = {
  )
  
  x = {
-@@ -597,10 +455,10 @@
+@@ -597,10 +453,10 @@
      )
  }
  x = {
@@ -1408,10 +1414,8 @@ msg = (
 )
 
 dict_with_lambda_values = {
-    "join": lambda j: (
-        f"{j.__class__.__name__}({some_function_call(j.left)}, "
-        f"{some_function_call(j.right)})"
-    ),
+    "join": lambda j: f"{j.__class__.__name__}({some_function_call(j.left)}, "
+    f"{some_function_call(j.right)})",
 }
 
 # Complex string concatenations with a method call in the middle.
