@@ -205,9 +205,15 @@ pub(crate) fn non_pep604_annotation(
                 return;
             }
 
-            // Skip dynamic Union creation (e.g., `Union[types]` where `types` is a variable).
-            // This cannot be converted to PEP 604 syntax because the types are determined at runtime.
-            if matches!(slice, Expr::Name(_)) {
+            // Only apply this rule in type annotation/definition positions, including implicit
+            // type aliases (e.g., `X = Union[int, str]` at module or class level).
+            // Skip dynamic Union creation (e.g., `Union[types]` or `Union[foo()]`) when not in
+            // type annotations, as these cannot be converted to PEP 604 syntax since the types
+            // are determined at runtime.
+            let in_type_definition = checker.semantic().in_type_definition();
+            let in_implicit_type_alias = is_implicit_type_alias(checker, expr);
+
+            if !in_type_definition && !in_implicit_type_alias {
                 return;
             }
 
@@ -326,4 +332,25 @@ fn is_named_tuple(checker: &Checker, expr: &Expr) -> bool {
 /// Return `true` if this is an `Optional[None]` annotation.
 fn is_optional_none(operator: Pep604Operator, slice: &Expr) -> bool {
     matches!(operator, Pep604Operator::Optional) && matches!(slice, Expr::NoneLiteral(_))
+}
+
+/// Return `true` if the expression is part of an implicit type alias (e.g., `X = Union[int, str]`
+/// at module or class level).
+fn is_implicit_type_alias(checker: &Checker, expr: &Expr) -> bool {
+    let semantic = checker.semantic();
+    let scope = semantic.current_scope();
+
+    // Only consider module-level or class-level assignments as potential type aliases
+    if scope.kind.is_function() {
+        return false;
+    }
+
+    // Check if the current statement is a simple assignment
+    if let ast::Stmt::Assign(ast::StmtAssign { value, .. }) = semantic.current_statement() {
+        // Check if the Union expression is part of the assignment value
+        // We check if the expression's range is within the value's range
+        expr.range().start() >= value.range().start() && expr.range().end() <= value.range().end()
+    } else {
+        false
+    }
 }

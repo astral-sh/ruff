@@ -147,6 +147,18 @@ def f(types: tuple[type, ...]):
     return Union[types]
 
 
+# Don't emit lint for dynamic Union creation with function calls (e.g., Union[foo()])
+def get_types():
+    return (int, str, float)
+
+
+def g():
+    return Union[get_types()]
+
+
+# Implicit type alias at module level - should be flagged
+IntOrStr = Union[int, str]
+
 if __name__ == "__main__":
     u = f((int, str, float))
     print(u)  # typing.Union[int, str, float]
