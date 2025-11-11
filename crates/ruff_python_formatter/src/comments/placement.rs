@@ -569,15 +569,6 @@ fn handle_own_line_comment_between_statements<'a>(
     // y = 2
     // ```
     if max_empty_lines(&source[TextRange::new(comment.end(), following.start())]) == 0 {
-        for token in SimpleTokenizer::new(source, TextRange::new(comment.end(), following.start()))
-        {
-            match token.kind() {
-                SimpleTokenKind::Else | SimpleTokenKind::Finally => {
-                    return CommentPlacement::dangling(comment.enclosing_node(), comment);
-                }
-                _ => {}
-            }
-        }
         CommentPlacement::leading(following, comment)
     } else {
         CommentPlacement::trailing(preceding, comment)
