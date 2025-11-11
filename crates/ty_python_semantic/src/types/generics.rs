@@ -1393,31 +1393,6 @@ impl<'db> SpecializationBuilder<'db> {
             return Ok(());
         }
 
-        // If the actual type is a subtype of the formal type, then return without adding any new
-        // type mappings. (Note that if the formal type contains any typevars, this check will
-        // fail, since no non-typevar types are assignable to a typevar. Also note that we are
-        // checking _subtyping_, not _assignability_, so that we do specialize typevars to dynamic
-        // argument types; and we have a special case for `Never`, which is a subtype of all types,
-        // but which we also do want as a specialization candidate.)
-        //
-        // In particular, this handles a case like
-        //
-        // ```py
-        // def f[T](t: T | None): ...
-        //
-        // f(None)
-        // ```
-        //
-        // without specializing `T` to `None`.
-        if !matches!(formal, Type::ProtocolInstance(_))
-            && !actual.is_never()
-            && actual
-                .when_subtype_of(self.db, formal, self.inferable)
-                .is_always_satisfied(self.db)
-        {
-            return Ok(());
-        }
-
         // Remove the union elements from `actual` that are not related to `formal`, and vice
         // versa.
         //
@@ -1473,10 +1448,30 @@ impl<'db> SpecializationBuilder<'db> {
                 self.add_type_mapping(*formal_bound_typevar, remaining_actual, filter);
             }
             (Type::Union(formal), _) => {
-                // Second, if the formal is a union, and precisely one union element _is_ a typevar (not
-                // _contains_ a typevar), then we add a mapping between that typevar and the actual
-                // type. (Note that we've already handled above the case where the actual is
-                // assignable to any _non-typevar_ union element.)
+                // Second, if the formal is a union, and precisely one union element is assignable
+                // from the actual type, then we don't add any type mapping. This handles a case like
+                //
+                // ```py
+                // def f[T](t: T | None): ...
+                //
+                // f(None)
+                // ```
+                //
+                // without specializing `T` to `None`.
+                //
+                // Otherwise, if precisely one union element _is_ a typevar (not _contains_ a
+                // typevar), then we add a mapping between that typevar and the actual type.
+                if !actual.is_never() {
+                    let assignable_elements = (formal.elements(self.db).iter()).filter(|ty| {
+                        actual
+                            .when_subtype_of(self.db, **ty, self.inferable)
+                            .is_always_satisfied(self.db)
+                    });
+                    if assignable_elements.exactly_one().is_ok() {
+                        return Ok(());
+                    }
+                }
+
                 let bound_typevars =
                     (formal.elements(self.db).iter()).filter_map(|ty| ty.as_typevar());
                 if let Ok(bound_typevar) = bound_typevars.exactly_one() {
