@@ -224,7 +224,7 @@ impl<'db> TupleType<'db> {
     pub(crate) fn normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &mut NormalizedVisitor<'db>,
     ) -> Option<Self> {
         TupleType::new(db, &self.tuple(db).normalized_impl(db, visitor))
     }
@@ -234,7 +234,7 @@ impl<'db> TupleType<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Option<Self> {
         TupleType::new(
             db,
@@ -249,7 +249,7 @@ impl<'db> TupleType<'db> {
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &mut FindLegacyTypeVarsVisitor<'db>,
     ) {
         self.tuple(db)
             .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
@@ -261,8 +261,8 @@ impl<'db> TupleType<'db> {
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         self.tuple(db).has_relation_to_impl(
             db,
@@ -279,7 +279,7 @@ impl<'db> TupleType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
+        visitor: &mut IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         self.tuple(db)
             .is_equivalent_to_impl(db, other.tuple(db), inferable, visitor)
@@ -388,7 +388,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     }
 
     #[must_use]
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut NormalizedVisitor<'db>) -> Self {
         Self::from_elements(self.0.iter().map(|ty| ty.normalized_impl(db, visitor)))
     }
 
@@ -397,7 +397,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         let tcx_tuple = tcx
             .annotation
@@ -430,7 +430,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &mut FindLegacyTypeVarsVisitor<'db>,
     ) {
         for ty in &self.0 {
             ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
@@ -443,8 +443,8 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         other: &Tuple<Type<'db>>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match other {
             Tuple::Fixed(other) => {
@@ -529,7 +529,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         other: &Self,
         inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
+        visitor: &mut IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         ConstraintSet::from(self.0.len() == other.0.len()).and(db, || {
             (self.0.iter())
@@ -741,7 +741,11 @@ impl<'db> VariableLengthTuple<Type<'db>> {
     }
 
     #[must_use]
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> TupleSpec<'db> {
+    fn normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        visitor: &mut NormalizedVisitor<'db>,
+    ) -> TupleSpec<'db> {
         let prefix = self
             .prenormalized_prefix_elements(db, None)
             .map(|ty| ty.normalized_impl(db, visitor))
@@ -763,18 +767,22 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> TupleSpec<'db> {
-        Self::mixed(
-            self.prefix
-                .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
-            self.variable
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            self.suffix
-                .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
-        )
+        let prefix: Vec<_> = self
+            .prefix
+            .iter()
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            .collect();
+        let variable = self
+            .variable
+            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        let suffix: Vec<_> = self
+            .suffix
+            .iter()
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            .collect();
+        Self::mixed(prefix, variable, suffix)
     }
 
     fn find_legacy_typevars_impl(
@@ -782,7 +790,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &mut FindLegacyTypeVarsVisitor<'db>,
     ) {
         for ty in &self.prefix {
             ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
@@ -800,8 +808,8 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         other: &Tuple<Type<'db>>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match other {
             Tuple::Fixed(other) => {
@@ -978,7 +986,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         other: &Self,
         inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
+        visitor: &mut IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         self.variable
             .is_equivalent_to_impl(db, other.variable, inferable, visitor)
@@ -1146,7 +1154,7 @@ impl<'db> Tuple<Type<'db>> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &mut NormalizedVisitor<'db>,
     ) -> Self {
         match self {
             Tuple::Fixed(tuple) => Tuple::Fixed(tuple.normalized_impl(db, visitor)),
@@ -1159,7 +1167,7 @@ impl<'db> Tuple<Type<'db>> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
             Tuple::Fixed(tuple) => {
@@ -1174,7 +1182,7 @@ impl<'db> Tuple<Type<'db>> {
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &mut FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self {
             Tuple::Fixed(tuple) => {
@@ -1192,8 +1200,8 @@ impl<'db> Tuple<Type<'db>> {
         other: &Self,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match self {
             Tuple::Fixed(self_tuple) => self_tuple.has_relation_to_impl(
@@ -1220,7 +1228,7 @@ impl<'db> Tuple<Type<'db>> {
         db: &'db dyn Db,
         other: &Self,
         inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
+        visitor: &mut IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self, other) {
             (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
@@ -1240,8 +1248,8 @@ impl<'db> Tuple<Type<'db>> {
         db: &'db dyn Db,
         other: &Self,
         inferable: InferableTypeVars<'_, 'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         // Two tuples with an incompatible number of required elements must always be disjoint.
         let (self_min, self_max) = self.len().size_hint();
@@ -1260,8 +1268,8 @@ impl<'db> Tuple<Type<'db>> {
             a: impl IntoIterator<Item = &'s Type<'db>>,
             b: impl IntoIterator<Item = &'s Type<'db>>,
             inferable: InferableTypeVars<'_, 'db>,
-            disjointness_visitor: &IsDisjointVisitor<'db>,
-            relation_visitor: &HasRelationToVisitor<'db>,
+            disjointness_visitor: &mut IsDisjointVisitor<'db>,
+            relation_visitor: &mut HasRelationToVisitor<'db>,
         ) -> ConstraintSet<'db>
         where
             'db: 's,

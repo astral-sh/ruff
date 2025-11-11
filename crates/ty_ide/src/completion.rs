@@ -109,7 +109,7 @@ impl<'db> Completion<'db> {
         fn imp<'db>(
             db: &'db dyn Db,
             ty: Type<'db>,
-            visitor: &CompletionKindVisitor<'db>,
+            visitor: &mut CompletionKindVisitor<'db>,
         ) -> Option<CompletionKind> {
             Some(match ty {
                 Type::FunctionLiteral(_)
@@ -152,13 +152,13 @@ impl<'db> Completion<'db> {
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy => return None,
                 Type::TypeAlias(alias) => {
-                    visitor.visit(ty, || imp(db, alias.value_type(db), visitor))?
+                    visitor.visit(ty, |visitor| imp(db, alias.value_type(db), visitor))?
                 }
             })
         }
         self.kind.or_else(|| {
             self.ty
-                .and_then(|ty| imp(db, ty, &CompletionKindVisitor::default()))
+                .and_then(|ty| imp(db, ty, &mut CompletionKindVisitor::default()))
         })
     }
 

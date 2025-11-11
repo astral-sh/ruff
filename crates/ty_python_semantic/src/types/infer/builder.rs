@@ -9414,7 +9414,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         *op,
                         right_ty,
                         range,
-                        &BinaryComparisonVisitor::new(Ok(Type::BooleanLiteral(true))),
+                        &mut BinaryComparisonVisitor::new(Ok(Type::BooleanLiteral(true))),
                     )
                     .unwrap_or_else(|error| {
                         if let Some(diagnostic_builder) =
@@ -9461,7 +9461,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         other: Type<'db>,
         intersection_on: IntersectionOn,
         range: TextRange,
-        visitor: &BinaryComparisonVisitor<'db>,
+        visitor: &mut BinaryComparisonVisitor<'db>,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
         enum State<'db> {
             // We have not seen any positive elements (yet)
@@ -9623,7 +9623,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         op: ast::CmpOp,
         right: Type<'db>,
         range: TextRange,
-        visitor: &BinaryComparisonVisitor<'db>,
+        visitor: &mut BinaryComparisonVisitor<'db>,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
         // Note: identity (is, is not) for equal builtin types is unreliable and not part of the
         // language spec.
@@ -9710,7 +9710,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             (Type::TypeAlias(alias), right) => Some(
-                visitor.visit((left, op, right), || { self.infer_binary_type_comparison(
+                visitor.visit((left, op, right), |visitor| { self.infer_binary_type_comparison(
                     alias.value_type(self.db()),
                     op,
                     right,
@@ -9720,7 +9720,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             })),
 
             (left, Type::TypeAlias(alias)) => Some(
-                visitor.visit((left, op, right), || { self.infer_binary_type_comparison(
+                visitor.visit((left, op, right), |visitor| { self.infer_binary_type_comparison(
                     left,
                     op,
                     alias.value_type(self.db()),
@@ -9951,7 +9951,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .and_then(|lhs_tuple| Some((lhs_tuple, nominal2.tuple_spec(self.db())?)))
                 .map(|(lhs_tuple, rhs_tuple)| {
                     let mut tuple_rich_comparison =
-                        |rich_op| visitor.visit((left, op, right), || {
+                        |rich_op| visitor.visit((left, op, right), |visitor| {
                             self.infer_tuple_rich_comparison(&lhs_tuple, rich_op, &rhs_tuple, range, visitor)
                         });
 
@@ -10147,7 +10147,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         op: RichCompareOperator,
         right: &TupleSpec<'db>,
         range: TextRange,
-        visitor: &BinaryComparisonVisitor<'db>,
+        visitor: &mut BinaryComparisonVisitor<'db>,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
         // If either tuple is variable length, we can make no assumptions about the relative
         // lengths of the tuples, and therefore neither about how they compare lexicographically.

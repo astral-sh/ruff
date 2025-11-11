@@ -86,7 +86,7 @@ impl<'db> SubclassOfType<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
         match self.subclass_of {
             SubclassOfInner::Class(class) => Type::SubclassOf(Self {
@@ -112,7 +112,7 @@ impl<'db> SubclassOfType<'db> {
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &mut FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self.subclass_of {
             SubclassOfInner::Class(class) => {
@@ -138,8 +138,8 @@ impl<'db> SubclassOfType<'db> {
         other: SubclassOfType<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
@@ -187,7 +187,11 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut NormalizedVisitor<'db>,
+    ) -> Self {
         Self {
             subclass_of: self.subclass_of.normalized_impl(db, visitor),
         }
@@ -259,7 +263,11 @@ impl<'db> SubclassOfInner<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut NormalizedVisitor<'db>,
+    ) -> Self {
         match self {
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),

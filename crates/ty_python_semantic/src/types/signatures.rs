@@ -165,7 +165,7 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &mut NormalizedVisitor<'db>,
     ) -> Self {
         Self::from_overloads(
             self.overloads
@@ -179,7 +179,7 @@ impl<'db> CallableSignature<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self::from_overloads(
             self.overloads
@@ -193,7 +193,7 @@ impl<'db> CallableSignature<'db> {
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &mut FindLegacyTypeVarsVisitor<'db>,
     ) {
         for signature in &self.overloads {
             signature.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
@@ -224,8 +224,8 @@ impl<'db> CallableSignature<'db> {
             other,
             inferable,
             TypeRelation::Subtyping,
-            &HasRelationToVisitor::default(),
-            &IsDisjointVisitor::default(),
+            &mut HasRelationToVisitor::default(),
+            &mut IsDisjointVisitor::default(),
         )
     }
 
@@ -235,8 +235,8 @@ impl<'db> CallableSignature<'db> {
         other: &Self,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         Self::has_relation_to_inner(
             db,
@@ -257,8 +257,8 @@ impl<'db> CallableSignature<'db> {
         other_signatures: &[Signature<'db>],
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self_signatures, other_signatures) {
             ([self_signature], [other_signature]) => {
@@ -322,7 +322,7 @@ impl<'db> CallableSignature<'db> {
         db: &'db dyn Db,
         other: &Self,
         inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
+        visitor: &mut IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.overloads.as_slice(), other.overloads.as_slice()) {
             ([self_signature], [other_signature]) => {
@@ -520,7 +520,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &mut NormalizedVisitor<'db>,
     ) -> Self {
         Self {
             generic_context: self
@@ -545,7 +545,7 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
             generic_context: self
@@ -569,7 +569,7 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &mut FindLegacyTypeVarsVisitor<'db>,
     ) {
         for param in &self.parameters {
             if let Some(ty) = param.annotated_type() {
@@ -610,7 +610,7 @@ impl<'db> Signature<'db> {
                 db,
                 &TypeMapping::BindSelf(self_type),
                 TypeContext::default(),
-                &ApplyTypeMappingVisitor::default(),
+                &mut ApplyTypeMappingVisitor::default(),
             );
             return_ty = return_ty.map(|ty| {
                 ty.apply_type_mapping(
@@ -636,7 +636,7 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         other: &Signature<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
+        visitor: &mut IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         // The typevars in self and other should also be considered inferable when checking whether
         // two signatures are equivalent.
@@ -733,8 +733,8 @@ impl<'db> Signature<'db> {
         other: &Signature<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         /// A helper struct to zip two slices of parameters together that provides control over the
         /// two iterators individually. It also keeps track of the current parameter in each
@@ -1465,7 +1465,7 @@ impl<'db> Parameters<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match type_mapping {
             // Note that we've already flipped the materialization in Signature.apply_type_mapping_impl(),
@@ -1677,7 +1677,7 @@ impl<'db> Parameter<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
             annotated_type: self
@@ -1698,7 +1698,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &mut NormalizedVisitor<'db>,
     ) -> Self {
         let Parameter {
             annotated_type,
@@ -1900,9 +1900,9 @@ impl<'db> ParameterKind<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        let apply_to_default_type = |default_type: &Option<Type<'db>>| {
+        let mut apply_to_default_type = |default_type: &Option<Type<'db>>| {
             if type_mapping == &TypeMapping::ReplaceParameterDefaults && default_type.is_some() {
                 Some(Type::unknown())
             } else {

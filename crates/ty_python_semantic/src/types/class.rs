@@ -237,7 +237,11 @@ pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 impl get_size2::GetSize for GenericAlias<'_> {}
 
 impl<'db> GenericAlias<'db> {
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(super) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut NormalizedVisitor<'db>,
+    ) -> Self {
         Self::new(
             db,
             self.origin(db),
@@ -254,7 +258,7 @@ impl<'db> GenericAlias<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         let tcx = tcx
             .annotation
@@ -275,7 +279,7 @@ impl<'db> GenericAlias<'db> {
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &mut FindLegacyTypeVarsVisitor<'db>,
     ) {
         self.specialization(db)
             .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
@@ -377,7 +381,11 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(super) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut NormalizedVisitor<'db>,
+    ) -> Self {
         match self {
             Self::NonGeneric(_) => self,
             Self::Generic(generic) => Self::Generic(generic.normalized_impl(db, visitor)),
@@ -458,7 +466,7 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
             Self::NonGeneric(_) => self,
@@ -473,7 +481,7 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &mut FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self {
             Self::NonGeneric(_) => {}
@@ -531,8 +539,8 @@ impl<'db> ClassType<'db> {
             other,
             inferable,
             TypeRelation::Subtyping,
-            &HasRelationToVisitor::default(),
-            &IsDisjointVisitor::default(),
+            &mut HasRelationToVisitor::default(),
+            &mut IsDisjointVisitor::default(),
         )
     }
 
@@ -542,8 +550,8 @@ impl<'db> ClassType<'db> {
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         self.iter_mro(db).when_any(db, |base| {
             match base {
@@ -592,7 +600,7 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         other: ClassType<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
+        visitor: &mut IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
             return ConstraintSet::from(true);
@@ -761,7 +769,7 @@ impl<'db> ClassType<'db> {
                         Some(Some(materialization_kind)) => ty.materialize(
                             db,
                             materialization_kind,
-                            &ApplyTypeMappingVisitor::default(),
+                            &mut ApplyTypeMappingVisitor::default(),
                         ),
                         _ => ty,
                     }
@@ -1549,7 +1557,7 @@ impl<'db> ClassLiteral<'db> {
                 .materialize_impl(
                     db,
                     MaterializationKind::Top,
-                    &ApplyTypeMappingVisitor::default(),
+                    &mut ApplyTypeMappingVisitor::default(),
                 )
         })
     }

@@ -602,7 +602,11 @@ impl<'db> GenericContext<'db> {
         Specialization::new(db, self, expanded.into_boxed_slice(), None, None)
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut NormalizedVisitor<'db>,
+    ) -> Self {
         let variables = self
             .variables(db)
             .map(|bound_typevar| bound_typevar.normalized_impl(db, visitor));
@@ -694,15 +698,15 @@ fn is_subtype_in_invariant_position<'db>(
     base_type: &Type<'db>,
     base_materialization: MaterializationKind,
     inferable: InferableTypeVars<'_, 'db>,
-    relation_visitor: &HasRelationToVisitor<'db>,
-    disjointness_visitor: &IsDisjointVisitor<'db>,
+    relation_visitor: &mut HasRelationToVisitor<'db>,
+    disjointness_visitor: &mut IsDisjointVisitor<'db>,
 ) -> ConstraintSet<'db> {
     let derived_top = derived_type.top_materialization(db);
     let derived_bottom = derived_type.bottom_materialization(db);
     let base_top = base_type.top_materialization(db);
     let base_bottom = base_type.bottom_materialization(db);
 
-    let is_subtype_of = |derived: Type<'db>, base: Type<'db>| {
+    let mut is_subtype_of = |derived: Type<'db>, base: Type<'db>| {
         // TODO:
         // This should be removed and properly handled in the respective
         // `(Type::TypeVar(_), _) | (_, Type::TypeVar(_))` branch of
@@ -773,8 +777,8 @@ fn has_relation_in_invariant_position<'db>(
     base_materialization: Option<MaterializationKind>,
     inferable: InferableTypeVars<'_, 'db>,
     relation: TypeRelation,
-    relation_visitor: &HasRelationToVisitor<'db>,
-    disjointness_visitor: &IsDisjointVisitor<'db>,
+    relation_visitor: &mut HasRelationToVisitor<'db>,
+    disjointness_visitor: &mut IsDisjointVisitor<'db>,
 ) -> ConstraintSet<'db> {
     match (derived_materialization, base_materialization, relation) {
         // Top and bottom materializations are fully static types, so subtyping
@@ -934,7 +938,7 @@ impl<'db> Specialization<'db> {
             Some(materialization_kind) => new_specialization.materialize_impl(
                 db,
                 materialization_kind,
-                &ApplyTypeMappingVisitor::default(),
+                &mut ApplyTypeMappingVisitor::default(),
             ),
         }
     }
@@ -944,7 +948,12 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
-        self.apply_type_mapping_impl(db, type_mapping, &[], &ApplyTypeMappingVisitor::default())
+        self.apply_type_mapping_impl(
+            db,
+            type_mapping,
+            &[],
+            &mut ApplyTypeMappingVisitor::default(),
+        )
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -952,7 +961,7 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: &[Type<'db>],
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         if let TypeMapping::Materialize(materialization_kind) = type_mapping {
             return self.materialize_impl(db, *materialization_kind, visitor);
@@ -1025,7 +1034,11 @@ impl<'db> Specialization<'db> {
         Specialization::new(db, self.generic_context(db), types, None, None)
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut NormalizedVisitor<'db>,
+    ) -> Self {
         let types: Box<[_]> = self
             .types(db)
             .iter()
@@ -1048,7 +1061,7 @@ impl<'db> Specialization<'db> {
         self,
         db: &'db dyn Db,
         materialization_kind: MaterializationKind,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         // The top and bottom materializations are fully static types already, so materializing them
         // further does nothing.
@@ -1113,8 +1126,8 @@ impl<'db> Specialization<'db> {
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
@@ -1190,7 +1203,7 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         other: Specialization<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
+        visitor: &mut IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.materialization_kind(db) != other.materialization_kind(db) {
             return ConstraintSet::from(false);
@@ -1244,7 +1257,7 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &mut FindLegacyTypeVarsVisitor<'db>,
     ) {
         for ty in self.types(db) {
             ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);

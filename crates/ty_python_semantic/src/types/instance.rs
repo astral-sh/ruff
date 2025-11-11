@@ -112,7 +112,7 @@ impl<'db> Type<'db> {
             SynthesizedProtocolType::new(
                 db,
                 ProtocolInterface::with_property_members(db, members),
-                &NormalizedVisitor::default(),
+                &mut NormalizedVisitor::default(),
             ),
         ))
     }
@@ -124,8 +124,8 @@ impl<'db> Type<'db> {
         protocol: ProtocolInstanceType<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         let structurally_satisfied = if let Type::ProtocolInstance(self_protocol) = self {
             self_protocol.interface(db).has_relation_to_impl(
@@ -348,7 +348,7 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &mut NormalizedVisitor<'db>,
     ) -> Type<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
@@ -367,8 +367,8 @@ impl<'db> NominalInstanceType<'db> {
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.0, other.0) {
             (_, NominalInstanceInner::Object) => ConstraintSet::from(true),
@@ -399,7 +399,7 @@ impl<'db> NominalInstanceType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
+        visitor: &mut IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.0, other.0) {
             (
@@ -421,8 +421,8 @@ impl<'db> NominalInstanceType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.is_object() || other.is_object() {
             return ConstraintSet::from(false);
@@ -483,7 +483,7 @@ impl<'db> NominalInstanceType<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
@@ -503,7 +503,7 @@ impl<'db> NominalInstanceType<'db> {
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &mut FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
@@ -668,8 +668,8 @@ impl<'db> ProtocolInstanceType<'db> {
                     protocol,
                     InferableTypeVars::None,
                     TypeRelation::Subtyping,
-                    &HasRelationToVisitor::default(),
-                    &IsDisjointVisitor::default(),
+                    &mut HasRelationToVisitor::default(),
+                    &mut IsDisjointVisitor::default(),
                 )
                 .is_always_satisfied(db)
         }
@@ -690,7 +690,7 @@ impl<'db> ProtocolInstanceType<'db> {
     ///
     /// See [`Type::normalized`] for more details.
     pub(super) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
-        self.normalized_impl(db, &NormalizedVisitor::default())
+        self.normalized_impl(db, &mut NormalizedVisitor::default())
     }
 
     /// Return a "normalized" version of this `Protocol` type.
@@ -699,7 +699,7 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &mut NormalizedVisitor<'db>,
     ) -> Type<'db> {
         if self.is_equivalent_to_object(db) {
             return Type::object();
@@ -720,7 +720,7 @@ impl<'db> ProtocolInstanceType<'db> {
         db: &'db dyn Db,
         other: Self,
         _inferable: InferableTypeVars<'_, 'db>,
-        _visitor: &IsEquivalentVisitor<'db>,
+        _visitor: &mut IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
             return ConstraintSet::from(true);
@@ -759,7 +759,7 @@ impl<'db> ProtocolInstanceType<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self.inner {
             Protocol::FromClass(class) => {
@@ -776,7 +776,7 @@ impl<'db> ProtocolInstanceType<'db> {
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &mut FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self.inner {
             Protocol::FromClass(class) => {
@@ -860,7 +860,7 @@ mod synthesized_protocol {
         pub(super) fn new(
             db: &'db dyn Db,
             interface: ProtocolInterface<'db>,
-            visitor: &NormalizedVisitor<'db>,
+            visitor: &mut NormalizedVisitor<'db>,
         ) -> Self {
             Self(interface.normalized_impl(db, visitor))
         }
@@ -870,7 +870,7 @@ mod synthesized_protocol {
             db: &'db dyn Db,
             type_mapping: &TypeMapping<'a, 'db>,
             tcx: TypeContext<'db>,
-            _visitor: &ApplyTypeMappingVisitor<'db>,
+            _visitor: &mut ApplyTypeMappingVisitor<'db>,
         ) -> Self {
             Self(self.0.specialized_and_normalized(db, type_mapping, tcx))
         }
@@ -880,7 +880,7 @@ mod synthesized_protocol {
             db: &'db dyn Db,
             binding_context: Option<Definition<'db>>,
             typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-            visitor: &FindLegacyTypeVarsVisitor<'db>,
+            visitor: &mut FindLegacyTypeVarsVisitor<'db>,
         ) {
             self.0
                 .find_legacy_typevars_impl(db, binding_context, typevars, visitor);

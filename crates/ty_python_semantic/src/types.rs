@@ -510,7 +510,7 @@ impl<'db> PropertyInstanceType<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         let getter = self
             .getter(db)
@@ -521,7 +521,7 @@ impl<'db> PropertyInstanceType<'db> {
         Self::new(db, getter, setter)
     }
 
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
             self.getter(db).map(|ty| ty.normalized_impl(db, visitor)),
@@ -534,7 +534,7 @@ impl<'db> PropertyInstanceType<'db> {
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &mut FindLegacyTypeVarsVisitor<'db>,
     ) {
         if let Some(ty) = self.getter(db) {
             ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
@@ -550,7 +550,7 @@ impl<'db> PropertyInstanceType<'db> {
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db> {
-        self.is_equivalent_to_impl(db, other, inferable, &IsEquivalentVisitor::default())
+        self.is_equivalent_to_impl(db, other, inferable, &mut IsEquivalentVisitor::default())
     }
 
     fn is_equivalent_to_impl(
@@ -558,7 +558,7 @@ impl<'db> PropertyInstanceType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
+        visitor: &mut IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         let getter_equivalence = if let Some(getter) = self.getter(db) {
             let Some(other_getter) = other.getter(db) else {
@@ -943,7 +943,7 @@ impl<'db> Type<'db> {
         self.materialize(
             db,
             MaterializationKind::Top,
-            &ApplyTypeMappingVisitor::default(),
+            &mut ApplyTypeMappingVisitor::default(),
         )
     }
 
@@ -954,7 +954,7 @@ impl<'db> Type<'db> {
         self.materialize(
             db,
             MaterializationKind::Bottom,
-            &ApplyTypeMappingVisitor::default(),
+            &mut ApplyTypeMappingVisitor::default(),
         )
     }
 
@@ -1003,7 +1003,7 @@ impl<'db> Type<'db> {
         &self,
         db: &'db dyn Db,
         materialization_kind: MaterializationKind,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
         self.apply_type_mapping_impl(
             db,
@@ -1366,53 +1366,57 @@ impl<'db> Type<'db> {
     /// - Converts class-based protocols into synthesized protocols
     #[must_use]
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &NormalizedVisitor::default())
+        self.normalized_impl(db, &mut NormalizedVisitor::default())
     }
 
     #[must_use]
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut NormalizedVisitor<'db>,
+    ) -> Self {
         match self {
-            Type::Union(union) => visitor.visit(self, || union.normalized_impl(db, visitor)),
-            Type::Intersection(intersection) => visitor.visit(self, || {
+            Type::Union(union) => visitor.visit(self, |visitor| union.normalized_impl(db, visitor)),
+            Type::Intersection(intersection) => visitor.visit(self, |visitor| {
                 Type::Intersection(intersection.normalized_impl(db, visitor))
             }),
-            Type::Callable(callable) => visitor.visit(self, || {
+            Type::Callable(callable) => visitor.visit(self, |visitor| {
                 Type::Callable(callable.normalized_impl(db, visitor))
             }),
             Type::ProtocolInstance(protocol) => {
-                visitor.visit(self, || protocol.normalized_impl(db, visitor))
+                visitor.visit(self, |visitor| protocol.normalized_impl(db, visitor))
             }
             Type::NominalInstance(instance) => {
-                visitor.visit(self, || instance.normalized_impl(db, visitor))
+                visitor.visit(self, |visitor| instance.normalized_impl(db, visitor))
             }
-            Type::FunctionLiteral(function) => visitor.visit(self, || {
+            Type::FunctionLiteral(function) => visitor.visit(self, |visitor| {
                 Type::FunctionLiteral(function.normalized_impl(db, visitor))
             }),
-            Type::PropertyInstance(property) => visitor.visit(self, || {
+            Type::PropertyInstance(property) => visitor.visit(self, |visitor| {
                 Type::PropertyInstance(property.normalized_impl(db, visitor))
             }),
-            Type::KnownBoundMethod(method_kind) => visitor.visit(self, || {
+            Type::KnownBoundMethod(method_kind) => visitor.visit(self, |visitor| {
                 Type::KnownBoundMethod(method_kind.normalized_impl(db, visitor))
             }),
-            Type::BoundMethod(method) => visitor.visit(self, || {
+            Type::BoundMethod(method) => visitor.visit(self, |visitor| {
                 Type::BoundMethod(method.normalized_impl(db, visitor))
             }),
-            Type::BoundSuper(bound_super) => visitor.visit(self, || {
+            Type::BoundSuper(bound_super) => visitor.visit(self, |visitor| {
                 Type::BoundSuper(bound_super.normalized_impl(db, visitor))
             }),
-            Type::GenericAlias(generic) => visitor.visit(self, || {
+            Type::GenericAlias(generic) => visitor.visit(self, |visitor| {
                 Type::GenericAlias(generic.normalized_impl(db, visitor))
             }),
-            Type::SubclassOf(subclass_of) => visitor.visit(self, || {
+            Type::SubclassOf(subclass_of) => visitor.visit(self, |visitor| {
                 Type::SubclassOf(subclass_of.normalized_impl(db, visitor))
             }),
-            Type::TypeVar(bound_typevar) => visitor.visit(self, || {
+            Type::TypeVar(bound_typevar) => visitor.visit(self, |visitor| {
                 Type::TypeVar(bound_typevar.normalized_impl(db, visitor))
             }),
-            Type::KnownInstance(known_instance) => visitor.visit(self, || {
+            Type::KnownInstance(known_instance) => visitor.visit(self, |visitor| {
                 Type::KnownInstance(known_instance.normalized_impl(db, visitor))
             }),
-            Type::TypeIs(type_is) => visitor.visit(self, || {
+            Type::TypeIs(type_is) => visitor.visit(self, |visitor| {
                 type_is.with_type(db, type_is.return_type(db).normalized_impl(db, visitor))
             }),
             Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized()),
@@ -1428,7 +1432,7 @@ impl<'db> Type<'db> {
             }
             Type::TypeAlias(alias) => alias.value_type(db).normalized_impl(db, visitor),
             Type::NewTypeInstance(newtype) => {
-                visitor.visit(self, || {
+                visitor.visit(self, |visitor| {
                     Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
                         class_type.normalized_impl(db, visitor)
                     }))
@@ -1656,8 +1660,8 @@ impl<'db> Type<'db> {
             target,
             inferable,
             relation,
-            &HasRelationToVisitor::default(),
-            &IsDisjointVisitor::default(),
+            &mut HasRelationToVisitor::default(),
+            &mut IsDisjointVisitor::default(),
         )
     }
 
@@ -1667,8 +1671,8 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         // Subtyping implies assignability, so if subtyping is reflexive and the two types are
         // equal, it is both a subtype and assignable. Assignability is always reflexive.
@@ -1701,7 +1705,7 @@ impl<'db> Type<'db> {
             }
 
             (Type::TypeAlias(self_alias), _) => {
-                relation_visitor.visit((self, target, relation), || {
+                relation_visitor.visit((self, target, relation), |relation_visitor| {
                     self_alias.value_type(db).has_relation_to_impl(
                         db,
                         target,
@@ -1714,7 +1718,7 @@ impl<'db> Type<'db> {
             }
 
             (_, Type::TypeAlias(target_alias)) => {
-                relation_visitor.visit((self, target, relation), || {
+                relation_visitor.visit((self, target, relation), |relation_visitor| {
                     self.has_relation_to_impl(
                         db,
                         target_alias.value_type(db),
@@ -2116,7 +2120,7 @@ impl<'db> Type<'db> {
             ) => ConstraintSet::from(false),
 
             (Type::Callable(self_callable), Type::Callable(other_callable)) => relation_visitor
-                .visit((self, target, relation), || {
+                .visit((self, target, relation), |relation_visitor| {
                     self_callable.has_relation_to_impl(
                         db,
                         other_callable,
@@ -2127,21 +2131,23 @@ impl<'db> Type<'db> {
                     )
                 }),
 
-            (_, Type::Callable(_)) => relation_visitor.visit((self, target, relation), || {
-                self.try_upcast_to_callable(db).when_some_and(|callable| {
-                    callable.has_relation_to_impl(
-                        db,
-                        target,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
+            (_, Type::Callable(_)) => {
+                relation_visitor.visit((self, target, relation), |relation_visitor| {
+                    self.try_upcast_to_callable(db).when_some_and(|callable| {
+                        callable.has_relation_to_impl(
+                            db,
+                            target,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
                 })
-            }),
+            }
 
             (_, Type::ProtocolInstance(protocol)) => {
-                relation_visitor.visit((self, target, relation), || {
+                relation_visitor.visit((self, target, relation), |relation_visitor| {
                     self.satisfies_protocol(
                         db,
                         protocol,
@@ -2445,7 +2451,7 @@ impl<'db> Type<'db> {
             // `bool` is a subtype of `int`, because `bool` subclasses `int`,
             // which means that all instances of `bool` are also instances of `int`
             (Type::NominalInstance(self_instance), Type::NominalInstance(target_instance)) => {
-                relation_visitor.visit((self, target, relation), || {
+                relation_visitor.visit((self, target, relation), |relation_visitor| {
                     self_instance.has_relation_to_impl(
                         db,
                         target_instance,
@@ -2527,7 +2533,7 @@ impl<'db> Type<'db> {
         other: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db> {
-        self.is_equivalent_to_impl(db, other, inferable, &IsEquivalentVisitor::default())
+        self.is_equivalent_to_impl(db, other, inferable, &mut IsEquivalentVisitor::default())
     }
 
     pub(crate) fn is_equivalent_to_impl(
@@ -2535,7 +2541,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         other: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
+        visitor: &mut IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
             return ConstraintSet::from(true);
@@ -2562,14 +2568,14 @@ impl<'db> Type<'db> {
 
             (Type::TypeAlias(self_alias), _) => {
                 let self_alias_ty = self_alias.value_type(db).normalized(db);
-                visitor.visit((self_alias_ty, other), || {
+                visitor.visit((self_alias_ty, other), |visitor| {
                     self_alias_ty.is_equivalent_to_impl(db, other, inferable, visitor)
                 })
             }
 
             (_, Type::TypeAlias(other_alias)) => {
                 let other_alias_ty = other_alias.value_type(db).normalized(db);
-                visitor.visit((self, other_alias_ty), || {
+                visitor.visit((self, other_alias_ty), |visitor| {
                     self.is_equivalent_to_impl(db, other_alias_ty, inferable, visitor)
                 })
             }
@@ -2658,8 +2664,8 @@ impl<'db> Type<'db> {
             db,
             other,
             inferable,
-            &IsDisjointVisitor::default(),
-            &HasRelationToVisitor::default(),
+            &mut IsDisjointVisitor::default(),
+            &mut HasRelationToVisitor::default(),
         )
     }
 
@@ -2668,16 +2674,16 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         other: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         fn any_protocol_members_absent_or_disjoint<'db>(
             db: &'db dyn Db,
             protocol: ProtocolInstanceType<'db>,
             other: Type<'db>,
             inferable: InferableTypeVars<'_, 'db>,
-            disjointness_visitor: &IsDisjointVisitor<'db>,
-            relation_visitor: &HasRelationToVisitor<'db>,
+            disjointness_visitor: &mut IsDisjointVisitor<'db>,
+            relation_visitor: &mut HasRelationToVisitor<'db>,
         ) -> ConstraintSet<'db> {
             protocol.interface(db).members(db).when_any(db, |member| {
                 other
@@ -2703,7 +2709,7 @@ impl<'db> Type<'db> {
 
             (Type::TypeAlias(alias), _) => {
                 let self_alias_ty = alias.value_type(db);
-                disjointness_visitor.visit((self, other), || {
+                disjointness_visitor.visit((self, other), |disjointness_visitor| {
                     self_alias_ty.is_disjoint_from_impl(
                         db,
                         other,
@@ -2716,7 +2722,7 @@ impl<'db> Type<'db> {
 
             (_, Type::TypeAlias(alias)) => {
                 let other_alias_ty = alias.value_type(db);
-                disjointness_visitor.visit((self, other), || {
+                disjointness_visitor.visit((self, other), |disjointness_visitor| {
                     self.is_disjoint_from_impl(
                         db,
                         other_alias_ty,
@@ -2801,7 +2807,7 @@ impl<'db> Type<'db> {
             // Negative elements need a positive element on the other side in order to be disjoint.
             // This is similar to what would happen if we tried to build a new intersection that combines the two
             (Type::Intersection(self_intersection), Type::Intersection(other_intersection)) => {
-                disjointness_visitor.visit((self, other), || {
+                disjointness_visitor.visit((self, other), |disjointness_visitor| {
                     self_intersection
                         .positive(db)
                         .iter()
@@ -2830,7 +2836,7 @@ impl<'db> Type<'db> {
 
             (Type::Intersection(intersection), non_intersection)
             | (non_intersection, Type::Intersection(intersection)) => {
-                disjointness_visitor.visit((self, other), || {
+                disjointness_visitor.visit((self, other), |disjointness_visitor| {
                     intersection
                         .positive(db)
                         .iter()
@@ -2932,13 +2938,13 @@ impl<'db> Type<'db> {
             }
 
             (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => disjointness_visitor
-                .visit((self, other), || {
+                .visit((self, other), |disjointness_visitor| {
                     left.is_disjoint_from_impl(db, right, inferable, disjointness_visitor)
                 }),
 
             (Type::ProtocolInstance(protocol), Type::SpecialForm(special_form))
             | (Type::SpecialForm(special_form), Type::ProtocolInstance(protocol)) => {
-                disjointness_visitor.visit((self, other), || {
+                disjointness_visitor.visit((self, other), |disjointness_visitor| {
                     any_protocol_members_absent_or_disjoint(
                         db,
                         protocol,
@@ -2952,7 +2958,7 @@ impl<'db> Type<'db> {
 
             (Type::ProtocolInstance(protocol), Type::KnownInstance(known_instance))
             | (Type::KnownInstance(known_instance), Type::ProtocolInstance(protocol)) => {
-                disjointness_visitor.visit((self, other), || {
+                disjointness_visitor.visit((self, other), |disjointness_visitor| {
                     any_protocol_members_absent_or_disjoint(
                         db,
                         protocol,
@@ -3016,7 +3022,7 @@ impl<'db> Type<'db> {
                 | Type::GenericAlias(..)
                 | Type::IntLiteral(..)
                 | Type::EnumLiteral(..)),
-            ) => disjointness_visitor.visit((self, other), || {
+            ) => disjointness_visitor.visit((self, other), |disjointness_visitor| {
                 any_protocol_members_absent_or_disjoint(
                     db,
                     protocol,
@@ -3034,7 +3040,7 @@ impl<'db> Type<'db> {
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol))
                 if n.class(db).is_final(db) =>
             {
-                disjointness_visitor.visit((self, other), || {
+                disjointness_visitor.visit((self, other), |disjointness_visitor| {
                     any_protocol_members_absent_or_disjoint(
                         db,
                         protocol,
@@ -3048,7 +3054,7 @@ impl<'db> Type<'db> {
 
             (Type::ProtocolInstance(protocol), other)
             | (other, Type::ProtocolInstance(protocol)) => {
-                disjointness_visitor.visit((self, other), || {
+                disjointness_visitor.visit((self, other), |disjointness_visitor| {
                     protocol.interface(db).members(db).when_any(db, |member| {
                         match other.member(db, member.name()).place {
                             Place::Defined(attribute_type, _, _) => member.has_disjoint_type_from(
@@ -3327,7 +3333,7 @@ impl<'db> Type<'db> {
             }
 
             (Type::NominalInstance(left), Type::NominalInstance(right)) => disjointness_visitor
-                .visit((self, other), || {
+                .visit((self, other), |disjointness_visitor| {
                     left.is_disjoint_from_impl(
                         db,
                         right,
@@ -3656,7 +3662,7 @@ impl<'db> Type<'db> {
                         attr.materialize(
                             db,
                             materialization_kind,
-                            &ApplyTypeMappingVisitor::default(),
+                            &mut ApplyTypeMappingVisitor::default(),
                         )
                     }),
                 }
@@ -4636,8 +4642,12 @@ impl<'db> Type<'db> {
     /// is truthy or falsy in a context where Python doesn't make an implicit `bool` call.
     /// Use [`try_bool`](Self::try_bool) for type checking or implicit `bool` calls.
     pub(crate) fn bool(&self, db: &'db dyn Db) -> Truthiness {
-        self.try_bool_impl(db, true, &TryBoolVisitor::new(Ok(Truthiness::Ambiguous)))
-            .unwrap_or_else(|err| err.fallback_truthiness())
+        self.try_bool_impl(
+            db,
+            true,
+            &mut TryBoolVisitor::new(Ok(Truthiness::Ambiguous)),
+        )
+        .unwrap_or_else(|err| err.fallback_truthiness())
     }
 
     /// Resolves the boolean value of a type.
@@ -4647,7 +4657,11 @@ impl<'db> Type<'db> {
     ///
     /// Returns an error if the type doesn't implement `__bool__` correctly.
     pub(crate) fn try_bool(&self, db: &'db dyn Db) -> Result<Truthiness, BoolError<'db>> {
-        self.try_bool_impl(db, false, &TryBoolVisitor::new(Ok(Truthiness::Ambiguous)))
+        self.try_bool_impl(
+            db,
+            false,
+            &mut TryBoolVisitor::new(Ok(Truthiness::Ambiguous)),
+        )
     }
 
     /// Resolves the boolean value of a type.
@@ -4666,7 +4680,7 @@ impl<'db> Type<'db> {
         &self,
         db: &'db dyn Db,
         allow_short_circuit: bool,
-        visitor: &TryBoolVisitor<'db>,
+        visitor: &mut TryBoolVisitor<'db>,
     ) -> Result<Truthiness, BoolError<'db>> {
         let type_to_truthiness = |ty| {
             match ty {
@@ -4781,7 +4795,7 @@ impl<'db> Type<'db> {
             }
         };
 
-        let try_union = |union: UnionType<'db>| {
+        let mut try_union = |union: UnionType<'db>| {
             let mut truthiness = None;
             let mut all_not_callable = true;
             let mut has_errors = false;
@@ -4908,7 +4922,7 @@ impl<'db> Type<'db> {
             Type::BooleanLiteral(bool) => Truthiness::from(*bool),
             Type::StringLiteral(str) => Truthiness::from(!str.value(db).is_empty()),
             Type::BytesLiteral(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
-            Type::TypeAlias(alias) => visitor.visit(*self, || {
+            Type::TypeAlias(alias) => visitor.visit(*self, |visitor| {
                 alias
                     .value_type(db)
                     .try_bool_impl(db, allow_short_circuit, visitor)
@@ -6914,7 +6928,7 @@ impl<'db> Type<'db> {
             Some(materialization_kind) => new_specialization.materialize(
                 db,
                 materialization_kind,
-                &ApplyTypeMappingVisitor::default(),
+                &mut ApplyTypeMappingVisitor::default(),
             ),
         }
     }
@@ -6925,7 +6939,12 @@ impl<'db> Type<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        self.apply_type_mapping_impl(db, type_mapping, tcx, &ApplyTypeMappingVisitor::default())
+        self.apply_type_mapping_impl(
+            db,
+            type_mapping,
+            tcx,
+            &mut ApplyTypeMappingVisitor::default(),
+        )
     }
 
     fn apply_type_mapping_impl<'a>(
@@ -6933,7 +6952,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
         match self {
             Type::TypeVar(bound_typevar) => match type_mapping {
@@ -7003,7 +7022,7 @@ impl<'db> Type<'db> {
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             },
 
-            Type::NewTypeInstance(newtype) => visitor.visit(self, || {
+            Type::NewTypeInstance(newtype) => visitor.visit(self, |visitor| {
                 Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
                     class_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }))
@@ -7085,7 +7104,7 @@ impl<'db> Type<'db> {
                 // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is performed without `visitor` inheritance.
                 // In the case of recursive type aliases, this leads to infinite recursion.
                 // Instead, call `raw_value_type` and perform the specialization after the `visitor` cache has been created.
-                let value_type = visitor.visit(self, || alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+                let value_type = visitor.visit(self, |visitor| alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor));
                 alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
 
@@ -7160,7 +7179,7 @@ impl<'db> Type<'db> {
             db,
             binding_context,
             typevars,
-            &FindLegacyTypeVarsVisitor::default(),
+            &mut FindLegacyTypeVarsVisitor::default(),
         );
     }
 
@@ -7169,7 +7188,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &mut FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self {
             Type::TypeVar(bound_typevar) => {
@@ -7270,7 +7289,7 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeAlias(alias) => {
-                visitor.visit(self, || {
+                visitor.visit(self, |visitor| {
                     alias.value_type(db).find_legacy_typevars_impl(
                         db,
                         binding_context,
@@ -7892,7 +7911,7 @@ impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
 }
 
 impl<'db> KnownInstanceType<'db> {
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut NormalizedVisitor<'db>) -> Self {
         match self {
             Self::SubscriptedProtocol(context) => {
                 Self::SubscriptedProtocol(context.normalized_impl(db, visitor))
@@ -8409,7 +8428,11 @@ pub struct FieldInstance<'db> {
 impl get_size2::GetSize for FieldInstance<'_> {}
 
 impl<'db> FieldInstance<'db> {
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut NormalizedVisitor<'db>,
+    ) -> Self {
         FieldInstance::new(
             db,
             self.default_type(db)
@@ -8622,7 +8645,11 @@ impl<'db> TypeVarInstance<'db> {
         })
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut NormalizedVisitor<'db>,
+    ) -> Self {
         Self::new(
             db,
             self.identity(db),
@@ -8652,7 +8679,7 @@ impl<'db> TypeVarInstance<'db> {
         self,
         db: &'db dyn Db,
         materialization_kind: MaterializationKind,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self::new(
             db,
@@ -9029,7 +9056,11 @@ impl<'db> BoundTypeVarInstance<'db> {
         })
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut NormalizedVisitor<'db>,
+    ) -> Self {
         Self::new(
             db,
             self.typevar(db).normalized_impl(db, visitor),
@@ -9041,7 +9072,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         self,
         db: &'db dyn Db,
         materialization_kind: MaterializationKind,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self::new(
             db,
@@ -9112,7 +9143,7 @@ fn walk_type_var_bounds<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> TypeVarBoundOrConstraints<'db> {
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut NormalizedVisitor<'db>) -> Self {
         match self {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
                 TypeVarBoundOrConstraints::UpperBound(bound.normalized_impl(db, visitor))
@@ -9137,7 +9168,7 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
         self,
         db: &'db dyn Db,
         materialization_kind: MaterializationKind,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
             TypeVarBoundOrConstraints::UpperBound(bound) => TypeVarBoundOrConstraints::UpperBound(
@@ -9180,7 +9211,11 @@ impl<'db> InternedTypes<'db> {
         InternedTypes::new(db, elements.into_iter().collect::<Box<[_]>>())
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut NormalizedVisitor<'db>,
+    ) -> Self {
         InternedTypes::new(
             db,
             self.elements(db)
@@ -9205,7 +9240,11 @@ pub struct InternedType<'db> {
 impl get_size2::GetSize for InternedType<'_> {}
 
 impl<'db> InternedType<'db> {
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut NormalizedVisitor<'db>,
+    ) -> Self {
         InternedType::new(db, self.inner(db).normalized_impl(db, visitor))
     }
 }
@@ -10465,7 +10504,7 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
             self.function(db).normalized_impl(db, visitor),
@@ -10479,8 +10518,8 @@ impl<'db> BoundMethodType<'db> {
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         // A bound method is a typically a subtype of itself. However, we must explicitly verify
         // the subtyping of the underlying function signatures (since they might be specialized
@@ -10512,7 +10551,7 @@ impl<'db> BoundMethodType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
+        visitor: &mut IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         self.function(db)
             .is_equivalent_to_impl(db, other.function(db), inferable, visitor)
@@ -10603,7 +10642,7 @@ impl<'db> CallableType<'db> {
     /// Return a "normalized" version of this `Callable` type.
     ///
     /// See [`Type::normalized`] for more details.
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut NormalizedVisitor<'db>) -> Self {
         CallableType::new(
             db,
             self.signatures(db).normalized_impl(db, visitor),
@@ -10616,7 +10655,7 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         CallableType::new(
             db,
@@ -10631,7 +10670,7 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &mut FindLegacyTypeVarsVisitor<'db>,
     ) {
         self.signatures(db)
             .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
@@ -10646,8 +10685,8 @@ impl<'db> CallableType<'db> {
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if other.is_function_like(db) && !self.is_function_like(db) {
             return ConstraintSet::from(false);
@@ -10670,7 +10709,7 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
+        visitor: &mut IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
             return ConstraintSet::from(true);
@@ -10755,8 +10794,8 @@ impl<'db> KnownBoundMethodType<'db> {
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self, other) {
             (
@@ -10856,7 +10895,7 @@ impl<'db> KnownBoundMethodType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
+        visitor: &mut IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self, other) {
             (
@@ -10940,7 +10979,7 @@ impl<'db> KnownBoundMethodType<'db> {
         }
     }
 
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut NormalizedVisitor<'db>) -> Self {
         match self {
             KnownBoundMethodType::FunctionTypeDunderGet(function) => {
                 KnownBoundMethodType::FunctionTypeDunderGet(function.normalized_impl(db, visitor))
@@ -11498,7 +11537,7 @@ impl<'db> PEP695TypeAliasType<'db> {
             })
     }
 
-    fn normalized_impl(self, _db: &'db dyn Db, _visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(self, _db: &'db dyn Db, _visitor: &mut NormalizedVisitor<'db>) -> Self {
         self
     }
 }
@@ -11545,7 +11584,7 @@ fn walk_manual_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> ManualPEP695TypeAliasType<'db> {
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
             self.name(db),
@@ -11584,7 +11623,11 @@ fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> TypeAliasType<'db> {
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut NormalizedVisitor<'db>,
+    ) -> Self {
         match self {
             TypeAliasType::PEP695(type_alias) => {
                 TypeAliasType::PEP695(type_alias.normalized_impl(db, visitor))
@@ -11876,13 +11919,13 @@ impl<'db> UnionType<'db> {
     /// See [`Type::normalized`] for more details.
     #[must_use]
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
-        self.normalized_impl(db, &NormalizedVisitor::default())
+        self.normalized_impl(db, &mut NormalizedVisitor::default())
     }
 
     pub(crate) fn normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &mut NormalizedVisitor<'db>,
     ) -> Type<'db> {
         self.elements(db)
             .iter()
@@ -11972,14 +12015,18 @@ impl<'db> IntersectionType<'db> {
     /// See [`Type::normalized`] for more details.
     #[must_use]
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &NormalizedVisitor::default())
+        self.normalized_impl(db, &mut NormalizedVisitor::default())
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut NormalizedVisitor<'db>,
+    ) -> Self {
         fn normalized_set<'db>(
             db: &'db dyn Db,
             elements: &FxOrderSet<Type<'db>>,
-            visitor: &NormalizedVisitor<'db>,
+            visitor: &mut NormalizedVisitor<'db>,
         ) -> FxOrderSet<Type<'db>> {
             let mut elements: FxOrderSet<Type<'db>> = elements
                 .iter()

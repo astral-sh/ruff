@@ -627,7 +627,7 @@ impl<'db> PlaceAndQualifiers<'db> {
         self,
         db: &'db dyn Db,
         materialization_kind: MaterializationKind,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> PlaceAndQualifiers<'db> {
         self.map_type(|ty| ty.materialize(db, materialization_kind, visitor))
     }

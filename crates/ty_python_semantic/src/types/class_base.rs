@@ -35,7 +35,11 @@ impl<'db> ClassBase<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut NormalizedVisitor<'db>,
+    ) -> Self {
         match self {
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
@@ -287,7 +291,7 @@ impl<'db> ClassBase<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
             Self::Class(class) => {
@@ -307,7 +311,7 @@ impl<'db> ClassBase<'db> {
                 db,
                 &TypeMapping::Specialization(specialization),
                 TypeContext::default(),
-                &ApplyTypeMappingVisitor::default(),
+                &mut ApplyTypeMappingVisitor::default(),
             );
             match specialization.materialization_kind(db) {
                 None => new_self,
@@ -323,7 +327,7 @@ impl<'db> ClassBase<'db> {
             db,
             &TypeMapping::Materialize(kind),
             TypeContext::default(),
-            &ApplyTypeMappingVisitor::default(),
+            &mut ApplyTypeMappingVisitor::default(),
         )
     }
 

@@ -19,7 +19,6 @@
 //! of the Rust types implementing protocols also call `visitor.visit`. The best way to avoid this
 //! is to prefer always calling `visitor.visit` only in the main recursive method on `Type`.
 
-use std::cell::RefCell;
 use std::cmp::Eq;
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -48,7 +47,7 @@ pub struct CycleDetector<Tag, T, R> {
     /// If the type we're visiting is present in `seen`, it indicates that we've hit a cycle (due
     /// to a recursive type); we need to immediately short circuit the whole operation and return
     /// the fallback value. That's why we pop items off the end of `seen` after we've visited them.
-    seen: RefCell<FxIndexSet<T>>,
+    seen: FxIndexSet<T>,
 
     /// Unlike `seen`, this field is a pure performance optimisation (and an essential one). If the
     /// type we're trying to normalize is present in `cache`, it doesn't necessarily mean we've hit
@@ -56,7 +55,7 @@ pub struct CycleDetector<Tag, T, R> {
     /// chain we're currently in. Since this cache is just a performance optimisation, it doesn't
     /// make sense to pop items off the end of the cache after they've been visited (it would
     /// sort-of defeat the point of a cache if we did!)
-    cache: RefCell<FxHashMap<T, R>>,
+    cache: FxHashMap<T, R>,
 
     fallback: R,
 
@@ -66,26 +65,26 @@ pub struct CycleDetector<Tag, T, R> {
 impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
     pub fn new(fallback: R) -> Self {
         CycleDetector {
-            seen: RefCell::new(FxIndexSet::default()),
-            cache: RefCell::new(FxHashMap::default()),
+            seen: FxIndexSet::default(),
+            cache: FxHashMap::default(),
             fallback,
             _tag: PhantomData,
         }
     }
 
-    pub fn visit(&self, item: T, func: impl FnOnce() -> R) -> R {
-        if let Some(val) = self.cache.borrow().get(&item) {
+    pub fn visit(&mut self, item: T, func: impl FnOnce(&mut Self) -> R) -> R {
+        if let Some(val) = self.cache.get(&item) {
             return val.clone();
         }
 
         // We hit a cycle
-        if !self.seen.borrow_mut().insert(item.clone()) {
+        if !self.seen.insert(item.clone()) {
             return self.fallback.clone();
         }
 
-        let ret = func();
-        self.seen.borrow_mut().pop();
-        self.cache.borrow_mut().insert(item, ret.clone());
+        let ret = func(self);
+        self.seen.pop();
+        self.cache.insert(item, ret.clone());
 
         ret
     }

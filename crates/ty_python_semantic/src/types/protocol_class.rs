@@ -235,8 +235,8 @@ impl<'db> ProtocolInterface<'db> {
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         other.members(db).when_all(db, |other_member| {
             self.member_by_name(db, other_member.name)
@@ -329,7 +329,11 @@ impl<'db> ProtocolInterface<'db> {
         })
     }
 
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(super) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut NormalizedVisitor<'db>,
+    ) -> Self {
         Self::new(
             db,
             self.inner(db)
@@ -356,7 +360,7 @@ impl<'db> ProtocolInterface<'db> {
                             db,
                             type_mapping,
                             tcx,
-                            &ApplyTypeMappingVisitor::default(),
+                            &mut ApplyTypeMappingVisitor::default(),
                         )
                         .normalized(db),
                     )
@@ -370,7 +374,7 @@ impl<'db> ProtocolInterface<'db> {
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &mut FindLegacyTypeVarsVisitor<'db>,
     ) {
         for data in self.inner(db).values() {
             data.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
@@ -420,10 +424,10 @@ pub(super) struct ProtocolMemberData<'db> {
 
 impl<'db> ProtocolMemberData<'db> {
     fn normalized(&self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &NormalizedVisitor::default())
+        self.normalized_impl(db, &mut NormalizedVisitor::default())
     }
 
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut NormalizedVisitor<'db>) -> Self {
         Self {
             kind: self.kind.normalized_impl(db, visitor),
             qualifiers: self.qualifiers,
@@ -435,7 +439,7 @@ impl<'db> ProtocolMemberData<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
             kind: self
@@ -450,7 +454,7 @@ impl<'db> ProtocolMemberData<'db> {
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &mut FindLegacyTypeVarsVisitor<'db>,
     ) {
         self.kind
             .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
@@ -507,7 +511,7 @@ enum ProtocolMemberKind<'db> {
 }
 
 impl<'db> ProtocolMemberKind<'db> {
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut NormalizedVisitor<'db>) -> Self {
         match self {
             ProtocolMemberKind::Method(callable) => {
                 ProtocolMemberKind::Method(callable.normalized_impl(db, visitor))
@@ -526,7 +530,7 @@ impl<'db> ProtocolMemberKind<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &mut ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
             ProtocolMemberKind::Method(callable) => ProtocolMemberKind::Method(
@@ -549,7 +553,7 @@ impl<'db> ProtocolMemberKind<'db> {
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &mut FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self {
             ProtocolMemberKind::Method(callable) => {
@@ -609,8 +613,8 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         db: &'db dyn Db,
         other: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match &self.kind {
             // TODO: implement disjointness for property/method members as well as attribute members
@@ -635,8 +639,8 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         other: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &mut HasRelationToVisitor<'db>,
+        disjointness_visitor: &mut IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match &self.kind {
             ProtocolMemberKind::Method(method) => {
