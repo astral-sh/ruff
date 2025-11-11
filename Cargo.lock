@@ -3586,7 +3586,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "salsa"
 version = "0.24.0"
-source = "git+https://github.com/mtshiba/salsa.git?rev=aeb592d2c143b9c4d1747e5223371ac6b43b12ac#aeb592d2c143b9c4d1747e5223371ac6b43b12ac"
+source = "git+https://github.com/mtshiba/salsa.git?rev=9333447c568e5095a1376164ddaeb8135692b253#9333447c568e5095a1376164ddaeb8135692b253"
 dependencies = [
  "boxcar",
  "compact_str",
@@ -3610,12 +3610,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.24.0"
-source = "git+https://github.com/mtshiba/salsa.git?rev=aeb592d2c143b9c4d1747e5223371ac6b43b12ac#aeb592d2c143b9c4d1747e5223371ac6b43b12ac"
+source = "git+https://github.com/mtshiba/salsa.git?rev=9333447c568e5095a1376164ddaeb8135692b253#9333447c568e5095a1376164ddaeb8135692b253"
 
 [[package]]
 name = "salsa-macros"
 version = "0.24.0"
-source = "git+https://github.com/mtshiba/salsa.git?rev=aeb592d2c143b9c4d1747e5223371ac6b43b12ac#aeb592d2c143b9c4d1747e5223371ac6b43b12ac"
+source = "git+https://github.com/mtshiba/salsa.git?rev=9333447c568e5095a1376164ddaeb8135692b253#9333447c568e5095a1376164ddaeb8135692b253"
 dependencies = [
  "proc-macro2",
  "quote",
