@@ -16,10 +16,6 @@ use ruff_python_ast::PythonVersion;
 /// `ValueError("...")` on its own will have no effect (unlike
 /// `raise ValueError("...")`) and is likely a mistake.
 ///
-/// ## Known problems
-/// This rule only detects built-in exceptions, like `ValueError`, and does
-/// not catch user-defined exceptions.
-///
 /// ## Example
 /// ```python
 /// ValueError("...")
