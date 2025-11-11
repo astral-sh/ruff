@@ -62,6 +62,12 @@ def foo():
 # comment
     else:
         pass
+
+while True:
+    first;second
+    # comment
+else:
+    pass
 ```
 
 ## Output
@@ -106,13 +112,13 @@ else:
 
 while True:
     pass
-# comment
+    # comment
 else:
     pass
 
 while True:
     pass
-    # comment
+# comment
 else:
     pass
 
@@ -129,4 +135,12 @@ def foo():
     # comment
     else:
         pass
+
+
+while True:
+    first
+    second
+# comment
+else:
+    pass
 ```

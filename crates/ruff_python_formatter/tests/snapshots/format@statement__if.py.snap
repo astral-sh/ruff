@@ -330,6 +330,12 @@ def foo():
 # comment
     else:
         pass
+
+if True:
+    first;second
+    # comment
+else:
+    pass
 ```
 
 ## Output
@@ -647,13 +653,13 @@ else:
 
 if True:
     pass
-# comment
+    # comment
 else:
     pass
 
 if True:
     pass
-    # comment
+# comment
 else:
     pass
 
@@ -670,6 +676,14 @@ def foo():
     # comment
     else:
         pass
+
+
+if True:
+    first
+    second
+# comment
+else:
+    pass
 ```
 
 

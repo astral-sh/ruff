@@ -4,18 +4,18 @@ expression: comments.debug(test_case.source_code)
 ---
 {
     Node {
-        kind: StmtWhile,
-        range: 0..53,
-        source: `while True:⏎`,
+        kind: StmtPass,
+        range: 16..20,
+        source: `pass`,
     }: {
         "leading": [],
-        "dangling": [
+        "dangling": [],
+        "trailing": [
             SourceComment {
                 text: "# comment",
                 position: OwnLine,
                 formatted: false,
             },
         ],
-        "trailing": [],
     },
 }
