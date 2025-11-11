@@ -333,7 +333,7 @@ reveal_type(mypackage.nested.X)  # revealed: Unknown
 
 ### In Non-Stub
 
-`from mypackage.submodule import nested` in an `__init__.py` only creates `submodule` and `nested`.
+`from mypackage.submodule import nested` in an `__init__.py` creates both `submodule` and `nested`.
 
 `mypackage/__init__.py`:
 
