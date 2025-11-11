@@ -333,7 +333,7 @@ reveal_type(mypackage.nested.X)  # revealed: Unknown
 
 ### In Non-Stub
 
-`from mypackage.submodule import nested` in an `__init__.py` only creates `nested`.
+`from mypackage.submodule import nested` in an `__init__.py` creates both `submodule` and `nested`.
 
 `mypackage/__init__.py`:
 
@@ -357,12 +357,11 @@ X: int = 42
 ```py
 import mypackage
 
+reveal_type(mypackage.submodule)  # revealed: <module 'mypackage.submodule'>
 # TODO: this would be nice to support
-# error: "has no member `submodule`"
-reveal_type(mypackage.submodule)  # revealed: Unknown
-# error: "has no member `submodule`"
+# error: "has no member `nested`"
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
-# error: "has no member `submodule`"
+# error: "has no member `nested`"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
 reveal_type(mypackage.nested)  # revealed: <module 'mypackage.submodule.nested'>
 reveal_type(mypackage.nested.X)  # revealed: int

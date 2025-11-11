@@ -1451,7 +1451,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 // If we see:
                 //
-                // * `from .x.y import z` (must be relative!)
+                // * `from .x.y import z` (or `from whatever.thispackage.x.y`)
                 // * And we are in an `__init__.py(i)` (hereafter `thispackage`)
                 // * And this is the first time we've seen `from .x` in this module
                 // * And we're in the global scope
@@ -1465,14 +1465,18 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // reasons but it works well for most practical purposes. In particular it's nice
                 // that `x` can be freely overwritten, and that we don't assume that an import
                 // in one function is visible in another function.
-                //
-                // TODO: Also support `from thispackage.x.y import z`?
-                if self.current_scope() == FileScopeId::global()
-                    && node.level == 1
-                    && let Some(submodule) = &node.module
-                    && let Some(parsed_submodule) = ModuleName::new(submodule.as_str())
-                    && let Some(direct_submodule) = parsed_submodule.components().next()
+                if node.module.is_some()
+                    && self.current_scope().is_global()
                     && self.file.is_package(self.db)
+                    && let Ok(module_name) = ModuleName::from_identifier_parts(
+                        self.db,
+                        self.file,
+                        node.module.as_deref(),
+                        node.level,
+                    )
+                    && let Ok(thispackage) = ModuleName::package_for_file(self.db, self.file)
+                    && let Some(relative_submodule) = module_name.relative_to(&thispackage)
+                    && let Some(direct_submodule) = relative_submodule.components().next()
                     && !self.seen_submodule_imports.contains(direct_submodule)
                 {
                     self.seen_submodule_imports
@@ -1482,7 +1486,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     let symbol = self.add_symbol(direct_submodule_name);
                     self.add_definition(
                         symbol.into(),
-                        ImportFromSubmoduleDefinitionNodeRef { node, submodule },
+                        ImportFromSubmoduleDefinitionNodeRef { node },
                     );
                 }
 
