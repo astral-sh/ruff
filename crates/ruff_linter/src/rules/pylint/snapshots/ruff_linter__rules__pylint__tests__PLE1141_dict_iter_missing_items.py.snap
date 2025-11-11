@@ -61,19 +61,19 @@ help: Add a call to `.items()`
 note: This is an unsafe fix and may change runtime behavior
 
 PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
-  --> dict_iter_missing_items.py:47:13
+  --> dict_iter_missing_items.py:51:13
    |
-45 | empty_dict_annotated_str_keys: dict[str, int] = {}
-46 | empty_dict_annotated_str_keys["x"] = 1
-47 | for k, v in empty_dict_annotated_str_keys:
+49 | empty_dict_annotated_str_keys: dict[str, int] = {}
+50 | empty_dict_annotated_str_keys["x"] = 1
+51 | for k, v in empty_dict_annotated_str_keys:
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-48 |     pass
+52 |     pass
    |
 help: Add a call to `.items()`
-44 | 
-45 | empty_dict_annotated_str_keys: dict[str, int] = {}
-46 | empty_dict_annotated_str_keys["x"] = 1
+48 | 
+49 | empty_dict_annotated_str_keys: dict[str, int] = {}
+50 | empty_dict_annotated_str_keys["x"] = 1
    - for k, v in empty_dict_annotated_str_keys:
-47 + for k, v in empty_dict_annotated_str_keys.items():
-48 |     pass
+51 + for k, v in empty_dict_annotated_str_keys.items():
+52 |     pass
 note: This is an unsafe fix and may change runtime behavior

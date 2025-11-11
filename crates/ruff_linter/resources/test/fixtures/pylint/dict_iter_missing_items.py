@@ -38,6 +38,10 @@ for k, v in empty_dict:
     pass
 
 empty_dict_annotated_tuple_keys: dict[tuple[int, str], bool] = {}
+for k, v in empty_dict_annotated_tuple_keys:
+    pass
+
+empty_dict_annotated_tuple_keys = {}
 empty_dict_annotated_tuple_keys[("x", "y")] = True
 for k, v in empty_dict_annotated_tuple_keys:
     pass
