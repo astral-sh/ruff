@@ -1004,9 +1004,18 @@ fn is_in_definition_place(db: &dyn Db, tokens: &[Token], file: File) -> bool {
 /// This has the effect of putting all dunder attributes after "normal"
 /// attributes, and all single-underscore attributes after dunder attributes.
 fn compare_suggestions(c1: &Completion, c2: &Completion) -> Ordering {
-    fn key<'a>(completion: &'a Completion) -> (bool, bool, NameKind, bool, &'a Name) {
+    fn key<'a>(completion: &'a Completion) -> (bool, bool, bool, NameKind, bool, &'a Name) {
         (
             completion.module_name.is_some(),
+            // At time of writing (2025-11-11), keyword completions
+            // are classified as builtins, which makes them sort after
+            // everything else. But we probably want keyword completions
+            // to sort *before* anything else since they are so common.
+            // Moreover, it seems VS Code forcefully does this sorting.
+            // By doing it ourselves, we make our natural sorting match
+            // VS Code's, and thus our completion evaluation framework
+            // should be more representative of real world conditions.
+            completion.kind != Some(CompletionKind::Keyword),
             completion.builtin,
             NameKind::classify(&completion.name),
             completion.is_type_check_only,
