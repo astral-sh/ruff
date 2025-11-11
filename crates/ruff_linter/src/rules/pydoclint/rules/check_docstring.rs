@@ -672,9 +672,7 @@ fn parse_parameters_numpy(content: &str, content_start: TextSize) -> Vec<Paramet
                             // Calculate the position of this specific parameter part within the line
                             // Account for leading whitespace that gets trimmed
                             let param_start_in_line = current_offset
-                                + TextSize::from(u32::from(
-                                    param_part.text_len() - param_part_trimmed.text_len(),
-                                ));
+                                + (param_part.text_len() - param_part_trimmed.text_len());
                             let param_start =
                                 line_start + indentation.text_len() + param_start_in_line;
 
