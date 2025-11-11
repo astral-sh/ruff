@@ -2,15 +2,34 @@ from abc import ABC, abstractmethod
 from contextlib import suppress
 
 
+class MyError(Exception):
+    ...
+
+
+class MyValueError(ValueError):
+    ...
+
+
+class MyUserWarning(UserWarning):
+    ...
+
+
+# Violation test cases with builtin errors: PLW0133
+
+
 # Test case 1: Useless exception statement
 def func():
     AssertionError("This is an assertion error")  # PLW0133
+    MyError("This is a custom error")  # PLW0133
+    MyValueError("This is a custom value error")  # PLW0133
 
 
 # Test case 2: Useless exception statement in try-except block
 def func():
     try:
         Exception("This is an exception")  # PLW0133
+        MyError("This is an exception")  # PLW0133
+        MyValueError("This is an exception")  # PLW0133
     except Exception as err:
         pass
 
@@ -19,6 +38,8 @@ def func():
 def func():
     if True:
         RuntimeError("This is an exception")  # PLW0133
+        MyError("This is an exception")  # PLW0133
+        MyValueError("This is an exception")  # PLW0133
 
 
 # Test case 4: Useless exception statement in class
@@ -26,12 +47,16 @@ def func():
     class Class:
         def __init__(self):
             TypeError("This is an exception")  # PLW0133
+            MyError("This is an exception")  # PLW0133
+            MyValueError("This is an exception")  # PLW0133
 
 
 # Test case 5: Useless exception statement in function
 def func():
     def inner():
         IndexError("This is an exception")  # PLW0133
+        MyError("This is an exception")  # PLW0133
+        MyValueError("This is an exception")  # PLW0133
 
     inner()
 
@@ -40,6 +65,8 @@ def func():
 def func():
     while True:
         KeyError("This is an exception")  # PLW0133
+        MyError("This is an exception")  # PLW0133
+        MyValueError("This is an exception")  # PLW0133
 
 
 # Test case 7: Useless exception statement in abstract class
@@ -48,35 +75,52 @@ def func():
         @abstractmethod
         def method(self):
             NotImplementedError("This is an exception")  # PLW0133
+            MyError("This is an exception")  # PLW0133
+            MyValueError("This is an exception")  # PLW0133
 
 
 # Test case 8: Useless exception statement inside context manager
 def func():
-    with suppress(AttributeError):
+    with suppress(Exception):
         AttributeError("This is an exception")  # PLW0133
+        MyError("This is an exception")  # PLW0133
+        MyValueError("This is an exception")  # PLW0133
 
 
 # Test case 9: Useless exception statement in parentheses
 def func():
     (RuntimeError("This is an exception"))  # PLW0133
+    (MyError("This is an exception"))  # PLW0133
+    (MyValueError("This is an exception"))  # PLW0133
 
 
 # Test case 10: Useless exception statement in continuation
 def func():
     x = 1; (RuntimeError("This is an exception")); y = 2  # PLW0133
+    x = 1; (MyError("This is an exception")); y = 2  # PLW0133
+    x = 1; (MyValueError("This is an exception")); y = 2  # PLW0133
 
 
 # Test case 11: Useless warning statement
 def func():
-    UserWarning("This is an assertion error")  # PLW0133
+    UserWarning("This is a user warning")  # PLW0133
+    MyUserWarning("This is a custom user warning")  # PLW0133
 
 
 # Test case 12: Useless exception statement at module level
 import builtins
 
-builtins.TypeError("still an exception even though it's an Attribute")
+builtins.TypeError("still an exception even though it's an Attribute")  # PLW0133
 
-PythonFinalizationError("Added in Python 3.13")
+PythonFinalizationError("Added in Python 3.13")  # PLW0133
+
+MyError("This is an exception")  # PLW0133
+
+MyValueError("This is an exception")  # PLW0133
+
+UserWarning("This is a user warning")  # PLW0133
+
+MyUserWarning("This is a custom user warning")  # PLW0133
 
 
 # Non-violation test cases: PLW0133
