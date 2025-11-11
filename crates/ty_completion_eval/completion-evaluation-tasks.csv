@@ -17,7 +17,7 @@ numpy-array,main.py,0,
 numpy-array,main.py,1,1
 object-attr-instance-methods,main.py,0,1
 object-attr-instance-methods,main.py,1,1
-pass-keyword-completion,main.py,0,
+pass-keyword-completion,main.py,0,7
 raise-uses-base-exception,main.py,0,2
 scope-existing-over-new-import,main.py,0,1
 scope-prioritize-closer,main.py,0,2
@@ -25,4 +25,4 @@ scope-simple-long-identifier,main.py,0,1
 tstring-completions,main.py,0,1
 ty-extensions-lower-stdlib,main.py,0,8
 type-var-typing-over-ast,main.py,0,3
-type-var-typing-over-ast,main.py,1,277
+type-var-typing-over-ast,main.py,1,279

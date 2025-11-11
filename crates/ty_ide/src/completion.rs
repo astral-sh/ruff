@@ -175,6 +175,20 @@ impl<'db> Completion<'db> {
             documentation: None,
         }
     }
+
+    fn value_keyword(name: &str, ty: Type<'db>) -> Completion<'db> {
+        Completion {
+            name: name.into(),
+            insert: None,
+            ty: Some(ty),
+            kind: Some(CompletionKind::Keyword),
+            module_name: None,
+            import: None,
+            builtin: true,
+            is_type_check_only: false,
+            documentation: None,
+        }
+    }
 }
 
 /// The "kind" of a completion.
@@ -275,7 +289,7 @@ pub fn completion<'db>(
         .collect();
 
     if scoped.is_some() {
-        add_keyword_value_completions(db, &typed_query, &mut completions);
+        add_keyword_completions(db, &typed_query, &mut completions);
     }
     if settings.auto_import {
         if let Some(scoped) = scoped {
@@ -294,35 +308,45 @@ pub fn completion<'db>(
     completions
 }
 
-/// Adds a subset of completions derived from keywords.
+/// Adds completions derived from keywords.
 ///
-/// Note that at present, these should only be added to "scoped"
-/// completions. i.e., This will include `None`, `True`, `False`, etc.
-fn add_keyword_value_completions<'db>(
+/// This should generally only be used when offering "scoped" completions.
+/// This will include keywords corresponding to Python values (like `None`)
+/// and general language keywords (like `raise`).
+fn add_keyword_completions<'db>(
     db: &'db dyn Db,
     query: &QueryPattern,
     completions: &mut Vec<Completion<'db>>,
 ) {
-    let keywords = [
+    let keyword_values = [
         ("None", Type::none(db)),
         ("True", Type::BooleanLiteral(true)),
         ("False", Type::BooleanLiteral(false)),
     ];
-    for (name, ty) in keywords {
+    for (name, ty) in keyword_values {
         if !query.is_match_symbol_name(name) {
             continue;
         }
-        completions.push(Completion {
-            name: ast::name::Name::new(name),
-            insert: None,
-            ty: Some(ty),
-            kind: None,
-            module_name: None,
-            import: None,
-            is_type_check_only: false,
-            builtin: true,
-            documentation: None,
-        });
+        completions.push(Completion::value_keyword(name, ty));
+    }
+
+    // Note that we specifically omit the `type` keyword here, since
+    // it will be included via `builtins`. This does make its sorting
+    // priority slighty different than other keywords, but it's not
+    // clear (to me, AG) if that's an issue or not. Since the builtin
+    // completion has an actual type associated with it, we use that
+    // instead of a keyword completion.
+    let keywords = [
+        "and", "as", "assert", "async", "await", "break", "class", "continue", "def", "del",
+        "elif", "else", "except", "finally", "for", "from", "global", "if", "import", "in", "is",
+        "lambda", "nonlocal", "not", "or", "pass", "raise", "return", "try", "while", "with",
+        "yield", "case", "match",
+    ];
+    for name in keywords {
+        if !query.is_match_symbol_name(name) {
+            continue;
+        }
+        completions.push(Completion::keyword(name));
     }
 }
 
@@ -1079,7 +1103,7 @@ mod tests {
         );
 
         assert_snapshot!(
-            test.skip_builtins().build().snapshot(),
+            test.skip_keywords().skip_builtins().build().snapshot(),
             @"<No completions found after filtering out completions>",
         );
     }
@@ -1099,6 +1123,73 @@ mod tests {
         // Dunder attributes should not be stripped
         test.contains("__annotations__");
         // See `private_symbols_in_stub` for more comprehensive testing private of symbol filtering.
+    }
+
+    #[test]
+    fn keywords() {
+        let test = completion_test_builder(
+            "\
+<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+            test.skip_builtins().build().snapshot(),
+            @r"
+        and
+        as
+        assert
+        async
+        await
+        break
+        case
+        class
+        continue
+        def
+        del
+        elif
+        else
+        except
+        finally
+        for
+        from
+        global
+        if
+        import
+        in
+        is
+        lambda
+        match
+        nonlocal
+        not
+        or
+        pass
+        raise
+        return
+        try
+        while
+        with
+        yield
+        ",
+        );
+    }
+
+    #[test]
+    fn type_keyword_dedup() {
+        let test = completion_test_builder(
+            "\
+type<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+            test.type_signatures().build().snapshot(),
+            @r"
+        TypeError :: <class 'TypeError'>
+        type :: <class 'type'>
+        _NotImplementedType :: <class '_NotImplementedType'>
+        ",
+        );
     }
 
     #[test]
@@ -1133,7 +1224,7 @@ import re
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"re");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"re");
     }
 
     #[test]
@@ -1146,7 +1237,7 @@ from os import path
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"path");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"path");
     }
 
     // N.B. We don't currently explore module APIs. This
@@ -1288,7 +1379,7 @@ f<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"foo");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
     }
 
     #[test]
@@ -1302,7 +1393,7 @@ g<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().build().snapshot(),
             @"<No completions found after filtering out completions>",
         );
     }
@@ -1317,7 +1408,7 @@ def foo(): ...
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         foo
         ");
     }
@@ -1333,7 +1424,7 @@ f<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"foo");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
     }
 
     #[test]
@@ -1347,7 +1438,7 @@ def foo():
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         foo
         ");
     }
@@ -1362,7 +1453,7 @@ def foo():
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         foo
         foofoo
         ");
@@ -1396,7 +1487,7 @@ def foo():
         // matches the current cursor's indentation. This seems fraught
         // however. It's not clear to me that we can always assume a
         // correspondence between scopes and indentation level.
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         foo
         ");
     }
@@ -1412,7 +1503,7 @@ def foo():
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         foo
         foofoo
         ");
@@ -1428,7 +1519,7 @@ def foo():
     f<CURSOR>",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         foo
         foofoo
         ");
@@ -1446,7 +1537,7 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         foo
         foofoo
         frob
@@ -1465,7 +1556,7 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         foo
         frob
         ");
@@ -1483,7 +1574,7 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         foo
         foofoo
         foofoofoo
@@ -1511,7 +1602,7 @@ def foo():
         // account for the indented whitespace, or some other technique
         // needs to be used to get the scope containing `foofoo` but not
         // `foofoofoo`.
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         foo
         ");
     }
@@ -1527,7 +1618,7 @@ def foo():
         );
 
         // FIXME: Should include `foofoo` (but not `foofoofoo`).
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         foo
         ");
     }
@@ -1545,7 +1636,7 @@ def frob(): ...
         );
 
         // FIXME: Should include `foofoo` (but not `foofoofoo`).
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         foo
         frob
         ");
@@ -1565,7 +1656,7 @@ def frob(): ...
         );
 
         // FIXME: Should include `foofoo` (but not `foofoofoo`).
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         foo
         frob
         ");
@@ -1586,7 +1677,7 @@ def frob(): ...
         );
 
         // FIXME: Should include `foofoo` (but not `foofoofoo`).
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         foo
         frob
         ");
@@ -1621,7 +1712,7 @@ def frob(): ...
         // the list comprehension is not yet valid and so we do not
         // detect this as a definition of `bar`.
         assert_snapshot!(
-            builder.skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().build().snapshot(),
             @"<No completions found after filtering out completions>",
         );
     }
@@ -1634,7 +1725,7 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"foo");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
     }
 
     #[test]
@@ -1645,7 +1736,7 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"foo");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
     }
 
     #[test]
@@ -1656,7 +1747,7 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"foo");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
     }
 
     #[test]
@@ -1667,7 +1758,7 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"foo");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
     }
 
     #[test]
@@ -1678,7 +1769,7 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"foo");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
     }
 
     #[test]
@@ -1689,7 +1780,7 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"foo");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
     }
 
     #[test]
@@ -1712,7 +1803,7 @@ def frob(): ...
         // The `lambda_blank1` test works because there are expressions
         // on either side of <CURSOR>.
         assert_snapshot!(
-            builder.skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().build().snapshot(),
             @"<No completions found after filtering out completions>",
         );
     }
@@ -1727,7 +1818,7 @@ def frob(): ...
 
         // FIXME: Should include `foo`.
         assert_snapshot!(
-            builder.skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().build().snapshot(),
             @"<No completions found after filtering out completions>",
         );
     }
@@ -1742,7 +1833,7 @@ def frob(): ...
 
         // FIXME: Should include `foo`.
         assert_snapshot!(
-            builder.skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().build().snapshot(),
             @"<No completions found after filtering out completions>",
         );
     }
@@ -1758,7 +1849,7 @@ class Foo:
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         bar
         frob
         ");
@@ -1774,7 +1865,7 @@ class Foo:
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"bar");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"bar");
     }
 
     #[test]
@@ -1794,7 +1885,7 @@ class Foo:
         //
         // These don't work for similar reasons as other
         // tests above with the <CURSOR> inside of whitespace.
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         Foo
         ");
     }
@@ -1813,7 +1904,7 @@ class Foo:
         // FIXME: Should include `bar`, `quux` and `frob`.
         // (Unclear if `Foo` should be included, but a false
         // positive isn't the end of the world.)
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         Foo
         ");
     }
@@ -1829,7 +1920,7 @@ class Foo(<CURSOR>):
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         Bar
         Foo
         ");
@@ -1846,7 +1937,7 @@ class Bar: ...
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         Bar
         Foo
         ");
@@ -1863,7 +1954,7 @@ class Bar: ...
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         Bar
         Foo
         ");
@@ -1878,7 +1969,7 @@ class Bar: ...
 class Foo(<CURSOR>",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         Bar
         Foo
         ");
@@ -1899,7 +1990,8 @@ quux.<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().type_signatures().build().snapshot(), @r"
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r"
         bar :: Unknown | Literal[2]
         baz :: Unknown | Literal[3]
         foo :: Unknown | Literal[1]
@@ -1944,7 +2036,8 @@ quux.b<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().type_signatures().build().snapshot(), @r"
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r"
         bar :: Unknown | Literal[2]
         baz :: Unknown | Literal[3]
         __getattribute__ :: bound method Quux.__getattribute__(name: str, /) -> Any
@@ -1968,7 +2061,8 @@ C.<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().type_signatures().build().snapshot(), @r"
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r"
         meta_attr :: int
         mro :: bound method <class 'C'>.mro() -> list[type]
         __annotate__ :: @Todo | None
@@ -2039,7 +2133,8 @@ Meta.<CURSOR>
             // just redact them. ---AG
             filters => [(r"(?m)\s*__(annotations|new|annotate)__.+$", "")]},
             {
-                assert_snapshot!(builder.skip_builtins().type_signatures().build().snapshot(), @r"
+                assert_snapshot!(
+                    builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r"
                 meta_attr :: property
                 mro :: def mro(self) -> list[type]
                 __base__ :: type | None
@@ -2100,7 +2195,7 @@ class Quux:
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         bar
         baz
         foo
@@ -2161,7 +2256,8 @@ Quux.<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().type_signatures().build().snapshot(), @r"
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r"
         mro :: bound method <class 'Quux'>.mro() -> list[type]
         some_attribute :: int
         some_class_method :: bound method <class 'Quux'>.some_class_method() -> int
@@ -2233,7 +2329,8 @@ Answer.<CURSOR>
             // rendered differently in release mode.
             filters => [(r"(?m)\s*__(call|reduce_ex|annotate|signature)__.+$", "")]},
             {
-                assert_snapshot!(builder.skip_builtins().type_signatures().build().snapshot(), @r"
+                assert_snapshot!(
+                    builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r"
                 NO :: Literal[Answer.NO]
                 YES :: Literal[Answer.YES]
                 mro :: bound method <class 'Answer'>.mro() -> list[type]
@@ -2318,7 +2415,7 @@ bar(o<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"foo");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
     }
 
     #[test]
@@ -2333,7 +2430,7 @@ bar(<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         bar
         foo
         ");
@@ -2352,7 +2449,7 @@ class C:
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         foo
         self
         ");
@@ -2369,7 +2466,7 @@ class C:
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"C");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"C");
     }
 
     #[test]
@@ -2386,7 +2483,7 @@ class C:
         // FIXME: Should NOT include `foo` here, since
         // that is only a method that can be called on
         // `self`.
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         foo
         self
         ");
@@ -2402,7 +2499,10 @@ class<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"classy_variable_name");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @"classy_variable_name",
+        );
     }
 
     #[test]
@@ -2415,7 +2515,10 @@ print(f\"{some<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"some_symbol");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @"some_symbol",
+        );
     }
 
     #[test]
@@ -2429,7 +2532,10 @@ hidden_<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -2449,7 +2555,7 @@ if sys.platform == \"not-my-current-platform\":
         // currently make no effort to provide a good IDE experience within sections that
         // are unreachable
         assert_snapshot!(
-            builder.skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().build().snapshot(),
             @"<No completions found after filtering out completions>",
         );
     }
@@ -2555,7 +2661,10 @@ A().<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -2776,7 +2885,10 @@ q<CURSOR>.foo.xyz
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -2787,7 +2899,7 @@ q<CURSOR>.foo.xyz
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         __annotations__
         __class__
         __delattr__
@@ -2822,7 +2934,10 @@ class Foo: ...<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -2867,7 +2982,10 @@ def m<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -2879,7 +2997,10 @@ def m<CURSOR>(): pass
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -2892,9 +3013,7 @@ def m(): pass
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"
-        m
-        ");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"m");
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -2906,7 +3025,10 @@ class M<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -2918,7 +3040,10 @@ Fo<CURSOR> = float
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"Fo");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @"Fo",
+        );
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -2934,7 +3059,14 @@ import fo<CURSOR>
         // which is kind of annoying. So just assert that it
         // runs without panicking and produces some non-empty
         // output.
-        assert!(!builder.skip_builtins().build().completions().is_empty());
+        assert!(
+            !builder
+                .skip_keywords()
+                .skip_builtins()
+                .build()
+                .completions()
+                .is_empty()
+        );
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -2950,7 +3082,14 @@ import foo as ba<CURSOR>
         // which is kind of annoying. So just assert that it
         // runs without panicking and produces some non-empty
         // output.
-        assert!(!builder.skip_builtins().build().completions().is_empty());
+        assert!(
+            !builder
+                .skip_keywords()
+                .skip_builtins()
+                .build()
+                .completions()
+                .is_empty()
+        );
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -2966,7 +3105,14 @@ from fo<CURSOR> import wat
         // which is kind of annoying. So just assert that it
         // runs without panicking and produces some non-empty
         // output.
-        assert!(!builder.skip_builtins().build().completions().is_empty());
+        assert!(
+            !builder
+                .skip_keywords()
+                .skip_builtins()
+                .build()
+                .completions()
+                .is_empty()
+        );
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -2978,7 +3124,10 @@ from foo import wa<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -2990,7 +3139,10 @@ from foo import wat as ba<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -3006,7 +3158,7 @@ except Type<CURSOR>:
         );
 
         assert_snapshot!(
-            builder.skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().build().snapshot(),
             @"<No completions found after filtering out completions>",
         );
     }
@@ -3021,7 +3173,10 @@ def _():
 ",
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found after filtering out completions>",
+        );
     }
 
     #[test]
@@ -3041,7 +3196,10 @@ f = Foo()
 "#,
         );
 
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"<No completions found>");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @r"<No completions found>",
+        );
     }
 
     #[test]
@@ -3227,7 +3385,10 @@ foo = 1
 from ? import <CURSOR>
 ",
         );
-        assert_snapshot!(builder.skip_builtins().build().snapshot(), @r"<No completions found>");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @r"<No completions found>",
+        );
     }
 
     #[test]
@@ -3621,7 +3782,7 @@ from os.<CURSOR>
         );
 
         assert_snapshot!(
-            test.skip_builtins().build().snapshot(),
+            test.skip_keywords().skip_builtins().build().snapshot(),
             @"<No completions found after filtering out completions>",
         );
     }
@@ -3650,7 +3811,10 @@ zqzqzq = 1
 ",
         );
 
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -3661,7 +3825,10 @@ zqzqzq = 1
 print(\"zqzq<CURSOR>\")
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -3670,7 +3837,10 @@ class Foo:
 print(\"Foo.zqzq<CURSOR>\")
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -3681,7 +3851,10 @@ zqzqzq = 1
 print(\"zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -3690,7 +3863,10 @@ class Foo:
 print(\"Foo.zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -3701,7 +3877,10 @@ zqzqzq = 1
 print('zqzq<CURSOR>')
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -3710,7 +3889,10 @@ class Foo:
 print('Foo.zqzq<CURSOR>')
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -3721,7 +3903,10 @@ zqzqzq = 1
 print('zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -3730,7 +3915,10 @@ class Foo:
 print('Foo.zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -3741,7 +3929,10 @@ zqzqzq = 1
 print(\"\"\"zqzq<CURSOR>\"\"\")
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -3750,7 +3941,10 @@ class Foo:
 print(\"\"\"Foo.zqzq<CURSOR>\"\"\")
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -3761,7 +3955,10 @@ zqzqzq = 1
 print(\"\"\"zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -3770,7 +3967,10 @@ class Foo:
 print(\"\"\"Foo.zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -3781,7 +3981,10 @@ zqzqzq = 1
 print('''zqzq<CURSOR>''')
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -3790,7 +3993,10 @@ class Foo:
 print('''Foo.zqzq<CURSOR>''')
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -3801,7 +4007,10 @@ zqzqzq = 1
 print('''zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -3810,7 +4019,10 @@ class Foo:
 print('''Foo.zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -3821,7 +4033,10 @@ zqzqzq = 1
 print(f\"zqzq<CURSOR>\")
         ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -3830,7 +4045,10 @@ class Foo:
 print(f\"{Foo} and Foo.zqzq<CURSOR>\")
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -3841,7 +4059,10 @@ zqzqzq = 1
 print(f\"zqzq<CURSOR>
         ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -3850,7 +4071,10 @@ class Foo:
 print(f\"{Foo} and Foo.zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -3861,7 +4085,10 @@ zqzqzq = 1
 print(f'zqzq<CURSOR>')
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -3870,7 +4097,10 @@ class Foo:
 print(f'{Foo} and Foo.zqzq<CURSOR>')
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -3881,7 +4111,10 @@ zqzqzq = 1
 print(f'zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -3890,7 +4123,10 @@ class Foo:
 print(f'{Foo} and Foo.zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -3901,7 +4137,10 @@ zqzqzq = 1
 print(f\"\"\"zqzq<CURSOR>\"\"\")
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -3910,7 +4149,10 @@ class Foo:
 print(f\"\"\"{Foo} and Foo.zqzq<CURSOR>\"\"\")
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -3921,7 +4163,10 @@ zqzqzq = 1
 print(f\"\"\"zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -3930,7 +4175,10 @@ class Foo:
 print(f\"\"\"{Foo} and Foo.zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -3941,7 +4189,10 @@ zqzqzq = 1
 print(f'''zqzq<CURSOR>''')
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -3950,7 +4201,10 @@ class Foo:
 print(f'''{Foo} and Foo.zqzq<CURSOR>''')
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -3961,7 +4215,10 @@ zqzqzq = 1
 print(f'''zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -3970,7 +4227,10 @@ class Foo:
 print(f'''{Foo} and Foo.zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -3981,7 +4241,10 @@ zqzqzq = 1
 print(t\"zqzq<CURSOR>\")
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -3990,7 +4253,10 @@ class Foo:
 print(t\"{Foo} and Foo.zqzq<CURSOR>\")
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -4001,7 +4267,10 @@ zqzqzq = 1
 print(t\"zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -4010,7 +4279,10 @@ class Foo:
 print(t\"{Foo} and Foo.zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -4021,7 +4293,10 @@ zqzqzq = 1
 print(t'zqzq<CURSOR>')
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -4030,7 +4305,10 @@ class Foo:
 print(t'{Foo} and Foo.zqzq<CURSOR>')
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -4041,7 +4319,10 @@ zqzqzq = 1
 print(t'zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -4050,7 +4331,10 @@ class Foo:
 print(t'{Foo} and Foo.zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -4061,7 +4345,10 @@ zqzqzq = 1
 print(t\"\"\"zqzq<CURSOR>\"\"\")
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -4070,7 +4357,10 @@ class Foo:
 print(t\"\"\"{Foo} and Foo.zqzq<CURSOR>\"\"\")
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -4081,7 +4371,10 @@ zqzqzq = 1
 print(t\"\"\"zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -4090,7 +4383,10 @@ class Foo:
 print(t\"\"\"{Foo} and Foo.zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -4101,7 +4397,10 @@ zqzqzq = 1
 print(t'''zqzq<CURSOR>''')
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -4110,7 +4409,10 @@ class Foo:
 print(t'''{Foo} and Foo.zqzq<CURSOR>''')
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -4121,7 +4423,10 @@ zqzqzq = 1
 print(t'''zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
 
         let test = completion_test_builder(
             "\
@@ -4130,7 +4435,10 @@ class Foo:
 print(t'''{Foo} and Foo.zqzq<CURSOR>
 ",
         );
-        assert_snapshot!(test.skip_builtins().build().snapshot(), @"<No completions found>");
+        assert_snapshot!(
+            test.skip_keywords().skip_builtins().build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
@@ -4463,10 +4771,12 @@ type <CURSOR>
     /// of completions from a cursor position in source code. Most of
     /// the options involve some kind of filtering or adjustment to
     /// apply to the snapshots, depending on what one wants to test.
+    #[expect(clippy::struct_excessive_bools)] // free the bools!
     struct CompletionTestBuilder {
         cursor_test: CursorTest,
         settings: CompletionSettings,
         skip_builtins: bool,
+        skip_keywords: bool,
         type_signatures: bool,
         module_names: bool,
         // This doesn't seem like a "very complex" type to me... ---AG
@@ -4486,6 +4796,7 @@ type <CURSOR>
             let filtered = original
                 .iter()
                 .filter(|c| !self.skip_builtins || !c.builtin)
+                .filter(|c| !self.skip_keywords || c.kind != Some(CompletionKind::Keyword))
                 .filter(|c| {
                     self.predicate
                         .as_ref()
@@ -4523,6 +4834,21 @@ type <CURSOR>
         /// Not enabled by default.
         fn skip_builtins(mut self) -> CompletionTestBuilder {
             self.skip_builtins = true;
+            self
+        }
+
+        /// When set, keywords from completions are skipped. This
+        /// is useful in tests to reduce noise for scope based
+        /// completions.
+        ///
+        /// Not enabled by default.
+        ///
+        /// Note that, at time of writing (2025-11-11), keywords are
+        /// *also* considered builtins. So `skip_builtins()` will also
+        /// skip keywords. But this may not always be true. And one
+        /// might want to skip keywords but *not* builtins.
+        fn skip_keywords(mut self) -> CompletionTestBuilder {
+            self.skip_keywords = true;
             self
         }
 
@@ -4645,6 +4971,7 @@ type <CURSOR>
                 cursor_test: self.build(),
                 settings: CompletionSettings::default(),
                 skip_builtins: false,
+                skip_keywords: false,
                 type_signatures: false,
                 module_names: false,
                 predicate: None,
