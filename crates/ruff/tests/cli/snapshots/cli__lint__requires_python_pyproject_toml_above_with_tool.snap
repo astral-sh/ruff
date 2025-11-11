@@ -11,7 +11,6 @@ info:
     - "--select"
     - UP007
     - foo/test.py
-snapshot_kind: text
 ---
 success: true
 exit_code: 0
@@ -144,14 +143,18 @@ linter.flake8_import_conventions.aliases = {
 	pandas = pd,
 	panel = pn,
 	plotly.express = px,
+	plotly.graph_objects = go,
 	polars = pl,
 	pyarrow = pa,
 	seaborn = sns,
+	statsmodels.api = sm,
 	tensorflow = tf,
 	tkinter = tk,
 	xml.etree.ElementTree = ET,
 }
-linter.flake8_import_conventions.banned_aliases = {}
+linter.flake8_import_conventions.banned_aliases = {
+	geopandas = [gpd],
+}
 linter.flake8_import_conventions.banned_from = []
 linter.flake8_pytest_style.fixture_parentheses = false
 linter.flake8_pytest_style.parametrize_names_type = tuple
