@@ -276,7 +276,7 @@ def g(
 
 In runtime contexts, `|` unions are only permitted on Python 3.10+. But in suites of code that are
 never executed at runtime (stub files, `if TYPE_CHECKING` blocks, and stringified annotations), they
-are permitted even if the target version is set to Python \<=3.9.
+are permitted even if the target version is set to Python 3.9 or earlier.
 
 ```toml
 [environment]
