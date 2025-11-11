@@ -8899,6 +8899,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             emitted_division_by_zero_diagnostic = self.check_division_by_zero(node, op, left_ty);
         }
 
+        let pep_604_unions_allowed = || {
+            Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY310
+                || self.file().is_stub(self.db())
+                || self.scope().scope(self.db()).in_type_checking_block()
+        };
+
         match (left_ty, right_ty, op) {
             (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(self.db(), |lhs_element| {
                 self.infer_binary_expression_type(
@@ -9160,7 +9166,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     | KnownInstanceType::Annotated(_),
                 ),
                 ast::Operator::BitOr,
-            ) if Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY310 => {
+            ) if pep_604_unions_allowed() => {
                 if left_ty.is_equivalent_to(self.db(), right_ty) {
                     Some(left_ty)
                 } else {
@@ -9186,7 +9192,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::KnownInstance(..)
                 | Type::SpecialForm(..),
                 ast::Operator::BitOr,
-            ) if Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY310
+            ) if pep_604_unions_allowed()
                 && instance.has_known_class(self.db(), KnownClass::NoneType) =>
             {
                 Some(Type::KnownInstance(KnownInstanceType::UnionType(
@@ -9210,17 +9216,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 _,
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..),
                 ast::Operator::BitOr,
-            ) if Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY310 => {
-                Type::try_call_bin_op_with_policy(
-                    self.db(),
-                    left_ty,
-                    ast::Operator::BitOr,
-                    right_ty,
-                    MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-                )
-                .ok()
-                .map(|binding| binding.return_type(self.db()))
-            }
+            ) if pep_604_unions_allowed() => Type::try_call_bin_op_with_policy(
+                self.db(),
+                left_ty,
+                ast::Operator::BitOr,
+                right_ty,
+                MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+            )
+            .ok()
+            .map(|binding| binding.return_type(self.db())),
 
             // We've handled all of the special cases that we support for literals, so we need to
             // fall back on looking for dunder methods on one of the operand types.
