@@ -1164,7 +1164,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    #[cfg(test)]
     #[track_caller]
     pub(crate) const fn expect_union(self) -> UnionType<'db> {
         self.as_union().expect("Expected a Type::Union variant")
