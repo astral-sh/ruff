@@ -8321,7 +8321,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
                 // If the current enclosing scope is global, no place lookup is performed here,
                 // instead falling back to the module's explicit global lookup below.
-                if enclosing_scope_file_id == FileScopeId::global() {
+                if enclosing_scope_file_id.is_global() {
                     break;
                 }
 
