@@ -10,6 +10,7 @@ import-deprioritizes-type_check_only,main.py,1,1
 import-deprioritizes-type_check_only,main.py,2,1
 import-deprioritizes-type_check_only,main.py,3,2
 import-deprioritizes-type_check_only,main.py,4,3
+import-keyword-completion,main.py,0,1
 internal-typeshed-hidden,main.py,0,5
 none-completion,main.py,0,11
 numpy-array,main.py,0,
