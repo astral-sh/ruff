@@ -1465,8 +1465,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // reasons but it works well for most practical purposes. In particular it's nice
                 // that `x` can be freely overwritten, and that we don't assume that an import
                 // in one function is visible in another function.
-                if let Some(submodule) = &node.module
-                    && self.current_scope() == FileScopeId::global()
+                if node.module.is_some()
+                    && self.current_scope().is_global()
                     && self.file.is_package(self.db)
                     && let Ok(module_name) = ModuleName::from_identifier_parts(
                         self.db,
@@ -1474,8 +1474,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         node.module.as_deref(),
                         node.level,
                     )
-                    && let Ok(thispackage) =
-                        ModuleName::from_identifier_parts(self.db, self.file, None, 1)
+                    && let Ok(thispackage) = ModuleName::package_for_file(self.db, self.file)
                     && let Some(relative_submodule) = module_name.relative_to(&thispackage)
                     && let Some(direct_submodule) = relative_submodule.components().next()
                     && !self.seen_submodule_imports.contains(direct_submodule)
@@ -1487,7 +1486,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     let symbol = self.add_symbol(direct_submodule_name);
                     self.add_definition(
                         symbol.into(),
-                        ImportFromSubmoduleDefinitionNodeRef { node, submodule },
+                        ImportFromSubmoduleDefinitionNodeRef { node },
                     );
                 }
 

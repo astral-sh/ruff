@@ -4,7 +4,6 @@ use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
-use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ExprContext, HasNodeIndex, NodeIndex, PythonVersion,
@@ -1218,7 +1217,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DefinitionKind::ImportFromSubmodule(import_from) => {
                 self.infer_import_from_submodule_definition(
                     import_from.import(self.module()),
-                    import_from.submodule(),
                     definition,
                 );
             }
@@ -5901,66 +5899,64 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Infer the implicit local definition `x = <module 'thispackage.x'>` that
-    /// `from .x.y import z` can introduce in an `__init__.py(i)`.
+    /// Infer the implicit local definition `x = <module 'whatever.thispackage.x'>` that
+    /// `from .x.y import z` or `from whatever.thispackage.x.y` can introduce in `__init__.py(i)`.
     ///
     /// For the definition `z`, see [`TypeInferenceBuilder::infer_import_from_definition`].
+    ///
+    /// The runtime semantic of this kind of statement is to introduce a variable in the global
+    /// scope of this module *the first time it's imported in the entire program*. This
+    /// implementation just blindly introduces a local variable wherever the `from..import` is
+    /// (if the imports actually resolve).
+    ///
+    /// That gap between the semantics and implementation are currently the responsibility of the
+    /// code that actually creates these kinds of Definitions (so blindly introducing a local
+    /// is all we need to be doing here).
     fn infer_import_from_submodule_definition(
         &mut self,
         import_from: &ast::StmtImportFrom,
-        submodule: &Name,
         definition: Definition<'db>,
     ) {
-        // The runtime semantic of this kind of statement is to introduce a variable in the global
-        // scope of this module, so we do just that. (Actually we introduce a local variable, but
-        // this type of Definition is only created when a `from..import` is in global scope.)
-
-        // Get this package's module by resolving `.`
-        let Ok(thispackage_name) =
-            ModuleName::from_identifier_parts(self.db(), self.file(), None, 1)
-        else {
+        // Get this package's absolute module name by resolving `.`, and make sure it exists
+        let Ok(thispackage_name) = ModuleName::package_for_file(self.db(), self.file()) else {
             self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
             return;
         };
-
         let Some(module) = resolve_module(self.db(), &thispackage_name) else {
             self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
             return;
         };
 
-        // Now construct the submodule `.x`
-        assert!(
-            !submodule.is_empty(),
-            "ImportFromSubmoduleDefinitionKind constructed with empty module"
-        );
+        // We have `from whatever.thispackage.x.y ...` or `from .x.y ...`
+        // and we want to extract `x` (to ultimately construct `whatever.thispackage.x`):
 
-        let Ok(submodule_name) = ModuleName::from_identifier_parts(
+        // First we normalize to `whatever.thispackage.x.y`
+        let Some(final_part) = ModuleName::from_identifier_parts(
             self.db(),
             self.file(),
             import_from.module.as_deref(),
             import_from.level,
-        ) else {
+        )
+        .ok()
+        // `whatever.thispackage.x.y` => `x.y`
+        .and_then(|submodule_name| submodule_name.relative_to(&thispackage_name))
+        // `x.y` => `x`
+        .and_then(|relative_submodule_name| {
+            relative_submodule_name
+                .components()
+                .next()
+                .and_then(ModuleName::new)
+        }) else {
             self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
             return;
         };
-        let Some(relative_submodule_name) = submodule_name.relative_to(&thispackage_name) else {
-            self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
-            return;
-        };
-        let Some(name) = relative_submodule_name.components().next() else {
-            self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
-            return;
-        };
-        let full_submodule_name = ModuleName::new(name).map(|final_part| {
-            let mut ret = thispackage_name.clone();
-            ret.extend(&final_part);
-            ret
-        });
-        // And try to import it
-        if let Some(submodule_type) = full_submodule_name
-            .as_ref()
-            .and_then(|submodule_name| self.module_type_from_name(submodule_name))
-        {
+
+        // `x` => `whatever.thispackage.x`
+        let mut full_submodule_name = thispackage_name.clone();
+        full_submodule_name.extend(&final_part);
+
+        // Try to actually resolve the import `whatever.thispackage.x`
+        if let Some(submodule_type) = self.module_type_from_name(&full_submodule_name) {
             // Success, introduce a binding!
             //
             // We explicitly don't introduce a *declaration* because it's actual ok
@@ -5985,17 +5981,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let diagnostic = builder.into_diagnostic(format_args!(
-            "Module `{thispackage_name}` has no submodule `{name}`"
+            "Module `{thispackage_name}` has no submodule `{final_part}`"
         ));
 
-        if let Some(full_submodule_name) = full_submodule_name {
-            hint_if_stdlib_submodule_exists_on_other_versions(
-                self.db(),
-                diagnostic,
-                &full_submodule_name,
-                module,
-            );
-        }
+        hint_if_stdlib_submodule_exists_on_other_versions(
+            self.db(),
+            diagnostic,
+            &full_submodule_name,
+            module,
+        );
     }
 
     fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
