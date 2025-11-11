@@ -145,24 +145,27 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
     typed_dict: TypedDictType<'db>,
     key: &str,
     value_ty: Type<'db>,
-    typed_dict_node: impl Into<AnyNodeRef<'ast>>,
-    key_node: impl Into<AnyNodeRef<'ast>>,
-    value_node: impl Into<AnyNodeRef<'ast>>,
+    typed_dict_node: impl Into<AnyNodeRef<'ast>> + Copy,
+    key_node: impl Into<AnyNodeRef<'ast>> + Copy,
+    value_node: impl Into<AnyNodeRef<'ast>> + Copy,
     assignment_kind: TypedDictAssignmentKind,
+    emit_diagnostic: bool,
 ) -> bool {
     let db = context.db();
     let items = typed_dict.items(db);
 
     // Check if key exists in `TypedDict`
     let Some((_, item)) = items.iter().find(|(name, _)| *name == key) else {
-        report_invalid_key_on_typed_dict(
-            context,
-            typed_dict_node.into(),
-            key_node.into(),
-            Type::TypedDict(typed_dict),
-            Type::string_literal(db, key),
-            &items,
-        );
+        if emit_diagnostic {
+            report_invalid_key_on_typed_dict(
+                context,
+                typed_dict_node.into(),
+                key_node.into(),
+                Type::TypedDict(typed_dict),
+                Type::string_literal(db, key),
+                &items,
+            );
+        }
 
         return false;
     };
@@ -184,8 +187,9 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
     };
 
     if assignment_kind.is_subscript() && item.is_read_only() {
-        if let Some(builder) =
-            context.report_lint(assignment_kind.diagnostic_type(), key_node.into())
+        if emit_diagnostic
+            && let Some(builder) =
+                context.report_lint(assignment_kind.diagnostic_type(), key_node.into())
         {
             let typed_dict_ty = Type::TypedDict(typed_dict);
             let typed_dict_d = typed_dict_ty.display(db);
@@ -219,7 +223,9 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
     }
 
     // Invalid assignment - emit diagnostic
-    if let Some(builder) = context.report_lint(assignment_kind.diagnostic_type(), value_node) {
+    if emit_diagnostic
+        && let Some(builder) = context.report_lint(assignment_kind.diagnostic_type(), value_node)
+    {
         let typed_dict_ty = Type::TypedDict(typed_dict);
         let typed_dict_d = typed_dict_ty.display(db);
         let value_d = value_ty.display(db);
@@ -349,6 +355,7 @@ fn validate_from_dict_literal<'db, 'ast>(
                     key_expr,
                     &dict_item.value,
                     TypedDictAssignmentKind::Constructor,
+                    true,
                 );
             }
         }
@@ -386,6 +393,7 @@ fn validate_from_keywords<'db, 'ast>(
                 keyword,
                 &keyword.value,
                 TypedDictAssignmentKind::Constructor,
+                true,
             );
         }
     }
@@ -424,6 +432,7 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
                 key_expr,
                 &item.value,
                 TypedDictAssignmentKind::Constructor,
+                true,
             );
         }
     }

@@ -3545,6 +3545,112 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         rhs: &ast::Expr,
         assigned_ty: Type<'db>,
     ) -> bool {
+        /// Given a string literal or a union of string literals, return an iterator over the contained strings.
+        fn key_literals<'db>(
+            db: &'db dyn Db,
+            slice_ty: Type<'db>,
+        ) -> impl Iterator<Item = &'db str> + 'db {
+            if let Some(literal) = slice_ty.as_string_literal() {
+                Either::Left(Either::Left(std::iter::once(literal.value(db))))
+            } else if let Some(union) = slice_ty.as_union() {
+                Either::Left(Either::Right(
+                    union
+                        .elements(db)
+                        .iter()
+                        .filter_map(|ty| ty.as_string_literal().map(|lit| lit.value(db))),
+                ))
+            } else {
+                Either::Right(std::iter::empty())
+            }
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        fn is_valid_typed_dict_assignment<'db, 'ast>(
+            db: &'db dyn Db,
+            context: &InferContext<'db, 'ast>,
+            value_ty: Type<'db>,
+            slice_ty: Type<'db>,
+            assigned_ty: Type<'db>,
+            typed_dict_node: impl Into<AnyNodeRef<'ast>> + Copy,
+            key_node: impl Into<AnyNodeRef<'ast>> + Copy,
+            value_node: impl Into<AnyNodeRef<'ast>> + Copy,
+            emit_diagnostic: bool,
+        ) -> bool {
+            match value_ty {
+                Type::Union(union) => {
+                    // Note that we use a loop here instead of .all(…) to avoid short-circuiting.
+                    // We need to keep iterating to emit all diagnostics.
+                    let mut valid = true;
+                    for element in union.elements(db) {
+                        valid &= is_valid_typed_dict_assignment(
+                            db,
+                            context,
+                            *element,
+                            slice_ty,
+                            assigned_ty,
+                            typed_dict_node,
+                            key_node,
+                            value_node,
+                            emit_diagnostic,
+                        );
+                    }
+                    valid
+                }
+                Type::Intersection(intersection) => {
+                    let check_positive_elements = |emit_diagnostic_and_short_circuit| {
+                        let mut valid = false;
+                        for element in intersection.positive(db) {
+                            valid |= is_valid_typed_dict_assignment(
+                                db,
+                                context,
+                                *element,
+                                slice_ty,
+                                assigned_ty,
+                                typed_dict_node,
+                                key_node,
+                                value_node,
+                                emit_diagnostic_and_short_circuit,
+                            );
+                            if !valid && emit_diagnostic_and_short_circuit {
+                                break;
+                            }
+                        }
+
+                        valid
+                    };
+
+                    // Perform an initial check of all elements. If the assignment is valid
+                    // for at least one element, we do not emit any diagnostics. Otherwise,
+                    // we re-run the check and emit a diagnostic on the first failing element.
+                    let valid = check_positive_elements(false);
+
+                    if !valid {
+                        check_positive_elements(true);
+                    }
+
+                    valid
+                }
+                Type::TypedDict(typed_dict) => {
+                    let mut valid = true;
+                    for key in key_literals(db, slice_ty) {
+                        valid &= validate_typed_dict_key_assignment(
+                            context,
+                            typed_dict,
+                            key,
+                            assigned_ty,
+                            typed_dict_node,
+                            key_node,
+                            value_node,
+                            TypedDictAssignmentKind::Subscript,
+                            emit_diagnostic,
+                        );
+                    }
+                    valid
+                }
+                _ => true,
+            }
+        }
+
         let ast::ExprSubscript {
             range: _,
             node_index: _,
@@ -3565,7 +3671,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             CallArguments::positional([slice_ty, assigned_ty]),
             TypeContext::default(),
         ) {
-            Ok(_) => true,
+            Ok(_) => {
+                // We do not synthesize precise `__setitem__` methods for `TypedDict`s for performance reasons,
+                // so we need to post-validate the assignment here.
+                is_valid_typed_dict_assignment(
+                    db,
+                    context,
+                    value_ty,
+                    slice_ty,
+                    assigned_ty,
+                    value.as_ref(),
+                    slice.as_ref(),
+                    rhs,
+                    true,
+                )
+            }
             Err(err) => match err {
                 CallDunderError::PossiblyUnbound { .. } => {
                     if let Some(builder) =
@@ -3607,6 +3727,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         slice.as_ref(),
                                         rhs,
                                         TypedDictAssignmentKind::Subscript,
+                                        true,
                                     );
                                 } else {
                                     // Check if the key has a valid type. We only allow string literals, a union of string literals,

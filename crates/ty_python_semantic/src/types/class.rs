@@ -2426,54 +2426,40 @@ impl<'db> ClassLiteral<'db> {
             (CodeGeneratorKind::TypedDict, "__setitem__") => {
                 let fields = self.fields(db, specialization, field_policy);
 
-                // Add (key type, value type) overloads for all TypedDict items ("fields") that are not read-only:
+                let writeable_fields = fields.iter().filter(|(_, field)| !field.is_read_only());
 
-                let mut writeable_fields = fields
-                    .iter()
-                    .filter(|(_, field)| !field.is_read_only())
-                    .peekable();
+                // Instead of creating precise (key: Literal["key_j"], value: ValueType_j)
+                // overloads for each of the writeable fields, we create a single overload
+                // that takes the union of all keys and a value type of `Any`. This is
+                // a performance optimization, as there are large `TypedDict`s, and running
+                // the full overload resolution for every key access becomes expensive. The
+                // assignability of the value type is instead checked later during inference
+                // (see `validate_subscript_assignment`).
+                //
+                // If there are no writeable fields, the empty union guarantees that we
+                // synthesize a `__setitem__` that takes a `key` of type `Never` to signal
+                // that no keys are accepted. This leads to slightly more user-friendly
+                // error messages compared to returning an empty overload set.
+                let key_type = UnionType::from_elements(
+                    db,
+                    writeable_fields.map(|(name, _)| {
+                        Type::StringLiteral(StringLiteralType::new(db, name.as_str()))
+                    }),
+                );
 
-                if writeable_fields.peek().is_none() {
-                    // If there are no writeable fields, synthesize a `__setitem__` that takes
-                    // a `key` of type `Never` to signal that no keys are accepted. This leads
-                    // to slightly more user-friendly error messages compared to returning an
-                    // empty overload set.
-                    return Some(Type::Callable(CallableType::new(
-                        db,
-                        CallableSignature::single(Signature::new(
-                            Parameters::new([
-                                Parameter::positional_only(Some(Name::new_static("self")))
-                                    .with_annotated_type(instance_ty),
-                                Parameter::positional_only(Some(Name::new_static("key")))
-                                    .with_annotated_type(Type::Never),
-                                Parameter::positional_only(Some(Name::new_static("value")))
-                                    .with_annotated_type(Type::any()),
-                            ]),
-                            Some(Type::none(db)),
-                        )),
-                        true,
-                    )));
-                }
-
-                let overloads = writeable_fields.map(|(name, field)| {
-                    let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
-
-                    Signature::new(
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::single(Signature::new(
                         Parameters::new([
                             Parameter::positional_only(Some(Name::new_static("self")))
                                 .with_annotated_type(instance_ty),
                             Parameter::positional_only(Some(Name::new_static("key")))
                                 .with_annotated_type(key_type),
                             Parameter::positional_only(Some(Name::new_static("value")))
-                                .with_annotated_type(field.declared_ty),
+                                .with_annotated_type(Type::any()),
                         ]),
                         Some(Type::none(db)),
-                    )
-                });
-
-                Some(Type::Callable(CallableType::new(
-                    db,
-                    CallableSignature::from_overloads(overloads),
+                    )),
                     true,
                 )))
             }
