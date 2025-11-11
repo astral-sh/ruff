@@ -147,6 +147,25 @@ def _(x: int | str | bytes):
         reveal_type(x)  # revealed: (int & Unknown) | (str & Unknown) | (bytes & Unknown)
 ```
 
+## `classinfo` is a `typing.py` special form
+
+Certain special forms in `typing.py` are aliases to classes elsewhere in the standard library; these
+can be used in `isinstance()` and `issubclass()` checks. We support narrowing using them:
+
+```py
+import typing as t
+
+def f(x: dict[str, int] | list[str], y: object):
+    if isinstance(x, t.Dict):
+        reveal_type(x)  # revealed: dict[str, int]
+    else:
+        reveal_type(x)  # revealed: list[str]
+
+    if isinstance(y, t.Callable):
+        # TODO: a better top-materialization for `Callable`s (https://github.com/astral-sh/ty/issues/1426)
+        reveal_type(y)  # revealed: () -> object
+```
+
 ## Class types
 
 ```py
