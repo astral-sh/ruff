@@ -624,7 +624,7 @@ fn handle_own_line_comment_between_branches<'a>(
         //     pass
         // ```
         || comment_indentation + TextSize::new(1),
-        |indent| indent.text_len(),
+        ruff_text_size::TextLen::text_len,
     );
 
     // Compare to the last statement in the body
