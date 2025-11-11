@@ -531,8 +531,8 @@ impl<'db> ClassType<'db> {
             other,
             inferable,
             TypeRelation::Subtyping,
-            &HasRelationToVisitor::from_inferable(inferable),
-            &IsDisjointVisitor::from_inferable(inferable),
+            &HasRelationToVisitor::default(),
+            &IsDisjointVisitor::default(),
         )
     }
 
@@ -545,48 +545,45 @@ impl<'db> ClassType<'db> {
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        self.iter_mro(db).when_any(db, inferable, |base| {
+        self.iter_mro(db).when_any(db, |base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
                     TypeRelation::Subtyping
                     | TypeRelation::Redundancy
                     | TypeRelation::ConstraintImplication(_) => {
-                        ConstraintSet::from_bool(other.is_object(db), inferable)
+                        ConstraintSet::from(other.is_object(db))
                     }
-                    TypeRelation::Assignability => {
-                        ConstraintSet::from_bool(!other.is_final(db), inferable)
-                    }
+                    TypeRelation::Assignability => ConstraintSet::from(!other.is_final(db)),
                 },
 
                 // Protocol and Generic are not represented by a ClassType.
-                ClassBase::Protocol | ClassBase::Generic => ConstraintSet::never(inferable),
+                ClassBase::Protocol | ClassBase::Generic => ConstraintSet::from(false),
 
                 ClassBase::Class(base) => match (base, other) {
                     (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => {
-                        ConstraintSet::from_bool(base == other, inferable)
+                        ConstraintSet::from(base == other)
                     }
                     (ClassType::Generic(base), ClassType::Generic(other)) => {
-                        ConstraintSet::from_bool(base.origin(db) == other.origin(db), inferable)
-                            .and(db, || {
-                                base.specialization(db).has_relation_to_impl(
-                                    db,
-                                    other.specialization(db),
-                                    inferable,
-                                    relation,
-                                    relation_visitor,
-                                    disjointness_visitor,
-                                )
-                            })
+                        ConstraintSet::from(base.origin(db) == other.origin(db)).and(db, || {
+                            base.specialization(db).has_relation_to_impl(
+                                db,
+                                other.specialization(db),
+                                inferable,
+                                relation,
+                                relation_visitor,
+                                disjointness_visitor,
+                            )
+                        })
                     }
                     (ClassType::Generic(_), ClassType::NonGeneric(_))
                     | (ClassType::NonGeneric(_), ClassType::Generic(_)) => {
-                        ConstraintSet::never(inferable)
+                        ConstraintSet::from(false)
                     }
                 },
 
                 ClassBase::TypedDict => {
                     // TODO: Implement subclassing and assignability for TypedDicts.
-                    ConstraintSet::always(inferable)
+                    ConstraintSet::from(true)
                 }
             }
         })
@@ -600,28 +597,26 @@ impl<'db> ClassType<'db> {
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
-            return ConstraintSet::always(inferable);
+            return ConstraintSet::from(true);
         }
 
         match (self, other) {
             // A non-generic class is never equivalent to a generic class.
             // Two non-generic classes are only equivalent if they are equal (handled above).
             (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => {
-                ConstraintSet::never(inferable)
+                ConstraintSet::from(false)
             }
 
-            (ClassType::Generic(this), ClassType::Generic(other)) => ConstraintSet::from_bool(
-                this.origin(db) == other.origin(db),
-                inferable,
-            )
-            .and(db, || {
-                this.specialization(db).is_equivalent_to_impl(
-                    db,
-                    other.specialization(db),
-                    inferable,
-                    visitor,
-                )
-            }),
+            (ClassType::Generic(this), ClassType::Generic(other)) => {
+                ConstraintSet::from(this.origin(db) == other.origin(db)).and(db, || {
+                    this.specialization(db).is_equivalent_to_impl(
+                        db,
+                        other.specialization(db),
+                        inferable,
+                        visitor,
+                    )
+                })
+            }
         }
     }
 
@@ -1780,10 +1775,7 @@ impl<'db> ClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         other: ClassType<'db>,
     ) -> ConstraintSet<'db> {
-        ConstraintSet::from_bool(
-            self.is_subclass_of(db, specialization, other),
-            InferableTypeVars::none(),
-        )
+        ConstraintSet::from(self.is_subclass_of(db, specialization, other))
     }
 
     /// Return `true` if this class constitutes a typed dict specification (inherits from
@@ -4701,7 +4693,7 @@ impl KnownClass {
         db: &'db dyn Db,
         other: ClassType<'db>,
     ) -> ConstraintSet<'db> {
-        ConstraintSet::from_bool(self.is_subclass_of(db, other), InferableTypeVars::none())
+        ConstraintSet::from(self.is_subclass_of(db, other))
     }
 
     /// Return the module in which we should look up the definition for this class

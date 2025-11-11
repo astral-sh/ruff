@@ -141,7 +141,7 @@ impl<'db> Type<'db> {
                 .inner
                 .interface(db)
                 .members(db)
-                .when_all(db, inferable, |member| {
+                .when_all(db, |member| {
                     member.is_satisfied_by(
                         db,
                         self,
@@ -161,7 +161,7 @@ impl<'db> Type<'db> {
         // recognise `str` as a subtype of `Container[str]`.
         structurally_satisfied.or(db, || {
             let Some(nominal_instance) = protocol.as_nominal_type() else {
-                return ConstraintSet::never(inferable);
+                return ConstraintSet::from(false);
             };
 
             // if `self` and `other` are *both* protocols, we also need to treat `self` as if it
@@ -371,7 +371,7 @@ impl<'db> NominalInstanceType<'db> {
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.0, other.0) {
-            (_, NominalInstanceInner::Object) => ConstraintSet::always(inferable),
+            (_, NominalInstanceInner::Object) => ConstraintSet::from(true),
             (
                 NominalInstanceInner::ExactTuple(tuple1),
                 NominalInstanceInner::ExactTuple(tuple2),
@@ -407,12 +407,12 @@ impl<'db> NominalInstanceType<'db> {
                 NominalInstanceInner::ExactTuple(tuple2),
             ) => tuple1.is_equivalent_to_impl(db, tuple2, inferable, visitor),
             (NominalInstanceInner::Object, NominalInstanceInner::Object) => {
-                ConstraintSet::always(inferable)
+                ConstraintSet::from(true)
             }
             (NominalInstanceInner::NonTuple(class1), NominalInstanceInner::NonTuple(class2)) => {
                 class1.is_equivalent_to_impl(db, class2, inferable, visitor)
             }
-            _ => ConstraintSet::never(inferable),
+            _ => ConstraintSet::from(false),
         }
     }
 
@@ -425,9 +425,9 @@ impl<'db> NominalInstanceType<'db> {
         relation_visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.is_object() || other.is_object() {
-            return ConstraintSet::never(inferable);
+            return ConstraintSet::from(false);
         }
-        let mut result = ConstraintSet::never(inferable);
+        let mut result = ConstraintSet::from(false);
         if let Some(self_spec) = self.tuple_spec(db) {
             if let Some(other_spec) = other.tuple_spec(db) {
                 let compatible = self_spec.is_disjoint_from_impl(
@@ -443,10 +443,7 @@ impl<'db> NominalInstanceType<'db> {
             }
         }
         result.or(db, || {
-            ConstraintSet::from_bool(
-                !(self.class(db)).could_coexist_in_mro_with(db, other.class(db)),
-                inferable,
-            )
+            ConstraintSet::from(!(self.class(db)).could_coexist_in_mro_with(db, other.class(db)))
         })
     }
 
@@ -671,8 +668,8 @@ impl<'db> ProtocolInstanceType<'db> {
                     protocol,
                     InferableTypeVars::none(),
                     TypeRelation::Subtyping,
-                    &HasRelationToVisitor::from_inferable(InferableTypeVars::none()),
-                    &IsDisjointVisitor::from_inferable(InferableTypeVars::none()),
+                    &HasRelationToVisitor::default(),
+                    &IsDisjointVisitor::default(),
                 )
                 .is_always_satisfied(db)
         }
@@ -722,17 +719,17 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: InferableTypeVars<'db>,
+        _inferable: InferableTypeVars<'db>,
         _visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
-            return ConstraintSet::always(inferable);
+            return ConstraintSet::from(true);
         }
         let self_normalized = self.normalized(db);
         if self_normalized == Type::ProtocolInstance(other) {
-            return ConstraintSet::always(inferable);
+            return ConstraintSet::from(true);
         }
-        ConstraintSet::from_bool(self_normalized == other.normalized(db), inferable)
+        ConstraintSet::from(self_normalized == other.normalized(db))
     }
 
     /// Return `true` if this protocol type is disjoint from the protocol `other`.
@@ -744,10 +741,10 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         _db: &'db dyn Db,
         _other: Self,
-        inferable: InferableTypeVars<'db>,
+        _inferable: InferableTypeVars<'db>,
         _visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        ConstraintSet::never(inferable)
+        ConstraintSet::from(false)
     }
 
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {

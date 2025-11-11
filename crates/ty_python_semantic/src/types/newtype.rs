@@ -3,7 +3,6 @@ use std::collections::BTreeSet;
 use crate::Db;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::types::constraints::ConstraintSet;
-use crate::types::generics::InferableTypeVars;
 use crate::types::{ClassType, Type, definition_expression_type, visitor};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -116,37 +115,26 @@ impl<'db> NewType<'db> {
     // Since a regular class can't inherit from a newtype, the only way for one newtype to be a
     // subtype of another is to have the other in its chain of newtype bases. Once we reach the
     // base class, we don't have to keep looking.
-    pub(crate) fn has_relation_to_impl(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        inferable: InferableTypeVars<'db>,
-    ) -> ConstraintSet<'db> {
+    pub(crate) fn has_relation_to_impl(self, db: &'db dyn Db, other: Self) -> ConstraintSet<'db> {
         if self.is_equivalent_to_impl(db, other) {
-            return ConstraintSet::always(inferable);
+            return ConstraintSet::from(true);
         }
         for base in self.iter_bases(db) {
             if let NewTypeBase::NewType(base_newtype) = base {
                 if base_newtype.is_equivalent_to_impl(db, other) {
-                    return ConstraintSet::always(inferable);
+                    return ConstraintSet::from(true);
                 }
             }
         }
-        ConstraintSet::never(inferable)
+        ConstraintSet::from(false)
     }
 
-    pub(crate) fn is_disjoint_from_impl(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        inferable: InferableTypeVars<'db>,
-    ) -> ConstraintSet<'db> {
+    pub(crate) fn is_disjoint_from_impl(self, db: &'db dyn Db, other: Self) -> ConstraintSet<'db> {
         // Two NewTypes are disjoint if they're not equal and neither inherits from the other.
         // NewTypes have single inheritance, and a regular class can't inherit from a NewType, so
         // it's not possible for some third type to multiply-inherit from both.
-        let mut self_not_subtype_of_other =
-            self.has_relation_to_impl(db, other, inferable).negate(db);
-        let other_not_subtype_of_self = other.has_relation_to_impl(db, self, inferable).negate(db);
+        let mut self_not_subtype_of_other = self.has_relation_to_impl(db, other).negate(db);
+        let other_not_subtype_of_self = other.has_relation_to_impl(db, self).negate(db);
         self_not_subtype_of_other.intersect(db, other_not_subtype_of_self)
     }
 

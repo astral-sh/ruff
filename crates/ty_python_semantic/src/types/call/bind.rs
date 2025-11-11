@@ -36,9 +36,9 @@ use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, ClassLiteral, DataclassFlags, DataclassParams,
     FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    PropertyInstanceType, SpecialFormType, TrackedConstraintSet, TypeAliasType, TypeContext,
-    UnionBuilder, UnionType, WrapperDescriptorKind, enums, ide_support, infer_isolated_expression,
-    todo_type,
+    NominalInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
+    TypeAliasType, TypeContext, UnionBuilder, UnionType, WrapperDescriptorKind, enums, ide_support,
+    infer_isolated_expression, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
@@ -181,7 +181,7 @@ impl<'db> Bindings<'db> {
             }
         }
 
-        self.evaluate_known_cases(db, argument_types, dataclass_field_specifiers);
+        self.evaluate_known_cases(db, dataclass_field_specifiers);
 
         // In order of precedence:
         //
@@ -300,12 +300,7 @@ impl<'db> Bindings<'db> {
 
     /// Evaluates the return type of certain known callables, where we have special-case logic to
     /// determine the return type in a way that isn't directly expressible in the type system.
-    fn evaluate_known_cases(
-        &mut self,
-        db: &'db dyn Db,
-        argument_types: &CallArguments<'_, 'db>,
-        dataclass_field_specifiers: &[Type<'db>],
-    ) {
+    fn evaluate_known_cases(&mut self, db: &'db dyn Db, dataclass_field_specifiers: &[Type<'db>]) {
         let to_bool = |ty: &Option<Type<'_>>, default: bool| -> bool {
             if let Some(Type::BooleanLiteral(value)) = ty {
                 *value
@@ -1147,13 +1142,7 @@ impl<'db> Bindings<'db> {
                         else {
                             return;
                         };
-                        let constraints = ConstraintSet::range(
-                            db,
-                            *lower,
-                            *typevar,
-                            *upper,
-                            InferableTypeVars::none(),
-                        );
+                        let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
                         let tracked = TrackedConstraintSet::new(db, constraints);
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),
@@ -1164,7 +1153,7 @@ impl<'db> Bindings<'db> {
                         if !overload.parameter_types().is_empty() {
                             return;
                         }
-                        let constraints = ConstraintSet::always(InferableTypeVars::none());
+                        let constraints = ConstraintSet::from(true);
                         let tracked = TrackedConstraintSet::new(db, constraints);
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),
@@ -1175,35 +1164,8 @@ impl<'db> Bindings<'db> {
                         if !overload.parameter_types().is_empty() {
                             return;
                         }
-                        let constraints = ConstraintSet::never(InferableTypeVars::none());
+                        let constraints = ConstraintSet::from(false);
                         let tracked = TrackedConstraintSet::new(db, constraints);
-                        overload.set_return_type(Type::KnownInstance(
-                            KnownInstanceType::ConstraintSet(tracked),
-                        ));
-                    }
-
-                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetWithInferable(
-                        tracked,
-                    )) => {
-                        let mut any_invalid = false;
-                        let inferable = InferableTypeVars::from_bound_typevars(
-                            db,
-                            overload
-                                .arguments_for_parameter(argument_types, 0)
-                                .filter_map(|(_, ty)| {
-                                    let identity = ty
-                                        .as_typevar()
-                                        .map(|bound_typevar| bound_typevar.identity(db));
-                                    any_invalid |= identity.is_none();
-                                    identity
-                                }),
-                        );
-                        if any_invalid {
-                            continue;
-                        }
-
-                        let result = tracked.constraints(db).with_inferable(inferable);
-                        let tracked = TrackedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),
                         ));
@@ -1216,7 +1178,12 @@ impl<'db> Bindings<'db> {
                             continue;
                         };
 
-                        let result = ty_a.when_subtype_of_given(db, *ty_b, tracked.constraints(db));
+                        let result = ty_a.when_subtype_of_given(
+                            db,
+                            *ty_b,
+                            tracked.constraints(db),
+                            InferableTypeVars::none(),
+                        );
                         let tracked = TrackedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),
@@ -1246,7 +1213,35 @@ impl<'db> Bindings<'db> {
                     Type::KnownBoundMethod(
                         KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(tracked),
                     ) => {
-                        let result = tracked.constraints(db).satisfied_by_all_typevars(db);
+                        let extract_inferable = |instance: &NominalInstanceType<'db>| {
+                            if instance.has_known_class(db, KnownClass::NoneType) {
+                                // Caller explicitly passed None, so no typevars are inferable.
+                                return Some(InferableTypeVars::none());
+                            }
+                            Some(InferableTypeVars::from_bound_typevars(
+                                db,
+                                instance.tuple_spec(db)?.fixed_elements().filter_map(|ty| {
+                                    ty.as_typevar()
+                                        .map(|bound_typevar| bound_typevar.identity(db))
+                                }),
+                            ))
+                        };
+
+                        let inferable = match overload.parameter_types() {
+                            // Caller did not provide argument, so no typevars are inferable.
+                            [None] => InferableTypeVars::none(),
+                            [Some(Type::NominalInstance(instance))] => {
+                                match extract_inferable(instance) {
+                                    Some(inferable) => inferable,
+                                    None => continue,
+                                }
+                            }
+                            _ => continue,
+                        };
+
+                        let result = tracked
+                            .constraints(db)
+                            .satisfied_by_all_typevars(db, inferable);
                         overload.set_return_type(Type::BooleanLiteral(result));
                     }
 

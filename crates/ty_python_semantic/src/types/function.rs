@@ -986,11 +986,11 @@ impl<'db> FunctionType<'db> {
                 | TypeRelation::ConstraintImplication(_)
         ) && self.normalized(db) == other.normalized(db)
         {
-            return ConstraintSet::always(inferable);
+            return ConstraintSet::from(true);
         }
 
         if self.literal(db) != other.literal(db) {
-            return ConstraintSet::never(inferable);
+            return ConstraintSet::from(false);
         }
 
         let self_signature = self.signature(db);
@@ -1013,10 +1013,10 @@ impl<'db> FunctionType<'db> {
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.normalized(db) == other.normalized(db) {
-            return ConstraintSet::always(inferable);
+            return ConstraintSet::from(true);
         }
         if self.literal(db) != other.literal(db) {
-            return ConstraintSet::never(inferable);
+            return ConstraintSet::from(false);
         }
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);

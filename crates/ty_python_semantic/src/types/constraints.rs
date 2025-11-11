@@ -74,41 +74,25 @@ use crate::types::{
 pub(crate) trait OptionConstraintsExtension<T> {
     /// Returns a constraint set that is always satisfiable if the option is `None`; otherwise
     /// applies a function to determine under what constraints the value inside of it holds.
-    fn when_none_or<'db>(
-        self,
-        inferable: InferableTypeVars<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db>,
-    ) -> ConstraintSet<'db>;
+    fn when_none_or<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db>;
 
     /// Returns a constraint set that is never satisfiable if the option is `None`; otherwise
     /// applies a function to determine under what constraints the value inside of it holds.
-    fn when_some_and<'db>(
-        self,
-        inferable: InferableTypeVars<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db>,
-    ) -> ConstraintSet<'db>;
+    fn when_some_and<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db>;
 }
 
 impl<T> OptionConstraintsExtension<T> for Option<T> {
-    fn when_none_or<'db>(
-        self,
-        inferable: InferableTypeVars<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db>,
-    ) -> ConstraintSet<'db> {
+    fn when_none_or<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db> {
         match self {
             Some(value) => f(value),
-            None => ConstraintSet::always(inferable),
+            None => ConstraintSet::always(),
         }
     }
 
-    fn when_some_and<'db>(
-        self,
-        inferable: InferableTypeVars<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db>,
-    ) -> ConstraintSet<'db> {
+    fn when_some_and<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db> {
         match self {
             Some(value) => f(value),
-            None => ConstraintSet::never(inferable),
+            None => ConstraintSet::never(),
         }
     }
 }
@@ -123,7 +107,6 @@ pub(crate) trait IteratorConstraintsExtension<T> {
     fn when_any<'db>(
         self,
         db: &'db dyn Db,
-        inferable: InferableTypeVars<'db>,
         f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db>;
 
@@ -135,7 +118,6 @@ pub(crate) trait IteratorConstraintsExtension<T> {
     fn when_all<'db>(
         self,
         db: &'db dyn Db,
-        inferable: InferableTypeVars<'db>,
         f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db>;
 }
@@ -147,10 +129,9 @@ where
     fn when_any<'db>(
         self,
         db: &'db dyn Db,
-        inferable: InferableTypeVars<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::never(inferable);
+        let mut result = ConstraintSet::never();
         for child in self {
             if result.union(db, f(child)).is_always_satisfied(db) {
                 return result;
@@ -162,10 +143,9 @@ where
     fn when_all<'db>(
         self,
         db: &'db dyn Db,
-        inferable: InferableTypeVars<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::always(inferable);
+        let mut result = ConstraintSet::always();
         for child in self {
             if result.intersect(db, f(child)).is_never_satisfied(db) {
                 return result;
@@ -184,34 +164,18 @@ where
 pub struct ConstraintSet<'db> {
     /// The BDD representing this constraint set
     node: Node<'db>,
-
-    /// The typevars that were inferable when constructing this constraint set
-    pub(crate) inferable: InferableTypeVars<'db>,
 }
 
 impl<'db> ConstraintSet<'db> {
-    pub(crate) fn never(inferable: InferableTypeVars<'db>) -> Self {
+    fn never() -> Self {
         Self {
             node: Node::AlwaysFalse,
-            inferable,
         }
     }
 
-    pub(crate) fn always(inferable: InferableTypeVars<'db>) -> Self {
+    fn always() -> Self {
         Self {
             node: Node::AlwaysTrue,
-            inferable,
-        }
-    }
-
-    pub(crate) fn from_bool(b: bool, inferable: InferableTypeVars<'db>) -> Self {
-        Self {
-            node: if b {
-                Node::AlwaysTrue
-            } else {
-                Node::AlwaysFalse
-            },
-            inferable,
         }
     }
 
@@ -221,7 +185,6 @@ impl<'db> ConstraintSet<'db> {
         typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
         upper: Type<'db>,
-        inferable: InferableTypeVars<'db>,
         relation: TypeRelation<'db>,
     ) -> Self {
         let (lower, upper) = match relation {
@@ -239,14 +202,6 @@ impl<'db> ConstraintSet<'db> {
 
         Self {
             node: ConstrainedTypeVar::new_node(db, typevar, lower, upper),
-            inferable,
-        }
-    }
-
-    pub(crate) fn with_inferable(self, inferable: InferableTypeVars<'db>) -> Self {
-        Self {
-            node: self.node,
-            inferable,
         }
     }
 
@@ -271,7 +226,6 @@ impl<'db> ConstraintSet<'db> {
     ) -> Self {
         Self {
             node: self.node.when_subtype_of_given(db, lhs, rhs),
-            inferable: self.inferable,
         }
     }
 
@@ -289,8 +243,12 @@ impl<'db> ConstraintSet<'db> {
     /// since the constraint set cannot be affected by any typevars that it does not mention. That
     /// means that those additional typevars trivially satisfy the constraint set, regardless of
     /// whether they are inferable or not.
-    pub(crate) fn satisfied_by_all_typevars(self, db: &'db dyn Db) -> bool {
-        self.node.satisfied_by_all_typevars(db, self.inferable)
+    pub(crate) fn satisfied_by_all_typevars(
+        self,
+        db: &'db dyn Db,
+        inferable: InferableTypeVars<'db>,
+    ) -> bool {
+        self.node.satisfied_by_all_typevars(db, inferable)
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
@@ -301,7 +259,6 @@ impl<'db> ConstraintSet<'db> {
     /// only mention typevars that are inferable in the lhs, or which both sides consider
     /// non-inferable.
     pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        let other = other.reduce_inferable(db, self.inferable);
         self.node = self.node.or(db, other.node);
         *self
     }
@@ -314,7 +271,6 @@ impl<'db> ConstraintSet<'db> {
     /// only mention typevars that are inferable in the lhs, or which both sides consider
     /// non-inferable.
     pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        let other = other.reduce_inferable(db, self.inferable);
         self.node = self.node.and(db, other.node);
         *self
     }
@@ -323,7 +279,6 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn negate(self, db: &'db dyn Db) -> Self {
         Self {
             node: self.node.negate(db),
-            inferable: self.inferable,
         }
     }
 
@@ -355,7 +310,6 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn iff(self, db: &'db dyn Db, other: Self) -> Self {
         ConstraintSet {
             node: self.node.iff(db, other.node),
-            inferable: self.inferable.merge(db, other.inferable),
         }
     }
 
@@ -364,14 +318,14 @@ impl<'db> ConstraintSet<'db> {
     /// away. (That is, those typevars will be removed from the constraint set, and the constraint
     /// set will return true whenever there was _any_ specialization of those typevars that
     /// returned true before.)
+    /// XXX: fix docs
     pub(crate) fn reduce_inferable(
         self,
         db: &'db dyn Db,
-        inferable: InferableTypeVars<'db>,
+        to_remove: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
     ) -> Self {
-        let to_abstract = self.inferable.subtract(db, inferable);
-        let node = self.node.exists(db, to_abstract);
-        Self { node, inferable }
+        let node = self.node.exists(db, to_remove);
+        Self { node }
     }
 
     pub(crate) fn range(
@@ -379,20 +333,18 @@ impl<'db> ConstraintSet<'db> {
         lower: Type<'db>,
         typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
-        inferable: InferableTypeVars<'db>,
     ) -> Self {
-        Self::constrain_typevar(
-            db,
-            typevar,
-            lower,
-            upper,
-            inferable,
-            TypeRelation::Assignability,
-        )
+        Self::constrain_typevar(db, typevar, lower, upper, TypeRelation::Assignability)
     }
 
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         self.node.simplify(db).display(db)
+    }
+}
+
+impl From<bool> for ConstraintSet<'_> {
+    fn from(b: bool) -> Self {
+        if b { Self::always() } else { Self::never() }
     }
 }
 
@@ -2230,10 +2182,10 @@ mod tests {
         let u = BoundTypeVarInstance::synthetic(&db, "U", TypeVarVariance::Invariant);
         let bool_type = KnownClass::Bool.to_instance(&db);
         let str_type = KnownClass::Str.to_instance(&db);
-        let t_str = ConstraintSet::range(&db, str_type, t, str_type, InferableTypeVars::none());
-        let t_bool = ConstraintSet::range(&db, bool_type, t, bool_type, InferableTypeVars::none());
-        let u_str = ConstraintSet::range(&db, str_type, u, str_type, InferableTypeVars::none());
-        let u_bool = ConstraintSet::range(&db, bool_type, u, bool_type, InferableTypeVars::none());
+        let t_str = ConstraintSet::range(&db, str_type, t, str_type);
+        let t_bool = ConstraintSet::range(&db, bool_type, t, bool_type);
+        let u_str = ConstraintSet::range(&db, str_type, u, str_type);
+        let u_bool = ConstraintSet::range(&db, bool_type, u, bool_type);
         let constraints = (t_str.or(&db, || t_bool)).and(&db, || u_str.or(&db, || u_bool));
         let actual = constraints.node.display_graph(&db, &"").to_string();
         assert_eq!(actual, expected);

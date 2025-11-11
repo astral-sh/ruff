@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::fmt::Display;
 
-use itertools::{Either, EitherOrBoth, Itertools};
+use itertools::Itertools;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec};
@@ -119,7 +119,7 @@ pub(crate) fn typing_self<'db>(
     .map(Type::TypeVar)
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct InferableTypeVars<'db> {
     inner: Option<InferableTypeVarsInner<'db>>,
 }
@@ -168,36 +168,19 @@ impl<'db> InferableTypeVars<'db> {
             (None, None) => self,
             (Some(_), None) => self,
             (None, Some(_)) => other,
-            (Some(self_inner), Some(other_inner)) if self_inner == other_inner => self,
             (Some(self_inner), Some(other_inner)) => InferableTypeVars {
                 inner: Some(self_inner.merge(db, other_inner)),
             },
         }
     }
 
-    /// Returns an iterator of the typevars that are in this inferable set but not in another.
-    pub(crate) fn subtract(
+    pub(crate) fn iter(
         self,
         db: &'db dyn Db,
-        other: Self,
     ) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> + 'db {
-        let (self_inner, other_inner) = match (self.inner, other.inner) {
-            (None, _) => return Either::Left(Either::Left(std::iter::empty())),
-            (Some(self_inner), None) => {
-                return Either::Left(Either::Right(self_inner.inferable(db).into_iter().copied()));
-            }
-            (Some(self_inner), Some(other_inner)) => (self_inner, other_inner),
-        };
-        let self_inferable = self_inner.inferable(db).into_iter().copied();
-        let other_inferable = other_inner.inferable(db).into_iter().copied();
-        Either::Right(
-            self_inferable
-                .merge_join_by(other_inferable, BoundTypeVarIdentity::cmp)
-                .filter_map(|merged| match merged {
-                    EitherOrBoth::Left(bound_typevar) => Some(bound_typevar),
-                    EitherOrBoth::Right(_) | EitherOrBoth::Both(_, _) => None,
-                }),
-        )
+        self.inner
+            .into_iter()
+            .flat_map(|inner| inner.inferable(db).iter().copied())
     }
 
     // Keep this around for debugging purposes
@@ -770,12 +753,12 @@ fn is_subtype_in_invariant_position<'db>(
         // This should be removed and properly handled in the respective
         // `(Type::TypeVar(_), _) | (_, Type::TypeVar(_))` branch of
         // `Type::has_relation_to_impl`. Right now, we cannot generally
-        // return `ConstraintSet::always(inferable)` from that branch, as that
+        // return `ConstraintSet::from(true)` from that branch, as that
         // leads to union simplification, which means that we lose track
         // of type variables without recording the constraints under which
         // the relation holds.
         if matches!(base, Type::TypeVar(_)) || matches!(derived, Type::TypeVar(_)) {
-            return ConstraintSet::always(inferable);
+            return ConstraintSet::from(true);
         }
 
         derived.has_relation_to_impl(
@@ -1189,7 +1172,7 @@ impl<'db> Specialization<'db> {
     ) -> ConstraintSet<'db> {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
-            return ConstraintSet::never(inferable);
+            return ConstraintSet::from(false);
         }
 
         if let (Some(self_tuple), Some(other_tuple)) = (self.tuple_inner(db), other.tuple_inner(db))
@@ -1207,7 +1190,7 @@ impl<'db> Specialization<'db> {
         let self_materialization_kind = self.materialization_kind(db);
         let other_materialization_kind = other.materialization_kind(db);
 
-        let mut result = ConstraintSet::always(inferable);
+        let mut result = ConstraintSet::from(true);
         for ((bound_typevar, self_type), other_type) in (generic_context.variables(db))
             .zip(self.types(db))
             .zip(other.types(db))
@@ -1246,7 +1229,7 @@ impl<'db> Specialization<'db> {
                     relation_visitor,
                     disjointness_visitor,
                 ),
-                TypeVarVariance::Bivariant => ConstraintSet::always(inferable),
+                TypeVarVariance::Bivariant => ConstraintSet::from(true),
             };
             if result.intersect(db, compatible).is_never_satisfied(db) {
                 return result;
@@ -1264,14 +1247,14 @@ impl<'db> Specialization<'db> {
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.materialization_kind(db) != other.materialization_kind(db) {
-            return ConstraintSet::never(inferable);
+            return ConstraintSet::from(false);
         }
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
-            return ConstraintSet::never(inferable);
+            return ConstraintSet::from(false);
         }
 
-        let mut result = ConstraintSet::always(inferable);
+        let mut result = ConstraintSet::from(true);
         for ((bound_typevar, self_type), other_type) in (generic_context.variables(db))
             .zip(self.types(db))
             .zip(other.types(db))
@@ -1288,7 +1271,7 @@ impl<'db> Specialization<'db> {
                 | TypeVarVariance::Contravariant => {
                     self_type.is_equivalent_to_impl(db, *other_type, inferable, visitor)
                 }
-                TypeVarVariance::Bivariant => ConstraintSet::always(inferable),
+                TypeVarVariance::Bivariant => ConstraintSet::from(true),
             };
             if result.intersect(db, compatible).is_never_satisfied(db) {
                 return result;
@@ -1296,7 +1279,7 @@ impl<'db> Specialization<'db> {
         }
 
         match (self.tuple_inner(db), other.tuple_inner(db)) {
-            (Some(_), None) | (None, Some(_)) => return ConstraintSet::never(inferable),
+            (Some(_), None) | (None, Some(_)) => return ConstraintSet::from(false),
             (None, None) => {}
             (Some(self_tuple), Some(other_tuple)) => {
                 let compatible =

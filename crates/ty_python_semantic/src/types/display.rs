@@ -532,9 +532,6 @@ impl Display for DisplayRepresentation<'_> {
             Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetNever) => {
                 f.write_str("bound method `ConstraintSet.never`")
             }
-            Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetWithInferable(_)) => {
-                f.write_str("bound method `ConstraintSet.with_inferable`")
-            }
             Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)) => {
                 f.write_str("bound method `ConstraintSet.implies_subtype_of`")
             }
