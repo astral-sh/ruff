@@ -265,12 +265,10 @@ Similarly, for an `__init__.pyi` (stub) file, importing a non-exported name shou
 but the inference would be `Unknown`.
 
 ```py
-# error: 15 "Module `a` has no member `Foo`"
-# error: 20 "Module `a` has no member `c`"
 from a import Foo, c, foo
 
-reveal_type(Foo)  # revealed: Unknown
-reveal_type(c)  # revealed: Unknown
+reveal_type(Foo)  # revealed: <class 'Foo'>
+reveal_type(c)  # revealed: <module 'a.b.c'>
 reveal_type(foo)  # revealed: <module 'a.foo'>
 ```
 

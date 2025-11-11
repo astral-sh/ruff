@@ -25,7 +25,7 @@ This file currently covers the following details:
     wild. Equivalent imports like `from whatever.thispackage import a` also introduce a re-export
     (this has essentially zero ecosystem impact, we just felt it was more consistent). The only way
     to opt out of this is to rename the import to something else (`from . import a as b`).
-    `from .a import b` and equivalent does *not* introduce a re-export.
+    `from .a import b` and equivalent also introduces a re-export, yes this is chaos.
 
 Note: almost all tests in here have a stub and non-stub version, because we're interested in both
 defining symbols *at all* and re-exporting them.
@@ -247,10 +247,8 @@ reveal_type(mypackage.submodule)  # revealed: Unknown
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
 # error: "has no member `submodule`"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
-# error: "has no member `nested`"
-reveal_type(mypackage.nested)  # revealed: Unknown
-# error: "has no member `nested`"
-reveal_type(mypackage.nested.X)  # revealed: Unknown
+reveal_type(mypackage.nested)  # revealed: <module 'mypackage.submodule.nested'>
+reveal_type(mypackage.nested.X)  # revealed: int
 ```
 
 ### In Non-Stub
@@ -325,10 +323,8 @@ reveal_type(mypackage.submodule)  # revealed: Unknown
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
 # error: "has no member `submodule`"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
-# error: "has no member `nested`"
-reveal_type(mypackage.nested)  # revealed: Unknown
-# error: "has no member `nested`"
-reveal_type(mypackage.nested.X)  # revealed: Unknown
+reveal_type(mypackage.nested)  # revealed: <module 'mypackage.submodule.nested'>
+reveal_type(mypackage.nested.X)  # revealed: int
 ```
 
 ### In Non-Stub

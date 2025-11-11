@@ -1484,6 +1484,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         && !self.seen_submodule_imports.contains(direct_submodule)
                         && self.current_scope().is_global()
                     {
+                        // Record that this is equivalent to `from .a import ...`
+                        is_self_import = true;
+
                         self.seen_submodule_imports
                             .insert(direct_submodule.to_owned());
 
