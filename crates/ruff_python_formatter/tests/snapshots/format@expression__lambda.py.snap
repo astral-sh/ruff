@@ -417,10 +417,8 @@ a = (
 )
 
 a = (
-    lambda 
-        x,  # Dangling
-        y
-    : 1
+    lambda x,  # Dangling
+    y: 1
 )
 
 # Regression test: lambda empty arguments ranges were too long, leading to unstable
@@ -481,54 +479,48 @@ lambda a, /, c: a
 
 (
     lambda
-        # comment
-        *x
-    : x
+    # comment
+    *x: x
 )
 
 (
     lambda
-        # comment
-        *x,
-        **y
-    : x
+    # comment
+    *x,
+    **y: x
 )
 
 (
     lambda
-        # comment 1
-        # comment 2
-        *x
-    :
+    # comment 1
+    # comment 2
+    *x:
     # comment 3
     x
 )
 
 (
     lambda
-        # comment 1
-        # comment 2
-        *x,
-        **y
-    :
+    # comment 1
+    # comment 2
+    *x,
+    **y:
     # comment 3
     x
 )
 
 (
     lambda  # comment 1
-        # comment 2
-        *x
-    :  # comment 3
+    # comment 2
+    *x:  # comment 3
     x
 )
 
 (
     lambda  # comment 1
-        # comment 2
-        *x,
-        y
-    :  # comment 3
+    # comment 2
+    *x,
+    y:  # comment 3
     x
 )
 
@@ -536,9 +528,8 @@ lambda *x: x
 
 (
     lambda
-        # comment
-        *x
-    : x
+    # comment
+    *x: x
 )
 
 lambda: (  # comment
@@ -576,9 +567,8 @@ lambda: (  # comment
 
 (
     lambda  # 1
-        # 2
-        x
-    :  # 3
+    # 2
+    x:  # 3
     # 4
     # 5
     # 6
@@ -587,21 +577,18 @@ lambda: (  # comment
 
 (
     lambda  # 1
-        # 2
-        x,  # 3
-        # 4
-        y
-    :  # 5
+    # 2
+    x,  # 3
+    # 4
+    y:  # 5
     # 6
     x
 )
 
 (
-    lambda 
-        x,
-        # comment
-        y
-    : z
+    lambda x,
+    # comment
+    y: z
 )
 
 
@@ -680,11 +667,9 @@ def a():
         c,
         d,
         e,
-        f=lambda 
-            self,
-            *args,
-            **kwargs
-        : aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs),
+        f=lambda self,
+        *args,
+        **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs),
     )
 
 
@@ -693,17 +678,15 @@ def a():
         c,
         d,
         e,
-        f=lambda 
-            self,
-            araa,
-            kkkwargs,
-            aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-            args,
-            kwargs,
-            e=1,
-            f=2,
-            g=2
-        : d,
+        f=lambda self,
+        araa,
+        kkkwargs,
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+        args,
+        kwargs,
+        e=1,
+        f=2,
+        g=2: d,
         g=10,
     )
 ```
@@ -748,7 +731,20 @@ def a():
  )  # Trailing
  # Trailing
  
-@@ -76,7 +56,9 @@
+@@ -60,8 +40,10 @@
+ )
+ 
+ a = (
+-    lambda x,  # Dangling
+-    y: 1
++    lambda 
++        x,  # Dangling
++        y
++    : 1
+ )
+ 
+ # Regression test: lambda empty arguments ranges were too long, leading to unstable
+@@ -74,7 +56,9 @@
  
  # lambda arguments don't have parentheses, so we never add a magic trailing comma ...
  def f(
@@ -759,7 +755,130 @@ def a():
  ):
      pass
  
-@@ -250,66 +232,74 @@
+@@ -122,48 +106,54 @@
+ 
+ (
+     lambda
+-    # comment
+-    *x: x
++        # comment
++        *x
++    : x
+ )
+ 
+ (
+     lambda
+-    # comment
+-    *x,
+-    **y: x
++        # comment
++        *x,
++        **y
++    : x
+ )
+ 
+ (
+     lambda
+-    # comment 1
+-    # comment 2
+-    *x:
++        # comment 1
++        # comment 2
++        *x
++    :
+     # comment 3
+     x
+ )
+ 
+ (
+     lambda
+-    # comment 1
+-    # comment 2
+-    *x,
+-    **y:
++        # comment 1
++        # comment 2
++        *x,
++        **y
++    :
+     # comment 3
+     x
+ )
+ 
+ (
+     lambda  # comment 1
+-    # comment 2
+-    *x:  # comment 3
++        # comment 2
++        *x
++    :  # comment 3
+     x
+ )
+ 
+ (
+     lambda  # comment 1
+-    # comment 2
+-    *x,
+-    y:  # comment 3
++        # comment 2
++        *x,
++        y
++    :  # comment 3
+     x
+ )
+ 
+@@ -171,8 +161,9 @@
+ 
+ (
+     lambda
+-    # comment
+-    *x: x
++        # comment
++        *x
++    : x
+ )
+ 
+ lambda: (  # comment
+@@ -210,8 +201,9 @@
+ 
+ (
+     lambda  # 1
+-    # 2
+-    x:  # 3
++        # 2
++        x
++    :  # 3
+     # 4
+     # 5
+     # 6
+@@ -220,83 +212,94 @@
+ 
+ (
+     lambda  # 1
+-    # 2
+-    x,  # 3
+-    # 4
+-    y:  # 5
++        # 2
++        x,  # 3
++        # 4
++        y
++    :  # 5
+     # 6
+     x
+ )
+ 
+ (
+-    lambda x,
+-    # comment
+-    y: z
++    lambda 
++        x,
++        # comment
++        y
++    : z
+ )
+ 
  
  # Leading
  lambda x: (
@@ -890,6 +1009,47 @@ def a():
  # Trailing
  
  lambda self, araa, kkkwargs=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+@@ -310,9 +313,11 @@
+         c,
+         d,
+         e,
+-        f=lambda self,
+-        *args,
+-        **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs),
++        f=lambda 
++            self,
++            *args,
++            **kwargs
++        : aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs),
+     )
+ 
+ 
+@@ -321,14 +326,16 @@
+         c,
+         d,
+         e,
+-        f=lambda self,
+-        araa,
+-        kkkwargs,
+-        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+-        args,
+-        kwargs,
+-        e=1,
+-        f=2,
+-        g=2: d,
++        f=lambda 
++            self,
++            araa,
++            kkkwargs,
++            aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
++            args,
++            kwargs,
++            e=1,
++            f=2,
++            g=2
++        : d,
+         g=10,
+     )
 ```
 
 
