@@ -709,6 +709,190 @@ def a():
 ```
 
 
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -27,30 +27,10 @@
+ # Trailing
+ 
+ # Leading
+-lambda x: lambda y: lambda z: (
+-    x,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    z,
++lambda x: (
++    lambda y: (
++        lambda z: (x, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, z)
++    )
+ )  # Trailing
+ # Trailing
+ 
+@@ -76,7 +56,9 @@
+ 
+ # lambda arguments don't have parentheses, so we never add a magic trailing comma ...
+ def f(
+-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = lambda x: y,
++    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = lambda x: (
++        y
++    ),
+ ):
+     pass
+ 
+@@ -250,66 +232,74 @@
+ 
+ # Leading
+ lambda x: (
+-    lambda y: lambda z: x
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + z  # Trailing
++    lambda y: (
++        lambda z: (
++            x
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + z
++        )
++    )  # Trailing
+ )  # Trailing
+ 
+ 
+ # Leading
+-lambda x: lambda y: lambda z: [
+-    x,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    z,
+-]  # Trailing
++lambda x: (
++    lambda y: (
++        lambda z: [
++            x,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            z,
++        ]
++    )
++)  # Trailing
+ # Trailing
+ 
+ lambda self, araa, kkkwargs=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+```
+
+
 ### Output 2
 ```
 indent-style               = space
@@ -754,30 +938,10 @@ lambda x: lambda y: lambda z: (x, y, z)  # Trailing
 # Trailing
 
 # Leading
-lambda x: lambda y: lambda z: (
-    x,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    z,
+lambda x: (
+    lambda y: (
+        lambda z: (x, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, z)
+    )
 )  # Trailing
 # Trailing
 
@@ -803,7 +967,9 @@ a = (
 
 # lambda arguments don't have parentheses, so we never add a magic trailing comma ...
 def f(
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = lambda x: y,
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = lambda x: (
+        y
+    ),
 ):
     pass
 
@@ -977,66 +1143,74 @@ lambda: (  # comment
 
 # Leading
 lambda x: (
-    lambda y: lambda z: x
-    + y
-    + y
-    + y
-    + y
-    + y
-    + y
-    + y
-    + y
-    + y
-    + y
-    + y
-    + y
-    + y
-    + y
-    + y
-    + y
-    + y
-    + y
-    + y
-    + y
-    + y
-    + z  # Trailing
+    lambda y: (
+        lambda z: (
+            x
+            + y
+            + y
+            + y
+            + y
+            + y
+            + y
+            + y
+            + y
+            + y
+            + y
+            + y
+            + y
+            + y
+            + y
+            + y
+            + y
+            + y
+            + y
+            + y
+            + y
+            + y
+            + z
+        )
+    )  # Trailing
 )  # Trailing
 
 
 # Leading
-lambda x: lambda y: lambda z: [
-    x,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    y,
-    z,
-]  # Trailing
+lambda x: (
+    lambda y: (
+        lambda z: [
+            x,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            y,
+            z,
+        ]
+    )
+)  # Trailing
 # Trailing
 
 lambda self, araa, kkkwargs=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
