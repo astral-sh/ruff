@@ -4,7 +4,8 @@ use ruff_python_ast::ExprLambda;
 use ruff_text_size::Ranged;
 
 use crate::comments::{dangling_comments, leading_comments};
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parenthesize};
+use crate::expression::{has_own_parentheses, maybe_parenthesize_expression};
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
 
@@ -80,7 +81,12 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             }
         }
 
-        write!(f, [body.format()])
+        // Avoid parenthesizing lists, dictionaries, etc.
+        if f.context().is_stable() || has_own_parentheses(body, f.context()).is_some() {
+            body.format().fmt(f)
+        } else {
+            maybe_parenthesize_expression(body, item, Parenthesize::IfBreaksOrIfRequired).fmt(f)
+        }
     }
 }
 

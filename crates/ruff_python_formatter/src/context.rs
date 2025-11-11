@@ -112,6 +112,10 @@ impl<'a> PyFormatContext<'a> {
     pub(crate) const fn is_preview(&self) -> bool {
         self.options.preview().is_enabled()
     }
+
+    pub(crate) const fn is_stable(&self) -> bool {
+        !self.is_preview()
+    }
 }
 
 impl FormatContext for PyFormatContext<'_> {
