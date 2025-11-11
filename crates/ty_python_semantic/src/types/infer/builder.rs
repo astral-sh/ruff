@@ -3630,6 +3630,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assignable
             };
 
+        let emit_invalid_final = |builder: &Self| {
+            if emit_diagnostics {
+                if let Some(builder) = builder.context.report_lint(&INVALID_ASSIGNMENT, target) {
+                    builder.into_diagnostic(format_args!(
+                        "Cannot assign to final attribute `{attribute}` on type `{}`",
+                        object_ty.display(db)
+                    ));
+                }
+            }
+        };
+
         // Return true (and emit a diagnostic) if this is an invalid assignment to a `Final` attribute.
         // Per PEP 591 and the typing conformance suite, Final instance attributes can be assigned
         // in __init__ methods. Multiple assignments within __init__ are allowed (matching mypy
@@ -3647,33 +3658,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Not in __init__ - always disallow
             if !is_in_init {
-                if emit_diagnostics {
-                    if let Some(builder) = builder.context.report_lint(&INVALID_ASSIGNMENT, target)
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "Cannot assign to final attribute `{attribute}` \
-                                             on type `{}`",
-                            object_ty.display(db)
-                        ));
-                    }
-                }
+                emit_invalid_final(builder);
                 return true;
             }
 
             // We're in __init__ - verify we're in a method of the class being mutated
             let Some(class_ty) = builder.class_context_of_current_method() else {
                 // Not a method (standalone function named __init__)
-                if emit_diagnostics {
-                    if let Some(diag_builder) =
-                        builder.context.report_lint(&INVALID_ASSIGNMENT, target)
-                    {
-                        diag_builder.into_diagnostic(format_args!(
-                            "Cannot assign to final attribute `{attribute}` \
-                                         on type `{}`",
-                            object_ty.display(db)
-                        ));
-                    }
-                }
+                emit_invalid_final(builder);
                 return true;
             };
 
@@ -3693,16 +3685,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if !is_same_class {
                 // Assigning to a different class's Final attribute
-                if emit_diagnostics {
-                    if let Some(diag_builder) =
-                        builder.context.report_lint(&INVALID_ASSIGNMENT, target)
-                    {
-                        diag_builder.into_diagnostic(format_args!(
-                            "Cannot assign to final attribute `{attribute}` on type `{}`",
-                            object_ty.display(db)
-                        ));
-                    }
-                }
+                emit_invalid_final(builder);
                 return true;
             }
 

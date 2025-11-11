@@ -463,6 +463,15 @@ class MultipleAssignmentsInInit:
         self.attr4 = 1  # OK: Assignment in __init__
         self.attr4 = 2  # OK: Multiple assignments in __init__ are allowed
 
+class ConditionalAssignment:
+    X: Final[int]
+
+    def __init__(self, cond: bool):
+        if cond:
+            self.X = 42  # OK: Assignment in __init__
+        else:
+            self.X = 56  # OK: Multiple assignments in __init__ are allowed
+
 # Case 5: Declaration and assignment in __init__ - ALLOWED
 class DeclareAndAssignInInit:
     def __init__(self):
@@ -479,8 +488,8 @@ class AssignmentOutsideInit:
 
 ## Final assignment restrictions in `__init__`
 
-Per carljm's feedback, `__init__` can only assign Final attributes on the class it's defining, and
-only to the first parameter (`self`).
+`__init__` can only assign Final attributes on the class it's defining, and only to the first
+parameter (`self`).
 
 ```py
 from typing import Final
@@ -512,35 +521,6 @@ class D:
         # TODO: Should error - assigning to non-self parameter
         # Requires tracking which parameter the base expression refers to
         other.y = 2
-```
-
-## Conditional assignments in `__init__`
-
-Per the typing conformance suite and feedback from Carl, conditional assignments in different
-branches are allowed in `__init__`. Both mypy and pyright allow multiple assignments in `__init__`,
-and the conformance suite requires this behavior.
-
-```py
-import sys
-from typing import Final
-
-class ConditionalAssignmentTyped:
-    X: Final[int]
-
-    def __init__(self, cond: bool):
-        if cond:
-            self.X = 42  # OK: Assignment in __init__
-        else:
-            self.X = 56  # OK: Multiple conditional assignments in __init__ are allowed
-
-class ConditionalAssignmentUntyped:
-    Y: Final[int]
-
-    def __init__(self, cond):
-        if cond:
-            self.Y = 1  # OK: Assignment in __init__
-        else:
-            self.Y = 2  # OK: Multiple conditional assignments in __init__ are allowed
 ```
 
 ## Full diagnostics
