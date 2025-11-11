@@ -181,30 +181,20 @@ def _(
     bool2: Literal[Bool2],
     multiple: Literal[SingleInt, SingleStr, SingleEnum],
 ):
-    # TODO should be `Literal[1]`
-    reveal_type(single_int)  # revealed: @Todo(Inference of subscript on special form)
-    # TODO should be `Literal["foo"]`
-    reveal_type(single_str)  # revealed: @Todo(Inference of subscript on special form)
-    # TODO should be `Literal[b"bar"]`
-    reveal_type(single_bytes)  # revealed: @Todo(Inference of subscript on special form)
-    # TODO should be `Literal[True]`
-    reveal_type(single_bool)  # revealed: @Todo(Inference of subscript on special form)
-    # TODO should be `None`
-    reveal_type(single_none)  # revealed: @Todo(Inference of subscript on special form)
-    # TODO should be `Literal[E.A]`
-    reveal_type(single_enum)  # revealed: @Todo(Inference of subscript on special form)
-    # TODO should be `Literal[1, "foo", b"bar", True, E.A] | None`
-    reveal_type(union_literals)  # revealed: @Todo(Inference of subscript on special form)
+    reveal_type(single_int)  # revealed: Literal[1]
+    reveal_type(single_str)  # revealed: Literal["foo"]
+    reveal_type(single_bytes)  # revealed: Literal[b"bar"]
+    reveal_type(single_bool)  # revealed: Literal[True]
+    reveal_type(single_none)  # revealed: None
+    reveal_type(single_enum)  # revealed: Literal[E.A]
+    reveal_type(union_literals)  # revealed: Literal[1, "foo", b"bar", True, E.A] | None
     # Could also be `E`
     reveal_type(an_enum1)  # revealed: Unknown
-    # TODO should be `E`
-    reveal_type(an_enum2)  # revealed: @Todo(Inference of subscript on special form)
+    reveal_type(an_enum2)  # revealed: E
     # Could also be `bool`
     reveal_type(bool1)  # revealed: Unknown
-    # TODO should be `bool`
-    reveal_type(bool2)  # revealed: @Todo(Inference of subscript on special form)
-    # TODO should be `Literal[1, "foo", E.A]`
-    reveal_type(multiple)  # revealed: @Todo(Inference of subscript on special form)
+    reveal_type(bool2)  # revealed: bool
+    reveal_type(multiple)  # revealed: Literal[1, "foo", E.A]
 ```
 
 ### Implicit type alias
@@ -246,28 +236,18 @@ def _(
     bool2: Literal[Bool2],
     multiple: Literal[SingleInt, SingleStr, SingleEnum],
 ):
-    # TODO should be `Literal[1]`
-    reveal_type(single_int)  # revealed: @Todo(Inference of subscript on special form)
-    # TODO should be `Literal["foo"]`
-    reveal_type(single_str)  # revealed: @Todo(Inference of subscript on special form)
-    # TODO should be `Literal[b"bar"]`
-    reveal_type(single_bytes)  # revealed: @Todo(Inference of subscript on special form)
-    # TODO should be `Literal[True]`
-    reveal_type(single_bool)  # revealed: @Todo(Inference of subscript on special form)
-    # TODO should be `None`
-    reveal_type(single_none)  # revealed: @Todo(Inference of subscript on special form)
-    # TODO should be `Literal[E.A]`
-    reveal_type(single_enum)  # revealed: @Todo(Inference of subscript on special form)
-    # TODO should be `Literal[1, "foo", b"bar", True, E.A] | None`
-    reveal_type(union_literals)  # revealed: @Todo(Inference of subscript on special form)
+    reveal_type(single_int)  # revealed: Literal[1]
+    reveal_type(single_str)  # revealed: Literal["foo"]
+    reveal_type(single_bytes)  # revealed: Literal[b"bar"]
+    reveal_type(single_bool)  # revealed: Literal[True]
+    reveal_type(single_none)  # revealed: None
+    reveal_type(single_enum)  # revealed: Literal[E.A]
+    reveal_type(union_literals)  # revealed: Literal[1, "foo", b"bar", True, E.A] | None
     reveal_type(an_enum1)  # revealed: Unknown
-    # TODO should be `E`
-    reveal_type(an_enum2)  # revealed: @Todo(Inference of subscript on special form)
+    reveal_type(an_enum2)  # revealed: E
     reveal_type(bool1)  # revealed: Unknown
-    # TODO should be `bool`
-    reveal_type(bool2)  # revealed: @Todo(Inference of subscript on special form)
-    # TODO should be `Literal[1, "foo", E.A]`
-    reveal_type(multiple)  # revealed: @Todo(Inference of subscript on special form)
+    reveal_type(bool2)  # revealed: bool
+    reveal_type(multiple)  # revealed: Literal[1, "foo", E.A]
 ```
 
 ## Shortening unions of literals

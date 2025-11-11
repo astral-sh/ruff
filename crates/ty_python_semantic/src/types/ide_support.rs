@@ -128,6 +128,10 @@ impl<'db> AllMembers<'db> {
                 }
             }
 
+            Type::NewTypeInstance(newtype) => {
+                self.extend_with_type(db, Type::instance(db, newtype.base_class_type(db)));
+            }
+
             Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
                 self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
             }
@@ -1281,7 +1285,7 @@ mod resolve_definition {
                 let file = definition.file(db);
                 let module = parsed_module(db, file).load(db);
                 let import_node = import_from_def.import(&module);
-                let alias = import_from_def.alias(&module);
+                let name = &import_from_def.alias(&module).name;
 
                 // For `ImportFrom`, we need to resolve the original imported symbol name
                 // (alias.name), not the local alias (symbol_name)
@@ -1289,7 +1293,7 @@ mod resolve_definition {
                     db,
                     file,
                     import_node,
-                    &alias.name,
+                    name,
                     visited,
                     alias_resolution,
                 )
@@ -1621,6 +1625,7 @@ mod resolve_definition {
             DefinitionKind::TypeAlias(_)
             | DefinitionKind::Import(_)
             | DefinitionKind::ImportFrom(_)
+            | DefinitionKind::ImportFromSubmodule(_)
             | DefinitionKind::StarImport(_)
             | DefinitionKind::NamedExpression(_)
             | DefinitionKind::Assignment(_)

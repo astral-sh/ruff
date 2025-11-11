@@ -40,17 +40,24 @@ impl BackgroundDocumentRequestHandler for PrepareRenameRequestHandler {
             return Ok(None);
         };
 
-        let offset = params
-            .position
-            .to_text_size(db, file, snapshot.url(), snapshot.encoding());
+        let Some(offset) =
+            params
+                .position
+                .to_text_size(db, file, snapshot.url(), snapshot.encoding())
+        else {
+            return Ok(None);
+        };
 
         let Some(range) = can_rename(db, file, offset) else {
             return Ok(None);
         };
 
-        let lsp_range = range
-            .as_lsp_range(db, file, snapshot.encoding())
-            .to_local_range();
+        let Some(lsp_range) = range
+            .to_lsp_range(db, file, snapshot.encoding())
+            .map(|lsp_range| lsp_range.local_range())
+        else {
+            return Ok(None);
+        };
 
         Ok(Some(PrepareRenameResponse::Range(lsp_range)))
     }

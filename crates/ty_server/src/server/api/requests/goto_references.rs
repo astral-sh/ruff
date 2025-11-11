@@ -40,12 +40,14 @@ impl BackgroundDocumentRequestHandler for ReferencesRequestHandler {
             return Ok(None);
         };
 
-        let offset = params.text_document_position.position.to_text_size(
+        let Some(offset) = params.text_document_position.position.to_text_size(
             db,
             file,
             snapshot.url(),
             snapshot.encoding(),
-        );
+        ) else {
+            return Ok(None);
+        };
 
         let include_declaration = params.context.include_declaration;
 

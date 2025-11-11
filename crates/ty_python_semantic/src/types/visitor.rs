@@ -9,6 +9,7 @@ use crate::{
         class::walk_generic_alias,
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
+        newtype::{NewType, walk_newtype_instance_type},
         subclass_of::walk_subclass_of_type,
         walk_bound_method_type, walk_bound_type_var_type, walk_callable_type,
         walk_intersection_type, walk_known_instance_type, walk_method_wrapper_type,
@@ -104,6 +105,10 @@ pub(crate) trait TypeVisitor<'db> {
     fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
         walk_typed_dict_type(db, typed_dict, self);
     }
+
+    fn visit_newtype_instance_type(&self, db: &'db dyn Db, newtype: NewType<'db>) {
+        walk_newtype_instance_type(db, newtype, self);
+    }
 }
 
 /// Enumeration of types that may contain other types, such as unions, intersections, and generics.
@@ -126,6 +131,7 @@ pub(super) enum NonAtomicType<'db> {
     ProtocolInstance(ProtocolInstanceType<'db>),
     TypedDict(TypedDictType<'db>),
     TypeAlias(TypeAliasType<'db>),
+    NewTypeInstance(NewType<'db>),
 }
 
 pub(super) enum TypeKind<'db> {
@@ -193,6 +199,9 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
                 TypeKind::NonAtomic(NonAtomicType::TypedDict(typed_dict))
             }
             Type::TypeAlias(alias) => TypeKind::NonAtomic(NonAtomicType::TypeAlias(alias)),
+            Type::NewTypeInstance(newtype) => {
+                TypeKind::NonAtomic(NonAtomicType::NewTypeInstance(newtype))
+            }
         }
     }
 }
@@ -234,6 +243,36 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         NonAtomicType::TypeAlias(alias) => {
             visitor.visit_type_alias_type(db, alias);
         }
+        NonAtomicType::NewTypeInstance(newtype) => {
+            visitor.visit_newtype_instance_type(db, newtype);
+        }
+    }
+}
+
+pub(crate) fn walk_type_with_recursion_guard<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    visitor: &impl TypeVisitor<'db>,
+    recursion_guard: &TypeCollector<'db>,
+) {
+    match TypeKind::from(ty) {
+        TypeKind::Atomic => {}
+        TypeKind::NonAtomic(non_atomic_type) => {
+            if recursion_guard.type_was_already_seen(ty) {
+                // If we have already seen this type, we can skip it.
+                return;
+            }
+            walk_non_atomic_type(db, non_atomic_type, visitor);
+        }
+    }
+}
+
+#[derive(Default, Debug)]
+pub(crate) struct TypeCollector<'db>(RefCell<FxIndexSet<Type<'db>>>);
+
+impl<'db> TypeCollector<'db> {
+    pub(crate) fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
+        !self.0.borrow_mut().insert(ty)
     }
 }
 
@@ -253,7 +292,7 @@ pub(super) fn any_over_type<'db>(
 ) -> bool {
     struct AnyOverTypeVisitor<'db, 'a> {
         query: &'a dyn Fn(Type<'db>) -> bool,
-        seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
+        recursion_guard: TypeCollector<'db>,
         found_matching_type: Cell<bool>,
         should_visit_lazy_type_attributes: bool,
     }
@@ -273,22 +312,13 @@ pub(super) fn any_over_type<'db>(
             if found {
                 return;
             }
-            match TypeKind::from(ty) {
-                TypeKind::Atomic => {}
-                TypeKind::NonAtomic(non_atomic_type) => {
-                    if !self.seen_types.borrow_mut().insert(non_atomic_type) {
-                        // If we have already seen this type, we can skip it.
-                        return;
-                    }
-                    walk_non_atomic_type(db, non_atomic_type, self);
-                }
-            }
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
         }
     }
 
     let visitor = AnyOverTypeVisitor {
         query,
-        seen_types: RefCell::new(FxIndexSet::default()),
+        recursion_guard: TypeCollector::default(),
         found_matching_type: Cell::new(false),
         should_visit_lazy_type_attributes,
     };

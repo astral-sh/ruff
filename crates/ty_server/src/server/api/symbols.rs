@@ -36,7 +36,7 @@ pub(crate) fn convert_to_lsp_symbol_information(
 
     let location = symbol
         .full_range
-        .as_lsp_range(db, file, encoding)
+        .to_lsp_range(db, file, encoding)?
         .to_location()?;
 
     Some(SymbolInformation {

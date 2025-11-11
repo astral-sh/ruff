@@ -39,10 +39,13 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
         };
 
         // Convert LSP range to text offsets
-        let requested_range =
+        let Some(requested_range) =
             params
                 .range
-                .to_text_range(db, file, snapshot.url(), snapshot.encoding());
+                .to_text_range(db, file, snapshot.url(), snapshot.encoding())
+        else {
+            return Ok(None);
+        };
 
         let lsp_tokens = generate_semantic_tokens(
             db,

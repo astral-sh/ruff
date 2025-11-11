@@ -17,7 +17,7 @@ x = 1
 def foo(a: int) -> int:
     return a + 1
 
-foo(1)
+y = foo(1)
 ";
 
     let mut server = TestServerBuilder::new()?
@@ -39,7 +39,7 @@ foo(1)
     [
       {
         "position": {
-          "line": 0,
+          "line": 5,
           "character": 1
         },
         "label": [
@@ -47,7 +47,7 @@ foo(1)
             "value": ": "
           },
           {
-            "value": "Literal[1]"
+            "value": "int"
           }
         ],
         "kind": 1
@@ -55,7 +55,7 @@ foo(1)
       {
         "position": {
           "line": 5,
-          "character": 4
+          "character": 8
         },
         "label": [
           {

@@ -48,12 +48,15 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             return Ok(None);
         };
 
-        let offset = params.text_document_position.position.to_text_size(
+        let Some(offset) = params.text_document_position.position.to_text_size(
             db,
             file,
             snapshot.url(),
             snapshot.encoding(),
-        );
+        ) else {
+            return Ok(None);
+        };
+
         let settings = CompletionSettings {
             auto_import: snapshot.global_settings().is_auto_import_enabled(),
         };
@@ -70,15 +73,15 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             .map(|(i, comp)| {
                 let kind = comp.kind(db).map(ty_kind_to_lsp_kind);
                 let type_display = comp.ty.map(|ty| ty.display(db).to_string());
-                let import_edit = comp.import.as_ref().map(|edit| {
+                let import_edit = comp.import.as_ref().and_then(|edit| {
                     let range = edit
                         .range()
-                        .as_lsp_range(db, file, snapshot.encoding())
-                        .to_local_range();
-                    TextEdit {
+                        .to_lsp_range(db, file, snapshot.encoding())?
+                        .local_range();
+                    Some(TextEdit {
                         range,
                         new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
-                    }
+                    })
                 });
 
                 let name = comp.name.to_string();
