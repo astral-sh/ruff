@@ -4,6 +4,7 @@ use ruff_python_ast::ExprLambda;
 use ruff_text_size::Ranged;
 
 use crate::comments::dangling_comments;
+use crate::comments::leading_comments;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
@@ -33,24 +34,45 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
             if dangling_before_parameters.is_empty() {
                 write!(f, [space()])?;
-            } else {
-                write!(f, [dangling_comments(dangling_before_parameters)])?;
             }
 
-            write!(
-                f,
-                [parameters
-                    .format()
-                    .with_options(ParametersParentheses::Never)]
-            )?;
+            group(&format_with(|f: &mut PyFormatter| {
+                if f.context().node_level().is_parenthesized()
+                    && (parameters.len() > 1 || !dangling_before_parameters.is_empty())
+                {
+                    let end_of_line_start = dangling_before_parameters
+                        .partition_point(|comment| comment.line_position().is_end_of_line());
+                    let (same_line_comments, own_line_comments) =
+                        dangling_before_parameters.split_at(end_of_line_start);
 
-            write!(f, [token(":")])?;
+                    dangling_comments(same_line_comments).fmt(f)?;
 
-            if dangling_after_parameters.is_empty() {
-                write!(f, [space()])?;
-            } else {
-                write!(f, [dangling_comments(dangling_after_parameters)])?;
-            }
+                    write![
+                        f,
+                        [
+                            soft_line_break(),
+                            leading_comments(own_line_comments),
+                            parameters
+                                .format()
+                                .with_options(ParametersParentheses::Never),
+                        ]
+                    ]
+                } else {
+                    parameters
+                        .format()
+                        .with_options(ParametersParentheses::Never)
+                        .fmt(f)
+                }?;
+
+                write!(f, [token(":")])?;
+
+                if dangling_after_parameters.is_empty() {
+                    write!(f, [space()])
+                } else {
+                    write!(f, [dangling_comments(dangling_after_parameters)])
+                }
+            }))
+            .fmt(f)?;
         } else {
             write!(f, [token(":")])?;
 
