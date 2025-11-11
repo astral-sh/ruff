@@ -1028,6 +1028,13 @@ impl<'db> Type<'db> {
         any_over_type(db, self, &|ty| matches!(ty, Type::TypeVar(_)), false)
     }
 
+    pub(crate) const fn as_special_form(self) -> Option<SpecialFormType> {
+        match self {
+            Type::SpecialForm(special_form) => Some(special_form),
+            _ => None,
+        }
+    }
+
     pub(crate) const fn as_class_literal(self) -> Option<ClassLiteral<'db>> {
         match self {
             Type::ClassLiteral(class_type) => Some(class_type),

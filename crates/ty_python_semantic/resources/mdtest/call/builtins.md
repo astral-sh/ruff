@@ -163,7 +163,7 @@ def _(x: A | B, y: list[int]):
         reveal_type(isinstance(x, B))  # revealed: Literal[True]
 ```
 
-Certain special forms in the typing module are not instances of `type`, so are strictly-spekaing
+Certain special forms in the typing module are not instances of `type`, so are strictly-speaking
 disallowed as the second argument to `isinstance()` according to typeshed's annotations. However, at
 runtime they work fine as the second argument, and we implement that special case in ty:
 
@@ -182,6 +182,11 @@ isinstance("", t.Deque)
 isinstance("", t.OrderedDict)
 isinstance("", t.Callable)
 isinstance("", t.Type)
+isinstance("", t.Callable | t.Deque)
+
+# `Any` is valid in `issubclass()` calls but not `isinstance()` calls
+issubclass(list, t.Any)
+issubclass(list, t.Any | t.Dict)
 ```
 
 But for other special forms that are not permitted as the second argument, we still emit an error:
@@ -190,4 +195,5 @@ But for other special forms that are not permitted as the second argument, we st
 isinstance("", t.TypeGuard)  # error: [invalid-argument-type]
 isinstance("", t.ClassVar)  # error: [invalid-argument-type]
 isinstance("", t.Final)  # error: [invalid-argument-type]
+isinstance("", t.Any)  # error: [invalid-argument-type]
 ```

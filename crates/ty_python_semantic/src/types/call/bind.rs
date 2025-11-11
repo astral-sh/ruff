@@ -3665,23 +3665,9 @@ impl<'db> BindingError<'db> {
                             .and_then(|function| function.known(context.db())),
                         Some(KnownFunction::IsInstance | KnownFunction::IsSubclass)
                     )
-                    && matches!(
-                        provided_ty,
-                        Type::SpecialForm(
-                            SpecialFormType::Callable
-                                | SpecialFormType::ChainMap
-                                | SpecialFormType::Counter
-                                | SpecialFormType::DefaultDict
-                                | SpecialFormType::Deque
-                                | SpecialFormType::FrozenSet
-                                | SpecialFormType::Dict
-                                | SpecialFormType::List
-                                | SpecialFormType::OrderedDict
-                                | SpecialFormType::Set
-                                | SpecialFormType::Tuple
-                                | SpecialFormType::Type
-                        )
-                    )
+                    && provided_ty
+                        .as_special_form()
+                        .is_some_and(SpecialFormType::is_valid_isinstance_target)
                 {
                     return;
                 }
