@@ -211,41 +211,45 @@ help: Add `raise` keyword
 71 +     raise UserWarning("This is an assertion error")  # PLW0133
 72 | 
 73 | 
-74 | # Non-violation test cases: PLW0133
+74 | # Test case 12: Useless exception statement at module level
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
-   --> useless_exception_statement.py:126:1
-    |
-124 | import builtins
-125 |
-126 | builtins.TypeError("still an exception even though it's an Attribute")
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-127 |
-128 | PythonFinalizationError("Added in Python 3.13")
-    |
+  --> useless_exception_statement.py:77:1
+   |
+75 | import builtins
+76 |
+77 | builtins.TypeError("still an exception even though it's an Attribute")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+78 |
+79 | PythonFinalizationError("Added in Python 3.13")
+   |
 help: Add `raise` keyword
-123 | 
-124 | import builtins
-125 | 
-    - builtins.TypeError("still an exception even though it's an Attribute")
-126 + raise builtins.TypeError("still an exception even though it's an Attribute")
-127 | 
-128 | PythonFinalizationError("Added in Python 3.13")
+74 | # Test case 12: Useless exception statement at module level
+75 | import builtins
+76 | 
+   - builtins.TypeError("still an exception even though it's an Attribute")
+77 + raise builtins.TypeError("still an exception even though it's an Attribute")
+78 | 
+79 | PythonFinalizationError("Added in Python 3.13")
+80 | 
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
-   --> useless_exception_statement.py:128:1
-    |
-126 | builtins.TypeError("still an exception even though it's an Attribute")
-127 |
-128 | PythonFinalizationError("Added in Python 3.13")
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
+  --> useless_exception_statement.py:79:1
+   |
+77 | builtins.TypeError("still an exception even though it's an Attribute")
+78 |
+79 | PythonFinalizationError("Added in Python 3.13")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Add `raise` keyword
-125 | 
-126 | builtins.TypeError("still an exception even though it's an Attribute")
-127 | 
-    - PythonFinalizationError("Added in Python 3.13")
-128 + raise PythonFinalizationError("Added in Python 3.13")
+76 | 
+77 | builtins.TypeError("still an exception even though it's an Attribute")
+78 | 
+   - PythonFinalizationError("Added in Python 3.13")
+79 + raise PythonFinalizationError("Added in Python 3.13")
+80 | 
+81 | 
+82 | # Non-violation test cases: PLW0133
 note: This is an unsafe fix and may change runtime behavior

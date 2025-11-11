@@ -71,6 +71,14 @@ def func():
     UserWarning("This is an assertion error")  # PLW0133
 
 
+# Test case 12: Useless exception statement at module level
+import builtins
+
+builtins.TypeError("still an exception even though it's an Attribute")
+
+PythonFinalizationError("Added in Python 3.13")
+
+
 # Non-violation test cases: PLW0133
 
 
@@ -120,9 +128,3 @@ def func():
     with suppress(AttributeError):
         raise AttributeError("This is an exception")  # OK
 
-
-import builtins
-
-builtins.TypeError("still an exception even though it's an Attribute")
-
-PythonFinalizationError("Added in Python 3.13")
