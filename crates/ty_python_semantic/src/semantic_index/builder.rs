@@ -1465,9 +1465,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // reasons but it works well for most practical purposes. In particular it's nice
                 // that `x` can be freely overwritten, and that we don't assume that an import
                 // in one function is visible in another function.
-                if node.module.is_some()
-                    && self.current_scope().is_global()
-                    && self.file.is_package(self.db)
+                let mut is_self_import = false;
+                if self.file.is_package(self.db)
                     && let Ok(module_name) = ModuleName::from_identifier_parts(
                         self.db,
                         self.file,
@@ -1475,19 +1474,26 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         node.level,
                     )
                     && let Ok(thispackage) = ModuleName::package_for_file(self.db, self.file)
-                    && let Some(relative_submodule) = module_name.relative_to(&thispackage)
-                    && let Some(direct_submodule) = relative_submodule.components().next()
-                    && !self.seen_submodule_imports.contains(direct_submodule)
                 {
-                    self.seen_submodule_imports
-                        .insert(direct_submodule.to_owned());
+                    // Record whether this is equivalent to `from . import ...`
+                    is_self_import = module_name == thispackage;
 
-                    let direct_submodule_name = Name::new(direct_submodule);
-                    let symbol = self.add_symbol(direct_submodule_name);
-                    self.add_definition(
-                        symbol.into(),
-                        ImportFromSubmoduleDefinitionNodeRef { node },
-                    );
+                    if node.module.is_some()
+                        && let Some(relative_submodule) = module_name.relative_to(&thispackage)
+                        && let Some(direct_submodule) = relative_submodule.components().next()
+                        && !self.seen_submodule_imports.contains(direct_submodule)
+                        && self.current_scope().is_global()
+                    {
+                        self.seen_submodule_imports
+                            .insert(direct_submodule.to_owned());
+
+                        let direct_submodule_name = Name::new(direct_submodule);
+                        let symbol = self.add_symbol(direct_submodule_name);
+                        self.add_definition(
+                            symbol.into(),
+                            ImportFromSubmoduleDefinitionNodeRef { node },
+                        );
+                    }
                 }
 
                 let mut found_star = false;
@@ -1599,13 +1605,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // It's re-exported if it's `from ... import x as x`
                         (&asname.id, asname.id == alias.name.id)
                     } else {
-                        // It's re-exported if it's `from . import x` in an `__init__.pyi`
-                        (
-                            &alias.name.id,
-                            node.level == 1
-                                && node.module.is_none()
-                                && self.file.is_package(self.db),
-                        )
+                        // As a non-standard rule to handle stubs in the wild, we consider
+                        // `from . import x` and `from whatever.thispackage import x` in an
+                        // `__init__.pyi` to re-export `x` (as long as it wasn't renamed)
+                        (&alias.name.id, is_self_import)
                     };
 
                     // Look for imports `from __future__ import annotations`, ignore `as ...`

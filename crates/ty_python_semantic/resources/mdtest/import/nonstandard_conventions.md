@@ -29,7 +29,8 @@ defining symbols *at all* and re-exporting them.
 
 ## Relative `from` Import of Direct Submodule in `__init__`
 
-We consider the `from . import submodule` idiom in an `__init__.pyi` an explicit re-export.
+We consider the `from . import submodule` idiom in an `__init__.pyi` an explicit re-export. This
+pattern is observed in the wild with various stub packages.
 
 ### In Stub
 
@@ -94,8 +95,7 @@ reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ## Absolute `from` Import of Direct Submodule in `__init__`
 
 If an absolute `from...import` happens to import a submodule (i.e. it's equivalent to
-`from . import y`) we do not treat it as a re-export. We could, but we don't. (This is an arbitrary
-decision and can be changed!)
+`from . import y`) we also treat it as a re-export.
 
 ### In Stub
 
@@ -122,9 +122,7 @@ Y: int = 47
 ```py
 import mypackage
 
-# TODO: this could work and would be nice to have?
-# error: "has no member `imported`"
-reveal_type(mypackage.imported.X)  # revealed: Unknown
+reveal_type(mypackage.imported.X)  # revealed: int
 # error: "has no member `fails`"
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
