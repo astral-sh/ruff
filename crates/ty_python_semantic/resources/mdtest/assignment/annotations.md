@@ -674,8 +674,7 @@ x6: Covariant[Any] = covariant(1)
 x7: Contravariant[Any] = contravariant(1)
 x8: Invariant[Any] = invariant(1)
 
-# TODO: This could reveal `Bivariant[Any]`.
-reveal_type(x5)  # revealed: Bivariant[Literal[1]]
+reveal_type(x5)  # revealed: Bivariant[Any]
 reveal_type(x6)  # revealed: Covariant[Any]
 reveal_type(x7)  # revealed: Contravariant[Any]
 reveal_type(x8)  # revealed: Invariant[Any]
