@@ -328,6 +328,58 @@ impl SpecialFormType {
         }
     }
 
+    /// Return `true` if this special form is valid as the second argument
+    /// to `issubclass()` and `isinstance()` calls.
+    pub(super) const fn is_valid_isinstance_target(self) -> bool {
+        match self {
+            Self::Callable
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::FrozenSet
+            | Self::Dict
+            | Self::List
+            | Self::OrderedDict
+            | Self::Set
+            | Self::Tuple
+            | Self::Type
+            | Self::Protocol
+            | Self::Generic => true,
+
+            Self::AlwaysFalsy
+            | Self::AlwaysTruthy
+            | Self::Annotated
+            | Self::Bottom
+            | Self::CallableTypeOf
+            | Self::ClassVar
+            | Self::Concatenate
+            | Self::Final
+            | Self::Intersection
+            | Self::Literal
+            | Self::LiteralString
+            | Self::Never
+            | Self::NoReturn
+            | Self::Not
+            | Self::ReadOnly
+            | Self::Required
+            | Self::TypeAlias
+            | Self::TypeGuard
+            | Self::NamedTuple
+            | Self::NotRequired
+            | Self::Optional
+            | Self::Top
+            | Self::TypeIs
+            | Self::TypedDict
+            | Self::TypingSelf
+            | Self::Union
+            | Self::Unknown
+            | Self::TypeOf
+            | Self::Any  // can be used in `issubclass()` but not `isinstance()`.
+            | Self::Unpack => false,
+        }
+    }
+
     /// Return the repr of the symbol at runtime
     pub(super) const fn repr(self) -> &'static str {
         match self {
