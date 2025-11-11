@@ -17,12 +17,14 @@ const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("numpy", "np"),
     ("numpy.typing", "npt"),
     ("pandas", "pd"),
+    ("plotly.express", "px"),
+    ("plotly.graph_objects", "go"),
     ("seaborn", "sns"),
+    ("statsmodels.api", "sm"),
     ("tensorflow", "tf"),
     ("tkinter", "tk"),
     ("holoviews", "hv"),
     ("panel", "pn"),
-    ("plotly.express", "px"),
     ("polars", "pl"),
     ("pyarrow", "pa"),
     ("xml.etree.ElementTree", "ET"),
@@ -73,11 +75,18 @@ pub fn default_aliases() -> FxHashMap<String, String> {
         .collect::<FxHashMap<_, _>>()
 }
 
+pub fn default_banned_aliases() -> FxHashMap<String, BannedAliases> {
+    FxHashMap::from_iter([(
+        "geopandas".to_string(),
+        BannedAliases::from_iter(["gpd".to_string()]),
+    )])
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
             aliases: default_aliases(),
-            banned_aliases: FxHashMap::default(),
+            banned_aliases: default_banned_aliases(),
             banned_from: FxHashSet::default(),
         }
     }

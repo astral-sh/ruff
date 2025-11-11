@@ -204,4 +204,20 @@ mod tests {
         assert_diagnostics!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn missing_conventions() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_import_conventions/missing_conventions.py"),
+            &LinterSettings {
+                flake8_import_conventions: super::settings::Settings::default(),
+                ..LinterSettings::for_rules([
+                    Rule::UnconventionalImportAlias,
+                    Rule::BannedImportAlias,
+                ])
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
 }

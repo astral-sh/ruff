@@ -1,0 +1,32 @@
+---
+source: crates/ruff_linter/src/rules/flake8_import_conventions/mod.rs
+---
+ICN001 `plotly.graph_objects` should be imported as `go`
+ --> missing_conventions.py:4:8
+  |
+3 | # ICN001: plotly.graph_objects should be imported as go
+4 | import plotly.graph_objects  # should require alias
+  |        ^^^^^^^^^^^^^^^^^^^^
+5 | import plotly.graph_objects as go  # ok
+  |
+help: Alias `plotly.graph_objects` to `go`
+
+ICN001 `statsmodels.api` should be imported as `sm`
+ --> missing_conventions.py:8:8
+  |
+7 | # ICN001: statsmodels.api should be imported as sm
+8 | import statsmodels.api  # should require alias
+  |        ^^^^^^^^^^^^^^^
+9 | import statsmodels.api as sm  # ok
+  |
+help: Alias `statsmodels.api` to `sm`
+
+ICN002 `geopandas` should not be imported as `gpd`
+  --> missing_conventions.py:12:1
+   |
+11 | # ICN002: geopandas should not be imported as gpd
+12 | import geopandas as gpd  # banned
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+13 | import geopandas  # ok
+14 | import geopandas as gdf  # ok
+   |
