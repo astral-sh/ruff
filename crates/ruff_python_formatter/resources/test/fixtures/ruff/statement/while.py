@@ -56,3 +56,9 @@ def foo():
 # comment
     else:
         pass
+
+while True:
+    first;second
+    # comment
+else:
+    pass

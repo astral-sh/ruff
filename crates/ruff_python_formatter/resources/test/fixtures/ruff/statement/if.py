@@ -324,3 +324,9 @@ def foo():
 # comment
     else:
         pass
+
+if True:
+    first;second
+    # comment
+else:
+    pass
