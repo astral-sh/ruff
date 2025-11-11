@@ -678,9 +678,31 @@ fn handle_own_line_comment_after_branch<'a>(
     preceding: AnyNodeRef<'a>,
     source: &str,
 ) -> CommentPlacement<'a> {
-    let Some(last_child) = preceding.last_child_in_body() else {
-        return CommentPlacement::Default(comment);
-    };
+    // If the preceding node has a body, we want the last child - e.g.
+    //
+    // ```python
+    // if True:
+    //     def foo():
+    //         something
+    //         last_child
+    //             # comment
+    // else:
+    //     pass
+    // ```
+    //
+    // Otherwise, the preceding node is the last statement in the body
+    // of the preceding branch, in which case we can take it as our
+    // `last_child` here - e.g.
+    //
+    // ```python
+    // if True:
+    //     something
+    //     last_child
+    //         # comment
+    // else:
+    //     pass
+    // ```
+    let last_child = preceding.last_child_in_body().unwrap_or(preceding);
 
     // We only care about the length because indentations with mixed spaces and tabs are only valid if
     // the indent-level doesn't depend on the tab width (the indent level must be the same if the tab width is 1 or 8).
