@@ -63,11 +63,11 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
     // This allows: func(arg), func(name=arg), and func(arg, dir_fd=None)
     let has_positional_arg = call.arguments.args.len() == 1;
     let has_keyword_arg = call.arguments.find_keyword(fn_argument).is_some();
-    
+
     if !has_positional_arg && !has_keyword_arg {
         return;
     }
-    
+
     // If we have both positional and keyword for the main argument, that's invalid
     if has_positional_arg && has_keyword_arg {
         return;
