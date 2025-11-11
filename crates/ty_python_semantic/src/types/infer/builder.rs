@@ -3741,23 +3741,77 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assignable
             };
 
+        let emit_invalid_final = |builder: &Self| {
+            if emit_diagnostics {
+                if let Some(builder) = builder.context.report_lint(&INVALID_ASSIGNMENT, target) {
+                    builder.into_diagnostic(format_args!(
+                        "Cannot assign to final attribute `{attribute}` on type `{}`",
+                        object_ty.display(db)
+                    ));
+                }
+            }
+        };
+
         // Return true (and emit a diagnostic) if this is an invalid assignment to a `Final` attribute.
+        // Per PEP 591 and the typing conformance suite, Final instance attributes can be assigned
+        // in __init__ methods. Multiple assignments within __init__ are allowed (matching mypy
+        // and pyright behavior), as long as the attribute doesn't have a class-level value.
         let invalid_assignment_to_final = |builder: &Self, qualifiers: TypeQualifiers| -> bool {
-            if qualifiers.contains(TypeQualifiers::FINAL) {
-                if emit_diagnostics {
-                    if let Some(builder) = builder.context.report_lint(&INVALID_ASSIGNMENT, target)
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "Cannot assign to final attribute `{attribute}` \
-                                         on type `{}`",
-                            object_ty.display(db)
-                        ));
+            // Check if it's a Final attribute
+            if !qualifiers.contains(TypeQualifiers::FINAL) {
+                return false;
+            }
+
+            // Check if we're in an __init__ method (where Final attributes can be initialized).
+            let is_in_init = builder
+                .current_function_definition()
+                .is_some_and(|func| func.name.id == "__init__");
+
+            // Not in __init__ - always disallow
+            if !is_in_init {
+                emit_invalid_final(builder);
+                return true;
+            }
+
+            // We're in __init__ - verify we're in a method of the class being mutated
+            let Some(class_ty) = builder.class_context_of_current_method() else {
+                // Not a method (standalone function named __init__)
+                emit_invalid_final(builder);
+                return true;
+            };
+
+            // Check that object_ty is an instance of the class we're in
+            if !object_ty.is_subtype_of(builder.db(), Type::instance(builder.db(), class_ty)) {
+                // Assigning to a different class's Final attribute
+                emit_invalid_final(builder);
+                return true;
+            }
+
+            // Check if class-level attribute already has a value
+            {
+                let class_definition = class_ty.class_literal(db).0;
+                let class_scope_id = class_definition.body_scope(db).file_scope_id(db);
+                let place_table = builder.index.place_table(class_scope_id);
+
+                if let Some(symbol) = place_table.symbol_by_name(attribute) {
+                    if symbol.is_bound() {
+                        if emit_diagnostics {
+                            if let Some(diag_builder) =
+                                builder.context.report_lint(&INVALID_ASSIGNMENT, target)
+                            {
+                                diag_builder.into_diagnostic(format_args!(
+                                    "Cannot assign to final attribute `{attribute}` in `__init__` \
+                                                     because it already has a value at class level"
+                                ));
+                            }
+                        }
+                        return true;
                     }
                 }
-                true
-            } else {
-                false
             }
+
+            // In __init__ and no class-level value - allow
+            false
         };
 
         match object_ty {
