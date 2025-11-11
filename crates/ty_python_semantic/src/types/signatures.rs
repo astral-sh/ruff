@@ -651,22 +651,6 @@ impl<'db> Signature<'db> {
         inferable: InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        self.is_equivalent_to_inner(db, other, inferable, visitor)
-            .reduce_inferable(db, inferable)
-    }
-
-    fn is_equivalent_to_inner(
-        &self,
-        db: &'db dyn Db,
-        other: &Signature<'db>,
-        inferable: InferableTypeVars<'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        // The typevars in self and other should also be considered inferable when checking whether
-        // two signatures are equivalent.
-        let inferable = inferable.merge(db, self.inferable_typevars(db));
-        let inferable = inferable.merge(db, other.inferable_typevars(db));
-
         let mut result = ConstraintSet::always(inferable);
         let mut check_types = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
             let self_type = self_type.unwrap_or(Type::unknown());
@@ -756,15 +740,23 @@ impl<'db> Signature<'db> {
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        self.has_relation_to_inner(
+        // If this callable is generic, then `inner` will add all of our typevars to the
+        // `inferable` set, since we only need to find one specialization that causes the check to
+        // succeed.
+        let when = self.has_relation_to_inner(
             db,
             other,
             inferable,
             relation,
             relation_visitor,
             disjointness_visitor,
-        )
-        .reduce_inferable(db, inferable)
+        );
+
+        // But the caller does not need to consider those extra typevars. Whatever constraint set
+        // we produce, we reduce it back down to the inferable set that the caller asked about.
+        // If we introduced new inferable typevars, those will be existentially quantified away
+        // before returning.
+        when.reduce_inferable(db, inferable)
     }
 
     fn has_relation_to_inner(
