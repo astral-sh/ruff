@@ -26,6 +26,10 @@ impl<'a> Locator<'a> {
         }
     }
 
+    pub fn as_str(&self) -> &'a str {
+        self.contents
+    }
+
     #[deprecated(
         note = "This is expensive, avoid using outside of the diagnostic phase. Prefer the other `Locator` methods instead."
     )]

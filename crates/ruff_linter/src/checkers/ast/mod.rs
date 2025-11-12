@@ -499,6 +499,11 @@ impl<'a> Checker<'a> {
         self.parsed.tokens()
     }
 
+    #[cfg_attr(not(feature = "ext-lint"), allow(dead_code))]
+    pub(crate) fn owned_source_file(&self) -> SourceFile {
+        self.context.owned_source_file()
+    }
+
     /// The [`Locator`] for the current file, which enables extraction of source code from byte
     /// offsets.
     pub(crate) const fn locator(&self) -> &'a Locator<'a> {
@@ -3593,6 +3598,10 @@ impl<'a> LintContext<'a> {
     #[inline]
     pub(crate) fn into_parts(self) -> (Vec<Diagnostic>, LazySourceFile<'a>) {
         (self.diagnostics.into_inner(), self.source_file)
+    }
+
+    pub(crate) fn owned_source_file(&self) -> SourceFile {
+        self.source_file().clone()
     }
 
     #[inline]
