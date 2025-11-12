@@ -756,13 +756,13 @@ fn parse_raises_numpy(content: &str) -> Vec<QualifiedName<'_>> {
     };
     let indentation = &dashes[..dashes.len() - dashes.trim_start().len()];
     for potential in lines {
-        // Check for Sphinx directives (lines starting with ..) - these indicate the end of the section
-        // In numpy-style, exceptions are dedented to the same level as sphinx directives
-        let trimmed = potential.trim_start();
-        if trimmed.starts_with("..") {
-            break;
-        }
         if let Some(entry) = potential.strip_prefix(indentation) {
+            // Check for Sphinx directives (lines starting with ..) - these indicate the end of the
+            // section. In numpy-style, exceptions are dedented to the same level as sphinx
+            // directives.
+            if entry.starts_with("..") {
+                break;
+            }
             if let Some(first_char) = entry.chars().next() {
                 if !first_char.is_whitespace() {
                     entries.push(QualifiedName::user_defined(entry.trim_end()));

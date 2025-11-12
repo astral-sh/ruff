@@ -132,3 +132,18 @@ def foo():
         The ``init_kwargs`` argument.
     """
     raise ValueError
+
+# Make sure we don't bail out on a Sphinx directive in the description of one
+# of the exceptions
+def foo():
+    """First line.
+
+    Raises
+    ------
+    ValueError
+        some text
+        .. math:: e^{xception}
+    ZeroDivisionError
+        Will not be raised, DOC502
+    """
+    raise ValueError
