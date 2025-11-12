@@ -628,22 +628,21 @@ pub fn definitions_for_name<'db>(
         // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
         if matches!(name_str, "float" | "complex")
             && let Some(union) = name.inferred_type(&SemanticModel::new(db, file)).as_union()
+            && is_float_or_complex_annotation(db, union, name_str)
         {
-            if is_float_or_complex_annotation(db, union, name_str) {
-                return union
-                    .elements(db)
-                    .iter()
-                    .filter_map(|ty| ty.as_nominal_instance())
-                    .flat_map(|instance| {
-                        resolve_definition(
-                            db,
-                            instance.class_literal(db).definition(db),
-                            Some(name_str),
-                            ImportAliasResolution::ResolveAliases,
-                        )
-                    })
-                    .collect();
-            }
+            return union
+                .elements(db)
+                .iter()
+                .filter_map(|ty| ty.as_nominal_instance())
+                .flat_map(|instance| {
+                    resolve_definition(
+                        db,
+                        instance.class_literal(db).definition(db),
+                        Some(name_str),
+                        ImportAliasResolution::ResolveAliases,
+                    )
+                })
+                .collect();
         }
 
         find_symbol_in_scope(db, builtins_scope, name_str)

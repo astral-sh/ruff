@@ -1186,10 +1186,10 @@ result = check(None)
                 a: int
                 b: bool
                 c: str
-                d: float
+                d: float  # TODO: Should be Class
                 e: list[int]
-                f: list[float]
-                g: int | float
+                f: list[float]  # TODO: Should be Class
+                g: int | float  # TODO: float should be Class
             "#,
         );
 
