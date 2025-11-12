@@ -792,6 +792,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
+                KnownInstanceType::Specialization(_) => {
+                    self.infer_type_expression(slice);
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "`ty_extensions.Specialization` is not allowed in type expressions",
+                        ));
+                    }
+                    Type::unknown()
+                }
                 KnownInstanceType::TypeVar(_) => {
                     self.infer_type_expression(slice);
                     todo_type!("TypeVar annotations")

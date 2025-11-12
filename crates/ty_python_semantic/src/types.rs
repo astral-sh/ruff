@@ -6716,6 +6716,10 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::GenericContext],
                     fallback_type: Type::unknown(),
                 }),
+                KnownInstanceType::Specialization(__call__) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Specialization],
+                    fallback_type: Type::unknown(),
+                }),
                 KnownInstanceType::SubscriptedProtocol(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec_inline![
                         InvalidTypeExpression::Protocol
@@ -7986,6 +7990,10 @@ pub enum KnownInstanceType<'db> {
     /// `ty_extensions.GenericContext`.
     GenericContext(GenericContext<'db>),
 
+    /// A specialization, which is exposed in mdtests as an instance of
+    /// `ty_extensions.Specialization`.
+    Specialization(Specialization<'db>),
+
     /// A single instance of `types.UnionType`, which stores the left- and
     /// right-hand sides of a PEP 604 union.
     UnionType(InternedTypes<'db>),
@@ -8025,7 +8033,8 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         }
         KnownInstanceType::Deprecated(_)
         | KnownInstanceType::ConstraintSet(_)
-        | KnownInstanceType::GenericContext(_) => {
+        | KnownInstanceType::GenericContext(_)
+        | KnownInstanceType::Specialization(_) => {
             // Nothing to visit
         }
         KnownInstanceType::Field(field) => {
@@ -8088,7 +8097,10 @@ impl<'db> KnownInstanceType<'db> {
                 newtype
                     .map_base_class_type(db, |class_type| class_type.normalized_impl(db, visitor)),
             ),
-            Self::Deprecated(_) | Self::ConstraintSet(_) | Self::GenericContext(_) => {
+            Self::Deprecated(_)
+            | Self::ConstraintSet(_)
+            | Self::GenericContext(_)
+            | Self::Specialization(_) => {
                 // Nothing to normalize
                 self
             }
@@ -8110,6 +8122,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Field(_) => KnownClass::Field,
             Self::ConstraintSet(_) => KnownClass::ConstraintSet,
             Self::GenericContext(_) => KnownClass::GenericContext,
+            Self::Specialization(_) => KnownClass::Specialization,
             Self::UnionType(_) => KnownClass::UnionType,
             Self::Literal(_)
             | Self::Annotated(_)
@@ -8200,6 +8213,13 @@ impl<'db> KnownInstanceType<'db> {
                             f,
                             "ty_extensions.GenericContext{}",
                             generic_context.display_full(self.db)
+                        )
+                    }
+                    KnownInstanceType::Specialization(specialization) => {
+                        write!(
+                            f,
+                            "ty_extensions.Specialization{}",
+                            specialization.display(self.db)
                         )
                     }
                     KnownInstanceType::UnionType(_) => f.write_str("types.UnionType"),
@@ -8450,6 +8470,8 @@ enum InvalidTypeExpression<'db> {
     ConstraintSet,
     /// Same for `ty_extensions.GenericContext`
     GenericContext,
+    /// Same for `ty_extensions.Specialization`
+    Specialization,
     /// Same for `typing.TypedDict`
     TypedDict,
     /// Type qualifiers are always invalid in *type expressions*,
@@ -8503,6 +8525,9 @@ impl<'db> InvalidTypeExpression<'db> {
                         f.write_str("`ty_extensions.ConstraintSet` is not allowed in type expressions")
                     }
                     InvalidTypeExpression::GenericContext => {
+                        f.write_str("`ty_extensions.GenericContext` is not allowed in type expressions")
+                    }
+                    InvalidTypeExpression::Specialization => {
                         f.write_str("`ty_extensions.GenericContext` is not allowed in type expressions")
                     }
                     InvalidTypeExpression::TypedDict => {
