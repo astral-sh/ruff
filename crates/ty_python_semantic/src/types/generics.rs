@@ -146,7 +146,10 @@ impl<'db> BoundTypeVarInstance<'db> {
 
 impl<'a, 'db> InferableTypeVars<'a, 'db> {
     pub(crate) fn merge(&'a self, other: &'a InferableTypeVars<'a, 'db>) -> Self {
-        InferableTypeVars::Two(self, other)
+        match (self, other) {
+            (InferableTypeVars::None, other) | (other, InferableTypeVars::None) => other.clone(),
+            _ => InferableTypeVars::Two(self, other),
+        }
     }
 
     // This is not an IntoIterator implementation because I have no desire to try to name the
