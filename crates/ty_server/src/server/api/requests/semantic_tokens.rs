@@ -42,14 +42,13 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
 
         let mut range = None;
 
-        if snapshot.document().is_cell() {
-            if let Some(notebook_document) = db.notebook_document(file)
-                && let Some(notebook) = source_text(db, file).as_notebook()
-            {
-                let cell_index = notebook_document.cell_index_by_uri(snapshot.url());
+        if snapshot.document().is_cell()
+            && let Some(notebook_document) = db.notebook_document(file)
+            && let Some(notebook) = source_text(db, file).as_notebook()
+        {
+            let cell_index = notebook_document.cell_index_by_uri(snapshot.url());
 
-                range = cell_index.and_then(|index| notebook.cell_range(index));
-            }
+            range = cell_index.and_then(|index| notebook.cell_range(index));
         }
 
         let lsp_tokens = generate_semantic_tokens(

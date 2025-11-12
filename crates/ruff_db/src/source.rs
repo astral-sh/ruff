@@ -48,13 +48,12 @@ fn is_notebook(system: &dyn System, path: &FilePath) -> bool {
         FilePath::Vendored(_) => return false,
     };
 
-    if let Some(source_type) = source_type {
-        source_type.is_ipynb()
-    } else {
-        path.extension().is_some_and(|extension| {
-            PySourceType::try_from_extension(extension) == Some(PySourceType::Ipynb)
-        })
-    }
+    let with_extension_fallback =
+        source_type.or_else(|| PySourceType::try_from_extension(path.extension()?));
+
+    tracing::debug!("with_extension_fallback: {:?}", with_extension_fallback);
+
+    with_extension_fallback == Some(PySourceType::Ipynb)
 }
 
 /// The source text of a file containing python code.

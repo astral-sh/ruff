@@ -68,6 +68,10 @@ pub trait System: Debug + Sync + Send {
 
     /// Returns the source type for `path` if known or `None`.
     ///
+    /// The default is to always return `None`, assuming the system
+    /// has no additional information and that the caller should
+    /// rely on the file extension instead.
+    ///
     /// This is primarily used for the LSP integration to respect
     /// the chosen language (or the fact that it is a notebook) in
     /// the editor.
@@ -77,6 +81,10 @@ pub trait System: Debug + Sync + Send {
     }
 
     /// Returns the source type for `path` if known or `None`.
+    ///
+    /// The default is to always return `None`, assuming the system
+    /// has no additional information and that the caller should
+    /// rely on the file extension instead.
     ///
     /// This is primarily used for the LSP integration to respect
     /// the chosen language (or the fact that it is a notebook) in

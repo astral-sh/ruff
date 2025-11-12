@@ -1,4 +1,3 @@
-use anyhow::Ok;
 use lsp_types::NotebookCellKind;
 use ruff_notebook::CellMetadata;
 use ruff_source_file::OneIndexed;
@@ -9,8 +8,9 @@ use crate::session::index::Index;
 
 /// A notebook document.
 ///
-/// The document only stores the metadata about its cell.
-/// Each cell is stored as a [`super::TextDocument`].
+/// This notebook document only stores the metadata about the notebook
+/// and the cell metadata. The cell contents are stored as separate
+/// [`super::TextDocument`]s (they can be looked up by the Cell's URL).
 #[derive(Clone, Debug)]
 pub struct NotebookDocument {
     url: lsp_types::Url,
@@ -21,7 +21,9 @@ pub struct NotebookDocument {
     cell_index: FxHashMap<lsp_types::Url, usize>,
 }
 
-/// A single cell within a notebook, which has text contents represented as a `TextDocument`.
+/// The metadata of a single cell within a notebook.
+///
+/// The cell's content are stored as a [`TextDocument`] and can be looked up by the Cell's URL.
 #[derive(Clone, Debug)]
 struct NotebookCell {
     /// The URL uniquely identifying the cell.
@@ -71,14 +73,21 @@ impl NotebookDocument {
             .cells
             .iter()
             .map(|cell| {
-                let source = ruff_notebook::SourceValue::String(
-                    index
-                        .document(&DocumentKey::from_url(&cell.url))
-                        .ok()
-                        .and_then(|document| document.as_text())
-                        .map(|text| text.contents().to_string())
-                        .unwrap_or_default(),
-                );
+                let cell_text =
+                    if let Ok(document) = index.document(&DocumentKey::from_url(&cell.url)) {
+                        if let Some(text_document) = document.as_text() {
+                            Some(text_document.contents().to_string())
+                        } else {
+                            tracing::warn!("Non-text document found for cell `{}`", cell.url);
+                            None
+                        }
+                    } else {
+                        tracing::warn!("Text document not found for cell `{}`", cell.url);
+                        None
+                    }
+                    .unwrap_or_default();
+
+                let source = ruff_notebook::SourceValue::String(cell_text);
                 match cell.kind {
                     NotebookCellKind::Code => ruff_notebook::Cell::Code(ruff_notebook::CodeCell {
                         execution_count: cell
@@ -115,7 +124,7 @@ impl NotebookDocument {
     pub(crate) fn update(
         &mut self,
         array: lsp_types::NotebookCellArrayChange,
-        cells: Vec<lsp_types::NotebookCell>,
+        updated_cells: Vec<lsp_types::NotebookCell>,
         metadata_change: Option<serde_json::Map<String, serde_json::Value>>,
         version: DocumentVersion,
     ) -> crate::Result<()> {
@@ -143,7 +152,7 @@ impl NotebookDocument {
             );
         }
 
-        for cell in cells {
+        for cell in updated_cells {
             if let Some(existing_cell_index) = self.cell_index.get(&cell.document).copied() {
                 self.cells[existing_cell_index].kind = cell.kind;
             }

@@ -31,13 +31,13 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
         let document = session
             .document_handle(&uri)
             .with_failure_code(ErrorCode::InternalError)?;
+        let is_cell = document.is_cell();
 
-        if !document.is_cell() {
+        if !is_cell {
             close_document(&document, session, client);
         }
 
         let url = document.url().clone();
-        let is_cell = document.is_cell();
 
         document
             .close(session)

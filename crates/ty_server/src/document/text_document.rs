@@ -7,6 +7,8 @@ use crate::system::AnySystemPath;
 
 pub(crate) type DocumentVersion = i32;
 
+/// A regular text file or the content of a notebook cell.
+///
 /// The state of an individual document in the server. Stays up-to-date
 /// with changes made by the user, including unsaved changes.
 #[derive(Debug, Clone)]

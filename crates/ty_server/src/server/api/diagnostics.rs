@@ -19,9 +19,6 @@ use crate::session::client::Client;
 use crate::system::{AnySystemPath, file_to_url};
 use crate::{PositionEncoding, Session};
 
-// THe real challenge here is that `to_lsp_range` now needs to
-// map to the cell document instead of the document. This is tricky.
-
 pub(super) struct Diagnostics {
     items: Vec<ruff_db::diagnostic::Diagnostic>,
     encoding: PositionEncoding,
@@ -143,7 +140,11 @@ pub(super) fn clear_diagnostics(uri: &lsp_types::Url, client: &Client) {
 /// Publishes the diagnostics for the given document snapshot using the [publish diagnostics
 /// notification].
 ///
-/// This function is a no-op if the client supports pull diagnostics.
+/// This function publishes the diagnostics for the entire notebook if `url` points to a notebook or a cell,
+/// even if the client supports pull diagnostics. This is because VS Code
+/// does not support pull diagnostics for notebooks or cells (as of 2025-11-12).
+///
+/// This function is a no-op for simple text files when the client supports pull diagnostics.
 ///
 /// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
 pub(super) fn publish_diagnostics(session: &Session, url: &lsp_types::Url, client: &Client) {
