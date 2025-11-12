@@ -77,6 +77,7 @@ from typing import TypedDict
 
 class Person(TypedDict):
     name: str
+    phone_number: str
 
 class Animal(TypedDict):
     name: str
@@ -86,13 +87,14 @@ def _(being: Person | Animal) -> None:
     being["legs"] = 4  # error: [invalid-key]
 ```
 
-## Unknown key for all elemens of a union
+## Unknown key for all elements of a union
 
 ```py
 from typing import TypedDict
 
 class Person(TypedDict):
     name: str
+    phone_number: str
 
 class Animal(TypedDict):
     name: str

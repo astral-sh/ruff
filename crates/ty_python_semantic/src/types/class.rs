@@ -3882,6 +3882,7 @@ pub enum KnownClass {
     SupportsIndex,
     Iterable,
     Iterator,
+    Mapping,
     // typing_extensions
     ExtensionsTypeVar, // must be distinct from typing.TypeVar, backports new features
     // Collections
@@ -3994,6 +3995,7 @@ impl KnownClass {
             | Self::ABCMeta
             | Self::Iterable
             | Self::Iterator
+            | Self::Mapping
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
@@ -4078,6 +4080,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::Mapping
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -4161,6 +4164,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::Mapping
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -4244,6 +4248,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::Mapping
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -4356,7 +4361,8 @@ impl KnownClass {
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
             | Self::Template
-            | KnownClass::Path => false,
+            | Self::Path
+            | Self::Mapping => false,
         }
     }
 
@@ -4429,6 +4435,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::Mapping
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -4517,6 +4524,7 @@ impl KnownClass {
             Self::Super => "super",
             Self::Iterable => "Iterable",
             Self::Iterator => "Iterator",
+            Self::Mapping => "Mapping",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
             Self::StdlibAlias => "_Alias",
             // This is the name the type of `sys.version_info` has in typeshed,
@@ -4805,6 +4813,7 @@ impl KnownClass {
             | Self::StdlibAlias
             | Self::Iterable
             | Self::Iterator
+            | Self::Mapping
             | Self::ProtocolMeta
             | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType
@@ -4924,6 +4933,7 @@ impl KnownClass {
             | Self::InitVar
             | Self::Iterable
             | Self::Iterator
+            | Self::Mapping
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
@@ -5012,6 +5022,7 @@ impl KnownClass {
             | Self::InitVar
             | Self::Iterable
             | Self::Iterator
+            | Self::Mapping
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
@@ -5073,6 +5084,7 @@ impl KnownClass {
             "TypeVar" => &[Self::TypeVar, Self::ExtensionsTypeVar],
             "Iterable" => &[Self::Iterable],
             "Iterator" => &[Self::Iterator],
+            "Mapping" => &[Self::Mapping],
             "ParamSpec" => &[Self::ParamSpec],
             "ParamSpecArgs" => &[Self::ParamSpecArgs],
             "ParamSpecKwargs" => &[Self::ParamSpecKwargs],
@@ -5205,6 +5217,7 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::Iterable
             | Self::Iterator
+            | Self::Mapping
             | Self::ProtocolMeta
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
             Self::Deprecated => matches!(module, KnownModule::Warnings | KnownModule::TypingExtensions),
