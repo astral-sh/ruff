@@ -64,10 +64,10 @@ use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 
-use crate::types::generics::InferableTypeVars;
+use crate::types::generics::{GenericContext, InferableTypeVars, Specialization};
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation,
-    TypeVarBoundOrConstraints, UnionType,
+    TypeVarBoundOrConstraints, UnionBuilder, UnionType,
 };
 use crate::{Db, FxOrderSet};
 
@@ -1023,6 +1023,91 @@ impl<'db> Node<'db> {
             Node::AlwaysTrue => Node::AlwaysTrue,
             Node::AlwaysFalse => Node::AlwaysFalse,
             Node::Interior(interior) => interior.abstract_one_inner(db, should_remove, map, path),
+        }
+    }
+
+    /// Invokes a callback for each of the representative types of a particular typevar for this
+    /// constraint set.
+    ///
+    /// There is a representative type for each distinct path from the BDD root to the `AlwaysTrue`
+    /// terminal. Each of those paths can be viewed as the conjunction of the individual
+    /// constraints of each internal node that we traverse as we walk that path. We choose the
+    /// "highest" (i.e. least upper bound) type that satisfies all of those constraints.
+    fn find_representative_types(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarIdentity<'db>,
+        mut f: impl FnMut(Type<'db>),
+    ) {
+        self.retain_one(db, bound_typevar)
+            .find_representative_types_inner(db, Type::Never, Type::object(), &mut f);
+    }
+
+    fn find_representative_types_inner(
+        self,
+        db: &'db dyn Db,
+        greatest_lower_bound: Type<'db>,
+        least_upper_bound: Type<'db>,
+        f: &mut dyn FnMut(Type<'db>),
+    ) {
+        match self {
+            Node::AlwaysTrue => {
+                // If we reach the `true` terminal, the path we've been following represents one
+                // representative type.
+
+                // If `lower ≰ upper`, then this path somehow represents in invalid specialization.
+                // That should have been removed from the BDD domain as part of the simplification
+                // process.
+                debug_assert!(greatest_lower_bound.is_subtype_of(db, least_upper_bound));
+
+                // We've been tracking the least upper bound that the types for this path must
+                // satisfy. We choose that lub as the representative type.
+                f(least_upper_bound);
+            }
+
+            Node::AlwaysFalse => {
+                // If we reach the `false` terminal, the path we've been following represents an
+                // invalid specialization, so we skip it.
+            }
+
+            Node::Interior(interior) => {
+                // For an interior node, there are two outgoing paths: one for the `if_true`
+                // branch, and one for the `if_false` branch.
+                //
+                // For the `if_true` branch, this node's constraint places additional restrictions
+                // on the types that satisfy the current path through the BDD. So we intersect the
+                // current glb/lub with the constraint's bounds to get the new glb/lub for the
+                // recursive call.
+                let constraint = interior.constraint(db);
+                let new_greatest_lower_bound = IntersectionType::from_elements(
+                    db,
+                    [greatest_lower_bound, constraint.lower(db)],
+                );
+                let new_least_upper_bound =
+                    IntersectionType::from_elements(db, [least_upper_bound, constraint.upper(db)]);
+                interior.if_true(db).find_representative_types_inner(
+                    db,
+                    new_greatest_lower_bound,
+                    new_least_upper_bound,
+                    f,
+                );
+
+                // For the `if_false` branch, then the types that satisfy the current path through
+                // the BDD do _not_ satisfy the node's constraint. Because we used `retain_one` to
+                // abstract the BDD to a single typevar, we don't need to worry about how that
+                // negative constraint affects the least upper bound. The abstraction process will
+                // have compared the negative constraint with all of the other constraints in the
+                // BDD, and added new interior nodes to handle the combination of those
+                // constraints. So we can recurse down the `if_false` branch without updating the
+                // lower/upper bounds, relying on the other constraints along the path to
+                // incorporate that negative "hole" in the set of valid types for this path.
+                interior.if_false(db).find_representative_types_inner(
+                    db,
+                    greatest_lower_bound,
+                    least_upper_bound,
+                    f,
+                );
+            }
         }
     }
 
@@ -2798,6 +2883,37 @@ impl<'db> BoundTypeVarInstance<'db> {
                 (non_gradual_constraints, gradual_constraints)
             }
         }
+    }
+}
+
+impl<'db> GenericContext<'db> {
+    pub(crate) fn specialize_constrained(
+        self,
+        db: &'db dyn Db,
+        constraints: ConstraintSet<'db>,
+    ) -> Result<Specialization<'db>, ()> {
+        let mut types = vec![Type::Never; self.len(db)];
+        for (i, bound_typevar) in self.variables(db).enumerate() {
+            // First we intersect with the valid specializations of this typevar, in case the
+            // constraint set is more permissive.
+            let abstracted = (constraints.node).and(db, bound_typevar.valid_specializations(db));
+
+            // Then we find all of the "representative types" for this typevar in the constraint
+            // set. This is a union type, where each element represents one of the ways that the
+            // constraint set can be satisfied. Each of those is a conjunction of individual
+            // constraints. We choose the "highest" (i.e. least upper bound, "closest to `object`")
+            // type that satisfies all of those individual constraints.
+            let mut builder = UnionBuilder::new(db);
+            abstracted.find_representative_types(db, bound_typevar.identity(db), |ty| {
+                builder.add_in_place(ty)
+            });
+            let Some(specialized_type) = builder.try_build() else {
+                // TODO: Construct a useful error here
+                return Err(());
+            };
+            types[i] = specialized_type;
+        }
+        Ok(self.specialize(db, types.into_boxed_slice()))
     }
 }
 
