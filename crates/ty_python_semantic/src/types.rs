@@ -1723,40 +1723,11 @@ impl<'db> Type<'db> {
             // constraint set. If the typevar has an upper bound or constraints, then the relation
             // only has to hold when the typevar has a valid specialization (i.e., one that
             // satisfies the upper bound/constraints).
-            (Type::TypeVar(lhs_bound_typevar), Type::TypeVar(rhs_bound_typevar)) => {
-                lhs_bound_typevar.valid_specializations(db).and(db, || {
-                    rhs_bound_typevar.valid_specializations(db).and(db, || {
-                        ConstraintSet::constrain_typevar(
-                            db,
-                            lhs_bound_typevar,
-                            Type::Never,
-                            Type::TypeVar(rhs_bound_typevar),
-                            relation,
-                        )
-                    })
-                })
-            }
             (Type::TypeVar(bound_typevar), _) => {
-                bound_typevar.valid_specializations(db).and(db, || {
-                    ConstraintSet::constrain_typevar(
-                        db,
-                        bound_typevar,
-                        Type::Never,
-                        target,
-                        relation,
-                    )
-                })
+                ConstraintSet::constrain_typevar(db, bound_typevar, Type::Never, target, relation)
             }
             (_, Type::TypeVar(bound_typevar)) => {
-                bound_typevar.valid_specializations(db).and(db, || {
-                    ConstraintSet::constrain_typevar(
-                        db,
-                        bound_typevar,
-                        self,
-                        Type::object(),
-                        relation,
-                    )
-                })
+                ConstraintSet::constrain_typevar(db, bound_typevar, self, Type::object(), relation)
             }
 
             // Everything is a subtype of `object`.
