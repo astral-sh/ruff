@@ -97,6 +97,9 @@ class GenericContext:
     alias.
     """
 
+class Specialization:
+    """A mapping of typevars to specific types"""
+
 # Predicates on types
 #
 # Ideally, these would be annotated using `TypeForm`, but that has not been

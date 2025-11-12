@@ -175,6 +175,7 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Field(_)
                 | KnownInstanceType::ConstraintSet(_)
                 | KnownInstanceType::GenericContext(_)
+                | KnownInstanceType::Specialization(_)
                 | KnownInstanceType::UnionType(_)
                 | KnownInstanceType::Literal(_)
                 // A class inheriting from a newtype would make intuitive sense, but newtype
