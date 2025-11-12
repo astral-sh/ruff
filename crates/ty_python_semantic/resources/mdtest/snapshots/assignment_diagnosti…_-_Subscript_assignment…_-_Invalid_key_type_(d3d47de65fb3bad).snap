@@ -19,12 +19,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
 # Diagnostics
 
 ```
-error[invalid-assignment]: Method `__setitem__` of type `bound method dict[str, int].__setitem__(key: str, value: int, /) -> None` cannot be called with a key of type `Literal[0]` and a value of type `Literal[3]` on object of type `dict[str, int]`
+error[invalid-assignment]: Cannot assign to `dict[str, int]` with key of type `Literal[0]` and a value of type `Literal[3]`
  --> src/mdtest_snippet.py:2:1
   |
 1 | config: dict[str, int] = {}
 2 | config[0] = 3  # error: [invalid-assignment]
-  | ^^^^^^
+  | ^^^^^^^-^^^^^
+  |        |
+  |        Expected key of type `str`, got `Literal[0]`
   |
 info: rule `invalid-assignment` is enabled by default
 

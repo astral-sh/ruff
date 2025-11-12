@@ -23,13 +23,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
 # Diagnostics
 
 ```
-error[invalid-assignment]: Cannot assign to a subscript on an object of type `ReadOnlyDict` with no `__setitem__` method
+error[invalid-assignment]: Cannot assign to a subscript on an object of type `ReadOnlyDict`
  --> src/mdtest_snippet.py:6:1
   |
 5 | config = ReadOnlyDict()
 6 | config["retries"] = 3  # error: [invalid-assignment]
-  | ^^^^^^
+  | ^^^^^^^^^^^^^^^^^
   |
+info: `ReadOnlyDict` may be missing a `__setitem__` method.
 info: rule `invalid-assignment` is enabled by default
 
 ```

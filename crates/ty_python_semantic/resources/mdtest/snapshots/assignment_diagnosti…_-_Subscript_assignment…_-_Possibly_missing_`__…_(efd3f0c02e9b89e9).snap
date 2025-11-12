@@ -19,12 +19,12 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
 # Diagnostics
 
 ```
-error[invalid-assignment]: Cannot assign to a subscript on an object of type `None` with no `__setitem__` method
+error[invalid-assignment]: Cannot assign to a subscript on an object of type `None`
  --> src/mdtest_snippet.py:2:5
   |
 1 | def _(config: dict[str, int] | None) -> None:
 2 |     config["retries"] = 3  # error: [invalid-assignment]
-  |     ^^^^^^
+  |     ^^^^^^^^^^^^^^^^^
   |
 info: The full type of the subscripted object is `dict[str, int] | None`
 info: rule `invalid-assignment` is enabled by default

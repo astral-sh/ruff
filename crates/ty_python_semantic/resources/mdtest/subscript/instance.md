@@ -76,7 +76,7 @@ a[0] = 0
 class NoSetitem: ...
 
 a = NoSetitem()
-a[0] = 0  # error: "Cannot assign to a subscript on an object of type `NoSetitem` with no `__setitem__` method"
+a[0] = 0  # error: "Cannot assign to a subscript on an object of type `NoSetitem`"
 ```
 
 ## `__setitem__` not callable

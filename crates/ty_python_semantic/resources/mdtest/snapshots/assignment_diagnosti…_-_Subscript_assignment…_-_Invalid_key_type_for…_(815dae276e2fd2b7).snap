@@ -24,7 +24,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
 # Diagnostics
 
 ```
-error[invalid-key]: Cannot access `Config` with a key of type `Literal[0]`. Only string literals are allowed as keys on TypedDicts.
+error[invalid-key]: TypedDict `Config` can only be subscripted with string literal keys, got key type `Literal[0]`.
  --> src/mdtest_snippet.py:7:12
   |
 6 | def _(config: Config) -> None:
