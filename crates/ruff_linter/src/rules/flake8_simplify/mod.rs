@@ -61,6 +61,7 @@ mod tests {
 
     #[test_case(Rule::SplitStaticString, Path::new("SIM905.py"))]
     #[test_case(Rule::DictGetWithNoneDefault, Path::new("SIM910.py"))]
+    #[test_case(Rule::EnumerateForLoop, Path::new("SIM113.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
