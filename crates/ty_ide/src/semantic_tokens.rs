@@ -1203,15 +1203,15 @@ result = check(None)
         "str" @ 43..46: Class
         "d" @ 51..52: Variable
         "float" @ 54..59: Variable
-        "e" @ 64..65: Variable
-        "list" @ 67..71: Class
-        "int" @ 72..75: Class
-        "f" @ 81..82: Variable
-        "list" @ 84..88: Class
-        "float" @ 89..94: Variable
-        "g" @ 100..101: Variable
-        "int" @ 103..106: Class
-        "float" @ 109..114: Variable
+        "e" @ 89..90: Variable
+        "list" @ 92..96: Class
+        "int" @ 97..100: Class
+        "f" @ 106..107: Variable
+        "list" @ 109..113: Class
+        "float" @ 114..119: Variable
+        "g" @ 150..151: Variable
+        "int" @ 153..156: Class
+        "float" @ 159..164: Variable
         "#);
     }
 

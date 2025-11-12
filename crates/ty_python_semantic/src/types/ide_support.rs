@@ -634,13 +634,10 @@ pub fn definitions_for_name<'db>(
                 .elements(db)
                 .iter()
                 .filter_map(|ty| ty.as_nominal_instance())
-                .flat_map(|instance| {
-                    resolve_definition(
-                        db,
-                        instance.class_literal(db).definition(db),
-                        Some(name_str),
-                        ImportAliasResolution::ResolveAliases,
-                    )
+                .map(|instance| {
+                    let definition = instance.class_literal(db).definition(db);
+                    let parsed = parsed_module(db, definition.file(db));
+                    ResolvedDefinition::FileWithRange(definition.focus_range(db, &parsed.load(db)))
                 })
                 .collect();
         }
