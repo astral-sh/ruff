@@ -48,3 +48,13 @@ SIM113 Use `enumerate()` for index variable `idx` in `for` loop
    |         ^^^^^^^^
 45 |         h(x)
    |
+
+SIM113 Use `enumerate()` for index variable `idx` in `for` loop
+  --> SIM113.py:53:9
+   |
+51 |     for x in range(5):
+52 |         g(x, idx)
+53 |         idx += 1
+   |         ^^^^^^^^
+54 |         h(x)
+   |

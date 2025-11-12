@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast, Expr, Int, Number, Operator, Stmt};
+use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
@@ -87,11 +88,8 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
                 continue;
             };
             if !matches!(
-                value,
-                Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: Number::Int(Int::ZERO),
-                    ..
-                })
+                ResolvedPythonType::from(value),
+                ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
             ) {
                 continue;
             }

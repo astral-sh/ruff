@@ -46,7 +46,7 @@ def func():
 
 
 def func():
-    # OK (index doesn't start at 0
+    # SIM113
     idx = 10
     for x in range(5):
         g(x, idx)
