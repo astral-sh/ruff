@@ -653,3 +653,133 @@ fn venv() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn notebook_basic() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    root.child("ruff").child("__init__.py").write_str("")?;
+    root.child("ruff")
+        .child("a.py")
+        .write_str(indoc::indoc! {r#"
+        def helper():
+            pass
+    "#})?;
+
+    // Create a basic notebook with a simple import
+    root.child("notebook.ipynb").write_str(indoc::indoc! {r#"
+        {
+          "cells": [
+            {
+              "cell_type": "code",
+              "execution_count": null,
+              "metadata": {},
+              "outputs": [],
+              "source": [
+                "from ruff.a import helper"
+              ]
+            }
+          ],
+          "metadata": {
+            "language_info": {
+              "name": "python",
+              "version": "3.12.0"
+            }
+          },
+          "nbformat": 4,
+          "nbformat_minor": 5
+        }
+    "#})?;
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().current_dir(&root), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "notebook.ipynb": [
+            "ruff/a.py"
+          ],
+          "ruff/__init__.py": [],
+          "ruff/a.py": []
+        }
+
+        ----- stderr -----
+        "###);
+    });
+
+    Ok(())
+}
+
+#[test]
+fn notebook_with_magic() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    root.child("ruff").child("__init__.py").write_str("")?;
+    root.child("ruff")
+        .child("a.py")
+        .write_str(indoc::indoc! {r#"
+        def helper():
+            pass
+    "#})?;
+
+    // Create a notebook with IPython magic commands and imports
+    root.child("notebook.ipynb").write_str(indoc::indoc! {r#"
+        {
+          "cells": [
+            {
+              "cell_type": "code",
+              "execution_count": null,
+              "metadata": {},
+              "outputs": [],
+              "source": [
+                "%load_ext autoreload\n",
+                "%autoreload 2"
+              ]
+            },
+            {
+              "cell_type": "code",
+              "execution_count": null,
+              "metadata": {},
+              "outputs": [],
+              "source": [
+                "from ruff.a import helper"
+              ]
+            }
+          ],
+          "metadata": {
+            "language_info": {
+              "name": "python",
+              "version": "3.12.0"
+            }
+          },
+          "nbformat": 4,
+          "nbformat_minor": 5
+        }
+    "#})?;
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().current_dir(&root), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "notebook.ipynb": [
+            "ruff/a.py"
+          ],
+          "ruff/__init__.py": [],
+          "ruff/a.py": []
+        }
+
+        ----- stderr -----
+        "###);
+    });
+
+    Ok(())
+}

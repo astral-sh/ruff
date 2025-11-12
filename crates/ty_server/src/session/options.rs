@@ -213,7 +213,7 @@ impl WorkspaceOptions {
 
             if let Some(python) = &overrides.fallback_python {
                 tracing::debug!(
-                    "Using the Python environment selected in the VS Code Python extension \
+                    "Using the Python environment selected in your editor \
                     in case the configuration doesn't specify a Python environment: {python}",
                     python = python.path()
                 );
@@ -221,7 +221,7 @@ impl WorkspaceOptions {
 
             if let Some(version) = &overrides.fallback_python_version {
                 tracing::debug!(
-                    "Using the Python version selected in the VS Code Python extension: {version} \
+                    "Using the Python version selected in your editor: {version} \
                     in case the configuration doesn't specify a Python version",
                 );
             }

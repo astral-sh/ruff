@@ -733,7 +733,7 @@ pub(crate) fn place_by_id<'db>(
     };
 
     // If a symbol is undeclared, but qualified with `typing.Final`, we use the right-hand side
-    // inferred type, without unioning with `Unknown`, because it can not be modified.
+    // inferred type, without unioning with `Unknown`, because it cannot be modified.
     if let Some(qualifiers) = declared.is_bare_final() {
         let bindings = all_considered_bindings();
         return place_from_bindings_impl(db, bindings, requires_explicit_reexport)

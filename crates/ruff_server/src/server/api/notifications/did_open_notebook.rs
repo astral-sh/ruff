@@ -40,7 +40,10 @@ impl super::SyncNotificationHandler for DidOpenNotebook {
         session.open_notebook_document(uri.clone(), notebook);
 
         // publish diagnostics
-        publish_diagnostics_for_document(session, &uri, client)?;
+        let snapshot = session
+            .take_snapshot(uri)
+            .expect("snapshot should be available");
+        publish_diagnostics_for_document(&snapshot, client)?;
 
         Ok(())
     }

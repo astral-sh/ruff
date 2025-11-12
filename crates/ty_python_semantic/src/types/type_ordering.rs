@@ -213,6 +213,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::TypedDict(_), _) => Ordering::Less,
         (_, Type::TypedDict(_)) => Ordering::Greater,
 
+        (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => left.cmp(right),
+        (Type::NewTypeInstance(_), _) => Ordering::Less,
+        (_, Type::NewTypeInstance(_)) => Ordering::Greater,
+
         (Type::Union(_), _) | (_, Type::Union(_)) => {
             unreachable!("our type representation does not permit nested unions");
         }
@@ -261,9 +265,6 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
 
         #[cfg(not(debug_assertions))]
         (DynamicType::Todo(TodoType), DynamicType::Todo(TodoType)) => Ordering::Equal,
-
-        (DynamicType::TodoPEP695ParamSpec, _) => Ordering::Less,
-        (_, DynamicType::TodoPEP695ParamSpec) => Ordering::Greater,
 
         (DynamicType::TodoUnpack, _) => Ordering::Less,
         (_, DynamicType::TodoUnpack) => Ordering::Greater,

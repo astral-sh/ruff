@@ -80,6 +80,6 @@ Module(
 
   |
 1 | match [1, 2]
-  |             ^ Syntax Error: Expected ':', found newline
+  |             ^ Syntax Error: Expected `:`, found newline
 2 |     case _: ...
   |

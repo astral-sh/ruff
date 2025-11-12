@@ -194,7 +194,7 @@ class_with_descriptor_dunder = ClassWithDescriptorDunder()
 reveal_type(class_with_descriptor_dunder[0])  # revealed: str
 ```
 
-## Dunders can not be overwritten on instances
+## Dunders cannot be overwritten on instances
 
 If we attempt to overwrite a dunder method on an instance, it does not affect the behavior of
 implicit dunder calls:

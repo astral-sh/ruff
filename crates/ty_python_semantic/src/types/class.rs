@@ -30,7 +30,7 @@ use crate::types::member::{Member, class_member};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
-use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, DataclassFlags,
     DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
@@ -258,7 +258,7 @@ impl<'db> GenericAlias<'db> {
     ) -> Self {
         let tcx = tcx
             .annotation
-            .and_then(|ty| ty.specialization_of(db, Some(self.origin(db))))
+            .and_then(|ty| ty.specialization_of(db, self.origin(db)))
             .map(|specialization| specialization.types(db))
             .unwrap_or(&[]);
 
@@ -294,7 +294,7 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
 
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
-    #[salsa::tracked]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         let origin = self.origin(db);
 
@@ -358,6 +358,14 @@ pub enum ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
+    /// Return a `ClassType` representing the class `builtins.object`
+    pub(super) fn object(db: &'db dyn Db) -> Self {
+        KnownClass::Object
+            .to_class_literal(db)
+            .to_class_type(db)
+            .unwrap()
+    }
+
     pub(super) const fn is_generic(self) -> bool {
         matches!(self, Self::Generic(_))
     }
@@ -637,12 +645,17 @@ impl<'db> ClassType<'db> {
             return true;
         }
 
-        // Optimisation: if either class is `@final`, we only need to do one `is_subclass_of` call.
         if self.is_final(db) {
-            return self.is_subclass_of(db, other);
+            return self
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .any(|class| class.class_literal(db).0 == other.class_literal(db).0);
         }
         if other.is_final(db) {
-            return other.is_subclass_of(db, self);
+            return other
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .any(|class| class.class_literal(db).0 == self.class_literal(db).0);
         }
 
         // Two disjoint bases can only coexist in an MRO if one is a subclass of the other.
@@ -1302,9 +1315,7 @@ impl<'db> Field<'db> {
     /// Returns true if this field is a `dataclasses.KW_ONLY` sentinel.
     /// <https://docs.python.org/3/library/dataclasses.html#dataclasses.KW_ONLY>
     pub(crate) fn is_kw_only_sentinel(&self, db: &'db dyn Db) -> bool {
-        self.declared_ty
-            .as_nominal_instance()
-            .is_some_and(|instance| instance.has_known_class(db, KnownClass::KwOnly))
+        self.declared_ty.is_instance_of(db, KnownClass::KwOnly)
     }
 }
 
@@ -1434,7 +1445,7 @@ impl<'db> ClassLiteral<'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
             typevars: RefCell<FxIndexSet<BoundTypeVarInstance<'db>>>,
-            seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
+            recursion_guard: TypeCollector<'db>,
         }
 
         impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
@@ -1451,16 +1462,7 @@ impl<'db> ClassLiteral<'db> {
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                match TypeKind::from(ty) {
-                    TypeKind::Atomic => {}
-                    TypeKind::NonAtomic(non_atomic_type) => {
-                        if !self.seen_types.borrow_mut().insert(non_atomic_type) {
-                            // If we have already seen this type, we can skip it.
-                            return;
-                        }
-                        walk_non_atomic_type(db, non_atomic_type, self);
-                    }
-                }
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
             }
         }
 
@@ -2176,7 +2178,8 @@ impl<'db> ClassLiteral<'db> {
         });
 
         if member.is_undefined() {
-            if let Some(synthesized_member) = self.own_synthesized_member(db, specialization, name)
+            if let Some(synthesized_member) =
+                self.own_synthesized_member(db, specialization, inherited_generic_context, name)
             {
                 return Member::definitely_declared(synthesized_member);
             }
@@ -2192,6 +2195,7 @@ impl<'db> ClassLiteral<'db> {
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
+        inherited_generic_context: Option<GenericContext<'db>>,
         name: &str,
     ) -> Option<Type<'db>> {
         let dataclass_params = self.dataclass_params(db);
@@ -2320,7 +2324,7 @@ impl<'db> ClassLiteral<'db> {
 
             let signature = match name {
                 "__new__" | "__init__" => Signature::new_generic(
-                    self.inherited_generic_context(db),
+                    inherited_generic_context.or_else(|| self.inherited_generic_context(db)),
                     Parameters::new(parameters),
                     return_ty,
                 ),
@@ -2702,7 +2706,7 @@ impl<'db> ClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        if let Some(member) = self.own_synthesized_member(db, specialization, name) {
+        if let Some(member) = self.own_synthesized_member(db, specialization, None, name) {
             Place::bound(member).into()
         } else {
             KnownClass::TypedDictFallback
@@ -3115,30 +3119,47 @@ impl<'db> ClassLiteral<'db> {
             union_of_inferred_types = union_of_inferred_types.add(Type::unknown());
         }
 
-        for (attribute_assignments, method_scope_id) in
+        for (attribute_assignments, attribute_binding_scope_id) in
             attribute_assignments(db, class_body_scope, &name)
         {
-            let method_scope = index.scope(method_scope_id);
-            if !is_valid_scope(method_scope) {
+            let binding_scope = index.scope(attribute_binding_scope_id);
+            if !is_valid_scope(binding_scope) {
                 continue;
             }
 
-            // The attribute assignment inherits the reachability of the method which contains it
-            let is_method_reachable = if let Some(method_def) = method_scope.node().as_function() {
-                let method = index.expect_single_definition(method_def);
-                let method_place = class_table
-                    .symbol_id(&method_def.node(&module).name)
-                    .unwrap();
-                class_map
-                    .all_reachable_symbol_bindings(method_place)
-                    .find_map(|bind| {
-                        (bind.binding.is_defined_and(|def| def == method))
-                            .then(|| class_map.binding_reachability(db, &bind))
-                    })
-                    .unwrap_or(Truthiness::AlwaysFalse)
-            } else {
-                Truthiness::AlwaysFalse
+            let scope_for_reachability_analysis = {
+                if binding_scope.node().as_function().is_some() {
+                    binding_scope
+                } else if binding_scope.is_eager() {
+                    let mut eager_scope_parent = binding_scope;
+                    while eager_scope_parent.is_eager()
+                        && let Some(parent) = eager_scope_parent.parent()
+                    {
+                        eager_scope_parent = index.scope(parent);
+                    }
+                    eager_scope_parent
+                } else {
+                    binding_scope
+                }
             };
+
+            // The attribute assignment inherits the reachability of the method which contains it
+            let is_method_reachable =
+                if let Some(method_def) = scope_for_reachability_analysis.node().as_function() {
+                    let method = index.expect_single_definition(method_def);
+                    let method_place = class_table
+                        .symbol_id(&method_def.node(&module).name)
+                        .unwrap();
+                    class_map
+                        .all_reachable_symbol_bindings(method_place)
+                        .find_map(|bind| {
+                            (bind.binding.is_defined_and(|def| def == method))
+                                .then(|| class_map.binding_reachability(db, &bind))
+                        })
+                        .unwrap_or(Truthiness::AlwaysFalse)
+                } else {
+                    Truthiness::AlwaysFalse
+                };
             if is_method_reachable.is_always_false() {
                 continue;
             }
@@ -3542,7 +3563,7 @@ impl<'db> From<ClassLiteral<'db>> for ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
-    #[salsa::tracked(cycle_initial=crate::types::variance_cycle_initial)]
+    #[salsa::tracked(cycle_initial=crate::types::variance_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         let typevar_in_generic_context = self
             .generic_context(db)

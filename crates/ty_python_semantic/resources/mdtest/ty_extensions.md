@@ -99,7 +99,7 @@ static_assert(is_assignable_to(int, Unknown))
 def explicit_unknown(x: Unknown, y: tuple[str, Unknown], z: Unknown = 1) -> None:
     reveal_type(x)  # revealed: Unknown
     reveal_type(y)  # revealed: tuple[str, Unknown]
-    reveal_type(z)  # revealed: Unknown | Literal[1]
+    reveal_type(z)  # revealed: Unknown
 ```
 
 `Unknown` can be subclassed, just like `Any`:
@@ -390,7 +390,7 @@ static_assert(not is_single_valued(Literal["a"] | Literal["b"]))
 
 We use `TypeOf` to get the inferred type of an expression. This is useful when we want to refer to
 it in a type expression. For example, if we want to make sure that the class literal type `str` is a
-subtype of `type[str]`, we can not use `is_subtype_of(str, type[str])`, as that would test if the
+subtype of `type[str]`, we cannot use `is_subtype_of(str, type[str])`, as that would test if the
 type `str` itself is a subtype of `type[str]`. Instead, we can use `TypeOf[str]` to get the type of
 the expression `str`:
 

@@ -258,6 +258,50 @@ def _[T]() -> None:
     reveal_type(ConstraintSet.range(SubSub, T, Sub) & ConstraintSet.range(Unrelated, T, object))
 ```
 
+Expanding on this, when intersecting two upper bounds constraints (`(T ≤ Base) ∧ (T ≤ Other)`), we
+intersect the upper bounds. Any type that satisfies both `T ≤ Base` and `T ≤ Other` must necessarily
+satisfy their intersection `T ≤ Base & Other`, and vice versa.
+
+```py
+from typing import Never
+from ty_extensions import Intersection, static_assert
+
+# This is not final, so it's possible for a subclass to inherit from both Base and Other.
+class Other: ...
+
+def upper_bounds[T]():
+    intersection_type = ConstraintSet.range(Never, T, Intersection[Base, Other])
+    # revealed: ty_extensions.ConstraintSet[(T@upper_bounds ≤ Base & Other)]
+    reveal_type(intersection_type)
+
+    intersection_constraint = ConstraintSet.range(Never, T, Base) & ConstraintSet.range(Never, T, Other)
+    # revealed: ty_extensions.ConstraintSet[(T@upper_bounds ≤ Base & Other)]
+    reveal_type(intersection_constraint)
+
+    # The two constraint sets are equivalent; each satisfies the other.
+    static_assert(intersection_type.satisfies(intersection_constraint))
+    static_assert(intersection_constraint.satisfies(intersection_type))
+```
+
+For an intersection of two lower bounds constraints (`(Base ≤ T) ∧ (Other ≤ T)`), we union the lower
+bounds. Any type that satisfies both `Base ≤ T` and `Other ≤ T` must necessarily satisfy their union
+`Base | Other ≤ T`, and vice versa.
+
+```py
+def lower_bounds[T]():
+    union_type = ConstraintSet.range(Base | Other, T, object)
+    # revealed: ty_extensions.ConstraintSet[(Base | Other ≤ T@lower_bounds)]
+    reveal_type(union_type)
+
+    intersection_constraint = ConstraintSet.range(Base, T, object) & ConstraintSet.range(Other, T, object)
+    # revealed: ty_extensions.ConstraintSet[(Base | Other ≤ T@lower_bounds)]
+    reveal_type(intersection_constraint)
+
+    # The two constraint sets are equivalent; each satisfies the other.
+    static_assert(union_type.satisfies(intersection_constraint))
+    static_assert(intersection_constraint.satisfies(union_type))
+```
+
 ### Intersection of a range and a negated range
 
 The bounds of the range constraint provide a range of types that should be included; the bounds of
@@ -335,7 +379,7 @@ def _[T]() -> None:
     reveal_type(~ConstraintSet.range(Sub, T, Super) & ~ConstraintSet.range(Sub, T, Super))
 ```
 
-Otherwise, the union cannot be simplified.
+Otherwise, the intersection cannot be simplified.
 
 ```py
 def _[T]() -> None:
@@ -350,13 +394,14 @@ def _[T]() -> None:
 In particular, the following does not simplify, even though it seems like it could simplify to
 `¬(SubSub ≤ T@_ ≤ Super)`. The issue is that there are types that are within the bounds of
 `SubSub ≤ T@_ ≤ Super`, but which are not comparable to `Base` or `Sub`, and which therefore should
-be included in the union. An example would be the type that contains all instances of `Super`,
-`Base`, and `SubSub` (but _not_ including instances of `Sub`). (We don't have a way to spell that
-type at the moment, but it is a valid type.) That type is not in `SubSub ≤ T ≤ Base`, since it
-includes `Super`, which is outside the range. It's also not in `Sub ≤ T ≤ Super`, because it does
-not include `Sub`. That means it should be in the union. (Remember that for negated range
-constraints, the lower and upper bounds define the "hole" of types that are _not_ allowed.) Since
-that type _is_ in `SubSub ≤ T ≤ Super`, it is not correct to simplify the union in this way.
+be included in the intersection. An example would be the type that contains all instances of
+`Super`, `Base`, and `SubSub` (but _not_ including instances of `Sub`). (We don't have a way to
+spell that type at the moment, but it is a valid type.) That type is not in `SubSub ≤ T ≤ Base`,
+since it includes `Super`, which is outside the range. It's also not in `Sub ≤ T ≤ Super`, because
+it does not include `Sub`. That means it should be in the intersection. (Remember that for negated
+range constraints, the lower and upper bounds define the "hole" of types that are _not_ allowed.)
+Since that type _is_ in `SubSub ≤ T ≤ Super`, it is not correct to simplify the intersection in this
+way.
 
 ```py
 def _[T]() -> None:
@@ -439,6 +484,65 @@ not include `Sub`. That means it should not be in the union. Since that type _is
 def _[T]() -> None:
     # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Super) ∨ (SubSub ≤ T@_ ≤ Base)]
     reveal_type(ConstraintSet.range(SubSub, T, Base) | ConstraintSet.range(Sub, T, Super))
+```
+
+The union of two upper bound constraints (`(T ≤ Base) ∨ (T ≤ Other)`) is different than the single
+range constraint involving the corresponding union type (`T ≤ Base | Other`). There are types (such
+as `T = Base | Other`) that satisfy the union type, but not the union constraint. But every type
+that satisfies the union constraint satisfies the union type.
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+
+# This is not final, so it's possible for a subclass to inherit from both Base and Other.
+class Other: ...
+
+def union[T]():
+    union_type = ConstraintSet.range(Never, T, Base | Other)
+    # revealed: ty_extensions.ConstraintSet[(T@union ≤ Base | Other)]
+    reveal_type(union_type)
+
+    union_constraint = ConstraintSet.range(Never, T, Base) | ConstraintSet.range(Never, T, Other)
+    # revealed: ty_extensions.ConstraintSet[(T@union ≤ Base) ∨ (T@union ≤ Other)]
+    reveal_type(union_constraint)
+
+    # (T = Base | Other) satisfies (T ≤ Base | Other) but not (T ≤ Base ∨ T ≤ Other)
+    specialization = ConstraintSet.range(Base | Other, T, Base | Other)
+    # revealed: ty_extensions.ConstraintSet[(T@union = Base | Other)]
+    reveal_type(specialization)
+    static_assert(specialization.satisfies(union_type))
+    static_assert(not specialization.satisfies(union_constraint))
+
+    # Every specialization that satisfies (T ≤ Base ∨ T ≤ Other) also satisfies
+    # (T ≤ Base | Other)
+    static_assert(union_constraint.satisfies(union_type))
+```
+
+These relationships are reversed for unions involving lower bounds. `T = Base` is an example that
+satisfies the union constraint (`(Base ≤ T) ∨ (Other ≤ T)`) but not the union type
+(`Base | Other ≤ T`). And every type that satisfies the union type satisfies the union constraint.
+
+```py
+def union[T]():
+    union_type = ConstraintSet.range(Base | Other, T, object)
+    # revealed: ty_extensions.ConstraintSet[(Base | Other ≤ T@union)]
+    reveal_type(union_type)
+
+    union_constraint = ConstraintSet.range(Base, T, object) | ConstraintSet.range(Other, T, object)
+    # revealed: ty_extensions.ConstraintSet[(Base ≤ T@union) ∨ (Other ≤ T@union)]
+    reveal_type(union_constraint)
+
+    # (T = Base) satisfies (Base ≤ T ∨ Other ≤ T) but not (Base | Other ≤ T)
+    specialization = ConstraintSet.range(Base, T, Base)
+    # revealed: ty_extensions.ConstraintSet[(T@union = Base)]
+    reveal_type(specialization)
+    static_assert(not specialization.satisfies(union_type))
+    static_assert(specialization.satisfies(union_constraint))
+
+    # Every specialization that satisfies (Base | Other ≤ T) also satisfies
+    # (Base ≤ T ∨ Other ≤ T)
+    static_assert(union_type.satisfies(union_constraint))
 ```
 
 ### Union of a range and a negated range
@@ -728,4 +832,53 @@ def f[T]():
     reveal_type(ConstraintSet.range(Never, T, str | int))
     # revealed: ty_extensions.ConstraintSet[(T@f ≤ int | str)]
     reveal_type(ConstraintSet.range(Never, T, int | str))
+```
+
+### Constraints on the same typevar
+
+Any particular specialization maps each typevar to one type. That means it's not useful to constrain
+a typevar with itself as an upper or lower bound. No matter what type the typevar is specialized to,
+that type is always a subtype of itself. (Remember that typevars are only specialized to fully
+static types.)
+
+```py
+from typing import Never
+from ty_extensions import ConstraintSet
+
+def same_typevar[T]():
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(ConstraintSet.range(Never, T, T))
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(ConstraintSet.range(T, T, object))
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(ConstraintSet.range(T, T, T))
+```
+
+This is also true when the typevar appears in a union in the upper bound, or in an intersection in
+the lower bound. (Note that this lines up with how we simplify the intersection of two constraints,
+as shown above.)
+
+```py
+from ty_extensions import Intersection
+
+def same_typevar[T]():
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(ConstraintSet.range(Never, T, T | None))
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(ConstraintSet.range(Intersection[T, None], T, object))
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(ConstraintSet.range(Intersection[T, None], T, T | None))
+```
+
+Similarly, if the lower bound is an intersection containing the _negation_ of the typevar, then the
+constraint set can never be satisfied, since every type is disjoint with its negation.
+
+```py
+from ty_extensions import Not
+
+def same_typevar[T]():
+    # revealed: ty_extensions.ConstraintSet[never]
+    reveal_type(ConstraintSet.range(Intersection[Not[T], None], T, object))
+    # revealed: ty_extensions.ConstraintSet[never]
+    reveal_type(ConstraintSet.range(Not[T], T, object))
 ```

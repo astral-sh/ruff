@@ -1,5 +1,5 @@
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions};
-use ruff_python_ast::{AnyNodeRef, Expr};
+use ruff_python_ast::{AnyNodeRef, Expr, PatternMatchAs};
 use ruff_python_ast::{MatchCase, Pattern};
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{
@@ -14,6 +14,7 @@ use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parentheses, optional_parentheses, parenthesized,
 };
 use crate::prelude::*;
+use crate::preview::is_avoid_parens_for_long_as_captures_enabled;
 
 pub(crate) mod pattern_arguments;
 pub(crate) mod pattern_keyword;
@@ -242,8 +243,14 @@ pub(crate) fn can_pattern_omit_optional_parentheses(
                 Pattern::MatchValue(_)
                 | Pattern::MatchSingleton(_)
                 | Pattern::MatchStar(_)
-                | Pattern::MatchAs(_)
                 | Pattern::MatchOr(_) => false,
+                Pattern::MatchAs(PatternMatchAs { pattern, .. }) => match pattern {
+                    Some(pattern) => {
+                        is_avoid_parens_for_long_as_captures_enabled(context)
+                            && has_parentheses_and_is_non_empty(pattern, context)
+                    }
+                    None => false,
+                },
                 Pattern::MatchSequence(sequence) => {
                     !sequence.patterns.is_empty() || context.comments().has_dangling(pattern)
                 }
@@ -299,7 +306,7 @@ impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
                 }
 
                 // `case 4+3j:` or `case 4-3j:
-                // Can not contain arbitrary expressions. Limited to complex numbers.
+                // Cannot contain arbitrary expressions. Limited to complex numbers.
                 Expr::BinOp(_) => {
                     self.update_max_precedence(OperatorPrecedence::Additive, 1);
                 }
@@ -318,7 +325,14 @@ impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
                 // The pattern doesn't start with a parentheses pattern, but with the class's identifier.
                 self.first.set_if_none(First::Token);
             }
-            Pattern::MatchStar(_) | Pattern::MatchSingleton(_) | Pattern::MatchAs(_) => {}
+            Pattern::MatchAs(PatternMatchAs { pattern, .. }) => {
+                if let Some(pattern) = pattern
+                    && is_avoid_parens_for_long_as_captures_enabled(context)
+                {
+                    self.visit_sub_pattern(pattern, context);
+                }
+            }
+            Pattern::MatchStar(_) | Pattern::MatchSingleton(_) => {}
             Pattern::MatchOr(or_pattern) => {
                 self.update_max_precedence(
                     OperatorPrecedence::Or,

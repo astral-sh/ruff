@@ -253,6 +253,8 @@ RUF057 [*] Value being rounded is already an integer
 82 | |     17 # a comment
 83 | | )
    | |_^
+84 |
+85 |   # See: https://github.com/astral-sh/ruff/issues/21209
    |
 help: Remove unnecessary `round` call
 78 | round(# a comment
@@ -262,4 +264,7 @@ help: Remove unnecessary `round` call
    -     17 # a comment
    - )
 81 + 17
+82 | 
+83 | # See: https://github.com/astral-sh/ruff/issues/21209
+84 | print(round(125, **{"ndigits": -2}))
 note: This is an unsafe fix and may change runtime behavior

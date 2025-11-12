@@ -111,7 +111,7 @@ Module(
 2 |     # This `as` pattern is unparenthesied so the parser never takes the path
 3 |     # where it might be confused as a complex literal pattern.
 4 |     case x as y + 1j:
-  |                 ^ Syntax Error: Expected ':', found '+'
+  |                 ^ Syntax Error: Expected `:`, found `+`
 5 |         pass
   |
 

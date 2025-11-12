@@ -3,9 +3,6 @@
 #
 # TODO: can we remove the ignores here so that our workflows are more secure?
 rules:
-  dangerous-triggers:
-    ignore:
-      - pr-comment.yaml
   cache-poisoning:
     ignore:
       - build-docker.yml

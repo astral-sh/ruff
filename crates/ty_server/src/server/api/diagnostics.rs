@@ -9,20 +9,20 @@ use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::FileRange;
-use ruff_db::source::{line_index, source_text};
 use ruff_db::system::SystemPathBuf;
-use ty_project::{Db, ProjectDatabase};
+use ty_project::{Db as _, ProjectDatabase};
 
-use crate::document::{DocumentKey, FileRangeExt, ToRangeExt};
+use crate::Db;
+use crate::document::{FileRangeExt, ToRangeExt};
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use crate::system::{AnySystemPath, file_to_url};
-use crate::{DocumentQuery, PositionEncoding, Session};
+use crate::{NotebookDocument, PositionEncoding, Session};
 
 pub(super) struct Diagnostics<'a> {
     items: Vec<ruff_db::diagnostic::Diagnostic>,
     encoding: PositionEncoding,
-    document: &'a DocumentQuery,
+    notebook: Option<&'a NotebookDocument>,
 }
 
 impl Diagnostics<'_> {
@@ -53,7 +53,7 @@ impl Diagnostics<'_> {
     }
 
     pub(super) fn to_lsp_diagnostics(&self, db: &ProjectDatabase) -> LspDiagnostics {
-        if let Some(notebook) = self.document.as_notebook() {
+        if let Some(notebook) = self.notebook {
             let mut cell_diagnostics: FxHashMap<Url, Vec<Diagnostic>> = FxHashMap::default();
 
             // Populates all relevant URLs with an empty diagnostic list. This ensures that documents
@@ -115,23 +115,18 @@ impl LspDiagnostics {
     }
 }
 
-/// Clears the diagnostics for the document identified by `key`.
+/// Clears the diagnostics for the document identified by `uri`.
 ///
 /// This is done by notifying the client with an empty list of diagnostics for the document.
 /// For notebook cells, this clears diagnostics for the specific cell.
 /// For other document types, this clears diagnostics for the main document.
-pub(super) fn clear_diagnostics(session: &Session, key: &DocumentKey, client: &Client) {
+pub(super) fn clear_diagnostics(session: &Session, uri: &lsp_types::Url, client: &Client) {
     if session.client_capabilities().supports_pull_diagnostics() {
         return;
     }
 
-    let Some(uri) = key.to_url() else {
-        // If we can't convert to URL, we can't clear diagnostics
-        return;
-    };
-
     client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
-        uri,
+        uri: uri.clone(),
         diagnostics: vec![],
         version: None,
     });
@@ -143,18 +138,12 @@ pub(super) fn clear_diagnostics(session: &Session, key: &DocumentKey, client: &C
 /// This function is a no-op if the client supports pull diagnostics.
 ///
 /// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
-pub(super) fn publish_diagnostics(session: &Session, key: &DocumentKey, client: &Client) {
+pub(super) fn publish_diagnostics(session: &Session, url: &lsp_types::Url, client: &Client) {
     if session.client_capabilities().supports_pull_diagnostics() {
         return;
     }
 
-    let Some(url) = key.to_url() else {
-        return;
-    };
-
-    let snapshot = session.take_document_snapshot(url.clone());
-
-    let document = match snapshot.document() {
+    let snapshot = match session.snapshot_document(url) {
         Ok(document) => document,
         Err(err) => {
             tracing::debug!("Failed to resolve document for URL `{}`: {}", url, err);
@@ -162,7 +151,7 @@ pub(super) fn publish_diagnostics(session: &Session, key: &DocumentKey, client: 
         }
     };
 
-    let db = session.project_db(key.path());
+    let db = session.project_db(&snapshot.to_file_path());
 
     let Some(diagnostics) = compute_diagnostics(db, &snapshot) else {
         return;
@@ -173,13 +162,13 @@ pub(super) fn publish_diagnostics(session: &Session, key: &DocumentKey, client: 
         client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
             uri,
             diagnostics,
-            version: Some(document.version()),
+            version: Some(snapshot.document().version()),
         });
     };
 
     match diagnostics.to_lsp_diagnostics(db) {
         LspDiagnostics::TextDocument(diagnostics) => {
-            publish_diagnostics_notification(url, diagnostics);
+            publish_diagnostics_notification(url.clone(), diagnostics);
         }
         LspDiagnostics::NotebookDocument(cell_diagnostics) => {
             for (cell_url, diagnostics) in cell_diagnostics {
@@ -264,16 +253,11 @@ pub(super) fn compute_diagnostics<'a>(
     db: &ProjectDatabase,
     snapshot: &'a DocumentSnapshot,
 ) -> Option<Diagnostics<'a>> {
-    let document = match snapshot.document() {
-        Ok(document) => document,
-        Err(err) => {
-            tracing::info!("Failed to resolve document for snapshot: {}", err);
-            return None;
-        }
-    };
-
-    let Some(file) = document.file(db) else {
-        tracing::info!("No file found for snapshot for `{}`", document.file_path());
+    let Some(file) = snapshot.to_file(db) else {
+        tracing::info!(
+            "No file found for snapshot for `{}`",
+            snapshot.to_file_path()
+        );
         return None;
     };
 
@@ -282,7 +266,7 @@ pub(super) fn compute_diagnostics<'a>(
     Some(Diagnostics {
         items: diagnostics,
         encoding: snapshot.encoding(),
-        document,
+        notebook: snapshot.notebook(),
     })
 }
 
@@ -295,12 +279,11 @@ pub(super) fn to_lsp_diagnostic(
 ) -> Diagnostic {
     let range = if let Some(span) = diagnostic.primary_span() {
         let file = span.expect_ty_file();
-        let index = line_index(db, file);
-        let source = source_text(db, file);
 
         span.range()
-            .map(|range| range.to_lsp_range(&source, &index, encoding))
+            .and_then(|range| range.to_lsp_range(db, file, encoding))
             .unwrap_or_default()
+            .local_range()
     } else {
         Range::default()
     };
@@ -381,7 +364,7 @@ fn annotation_to_related_information(
 
     let annotation_message = annotation.get_message()?;
     let range = FileRange::try_from(span).ok()?;
-    let location = range.to_location(db, encoding)?;
+    let location = range.to_lsp_range(db, encoding)?.into_location()?;
 
     Some(DiagnosticRelatedInformation {
         location,
@@ -399,7 +382,7 @@ fn sub_diagnostic_to_related_information(
 
     let span = primary_annotation.get_span();
     let range = FileRange::try_from(span).ok()?;
-    let location = range.to_location(db, encoding)?;
+    let location = range.to_lsp_range(db, encoding)?.into_location()?;
 
     Some(DiagnosticRelatedInformation {
         location,

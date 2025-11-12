@@ -1,4 +1,5 @@
 use crate::PositionEncoding;
+use crate::document::DocumentKey;
 use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
 use crate::server::api::traits::{
     BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
@@ -8,7 +9,7 @@ use crate::server::{Action, Result};
 use crate::session::client::Client;
 use crate::session::index::Index;
 use crate::session::{SessionSnapshot, SuspendedWorkspaceDiagnosticRequest};
-use crate::system::{AnySystemPath, file_to_url};
+use crate::system::file_to_url;
 use lsp_server::RequestId;
 use lsp_types::request::WorkspaceDiagnosticRequest;
 use lsp_types::{
@@ -25,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use ty_project::{Db, ProgressReporter};
+use ty_project::{ProgressReporter, ProjectDatabase};
 
 /// Handler for [Workspace diagnostics](workspace-diagnostics)
 ///
@@ -229,7 +230,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         state.report_progress(&self.work_done);
     }
 
-    fn report_checked_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]) {
+    fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
         // Another thread might have panicked at this point because of a salsa cancellation which
         // poisoned the result. If the response is poisoned, just don't report and wait for our thread
         // to unwind with a salsa cancellation next.
@@ -259,7 +260,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         state.response.maybe_flush();
     }
 
-    fn report_diagnostics(&mut self, db: &dyn Db, diagnostics: Vec<Diagnostic>) {
+    fn report_diagnostics(&mut self, db: &ProjectDatabase, diagnostics: Vec<Diagnostic>) {
         let mut by_file: BTreeMap<File, Vec<Diagnostic>> = BTreeMap::new();
 
         for diagnostic in diagnostics {
@@ -317,7 +318,7 @@ struct ResponseWriter<'a> {
     // It's important that we use `AnySystemPath` over `Url` here because
     // `file_to_url` isn't guaranteed to return the exact same URL as the one provided
     // by the client.
-    previous_result_ids: FxHashMap<AnySystemPath, (Url, String)>,
+    previous_result_ids: FxHashMap<DocumentKey, (Url, String)>,
 }
 
 impl<'a> ResponseWriter<'a> {
@@ -346,12 +347,7 @@ impl<'a> ResponseWriter<'a> {
 
         let previous_result_ids = previous_result_ids
             .into_iter()
-            .filter_map(|prev| {
-                Some((
-                    AnySystemPath::try_from_url(&prev.uri).ok()?,
-                    (prev.uri, prev.value),
-                ))
-            })
+            .map(|prev| (DocumentKey::from_url(&prev.uri), (prev.uri, prev.value)))
             .collect();
 
         Self {
@@ -362,25 +358,26 @@ impl<'a> ResponseWriter<'a> {
         }
     }
 
-    fn write_diagnostics_for_file(&mut self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]) {
+    fn write_diagnostics_for_file(
+        &mut self,
+        db: &ProjectDatabase,
+        file: File,
+        diagnostics: &[Diagnostic],
+    ) {
         let Some(url) = file_to_url(db, file) else {
             tracing::debug!("Failed to convert file path to URL at {}", file.path(db));
             return;
         };
-
+        let key = DocumentKey::from_url(&url);
         let version = self
             .index
-            .key_from_url(url.clone())
-            .ok()
-            .and_then(|key| self.index.make_document_ref(key).ok())
-            .map(|doc| i64::from(doc.version()));
+            .document_handle(&url)
+            .map(|doc| i64::from(doc.version()))
+            .ok();
 
         let result_id = Diagnostics::result_id_from_hash(diagnostics);
 
-        let previous_result_id = AnySystemPath::try_from_url(&url)
-            .ok()
-            .and_then(|path| self.previous_result_ids.remove(&path))
-            .map(|(_url, id)| id);
+        let previous_result_id = self.previous_result_ids.remove(&key).map(|(_url, id)| id);
 
         let report = match result_id {
             Some(new_id) if Some(&new_id) == previous_result_id.as_ref() => {
@@ -444,13 +441,12 @@ impl<'a> ResponseWriter<'a> {
 
         // Handle files that had diagnostics in previous request but no longer have any
         // Any remaining entries in previous_results are files that were fixed
-        for (previous_url, previous_result_id) in self.previous_result_ids.into_values() {
+        for (key, (previous_url, previous_result_id)) in self.previous_result_ids {
             // This file had diagnostics before but doesn't now, so we need to report it as having no diagnostics
             let version = self
                 .index
-                .key_from_url(previous_url.clone())
+                .document(&key)
                 .ok()
-                .and_then(|key| self.index.make_document_ref(key).ok())
                 .map(|doc| i64::from(doc.version()));
 
             let new_result_id = Diagnostics::result_id_from_hash(&[]);

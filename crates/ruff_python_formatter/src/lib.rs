@@ -334,7 +334,7 @@ class A: ...
         let options = PyFormatOptions::from_source_type(source_type);
         let printed = format_range(&source, TextRange::new(start, end), options).unwrap();
 
-        let mut formatted = source.to_string();
+        let mut formatted = source.clone();
         formatted.replace_range(
             std::ops::Range::<usize>::from(printed.source_range()),
             printed.as_code(),

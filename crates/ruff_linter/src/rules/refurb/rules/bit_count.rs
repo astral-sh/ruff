@@ -188,7 +188,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
     let mut diagnostic = checker.report_diagnostic(
         BitCount {
             existing: SourceCodeSnippet::from_str(literal_text),
-            replacement: SourceCodeSnippet::new(replacement.to_string()),
+            replacement: SourceCodeSnippet::new(replacement.clone()),
         },
         call.range(),
     );

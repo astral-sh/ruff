@@ -118,7 +118,7 @@ def takes_other_protocol(f: OtherProtocol): ...
 takes_other_protocol(SubclassOfAny())
 ```
 
-A subclass of `Any` cannot be assigned to literal types, since those can not be subclassed:
+A subclass of `Any` cannot be assigned to literal types, since those cannot be subclassed:
 
 ```py
 from typing import Any, Literal

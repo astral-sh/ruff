@@ -8,7 +8,7 @@ use ruff_text_size::Ranged;
 use super::class::{ClassType, CodeGeneratorKind, Field};
 use super::context::InferContext;
 use super::diagnostic::{
-    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, report_invalid_key_on_typed_dict,
+    self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, report_invalid_key_on_typed_dict,
     report_missing_typed_dict_key,
 };
 use super::{ApplyTypeMappingVisitor, Type, TypeMapping, visitor};
@@ -143,29 +143,56 @@ impl TypedDictAssignmentKind {
 pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
+    full_object_ty: Option<Type<'db>>,
     key: &str,
     value_ty: Type<'db>,
-    typed_dict_node: impl Into<AnyNodeRef<'ast>>,
+    typed_dict_node: impl Into<AnyNodeRef<'ast>> + Copy,
     key_node: impl Into<AnyNodeRef<'ast>>,
     value_node: impl Into<AnyNodeRef<'ast>>,
     assignment_kind: TypedDictAssignmentKind,
+    emit_diagnostic: bool,
 ) -> bool {
     let db = context.db();
     let items = typed_dict.items(db);
 
     // Check if key exists in `TypedDict`
     let Some((_, item)) = items.iter().find(|(name, _)| *name == key) else {
-        report_invalid_key_on_typed_dict(
-            context,
-            typed_dict_node.into(),
-            key_node.into(),
-            Type::TypedDict(typed_dict),
-            Type::string_literal(db, key),
-            &items,
-        );
+        if emit_diagnostic {
+            report_invalid_key_on_typed_dict(
+                context,
+                typed_dict_node.into(),
+                key_node.into(),
+                Type::TypedDict(typed_dict),
+                full_object_ty,
+                Type::string_literal(db, key),
+                &items,
+            );
+        }
 
         return false;
     };
+
+    let add_object_type_annotation =
+        |diagnostic: &mut Diagnostic| {
+            if let Some(full_object_ty) = full_object_ty {
+                diagnostic.annotate(context.secondary(typed_dict_node.into()).message(
+                    format_args!(
+                        "TypedDict `{}` in {kind} type `{}`",
+                        Type::TypedDict(typed_dict).display(db),
+                        full_object_ty.display(db),
+                        kind = if full_object_ty.is_union() {
+                            "union"
+                        } else {
+                            "intersection"
+                        },
+                    ),
+                ));
+            } else {
+                diagnostic.annotate(context.secondary(typed_dict_node.into()).message(
+                    format_args!("TypedDict `{}`", Type::TypedDict(typed_dict).display(db)),
+                ));
+            }
+        };
 
     let add_item_definition_subdiagnostic = |diagnostic: &mut Diagnostic, message| {
         if let Some(declaration) = item.single_declaration {
@@ -184,8 +211,9 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
     };
 
     if assignment_kind.is_subscript() && item.is_read_only() {
-        if let Some(builder) =
-            context.report_lint(assignment_kind.diagnostic_type(), key_node.into())
+        if emit_diagnostic
+            && let Some(builder) =
+                context.report_lint(assignment_kind.diagnostic_type(), key_node.into())
         {
             let typed_dict_ty = Type::TypedDict(typed_dict);
             let typed_dict_d = typed_dict_ty.display(db);
@@ -195,13 +223,7 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
             ));
 
             diagnostic.set_primary_message(format_args!("key is marked read-only"));
-
-            diagnostic.annotate(
-                context
-                    .secondary(typed_dict_node.into())
-                    .message(format_args!("TypedDict `{typed_dict_d}`")),
-            );
-
+            add_object_type_annotation(&mut diagnostic);
             add_item_definition_subdiagnostic(&mut diagnostic, "Read-only item declared here");
         }
 
@@ -213,8 +235,14 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
         return true;
     }
 
+    let value_node = value_node.into();
+    if diagnostic::is_invalid_typed_dict_literal(context.db(), item.declared_ty, value_node) {
+        return false;
+    }
+
     // Invalid assignment - emit diagnostic
-    if let Some(builder) = context.report_lint(assignment_kind.diagnostic_type(), value_node.into())
+    if emit_diagnostic
+        && let Some(builder) = context.report_lint(assignment_kind.diagnostic_type(), value_node)
     {
         let typed_dict_ty = Type::TypedDict(typed_dict);
         let typed_dict_d = typed_dict_ty.display(db);
@@ -230,17 +258,12 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
 
         diagnostic.annotate(
             context
-                .secondary(typed_dict_node.into())
-                .message(format_args!("TypedDict `{typed_dict_d}`")),
-        );
-
-        diagnostic.annotate(
-            context
                 .secondary(key_node.into())
                 .message(format_args!("key has declared type `{item_type_d}`")),
         );
 
         add_item_definition_subdiagnostic(&mut diagnostic, "Item declared here");
+        add_object_type_annotation(&mut diagnostic);
     }
 
     false
@@ -339,12 +362,14 @@ fn validate_from_dict_literal<'db, 'ast>(
                 validate_typed_dict_key_assignment(
                     context,
                     typed_dict,
+                    None,
                     key_str,
                     value_type,
                     error_node,
                     key_expr,
                     &dict_item.value,
                     TypedDictAssignmentKind::Constructor,
+                    true,
                 );
             }
         }
@@ -376,12 +401,14 @@ fn validate_from_keywords<'db, 'ast>(
             validate_typed_dict_key_assignment(
                 context,
                 typed_dict,
+                None,
                 arg_name.as_str(),
                 arg_type,
                 error_node,
                 keyword,
                 &keyword.value,
                 TypedDictAssignmentKind::Constructor,
+                true,
             );
         }
     }
@@ -414,12 +441,14 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
             valid &= validate_typed_dict_key_assignment(
                 context,
                 typed_dict,
+                None,
                 key_str,
                 value_type,
                 error_node,
                 key_expr,
                 &item.value,
                 TypedDictAssignmentKind::Constructor,
+                true,
             );
         }
     }

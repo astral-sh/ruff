@@ -67,6 +67,23 @@ class ConstraintSet:
         .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
         """
 
+    def satisfies(self, other: Self) -> Self:
+        """
+        Returns whether this constraint set satisfies another — that is, whether
+        every specialization that satisfies this constraint set also satisfies
+        `other`.
+        """
+
+    def satisfied_by_all_typevars(
+        self, *, inferable: tuple[Any, ...] | None = None
+    ) -> bool:
+        """
+        Returns whether this constraint set is satisfied by all of the typevars
+        that it mentions. You must provide a tuple of the typevars that should
+        be considered `inferable`. All other typevars mentioned in the
+        constraint set will be considered non-inferable.
+        """
+
     def __bool__(self) -> bool: ...
     def __eq__(self, other: ConstraintSet) -> bool: ...
     def __ne__(self, other: ConstraintSet) -> bool: ...

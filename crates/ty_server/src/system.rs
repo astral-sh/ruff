@@ -4,6 +4,9 @@ use std::fmt::Display;
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
+use crate::Db;
+use crate::document::DocumentKey;
+use crate::session::index::{Document, Index};
 use lsp_types::Url;
 use ruff_db::file_revision::FileRevision;
 use ruff_db::files::{File, FilePath};
@@ -14,11 +17,6 @@ use ruff_db::system::{
 };
 use ruff_notebook::{Notebook, NotebookError};
 use ty_ide::cached_vendored_path;
-use ty_python_semantic::Db;
-
-use crate::DocumentQuery;
-use crate::document::DocumentKey;
-use crate::session::index::Index;
 
 /// Returns a [`Url`] for the given [`File`].
 pub(crate) fn file_to_url(db: &dyn Db, file: File) -> Option<Url> {
@@ -41,26 +39,6 @@ pub(crate) enum AnySystemPath {
 }
 
 impl AnySystemPath {
-    /// Converts the given [`Url`] to an [`AnySystemPath`].
-    ///
-    /// If the URL scheme is `file`, then the path is converted to a [`SystemPathBuf`]. Otherwise, the
-    /// URL is converted to a [`SystemVirtualPathBuf`].
-    ///
-    /// This fails in the following cases:
-    /// * The URL cannot be converted to a file path (refer to [`Url::to_file_path`]).
-    /// * If the URL is not a valid UTF-8 string.
-    pub(crate) fn try_from_url(url: &Url) -> std::result::Result<Self, ()> {
-        if url.scheme() == "file" {
-            Ok(AnySystemPath::System(
-                SystemPathBuf::from_path_buf(url.to_file_path()?).map_err(|_| ())?,
-            ))
-        } else {
-            Ok(AnySystemPath::SystemVirtual(
-                SystemVirtualPath::new(url.as_str()).to_path_buf(),
-            ))
-        }
-    }
-
     pub(crate) const fn as_system(&self) -> Option<&SystemPathBuf> {
         match self {
             AnySystemPath::System(system_path_buf) => Some(system_path_buf),
@@ -68,21 +46,11 @@ impl AnySystemPath {
         }
     }
 
-    /// Returns the extension of the path, if any.
-    pub(crate) fn extension(&self) -> Option<&str> {
+    #[expect(unused)]
+    pub(crate) const fn as_virtual(&self) -> Option<&SystemVirtualPath> {
         match self {
-            AnySystemPath::System(system_path) => system_path.extension(),
-            AnySystemPath::SystemVirtual(virtual_path) => virtual_path.extension(),
-        }
-    }
-
-    /// Converts the path to a URL.
-    pub(crate) fn to_url(&self) -> Option<Url> {
-        match self {
-            AnySystemPath::System(system_path) => {
-                Url::from_file_path(system_path.as_std_path()).ok()
-            }
-            AnySystemPath::SystemVirtual(virtual_path) => Url::parse(virtual_path.as_str()).ok(),
+            AnySystemPath::SystemVirtual(path) => Some(path.as_path()),
+            AnySystemPath::System(_) => None,
         }
     }
 }
@@ -144,33 +112,32 @@ impl LSPSystem {
         self.index.as_ref().unwrap()
     }
 
-    fn make_document_ref(&self, path: AnySystemPath) -> Option<DocumentQuery> {
+    fn document(&self, path: AnySystemPath) -> Option<&Document> {
         let index = self.index();
-        let key = DocumentKey::from_path(path);
-        index.make_document_ref(key).ok()
+        index.document(&DocumentKey::from(path)).ok()
     }
 
-    fn system_path_to_document_ref(&self, path: &SystemPath) -> Option<DocumentQuery> {
+    pub(crate) fn system_path_to_document(&self, path: &SystemPath) -> Option<&Document> {
         let any_path = AnySystemPath::System(path.to_path_buf());
-        self.make_document_ref(any_path)
+        self.document(any_path)
     }
 
-    fn system_virtual_path_to_document_ref(
+    pub(crate) fn system_virtual_path_to_document(
         &self,
         path: &SystemVirtualPath,
-    ) -> Option<DocumentQuery> {
+    ) -> Option<&Document> {
         let any_path = AnySystemPath::SystemVirtual(path.to_path_buf());
-        self.make_document_ref(any_path)
+        self.document(any_path)
     }
 }
 
 impl System for LSPSystem {
     fn path_metadata(&self, path: &SystemPath) -> Result<Metadata> {
-        let document = self.system_path_to_document_ref(path);
+        let document = self.system_path_to_document(path);
 
         if let Some(document) = document {
             Ok(Metadata::new(
-                document_revision(&document),
+                document_revision(document),
                 None,
                 FileType::File,
             ))
@@ -188,32 +155,30 @@ impl System for LSPSystem {
     }
 
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
-        let document = self.system_path_to_document_ref(path);
+        let document = self.system_path_to_document(path);
 
         match document {
-            Some(DocumentQuery::Text { document, .. }) => Ok(document.contents().to_string()),
+            Some(Document::Text(document)) => Ok(document.contents().to_string()),
             _ => self.native_system.read_to_string(path),
         }
     }
 
     fn read_to_notebook(&self, path: &SystemPath) -> std::result::Result<Notebook, NotebookError> {
-        let document = self.system_path_to_document_ref(path);
+        let document = self.system_path_to_document(path);
 
         match document {
-            Some(DocumentQuery::Text { document, .. }) => {
-                Notebook::from_source_code(document.contents())
-            }
-            Some(DocumentQuery::Notebook { notebook, .. }) => Ok(notebook.make_ruff_notebook()),
+            Some(Document::Text(document)) => Notebook::from_source_code(document.contents()),
+            Some(Document::Notebook(notebook)) => Ok(notebook.make_ruff_notebook()),
             None => self.native_system.read_to_notebook(path),
         }
     }
 
     fn read_virtual_path_to_string(&self, path: &SystemVirtualPath) -> Result<String> {
         let document = self
-            .system_virtual_path_to_document_ref(path)
+            .system_virtual_path_to_document(path)
             .ok_or_else(|| virtual_path_not_found(path))?;
 
-        if let DocumentQuery::Text { document, .. } = &document {
+        if let Document::Text(document) = &document {
             Ok(document.contents().to_string())
         } else {
             Err(not_a_text_document(path))
@@ -225,12 +190,12 @@ impl System for LSPSystem {
         path: &SystemVirtualPath,
     ) -> std::result::Result<Notebook, NotebookError> {
         let document = self
-            .system_virtual_path_to_document_ref(path)
+            .system_virtual_path_to_document(path)
             .ok_or_else(|| virtual_path_not_found(path))?;
 
         match document {
-            DocumentQuery::Text { document, .. } => Notebook::from_source_code(document.contents()),
-            DocumentQuery::Notebook { notebook, .. } => Ok(notebook.make_ruff_notebook()),
+            Document::Text(document) => Notebook::from_source_code(document.contents()),
+            Document::Notebook(notebook) => Ok(notebook.make_ruff_notebook()),
         }
     }
 
@@ -307,7 +272,7 @@ fn virtual_path_not_found(path: impl Display) -> std::io::Error {
 }
 
 /// Helper function to get the [`FileRevision`] of the given document.
-fn document_revision(document: &DocumentQuery) -> FileRevision {
+fn document_revision(document: &Document) -> FileRevision {
     // The file revision is just an opaque number which doesn't have any significant meaning other
     // than that the file has changed if the revisions are different.
     #[expect(clippy::cast_sign_loss)]

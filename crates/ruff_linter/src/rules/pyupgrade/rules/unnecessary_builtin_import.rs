@@ -75,7 +75,13 @@ pub(crate) fn unnecessary_builtin_import(
     stmt: &Stmt,
     module: &str,
     names: &[Alias],
+    level: u32,
 ) {
+    // Ignore relative imports (they're importing from local modules, not Python's builtins).
+    if level > 0 {
+        return;
+    }
+
     // Ignore irrelevant modules.
     if !matches!(
         module,

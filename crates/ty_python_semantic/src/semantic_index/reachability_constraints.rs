@@ -13,7 +13,7 @@
 //! of `test`. When evaluating a constraint, there are three possible outcomes: always true, always
 //! false, or ambiguous. For a simple constraint like this, always-true and always-false correspond
 //! to the case in which we can infer that the type of `test` is `Literal[True]` or `Literal[False]`.
-//! In any other case, like if the type of `test` is `bool` or `Unknown`, we can not statically
+//! In any other case, like if the type of `test` is `bool` or `Unknown`, we cannot statically
 //! determine whether `test` is truthy or falsy, so the outcome would be "ambiguous".
 //!
 //!
@@ -29,7 +29,7 @@
 //! Here, we would accumulate a reachability constraint of `test1 AND test2`. We can statically
 //! determine that this position is *always* reachable only if both `test1` and `test2` are
 //! always true. On the other hand, we can statically determine that this position is *never*
-//! reachable if *either* `test1` or `test2` is always false. In any other case, we can not
+//! reachable if *either* `test1` or `test2` is always false. In any other case, we cannot
 //! determine whether this position is reachable or not, so the outcome is "ambiguous". This
 //! corresponds to a ternary *AND* operation in [Kleene] logic:
 //!
@@ -60,7 +60,7 @@
 //! The third branch ends in a terminal statement [^1]. When we merge control flow, we need to consider
 //! the reachability through either the first or the second branch. The current position is only
 //! *definitely* unreachable if both `test1` and `test2` are always false. It is definitely
-//! reachable if *either* `test1` or `test2` is always true. In any other case, we can not statically
+//! reachable if *either* `test1` or `test2` is always true. In any other case, we cannot statically
 //! determine whether it is reachable or not. This operation corresponds to a ternary *OR* operation:
 //!
 //! ```text
@@ -91,7 +91,7 @@
 //! ## Explicit ambiguity
 //!
 //! In some cases, we explicitly record an “ambiguous” constraint. We do this when branching on
-//! something that we can not (or intentionally do not want to) analyze statically. `for` loops are
+//! something that we cannot (or intentionally do not want to) analyze statically. `for` loops are
 //! one example:
 //! ```py
 //! def _():
@@ -771,8 +771,9 @@ impl ReachabilityConstraints {
                 truthiness
             }
             PatternPredicateKind::Class(class_expr, kind) => {
-                let class_ty =
-                    infer_expression_type(db, *class_expr, TypeContext::default()).to_instance(db);
+                let class_ty = infer_expression_type(db, *class_expr, TypeContext::default())
+                    .as_class_literal()
+                    .map(|class| Type::instance(db, class.top_materialization(db)));
 
                 class_ty.map_or(Truthiness::Ambiguous, |class_ty| {
                     if subject_ty.is_subtype_of(db, class_ty) {

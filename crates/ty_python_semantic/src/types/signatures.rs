@@ -13,6 +13,7 @@
 use std::{collections::HashMap, slice::Iter};
 
 use itertools::{EitherOrBoth, Itertools};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::ParameterWithDefault;
 use smallvec::{SmallVec, smallvec_inline};
 
@@ -20,9 +21,9 @@ use super::{
     DynamicType, Type, TypeVarVariance, definition_expression_type, infer_definition_types,
     semantic_index,
 };
-use crate::semantic_index::definition::Definition;
+use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use crate::types::function::FunctionType;
+use crate::types::function::{is_implicit_classmethod, is_implicit_staticmethod};
 use crate::types::generics::{
     GenericContext, InferableTypeVars, typing_self, walk_generic_context,
 };
@@ -36,8 +37,11 @@ use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
 #[derive(Clone, Copy, Debug)]
+#[expect(clippy::struct_excessive_bools)]
 struct MethodInformation<'db> {
-    method: FunctionType<'db>,
+    is_staticmethod: bool,
+    is_classmethod: bool,
+    method_may_be_generic: bool,
     class_literal: ClassLiteral<'db>,
     class_is_generic: bool,
 }
@@ -46,17 +50,49 @@ fn infer_method_information<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> Option<MethodInformation<'db>> {
+    let DefinitionKind::Function(function_definition) = definition.kind(db) else {
+        return None;
+    };
+
     let class_scope_id = definition.scope(db);
     let file = class_scope_id.file(db);
+    let module = parsed_module(db, file).load(db);
     let index = semantic_index(db, file);
 
     let class_scope = index.scope(class_scope_id.file_scope_id(db));
     let class_node = class_scope.node().as_class()?;
 
-    let method = infer_definition_types(db, definition)
-        .declaration_type(definition)
-        .inner_type()
-        .as_function_literal()?;
+    let function_node = function_definition.node(&module);
+    let function_name = &function_node.name;
+
+    let mut is_staticmethod = is_implicit_classmethod(function_name);
+    let mut is_classmethod = is_implicit_staticmethod(function_name);
+
+    let inference = infer_definition_types(db, definition);
+    for decorator in &function_node.decorator_list {
+        let decorator_ty = inference.expression_type(&decorator.expression);
+
+        match decorator_ty
+            .as_class_literal()
+            .and_then(|class| class.known(db))
+        {
+            Some(KnownClass::Staticmethod) => {
+                is_staticmethod = true;
+            }
+            Some(KnownClass::Classmethod) => {
+                is_classmethod = true;
+            }
+            _ => {}
+        }
+    }
+
+    let method_may_be_generic = match inference.declaration_type(definition).inner_type() {
+        Type::FunctionLiteral(f) => f.signature(db).overloads.iter().any(|s| {
+            s.generic_context
+                .is_some_and(|context| context.variables(db).any(|v| v.typevar(db).is_self(db)))
+        }),
+        _ => true,
+    };
 
     let class_def = index.expect_single_definition(class_node);
     let (class_literal, class_is_generic) = match infer_definition_types(db, class_def)
@@ -71,7 +107,9 @@ fn infer_method_information<'db>(
     };
 
     Some(MethodInformation {
-        method,
+        is_staticmethod,
+        is_classmethod,
+        method_may_be_generic,
         class_literal,
         class_is_generic,
     })
@@ -509,20 +547,17 @@ impl<'db> Signature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        let flipped_mapping = match type_mapping {
-            TypeMapping::Materialize(materialization_kind) => {
-                &TypeMapping::Materialize(materialization_kind.flip())
-            }
-            _ => type_mapping,
-        };
         Self {
             generic_context: self
                 .generic_context
                 .map(|context| type_mapping.update_signature_generic_context(db, context)),
             definition: self.definition,
-            parameters: self
-                .parameters
-                .apply_type_mapping_impl(db, flipped_mapping, tcx, visitor),
+            parameters: self.parameters.apply_type_mapping_impl(
+                db,
+                &type_mapping.flip(),
+                tcx,
+                visitor,
+            ),
             return_ty: self
                 .return_ty
                 .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
@@ -1114,7 +1149,7 @@ impl<'db> Signature<'db> {
 
 impl<'db> VarianceInferable<'db> for &Signature<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
-        tracing::debug!(
+        tracing::trace!(
             "Checking variance of `{tvar}` in `{self:?}`",
             tvar = typevar.typevar(db).name(db)
         );
@@ -1273,27 +1308,21 @@ impl<'db> Parameters<'db> {
         };
 
         let method_info = infer_method_information(db, definition);
-        let is_static_or_classmethod = method_info
-            .is_some_and(|f| f.method.is_staticmethod(db) || f.method.is_classmethod(db));
+        let is_static_or_classmethod =
+            method_info.is_some_and(|f| f.is_staticmethod || f.is_classmethod);
 
         let inferred_annotation = |arg: &ParameterWithDefault| {
             if let Some(MethodInformation {
-                method,
+                method_may_be_generic,
                 class_literal,
                 class_is_generic,
+                ..
             }) = method_info
                 && !is_static_or_classmethod
                 && arg.parameter.annotation().is_none()
                 && parameters.index(arg.name().id()) == Some(0)
             {
-                let method_has_self_in_generic_context =
-                    method.signature(db).overloads.iter().any(|s| {
-                        s.generic_context.is_some_and(|context| {
-                            context.variables(db).any(|v| v.typevar(db).is_self(db))
-                        })
-                    });
-
-                if method_has_self_in_generic_context
+                if method_may_be_generic
                     || class_is_generic
                     || class_literal
                         .known(db)

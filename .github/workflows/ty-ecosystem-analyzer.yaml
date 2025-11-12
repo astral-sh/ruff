@@ -33,7 +33,7 @@ jobs:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        uses: astral-sh/setup-uv@85856786d1ce8acfbcc2f13a5f3fbd6b938f9f41 # v7.1.2
         with:
           enable-cache: true # zizmor: ignore[cache-poisoning] acceptable risk for CloudFlare pages artifact
 
@@ -112,8 +112,6 @@ jobs:
 
           cat diff-statistics.md >> "$GITHUB_STEP_SUMMARY"
 
-          echo ${{ github.event.number }} > pr-number
-
       - name: "Deploy to Cloudflare Pages"
         if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
         id: deploy
@@ -131,17 +129,13 @@ jobs:
           echo >> comment.md
           echo "**[Full report with detailed diff]($DEPLOYMENT_URL/diff)** ([timing results]($DEPLOYMENT_URL/timing))" >> comment.md
 
+      # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
+      # Make sure to update the bot if you rename the artifact.
       - name: Upload comment
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: comment.md
           path: comment.md
-
-      - name: Upload pr-number
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: pr-number
-          path: pr-number
 
       - name: Upload diagnostics diff
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

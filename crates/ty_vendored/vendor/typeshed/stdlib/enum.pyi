@@ -623,6 +623,8 @@ if sys.version_info >= (3, 11):
         the module is the last module in case of a multi-module name
         """
 
+    def show_flag_values(value: int) -> list[int]: ...
+
 if sys.version_info >= (3, 12):
     # The body of the class is the same, but the base classes are different.
     class IntFlag(int, ReprEnum, Flag, boundary=KEEP):  # type: ignore[misc]  # complaints about incompatible bases

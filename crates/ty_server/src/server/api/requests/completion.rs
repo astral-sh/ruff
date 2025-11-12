@@ -6,7 +6,6 @@ use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionList,
     CompletionParams, CompletionResponse, Documentation, TextEdit, Url,
 };
-use ruff_db::source::{line_index, source_text};
 use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
 use ty_ide::{CompletionKind, CompletionSettings, completion};
@@ -45,17 +44,19 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.file(db) else {
+        let Some(file) = snapshot.to_file(db) else {
             return Ok(None);
         };
 
-        let source = source_text(db, file);
-        let line_index = line_index(db, file);
-        let offset = params.text_document_position.position.to_text_size(
-            &source,
-            &line_index,
+        let Some(offset) = params.text_document_position.position.to_text_size(
+            db,
+            file,
+            snapshot.url(),
             snapshot.encoding(),
-        );
+        ) else {
+            return Ok(None);
+        };
+
         let settings = CompletionSettings {
             auto_import: snapshot.global_settings().is_auto_import_enabled(),
         };
@@ -72,14 +73,15 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             .map(|(i, comp)| {
                 let kind = comp.kind(db).map(ty_kind_to_lsp_kind);
                 let type_display = comp.ty.map(|ty| ty.display(db).to_string());
-                let import_edit = comp.import.as_ref().map(|edit| {
-                    let range =
-                        edit.range()
-                            .to_lsp_range(&source, &line_index, snapshot.encoding());
-                    TextEdit {
+                let import_edit = comp.import.as_ref().and_then(|edit| {
+                    let range = edit
+                        .range()
+                        .to_lsp_range(db, file, snapshot.encoding())?
+                        .local_range();
+                    Some(TextEdit {
                         range,
                         new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
-                    }
+                    })
                 });
 
                 let name = comp.name.to_string();

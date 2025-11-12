@@ -233,7 +233,7 @@
 //! have two live bindings of `x`: `x = 3` and `x = 4`.
 //!
 //! Another piece of information that the `UseDefMap` needs to provide are reachability constraints.
-//! See [`reachability_constraints.rs`] for more details, in particular how they apply to bindings.
+//! See `reachability_constraints.rs` for more details, in particular how they apply to bindings.
 //!
 //! The [`UseDefMapBuilder`] itself just exposes methods for taking a snapshot, resetting to a
 //! snapshot, and merging a snapshot into the current state. The logic using these methods lives in
@@ -761,6 +761,7 @@ pub(crate) struct DeclarationsIterator<'map, 'db> {
     inner: LiveDeclarationsIterator<'map>,
 }
 
+#[derive(Debug)]
 pub(crate) struct DeclarationWithConstraint<'db> {
     pub(crate) declaration: DefinitionState<'db>,
     pub(crate) reachability_constraint: ScopedReachabilityConstraintId,
@@ -1186,17 +1187,21 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn snapshot_enclosing_state(
         &mut self,
         enclosing_place: ScopedPlaceId,
-        scope: ScopeKind,
+        enclosing_scope: ScopeKind,
         enclosing_place_expr: PlaceExprRef,
+        is_parent_of_annotation_scope: bool,
     ) -> ScopedEnclosingSnapshotId {
         let bindings = match enclosing_place {
             ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
             ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
         };
 
-        // Names bound in class scopes are never visible to nested scopes (but attributes/subscripts are visible),
-        // so we never need to save eager scope bindings in a class scope.
-        if (scope.is_class() && enclosing_place.is_symbol()) || !enclosing_place_expr.is_bound() {
+        let is_class_symbol = enclosing_scope.is_class() && enclosing_place.is_symbol();
+        // Names bound in class scopes are never visible to nested scopes (but
+        // attributes/subscripts are visible), so we never need to save eager scope bindings in a
+        // class scope. There is one exception to this rule: annotation scopes can see names
+        // defined in an immediately-enclosing class scope.
+        if (is_class_symbol && !is_parent_of_annotation_scope) || !enclosing_place_expr.is_bound() {
             self.enclosing_snapshots.push(EnclosingSnapshot::Constraint(
                 bindings.unbound_narrowing_constraint(),
             ))

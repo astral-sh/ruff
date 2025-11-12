@@ -267,7 +267,7 @@ Module(
   |
 1 | f"{"
 2 | f"{foo!r"
-  |         ^ Syntax Error: f-string: expecting '}'
+  |         ^ Syntax Error: f-string: expecting `}`
 3 | f"{foo="
 4 | f"{"
   |
@@ -277,7 +277,7 @@ Module(
 1 | f"{"
 2 | f"{foo!r"
 3 | f"{foo="
-  |        ^ Syntax Error: f-string: expecting '}'
+  |        ^ Syntax Error: f-string: expecting `}`
 4 | f"{"
 5 | f"""{"""
   |

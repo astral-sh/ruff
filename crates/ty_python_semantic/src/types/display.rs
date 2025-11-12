@@ -535,6 +535,12 @@ impl Display for DisplayRepresentation<'_> {
             Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)) => {
                 f.write_str("bound method `ConstraintSet.implies_subtype_of`")
             }
+            Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetSatisfies(_)) => {
+                f.write_str("bound method `ConstraintSet.satisfies`")
+            }
+            Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(
+                _,
+            )) => f.write_str("bound method `ConstraintSet.satisfied_by_all_typevars`"),
             Type::WrapperDescriptor(kind) => {
                 let (method, object) = match kind {
                     WrapperDescriptorKind::FunctionTypeDunderGet => ("__get__", "function"),
@@ -612,6 +618,7 @@ impl Display for DisplayRepresentation<'_> {
                         .fmt(f),
                 }
             }
+            Type::NewTypeInstance(newtype) => f.write_str(newtype.name(self.db)),
         }
     }
 }

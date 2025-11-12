@@ -71,17 +71,7 @@ D417 Missing argument description in the docstring for `test_missing_numpy_args`
 399 |     """Toggle the gizmo.
     |
 
-D417 Missing argument descriptions in the docstring for `test_method`: `another_test`, `test`, `x`, `y`
-   --> sections.py:413:9
-    |
-411 |     """Test class."""
-412 |
-413 |     def test_method(self, test, another_test, z, _, x=1, y=2, _private_arg=1):  # noqa: D213, D407
-    |         ^^^^^^^^^^^
-414 |         """Test a valid args section.
-    |
-
-D417 Missing argument descriptions in the docstring for `test_missing_args`: `t`, `test`, `x`, `y`, `z`
+D417 Missing argument descriptions in the docstring for `test_missing_args`: `test`, `y`, `z`
    --> sections.py:434:9
     |
 432 |             "(argument(s) test, y, z are missing descriptions in "
@@ -91,7 +81,7 @@ D417 Missing argument descriptions in the docstring for `test_missing_args`: `t`
 435 |         """Test a valid args section.
     |
 
-D417 Missing argument descriptions in the docstring for `test_missing_args_static_method`: `a`, `x`, `y`, `z`
+D417 Missing argument descriptions in the docstring for `test_missing_args_static_method`: `a`, `z`
    --> sections.py:468:9
     |
 466 |             "(argument(s) a, z are missing descriptions in "

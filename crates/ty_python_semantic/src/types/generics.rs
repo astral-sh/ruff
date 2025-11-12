@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::hash_map::Entry;
 use std::fmt::Display;
 
 use itertools::Itertools;
@@ -14,7 +15,7 @@ use crate::types::constraints::ConstraintSet;
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
-use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
@@ -22,7 +23,7 @@ use crate::types::{
     TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance,
     TypeVarKind, TypeVarVariance, UnionType, declaration_type, walk_bound_type_var_type,
 };
-use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet};
+use crate::{Db, FxOrderMap, FxOrderSet};
 
 /// Returns an iterator of any generic context introduced by the given scope or any enclosing
 /// scope.
@@ -288,7 +289,7 @@ impl<'db> GenericContext<'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
             typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
-            seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
+            recursion_guard: TypeCollector<'db>,
         }
 
         impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
@@ -308,16 +309,7 @@ impl<'db> GenericContext<'db> {
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                match TypeKind::from(ty) {
-                    TypeKind::Atomic => {}
-                    TypeKind::NonAtomic(non_atomic_type) => {
-                        if !self.seen_types.borrow_mut().insert(non_atomic_type) {
-                            // If we have already seen this type, we can skip it.
-                            return;
-                        }
-                        walk_non_atomic_type(db, non_atomic_type, self);
-                    }
-                }
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
             }
         }
 
@@ -714,7 +706,7 @@ fn is_subtype_in_invariant_position<'db>(
         // TODO:
         // This should be removed and properly handled in the respective
         // `(Type::TypeVar(_), _) | (_, Type::TypeVar(_))` branch of
-        // `Type::has_relation_to_impl`. Right now, we can not generally
+        // `Type::has_relation_to_impl`. Right now, we cannot generally
         // return `ConstraintSet::from(true)` from that branch, as that
         // leads to union simplification, which means that we lose track
         // of type variables without recording the constraints under which
@@ -969,10 +961,15 @@ impl<'db> Specialization<'db> {
         let types: Box<[_]> = self
             .types(db)
             .iter()
+            .zip(self.generic_context(db).variables(db))
             .enumerate()
-            .map(|(i, ty)| {
+            .map(|(i, (ty, typevar))| {
                 let tcx = TypeContext::new(tcx.get(i).copied());
-                ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                if typevar.variance(db).is_covariant() {
+                    ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                } else {
+                    ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor)
+                }
             })
             .collect();
 
@@ -1319,6 +1316,11 @@ impl<'db> SpecializationBuilder<'db> {
         }
     }
 
+    /// Returns the current set of type mappings for this specialization.
+    pub(crate) fn type_mappings(&self) -> &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
+        &self.types
+    }
+
     pub(crate) fn build(
         &mut self,
         generic_context: GenericContext<'db>,
@@ -1326,7 +1328,7 @@ impl<'db> SpecializationBuilder<'db> {
     ) -> Specialization<'db> {
         let tcx_specialization = tcx
             .annotation
-            .and_then(|annotation| annotation.specialization_of(self.db, None));
+            .and_then(|annotation| annotation.class_specialization(self.db));
 
         let types =
             (generic_context.variables_inner(self.db).iter()).map(|(identity, variable)| {
@@ -1349,54 +1351,55 @@ impl<'db> SpecializationBuilder<'db> {
         generic_context.specialize_partial(self.db, types)
     }
 
-    fn add_type_mapping(&mut self, bound_typevar: BoundTypeVarInstance<'db>, ty: Type<'db>) {
-        self.types
-            .entry(bound_typevar.identity(self.db))
-            .and_modify(|existing| {
-                *existing = UnionType::from_elements(self.db, [*existing, ty]);
-            })
-            .or_insert(ty);
+    fn add_type_mapping(
+        &mut self,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+        filter: impl Fn(BoundTypeVarIdentity<'db>, Type<'db>) -> bool,
+    ) {
+        let identity = bound_typevar.identity(self.db);
+        match self.types.entry(identity) {
+            Entry::Occupied(mut entry) => {
+                if filter(identity, ty) {
+                    *entry.get_mut() = UnionType::from_elements(self.db, [*entry.get(), ty]);
+                }
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(ty);
+            }
+        }
     }
 
+    /// Infer type mappings for the specialization based on a given type and its declared type.
     pub(crate) fn infer(
         &mut self,
         formal: Type<'db>,
         actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
+        self.infer_filter(formal, actual, |_, _| true)
+    }
+
+    /// Infer type mappings for the specialization based on a given type and its declared type.
+    ///
+    /// The filter predicate is provided with a type variable and the type being mapped to it. Type
+    /// mappings to which the predicate returns `false` will be ignored.
+    pub(crate) fn infer_filter(
+        &mut self,
+        formal: Type<'db>,
+        actual: Type<'db>,
+        filter: impl Fn(BoundTypeVarIdentity<'db>, Type<'db>) -> bool,
+    ) -> Result<(), SpecializationError<'db>> {
         if formal == actual {
             return Ok(());
         }
 
-        // If the actual type is a subtype of the formal type, then return without adding any new
-        // type mappings. (Note that if the formal type contains any typevars, this check will
-        // fail, since no non-typevar types are assignable to a typevar. Also note that we are
-        // checking _subtyping_, not _assignability_, so that we do specialize typevars to dynamic
-        // argument types; and we have a special case for `Never`, which is a subtype of all types,
-        // but which we also do want as a specialization candidate.)
+        // Remove the union elements from `actual` that are not related to `formal`, and vice
+        // versa.
         //
-        // In particular, this handles a case like
-        //
-        // ```py
-        // def f[T](t: T | None): ...
-        //
-        // f(None)
-        // ```
-        //
-        // without specializing `T` to `None`.
-        if !matches!(formal, Type::ProtocolInstance(_))
-            && !actual.is_never()
-            && actual
-                .when_subtype_of(self.db, formal, self.inferable)
-                .is_always_satisfied(self.db)
-        {
-            return Ok(());
-        }
-
-        // Remove the union elements that are not related to `formal`.
-        //
-        // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to specialize `T`
-        // to `int`.
+        // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to
+        // specialize `T` to `int`, and so ignore the `None`.
         let actual = actual.filter_disjoint_elements(self.db, formal, self.inferable);
+        let formal = formal.filter_disjoint_elements(self.db, actual, self.inferable);
 
         match (formal, actual) {
             // TODO: We haven't implemented a full unification solver yet. If typevars appear in
@@ -1442,17 +1445,37 @@ impl<'db> SpecializationBuilder<'db> {
                 if remaining_actual.is_never() {
                     return Ok(());
                 }
-                self.add_type_mapping(*formal_bound_typevar, remaining_actual);
+                self.add_type_mapping(*formal_bound_typevar, remaining_actual, filter);
             }
             (Type::Union(formal), _) => {
-                // Second, if the formal is a union, and precisely one union element _is_ a typevar (not
-                // _contains_ a typevar), then we add a mapping between that typevar and the actual
-                // type. (Note that we've already handled above the case where the actual is
-                // assignable to any _non-typevar_ union element.)
+                // Second, if the formal is a union, and precisely one union element is assignable
+                // from the actual type, then we don't add any type mapping. This handles a case like
+                //
+                // ```py
+                // def f[T](t: T | None): ...
+                //
+                // f(None)
+                // ```
+                //
+                // without specializing `T` to `None`.
+                //
+                // Otherwise, if precisely one union element _is_ a typevar (not _contains_ a
+                // typevar), then we add a mapping between that typevar and the actual type.
+                if !actual.is_never() {
+                    let assignable_elements = (formal.elements(self.db).iter()).filter(|ty| {
+                        actual
+                            .when_subtype_of(self.db, **ty, self.inferable)
+                            .is_always_satisfied(self.db)
+                    });
+                    if assignable_elements.exactly_one().is_ok() {
+                        return Ok(());
+                    }
+                }
+
                 let bound_typevars =
                     (formal.elements(self.db).iter()).filter_map(|ty| ty.as_typevar());
                 if let Ok(bound_typevar) = bound_typevars.exactly_one() {
-                    self.add_type_mapping(bound_typevar, actual);
+                    self.add_type_mapping(bound_typevar, actual, filter);
                 }
             }
 
@@ -1480,15 +1503,23 @@ impl<'db> SpecializationBuilder<'db> {
                                 argument: ty,
                             });
                         }
-                        self.add_type_mapping(bound_typevar, ty);
+                        self.add_type_mapping(bound_typevar, ty, filter);
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        // Prefer an exact match first.
+                        for constraint in constraints.elements(self.db) {
+                            if ty == *constraint {
+                                self.add_type_mapping(bound_typevar, ty, filter);
+                                return Ok(());
+                            }
+                        }
+
                         for constraint in constraints.elements(self.db) {
                             if ty
                                 .when_assignable_to(self.db, *constraint, self.inferable)
                                 .is_always_satisfied(self.db)
                             {
-                                self.add_type_mapping(bound_typevar, *constraint);
+                                self.add_type_mapping(bound_typevar, *constraint, filter);
                                 return Ok(());
                             }
                         }
@@ -1498,7 +1529,7 @@ impl<'db> SpecializationBuilder<'db> {
                         });
                     }
                     _ => {
-                        self.add_type_mapping(bound_typevar, ty);
+                        self.add_type_mapping(bound_typevar, ty, filter);
                     }
                 }
             }

@@ -219,7 +219,7 @@ impl SemanticSyntaxChecker {
                     AwaitOutsideAsyncFunctionKind::AsyncWith,
                 );
             }
-            Stmt::Nonlocal(ast::StmtNonlocal { range, .. }) => {
+            Stmt::Nonlocal(ast::StmtNonlocal { names, range, .. }) => {
                 // test_ok nonlocal_declaration_at_module_level
                 // def _():
                 //     nonlocal x
@@ -233,6 +233,18 @@ impl SemanticSyntaxChecker {
                         SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel,
                         *range,
                     );
+                }
+
+                if !ctx.in_module_scope() {
+                    for name in names {
+                        if !ctx.has_nonlocal_binding(name) {
+                            Self::add_error(
+                                ctx,
+                                SemanticSyntaxErrorKind::NonlocalWithoutBinding(name.to_string()),
+                                name.range,
+                            );
+                        }
+                    }
                 }
             }
             Stmt::Break(ast::StmtBreak { range, .. }) => {
@@ -1154,6 +1166,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::DifferentMatchPatternBindings => {
                 write!(f, "alternative patterns bind different names")
             }
+            SemanticSyntaxErrorKind::NonlocalWithoutBinding(name) => {
+                write!(f, "no binding for nonlocal `{name}` found")
+            }
         }
     }
 }
@@ -1554,6 +1569,9 @@ pub enum SemanticSyntaxErrorKind {
     ///         ...
     /// ```
     DifferentMatchPatternBindings,
+
+    /// Represents a nonlocal statement for a name that has no binding in an enclosing scope.
+    NonlocalWithoutBinding(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -1850,6 +1868,8 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         //     case [[x] | [x]] | x: ...
                         // match 42:
                         //     case [[x | x] | [x]] | x: ...
+                        // match 42:
+                        //     case ast.Subscript(n, ast.Constant() | ast.Slice()) | ast.Attribute(n): ...
                         SemanticSyntaxChecker::add_error(
                             self.ctx,
                             SemanticSyntaxErrorKind::DifferentMatchPatternBindings,
@@ -1857,7 +1877,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         );
                         break;
                     }
-                    self.names = visitor.names;
+                    self.names.extend(visitor.names);
                 }
             }
         }
@@ -2003,6 +2023,9 @@ pub trait SemanticSyntaxContext {
 
     /// Return the [`TextRange`] at which a name is declared as `global` in the current scope.
     fn global(&self, name: &str) -> Option<TextRange>;
+
+    /// Returns `true` if `name` has a binding in an enclosing scope.
+    fn has_nonlocal_binding(&self, name: &str) -> bool;
 
     /// Returns `true` if the visitor is currently in an async context, i.e. an async function.
     fn in_async_context(&self) -> bool;

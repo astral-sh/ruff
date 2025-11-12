@@ -1,5 +1,105 @@
 # Changelog
 
+## 0.14.4
+
+Released on 2025-11-06.
+
+### Preview features
+
+- [formatter] Allow newlines after function headers without docstrings ([#21110](https://github.com/astral-sh/ruff/pull/21110))
+- [formatter] Avoid extra parentheses for long `match` patterns with `as` captures ([#21176](https://github.com/astral-sh/ruff/pull/21176))
+- \[`refurb`\] Expand fix safety for keyword arguments and `Decimal`s (`FURB164`) ([#21259](https://github.com/astral-sh/ruff/pull/21259))
+- \[`refurb`\] Preserve argument ordering in autofix (`FURB103`) ([#20790](https://github.com/astral-sh/ruff/pull/20790))
+
+### Bug fixes
+
+- [server] Fix missing diagnostics for notebooks ([#21156](https://github.com/astral-sh/ruff/pull/21156))
+- \[`flake8-bugbear`\] Ignore non-NFKC attribute names in `B009` and `B010` ([#21131](https://github.com/astral-sh/ruff/pull/21131))
+- \[`refurb`\] Fix false negative for underscores before sign in `Decimal` constructor (`FURB157`) ([#21190](https://github.com/astral-sh/ruff/pull/21190))
+- \[`ruff`\] Fix false positives on starred arguments (`RUF057`) ([#21256](https://github.com/astral-sh/ruff/pull/21256))
+
+### Rule changes
+
+- \[`airflow`\] extend deprecated argument `concurrency` in `airflow..DAG` (`AIR301`) ([#21220](https://github.com/astral-sh/ruff/pull/21220))
+
+### Documentation
+
+- Improve `extend` docs ([#21135](https://github.com/astral-sh/ruff/pull/21135))
+- \[`flake8-comprehensions`\] Fix typo in `C416` documentation ([#21184](https://github.com/astral-sh/ruff/pull/21184))
+- Revise Ruff setup instructions for Zed editor ([#20935](https://github.com/astral-sh/ruff/pull/20935))
+
+### Other changes
+
+- Make `ruff analyze graph` work with jupyter notebooks ([#21161](https://github.com/astral-sh/ruff/pull/21161))
+
+### Contributors
+
+- [@chirizxc](https://github.com/chirizxc)
+- [@Lee-W](https://github.com/Lee-W)
+- [@musicinmybrain](https://github.com/musicinmybrain)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@tjkuson](https://github.com/tjkuson)
+- [@danparizher](https://github.com/danparizher)
+- [@renovate](https://github.com/renovate)
+- [@ntBre](https://github.com/ntBre)
+- [@gauthsvenkat](https://github.com/gauthsvenkat)
+- [@LoicRiegel](https://github.com/LoicRiegel)
+
+## 0.14.3
+
+Released on 2025-10-30.
+
+### Preview features
+
+- Respect `--output-format` with `--watch` ([#21097](https://github.com/astral-sh/ruff/pull/21097))
+- \[`pydoclint`\] Fix false positive on explicit exception re-raising (`DOC501`, `DOC502`) ([#21011](https://github.com/astral-sh/ruff/pull/21011))
+- \[`pyflakes`\] Revert to stable behavior if imports for module lie in alternate branches for `F401` ([#20878](https://github.com/astral-sh/ruff/pull/20878))
+- \[`pylint`\] Implement `stop-iteration-return` (`PLR1708`) ([#20733](https://github.com/astral-sh/ruff/pull/20733))
+- \[`ruff`\] Add support for additional eager conversion patterns (`RUF065`) ([#20657](https://github.com/astral-sh/ruff/pull/20657))
+
+### Bug fixes
+
+- Fix finding keyword range for clause header after statement ending with semicolon ([#21067](https://github.com/astral-sh/ruff/pull/21067))
+- Fix syntax error false positive on nested alternative patterns ([#21104](https://github.com/astral-sh/ruff/pull/21104))
+- \[`ISC001`\] Fix panic when string literals are unclosed ([#21034](https://github.com/astral-sh/ruff/pull/21034))
+- \[`flake8-django`\] Apply `DJ001` to annotated fields ([#20907](https://github.com/astral-sh/ruff/pull/20907))
+- \[`flake8-pyi`\] Fix `PYI034` to not trigger on metaclasses (`PYI034`) ([#20881](https://github.com/astral-sh/ruff/pull/20881))
+- \[`flake8-type-checking`\] Fix `TC003` false positive with `future-annotations` ([#21125](https://github.com/astral-sh/ruff/pull/21125))
+- \[`pyflakes`\] Fix false positive for `__class__` in lambda expressions within class definitions (`F821`) ([#20564](https://github.com/astral-sh/ruff/pull/20564))
+- \[`pyupgrade`\] Fix false positive for `TypeVar` with default on Python \<3.13 (`UP046`,`UP047`) ([#21045](https://github.com/astral-sh/ruff/pull/21045))
+
+### Rule changes
+
+- Add missing docstring sections to the numpy list ([#20931](https://github.com/astral-sh/ruff/pull/20931))
+- \[`airflow`\] Extend `airflow.models..Param` check (`AIR311`) ([#21043](https://github.com/astral-sh/ruff/pull/21043))
+- \[`airflow`\] Warn that `airflow....DAG.create_dagrun` has been removed (`AIR301`) ([#21093](https://github.com/astral-sh/ruff/pull/21093))
+- \[`refurb`\] Preserve digit separators in `Decimal` constructor (`FURB157`) ([#20588](https://github.com/astral-sh/ruff/pull/20588))
+
+### Server
+
+- Avoid sending an unnecessary "clear diagnostics" message for clients supporting pull diagnostics ([#21105](https://github.com/astral-sh/ruff/pull/21105))
+
+### Documentation
+
+- \[`flake8-bandit`\] Fix correct example for `S308` ([#21128](https://github.com/astral-sh/ruff/pull/21128))
+
+### Other changes
+
+- Clearer error message when `line-length` goes beyond threshold ([#21072](https://github.com/astral-sh/ruff/pull/21072))
+
+### Contributors
+
+- [@danparizher](https://github.com/danparizher)
+- [@jvacek](https://github.com/jvacek)
+- [@ntBre](https://github.com/ntBre)
+- [@augustelalande](https://github.com/augustelalande)
+- [@prakhar1144](https://github.com/prakhar1144)
+- [@TaKO8Ki](https://github.com/TaKO8Ki)
+- [@dylwil3](https://github.com/dylwil3)
+- [@fatelei](https://github.com/fatelei)
+- [@ShaharNaveh](https://github.com/ShaharNaveh)
+- [@Lee-W](https://github.com/Lee-W)
+
 ## 0.14.2
 
 Released on 2025-10-23.

@@ -26,9 +26,12 @@ reveal_type(generic_context(SingleTypevar))
 # revealed: tuple[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
 
-# TODO: support `ParamSpec`/`TypeVarTuple` properly (these should not reveal `None`)
-reveal_type(generic_context(SingleParamSpec))  # revealed: None
-reveal_type(generic_context(TypeVarAndParamSpec))  # revealed: None
+# revealed: tuple[P@SingleParamSpec]
+reveal_type(generic_context(SingleParamSpec))
+# revealed: tuple[P@TypeVarAndParamSpec, T@TypeVarAndParamSpec]
+reveal_type(generic_context(TypeVarAndParamSpec))
+
+# TODO: support `TypeVarTuple` properly (these should not reveal `None`)
 reveal_type(generic_context(SingleTypeVarTuple))  # revealed: None
 reveal_type(generic_context(TypeVarAndTypeVarTuple))  # revealed: None
 ```
@@ -433,9 +436,7 @@ def test_seq(x: Sequence[T]) -> Sequence[T]:
 def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: tuple[()]):
     reveal_type(test_seq(t1))  # revealed: Sequence[int | float | complex | list[int]]
     reveal_type(test_seq(t2))  # revealed: Sequence[int | str]
-
-    # TODO: this should be `Sequence[Never]`
-    reveal_type(test_seq(t3))  # revealed: Sequence[Unknown]
+    reveal_type(test_seq(t3))  # revealed: Sequence[Never]
 ```
 
 ### `__init__` is itself generic
@@ -463,6 +464,7 @@ wrong_innards: C[int] = C("five", 1)
 from typing_extensions import overload, Generic, TypeVar
 
 T = TypeVar("T")
+U = TypeVar("U")
 
 class C(Generic[T]):
     @overload
@@ -494,6 +496,17 @@ C[int](12)
 C[None]("string")  # error: [no-matching-overload]
 C[None](b"bytes")  # error: [no-matching-overload]
 C[None](12)
+
+class D(Generic[T, U]):
+    @overload
+    def __init__(self: "D[str, U]", u: U) -> None: ...
+    @overload
+    def __init__(self, t: T, u: U) -> None: ...
+    def __init__(self, *args) -> None: ...
+
+reveal_type(D("string"))  # revealed: D[str, str]
+reveal_type(D(1))  # revealed: D[str, int]
+reveal_type(D(1, "string"))  # revealed: D[int, str]
 ```
 
 ### Synthesized methods with dataclasses

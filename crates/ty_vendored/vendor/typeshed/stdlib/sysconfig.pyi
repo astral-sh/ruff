@@ -2,7 +2,7 @@
 
 import sys
 from typing import IO, Any, Literal, overload
-from typing_extensions import deprecated
+from typing_extensions import LiteralString, deprecated
 
 __all__ = [
     "get_config_h_filename",
@@ -47,8 +47,10 @@ def get_scheme_names() -> tuple[str, ...]:
     """Return a tuple containing the schemes names."""
 
 if sys.version_info >= (3, 10):
-    def get_default_scheme() -> str: ...
-    def get_preferred_scheme(key: Literal["prefix", "home", "user"]) -> str: ...
+    def get_default_scheme() -> LiteralString: ...
+    def get_preferred_scheme(key: Literal["prefix", "home", "user"]) -> LiteralString: ...
+    # Documented -- see https://docs.python.org/3/library/sysconfig.html#sysconfig._get_preferred_schemes
+    def _get_preferred_schemes() -> dict[Literal["prefix", "home", "user"], LiteralString]: ...
 
 def get_path_names() -> tuple[str, ...]:
     """Return a tuple containing the paths names."""

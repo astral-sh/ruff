@@ -2,7 +2,7 @@ import MonacoEditor from "@monaco-editor/react";
 import { AstralButton, Theme } from "shared";
 import { ReadonlyFiles } from "../Playground";
 import { Suspense, use, useState } from "react";
-import { loadPyodide, PyodideInterface } from "pyodide";
+import { loadPyodide } from "pyodide";
 import classNames from "classnames";
 
 export enum SecondaryTool {
@@ -103,41 +103,18 @@ function Content({
   }
 }
 
-let pyodidePromise: Promise<PyodideInterface> | null = null;
+const SANDBOX_BASE_DIRECTORY = "/playground/";
 
 function Run({ files, theme }: { files: ReadonlyFiles; theme: Theme }) {
-  if (pyodidePromise == null) {
-    pyodidePromise = loadPyodide();
-  }
+  const [runOutput, setRunOutput] = useState<Promise<string> | null>(null);
+  const handleRun = () => {
+    const output = (async () => {
+      const pyodide = await loadPyodide({
+        env: {
+          HOME: SANDBOX_BASE_DIRECTORY,
+        },
+      });
 
-  return (
-    <Suspense
-      fallback={<div className="text-center dark:text-white">Loading</div>}
-    >
-      <RunWithPyiodide
-        theme={theme}
-        files={files}
-        pyodidePromise={pyodidePromise}
-      />
-    </Suspense>
-  );
-}
-
-function RunWithPyiodide({
-  files,
-  pyodidePromise,
-  theme,
-}: {
-  files: ReadonlyFiles;
-  theme: Theme;
-  pyodidePromise: Promise<PyodideInterface>;
-}) {
-  const pyodide = use(pyodidePromise);
-
-  const [output, setOutput] = useState<string | null>(null);
-
-  if (output == null) {
-    const handleRun = () => {
       let combined_output = "";
 
       const outputHandler = (output: string) => {
@@ -151,7 +128,17 @@ function RunWithPyiodide({
 
       let fileName = "main.py";
       for (const file of files.index) {
-        pyodide.FS.writeFile(file.name, files.contents[file.id]);
+        const last_separator = file.name.lastIndexOf("/");
+
+        if (last_separator !== -1) {
+          const directory =
+            SANDBOX_BASE_DIRECTORY + file.name.slice(0, last_separator);
+          pyodide.FS.mkdirTree(directory);
+        }
+        pyodide.FS.writeFile(
+          SANDBOX_BASE_DIRECTORY + file.name,
+          files.contents[file.id],
+        );
 
         if (file.id === files.selected) {
           fileName = file.name;
@@ -162,7 +149,7 @@ function RunWithPyiodide({
       const globals = dict();
 
       try {
-        // Patch up reveal types
+        // Patch `reveal_type` to print runtime values
         pyodide.runPython(`
         import builtins
 
@@ -179,14 +166,18 @@ function RunWithPyiodide({
           filename: fileName,
         });
 
-        setOutput(combined_output);
+        return combined_output;
       } catch (e) {
-        setOutput(`Failed to run Python script: ${e}`);
+        return `Failed to run Python script: ${e}`;
       } finally {
         globals.destroy();
         dict.destroy();
       }
-    };
+    })();
+    setRunOutput(output);
+  };
+
+  if (runOutput == null) {
     return (
       <div className="flex flex-auto flex-col justify-center  items-center">
         <AstralButton
@@ -204,6 +195,25 @@ function RunWithPyiodide({
       </div>
     );
   }
+
+  return (
+    <Suspense
+      fallback={<div className="text-center dark:text-white">Loading</div>}
+    >
+      <RunOutput theme={theme} runOutput={runOutput} />
+    </Suspense>
+  );
+}
+
+function RunOutput({
+  runOutput,
+  theme,
+}: {
+  theme: Theme;
+  runOutput: Promise<string>;
+}) {
+  const output = use(runOutput);
+
   return (
     <pre
       className={classNames(

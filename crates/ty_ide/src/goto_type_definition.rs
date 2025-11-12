@@ -276,10 +276,20 @@ mod tests {
             "#,
         );
 
-        // TODO: Goto type definition currently doesn't work for type param specs
-        // because the inference doesn't support them yet.
-        // This snapshot should show a single target pointing to `T`
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> main.py:2:14
+          |
+        2 | type Alias[**P = [int, str]] = Callable[P, int]
+          |              ^
+          |
+        info: Source
+         --> main.py:2:41
+          |
+        2 | type Alias[**P = [int, str]] = Callable[P, int]
+          |                                         ^
+          |
+        ");
     }
 
     #[test]

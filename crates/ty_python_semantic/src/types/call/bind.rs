@@ -9,6 +9,7 @@ use std::fmt;
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
+use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
@@ -34,10 +35,11 @@ use crate::types::generics::{
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::{
-    BoundMethodType, ClassLiteral, DataclassFlags, DataclassParams, FieldInstance,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy, PropertyInstanceType,
-    SpecialFormType, TrackedConstraintSet, TypeAliasType, TypeContext, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, ide_support, infer_isolated_expression, todo_type,
+    BoundMethodType, BoundTypeVarIdentity, ClassLiteral, DataclassFlags, DataclassParams,
+    FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
+    NominalInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
+    TypeAliasType, TypeContext, UnionBuilder, UnionType, WrapperDescriptorKind, enums, ide_support,
+    infer_isolated_expression, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
@@ -46,7 +48,7 @@ use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
 /// compatible with _all_ of the types in the union for the call to be valid.
 ///
 /// It's guaranteed that the wrapped bindings have no errors.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Bindings<'db> {
     /// The type that is (hopefully) callable.
     callable_type: Type<'db>,
@@ -148,9 +150,27 @@ impl<'db> Bindings<'db> {
         mut self,
         db: &'db dyn Db,
         argument_types: &CallArguments<'_, 'db>,
-        call_expression_tcx: &TypeContext<'db>,
+        call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
     ) -> Result<Self, CallError<'db>> {
+        match self.check_types_impl(
+            db,
+            argument_types,
+            call_expression_tcx,
+            dataclass_field_specifiers,
+        ) {
+            Ok(()) => Ok(self),
+            Err(err) => Err(CallError(err, Box::new(self))),
+        }
+    }
+
+    pub(crate) fn check_types_impl(
+        &mut self,
+        db: &'db dyn Db,
+        argument_types: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+        dataclass_field_specifiers: &[Type<'db>],
+    ) -> Result<(), CallErrorKind> {
         for element in &mut self.elements {
             if let Some(mut updated_argument_forms) =
                 element.check_types(db, argument_types, call_expression_tcx)
@@ -195,16 +215,13 @@ impl<'db> Bindings<'db> {
         }
 
         if all_ok {
-            Ok(self)
+            Ok(())
         } else if any_binding_error {
-            Err(CallError(CallErrorKind::BindingError, Box::new(self)))
+            Err(CallErrorKind::BindingError)
         } else if all_not_callable {
-            Err(CallError(CallErrorKind::NotCallable, Box::new(self)))
+            Err(CallErrorKind::NotCallable)
         } else {
-            Err(CallError(
-                CallErrorKind::PossiblyNotCallable,
-                Box::new(self),
-            ))
+            Err(CallErrorKind::PossiblyNotCallable)
         }
     }
 
@@ -1174,6 +1191,62 @@ impl<'db> Bindings<'db> {
                         ));
                     }
 
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetSatisfies(
+                        tracked,
+                    )) => {
+                        let [Some(other)] = overload.parameter_types() else {
+                            continue;
+                        };
+                        let Type::KnownInstance(KnownInstanceType::ConstraintSet(other)) = other
+                        else {
+                            continue;
+                        };
+
+                        let result = tracked
+                            .constraints(db)
+                            .implies(db, || other.constraints(db));
+                        let tracked = TrackedConstraintSet::new(db, result);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(
+                        KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(tracked),
+                    ) => {
+                        let extract_inferable = |instance: &NominalInstanceType<'db>| {
+                            if instance.has_known_class(db, KnownClass::NoneType) {
+                                // Caller explicitly passed None, so no typevars are inferable.
+                                return Some(FxHashSet::default());
+                            }
+                            instance
+                                .tuple_spec(db)?
+                                .fixed_elements()
+                                .map(|ty| {
+                                    ty.as_typevar()
+                                        .map(|bound_typevar| bound_typevar.identity(db))
+                                })
+                                .collect()
+                        };
+
+                        let inferable = match overload.parameter_types() {
+                            // Caller did not provide argument, so no typevars are inferable.
+                            [None] => FxHashSet::default(),
+                            [Some(Type::NominalInstance(instance))] => {
+                                match extract_inferable(instance) {
+                                    Some(inferable) => inferable,
+                                    None => continue,
+                                }
+                            }
+                            _ => continue,
+                        };
+
+                        let result = tracked
+                            .constraints(db)
+                            .satisfied_by_all_typevars(db, InferableTypeVars::One(&inferable));
+                        overload.set_return_type(Type::BooleanLiteral(result));
+                    }
+
                     Type::ClassLiteral(class) => match class.known(db) {
                         Some(KnownClass::Bool) => match overload.parameter_types() {
                             [Some(arg)] => overload.set_return_type(arg.bool(db).into_type(db)),
@@ -1307,7 +1380,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
 /// If the arguments cannot be matched to formal parameters, we store information about the
 /// specific errors that occurred when trying to match them up. If the callable has multiple
 /// overloads, we store this error information for each overload.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct CallableBinding<'db> {
     /// The type that is (hopefully) callable.
     pub(crate) callable_type: Type<'db>,
@@ -1428,7 +1501,7 @@ impl<'db> CallableBinding<'db> {
         &mut self,
         db: &'db dyn Db,
         argument_types: &CallArguments<'_, 'db>,
-        call_expression_tcx: &TypeContext<'db>,
+        call_expression_tcx: TypeContext<'db>,
     ) -> Option<ArgumentForms> {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
@@ -2209,7 +2282,7 @@ pub(crate) enum MatchingOverloadIndex {
     Multiple(Vec<usize>),
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 struct ArgumentForms {
     values: Vec<Option<ParameterForm>>,
     conflicting: Vec<bool>,
@@ -2614,7 +2687,8 @@ struct ArgumentTypeChecker<'a, 'db> {
     arguments: &'a CallArguments<'a, 'db>,
     argument_matches: &'a [MatchedArgument<'db>],
     parameter_tys: &'a mut [Option<Type<'db>>],
-    call_expression_tcx: &'a TypeContext<'db>,
+    callable_type: Type<'db>,
+    call_expression_tcx: TypeContext<'db>,
     return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
 
@@ -2630,7 +2704,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         arguments: &'a CallArguments<'a, 'db>,
         argument_matches: &'a [MatchedArgument<'db>],
         parameter_tys: &'a mut [Option<Type<'db>>],
-        call_expression_tcx: &'a TypeContext<'db>,
+        callable_type: Type<'db>,
+        call_expression_tcx: TypeContext<'db>,
         return_ty: Type<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
     ) -> Self {
@@ -2640,6 +2715,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             arguments,
             argument_matches,
             parameter_tys,
+            callable_type,
             call_expression_tcx,
             return_ty,
             errors,
@@ -2680,8 +2756,23 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return;
         };
 
+        let return_with_tcx = self
+            .callable_type
+            .synthesized_constructor_return_ty(self.db)
+            .or(self.signature.return_ty)
+            .zip(self.call_expression_tcx.annotation);
+
         self.inferable_typevars = generic_context.inferable_typevars(self.db);
         let mut builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
+
+        // Prefer the declared type of generic classes.
+        let preferred_type_mappings = return_with_tcx.and_then(|(return_ty, tcx)| {
+            tcx.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some())
+                .class_specialization(self.db)?;
+
+            builder.infer(return_ty, tcx).ok()?;
+            Some(builder.type_mappings().clone())
+        });
 
         let parameters = self.signature.parameters();
         for (argument_index, adjusted_argument_index, _, argument_type) in
@@ -2695,9 +2786,21 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     continue;
                 };
 
-                if let Err(error) = builder.infer(
+                let filter = |declared_ty: BoundTypeVarIdentity<'_>, inferred_ty: Type<'_>| {
+                    // Avoid widening the inferred type if it is already assignable to the
+                    // preferred declared type.
+                    preferred_type_mappings
+                        .as_ref()
+                        .and_then(|types| types.get(&declared_ty))
+                        .is_none_or(|preferred_ty| {
+                            !inferred_ty.is_assignable_to(self.db, *preferred_ty)
+                        })
+                };
+
+                if let Err(error) = builder.infer_filter(
                     expected_type,
                     variadic_argument_type.unwrap_or(argument_type),
+                    filter,
                 ) {
                     self.errors.push(BindingError::SpecializationError {
                         error,
@@ -2707,15 +2810,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        // Build the specialization first without inferring the type context.
-        let isolated_specialization = builder.build(generic_context, *self.call_expression_tcx);
+        // Build the specialization first without inferring the complete type context.
+        let isolated_specialization = builder.build(generic_context, self.call_expression_tcx);
         let isolated_return_ty = self
             .return_ty
             .apply_specialization(self.db, isolated_specialization);
 
         let mut try_infer_tcx = || {
-            let return_ty = self.signature.return_ty?;
-            let call_expression_tcx = self.call_expression_tcx.annotation?;
+            let (return_ty, call_expression_tcx) = return_with_tcx?;
 
             // A type variable is not a useful type-context for expression inference, and applying it
             // to the return type can lead to confusing unions in nested generic calls.
@@ -2723,8 +2825,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return None;
             }
 
-            // If the return type is already assignable to the annotated type, we can ignore the
-            // type context and prefer the narrower inferred type.
+            // If the return type is already assignable to the annotated type, we ignore the rest of
+            // the type context and prefer the narrower inferred type.
             if isolated_return_ty.is_assignable_to(self.db, call_expression_tcx) {
                 return None;
             }
@@ -2733,8 +2835,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             // annotated assignment, to closer match the order of any unions written in the type annotation.
             builder.infer(return_ty, call_expression_tcx).ok()?;
 
-            // Otherwise, build the specialization again after inferring the type context.
-            let specialization = builder.build(generic_context, *self.call_expression_tcx);
+            // Otherwise, build the specialization again after inferring the complete type context.
+            let specialization = builder.build(generic_context, self.call_expression_tcx);
             let return_ty = return_ty.apply_specialization(self.db, specialization);
 
             Some((Some(specialization), return_ty))
@@ -2993,7 +3095,7 @@ impl<'db> MatchedArgument<'db> {
 pub(crate) struct UnknownParameterNameError;
 
 /// Binding information for one of the overloads of a callable.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Binding<'db> {
     pub(crate) signature: Signature<'db>,
 
@@ -3092,7 +3194,7 @@ impl<'db> Binding<'db> {
         &mut self,
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
-        call_expression_tcx: &TypeContext<'db>,
+        call_expression_tcx: TypeContext<'db>,
     ) {
         let mut checker = ArgumentTypeChecker::new(
             db,
@@ -3100,6 +3202,7 @@ impl<'db> Binding<'db> {
             arguments,
             &self.argument_matches,
             &mut self.parameter_tys,
+            self.callable_type,
             call_expression_tcx,
             self.return_ty,
             &mut self.errors,
@@ -3544,6 +3647,36 @@ impl<'db> BindingError<'db> {
                 expected_ty,
                 provided_ty,
             } => {
+                // Certain special forms in the typing module are aliases for classes
+                // elsewhere in the standard library. These special forms are not instances of `type`,
+                // and you cannot use them in place of their aliased classes in *all* situations:
+                // for example, `dict()` succeeds at runtime, but `typing.Dict()` fails. However,
+                // they *can* all be used as the second argument to `isinstance` and `issubclass`.
+                // We model that specific aspect of their behaviour here.
+                //
+                // This is implemented as a special case in call-binding machinery because overriding
+                // typeshed's signatures for `isinstance()` and `issubclass()` would be complex and
+                // error-prone, due to the fact that they are annotated with recursive type aliases.
+                if parameter.index == 1
+                    && *argument_index == Some(1)
+                    && matches!(
+                        callable_ty
+                            .as_function_literal()
+                            .and_then(|function| function.known(context.db())),
+                        Some(KnownFunction::IsInstance | KnownFunction::IsSubclass)
+                    )
+                    && provided_ty
+                        .as_special_form()
+                        .is_some_and(SpecialFormType::is_valid_isinstance_target)
+                {
+                    return;
+                }
+
+                // TODO: Ideally we would not emit diagnostics for `TypedDict` literal arguments
+                // here (see `diagnostic::is_invalid_typed_dict_literal`). However, we may have
+                // silenced diagnostics during overload evaluation, and rely on the assignability
+                // diagnostic being emitted here.
+
                 let range = Self::get_node(node, *argument_index);
                 let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
                     return;

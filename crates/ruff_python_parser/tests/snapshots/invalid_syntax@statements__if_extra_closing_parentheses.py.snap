@@ -40,7 +40,7 @@ Module(
   |
 1 | # FIXME(micha): This creates two syntax errors instead of just one (and overlapping ones)
 2 | if True)):
-  |        ^ Syntax Error: Expected ':', found ')'
+  |        ^ Syntax Error: Expected `:`, found `)`
 3 |     pass
   |
 

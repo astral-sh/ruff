@@ -752,6 +752,9 @@ environ: _Environ[str]
 if sys.platform != "win32":
     environb: _Environ[bytes]
 
+if sys.version_info >= (3, 14):
+    def reload_environ() -> None: ...
+
 if sys.version_info >= (3, 11) or sys.platform != "win32":
     EX_OK: Final[int]
 

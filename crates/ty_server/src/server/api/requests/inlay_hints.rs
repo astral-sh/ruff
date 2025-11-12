@@ -8,7 +8,6 @@ use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use lsp_types::request::InlayHintRequest;
 use lsp_types::{InlayHintParams, Url};
-use ruff_db::source::{line_index, source_text};
 use ty_ide::{InlayHintKind, InlayHintLabel, inlay_hints};
 use ty_project::ProjectDatabase;
 
@@ -36,32 +35,35 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.file(db) else {
+        let Some(file) = snapshot.to_file(db) else {
             return Ok(None);
         };
 
-        let index = line_index(db, file);
-        let source = source_text(db, file);
-
-        let range = params
+        let Some(range) = params
             .range
-            .to_text_range(&source, &index, snapshot.encoding());
+            .to_text_range(db, file, snapshot.url(), snapshot.encoding())
+        else {
+            return Ok(None);
+        };
 
         let inlay_hints = inlay_hints(db, file, range, workspace_settings.inlay_hints());
 
         let inlay_hints = inlay_hints
             .into_iter()
-            .map(|hint| lsp_types::InlayHint {
-                position: hint
-                    .position
-                    .to_position(&source, &index, snapshot.encoding()),
-                label: inlay_hint_label(&hint.label),
-                kind: Some(inlay_hint_kind(&hint.kind)),
-                tooltip: None,
-                padding_left: None,
-                padding_right: None,
-                data: None,
-                text_edits: None,
+            .filter_map(|hint| {
+                Some(lsp_types::InlayHint {
+                    position: hint
+                        .position
+                        .to_lsp_position(db, file, snapshot.encoding())?
+                        .local_position(),
+                    label: inlay_hint_label(&hint.label),
+                    kind: Some(inlay_hint_kind(&hint.kind)),
+                    tooltip: None,
+                    padding_left: None,
+                    padding_right: None,
+                    data: None,
+                    text_edits: None,
+                })
             })
             .collect();
 
