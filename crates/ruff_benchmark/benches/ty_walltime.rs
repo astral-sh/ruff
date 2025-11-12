@@ -71,16 +71,13 @@ impl Display for Benchmark<'_> {
     }
 }
 
-fn check_project(db: &ProjectDatabase, max_diagnostics: usize) {
+fn check_project(db: &ProjectDatabase, project_name: &str, max_diagnostics: usize) {
     let result = db.check();
     let diagnostics = result.len();
 
     assert!(
         diagnostics > 1 && diagnostics <= max_diagnostics,
-        "Expected between {} and {} diagnostics but got {}",
-        1,
-        max_diagnostics,
-        diagnostics
+        "Expected between 1 and {max_diagnostics} diagnostics on project '{project_name}' but got {diagnostics}",
     );
 }
 
@@ -234,7 +231,7 @@ fn run_single_threaded(bencher: Bencher, benchmark: &Benchmark) {
     bencher
         .with_inputs(|| benchmark.setup_iteration())
         .bench_local_refs(|db| {
-            check_project(db, benchmark.max_diagnostics);
+            check_project(db, benchmark.project.name, benchmark.max_diagnostics);
         });
 }
 
@@ -261,7 +258,7 @@ fn multithreaded(bencher: Bencher, benchmark: &Benchmark) {
         .with_inputs(|| benchmark.setup_iteration())
         .bench_local_values(|db| {
             thread_pool.install(|| {
-                check_project(&db, benchmark.max_diagnostics);
+                check_project(&db, benchmark.project.name, benchmark.max_diagnostics);
                 db
             })
         });
@@ -285,7 +282,7 @@ fn main() {
     // branch when looking up the ingredient index.
     {
         let db = TANJUN.setup_iteration();
-        check_project(&db, TANJUN.max_diagnostics);
+        check_project(&db, TANJUN.project.name, TANJUN.max_diagnostics);
     }
 
     divan::main();
