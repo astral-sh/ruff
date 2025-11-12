@@ -238,7 +238,7 @@ fn run_single_threaded(bencher: Bencher, benchmark: &Benchmark) {
         });
 }
 
-#[bench(args=[&ALTAIR, &FREQTRADE, &PYDANTIC, &TANJUN], sample_size=2, sample_count=3)]
+#[bench(args=[&ALTAIR, &FREQTRADE, &TANJUN], sample_size=2, sample_count=3)]
 fn small(bencher: Bencher, benchmark: &Benchmark) {
     run_single_threaded(bencher, benchmark);
 }
@@ -248,12 +248,12 @@ fn medium(bencher: Bencher, benchmark: &Benchmark) {
     run_single_threaded(bencher, benchmark);
 }
 
-#[bench(args=[&SYMPY], sample_size=1, sample_count=2)]
+#[bench(args=[&SYMPY, &PYDANTIC], sample_size=1, sample_count=2)]
 fn large(bencher: Bencher, benchmark: &Benchmark) {
     run_single_threaded(bencher, benchmark);
 }
 
-#[bench(args=[&PYDANTIC], sample_size=3, sample_count=8)]
+#[bench(args=[&ALTAIR], sample_size=3, sample_count=8)]
 fn multithreaded(bencher: Bencher, benchmark: &Benchmark) {
     let thread_pool = ThreadPoolBuilder::new().build().unwrap();
 
