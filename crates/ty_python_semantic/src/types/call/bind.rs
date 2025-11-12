@@ -1274,6 +1274,26 @@ impl<'db> Bindings<'db> {
                         overload.set_return_type(Type::BooleanLiteral(result));
                     }
 
+                    Type::KnownBoundMethod(
+                        KnownBoundMethodType::GenericContextSpecializeConstrained(generic_context),
+                    ) => {
+                        let [Some(constraints)] = overload.parameter_types() else {
+                            continue;
+                        };
+                        let Type::KnownInstance(KnownInstanceType::ConstraintSet(constraints)) =
+                            constraints
+                        else {
+                            continue;
+                        };
+                        if let Ok(specialization) =
+                            generic_context.specialize_constrained(db, constraints.constraints(db))
+                        {
+                            overload.set_return_type(Type::KnownInstance(
+                                KnownInstanceType::Specialization(specialization),
+                            ));
+                        }
+                    }
+
                     Type::ClassLiteral(class) => match class.known(db) {
                         Some(KnownClass::Bool) => match overload.parameter_types() {
                             [Some(arg)] => overload.set_return_type(arg.bool(db).into_type(db)),

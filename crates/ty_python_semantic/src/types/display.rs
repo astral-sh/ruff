@@ -541,6 +541,9 @@ impl Display for DisplayRepresentation<'_> {
             Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(
                 _,
             )) => f.write_str("bound method `ConstraintSet.satisfied_by_all_typevars`"),
+            Type::KnownBoundMethod(KnownBoundMethodType::GenericContextSpecializeConstrained(
+                _,
+            )) => f.write_str("bound method `GenericContext.specialize_constrained`"),
             Type::WrapperDescriptor(kind) => {
                 let (method, object) = match kind {
                     WrapperDescriptorKind::FunctionTypeDunderGet => ("__get__", "function"),
