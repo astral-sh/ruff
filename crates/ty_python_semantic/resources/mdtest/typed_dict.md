@@ -460,6 +460,8 @@ and their types, rather than the class hierarchy:
 
 ```py
 from typing import TypedDict
+from typing_extensions import ReadOnly
+from ty_extensions import static_assert, is_assignable_to, is_subtype_of
 
 class Person(TypedDict):
     name: str
@@ -468,10 +470,201 @@ class Employee(TypedDict):
     name: str
     employee_id: int
 
-p1: Person = Employee(name="Alice", employee_id=1)
+class Robot(TypedDict):
+    name: int
 
-# TODO: this should be an error
-e1: Employee = Person(name="Eve")
+static_assert(is_assignable_to(Employee, Person))
+
+static_assert(not is_assignable_to(Person, Employee))
+static_assert(not is_assignable_to(Robot, Person))
+static_assert(not is_assignable_to(Person, Robot))
+```
+
+In order for one `TypedDict` `B` to be assignable to another `TypedDict` `A`, all required keys in
+`A`'s schema must be required in `B`'s schema. If a key is not-required and also mutable in `A`,
+then it must be not-required in `B` (because `A` allows the caller to `del` that key). These rules
+cover keys that are explicitly marked `NotRequired`, and also all the keys in a `TypedDict` with
+`total=False`.
+
+```py
+from typing_extensions import NotRequired
+
+class Spy1(TypedDict):
+    name: NotRequired[str]
+
+class Spy2(TypedDict, total=False):
+    name: str
+
+# invalid because `Spy1` and `Spy2` might be missing `name`
+static_assert(not is_assignable_to(Spy1, Person))
+static_assert(not is_assignable_to(Spy2, Person))
+
+# invalid because `Spy1` and `Spy2` are allowed to delete `name`, while `Person` is not
+static_assert(not is_assignable_to(Person, Spy1))
+static_assert(not is_assignable_to(Person, Spy2))
+
+class Amnesiac1(TypedDict):
+    name: NotRequired[ReadOnly[str]]
+
+class Amnesiac2(TypedDict, total=False):
+    name: ReadOnly[str]
+
+# invalid because `Amnesiac1` and `Amnesiac2` might be missing `name`
+static_assert(not is_assignable_to(Amnesiac1, Person))
+static_assert(not is_assignable_to(Amnesiac2, Person))
+
+# Allowed. Neither `Amnesiac1` nor `Amnesiac2` can delete `name`, because it's read-only.
+static_assert(is_assignable_to(Person, Amnesiac1))
+static_assert(is_assignable_to(Person, Amnesiac2))
+```
+
+If an item in `A` (the destination `TypedDict` type) is read-only, then the corresponding item in
+`B` can have any assignable type. But if the item in `A` is mutable, the item type in `B` must be
+"consistent", i.e. both assignable-to and assignable-from. (For fully-static types, consistent is
+the same as equivalent.) The required and not-required cases are different codepaths, so we need
+test all the permutations:
+
+```py
+from typing import Any
+from typing_extensions import ReadOnly
+
+class RequiredMutableInt(TypedDict):
+    x: int
+
+class RequiredReadOnlyInt(TypedDict):
+    x: ReadOnly[int]
+
+class NotRequiredMutableInt(TypedDict):
+    x: NotRequired[int]
+
+class NotRequiredReadOnlyInt(TypedDict):
+    x: NotRequired[ReadOnly[int]]
+
+class RequiredMutableBool(TypedDict):
+    x: bool
+
+class RequiredReadOnlyBool(TypedDict):
+    x: ReadOnly[bool]
+
+class NotRequiredMutableBool(TypedDict):
+    x: NotRequired[bool]
+
+class NotRequiredReadOnlyBool(TypedDict):
+    x: NotRequired[ReadOnly[bool]]
+
+class RequiredMutableAny(TypedDict):
+    x: Any
+
+class RequiredReadOnlyAny(TypedDict):
+    x: ReadOnly[Any]
+
+class NotRequiredMutableAny(TypedDict):
+    x: NotRequired[Any]
+
+class NotRequiredReadOnlyAny(TypedDict):
+    x: NotRequired[ReadOnly[Any]]
+
+# fmt: off
+static_assert(    is_assignable_to( RequiredMutableInt,      RequiredMutableInt))
+static_assert(       is_subtype_of( RequiredMutableInt,      RequiredMutableInt))
+static_assert(not is_assignable_to( RequiredReadOnlyInt,     RequiredMutableInt))
+static_assert(not    is_subtype_of( RequiredReadOnlyInt,     RequiredMutableInt))
+static_assert(not is_assignable_to( NotRequiredMutableInt,   RequiredMutableInt))
+static_assert(not    is_subtype_of( NotRequiredMutableInt,   RequiredMutableInt))
+static_assert(not is_assignable_to( NotRequiredReadOnlyInt,  RequiredMutableInt))
+static_assert(not    is_subtype_of( NotRequiredReadOnlyInt,  RequiredMutableInt))
+static_assert(not is_assignable_to( RequiredMutableBool,     RequiredMutableInt))
+static_assert(not    is_subtype_of( RequiredMutableBool,     RequiredMutableInt))
+static_assert(not is_assignable_to( RequiredReadOnlyBool,    RequiredMutableInt))
+static_assert(not    is_subtype_of( RequiredReadOnlyBool,    RequiredMutableInt))
+static_assert(not is_assignable_to( NotRequiredMutableBool,  RequiredMutableInt))
+static_assert(not    is_subtype_of( NotRequiredMutableBool,  RequiredMutableInt))
+static_assert(not is_assignable_to( NotRequiredReadOnlyBool, RequiredMutableInt))
+static_assert(not    is_subtype_of( NotRequiredReadOnlyBool, RequiredMutableInt))
+static_assert(    is_assignable_to( RequiredMutableAny,      RequiredMutableInt))
+static_assert(not    is_subtype_of( RequiredMutableAny,      RequiredMutableInt))
+static_assert(not is_assignable_to( RequiredReadOnlyAny,     RequiredMutableInt))
+static_assert(not    is_subtype_of( RequiredReadOnlyAny,     RequiredMutableInt))
+static_assert(not is_assignable_to( NotRequiredMutableAny,   RequiredMutableInt))
+static_assert(not    is_subtype_of( NotRequiredMutableAny,   RequiredMutableInt))
+static_assert(not is_assignable_to( NotRequiredReadOnlyAny,  RequiredMutableInt))
+static_assert(not    is_subtype_of( NotRequiredReadOnlyAny,  RequiredMutableInt))
+
+static_assert(    is_assignable_to( RequiredMutableInt,      RequiredReadOnlyInt))
+static_assert(       is_subtype_of( RequiredMutableInt,      RequiredReadOnlyInt))
+static_assert(    is_assignable_to( RequiredReadOnlyInt,     RequiredReadOnlyInt))
+static_assert(       is_subtype_of( RequiredReadOnlyInt,     RequiredReadOnlyInt))
+static_assert(not is_assignable_to( NotRequiredMutableInt,   RequiredReadOnlyInt))
+static_assert(not    is_subtype_of( NotRequiredMutableInt,   RequiredReadOnlyInt))
+static_assert(not is_assignable_to( NotRequiredReadOnlyInt,  RequiredReadOnlyInt))
+static_assert(not    is_subtype_of( NotRequiredReadOnlyInt,  RequiredReadOnlyInt))
+static_assert(    is_assignable_to( RequiredMutableBool,     RequiredReadOnlyInt))
+static_assert(       is_subtype_of( RequiredMutableBool,     RequiredReadOnlyInt))
+static_assert(    is_assignable_to( RequiredReadOnlyBool,    RequiredReadOnlyInt))
+static_assert(       is_subtype_of( RequiredReadOnlyBool,    RequiredReadOnlyInt))
+static_assert(not is_assignable_to( NotRequiredMutableBool,  RequiredReadOnlyInt))
+static_assert(not    is_subtype_of( NotRequiredMutableBool,  RequiredReadOnlyInt))
+static_assert(not is_assignable_to( NotRequiredReadOnlyBool, RequiredReadOnlyInt))
+static_assert(not    is_subtype_of( NotRequiredReadOnlyBool, RequiredReadOnlyInt))
+static_assert(    is_assignable_to( RequiredMutableAny,      RequiredReadOnlyInt))
+static_assert(not    is_subtype_of( RequiredMutableAny,      RequiredReadOnlyInt))
+static_assert(    is_assignable_to( RequiredReadOnlyAny,     RequiredReadOnlyInt))
+static_assert(not    is_subtype_of( RequiredReadOnlyAny,     RequiredReadOnlyInt))
+static_assert(not is_assignable_to( NotRequiredMutableAny,   RequiredReadOnlyInt))
+static_assert(not    is_subtype_of( NotRequiredMutableAny,   RequiredReadOnlyInt))
+static_assert(not is_assignable_to( NotRequiredReadOnlyAny,  RequiredReadOnlyInt))
+static_assert(not    is_subtype_of( NotRequiredReadOnlyAny,  RequiredReadOnlyInt))
+
+static_assert(not is_assignable_to( RequiredMutableInt,      NotRequiredMutableInt))
+static_assert(not    is_subtype_of( RequiredMutableInt,      NotRequiredMutableInt))
+static_assert(not is_assignable_to( RequiredReadOnlyInt,     NotRequiredMutableInt))
+static_assert(not    is_subtype_of( RequiredReadOnlyInt,     NotRequiredMutableInt))
+static_assert(    is_assignable_to( NotRequiredMutableInt,   NotRequiredMutableInt))
+static_assert(       is_subtype_of( NotRequiredMutableInt,   NotRequiredMutableInt))
+static_assert(not is_assignable_to( NotRequiredReadOnlyInt,  NotRequiredMutableInt))
+static_assert(not    is_subtype_of( NotRequiredReadOnlyInt,  NotRequiredMutableInt))
+static_assert(not is_assignable_to( RequiredMutableBool,     NotRequiredMutableInt))
+static_assert(not    is_subtype_of( RequiredMutableBool,     NotRequiredMutableInt))
+static_assert(not is_assignable_to( RequiredReadOnlyBool,    NotRequiredMutableInt))
+static_assert(not    is_subtype_of( RequiredReadOnlyBool,    NotRequiredMutableInt))
+static_assert(not is_assignable_to( NotRequiredMutableBool,  NotRequiredMutableInt))
+static_assert(not    is_subtype_of( NotRequiredMutableBool,  NotRequiredMutableInt))
+static_assert(not is_assignable_to( NotRequiredReadOnlyBool, NotRequiredMutableInt))
+static_assert(not    is_subtype_of( NotRequiredReadOnlyBool, NotRequiredMutableInt))
+static_assert(not is_assignable_to( RequiredMutableAny,      NotRequiredMutableInt))
+static_assert(not    is_subtype_of( RequiredMutableAny,      NotRequiredMutableInt))
+static_assert(not is_assignable_to( RequiredReadOnlyAny,     NotRequiredMutableInt))
+static_assert(not    is_subtype_of( RequiredReadOnlyAny,     NotRequiredMutableInt))
+static_assert(    is_assignable_to( NotRequiredMutableAny,   NotRequiredMutableInt))
+static_assert(not    is_subtype_of( NotRequiredMutableAny,   NotRequiredMutableInt))
+static_assert(not is_assignable_to( NotRequiredReadOnlyAny,  NotRequiredMutableInt))
+static_assert(not    is_subtype_of( NotRequiredReadOnlyAny,  NotRequiredMutableInt))
+
+static_assert(    is_assignable_to( RequiredMutableInt,      NotRequiredReadOnlyInt))
+static_assert(       is_subtype_of( RequiredMutableInt,      NotRequiredReadOnlyInt))
+static_assert(    is_assignable_to( RequiredReadOnlyInt,     NotRequiredReadOnlyInt))
+static_assert(       is_subtype_of( RequiredReadOnlyInt,     NotRequiredReadOnlyInt))
+static_assert(    is_assignable_to( NotRequiredMutableInt,   NotRequiredReadOnlyInt))
+static_assert(       is_subtype_of( NotRequiredMutableInt,   NotRequiredReadOnlyInt))
+static_assert(    is_assignable_to( NotRequiredReadOnlyInt,  NotRequiredReadOnlyInt))
+static_assert(       is_subtype_of( NotRequiredReadOnlyInt,  NotRequiredReadOnlyInt))
+static_assert(    is_assignable_to( RequiredMutableBool,     NotRequiredReadOnlyInt))
+static_assert(       is_subtype_of( RequiredMutableBool,     NotRequiredReadOnlyInt))
+static_assert(    is_assignable_to( RequiredReadOnlyBool,    NotRequiredReadOnlyInt))
+static_assert(       is_subtype_of( RequiredReadOnlyBool,    NotRequiredReadOnlyInt))
+static_assert(    is_assignable_to( NotRequiredMutableBool,  NotRequiredReadOnlyInt))
+static_assert(       is_subtype_of( NotRequiredMutableBool,  NotRequiredReadOnlyInt))
+static_assert(    is_assignable_to( NotRequiredReadOnlyBool, NotRequiredReadOnlyInt))
+static_assert(       is_subtype_of( NotRequiredReadOnlyBool, NotRequiredReadOnlyInt))
+static_assert(    is_assignable_to( RequiredMutableAny,      NotRequiredReadOnlyInt))
+static_assert(not    is_subtype_of( RequiredMutableAny,      NotRequiredReadOnlyInt))
+static_assert(    is_assignable_to( RequiredReadOnlyAny,     NotRequiredReadOnlyInt))
+static_assert(not    is_subtype_of( RequiredReadOnlyAny,     NotRequiredReadOnlyInt))
+static_assert(    is_assignable_to( NotRequiredMutableAny,   NotRequiredReadOnlyInt))
+static_assert(not    is_subtype_of( NotRequiredMutableAny,   NotRequiredReadOnlyInt))
+static_assert(    is_assignable_to( NotRequiredReadOnlyAny,  NotRequiredReadOnlyInt))
+static_assert(not    is_subtype_of( NotRequiredReadOnlyAny,  NotRequiredReadOnlyInt))
+# fmt: on
 ```
 
 All typed dictionaries can be assigned to `Mapping[str, object]`:
@@ -483,10 +676,23 @@ class Person(TypedDict):
     name: str
     age: int | None
 
-m: Mapping[str, object] = Person(name="Alice", age=30)
+alice = Person(name="Alice", age=30)
+# Always assignable.
+_: Mapping[str, object] = alice
+# Follows from above.
+_: Mapping[str, Any] = alice
+# Also follows from above, because `update` accepts the `SupportsKeysAndGetItem` protocol.
+{}.update(alice)
+# Not assignable.
+# error: [invalid-assignment] "Object of type `Person` is not assignable to `Mapping[str, int]`"
+_: Mapping[str, int] = alice
+# `Person` does not have `closed=True` or `extra_items`, so it may have additional keys with values
+# of unknown type, therefore it can't be assigned to a `Mapping` with value type smaller than `object`.
+# error: [invalid-assignment]
+_: Mapping[str, str | int | None] = alice
 ```
 
-They can *not* be assigned to `dict[str, object]`, as that would allow them to be mutated in unsafe
+They *cannot* be assigned to `dict[str, object]`, as that would allow them to be mutated in unsafe
 ways:
 
 ```py
@@ -500,7 +706,7 @@ class Person(TypedDict):
 
 alice: Person = {"name": "Alice"}
 
-# TODO: this should be an invalid-assignment error
+# error: [invalid-argument-type] "Argument to function `dangerous` is incorrect: Expected `dict[str, object]`, found `Person`"
 dangerous(alice)
 
 reveal_type(alice["name"])  # revealed: str
@@ -513,6 +719,153 @@ alice: dict[str, str] = {"name": "Alice"}
 
 # error: [invalid-assignment] "Object of type `dict[str, str]` is not assignable to `Person`"
 alice: Person = alice
+```
+
+## A subtle interaction between two structural assignability rules prevents unsoundness
+
+> For the purposes of these conditions, an open `TypedDict` is treated as if it had **read-only**
+> extra items of type `object`.
+
+That language is at the top of [subtyping section of the `TypedDict` spec][subtyping section]. It
+sounds like an obscure technicality, especially since `extra_items` is still TODO, but it has an
+important interaction with another rule:
+
+> For each item in [the destination type]...If it is non-required...If it is mutable...If \[the
+> source type does not have an item with the same key and also\] has extra items, the extra items
+> type **must not be read-only**...
+
+In other words, by default (`closed=False`) a `TypedDict` cannot be assigned to a different
+`TypedDict` that has an additional, optional, mutable item. That implicit rule turns out to be the
+only thing standing in the way of this unsound example:
+
+```py
+from typing_extensions import TypedDict, NotRequired
+
+class C(TypedDict):
+    x: int
+    y: str
+
+class B(TypedDict):
+    x: int
+
+class A(TypedDict):
+    x: int
+    y: NotRequired[object]  # incompatible with both C and (surprisingly!) B
+
+def b_from_c(c: C) -> B:
+    return c  # allowed
+
+def a_from_b(b: B) -> A:
+    # error: [invalid-return-type] "Return type does not match returned value: expected `A`, found `B`"
+    return b
+
+# The [invalid-return-type] error above is the only thing that keeps us from corrupting the type of c['y'].
+c: C = {"x": 1, "y": "hello"}
+a: A = a_from_b(b_from_c(c))
+a["y"] = 42
+```
+
+If the additional, optional item in the target is read-only, the requirements are *somewhat*
+relaxed. In this case, because the source might contain have undeclared extra items of any type, the
+target item must be assignable from `object`:
+
+```py
+from typing_extensions import ReadOnly
+
+class A2(TypedDict):
+    x: int
+    y: NotRequired[ReadOnly[object]]
+
+def a2_from_b(b: B) -> A2:
+    return b  # allowed
+
+class A3(TypedDict):
+    x: int
+    y: NotRequired[ReadOnly[int]]  # not assignable from `object`
+
+def a3_from_b(b: B) -> A3:
+    return b  # error: [invalid-return-type]
+```
+
+## Structural assignability supports `TypedDict`s that contain other `TypedDict`s
+
+```py
+from typing_extensions import TypedDict, ReadOnly, NotRequired
+from ty_extensions import static_assert, is_assignable_to, is_subtype_of
+
+class Inner1(TypedDict):
+    name: str
+
+class Inner2(TypedDict):
+    name: str
+
+class Outer1(TypedDict):
+    a: Inner1
+    b: ReadOnly[Inner1]
+    c: NotRequired[Inner1]
+    d: ReadOnly[NotRequired[Inner1]]
+
+class Outer2(TypedDict):
+    a: Inner2
+    b: ReadOnly[Inner2]
+    c: NotRequired[Inner2]
+    d: ReadOnly[NotRequired[Inner2]]
+
+def _(o1: Outer1, o2: Outer2):
+    static_assert(is_assignable_to(Outer1, Outer2))
+    static_assert(is_subtype_of(Outer1, Outer2))
+    static_assert(is_assignable_to(Outer2, Outer1))
+    static_assert(is_subtype_of(Outer2, Outer1))
+```
+
+This also extends to gradual types:
+
+```py
+from typing import Any
+
+class Inner3(TypedDict):
+    name: Any
+
+class Outer3(TypedDict):
+    a: Inner3
+    b: ReadOnly[Inner3]
+    c: NotRequired[Inner3]
+    d: ReadOnly[NotRequired[Inner3]]
+
+class Outer4(TypedDict):
+    a: Any
+    b: ReadOnly[Any]
+    c: NotRequired[Any]
+    d: ReadOnly[NotRequired[Any]]
+
+def _(o1: Outer1, o2: Outer2, o3: Outer3, o4: Outer4):
+    static_assert(is_assignable_to(Outer3, Outer1))
+    static_assert(not is_subtype_of(Outer3, Outer1))
+    static_assert(is_assignable_to(Outer4, Outer1))
+    static_assert(not is_subtype_of(Outer4, Outer1))
+
+    static_assert(is_assignable_to(Outer3, Outer2))
+    static_assert(not is_subtype_of(Outer3, Outer2))
+    static_assert(is_assignable_to(Outer4, Outer2))
+    static_assert(not is_subtype_of(Outer4, Outer2))
+
+    static_assert(is_assignable_to(Outer1, Outer3))
+    static_assert(not is_subtype_of(Outer1, Outer3))
+    static_assert(is_assignable_to(Outer2, Outer3))
+    static_assert(not is_subtype_of(Outer2, Outer3))
+    static_assert(is_assignable_to(Outer3, Outer3))
+    static_assert(is_subtype_of(Outer3, Outer3))
+    static_assert(is_assignable_to(Outer4, Outer3))
+    static_assert(not is_subtype_of(Outer4, Outer3))
+
+    static_assert(is_assignable_to(Outer1, Outer4))
+    static_assert(not is_subtype_of(Outer1, Outer4))
+    static_assert(is_assignable_to(Outer2, Outer4))
+    static_assert(not is_subtype_of(Outer2, Outer4))
+    static_assert(is_assignable_to(Outer3, Outer4))
+    static_assert(not is_subtype_of(Outer3, Outer4))
+    static_assert(is_assignable_to(Outer4, Outer4))
+    static_assert(is_subtype_of(Outer4, Outer4))
 ```
 
 ## Key-based access
@@ -835,7 +1188,7 @@ def combine(p: Person, e: Employee):
     reveal_type(p | p)  # revealed: Person
     reveal_type(e | e)  # revealed: Employee
 
-    # TODO: Should be `Person` once we support subtyping for TypedDicts
+    # TODO: Should be `Person`; simplifying TypedDicts in Unions is pending better cycle handling
     reveal_type(p | e)  # revealed: Person | Employee
 ```
 
@@ -995,6 +1348,20 @@ nested: Node = {"name": "n1", "parent": {"name": "n2", "parent": {"name": "n3", 
 
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Node`: value of type `Literal[3]`"
 nested_invalid: Node = {"name": "n1", "parent": {"name": "n2", "parent": {"name": 3, "parent": None}}}
+```
+
+Structural assignment works for recursive `TypedDict`s too:
+
+```py
+class Person(TypedDict):
+    name: str
+    parent: Person | None
+
+def _(node: Node, person: Person):
+    _: Person = node
+    _: Node = person
+
+_: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charlie", parent=None)))
 ```
 
 ## Function/assignment syntax
@@ -1165,4 +1532,5 @@ reveal_type(actual_td)  # revealed: ActualTypedDict
 reveal_type(actual_td["name"])  # revealed: str
 ```
 
+[subtyping section]: https://typing.python.org/en/latest/spec/typeddict.html#subtyping-between-typeddict-types
 [`typeddict`]: https://typing.python.org/en/latest/spec/typeddict.html

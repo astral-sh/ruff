@@ -2093,14 +2093,6 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(false)
             }
 
-            (Type::TypedDict(_), _) => {
-                // TODO: Implement assignability and subtyping for TypedDict
-                ConstraintSet::from(relation.is_assignability())
-            }
-
-            // A non-`TypedDict` cannot subtype a `TypedDict`
-            (_, Type::TypedDict(_)) => ConstraintSet::from(false),
-
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
             (left, Type::AlwaysFalsy) => ConstraintSet::from(left.bool(db).is_always_false()),
@@ -2206,6 +2198,38 @@ impl<'db> Type<'db> {
 
             // A protocol instance can never be a subtype of a nominal type, with the *sole* exception of `object`.
             (Type::ProtocolInstance(_), _) => ConstraintSet::from(false),
+
+            (Type::TypedDict(self_typeddict), Type::TypedDict(other_typeddict)) => relation_visitor
+                .visit((self, target, relation), || {
+                    self_typeddict.has_relation_to_impl(
+                        db,
+                        other_typeddict,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                }),
+
+            // TODO: When we support `closed` and/or `extra_items`, we could allow assignments to other
+            // compatible `Mapping`s. `extra_items` could also allow for some assignments to `dict`, as
+            // long as `total=False`. (But then again, does anyone want a non-total `TypedDict` where all
+            // key types are a supertype of the extra items type?)
+            (Type::TypedDict(_), _) => relation_visitor.visit((self, target, relation), || {
+                KnownClass::Mapping
+                    .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::object()])
+                    .has_relation_to_impl(
+                        db,
+                        target,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+            }),
+
+            // A non-`TypedDict` cannot subtype a `TypedDict`
+            (_, Type::TypedDict(_)) => ConstraintSet::from(false),
 
             // All `StringLiteral` types are a subtype of `LiteralString`.
             (Type::StringLiteral(_), Type::LiteralString) => ConstraintSet::from(true),
