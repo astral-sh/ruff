@@ -1188,7 +1188,7 @@ impl<'db> UseDefMapBuilder<'db> {
         enclosing_place: ScopedPlaceId,
         enclosing_scope: ScopeKind,
         enclosing_place_expr: PlaceExprRef,
-        is_immediately_enclosing_scope: bool,
+        is_parent_of_annotation_scope: bool,
     ) -> ScopedEnclosingSnapshotId {
         let bindings = match enclosing_place {
             ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
@@ -1196,12 +1196,11 @@ impl<'db> UseDefMapBuilder<'db> {
         };
 
         let is_class_symbol = enclosing_scope.is_class() && enclosing_place.is_symbol();
-        // Names bound in class scopes are never visible to nested scopes (but attributes/subscripts are visible),
-        // so we never need to save eager scope bindings in a class scope.
-        // There is one exception to this rule: annotation scopes can see
-        // names defined in an immediately-enclosing class scope.
-        if (is_class_symbol && !is_immediately_enclosing_scope) || !enclosing_place_expr.is_bound()
-        {
+        // Names bound in class scopes are never visible to nested scopes (but
+        // attributes/subscripts are visible), so we never need to save eager scope bindings in a
+        // class scope. There is one exception to this rule: annotation scopes can see names
+        // defined in an immediately-enclosing class scope.
+        if (is_class_symbol && !is_parent_of_annotation_scope) || !enclosing_place_expr.is_bound() {
             self.enclosing_snapshots.push(EnclosingSnapshot::Constraint(
                 bindings.unbound_narrowing_constraint(),
             ))

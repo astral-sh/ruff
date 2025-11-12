@@ -315,6 +315,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     // Records snapshots of the place states visible from the current eager scope.
     fn record_eager_snapshots(&mut self, popped_scope_id: FileScopeId) {
         let popped_scope = &self.scopes[popped_scope_id];
+        let popped_scope_is_annotation_scope = popped_scope.kind().is_annotation();
 
         // If the scope that we just popped off is an eager scope, we need to "lock" our view of
         // which bindings reach each of the uses in the scope. Loop through each enclosing scope,
@@ -330,6 +331,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // ```
         for enclosing_scope_info in self.scope_stack.iter().rev() {
             let enclosing_scope_id = enclosing_scope_info.file_scope_id;
+            let is_immediately_enclosing_scope = popped_scope.parent() == Some(enclosing_scope_id);
             let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();
             let enclosing_place_table = &self.place_tables[enclosing_scope_id];
 
@@ -352,14 +354,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     nested_scope: popped_scope_id,
                     nested_laziness: ScopeLaziness::Eager,
                 };
-                let is_immediately_enclosing_scope = popped_scope.kind().is_annotation()
-                    && popped_scope.parent() == Some(enclosing_scope_id);
                 let eager_snapshot = self.use_def_maps[enclosing_scope_id]
                     .snapshot_enclosing_state(
                         enclosing_place_id,
                         enclosing_scope_kind,
                         enclosing_place,
-                        is_immediately_enclosing_scope,
+                        popped_scope_is_annotation_scope && is_immediately_enclosing_scope,
                     );
                 self.enclosing_snapshots.insert(key, eager_snapshot);
             }
