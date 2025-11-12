@@ -53,12 +53,6 @@ pub(crate) const fn is_avoid_parens_for_long_as_captures_enabled(
     context.is_preview()
 }
 
-/// Returns `true` if the [`indent_lambda_parameters`](https://github.com/astral-sh/ruff/pull/21385)
-/// preview style is enabled.
-pub(crate) const fn is_indent_lambda_parameters_enabled(context: &PyFormatContext) -> bool {
-    context.is_preview()
-}
-
 /// Returns `true` if the
 /// [`parenthesize_lambda_bodies`](https://github.com/astral-sh/ruff/pull/21385) preview style is
 /// enabled.
