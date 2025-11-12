@@ -89,7 +89,7 @@ info: rule `invalid-key` is enabled by default
 ```
 
 ```
-error[invalid-key]: Invalid key for TypedDict `Person` of type `str`
+error[invalid-key]: Invalid key of type `str` for TypedDict `Person`
   --> src/mdtest_snippet.py:16:12
    |
 15 | def access_with_str_key(person: Person, str_key: str):

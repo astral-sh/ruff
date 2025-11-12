@@ -143,9 +143,10 @@ impl TypedDictAssignmentKind {
 pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
+    full_object_ty: Option<Type<'db>>,
     key: &str,
     value_ty: Type<'db>,
-    typed_dict_node: impl Into<AnyNodeRef<'ast>>,
+    typed_dict_node: impl Into<AnyNodeRef<'ast>> + Copy,
     key_node: impl Into<AnyNodeRef<'ast>>,
     value_node: impl Into<AnyNodeRef<'ast>>,
     assignment_kind: TypedDictAssignmentKind,
@@ -162,6 +163,7 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
                 typed_dict_node.into(),
                 key_node.into(),
                 Type::TypedDict(typed_dict),
+                full_object_ty,
                 Type::string_literal(db, key),
                 &items,
             );
@@ -169,6 +171,28 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
 
         return false;
     };
+
+    let add_object_type_annotation =
+        |diagnostic: &mut Diagnostic| {
+            if let Some(full_object_ty) = full_object_ty {
+                diagnostic.annotate(context.secondary(typed_dict_node.into()).message(
+                    format_args!(
+                        "TypedDict `{}` in {kind} type `{}`",
+                        Type::TypedDict(typed_dict).display(db),
+                        full_object_ty.display(db),
+                        kind = if full_object_ty.is_union() {
+                            "union"
+                        } else {
+                            "intersection"
+                        },
+                    ),
+                ));
+            } else {
+                diagnostic.annotate(context.secondary(typed_dict_node.into()).message(
+                    format_args!("TypedDict `{}`", Type::TypedDict(typed_dict).display(db)),
+                ));
+            }
+        };
 
     let add_item_definition_subdiagnostic = |diagnostic: &mut Diagnostic, message| {
         if let Some(declaration) = item.single_declaration {
@@ -199,13 +223,7 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
             ));
 
             diagnostic.set_primary_message(format_args!("key is marked read-only"));
-
-            diagnostic.annotate(
-                context
-                    .secondary(typed_dict_node.into())
-                    .message(format_args!("TypedDict `{typed_dict_d}`")),
-            );
-
+            add_object_type_annotation(&mut diagnostic);
             add_item_definition_subdiagnostic(&mut diagnostic, "Read-only item declared here");
         }
 
@@ -240,17 +258,12 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
 
         diagnostic.annotate(
             context
-                .secondary(typed_dict_node.into())
-                .message(format_args!("TypedDict `{typed_dict_d}`")),
-        );
-
-        diagnostic.annotate(
-            context
                 .secondary(key_node.into())
                 .message(format_args!("key has declared type `{item_type_d}`")),
         );
 
         add_item_definition_subdiagnostic(&mut diagnostic, "Item declared here");
+        add_object_type_annotation(&mut diagnostic);
     }
 
     false
@@ -349,6 +362,7 @@ fn validate_from_dict_literal<'db, 'ast>(
                 validate_typed_dict_key_assignment(
                     context,
                     typed_dict,
+                    None,
                     key_str,
                     value_type,
                     error_node,
@@ -387,6 +401,7 @@ fn validate_from_keywords<'db, 'ast>(
             validate_typed_dict_key_assignment(
                 context,
                 typed_dict,
+                None,
                 arg_name.as_str(),
                 arg_type,
                 error_node,
@@ -426,6 +441,7 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
             valid &= validate_typed_dict_key_assignment(
                 context,
                 typed_dict,
+                None,
                 key_str,
                 value_type,
                 error_node,

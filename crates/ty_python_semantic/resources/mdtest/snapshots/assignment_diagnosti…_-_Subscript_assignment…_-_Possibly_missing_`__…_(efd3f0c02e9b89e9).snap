@@ -13,19 +13,20 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
 
 ```
 1 | def _(config: dict[str, int] | None) -> None:
-2 |     config["retries"] = 3  # error: [possibly-missing-implicit-call]
+2 |     config["retries"] = 3  # error: [invalid-assignment]
 ```
 
 # Diagnostics
 
 ```
-warning[possibly-missing-implicit-call]: Method `__setitem__` of type `dict[str, int] | None` may be missing
+error[invalid-assignment]: Cannot assign to a subscript on an object of type `None` with no `__setitem__` method
  --> src/mdtest_snippet.py:2:5
   |
 1 | def _(config: dict[str, int] | None) -> None:
-2 |     config["retries"] = 3  # error: [possibly-missing-implicit-call]
+2 |     config["retries"] = 3  # error: [invalid-assignment]
   |     ^^^^^^
   |
-info: rule `possibly-missing-implicit-call` is enabled by default
+info: The full type of the subscripted object is `dict[str, int] | None`
+info: rule `invalid-assignment` is enabled by default
 
 ```
