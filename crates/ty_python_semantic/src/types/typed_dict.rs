@@ -145,9 +145,9 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
     typed_dict: TypedDictType<'db>,
     key: &str,
     value_ty: Type<'db>,
-    typed_dict_node: impl Into<AnyNodeRef<'ast>> + Copy,
-    key_node: impl Into<AnyNodeRef<'ast>> + Copy,
-    value_node: impl Into<AnyNodeRef<'ast>> + Copy,
+    typed_dict_node: impl Into<AnyNodeRef<'ast>>,
+    key_node: impl Into<AnyNodeRef<'ast>>,
+    value_node: impl Into<AnyNodeRef<'ast>>,
     assignment_kind: TypedDictAssignmentKind,
     emit_diagnostic: bool,
 ) -> bool {
