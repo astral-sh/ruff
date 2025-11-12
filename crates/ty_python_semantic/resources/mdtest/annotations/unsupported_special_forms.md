@@ -12,11 +12,8 @@ P = ParamSpec("P")
 Ts = TypeVarTuple("Ts")
 R_co = TypeVar("R_co", covariant=True)
 
-Alias: TypeAlias = int
-
 def f(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
     reveal_type(args)  # revealed: tuple[@Todo(`Unpack[]` special form), ...]
-    reveal_type(Alias)  # revealed: @Todo(Support for `typing.TypeAlias`)
     return args
 
 def g() -> TypeGuard[int]: ...

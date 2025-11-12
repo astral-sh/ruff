@@ -143,7 +143,7 @@ static FREQTRADE: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    525,
+    600,
 );
 
 static PANDAS: Benchmark = Benchmark::new(
@@ -163,7 +163,7 @@ static PANDAS: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    3000,
+    4000,
 );
 
 static PYDANTIC: Benchmark = Benchmark::new(

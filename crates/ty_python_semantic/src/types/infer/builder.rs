@@ -5390,7 +5390,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target = assignment.target(self.module());
         let value = assignment.value(self.module());
 
-        let mut declared = self.infer_annotation_expression(
+        let mut declared = self.infer_annotation_expression_allow_pep_613(
             annotation,
             DeferredExpressionState::from(self.defer_annotations()),
         );
@@ -5442,6 +5442,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             declared.inner = Type::BooleanLiteral(true);
         }
 
+        // Check if this is a PEP 613 `TypeAlias`. (This must come below the SpecialForm handling
+        // immediately below, since that can overwrite the type to be `TypeAlias`.)
+        let is_pep_613_type_alias = matches!(
+            declared.inner_type(),
+            Type::SpecialForm(SpecialFormType::TypeAlias)
+        );
+
         // Handle various singletons.
         if let Some(name_expr) = target.as_name_expr() {
             if let Some(special_form) =
@@ -5487,20 +5494,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // We defer the r.h.s. of PEP-613 `TypeAlias` assignments in stub files.
-            let declared_type = declared.inner_type();
             let previous_deferred_state = self.deferred_state;
 
-            if matches!(
-                declared_type,
-                Type::SpecialForm(SpecialFormType::TypeAlias)
-                    | Type::Dynamic(DynamicType::TodoTypeAlias)
-            ) && self.in_stub()
-            {
+            if is_pep_613_type_alias && self.in_stub() {
                 self.deferred_state = DeferredExpressionState::Deferred;
             }
 
-            let inferred_ty = self
-                .infer_maybe_standalone_expression(value, TypeContext::new(Some(declared_type)));
+            let inferred_ty = if is_pep_613_type_alias && value.is_string_literal_expr() {
+                let aliased_type = self.infer_type_expression(value);
+                Type::KnownInstance(KnownInstanceType::LiteralStringAlias(InternedType::new(
+                    self.db(),
+                    aliased_type,
+                )))
+            } else {
+                self.infer_maybe_standalone_expression(
+                    value,
+                    TypeContext::new(Some(declared.inner_type())),
+                )
+            };
 
             self.deferred_state = previous_deferred_state;
 
@@ -5517,17 +5528,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 inferred_ty
             };
 
-            self.add_declaration_with_binding(
-                target.into(),
-                definition,
-                &DeclaredAndInferredType::MightBeDifferent {
-                    declared_ty: declared,
-                    inferred_ty,
-                },
-            );
+            if is_pep_613_type_alias {
+                self.add_declaration_with_binding(
+                    target.into(),
+                    definition,
+                    &DeclaredAndInferredType::AreTheSame(TypeAndQualifiers::declared(inferred_ty)),
+                );
+            } else {
+                self.add_declaration_with_binding(
+                    target.into(),
+                    definition,
+                    &DeclaredAndInferredType::MightBeDifferent {
+                        declared_ty: declared,
+                        inferred_ty,
+                    },
+                );
+            }
 
             self.store_expression_type(target, inferred_ty);
         } else {
+            if is_pep_613_type_alias {
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, annotation) {
+                    builder.into_diagnostic(
+                        "`TypeAlias` must be assigned a value in annotated assignments",
+                    );
+                }
+                declared.inner = Type::unknown();
+            }
             if self.in_stub() {
                 self.add_declaration_with_binding(
                     target.into(),
@@ -9286,20 +9313,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
 
-            (
-                todo @ Type::Dynamic(
-                    DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoTypeAlias,
-                ),
-                _,
-                _,
-            )
-            | (
-                _,
-                todo @ Type::Dynamic(
-                    DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoTypeAlias,
-                ),
-                _,
-            ) => Some(todo),
+            (todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::TodoUnpack), _, _)
+            | (_, todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::TodoUnpack), _) => {
+                Some(todo)
+            }
 
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 

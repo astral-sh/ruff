@@ -520,9 +520,6 @@ impl Display for DisplayRepresentation<'_> {
             Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_)) => {
                 f.write_str("<method-wrapper `startswith` of `str` object>")
             }
-            Type::KnownBoundMethod(KnownBoundMethodType::PathOpen) => {
-                f.write_str("bound method `Path.open`")
-            }
             Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetRange) => {
                 f.write_str("bound method `ConstraintSet.range`")
             }
