@@ -96,6 +96,7 @@ required-imports = ["from __future__ import annotations"]
 combine-as-imports = true
 
 [tool.ruff.per-file-target-version]
+"crates/ruff/tests/fixtures/external/*.py" = "py313"
 "crates/ty_python_semantic/mdtest.py" = "py310"
 "crates/ty_vendored/ty_extensions/ty_extensions.pyi" = "py312"
 

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 Span = Tuple[int, int]
 Reporter = Callable[[str, Optional[Span]], None]
 
-__all__ = ["Context", "Node", "CallArgument"]
+__all__ = ["Context", "Node", "RawNode"]
 
 
 class Node:
@@ -13,55 +13,17 @@ class Node:
     _span: Span
     _text: str
     _repr: str
-    _callee: Optional[str]
-    function_text: Optional[str]
-    function_kind: Optional[str]
-    arguments: Tuple["CallArgument", ...]
+    node_id: int
 
-    def __init__(
-        self,
-        kind: str,
-        span: Span,
-        text: str,
-        repr_value: str,
-        callee: Optional[str] = ...,
-        function_text: Optional[str] = ...,
-        function_kind: Optional[str] = ...,
-        arguments: Optional[Iterable["CallArgument"]] = ...,
-    ) -> None: ...
+    def __init__(self, kind: str, span: Span, text: str, repr_value: str, node_id: int) -> None: ...
 
     def __getitem__(self, key: str) -> Any: ...
 
     def get(self, key: str, default: Any = ...) -> Any: ...
 
 
-class CallArgument:
-    kind: str
-    is_unpack: bool
-    name: Optional[str]
-    span: Span
-    expr_kind: str
-    is_string_literal: bool
-    is_fstring: bool
-    binop_operator: Optional[str]
-    call_function_text: Optional[str]
-
-    def __init__(
-        self,
-        kind: str,
-        is_unpack: bool,
-        span: Span,
-        expr_kind: str,
-        is_string_literal: bool,
-        is_fstring: bool,
-        binop_operator: Optional[str] = ...,
-        call_function_text: Optional[str] = ...,
-        name: Optional[str] = ...,
-    ) -> None: ...
-
-    def __getitem__(self, key: str) -> Any: ...
-
-    def get(self, key: str, default: Any = ...) -> Any: ...
+class RawNode(Node):
+    pass
 
 
 class Context:
@@ -72,3 +34,8 @@ class Context:
     def __init__(self, code: str, name: str, reporter: Reporter) -> None: ...
 
     def report(self, message: str, span: Optional[Span] = ...) -> None: ...
+
+from .nodes import *
+from .nodes import __all__ as _node_all
+
+__all__ = __all__ + _node_all
