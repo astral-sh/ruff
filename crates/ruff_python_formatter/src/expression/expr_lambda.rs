@@ -62,14 +62,6 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                             .format()
                             .with_options(ParametersParentheses::Never)
                             .fmt(f)
-                    }?;
-
-                    token(":").fmt(f)?;
-
-                    if dangling_after_parameters.is_empty() {
-                        space().fmt(f)
-                    } else {
-                        dangling_comments(dangling_after_parameters).fmt(f)
                     }
                 }))
                 .fmt(f)?;
@@ -86,14 +78,14 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                         .format()
                         .with_options(ParametersParentheses::Never)]
                 )?;
+            }
 
-                write!(f, [token(":")])?;
+            write!(f, [token(":")])?;
 
-                if dangling_after_parameters.is_empty() {
-                    write!(f, [space()])?;
-                } else {
-                    write!(f, [dangling_comments(dangling_after_parameters)])?;
-                }
+            if dangling_after_parameters.is_empty() {
+                write!(f, [space()])?;
+            } else {
+                write!(f, [dangling_comments(dangling_after_parameters)])?;
             }
         } else {
             write!(f, [token(":")])?;
