@@ -1,0 +1,75 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/lambda_preview.py
+---
+## Input
+```python
+"""
+Test cases from lambda.py that cause an instability in the stable
+implementation but that are handled by the preview `indent_lambda_parameters`
+version.
+"""
+
+(
+    lambda
+    # comment 1
+    *
+    # comment 2
+    x,
+    **y:
+    # comment 3
+    x
+)
+
+(
+    lambda # comment 1
+        * # comment 2
+        x,
+        y: # comment 3
+    x
+)
+```
+
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Enabled
+target_version             = 3.10
+source_type                = Python
+```
+
+```python
+"""
+Test cases from lambda.py that cause an instability in the stable
+implementation but that are handled by the preview `indent_lambda_parameters`
+version.
+"""
+
+(
+    lambda
+        # comment 1
+        # comment 2
+        *x,
+        **y
+    :
+    # comment 3
+    x
+)
+
+(
+    lambda  # comment 1
+        # comment 2
+        *x,
+        y
+    :  # comment 3
+    x
+)
+```

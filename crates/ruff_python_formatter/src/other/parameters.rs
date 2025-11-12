@@ -10,6 +10,7 @@ use crate::comments::{
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::empty_parenthesized;
 use crate::prelude::*;
+use crate::preview::is_indent_lambda_parameters_enabled;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub enum ParametersParentheses {
@@ -241,7 +242,11 @@ impl FormatNodeRule<Parameters> for FormatParameters {
         let num_parameters = item.len();
 
         if self.parentheses == ParametersParentheses::Never {
-            write!(f, [format_inner, dangling_comments(dangling)])
+            if is_indent_lambda_parameters_enabled(f.context()) {
+                write!(f, [format_inner, dangling_comments(dangling)])
+            } else {
+                write!(f, [group(&format_inner), dangling_comments(dangling)])
+            }
         } else if num_parameters == 0 {
             let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
             // No parameters, format any dangling comments between `()`

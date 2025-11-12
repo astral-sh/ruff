@@ -149,28 +149,9 @@ lambda a, /, c: a
 )
 
 (
-    lambda
-    # comment 1
-    *
-    # comment 2
-    x,
-    **y:
-    # comment 3
-    x
-)
-
-(
     lambda # comment 1
     * # comment 2
     x: # comment 3
-    x
-)
-
-(
-    lambda # comment 1
-        * # comment 2
-        x,
-        y: # comment 3
     x
 )
 
@@ -486,8 +467,7 @@ lambda a, /, c: a
 (
     lambda
     # comment
-    *x,
-    **y: x
+    *x, **y: x
 )
 
 (
@@ -500,27 +480,9 @@ lambda a, /, c: a
 )
 
 (
-    lambda
-    # comment 1
-    # comment 2
-    *x,
-    **y:
-    # comment 3
-    x
-)
-
-(
     lambda  # comment 1
     # comment 2
     *x:  # comment 3
-    x
-)
-
-(
-    lambda  # comment 1
-    # comment 2
-    *x,
-    y:  # comment 3
     x
 )
 
@@ -755,7 +717,7 @@ def a():
  ):
      pass
  
-@@ -122,48 +106,54 @@
+@@ -122,29 +106,34 @@
  
  (
      lambda
@@ -769,8 +731,7 @@ def a():
  (
      lambda
 -    # comment
--    *x,
--    **y: x
+-    *x, **y: x
 +        # comment
 +        *x,
 +        **y
@@ -791,21 +752,6 @@ def a():
  )
  
  (
-     lambda
--    # comment 1
--    # comment 2
--    *x,
--    **y:
-+        # comment 1
-+        # comment 2
-+        *x,
-+        **y
-+    :
-     # comment 3
-     x
- )
- 
- (
      lambda  # comment 1
 -    # comment 2
 -    *x:  # comment 3
@@ -815,19 +761,7 @@ def a():
      x
  )
  
- (
-     lambda  # comment 1
--    # comment 2
--    *x,
--    y:  # comment 3
-+        # comment 2
-+        *x,
-+        y
-+    :  # comment 3
-     x
- )
- 
-@@ -171,8 +161,9 @@
+@@ -152,8 +141,9 @@
  
  (
      lambda
@@ -839,7 +773,7 @@ def a():
  )
  
  lambda: (  # comment
-@@ -210,8 +201,9 @@
+@@ -191,8 +181,9 @@
  
  (
      lambda  # 1
@@ -851,7 +785,7 @@ def a():
      # 4
      # 5
      # 6
-@@ -220,83 +212,94 @@
+@@ -201,83 +192,94 @@
  
  (
      lambda  # 1
@@ -1009,7 +943,7 @@ def a():
  # Trailing
  
  lambda self, araa, kkkwargs=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
-@@ -310,9 +313,11 @@
+@@ -291,9 +293,11 @@
          c,
          d,
          e,
@@ -1024,7 +958,7 @@ def a():
      )
  
  
-@@ -321,14 +326,16 @@
+@@ -302,14 +306,16 @@
          c,
          d,
          e,
@@ -1201,29 +1135,9 @@ lambda a, /, c: a
 )
 
 (
-    lambda
-        # comment 1
-        # comment 2
-        *x,
-        **y
-    :
-    # comment 3
-    x
-)
-
-(
     lambda  # comment 1
         # comment 2
         *x
-    :  # comment 3
-    x
-)
-
-(
-    lambda  # comment 1
-        # comment 2
-        *x,
-        y
     :  # comment 3
     x
 )

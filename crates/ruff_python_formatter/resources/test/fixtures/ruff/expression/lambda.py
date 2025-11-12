@@ -143,28 +143,9 @@ lambda a, /, c: a
 )
 
 (
-    lambda
-    # comment 1
-    *
-    # comment 2
-    x,
-    **y:
-    # comment 3
-    x
-)
-
-(
     lambda # comment 1
     * # comment 2
     x: # comment 3
-    x
-)
-
-(
-    lambda # comment 1
-        * # comment 2
-        x,
-        y: # comment 3
     x
 )
 
