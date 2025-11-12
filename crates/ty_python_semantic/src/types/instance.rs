@@ -437,7 +437,10 @@ impl<'db> NominalInstanceType<'db> {
                     disjointness_visitor,
                     relation_visitor,
                 );
-                if result.union(db, compatible).is_always_satisfied(db) {
+                if result
+                    .union(db, compatible)
+                    .satisfied_by_all_typevars(db, inferable)
+                {
                     return result;
                 }
             }
