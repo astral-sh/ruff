@@ -618,6 +618,9 @@ pub fn definitions_for_name<'db>(
             return union
                 .elements(db)
                 .iter()
+                // Use `rev` so that `complex` and `float` come first.
+                // This is required for hover to pick up the docstring of `complex` and `float`
+                // instead of `int` (hover only shows the docstring of the first definition).
                 .rev()
                 .filter_map(|ty| ty.as_nominal_instance())
                 .map(|instance| {
