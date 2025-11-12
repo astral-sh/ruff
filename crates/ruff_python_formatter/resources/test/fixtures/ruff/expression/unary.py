@@ -193,3 +193,8 @@ def foo():
         not (aaaaaaaaaaaaaaaaaaaaa[bbbbbbbb, ccccccc]) and dddddddddd < eeeeeeeeeeeeeee
     ):
         pass
+
+# Regression test for https://github.com/astral-sh/ruff/issues/19226
+if '' and (not #
+0):
+    pass
