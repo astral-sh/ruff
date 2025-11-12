@@ -689,7 +689,7 @@ def a():
  ):
      pass
  
-@@ -218,66 +200,74 @@
+@@ -218,71 +200,79 @@
  
  # Leading
  lambda x: (
@@ -819,5 +819,44 @@ def a():
 +)  # Trailing
  # Trailing
  
- lambda self, araa, kkkwargs=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+-lambda self, araa, kkkwargs=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+-    *args, **kwargs
+-), e=1, f=2, g=2: d
++lambda self, araa, kkkwargs=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs), e=1, f=2, g=2: (
++    d
++)
+ 
+ 
+ # Regression tests for https://github.com/astral-sh/ruff/issues/8179
+@@ -291,9 +281,9 @@
+         c,
+         d,
+         e,
+-        f=lambda self,
+-        *args,
+-        **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs),
++        f=lambda self, *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
++            *args, **kwargs
++        ),
+     )
+ 
+ 
+@@ -302,14 +292,8 @@
+         c,
+         d,
+         e,
+-        f=lambda self,
+-        araa,
+-        kkkwargs,
+-        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+-        args,
+-        kwargs,
+-        e=1,
+-        f=2,
+-        g=2: d,
++        f=lambda self, araa, kkkwargs, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, args, kwargs, e=1, f=2, g=2: (
++            d
++        ),
+         g=10,
+     )
 ```
