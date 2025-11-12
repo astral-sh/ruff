@@ -280,7 +280,11 @@ fn find_path_open<'a>(
     }
     let attr = func.as_attribute_expr()?;
     let filename = if let Expr::Call(path_call) = attr.value.as_ref() {
-        path_call.arguments.args.first()
+        if path_call.arguments.args.len() == 1 {
+            path_call.arguments.args.first()
+        } else {
+            None
+        }
     } else {
         None
     };

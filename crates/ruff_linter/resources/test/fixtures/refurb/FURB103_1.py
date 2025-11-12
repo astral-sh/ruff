@@ -21,3 +21,6 @@ with Path(foo()).open("w") as f:
 p = Path("file.txt")
 with p.open("w") as f:
     f.write("test")
+
+with Path("foo", "bar", "baz").open("w") as f:
+    f.write("test")

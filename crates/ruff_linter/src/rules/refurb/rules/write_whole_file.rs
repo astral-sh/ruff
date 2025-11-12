@@ -241,8 +241,6 @@ fn generate_fix(
     }
 
     let locator = checker.locator();
-    let filename = open.filename?;
-    let filename_code = locator.slice(filename.range());
 
     let (import_edit, binding) = checker
         .importer()
@@ -256,6 +254,8 @@ fn generate_fix(
     let target = if let Some(path_obj) = open.path_obj {
         locator.slice(path_obj.range()).to_string()
     } else {
+        let filename = open.filename?;
+        let filename_code = locator.slice(filename.range());
         format!("{binding}({filename_code})")
     };
 

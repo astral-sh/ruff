@@ -120,7 +120,7 @@ help: Replace with `Path(foo()).write_text("test")`
 20 | p = Path("file.txt")
 21 | with p.open("w") as f:
 
-FURB103 `Path.open()` followed by `write()` can be replaced by `p.write_text("test")`
+FURB103 [*] `Path.open()` followed by `write()` can be replaced by `p.write_text("test")`
   --> FURB103_1.py:22:6
    |
 21 | p = Path("file.txt")
@@ -129,3 +129,29 @@ FURB103 `Path.open()` followed by `write()` can be replaced by `p.write_text("te
 23 |     f.write("test")
    |
 help: Replace with `p.write_text("test")`
+19 |     f.write("test")
+20 | 
+21 | p = Path("file.txt")
+   - with p.open("w") as f:
+   -     f.write("test")
+22 + p.write_text("test")
+23 | 
+24 | with Path("foo", "bar", "baz").open("w") as f:
+25 |     f.write("test")
+
+FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("foo", "bar", "baz").write_text("test")`
+  --> FURB103_1.py:25:6
+   |
+23 |     f.write("test")
+24 |
+25 | with Path("foo", "bar", "baz").open("w") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+26 |     f.write("test")
+   |
+help: Replace with `Path("foo", "bar", "baz").write_text("test")`
+22 | with p.open("w") as f:
+23 |     f.write("test")
+24 | 
+   - with Path("foo", "bar", "baz").open("w") as f:
+   -     f.write("test")
+25 + Path("foo", "bar", "baz").write_text("test")
