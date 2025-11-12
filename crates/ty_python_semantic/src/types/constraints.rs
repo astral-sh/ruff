@@ -925,6 +925,16 @@ impl<'db> Node<'db> {
         }
     }
 
+    /// Returns a new BDD that is the _existential abstraction_ of `self` for a set of typevars.
+    /// All typevars _other_ than the one given will be removed and abstracted away.
+    fn retain_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Self {
+        match self {
+            Node::AlwaysTrue => Node::AlwaysTrue,
+            Node::AlwaysFalse => Node::AlwaysFalse,
+            Node::Interior(interior) => interior.retain_one(db, bound_typevar),
+        }
+    }
+
     /// Returns a new BDD that returns the same results as `self`, but with some inputs fixed to
     /// particular values. (Those variables will not be checked when evaluating the result, and
     /// will not be present in the result.)
@@ -1361,6 +1371,23 @@ impl<'db> InteriorNode<'db> {
                 let if_false = self.if_false(db).exists_one(db, bound_typevar);
                 Node::new(db, self_constraint, if_true, if_false)
             }
+        }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn retain_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
+        let if_true = self.if_true(db).retain_one(db, bound_typevar);
+        let if_false = self.if_false(db).retain_one(db, bound_typevar);
+        let self_constraint = self.constraint(db);
+        let self_typevar = self_constraint.typevar(db).identity(db);
+        if bound_typevar == self_typevar {
+            // If this typevar is one that we're keeping, we abstract the if_false/if_true edges
+            // recursively.
+            Node::new(db, self_constraint, if_true, if_false)
+        } else {
+            // Otherwise, we replace this node with the OR of its if_false/if_true edges. That is,
+            // the result is true if there's any assignment of this node's constraint that is true.
+            if_true.or(db, if_false)
         }
     }
 
