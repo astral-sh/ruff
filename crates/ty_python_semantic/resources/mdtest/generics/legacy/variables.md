@@ -458,6 +458,7 @@ class Event(Generic[_DataT]):
 
 def async_fire_internal(event_data: _DataT):
     event: Event[_DataT] | None = None
+    reveal_type(Event(event_data))
     event = Event(event_data)
 ```
 
