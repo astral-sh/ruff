@@ -6586,12 +6586,13 @@ impl<'db> Type<'db> {
                 }),
                 KnownInstanceType::UnionType(list) => {
                     let mut builder = UnionBuilder::new(db);
+                    let inferred_as = list.inferred_as(db);
                     for element in list.elements(db) {
-                        builder = builder.add(element.in_type_expression(
-                            db,
-                            scope_id,
-                            typevar_binding_context,
-                        )?);
+                        builder = builder.add(if inferred_as.type_expression() {
+                            *element
+                        } else {
+                            element.in_type_expression(db, scope_id, typevar_binding_context)?
+                        });
                     }
                     Ok(builder.build())
                 }
@@ -9164,6 +9165,21 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
     }
 }
 
+/// Whether a given type originates from value expression inference or type expression inference.
+/// For example, the symbol `int` would be inferred as `<class 'int'>` in value expression context,
+/// and as `int` (i.e. an instance of the class `int`) in type expression context.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
+pub enum InferredAs {
+    ValueExpression,
+    TypeExpression,
+}
+
+impl InferredAs {
+    pub const fn type_expression(self) -> bool {
+        matches!(self, InferredAs::TypeExpression)
+    }
+}
+
 /// A salsa-interned list of types.
 ///
 /// # Ordering
@@ -9174,6 +9190,7 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
 pub struct InternedTypes<'db> {
     #[returns(deref)]
     elements: Box<[Type<'db>]>,
+    inferred_as: InferredAs,
 }
 
 impl get_size2::GetSize for InternedTypes<'_> {}
@@ -9182,8 +9199,9 @@ impl<'db> InternedTypes<'db> {
     pub(crate) fn from_elements(
         db: &'db dyn Db,
         elements: impl IntoIterator<Item = Type<'db>>,
+        inferred_as: InferredAs,
     ) -> InternedTypes<'db> {
-        InternedTypes::new(db, elements.into_iter().collect::<Box<[_]>>())
+        InternedTypes::new(db, elements.into_iter().collect::<Box<[_]>>(), inferred_as)
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
@@ -9193,6 +9211,7 @@ impl<'db> InternedTypes<'db> {
                 .iter()
                 .map(|ty| ty.normalized_impl(db, visitor))
                 .collect::<Box<[_]>>(),
+            self.inferred_as(db),
         )
     }
 }

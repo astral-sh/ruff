@@ -101,10 +101,10 @@ use crate::types::typed_dict::{
 use crate::types::visitor::any_over_type;
 use crate::types::{
     CallDunderError, CallableBinding, CallableType, ClassLiteral, ClassType, DataclassParams,
-    DynamicType, InternedType, InternedTypes, IntersectionBuilder, IntersectionType, KnownClass,
-    KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter,
-    ParameterForm, Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness,
-    Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
+    DynamicType, InferredAs, InternedType, InternedTypes, IntersectionBuilder, IntersectionType,
+    KnownClass, KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType,
+    Parameter, ParameterForm, Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet,
+    Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
     TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
     TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
     binding_type, todo_type,
@@ -9234,7 +9234,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Some(left_ty)
                 } else {
                     Some(Type::KnownInstance(KnownInstanceType::UnionType(
-                        InternedTypes::from_elements(self.db(), [left_ty, right_ty]),
+                        InternedTypes::from_elements(
+                            self.db(),
+                            [left_ty, right_ty],
+                            InferredAs::ValueExpression,
+                        ),
                     )))
                 }
             }
@@ -9259,7 +9263,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 && instance.has_known_class(self.db(), KnownClass::NoneType) =>
             {
                 Some(Type::KnownInstance(KnownInstanceType::UnionType(
-                    InternedTypes::from_elements(self.db(), [left_ty, right_ty]),
+                    InternedTypes::from_elements(
+                        self.db(),
+                        [left_ty, right_ty],
+                        InferredAs::ValueExpression,
+                    ),
                 )))
             }
 
@@ -10476,8 +10484,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 return Type::KnownInstance(KnownInstanceType::UnionType(
-                    InternedTypes::from_elements(self.db(), [ty, Type::none(self.db())]),
+                    InternedTypes::from_elements(
+                        self.db(),
+                        [ty, Type::none(self.db())],
+                        InferredAs::ValueExpression,
+                    ),
                 ));
+            }
+            Type::SpecialForm(SpecialFormType::Union) => {
+                let db = self.db();
+
+                match **slice {
+                    ast::Expr::Tuple(ref tuple) => {
+                        let mut elements = tuple
+                            .elts
+                            .iter()
+                            .map(|elt| self.infer_type_expression(elt))
+                            .peekable();
+
+                        let is_empty = elements.peek().is_none();
+                        let union_type = Type::KnownInstance(KnownInstanceType::UnionType(
+                            InternedTypes::from_elements(db, elements, InferredAs::TypeExpression),
+                        ));
+
+                        if is_empty {
+                            if let Some(builder) =
+                                self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                            {
+                                builder.into_diagnostic(
+                                    "`typing.Union` requires at least one type argument",
+                                );
+                            }
+                        }
+
+                        return union_type;
+                    }
+                    _ => {
+                        return self.infer_expression(slice, TypeContext::default());
+                    }
+                }
             }
             _ => {}
         }
