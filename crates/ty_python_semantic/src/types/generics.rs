@@ -147,7 +147,7 @@ impl<'db> BoundTypeVarInstance<'db> {
 impl<'a, 'db> InferableTypeVars<'a, 'db> {
     pub(crate) fn merge(&'a self, other: &'a InferableTypeVars<'a, 'db>) -> Self {
         match (self, other) {
-            (InferableTypeVars::None, other) | (other, InferableTypeVars::None) => other.clone(),
+            (InferableTypeVars::None, other) | (other, InferableTypeVars::None) => *other,
             _ => InferableTypeVars::Two(self, other),
         }
     }
