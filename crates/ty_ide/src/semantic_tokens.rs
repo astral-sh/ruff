@@ -1,3 +1,37 @@
+//! This module walks the AST and collects a set of "semantic tokens" for a file
+//! or a range within a file. Each semantic token provides a "token type" and zero
+//! or more "modifiers". This information can be used by an editor to provide
+//! color coding based on semantic meaning.
+//!
+//! Visual Studio has a very useful debugger that allows you to inspect the
+//! semantic tokens for any given position in the code. Not only is this useful
+//! to debug our semantic highlighting, it also allows easy comparison with
+//! how Pylance (or other LSPs) highlight a certain token. You can open the scope inspector,
+//! with the Command Palette (Command/Ctrl+Shift+P), then select the
+//!  `Developer: Inspect Editor Tokens and Scopes` command.
+//!
+//! Current limitations and areas for future improvement:
+//!
+//! TODO: Need to handle semantic tokens within quoted annotations.
+//!
+//! TODO: Need to properly handle Annotated expressions. All type arguments other
+//! than the first should be treated as value expressions, not as type expressions.
+//!
+//! TODO: An identifier that resolves to a parameter when used within a function
+//! should be classified as a parameter, selfParameter, or clsParameter token.
+//!
+//! TODO: Properties (or perhaps more generally, descriptor objects?) should be
+//! classified as property tokens rather than just variables.
+//!
+//! TODO: Special forms like `Protocol` and `TypedDict` should probably be classified
+//! as class tokens, but they are currently classified as variables.
+//!
+//! TODO: Type aliases (including those defined with the Python 3.12 "type" statement)
+//! do not currently have a dedicated semantic token type, but they maybe should.
+//!
+//! TODO: Additional token modifiers might be added (e.g. for static methods,
+//! abstract methods and classes).
+
 use crate::Db;
 use bitflags::bitflags;
 use itertools::Itertools;
@@ -19,38 +53,6 @@ use ty_python_semantic::{
     HasType, SemanticModel, semantic_index::definition::DefinitionKind, types::Type,
     types::ide_support::definition_for_name,
 };
-
-// This module walks the AST and collects a set of "semantic tokens" for a file
-// or a range within a file. Each semantic token provides a "token type" and zero
-// or more "modifiers". This information can be used by an editor to provide
-// color coding based on semantic meaning.
-
-// Current limitations and areas for future improvement:
-
-// TODO: Need to provide better classification for name tokens that are imported
-// from other modules. Currently, these are classified based on their types,
-// which often means they're classified as variables when they should be classes
-// in many cases.
-
-// TODO: Need to handle semantic tokens within quoted annotations.
-
-// TODO: Need to properly handle Annotated expressions. All type arguments other
-// than the first should be treated as value expressions, not as type expressions.
-
-// TODO: An identifier that resolves to a parameter when used within a function
-// should be classified as a parameter, selfParameter, or clsParameter token.
-
-// TODO: Properties (or perhaps more generally, descriptor objects?) should be
-// classified as property tokens rather than just variables.
-
-// TODO: Special forms like Protocol and TypedDict should probably be classified
-// as class tokens, but they are currently classified as variables.
-
-// TODO: Type aliases (including those defined with the Python 3.12 "type" statement)
-// do not currently have a dedicated semantic token type, but they maybe should.
-
-// TODO: Additional token modifiers might be added (e.g. for static methods,
-// abstract methods and classes).
 
 /// Semantic token types supported by the language server.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
