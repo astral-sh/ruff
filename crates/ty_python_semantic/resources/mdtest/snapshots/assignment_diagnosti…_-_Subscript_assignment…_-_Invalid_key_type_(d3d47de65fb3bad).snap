@@ -1,0 +1,31 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: assignment_diagnostics.md - Subscript assignment diagnostics - Invalid key type
+mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_diagnostics.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | config: dict[str, int] = {}
+2 | config[0] = 3  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Method `__setitem__` of type `bound method dict[str, int].__setitem__(key: str, value: int, /) -> None` cannot be called with a key of type `Literal[0]` and a value of type `Literal[3]` on object of type `dict[str, int]`
+ --> src/mdtest_snippet.py:2:1
+  |
+1 | config: dict[str, int] = {}
+2 | config[0] = 3  # error: [invalid-assignment]
+  | ^^^^^^
+  |
+info: rule `invalid-assignment` is enabled by default
+
+```

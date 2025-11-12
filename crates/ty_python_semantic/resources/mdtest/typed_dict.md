@@ -526,10 +526,20 @@ class Person(TypedDict):
     name: str
     age: int | None
 
+class Animal(TypedDict):
+    name: str
+
 NAME_FINAL: Final = "name"
 AGE_FINAL: Final[Literal["age"]] = "age"
 
-def _(person: Person, literal_key: Literal["age"], union_of_keys: Literal["age", "name"], str_key: str, unknown_key: Any) -> None:
+def _(
+    person: Person,
+    being: Person | Animal,
+    literal_key: Literal["age"],
+    union_of_keys: Literal["age", "name"],
+    str_key: str,
+    unknown_key: Any,
+) -> None:
     reveal_type(person["name"])  # revealed: str
     reveal_type(person["age"])  # revealed: int | None
 
@@ -548,17 +558,29 @@ def _(person: Person, literal_key: Literal["age"], union_of_keys: Literal["age",
 
     # No error here:
     reveal_type(person[unknown_key])  # revealed: Unknown
+
+    reveal_type(being["name"])  # revealed: str
+
+    # TODO: A type of `int | None | Unknown` might be better here. The `str` is mixed in
+    # because `Animal.__getitem__` can only return `str`.
+    # error: [invalid-key] "Invalid key for TypedDict `Animal`"
+    reveal_type(being["age"])  # revealed: int | None | str
 ```
 
 ### Writing
 
 ```py
 from typing_extensions import TypedDict, Final, Literal, LiteralString, Any
+from ty_extensions import Intersection
 
 class Person(TypedDict):
     name: str
     surname: str
     age: int | None
+
+class Animal(TypedDict):
+    name: str
+    legs: int
 
 NAME_FINAL: Final = "name"
 AGE_FINAL: Final[Literal["age"]] = "age"
@@ -582,6 +604,23 @@ def _(person: Person, union_of_keys: Literal["name", "surname"]):
 
     # error: [invalid-assignment] "Cannot assign value of type `Literal[1]` to key of type `Literal["name", "surname"]` on TypedDict `Person`"
     person[union_of_keys] = 1
+
+def _(being: Person | Animal):
+    being["name"] = "Being"
+
+    # error: [invalid-assignment] "Method `__setitem__` of type `(Overload[(key: Literal["name"], value: str, /) -> None, (key: Literal["surname"], value: str, /) -> None, (key: Literal["age"], value: int | None, /) -> None]) | (Overload[(key: Literal["name"], value: str, /) -> None, (key: Literal["legs"], value: int, /) -> None])` cannot be called with a key of type `Literal["name"]` and a value of type `Literal[1]` on object of type `Person | Animal`"
+    being["name"] = 1
+
+    # error: [invalid-assignment] "Method `__setitem__` of type `(Overload[(key: Literal["name"], value: str, /) -> None, (key: Literal["surname"], value: str, /) -> None, (key: Literal["age"], value: int | None, /) -> None]) | (Overload[(key: Literal["name"], value: str, /) -> None, (key: Literal["legs"], value: int, /) -> None])` cannot be called with a key of type `Literal["surname"]` and a value of type `Literal["unknown"]` on object of type `Person | Animal`"
+    being["surname"] = "unknown"
+
+def _(centaur: Intersection[Person, Animal]):
+    centaur["name"] = "Chiron"
+    centaur["age"] = 100
+    centaur["legs"] = 4
+
+    # TODO: This should be an `invalid-key` error
+    centaur["unknown"] = "value"
 
 def _(person: Person, union_of_keys: Literal["name", "age"], unknown_value: Any):
     person[union_of_keys] = unknown_value
