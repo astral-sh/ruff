@@ -1179,6 +1179,43 @@ result = check(None)
     }
 
     #[test]
+    fn test_builtin_types() {
+        let test = SemanticTokenTest::new(
+            r#"
+            class Test:
+                a: int
+                b: bool
+                c: str
+                d: float  # TODO: Should be Class
+                e: list[int]
+                f: list[float]  # TODO: Should be Class
+                g: int | float  # TODO: float should be Class
+            "#,
+        );
+
+        assert_snapshot!(test.to_snapshot(&test.highlight_file()), @r#"
+        "Test" @ 7..11: Class [definition]
+        "a" @ 17..18: Variable
+        "int" @ 20..23: Class
+        "b" @ 28..29: Variable
+        "bool" @ 31..35: Class
+        "c" @ 40..41: Variable
+        "str" @ 43..46: Class
+        "d" @ 51..52: Variable
+        "float" @ 54..59: Variable
+        "e" @ 89..90: Variable
+        "list" @ 92..96: Class
+        "int" @ 97..100: Class
+        "f" @ 106..107: Variable
+        "list" @ 109..113: Class
+        "float" @ 114..119: Variable
+        "g" @ 150..151: Variable
+        "int" @ 153..156: Class
+        "float" @ 159..164: Variable
+        "#);
+    }
+
+    #[test]
     fn test_semantic_tokens_range() {
         let test = SemanticTokenTest::new(
             "

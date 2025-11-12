@@ -10,9 +10,9 @@ use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{
     attribute_scopes, global_scope, place_table, semantic_index, use_def_map,
 };
-use crate::types::CallDunderError;
 use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::signatures::Signature;
+use crate::types::{CallDunderError, UnionType};
 use crate::types::{
     ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type, TypeContext,
     TypeVarBoundOrConstraints, class::CodeGeneratorKind,
@@ -619,6 +619,29 @@ pub fn definitions_for_name<'db>(
         let Some(builtins_scope) = builtins_module_scope(db) else {
             return Vec::new();
         };
+
+        // Special cases for `float` and `complex` in type annotation positions.
+        // We don't know whether we're in a type annotation position, so we'll just ask `Name`'s type,
+        // which resolves to `int | float` or `int | float | complex` if `float` or `complex` is used in
+        // a type annotation position and `float` or `complex` otherwise.
+        //
+        // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
+        if matches!(name_str, "float" | "complex")
+            && let Some(union) = name.inferred_type(&SemanticModel::new(db, file)).as_union()
+            && is_float_or_complex_annotation(db, union, name_str)
+        {
+            return union
+                .elements(db)
+                .iter()
+                .filter_map(|ty| ty.as_nominal_instance())
+                .map(|instance| {
+                    let definition = instance.class_literal(db).definition(db);
+                    let parsed = parsed_module(db, definition.file(db));
+                    ResolvedDefinition::FileWithRange(definition.focus_range(db, &parsed.load(db)))
+                })
+                .collect();
+        }
+
         find_symbol_in_scope(db, builtins_scope, name_str)
             .into_iter()
             .filter(|def| def.is_reexported(db))
@@ -634,6 +657,30 @@ pub fn definitions_for_name<'db>(
     } else {
         resolved_definitions
     }
+}
+
+fn is_float_or_complex_annotation(db: &dyn Db, ty: UnionType, name: &str) -> bool {
+    let float_or_complex_ty = match name {
+        "float" => UnionType::from_elements(
+            db,
+            [
+                KnownClass::Int.to_instance(db),
+                KnownClass::Float.to_instance(db),
+            ],
+        ),
+        "complex" => UnionType::from_elements(
+            db,
+            [
+                KnownClass::Int.to_instance(db),
+                KnownClass::Float.to_instance(db),
+                KnownClass::Complex.to_instance(db),
+            ],
+        ),
+        _ => return false,
+    }
+    .expect_union();
+
+    ty == float_or_complex_ty
 }
 
 /// Returns all resolved definitions for an attribute expression `x.y`.

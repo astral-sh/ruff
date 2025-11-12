@@ -2634,6 +2634,32 @@ def ab(a: int, *, c: int):
         ");
     }
 
+    #[test]
+    fn hover_float_annotation() {
+        let test = cursor_test(
+            r#"
+            a: float<CURSOR> = 3.14
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        int | float
+        ---------------------------------------------
+        ```python
+        int | float
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:4
+          |
+        2 | a: float = 3.14
+          |    ^^^^^- Cursor offset
+          |    |
+          |    source
+          |
+        ");
+    }
+
     impl CursorTest {
         fn hover(&self) -> String {
             use std::fmt::Write;
