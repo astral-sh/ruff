@@ -722,12 +722,30 @@ fn parse_raises(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedName
 /// ```
 fn parse_raises_google(content: &str) -> Vec<QualifiedName<'_>> {
     let mut entries: Vec<QualifiedName> = Vec::new();
-    for potential in content.lines() {
-        let Some(colon_idx) = potential.find(':') else {
-            continue;
-        };
-        let entry = potential[..colon_idx].trim();
-        entries.push(QualifiedName::user_defined(entry));
+    let mut lines = content.lines().peekable();
+    let Some(first) = lines.peek() else {
+        return entries;
+    };
+    let indentation = &first[..first.len() - first.trim_start().len()];
+    for potential in lines {
+        if let Some(entry) = potential.strip_prefix(indentation) {
+            if let Some(first_char) = entry.chars().next() {
+                if !first_char.is_whitespace() {
+                    if let Some(colon_idx) = entry.find(':') {
+                        let entry = entry[..colon_idx].trim();
+                        if !entry.is_empty() {
+                            entries.push(QualifiedName::user_defined(entry));
+                        }
+                    }
+                }
+            }
+        } else {
+            // If we can't strip the expected indentation, check if this is a dedented line
+            // (not blank) - if so, break early as we've reached the end of this section
+            if !potential.trim().is_empty() {
+                break;
+            }
+        }
     }
     entries
 }
@@ -751,6 +769,12 @@ fn parse_raises_numpy(content: &str) -> Vec<QualifiedName<'_>> {
     let indentation = &dashes[..dashes.len() - dashes.trim_start().len()];
     for potential in lines {
         if let Some(entry) = potential.strip_prefix(indentation) {
+            // Check for Sphinx directives (lines starting with ..) - these indicate the end of the
+            // section. In numpy-style, exceptions are dedented to the same level as sphinx
+            // directives.
+            if entry.starts_with("..") {
+                break;
+            }
             if let Some(first_char) = entry.chars().next() {
                 if !first_char.is_whitespace() {
                     entries.push(QualifiedName::user_defined(entry.trim_end()));
