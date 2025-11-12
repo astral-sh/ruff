@@ -6829,7 +6829,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .try_to_class_literal(self.db())
                 .and_then(|class| class.generic_context(self.db()))
                 .map(|generic_context| generic_context.inferable_typevars(self.db()))
-                .unwrap_or(InferableTypeVars::none());
+                .unwrap_or(InferableTypeVars::None);
             annotation.filter_disjoint_elements(
                 self.db(),
                 Type::homogeneous_tuple(self.db(), Type::unknown()),
@@ -7149,7 +7149,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             annotation.filter_disjoint_elements(
                 self.db(),
                 collection_class.to_instance(self.db()),
-                InferableTypeVars::none(),
+                InferableTypeVars::None,
             )
         });
 

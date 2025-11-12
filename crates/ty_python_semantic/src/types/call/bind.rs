@@ -9,6 +9,7 @@ use std::fmt;
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
+use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
@@ -700,7 +701,7 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::IsEquivalentTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
-                                    ty_a.when_equivalent_to(db, *ty_b, InferableTypeVars::none());
+                                    ty_a.when_equivalent_to(db, *ty_b, InferableTypeVars::None);
                                 let tracked = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -711,7 +712,7 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::IsSubtypeOf) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
-                                    ty_a.when_subtype_of(db, *ty_b, InferableTypeVars::none());
+                                    ty_a.when_subtype_of(db, *ty_b, InferableTypeVars::None);
                                 let tracked = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -722,7 +723,7 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::IsAssignableTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
-                                    ty_a.when_assignable_to(db, *ty_b, InferableTypeVars::none());
+                                    ty_a.when_assignable_to(db, *ty_b, InferableTypeVars::None);
                                 let tracked = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -733,7 +734,7 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::IsDisjointFrom) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
-                                    ty_a.when_disjoint_from(db, *ty_b, InferableTypeVars::none());
+                                    ty_a.when_disjoint_from(db, *ty_b, InferableTypeVars::None);
                                 let tracked = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -1182,7 +1183,7 @@ impl<'db> Bindings<'db> {
                             db,
                             *ty_b,
                             tracked.constraints(db),
-                            InferableTypeVars::none(),
+                            InferableTypeVars::None,
                         );
                         let tracked = TrackedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
@@ -1216,20 +1217,21 @@ impl<'db> Bindings<'db> {
                         let extract_inferable = |instance: &NominalInstanceType<'db>| {
                             if instance.has_known_class(db, KnownClass::NoneType) {
                                 // Caller explicitly passed None, so no typevars are inferable.
-                                return Some(InferableTypeVars::none());
+                                return Some(FxHashSet::default());
                             }
-                            Some(InferableTypeVars::from_bound_typevars(
-                                db,
-                                instance.tuple_spec(db)?.fixed_elements().filter_map(|ty| {
+                            instance
+                                .tuple_spec(db)?
+                                .fixed_elements()
+                                .map(|ty| {
                                     ty.as_typevar()
                                         .map(|bound_typevar| bound_typevar.identity(db))
-                                }),
-                            ))
+                                })
+                                .collect()
                         };
 
                         let inferable = match overload.parameter_types() {
                             // Caller did not provide argument, so no typevars are inferable.
-                            [None] => InferableTypeVars::none(),
+                            [None] => FxHashSet::default(),
                             [Some(Type::NominalInstance(instance))] => {
                                 match extract_inferable(instance) {
                                     Some(inferable) => inferable,
@@ -1241,7 +1243,7 @@ impl<'db> Bindings<'db> {
 
                         let result = tracked
                             .constraints(db)
-                            .satisfied_by_all_typevars(db, inferable);
+                            .satisfied_by_all_typevars(db, InferableTypeVars::One(&inferable));
                         overload.set_return_type(Type::BooleanLiteral(result));
                     }
 
@@ -2690,7 +2692,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
 
-    inferable_typevars: InferableTypeVars<'db>,
+    inferable_typevars: InferableTypeVars<'db, 'db>,
     specialization: Option<Specialization<'db>>,
 }
 
@@ -2717,7 +2719,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             call_expression_tcx,
             return_ty,
             errors,
-            inferable_typevars: InferableTypeVars::none(),
+            inferable_typevars: InferableTypeVars::None,
             specialization: None,
         }
     }
@@ -3039,7 +3041,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     fn finish(
         self,
     ) -> (
-        InferableTypeVars<'db>,
+        InferableTypeVars<'db, 'db>,
         Option<Specialization<'db>>,
         Type<'db>,
     ) {
@@ -3109,7 +3111,7 @@ pub(crate) struct Binding<'db> {
     return_ty: Type<'db>,
 
     /// The inferable typevars in this signature.
-    inferable_typevars: InferableTypeVars<'db>,
+    inferable_typevars: InferableTypeVars<'db, 'db>,
 
     /// The specialization that was inferred from the argument types, if the callable is generic.
     specialization: Option<Specialization<'db>>,
@@ -3137,7 +3139,7 @@ impl<'db> Binding<'db> {
             callable_type: signature_type,
             signature_type,
             return_ty: Type::unknown(),
-            inferable_typevars: InferableTypeVars::none(),
+            inferable_typevars: InferableTypeVars::None,
             specialization: None,
             argument_matches: Box::from([]),
             variadic_argument_matched_to_variadic_parameter: false,
@@ -3350,7 +3352,7 @@ impl<'db> Binding<'db> {
     /// Resets the state of this binding to its initial state.
     fn reset(&mut self) {
         self.return_ty = Type::unknown();
-        self.inferable_typevars = InferableTypeVars::none();
+        self.inferable_typevars = InferableTypeVars::None;
         self.specialization = None;
         self.argument_matches = Box::from([]);
         self.parameter_tys = Box::from([]);
@@ -3361,7 +3363,7 @@ impl<'db> Binding<'db> {
 #[derive(Clone, Debug)]
 struct BindingSnapshot<'db> {
     return_ty: Type<'db>,
-    inferable_typevars: InferableTypeVars<'db>,
+    inferable_typevars: InferableTypeVars<'db, 'db>,
     specialization: Option<Specialization<'db>>,
     argument_matches: Box<[MatchedArgument<'db>]>,
     parameter_tys: Box<[Option<Type<'db>>]>,

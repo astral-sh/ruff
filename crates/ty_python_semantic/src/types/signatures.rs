@@ -217,7 +217,7 @@ impl<'db> CallableSignature<'db> {
         &self,
         db: &'db dyn Db,
         other: &Self,
-        inferable: InferableTypeVars<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db> {
         self.has_relation_to_impl(
             db,
@@ -233,7 +233,7 @@ impl<'db> CallableSignature<'db> {
         &self,
         db: &'db dyn Db,
         other: &Self,
-        inferable: InferableTypeVars<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -255,7 +255,7 @@ impl<'db> CallableSignature<'db> {
         db: &'db dyn Db,
         self_signatures: &[Signature<'db>],
         other_signatures: &[Signature<'db>],
-        inferable: InferableTypeVars<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -321,7 +321,7 @@ impl<'db> CallableSignature<'db> {
         &self,
         db: &'db dyn Db,
         other: &Self,
-        inferable: InferableTypeVars<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.overloads.as_slice(), other.overloads.as_slice()) {
@@ -628,10 +628,10 @@ impl<'db> Signature<'db> {
         }
     }
 
-    fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
+    fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db, 'db> {
         match self.generic_context {
             Some(generic_context) => generic_context.inferable_typevars(db),
-            None => InferableTypeVars::none(),
+            None => InferableTypeVars::None,
         }
     }
 
@@ -642,7 +642,7 @@ impl<'db> Signature<'db> {
         &self,
         db: &'db dyn Db,
         other: &Signature<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         let mut result = ConstraintSet::from(true);
@@ -729,7 +729,7 @@ impl<'db> Signature<'db> {
         &self,
         db: &'db dyn Db,
         other: &Signature<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -739,10 +739,8 @@ impl<'db> Signature<'db> {
         // specialization that causes the check to succeed.
         let self_inferable = self.inferable_typevars(db);
         let other_inferable = other.inferable_typevars(db);
-        let new_inferable = InferableTypeVars::none()
-            .merge(db, self_inferable)
-            .merge(db, other_inferable);
-        let inferable = inferable.merge(db, new_inferable);
+        let inferable = inferable.merge(&self_inferable);
+        let inferable = inferable.merge(&other_inferable);
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let when = self.has_relation_to_inner(
@@ -758,14 +756,14 @@ impl<'db> Signature<'db> {
         // we produce, we reduce it back down to the inferable set that the caller asked about.
         // If we introduced new inferable typevars, those will be existentially quantified away
         // before returning.
-        when.reduce_inferable(db, new_inferable.iter(db))
+        when.reduce_inferable(db, self_inferable.iter().chain(other_inferable.iter()))
     }
 
     fn has_relation_to_inner(
         &self,
         db: &'db dyn Db,
         other: &Signature<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
