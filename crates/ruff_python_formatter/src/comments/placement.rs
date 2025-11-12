@@ -1861,11 +1861,17 @@ fn handle_unary_op_comment<'a>(
             | SimpleTokenKind::Plus
             | SimpleTokenKind::Minus
     )));
-    let up_to = tokenizer
+    let lparen_start = tokenizer
         .find(|token| token.kind == SimpleTokenKind::LParen)
-        .map_or(unary_op.operand.start(), |lparen| lparen.start());
-    if comment.end() < up_to {
-        CommentPlacement::leading(&*unary_op.operand, comment)
+        .map(|lparen| lparen.start());
+    let up_to = lparen_start.unwrap_or(unary_op.operand.start());
+    if lparen_start.is_none()
+        && comment.end() < unary_op.operand.start()
+        && comment.line_position().is_end_of_line()
+    {
+        CommentPlacement::dangling(unary_op, comment)
+    } else if comment.end() < up_to {
+        CommentPlacement::leading(unary_op, comment)
     } else {
         CommentPlacement::Default(comment)
     }
