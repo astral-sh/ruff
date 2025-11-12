@@ -1034,7 +1034,7 @@ impl<'db> AssignmentDefinitionKind<'db> {
         self.target_kind
     }
 
-    pub(crate) fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+    pub fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
         self.value.node(module)
     }
 

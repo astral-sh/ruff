@@ -2645,8 +2645,16 @@ def ab(a: int, *, c: int):
         assert_snapshot!(test.hover(), @r"
         int | float
         ---------------------------------------------
+        Convert a string or number to a floating-point number, if possible.
+
+        ---------------------------------------------
         ```python
         int | float
+        ```
+        ---
+        ```text
+        Convert a string or number to a floating-point number, if possible.
+
         ```
         ---------------------------------------------
         info[hover]: Hovered content is

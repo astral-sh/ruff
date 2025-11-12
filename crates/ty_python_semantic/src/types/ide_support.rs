@@ -477,32 +477,17 @@ pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Member<'db>
 /// Get the primary definition kind for a name expression within a specific file.
 /// Returns the first definition kind that is reachable for this name in its scope.
 /// This is useful for IDE features like semantic tokens.
-pub fn definition_kind_for_name<'db>(
+pub fn definition_for_name<'db>(
     db: &'db dyn Db,
     file: File,
     name: &ast::ExprName,
-) -> Option<DefinitionKind<'db>> {
-    let index = semantic_index(db, file);
-    let name_str = name.id.as_str();
-
-    // Get the scope for this name expression
-    let file_scope = index.expression_scope_id(&ast::ExprRef::from(name));
-
-    // Get the place table for this scope
-    let place_table = index.place_table(file_scope);
-
-    // Look up the place by name
-    let symbol_id = place_table.symbol_id(name_str)?;
-
-    // Get the use-def map and look up definitions for this place
-    let declarations = index
-        .use_def_map(file_scope)
-        .all_reachable_symbol_declarations(symbol_id);
+) -> Option<Definition<'db>> {
+    let definitions = definitions_for_name(db, file, name);
 
     // Find the first valid definition and return its kind
-    for declaration in declarations {
-        if let Some(def) = declaration.declaration.definition() {
-            return Some(def.kind(db).clone());
+    for declaration in definitions {
+        if let Some(def) = declaration.definition() {
+            return Some(def);
         }
     }
 
@@ -617,7 +602,7 @@ pub fn definitions_for_name<'db>(
     // If we didn't find any definitions in scopes, fallback to builtins
     if resolved_definitions.is_empty() {
         let Some(builtins_scope) = builtins_module_scope(db) else {
-            return Vec::new();
+            return resolved_definitions;
         };
 
         // Special cases for `float` and `complex` in type annotation positions.
@@ -633,11 +618,14 @@ pub fn definitions_for_name<'db>(
             return union
                 .elements(db)
                 .iter()
+                // Use `rev` so that `complex` and `float` come first.
+                // This is required for hover to pick up the docstring of `complex` and `float`
+                // instead of `int` (hover only shows the docstring of the first definition).
+                .rev()
                 .filter_map(|ty| ty.as_nominal_instance())
                 .map(|instance| {
                     let definition = instance.class_literal(db).definition(db);
-                    let parsed = parsed_module(db, definition.file(db));
-                    ResolvedDefinition::FileWithRange(definition.focus_range(db, &parsed.load(db)))
+                    ResolvedDefinition::Definition(definition)
                 })
                 .collect();
         }
@@ -1243,6 +1231,14 @@ mod resolve_definition {
     }
 
     impl<'db> ResolvedDefinition<'db> {
+        pub(crate) fn definition(&self) -> Option<Definition<'db>> {
+            match self {
+                ResolvedDefinition::Definition(definition) => Some(*definition),
+                ResolvedDefinition::Module(_) => None,
+                ResolvedDefinition::FileWithRange(_) => None,
+            }
+        }
+
         fn file(&self, db: &'db dyn Db) -> File {
             match self {
                 ResolvedDefinition::Definition(definition) => definition.file(db),

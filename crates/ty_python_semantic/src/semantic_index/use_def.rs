@@ -761,6 +761,7 @@ pub(crate) struct DeclarationsIterator<'map, 'db> {
     inner: LiveDeclarationsIterator<'map>,
 }
 
+#[derive(Debug)]
 pub(crate) struct DeclarationWithConstraint<'db> {
     pub(crate) declaration: DefinitionState<'db>,
     pub(crate) reachability_constraint: ScopedReachabilityConstraintId,
