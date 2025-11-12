@@ -1002,17 +1002,27 @@ impl<'db> Node<'db> {
         }
     }
 
-    fn exists_one_inner(
+    /// Returns a new BDD that is the _existential abstraction_ of `self` for a set of typevars.
+    /// All typevars _other_ than the one given will be removed and abstracted away.
+    fn retain_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Self {
+        match self {
+            Node::AlwaysTrue => Node::AlwaysTrue,
+            Node::AlwaysFalse => Node::AlwaysFalse,
+            Node::Interior(interior) => interior.retain_one(db, bound_typevar),
+        }
+    }
+
+    fn abstract_one_inner(
         self,
         db: &'db dyn Db,
-        bound_typevar: BoundTypeVarIdentity<'db>,
+        should_remove: &mut dyn FnMut(BoundTypeVarInstance) -> bool,
         map: &SequentMap<'db>,
         path: &mut PathAssignments<'db>,
     ) -> Self {
         match self {
             Node::AlwaysTrue => Node::AlwaysTrue,
             Node::AlwaysFalse => Node::AlwaysFalse,
-            Node::Interior(interior) => interior.exists_one_inner(db, bound_typevar, map, path),
+            Node::Interior(interior) => interior.abstract_one_inner(db, should_remove, map, path),
         }
     }
 
@@ -1441,91 +1451,93 @@ impl<'db> InteriorNode<'db> {
     fn exists_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
         let map = self.sequent_map(db);
         let mut path = PathAssignments::default();
-        self.exists_one_inner(db, bound_typevar, map, &mut path)
+        self.abstract_one_inner(
+            db,
+            &mut |node_typevar| node_typevar.identity(db) == bound_typevar,
+            map,
+            &mut path,
+        )
     }
 
-    fn exists_one_inner(
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn retain_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
+        let map = self.sequent_map(db);
+        let mut path = PathAssignments::default();
+        self.abstract_one_inner(
+            db,
+            &mut |node_typevar| node_typevar.identity(db) != bound_typevar,
+            map,
+            &mut path,
+        )
+    }
+
+    fn abstract_one_inner(
         self,
         db: &'db dyn Db,
-        bound_typevar: BoundTypeVarIdentity<'db>,
+        should_remove: &mut dyn FnMut(BoundTypeVarInstance) -> bool,
         map: &SequentMap<'db>,
         path: &mut PathAssignments<'db>,
     ) -> Node<'db> {
         let self_constraint = self.constraint(db);
         let self_typevar = self_constraint.typevar(db);
-        match bound_typevar.cmp(&self_typevar.identity(db)) {
-            // If the typevar that this node checks is "later" than the typevar we're abstracting
-            // over, then we have reached a point in the BDD where the abstraction can no longer
-            // affect the result, and we can return early.
-            Ordering::Less => Node::Interior(self),
-
-            // If the typevar that this node checks _is_ the typevar we're abstracting over, then
-            // we replace this node with the OR of its if_false/if_true edges. That is, the result
-            // is true if there's any assignment of this node's constraint that is true.
+        if should_remove(self_typevar) {
+            // If we should remove constraints involving this typevar, then we replace this node
+            // with the OR of its if_false/if_true edges. That is, the result is true if there's
+            // any assignment of this node's constraint that is true.
             //
             // We also have to check if there are any derived facts that depend on the constraint
             // we're about to remove. If so, we need to "remember" them by AND-ing them in with the
             // corresponding branch.
-            Ordering::Equal => {
-                let if_true = path
-                    .walk_edge(map, self_constraint.when_true(), |path, new_range| {
-                        let branch =
-                            self.if_true(db)
-                                .exists_one_inner(db, bound_typevar, map, path);
-                        path.assignments[new_range]
-                            .iter()
-                            .filter(|assignment| {
-                                // Don't add back any derived facts if they reference the typevar
-                                // that we're trying to remove!
-                                !assignment
-                                    .constraint()
-                                    .typevar(db)
-                                    .is_same_typevar_as(db, self_typevar)
-                            })
-                            .fold(branch, |branch, assignment| {
-                                branch.and(db, Node::new_satisfied_constraint(db, *assignment))
-                            })
-                    })
-                    .unwrap_or(Node::AlwaysFalse);
-                let if_false = path
-                    .walk_edge(map, self_constraint.when_false(), |path, new_range| {
-                        let branch =
-                            self.if_false(db)
-                                .exists_one_inner(db, bound_typevar, map, path);
-                        path.assignments[new_range]
-                            .iter()
-                            .filter(|assignment| {
-                                // Don't add back any derived facts if they reference the typevar
-                                // that we're trying to remove!
-                                !assignment
-                                    .constraint()
-                                    .typevar(db)
-                                    .is_same_typevar_as(db, self_typevar)
-                            })
-                            .fold(branch, |branch, assignment| {
-                                branch.and(db, Node::new_satisfied_constraint(db, *assignment))
-                            })
-                    })
-                    .unwrap_or(Node::AlwaysFalse);
-                if_true.or(db, if_false)
-            }
-
+            let if_true = path
+                .walk_edge(map, self_constraint.when_true(), |path, new_range| {
+                    let branch = self
+                        .if_true(db)
+                        .abstract_one_inner(db, should_remove, map, path);
+                    path.assignments[new_range]
+                        .iter()
+                        .filter(|assignment| {
+                            // Don't add back any derived facts if they reference the typevar
+                            // that we're trying to remove!
+                            !should_remove(assignment.constraint().typevar(db))
+                        })
+                        .fold(branch, |branch, assignment| {
+                            branch.and(db, Node::new_satisfied_constraint(db, *assignment))
+                        })
+                })
+                .unwrap_or(Node::AlwaysFalse);
+            let if_false = path
+                .walk_edge(map, self_constraint.when_false(), |path, new_range| {
+                    let branch = self
+                        .if_false(db)
+                        .abstract_one_inner(db, should_remove, map, path);
+                    path.assignments[new_range]
+                        .iter()
+                        .filter(|assignment| {
+                            // Don't add back any derived facts if they reference the typevar
+                            // that we're trying to remove!
+                            !should_remove(assignment.constraint().typevar(db))
+                        })
+                        .fold(branch, |branch, assignment| {
+                            branch.and(db, Node::new_satisfied_constraint(db, *assignment))
+                        })
+                })
+                .unwrap_or(Node::AlwaysFalse);
+            if_true.or(db, if_false)
+        } else {
             // Otherwise, we abstract the if_false/if_true edges recursively.
-            Ordering::Greater => {
-                let if_true = path
-                    .walk_edge(map, self_constraint.when_true(), |path, _| {
-                        self.if_true(db)
-                            .exists_one_inner(db, bound_typevar, map, path)
-                    })
-                    .unwrap_or(Node::AlwaysFalse);
-                let if_false = path
-                    .walk_edge(map, self_constraint.when_false(), |path, _| {
-                        self.if_false(db)
-                            .exists_one_inner(db, bound_typevar, map, path)
-                    })
-                    .unwrap_or(Node::AlwaysFalse);
-                Node::new(db, self_constraint, if_true, if_false)
-            }
+            let if_true = path
+                .walk_edge(map, self_constraint.when_true(), |path, _| {
+                    self.if_true(db)
+                        .abstract_one_inner(db, should_remove, map, path)
+                })
+                .unwrap_or(Node::AlwaysFalse);
+            let if_false = path
+                .walk_edge(map, self_constraint.when_false(), |path, _| {
+                    self.if_false(db)
+                        .abstract_one_inner(db, should_remove, map, path)
+                })
+                .unwrap_or(Node::AlwaysFalse);
+            Node::new(db, self_constraint, if_true, if_false)
         }
     }
 
