@@ -86,20 +86,49 @@ pub fn run(
                     EmbeddedFileSourceMap::new(&md_index, test_failures.backtick_offsets);
 
                 for (relative_line_number, failures) in test_failures.by_line.iter() {
-                    let absolute_line_number =
-                        source_map.to_absolute_line_number(relative_line_number);
-
-                    for failure in failures {
-                        match output_format {
-                            OutputFormat::Cli => {
-                                let line_info =
-                                    format!("{relative_fixture_path}:{absolute_line_number}")
-                                        .cyan();
-                                println!("  {line_info} {failure}");
-                            }
-                            OutputFormat::GitHub => println!(
-                                "::error file={absolute_fixture_path},line={absolute_line_number}::{failure}"
+                    let (absolute_line_number, line_number_error) =
+                        match source_map.to_absolute_line_number(relative_line_number) {
+                            Ok(line_number) => (Some(line_number), None),
+                            Err(err) => (
+                                source_map.last_absolute_line_number(),
+                                Some(err.to_string()),
                             ),
+                        };
+
+                    let absolute_line_number_value = absolute_line_number.map(OneIndexed::get);
+                    let cli_line_info = match absolute_line_number_value {
+                        Some(line) => format!("{relative_fixture_path}:{line}"),
+                        None => format!("{relative_fixture_path}:?"),
+                    };
+
+                    match output_format {
+                        OutputFormat::Cli => {
+                            for failure in failures {
+                                println!("  {} {failure}", cli_line_info.as_str().cyan());
+                            }
+                            if let Some(err) = line_number_error.as_deref() {
+                                println!("  {} {err}", cli_line_info.as_str().cyan());
+                            }
+                        }
+                        OutputFormat::GitHub => {
+                            for failure in failures {
+                                if let Some(line) = absolute_line_number_value {
+                                    println!(
+                                        "::error file={absolute_fixture_path},line={line}::{failure}"
+                                    );
+                                } else {
+                                    println!("::error file={absolute_fixture_path}::{failure}");
+                                }
+                            }
+                            if let Some(err) = line_number_error.as_deref() {
+                                if let Some(line) = absolute_line_number_value {
+                                    println!(
+                                        "::error file={absolute_fixture_path},line={line}::{err}"
+                                    );
+                                } else {
+                                    println!("::error file={absolute_fixture_path}::{err}");
+                                }
+                            }
                         }
                     }
                 }
