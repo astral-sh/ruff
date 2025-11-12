@@ -991,37 +991,50 @@ impl Display for DisplayGenericContext<'_> {
 }
 
 impl<'db> Specialization<'db> {
-    pub fn display(&'db self, db: &'db dyn Db) -> DisplaySpecialization<'db> {
+    pub fn display(self, db: &'db dyn Db) -> DisplaySpecialization<'db> {
         self.display_short(db, TupleSpecialization::No, DisplaySettings::default())
+    }
+
+    pub(crate) fn display_full(self, db: &'db dyn Db) -> DisplaySpecialization<'db> {
+        DisplaySpecialization {
+            specialization: self,
+            db,
+            tuple_specialization: TupleSpecialization::No,
+            settings: DisplaySettings::default(),
+            full: true,
+        }
     }
 
     /// Renders the specialization as it would appear in a subscript expression, e.g. `[int, str]`.
     pub fn display_short(
-        &'db self,
+        self,
         db: &'db dyn Db,
         tuple_specialization: TupleSpecialization,
         settings: DisplaySettings<'db>,
     ) -> DisplaySpecialization<'db> {
         DisplaySpecialization {
-            types: self.types(db),
+            specialization: self,
             db,
             tuple_specialization,
             settings,
+            full: false,
         }
     }
 }
 
 pub struct DisplaySpecialization<'db> {
-    types: &'db [Type<'db>],
+    specialization: Specialization<'db>,
     db: &'db dyn Db,
     tuple_specialization: TupleSpecialization,
     settings: DisplaySettings<'db>,
+    full: bool,
 }
 
-impl Display for DisplaySpecialization<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl DisplaySpecialization<'_> {
+    fn fmt_normal(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_char('[')?;
-        for (idx, ty) in self.types.iter().enumerate() {
+        let types = self.specialization.types(self.db);
+        for (idx, ty) in types.iter().enumerate() {
             if idx > 0 {
                 f.write_str(", ")?;
             }
@@ -1031,6 +1044,37 @@ impl Display for DisplaySpecialization<'_> {
             f.write_str(", ...")?;
         }
         f.write_char(']')
+    }
+
+    fn fmt_full(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_char('[')?;
+        let variables = self
+            .specialization
+            .generic_context(self.db)
+            .variables(self.db);
+        let types = self.specialization.types(self.db);
+        for (idx, (bound_typevar, ty)) in variables.zip(types).enumerate() {
+            if idx > 0 {
+                f.write_str(", ")?;
+            }
+            write!(
+                f,
+                "{} = {}",
+                bound_typevar.identity(self.db).display(self.db),
+                ty.display_with(self.db, self.settings.clone()),
+            )?;
+        }
+        f.write_char(']')
+    }
+}
+
+impl Display for DisplaySpecialization<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if self.full {
+            self.fmt_full(f)
+        } else {
+            self.fmt_normal(f)
+        }
     }
 }
 
