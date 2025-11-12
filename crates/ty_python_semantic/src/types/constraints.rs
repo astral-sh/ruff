@@ -252,24 +252,12 @@ impl<'db> ConstraintSet<'db> {
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
-    ///
-    /// Because constraint sets track the set of inferable typevars, this operation is not
-    /// commutative! We keep the inferable set of the lhs. If the rhs has inferable typevars that
-    /// are not inferable in the lhs, those will be existentially quantified away. The result will
-    /// only mention typevars that are inferable in the lhs, or which both sides consider
-    /// non-inferable.
     pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
         self.node = self.node.or(db, other.node);
         *self
     }
 
     /// Updates this constraint set to hold the intersection of itself and another constraint set.
-    ///
-    /// Because constraint sets track the set of inferable typevars, this operation is not
-    /// commutative! We keep the inferable set of the lhs. If the rhs has inferable typevars that
-    /// are not inferable in the lhs, those will be existentially quantified away. The result will
-    /// only mention typevars that are inferable in the lhs, or which both sides consider
-    /// non-inferable.
     pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: Self) -> Self {
         self.node = self.node.and(db, other.node);
         *self
