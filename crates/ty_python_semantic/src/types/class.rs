@@ -3850,6 +3850,7 @@ pub enum KnownClass {
     Path,
     // ty_extensions
     ConstraintSet,
+    GenericContext,
 }
 
 impl KnownClass {
@@ -3953,6 +3954,7 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::GenericContext
             | Self::ProtocolMeta
             | Self::TypedDictFallback => Some(Truthiness::Ambiguous),
 
@@ -4036,6 +4038,7 @@ impl KnownClass {
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
             | KnownClass::ConstraintSet
+            | KnownClass::GenericContext
             | KnownClass::TypedDictFallback
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
@@ -4119,6 +4122,7 @@ impl KnownClass {
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
             | KnownClass::ConstraintSet
+            | KnownClass::GenericContext
             | KnownClass::TypedDictFallback
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
@@ -4202,6 +4206,7 @@ impl KnownClass {
             | KnownClass::NamedTupleLike
             | KnownClass::NamedTupleFallback
             | KnownClass::ConstraintSet
+            | KnownClass::GenericContext
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
             | KnownClass::Template
@@ -4296,6 +4301,7 @@ impl KnownClass {
             | Self::InitVar
             | Self::NamedTupleFallback
             | Self::ConstraintSet
+            | Self::GenericContext
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
@@ -4385,6 +4391,7 @@ impl KnownClass {
             | KnownClass::Template
             | KnownClass::Path
             | KnownClass::ConstraintSet
+            | KnownClass::GenericContext
             | KnownClass::InitVar => false,
             KnownClass::NamedTupleFallback | KnownClass::TypedDictFallback => true,
         }
@@ -4485,6 +4492,7 @@ impl KnownClass {
             Self::NamedTupleFallback => "NamedTupleFallback",
             Self::NamedTupleLike => "NamedTupleLike",
             Self::ConstraintSet => "ConstraintSet",
+            Self::GenericContext => "GenericContext",
             Self::TypedDictFallback => "TypedDictFallback",
             Self::Template => "Template",
             Self::Path => "Path",
@@ -4788,7 +4796,9 @@ impl KnownClass {
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field | Self::KwOnly | Self::InitVar => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
-            Self::NamedTupleLike | Self::ConstraintSet => KnownModule::TyExtensions,
+            Self::NamedTupleLike | Self::ConstraintSet | Self::GenericContext => {
+                KnownModule::TyExtensions
+            }
             Self::Template => KnownModule::Templatelib,
             Self::Path => KnownModule::Pathlib,
         }
@@ -4871,6 +4881,7 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::GenericContext
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
@@ -4959,6 +4970,7 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::GenericContext
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
@@ -5057,6 +5069,7 @@ impl KnownClass {
             "NamedTupleFallback" => &[Self::NamedTupleFallback],
             "NamedTupleLike" => &[Self::NamedTupleLike],
             "ConstraintSet" => &[Self::ConstraintSet],
+            "GenericContext" => &[Self::GenericContext],
             "TypedDictFallback" => &[Self::TypedDictFallback],
             "Template" => &[Self::Template],
             "Path" => &[Self::Path],
@@ -5134,6 +5147,7 @@ impl KnownClass {
             | Self::ExtensionsTypeVar
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::GenericContext
             | Self::Awaitable
             | Self::Generator
             | Self::Template
