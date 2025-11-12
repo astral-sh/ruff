@@ -60,6 +60,18 @@
 # variant:
 #   The name of the enum variant for this syntax node.  Defaults to the node
 #   name with the group prefix removed.  (That is, `StmtIf` becomes `If`.)
+#
+# python_projection:
+#   An optional table that describes how this node should be exposed to Python via
+#   the external-linter bridge.
+#   * class: The Python class name to use in the generated `.pyi`.
+#   * eager_fields: List of field names that should be populated eagerly; every
+#     other field is assumed to be lazily populated through the context object.
+#   * metadata_fields: Optional list of extra fields to add that aren't present
+#     on the AST node itself. Each entry must specify:
+#       - name: Field name (Python and Rust)
+#       - rust_type: Rust type stored on the generated struct
+#       - stub_type: Python stub type for `.pyi`
 
 [Mod]
 anynode_is_label = "module"
@@ -69,9 +81,15 @@ doc = "See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)"
 doc = "See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)"
 fields = [{ name = "body", type = "Stmt*" }]
 
+[Mod.nodes.ModModule.python_projection]
+class = "Module"
+
 [Mod.nodes.ModExpression]
 doc = "See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)"
 fields = [{ name = "body", type = "Box<Expr>" }]
+
+[Mod.nodes.ModExpression.python_projection]
+class = "Expression"
 
 [Stmt]
 add_suffix_to_is_methods = true
@@ -93,6 +111,10 @@ fields = [
   { name = "body", type = "Stmt*" },
 ]
 
+[Stmt.nodes.StmtFunctionDef.python_projection]
+class = "FunctionDefStmt"
+eager_fields = ["is_async", "name"]
+
 [Stmt.nodes.StmtClassDef]
 doc = "See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)"
 fields = [
@@ -103,13 +125,23 @@ fields = [
   { name = "body", type = "Stmt*" },
 ]
 
+[Stmt.nodes.StmtClassDef.python_projection]
+class = "ClassDefStmt"
+eager_fields = ["name"]
+
 [Stmt.nodes.StmtReturn]
 doc = "See also [Return](https://docs.python.org/3/library/ast.html#ast.Return)"
 fields = [{ name = "value", type = "Expr?" }]
 
+[Stmt.nodes.StmtReturn.python_projection]
+class = "ReturnStmt"
+
 [Stmt.nodes.StmtDelete]
 doc = "See also [Delete](https://docs.python.org/3/library/ast.html#ast.Delete)"
 fields = [{ name = "targets", type = "Expr*" }]
+
+[Stmt.nodes.StmtDelete.python_projection]
+class = "DeleteStmt"
 
 [Stmt.nodes.StmtTypeAlias]
 doc = "See also [TypeAlias](https://docs.python.org/3/library/ast.html#ast.TypeAlias)"
@@ -119,12 +151,18 @@ fields = [
   { name = "value", type = "Expr" },
 ]
 
+[Stmt.nodes.StmtTypeAlias.python_projection]
+class = "TypeAliasStmt"
+
 [Stmt.nodes.StmtAssign]
 doc = "See also [Assign](https://docs.python.org/3/library/ast.html#ast.Assign)"
 fields = [
   { name = "targets", type = "Expr*" },
   { name = "value", type = "Expr" },
 ]
+
+[Stmt.nodes.StmtAssign.python_projection]
+class = "AssignStmt"
 
 [Stmt.nodes.StmtAugAssign]
 doc = "See also [AugAssign](https://docs.python.org/3/library/ast.html#ast.AugAssign)"
@@ -134,6 +172,10 @@ fields = [
   { name = "value", type = "Expr" },
 ]
 
+[Stmt.nodes.StmtAugAssign.python_projection]
+class = "AugAssignStmt"
+eager_fields = ["op"]
+
 [Stmt.nodes.StmtAnnAssign]
 doc = "See also [AnnAssign](https://docs.python.org/3/library/ast.html#ast.AnnAssign)"
 fields = [
@@ -142,6 +184,10 @@ fields = [
   { name = "value", type = "Expr?" },
   { name = "simple", type = "bool" },
 ]
+
+[Stmt.nodes.StmtAnnAssign.python_projection]
+class = "AnnAssignStmt"
+eager_fields = ["simple"]
 
 [Stmt.nodes.StmtFor]
 doc = """See also [For](https://docs.python.org/3/library/ast.html#ast.For)
@@ -156,6 +202,10 @@ fields = [
   { name = "orelse", type = "Stmt*" },
 ]
 
+[Stmt.nodes.StmtFor.python_projection]
+class = "ForStmt"
+eager_fields = ["is_async"]
+
 [Stmt.nodes.StmtWhile]
 doc = """See also [While](https://docs.python.org/3/library/ast.html#ast.While)
 and [AsyncWhile](https://docs.python.org/3/library/ast.html#ast.AsyncWhile)."""
@@ -165,6 +215,9 @@ fields = [
   { name = "orelse", type = "Stmt*" },
 ]
 
+[Stmt.nodes.StmtWhile.python_projection]
+class = "WhileStmt"
+
 [Stmt.nodes.StmtIf]
 doc = "See also [If](https://docs.python.org/3/library/ast.html#ast.If)"
 fields = [
@@ -173,6 +226,10 @@ fields = [
   { name = "body", type = "Stmt*" },
   { name = "elif_else_clauses", type = "ElifElseClause*" },
 ]
+
+[Stmt.nodes.StmtIf.python_projection]
+class = "IfStmt"
+eager_fields = ["test"]
 
 [Stmt.nodes.StmtWith]
 doc = """See also [With](https://docs.python.org/3/library/ast.html#ast.With)
@@ -185,6 +242,10 @@ fields = [
   { name = "body", type = "Stmt*" },
 ]
 
+[Stmt.nodes.StmtWith.python_projection]
+class = "WithStmt"
+eager_fields = ["is_async"]
+
 [Stmt.nodes.StmtMatch]
 doc = "See also [Match](https://docs.python.org/3/library/ast.html#ast.Match)"
 fields = [
@@ -192,9 +253,15 @@ fields = [
   { name = "cases", type = "MatchCase*" },
 ]
 
+[Stmt.nodes.StmtMatch.python_projection]
+class = "MatchStmt"
+
 [Stmt.nodes.StmtRaise]
 doc = "See also [Raise](https://docs.python.org/3/library/ast.html#ast.Raise)"
 fields = [{ name = "exc", type = "Expr?" }, { name = "cause", type = "Expr?" }]
+
+[Stmt.nodes.StmtRaise.python_projection]
+class = "RaiseStmt"
 
 [Stmt.nodes.StmtTry]
 doc = """See also [Try](https://docs.python.org/3/library/ast.html#ast.Try)
@@ -207,13 +274,23 @@ fields = [
   { name = "is_star", type = "bool" },
 ]
 
+[Stmt.nodes.StmtTry.python_projection]
+class = "TryStmt"
+eager_fields = ["is_star"]
+
 [Stmt.nodes.StmtAssert]
 doc = "See also [Assert](https://docs.python.org/3/library/ast.html#ast.Assert)"
 fields = [{ name = "test", type = "Expr" }, { name = "msg", type = "Expr?" }]
 
+[Stmt.nodes.StmtAssert.python_projection]
+class = "AssertStmt"
+
 [Stmt.nodes.StmtImport]
 doc = "See also [Import](https://docs.python.org/3/library/ast.html#ast.Import)"
 fields = [{ name = "names", type = "Alias*" }]
+
+[Stmt.nodes.StmtImport.python_projection]
+class = "ImportStmt"
 
 [Stmt.nodes.StmtImportFrom]
 doc = "See also [ImportFrom](https://docs.python.org/3/library/ast.html#ast.ImportFrom)"
@@ -223,29 +300,51 @@ fields = [
   { name = "level", type = "u32" },
 ]
 
+[Stmt.nodes.StmtImportFrom.python_projection]
+class = "ImportFromStmt"
+eager_fields = ["module"]
+
 [Stmt.nodes.StmtGlobal]
 doc = "See also [Global](https://docs.python.org/3/library/ast.html#ast.Global)"
 fields = [{ name = "names", type = "Identifier*" }]
+
+[Stmt.nodes.StmtGlobal.python_projection]
+class = "GlobalStmt"
 
 [Stmt.nodes.StmtNonlocal]
 doc = "See also [Nonlocal](https://docs.python.org/3/library/ast.html#ast.Nonlocal)"
 fields = [{ name = "names", type = "Identifier*" }]
 
+[Stmt.nodes.StmtNonlocal.python_projection]
+class = "NonlocalStmt"
+
 [Stmt.nodes.StmtExpr]
 doc = "See also [Expr](https://docs.python.org/3/library/ast.html#ast.Expr)"
 fields = [{ name = "value", type = "Expr" }]
+
+[Stmt.nodes.StmtExpr.python_projection]
+class = "ExprStmt"
 
 [Stmt.nodes.StmtPass]
 doc = "See also [Pass](https://docs.python.org/3/library/ast.html#ast.Pass)"
 fields = []
 
+[Stmt.nodes.StmtPass.python_projection]
+class = "PassStmt"
+
 [Stmt.nodes.StmtBreak]
 doc = "See also [Break](https://docs.python.org/3/library/ast.html#ast.Break)"
 fields = []
 
+[Stmt.nodes.StmtBreak.python_projection]
+class = "BreakStmt"
+
 [Stmt.nodes.StmtContinue]
 doc = "See also [Continue](https://docs.python.org/3/library/ast.html#ast.Continue)"
 fields = []
+
+[Stmt.nodes.StmtContinue.python_projection]
+class = "ContinueStmt"
 
 [Stmt.nodes.StmtIpyEscapeCommand]
 # TODO: remove crate:: prefix from IpyEscapeKind after it's auto generated
@@ -308,6 +407,10 @@ fields = [
   { name = "value", type = "Box<str>" },
 ]
 
+[Stmt.nodes.StmtIpyEscapeCommand.python_projection]
+class = "IpyEscapeCommandStmt"
+eager_fields = ["kind"]
+
 [Expr]
 add_suffix_to_is_methods = true
 anynode_is_label = "expression"
@@ -318,9 +421,16 @@ doc = "See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)"
 fields = [{ name = "op", type = "BoolOp" }, { name = "values", type = "Expr*" }]
 custom_source_order = true
 
+[Expr.nodes.ExprBoolOp.python_projection]
+class = "BoolOpExpr"
+eager_fields = ["op"]
+
 [Expr.nodes.ExprNamed]
 doc = "See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)"
 fields = [{ name = "target", type = "Expr" }, { name = "value", type = "Expr" }]
+
+[Expr.nodes.ExprNamed.python_projection]
+class = "NamedExpr"
 
 [Expr.nodes.ExprBinOp]
 doc = "See also [BinOp](https://docs.python.org/3/library/ast.html#ast.BinOp)"
@@ -330,6 +440,10 @@ fields = [
   { name = "right", type = "Expr" },
 ]
 
+[Expr.nodes.ExprBinOp.python_projection]
+class = "BinOpExpr"
+eager_fields = ["op"]
+
 [Expr.nodes.ExprUnaryOp]
 doc = "See also [UnaryOp](https://docs.python.org/3/library/ast.html#ast.UnaryOp)"
 fields = [
@@ -337,12 +451,19 @@ fields = [
   { name = "operand", type = "Expr" },
 ]
 
+[Expr.nodes.ExprUnaryOp.python_projection]
+class = "UnaryOpExpr"
+eager_fields = ["op"]
+
 [Expr.nodes.ExprLambda]
 doc = "See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)"
 fields = [
   { name = "parameters", type = "Box<crate::Parameters>?" },
   { name = "body", type = "Expr" },
 ]
+
+[Expr.nodes.ExprLambda.python_projection]
+class = "LambdaExpr"
 
 [Expr.nodes.ExprIf]
 doc = "See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)"
@@ -353,14 +474,24 @@ fields = [
 ]
 source_order = ["body", "test", "orelse"]
 
+[Expr.nodes.ExprIf.python_projection]
+class = "IfExpr"
+eager_fields = ["test"]
+
 [Expr.nodes.ExprDict]
 doc = "See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)"
 fields = [{ name = "items", type = "DictItem*" }]
 custom_source_order = true
 
+[Expr.nodes.ExprDict.python_projection]
+class = "DictExpr"
+
 [Expr.nodes.ExprSet]
 doc = "See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)"
 fields = [{ name = "elts", type = "Expr*" }]
+
+[Expr.nodes.ExprSet.python_projection]
+class = "SetExpr"
 
 [Expr.nodes.ExprListComp]
 doc = "See also [ListComp](https://docs.python.org/3/library/ast.html#ast.ListComp)"
@@ -369,12 +500,18 @@ fields = [
   { name = "generators", type = "Comprehension*" },
 ]
 
+[Expr.nodes.ExprListComp.python_projection]
+class = "ListCompExpr"
+
 [Expr.nodes.ExprSetComp]
 doc = "See also [SetComp](https://docs.python.org/3/library/ast.html#ast.SetComp)"
 fields = [
   { name = "elt", type = "Expr" },
   { name = "generators", type = "Comprehension*" },
 ]
+
+[Expr.nodes.ExprSetComp.python_projection]
+class = "SetCompExpr"
 
 [Expr.nodes.ExprDictComp]
 doc = "See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictComp)"
@@ -384,6 +521,9 @@ fields = [
   { name = "generators", type = "Comprehension*" },
 ]
 
+[Expr.nodes.ExprDictComp.python_projection]
+class = "DictCompExpr"
+
 [Expr.nodes.ExprGenerator]
 doc = "See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)"
 fields = [
@@ -392,17 +532,30 @@ fields = [
   { name = "parenthesized", type = "bool" },
 ]
 
+[Expr.nodes.ExprGenerator.python_projection]
+class = "GeneratorExpr"
+eager_fields = ["parenthesized"]
+
 [Expr.nodes.ExprAwait]
 doc = "See also [Await](https://docs.python.org/3/library/ast.html#ast.Await)"
 fields = [{ name = "value", type = "Expr" }]
+
+[Expr.nodes.ExprAwait.python_projection]
+class = "AwaitExpr"
 
 [Expr.nodes.ExprYield]
 doc = "See also [Yield](https://docs.python.org/3/library/ast.html#ast.Yield)"
 fields = [{ name = "value", type = "Expr?" }]
 
+[Expr.nodes.ExprYield.python_projection]
+class = "YieldExpr"
+
 [Expr.nodes.ExprYieldFrom]
 doc = "See also [YieldFrom](https://docs.python.org/3/library/ast.html#ast.YieldFrom)"
 fields = [{ name = "value", type = "Expr" }]
+
+[Expr.nodes.ExprYieldFrom.python_projection]
+class = "YieldFromExpr"
 
 [Expr.nodes.ExprCompare]
 doc = "See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)"
@@ -414,11 +567,24 @@ fields = [
 # The fields must be visited simultaneously
 custom_source_order = true
 
+[Expr.nodes.ExprCompare.python_projection]
+class = "CompareExpr"
+eager_fields = ["ops"]
+
 [Expr.nodes.ExprCall]
 doc = "See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)"
 fields = [
   { name = "func", type = "Expr" },
   { name = "arguments", type = "Arguments" },
+]
+
+[Expr.nodes.ExprCall.python_projection]
+class = "CallExpr"
+eager_fields = ["arguments"]
+metadata_fields = [
+  { name = "callee", rust_type = "Option<String>", stub_type = "Optional[str]" },
+  { name = "function_text", rust_type = "Option<String>", stub_type = "Optional[str]" },
+  { name = "function_kind", rust_type = "Option<String>", stub_type = "Optional[str]" },
 ]
 
 [Expr.nodes.ExprFString]
@@ -433,6 +599,9 @@ See also [JoinedStr](https://docs.python.org/3/library/ast.html#ast.JoinedStr)""
 fields = [{ name = "value", type = "FStringValue" }]
 custom_source_order = true
 
+[Expr.nodes.ExprFString.python_projection]
+class = "FStringExpr"
+
 [Expr.nodes.ExprTString]
 doc = """An AST node that represents either a single-part t-string literal
 or an implicitly concatenated t-string literal.
@@ -445,12 +614,18 @@ See also [TemplateStr](https://docs.python.org/3/library/ast.html#ast.TemplateSt
 fields = [{ name = "value", type = "TStringValue" }]
 custom_source_order = true
 
+[Expr.nodes.ExprTString.python_projection]
+class = "TStringExpr"
+
 [Expr.nodes.ExprStringLiteral]
 doc = """An AST node that represents either a single-part string literal
 or an implicitly concatenated string literal."""
 fields = [{ name = "value", type = "StringLiteralValue" }]
 # Because StringLiteralValue type is an iterator and it's not clear from the type
 custom_source_order = true
+
+[Expr.nodes.ExprStringLiteral.python_projection]
+class = "StringLiteralExpr"
 
 [Expr.nodes.ExprBytesLiteral]
 doc = """An AST node that represents either a single-part bytestring literal
@@ -459,20 +634,36 @@ fields = [{ name = "value", type = "BytesLiteralValue" }]
 # Because BytesLiteralValue type is an iterator and it's not clear from the type
 custom_source_order = true
 
+[Expr.nodes.ExprBytesLiteral.python_projection]
+class = "BytesLiteralExpr"
+
 [Expr.nodes.ExprNumberLiteral]
 fields = [{ name = "value", type = "Number" }]
+
+[Expr.nodes.ExprNumberLiteral.python_projection]
+class = "NumberLiteralExpr"
 
 [Expr.nodes.ExprBooleanLiteral]
 fields = [{ name = "value", type = "bool" }]
 derives = ["Default"]
 
+[Expr.nodes.ExprBooleanLiteral.python_projection]
+class = "BooleanLiteralExpr"
+eager_fields = ["value"]
+
 [Expr.nodes.ExprNoneLiteral]
 fields = []
 derives = ["Default"]
 
+[Expr.nodes.ExprNoneLiteral.python_projection]
+class = "NoneLiteralExpr"
+
 [Expr.nodes.ExprEllipsisLiteral]
 fields = []
 derives = ["Default"]
+
+[Expr.nodes.ExprEllipsisLiteral.python_projection]
+class = "EllipsisLiteralExpr"
 
 [Expr.nodes.ExprAttribute]
 doc = "See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)"
@@ -482,6 +673,10 @@ fields = [
   { name = "ctx", type = "ExprContext" },
 ]
 
+[Expr.nodes.ExprAttribute.python_projection]
+class = "AttributeExpr"
+eager_fields = ["attr", "ctx"]
+
 [Expr.nodes.ExprSubscript]
 doc = "See also [Subscript](https://docs.python.org/3/library/ast.html#ast.Subscript)"
 fields = [
@@ -490,12 +685,20 @@ fields = [
   { name = "ctx", type = "ExprContext" },
 ]
 
+[Expr.nodes.ExprSubscript.python_projection]
+class = "SubscriptExpr"
+eager_fields = ["ctx"]
+
 [Expr.nodes.ExprStarred]
 doc = "See also [Starred](https://docs.python.org/3/library/ast.html#ast.Starred)"
 fields = [
   { name = "value", type = "Expr" },
   { name = "ctx", type = "ExprContext" },
 ]
+
+[Expr.nodes.ExprStarred.python_projection]
+class = "StarredExpr"
+eager_fields = ["ctx"]
 
 [Expr.nodes.ExprName]
 doc = "See also [Name](https://docs.python.org/3/library/ast.html#ast.Name)"
@@ -504,12 +707,20 @@ fields = [
   { name = "ctx", type = "ExprContext" },
 ]
 
+[Expr.nodes.ExprName.python_projection]
+class = "NameExpr"
+eager_fields = ["ctx"]
+
 [Expr.nodes.ExprList]
 doc = "See also [List](https://docs.python.org/3/library/ast.html#ast.List)"
 fields = [
   { name = "elts", type = "Expr*" },
   { name = "ctx", type = "ExprContext" },
 ]
+
+[Expr.nodes.ExprList.python_projection]
+class = "ListExpr"
+eager_fields = ["ctx"]
 
 [Expr.nodes.ExprTuple]
 doc = "See also [Tuple](https://docs.python.org/3/library/ast.html#ast.Tuple)"
@@ -519,6 +730,10 @@ fields = [
   { name = "parenthesized", type = "bool" },
 ]
 
+[Expr.nodes.ExprTuple.python_projection]
+class = "TupleExpr"
+eager_fields = ["ctx", "parenthesized"]
+
 [Expr.nodes.ExprSlice]
 doc = "See also [Slice](https://docs.python.org/3/library/ast.html#ast.Slice)"
 fields = [
@@ -526,6 +741,9 @@ fields = [
   { name = "upper", type = "Expr?" },
   { name = "step", type = "Expr?" },
 ]
+
+[Expr.nodes.ExprSlice.python_projection]
+class = "SliceExpr"
 
 [Expr.nodes.ExprIpyEscapeCommand]
 doc = """An AST node used to represent a IPython escape command at the expression level.
@@ -545,16 +763,30 @@ fields = [
   { name = "value", type = "Box<str>" },
 ]
 
+[Expr.nodes.ExprIpyEscapeCommand.python_projection]
+class = "IpyEscapeCommandExpr"
+eager_fields = ["kind"]
+
 [ExceptHandler]
 doc = "See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)"
 
-[ExceptHandler.nodes]
-ExceptHandlerExceptHandler = {}
+[ExceptHandler.nodes.ExceptHandlerExceptHandler]
 
-[InterpolatedStringElement.nodes]
-InterpolatedElement = { variant = "Interpolation" }
-InterpolatedStringLiteralElement = { variant = "Literal" }
+[ExceptHandler.nodes.ExceptHandlerExceptHandler.python_projection]
+class = "ExceptHandler"
 
+[InterpolatedStringElement.nodes.InterpolatedElement]
+variant = "Interpolation"
+
+[InterpolatedStringElement.nodes.InterpolatedStringLiteralElement]
+variant = "Literal"
+
+
+[InterpolatedStringElement.nodes.InterpolatedElement.python_projection]
+class = "InterpolatedElement"
+
+[InterpolatedStringElement.nodes.InterpolatedStringLiteralElement.python_projection]
+class = "InterpolatedStringLiteralElement"
 
 [Pattern]
 doc = "See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)"
@@ -563,13 +795,22 @@ doc = "See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern
 doc = "See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)"
 fields = [{ name = "value", type = "Box<Expr>" }]
 
+[Pattern.nodes.PatternMatchValue.python_projection]
+class = "MatchValuePattern"
+
 [Pattern.nodes.PatternMatchSingleton]
 doc = "See also [MatchSingleton](https://docs.python.org/3/library/ast.html#ast.MatchSingleton)"
 fields = [{ name = "value", type = "Singleton" }]
 
+[Pattern.nodes.PatternMatchSingleton.python_projection]
+class = "MatchSingletonPattern"
+
 [Pattern.nodes.PatternMatchSequence]
 doc = "See also [MatchSequence](https://docs.python.org/3/library/ast.html#ast.MatchSequence)"
 fields = [{ name = "patterns", type = "Pattern*" }]
+
+[Pattern.nodes.PatternMatchSequence.python_projection]
+class = "MatchSequencePattern"
 
 [Pattern.nodes.PatternMatchMapping]
 doc = "See also [MatchMapping](https://docs.python.org/3/library/ast.html#ast.MatchMapping)"
@@ -580,6 +821,10 @@ fields = [
 ]
 custom_source_order = true
 
+[Pattern.nodes.PatternMatchMapping.python_projection]
+class = "MatchMappingPattern"
+eager_fields = ["rest"]
+
 [Pattern.nodes.PatternMatchClass]
 doc = "See also [MatchClass](https://docs.python.org/3/library/ast.html#ast.MatchClass)"
 fields = [
@@ -587,9 +832,16 @@ fields = [
   { name = "arguments", type = "PatternArguments" },
 ]
 
+[Pattern.nodes.PatternMatchClass.python_projection]
+class = "MatchClassPattern"
+
 [Pattern.nodes.PatternMatchStar]
 doc = "See also [MatchStar](https://docs.python.org/3/library/ast.html#ast.MatchStar)"
 fields = [{ name = "name", type = "Identifier?" }]
+
+[Pattern.nodes.PatternMatchStar.python_projection]
+class = "MatchStarPattern"
+eager_fields = ["name"]
 
 [Pattern.nodes.PatternMatchAs]
 doc = "See also [MatchAs](https://docs.python.org/3/library/ast.html#ast.MatchAs)"
@@ -598,9 +850,16 @@ fields = [
   { name = "name", type = "Identifier?" },
 ]
 
+[Pattern.nodes.PatternMatchAs.python_projection]
+class = "MatchAsPattern"
+eager_fields = ["name"]
+
 [Pattern.nodes.PatternMatchOr]
 doc = "See also [MatchOr](https://docs.python.org/3/library/ast.html#ast.MatchOr)"
 fields = [{ name = "patterns", type = "Pattern*" }]
+
+[Pattern.nodes.PatternMatchOr.python_projection]
+class = "MatchOrPattern"
 
 [TypeParam]
 doc = "See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)"
@@ -613,12 +872,20 @@ fields = [
   { name = "default", type = "Box<Expr>?" },
 ]
 
+[TypeParam.nodes.TypeParamTypeVar.python_projection]
+class = "TypeVar"
+eager_fields = ["name"]
+
 [TypeParam.nodes.TypeParamTypeVarTuple]
 doc = "See also [TypeVarTuple](https://docs.python.org/3/library/ast.html#ast.TypeVarTuple)"
 fields = [
   { name = "name", type = "Identifier" },
   { name = "default", type = "Box<Expr>?" },
 ]
+
+[TypeParam.nodes.TypeParamTypeVarTuple.python_projection]
+class = "TypeVarTuple"
+eager_fields = ["name"]
 
 [TypeParam.nodes.TypeParamParamSpec]
 doc = "See also [ParamSpec](https://docs.python.org/3/library/ast.html#ast.ParamSpec)"
@@ -627,24 +894,127 @@ fields = [
   { name = "default", type = "Box<Expr>?" },
 ]
 
-[ungrouped.nodes]
-InterpolatedStringFormatSpec = {}
-PatternArguments = {}
-PatternKeyword = {}
-Comprehension = {}
-Arguments = {}
-Parameters = {}
-Parameter = {}
-ParameterWithDefault = {}
-Keyword = {}
-Alias = {}
-WithItem = {}
-MatchCase = {}
-Decorator = {}
-ElifElseClause = {}
-TypeParams = {}
-FString = {}
-TString = {}
-StringLiteral = {}
-BytesLiteral = {}
-Identifier = {}
+[TypeParam.nodes.TypeParamParamSpec.python_projection]
+class = "ParamSpec"
+eager_fields = ["name"]
+
+[ungrouped.nodes.InterpolatedStringFormatSpec]
+
+[ungrouped.nodes.PatternArguments]
+
+[ungrouped.nodes.PatternKeyword]
+
+[ungrouped.nodes.Comprehension]
+
+[ungrouped.nodes.Parameters]
+fields = [
+  { name = "posonlyargs", type = "ParameterWithDefault*" },
+  { name = "args", type = "ParameterWithDefault*" },
+  { name = "vararg", type = "Box<Parameter>?" },
+  { name = "kwonlyargs", type = "ParameterWithDefault*" },
+  { name = "kwarg", type = "Box<Parameter>?" },
+]
+
+[ungrouped.nodes.Parameter]
+fields = [
+  { name = "name", type = "Identifier" },
+  { name = "annotation", type = "Expr?", is_annotation = true },
+]
+
+[ungrouped.nodes.ParameterWithDefault]
+fields = [
+  { name = "parameter", type = "Parameter" },
+  { name = "default", type = "Expr?" },
+]
+
+[ungrouped.nodes.Alias]
+
+[ungrouped.nodes.WithItem]
+
+[ungrouped.nodes.MatchCase]
+
+[ungrouped.nodes.Decorator]
+
+[ungrouped.nodes.ElifElseClause]
+
+[ungrouped.nodes.TypeParams]
+
+[ungrouped.nodes.FString]
+
+[ungrouped.nodes.TString]
+
+[ungrouped.nodes.StringLiteral]
+
+[ungrouped.nodes.BytesLiteral]
+
+[ungrouped.nodes.Identifier]
+
+[ungrouped.nodes.InterpolatedStringFormatSpec.python_projection]
+class = "InterpolatedStringFormatSpec"
+
+[ungrouped.nodes.PatternArguments.python_projection]
+class = "PatternArguments"
+
+[ungrouped.nodes.PatternKeyword.python_projection]
+class = "PatternKeyword"
+
+[ungrouped.nodes.Comprehension.python_projection]
+class = "Comprehension"
+
+[ungrouped.nodes.Parameters.python_projection]
+class = "Parameters"
+
+[ungrouped.nodes.Parameter.python_projection]
+class = "Parameter"
+
+[ungrouped.nodes.ParameterWithDefault.python_projection]
+class = "ParameterWithDefault"
+
+[ungrouped.nodes.Alias.python_projection]
+class = "Alias"
+
+[ungrouped.nodes.WithItem.python_projection]
+class = "WithItem"
+
+[ungrouped.nodes.MatchCase.python_projection]
+class = "MatchCase"
+
+[ungrouped.nodes.Decorator.python_projection]
+class = "Decorator"
+
+[ungrouped.nodes.ElifElseClause.python_projection]
+class = "ElifElseClause"
+
+[ungrouped.nodes.TypeParams.python_projection]
+class = "TypeParams"
+
+[ungrouped.nodes.FString.python_projection]
+class = "FString"
+
+[ungrouped.nodes.TString.python_projection]
+class = "TString"
+
+[ungrouped.nodes.StringLiteral.python_projection]
+class = "StringLiteral"
+
+[ungrouped.nodes.BytesLiteral.python_projection]
+class = "BytesLiteral"
+
+[ungrouped.nodes.Identifier.python_projection]
+class = "Identifier"
+
+[ungrouped.nodes.Arguments]
+fields = [
+  { name = "args", type = "Expr*" },
+  { name = "keywords", type = "Keyword*" },
+]
+[ungrouped.nodes.Arguments.python_projection]
+class = "Arguments"
+
+[ungrouped.nodes.Keyword]
+fields = [
+  { name = "arg", type = "Identifier?" },
+  { name = "value", type = "Expr" },
+]
+[ungrouped.nodes.Keyword.python_projection]
+class = "Keyword"

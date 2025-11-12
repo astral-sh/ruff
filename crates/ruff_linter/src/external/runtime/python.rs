@@ -15,8 +15,9 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::checkers::ast::Checker;
 use crate::external::RuleLocator;
+use crate::external::ast::python::store::{AstStoreHandle, with_store};
 use crate::external::ast::python::{
-    ModuleTypes, ProjectionTypes, expr_to_python, load_module_types, stmt_to_python,
+    ModuleTypes, ProjectionTypesRef, expr_to_python, load_module_types, source, stmt_to_python,
 };
 use crate::external::ast::registry::ExternalLintRegistry;
 use crate::external::ast::target::{AstTarget, ExprKind, StmtKind};
@@ -27,6 +28,7 @@ use pyo3::types::{PyAny, PyModule};
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{Expr, Stmt};
+use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -138,7 +140,7 @@ impl ExternalLintRuntime {
             Python<'_>,
             &crate::Locator<'_>,
             &'node Node,
-            &ProjectionTypes,
+            ProjectionTypesRef,
         ) -> PyResult<PyObject>,
     ) where
         Node: Ranged + 'node,
@@ -151,34 +153,40 @@ impl ExternalLintRuntime {
             self.runtime_cache
                 .with_runtime(self.registry.as_ref(), |environment, compiled| {
                     let module_types = environment.module_types();
-                    let source = checker.locator();
-                    for &rule_locator in locators {
-                        let (_linter, rule) = self.registry.expect_entry(rule_locator);
-                        if !should_run(rule) {
-                            continue;
-                        }
-                        if let Some(handle) = compiled.get(&rule_locator) {
-                            if let Some(callback) = get_callback(handle) {
-                                let result = (|| -> PyResult<()> {
-                                    let py_node =
-                                        convert(py, source, node, &module_types.projection)?;
-                                    let context = build_context(
-                                        py,
-                                        module_types.as_ref(),
-                                        rule,
-                                        node.range(),
-                                    )?;
-                                    let outcome =
-                                        callback.call1(py, (py_node, context.context(py)));
-                                    context.flush(py, checker);
-                                    outcome.map(|_| ())
-                                })();
-                                if let Err(err) = result {
-                                    self.report_python_error(py, rule_locator, &err);
+                    let context = ExternalCheckerContext::new(checker, module_types.projection);
+                    context.with_checker_context(|| {
+                        for &rule_locator in locators {
+                            let (_linter, rule) = self.registry.expect_entry(rule_locator);
+                            if !should_run(rule) {
+                                continue;
+                            }
+                            if let Some(handle) = compiled.get(&rule_locator) {
+                                if let Some(callback) = get_callback(handle) {
+                                    let result = (|| -> PyResult<()> {
+                                        let py_node = convert(
+                                            py,
+                                            checker.locator(),
+                                            node,
+                                            context.projection(),
+                                        )?;
+                                        let runtime_context = build_context(
+                                            py,
+                                            module_types.as_ref(),
+                                            rule,
+                                            node.range(),
+                                        )?;
+                                        let outcome = callback
+                                            .call1(py, (py_node, runtime_context.context(py)));
+                                        runtime_context.flush(py, checker);
+                                        outcome.map(|_| ())
+                                    })();
+                                    if let Err(err) = result {
+                                        self.report_python_error(py, rule_locator, &err);
+                                    }
                                 }
                             }
                         }
-                    }
+                    });
                 });
         });
     }
@@ -444,6 +452,50 @@ impl RuntimeContext {
     fn flush(&self, py: Python<'_>, checker: &Checker<'_>) {
         let reporter = self.reporter.bind(py);
         reporter.borrow().drain_into(checker);
+    }
+}
+
+/// Per-checker state used when converting nodes and building contexts.
+struct ExternalCheckerContext {
+    store: AstStoreHandle,
+    source_file: SourceFile,
+    projection: ProjectionTypesRef,
+}
+
+impl ExternalCheckerContext {
+    fn new(checker: &Checker<'_>, projection: ProjectionTypesRef) -> Self {
+        let source_file = checker.owned_source_file();
+        Self {
+            store: AstStoreHandle::new(),
+            source_file,
+            projection,
+        }
+    }
+
+    fn projection(&self) -> ProjectionTypesRef {
+        self.projection
+    }
+
+    fn store(&self) -> AstStoreHandle {
+        self.store.clone()
+    }
+
+    fn source_file(&self) -> &SourceFile {
+        &self.source_file
+    }
+
+    fn with_checker_context<R>(&self, f: impl FnOnce() -> R) -> R {
+        with_store(self.store(), || {
+            source::with_source_file(self.source_file(), f)
+        })
+    }
+}
+
+impl Drop for ExternalCheckerContext {
+    fn drop(&mut self) {
+        // Ensure any Python nodes retained past the dispatch observe an invalid store rather
+        // than dereferencing freed AST data.
+        self.store.invalidate();
     }
 }
 
