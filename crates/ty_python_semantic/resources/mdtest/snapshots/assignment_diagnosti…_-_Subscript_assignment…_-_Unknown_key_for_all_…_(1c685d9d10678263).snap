@@ -22,19 +22,39 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
  8 |     legs: int
  9 | 
 10 | def _(being: Person | Animal) -> None:
-11 |     being["surname"] = "unknown"  # error: [invalid-assignment]
+11 |     # error: [invalid-key]
+12 |     # error: [invalid-key]
+13 |     being["surname"] = "unknown"
 ```
 
 # Diagnostics
 
 ```
-error[invalid-assignment]: Method `__setitem__` of type `(key: Literal["name"], value: str, /) -> None` cannot be called with a key of type `Literal["surname"]` and a value of type `Literal["unknown"]` on object of type `Person | Animal`
-  --> src/mdtest_snippet.py:11:5
+error[invalid-key]: Invalid key for TypedDict `Person`
+  --> src/mdtest_snippet.py:13:5
    |
-10 | def _(being: Person | Animal) -> None:
-11 |     being["surname"] = "unknown"  # error: [invalid-assignment]
-   |     ^^^^^
+11 |     # error: [invalid-key]
+12 |     # error: [invalid-key]
+13 |     being["surname"] = "unknown"
+   |     ----- ^^^^^^^^^ Unknown key "surname" - did you mean "name"?
+   |     |
+   |     TypedDict `Person` in union type `Person | Animal`
    |
-info: rule `invalid-assignment` is enabled by default
+info: rule `invalid-key` is enabled by default
+
+```
+
+```
+error[invalid-key]: Invalid key for TypedDict `Animal`
+  --> src/mdtest_snippet.py:13:5
+   |
+11 |     # error: [invalid-key]
+12 |     # error: [invalid-key]
+13 |     being["surname"] = "unknown"
+   |     ----- ^^^^^^^^^ Unknown key "surname" - did you mean "name"?
+   |     |
+   |     TypedDict `Animal` in union type `Person | Animal`
+   |
+info: rule `invalid-key` is enabled by default
 
 ```

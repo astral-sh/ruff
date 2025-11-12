@@ -102,10 +102,10 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     CallDunderError, CallableBinding, CallableType, ClassLiteral, ClassType, DataclassParams,
     DynamicType, InferredAs, InternedType, InternedTypes, IntersectionBuilder, IntersectionType,
-    KnownClass, KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType,
-    Parameter, ParameterForm, Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet,
-    Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
+    KnownClass, KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
+    PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType, SubclassOfType,
+    TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
     TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
     binding_type, todo_type,
 };
@@ -3538,142 +3538,305 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Make sure that the subscript assignment `obj[slice] = value` is valid.
+    /// Validate a subscript assignment of the form `object[key] = rhs_value`.
     fn validate_subscript_assignment(
         &mut self,
         target: &ast::ExprSubscript,
-        rhs: &ast::Expr,
-        assigned_ty: Type<'db>,
+        rhs_value: &ast::Expr,
+        rhs_value_ty: Type<'db>,
     ) -> bool {
         let ast::ExprSubscript {
             range: _,
             node_index: _,
-            value,
+            value: object,
             slice,
             ctx: _,
         } = target;
 
-        let value_ty = self.infer_expression(value, TypeContext::default());
+        let object_ty = self.infer_expression(object, TypeContext::default());
         let slice_ty = self.infer_expression(slice, TypeContext::default());
 
+        self.validate_subscript_assignment_impl(
+            object.as_ref(),
+            None,
+            object_ty,
+            slice.as_ref(),
+            slice_ty,
+            rhs_value,
+            rhs_value_ty,
+            true,
+        )
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn validate_subscript_assignment_impl(
+        &self,
+        object_node: &'ast ast::Expr,
+        full_object_ty: Option<Type<'db>>,
+        object_ty: Type<'db>,
+        slice_node: &'ast ast::Expr,
+        slice_ty: Type<'db>,
+        rhs_value_node: &'ast ast::Expr,
+        rhs_value_ty: Type<'db>,
+        emit_diagnostic: bool,
+    ) -> bool {
+        /// Given a string literal or a union of string literals, return an iterator over the contained
+        /// strings, or `None`, if the type is neither.
+        fn key_literals<'db>(
+            db: &'db dyn Db,
+            slice_ty: Type<'db>,
+        ) -> Option<impl Iterator<Item = &'db str> + 'db> {
+            if let Some(literal) = slice_ty.as_string_literal() {
+                Some(Either::Left(std::iter::once(literal.value(db))))
+            } else {
+                slice_ty.as_union().map(|union| {
+                    Either::Right(
+                        union
+                            .elements(db)
+                            .iter()
+                            .filter_map(|ty| ty.as_string_literal().map(|lit| lit.value(db))),
+                    )
+                })
+            }
+        }
+
         let db = self.db();
-        let context = &self.context;
 
-        match value_ty.try_call_dunder(
-            db,
-            "__setitem__",
-            CallArguments::positional([slice_ty, assigned_ty]),
-            TypeContext::default(),
-        ) {
-            Ok(_) => true,
-            Err(err) => match err {
-                CallDunderError::PossiblyUnbound { .. } => {
-                    if let Some(builder) =
-                        context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, &**value)
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "Method `__setitem__` of type `{}` may be missing",
-                            value_ty.display(db),
-                        ));
-                    }
-                    false
+        let attach_original_type_info = |mut diagnostic: LintDiagnosticGuard| {
+            if let Some(full_object_ty) = full_object_ty {
+                diagnostic.info(format_args!(
+                    "The full type of the subscripted object is `{}`",
+                    full_object_ty.display(db)
+                ));
+            }
+        };
+
+        match object_ty {
+            Type::Union(union) => {
+                // Note that we use a loop here instead of .all(…) to avoid short-circuiting.
+                // We need to keep iterating to emit all diagnostics.
+                let mut valid = true;
+                for element_ty in union.elements(db) {
+                    valid &= self.validate_subscript_assignment_impl(
+                        object_node,
+                        full_object_ty.or(Some(object_ty)),
+                        *element_ty,
+                        slice_node,
+                        slice_ty,
+                        rhs_value_node,
+                        rhs_value_ty,
+                        emit_diagnostic,
+                    );
                 }
-                CallDunderError::CallError(call_error_kind, bindings) => {
-                    match call_error_kind {
-                        CallErrorKind::NotCallable => {
-                            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, &**value)
-                            {
-                                builder.into_diagnostic(format_args!(
-                                    "Method `__setitem__` of type `{}` is not callable \
-                                    on object of type `{}`",
-                                    bindings.callable_type().display(db),
-                                    value_ty.display(db),
-                                ));
-                            }
-                        }
-                        CallErrorKind::BindingError => {
-                            let assigned_d = assigned_ty.display(db);
-                            let value_d = value_ty.display(db);
+                valid
+            }
 
-                            if let Some(typed_dict) = value_ty.as_typed_dict() {
-                                if let Some(key) = slice_ty.as_string_literal() {
-                                    let key = key.value(self.db());
-                                    validate_typed_dict_key_assignment(
-                                        &self.context,
-                                        typed_dict,
-                                        key,
-                                        assigned_ty,
-                                        value.as_ref(),
-                                        slice.as_ref(),
-                                        rhs,
-                                        TypedDictAssignmentKind::Subscript,
-                                    );
-                                } else {
-                                    // Check if the key has a valid type. We only allow string literals, a union of string literals,
-                                    // or a dynamic type like `Any`. We can do this by checking assignability to `LiteralString`,
-                                    // but we need to exclude `LiteralString` itself. This check would technically allow weird key
-                                    // types like `LiteralString & Any` to pass, but it does not need to be perfect. We would just
-                                    // fail to provide the "Only string literals are allowed" hint in that case.
-                                    if slice_ty.is_assignable_to(db, Type::LiteralString)
-                                        && !slice_ty.is_equivalent_to(db, Type::LiteralString)
+            Type::Intersection(intersection) => {
+                let check_positive_elements = |emit_diagnostic_and_short_circuit| {
+                    let mut valid = false;
+                    for element_ty in intersection.positive(db) {
+                        valid |= self.validate_subscript_assignment_impl(
+                            object_node,
+                            full_object_ty.or(Some(object_ty)),
+                            *element_ty,
+                            slice_node,
+                            slice_ty,
+                            rhs_value_node,
+                            rhs_value_ty,
+                            emit_diagnostic_and_short_circuit,
+                        );
+
+                        if !valid && emit_diagnostic_and_short_circuit {
+                            break;
+                        }
+                    }
+
+                    valid
+                };
+
+                // Perform an initial check of all elements. If the assignment is valid
+                // for at least one element, we do not emit any diagnostics. Otherwise,
+                // we re-run the check and emit a diagnostic on the first failing element.
+                let valid = check_positive_elements(false);
+
+                if !valid {
+                    check_positive_elements(true);
+                }
+
+                valid
+            }
+
+            Type::TypedDict(typed_dict) => {
+                // As an optimization, prevent calling `__setitem__` on (unions of) large `TypedDict`s, and
+                // validate the assignment ourselves. This also allows us to emit better diagnostics.
+
+                let mut valid = true;
+                let Some(keys) = key_literals(db, slice_ty) else {
+                    // Check if the key has a valid type. We only allow string literals, a union of string literals,
+                    // or a dynamic type like `Any`. We can do this by checking assignability to `LiteralString`,
+                    // but we need to exclude `LiteralString` itself. This check would technically allow weird key
+                    // types like `LiteralString & Any` to pass, but it does not need to be perfect. We would just
+                    // fail to provide the "Only string literals are allowed" hint in that case.
+
+                    if slice_ty.is_dynamic() {
+                        return true;
+                    }
+
+                    let assigned_d = rhs_value_ty.display(db);
+                    let value_d = object_ty.display(db);
+
+                    if slice_ty.is_assignable_to(db, Type::LiteralString)
+                        && !slice_ty.is_equivalent_to(db, Type::LiteralString)
+                    {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_ASSIGNMENT, slice_node)
+                        {
+                            let diagnostic = builder.into_diagnostic(format_args!(
+                                "Cannot assign value of type `{assigned_d}` to key of type `{}` on TypedDict `{value_d}`",
+                                slice_ty.display(db)
+                            ));
+                            attach_original_type_info(diagnostic);
+                        }
+                    } else {
+                        if let Some(builder) = self.context.report_lint(&INVALID_KEY, slice_node) {
+                            let diagnostic = builder.into_diagnostic(format_args!(
+                                "Cannot access `{value_d}` with a key of type `{}`. Only string literals are allowed as keys on TypedDicts.",
+                                slice_ty.display(db)
+                            ));
+                            attach_original_type_info(diagnostic);
+                        }
+                    }
+
+                    return false;
+                };
+
+                for key in keys {
+                    valid &= validate_typed_dict_key_assignment(
+                        &self.context,
+                        typed_dict,
+                        full_object_ty,
+                        key,
+                        rhs_value_ty,
+                        object_node,
+                        slice_node,
+                        rhs_value_node,
+                        TypedDictAssignmentKind::Subscript,
+                        emit_diagnostic,
+                    );
+                }
+
+                valid
+            }
+
+            _ => {
+                match object_ty.try_call_dunder(
+                    db,
+                    "__setitem__",
+                    CallArguments::positional([slice_ty, rhs_value_ty]),
+                    TypeContext::default(),
+                ) {
+                    Ok(_) => true,
+                    Err(err) => match err {
+                        CallDunderError::PossiblyUnbound { .. } => {
+                            if emit_diagnostic
+                                && let Some(builder) = self
+                                    .context
+                                    .report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, rhs_value_node)
+                            {
+                                let diagnostic = builder.into_diagnostic(format_args!(
+                                    "Method `__setitem__` of type `{}` may be missing",
+                                    object_ty.display(db),
+                                ));
+                                attach_original_type_info(diagnostic);
+                            }
+                            false
+                        }
+                        CallDunderError::CallError(call_error_kind, bindings) => {
+                            match call_error_kind {
+                                CallErrorKind::NotCallable => {
+                                    if emit_diagnostic
+                                        && let Some(builder) = self
+                                            .context
+                                            .report_lint(&CALL_NON_CALLABLE, object_node)
                                     {
-                                        if let Some(builder) =
-                                            context.report_lint(&INVALID_ASSIGNMENT, &**slice)
-                                        {
-                                            builder.into_diagnostic(format_args!(
-                                                "Cannot assign value of type `{assigned_d}` to key of type `{}` on TypedDict `{value_d}`",
-                                                slice_ty.display(db)
-                                            ));
+                                        let diagnostic = builder.into_diagnostic(format_args!(
+                                            "Method `__setitem__` of type `{}` is not callable \
+                                             on object of type `{}`",
+                                            bindings.callable_type().display(db),
+                                            object_ty.display(db),
+                                        ));
+                                        attach_original_type_info(diagnostic);
+                                    }
+                                }
+                                CallErrorKind::BindingError => {
+                                    if let Some(typed_dict) = object_ty.as_typed_dict() {
+                                        if let Some(key) = slice_ty.as_string_literal() {
+                                            let key = key.value(db);
+                                            validate_typed_dict_key_assignment(
+                                                &self.context,
+                                                typed_dict,
+                                                full_object_ty,
+                                                key,
+                                                rhs_value_ty,
+                                                object_node,
+                                                slice_node,
+                                                rhs_value_node,
+                                                TypedDictAssignmentKind::Subscript,
+                                                true,
+                                            );
                                         }
                                     } else {
-                                        if let Some(builder) =
-                                            context.report_lint(&INVALID_KEY, &**slice)
+                                        if emit_diagnostic
+                                            && let Some(builder) = self
+                                                .context
+                                                .report_lint(&INVALID_ASSIGNMENT, object_node)
                                         {
-                                            builder.into_diagnostic(format_args!(
-                                                "Cannot access `{value_d}` with a key of type `{}`. Only string literals are allowed as keys on TypedDicts.",
-                                                slice_ty.display(db)
+                                            let assigned_d = rhs_value_ty.display(db);
+                                            let value_d = object_ty.display(db);
+
+                                            let diagnostic = builder.into_diagnostic(format_args!(
+                                                "Method `__setitem__` of type `{}` cannot be called with \
+                                                a key of type `{}` and a value of type `{assigned_d}` on object of type `{value_d}`",
+                                                bindings.callable_type().display(db),
+                                                slice_ty.display(db),
                                             ));
+                                            attach_original_type_info(diagnostic);
                                         }
                                     }
                                 }
-                            } else {
-                                if let Some(builder) =
-                                    context.report_lint(&INVALID_ASSIGNMENT, &**value)
-                                {
-                                    builder.into_diagnostic(format_args!(
-                                        "Method `__setitem__` of type `{}` cannot be called with \
-                                        a key of type `{}` and a value of type `{assigned_d}` on object of type `{value_d}`",
-                                        bindings.callable_type().display(db),
-                                        slice_ty.display(db),
-                                    ));
+                                CallErrorKind::PossiblyNotCallable => {
+                                    if emit_diagnostic
+                                        && let Some(builder) = self
+                                            .context
+                                            .report_lint(&CALL_NON_CALLABLE, object_node)
+                                    {
+                                        let diagnostic = builder.into_diagnostic(format_args!(
+                                            "Method `__setitem__` of type `{}` may not be callable on object of type `{}`",
+                                            bindings.callable_type().display(db),
+                                            object_ty.display(db),
+                                        ));
+                                        attach_original_type_info(diagnostic);
+                                    }
                                 }
                             }
+                            false
                         }
-                        CallErrorKind::PossiblyNotCallable => {
-                            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, &**value)
+                        CallDunderError::MethodNotAvailable => {
+                            if emit_diagnostic
+                                && let Some(builder) =
+                                    self.context.report_lint(&INVALID_ASSIGNMENT, object_node)
                             {
-                                builder.into_diagnostic(format_args!(
-                                    "Method `__setitem__` of type `{}` may not be \
-                                    callable on object of type `{}`",
-                                    bindings.callable_type().display(db),
-                                    value_ty.display(db),
+                                let diagnostic = builder.into_diagnostic(format_args!(
+                                    "Cannot assign to a subscript on an object of type `{}` with no `__setitem__` method",
+                                    object_ty.display(db),
                                 ));
+                                attach_original_type_info(diagnostic);
                             }
+                            false
                         }
-                    }
-                    false
+                    },
                 }
-                CallDunderError::MethodNotAvailable => {
-                    if let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, &**value) {
-                        builder.into_diagnostic(format_args!(
-                            "Cannot assign to object of type `{}` with no `__setitem__` method",
-                            value_ty.display(db),
-                        ));
-                    }
-
-                    false
-                }
-            },
+            }
         }
     }
 
@@ -7682,6 +7845,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     first_arg.into(),
                                     first_arg.into(),
                                     Type::TypedDict(typed_dict_ty),
+                                    None,
                                     key_ty,
                                     &items,
                                 );
@@ -10908,6 +11072,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 value_node.into(),
                                 slice_node.into(),
                                 value_ty,
+                                None,
                                 slice_ty,
                                 &typed_dict.items(db),
                             );

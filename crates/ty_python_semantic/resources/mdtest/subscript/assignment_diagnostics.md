@@ -67,7 +67,7 @@ config["retries"] = 3  # error: [invalid-assignment]
 
 ```py
 def _(config: dict[str, int] | None) -> None:
-    config["retries"] = 3  # error: [possibly-missing-implicit-call]
+    config["retries"] = 3  # error: [invalid-assignment]
 ```
 
 ## Unknown key for one element of a union
@@ -83,7 +83,7 @@ class Animal(TypedDict):
     legs: int
 
 def _(being: Person | Animal) -> None:
-    being["legs"] = 4  # error: [invalid-assignment]
+    being["legs"] = 4  # error: [invalid-key]
 ```
 
 ## Unknown key for all elemens of a union
@@ -99,7 +99,9 @@ class Animal(TypedDict):
     legs: int
 
 def _(being: Person | Animal) -> None:
-    being["surname"] = "unknown"  # error: [invalid-assignment]
+    # error: [invalid-key]
+    # error: [invalid-key]
+    being["surname"] = "unknown"
 ```
 
 ## Wrong value type for one element of a union
@@ -113,5 +115,7 @@ def _(config: dict[str, int] | dict[str, str]) -> None:
 
 ```py
 def _(config: dict[str, int] | dict[str, str]) -> None:
-    config["retries"] = 3.0  # error: [invalid-assignment]
+    # error: [invalid-assignment]
+    # error: [invalid-assignment]
+    config["retries"] = 3.0
 ```

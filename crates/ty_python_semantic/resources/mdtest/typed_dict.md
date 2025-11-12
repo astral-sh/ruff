@@ -69,7 +69,7 @@ def name_or_age() -> Literal["name", "age"]:
 carol: Person = {NAME: "Carol", AGE: 20}
 
 reveal_type(carol[NAME])  # revealed: str
-# error: [invalid-key] "Invalid key for TypedDict `Person` of type `str`"
+# error: [invalid-key] "Invalid key of type `str` for TypedDict `Person`"
 reveal_type(carol[non_literal()])  # revealed: Unknown
 reveal_type(carol[name_or_age()])  # revealed: str | int | None
 
@@ -553,7 +553,7 @@ def _(
     # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "non_existing""
     reveal_type(person["non_existing"])  # revealed: Unknown
 
-    # error: [invalid-key] "Invalid key for TypedDict `Person` of type `str`"
+    # error: [invalid-key] "Invalid key of type `str` for TypedDict `Person`"
     reveal_type(person[str_key])  # revealed: Unknown
 
     # No error here:
@@ -602,16 +602,18 @@ def _(person: Person, literal_key: Literal["age"]):
 def _(person: Person, union_of_keys: Literal["name", "surname"]):
     person[union_of_keys] = "unknown"
 
-    # error: [invalid-assignment] "Cannot assign value of type `Literal[1]` to key of type `Literal["name", "surname"]` on TypedDict `Person`"
+    # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Person`: value of type `Literal[1]`"
+    # error: [invalid-assignment] "Invalid assignment to key "surname" with declared type `str` on TypedDict `Person`: value of type `Literal[1]`"
     person[union_of_keys] = 1
 
 def _(being: Person | Animal):
     being["name"] = "Being"
 
-    # error: [invalid-assignment] "Method `__setitem__` of type `(Overload[(key: Literal["name"], value: str, /) -> None, (key: Literal["surname"], value: str, /) -> None, (key: Literal["age"], value: int | None, /) -> None]) | (Overload[(key: Literal["name"], value: str, /) -> None, (key: Literal["legs"], value: int, /) -> None])` cannot be called with a key of type `Literal["name"]` and a value of type `Literal[1]` on object of type `Person | Animal`"
+    # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Person`: value of type `Literal[1]`"
+    # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Animal`: value of type `Literal[1]`"
     being["name"] = 1
 
-    # error: [invalid-assignment] "Method `__setitem__` of type `(Overload[(key: Literal["name"], value: str, /) -> None, (key: Literal["surname"], value: str, /) -> None, (key: Literal["age"], value: int | None, /) -> None]) | (Overload[(key: Literal["name"], value: str, /) -> None, (key: Literal["legs"], value: int, /) -> None])` cannot be called with a key of type `Literal["surname"]` and a value of type `Literal["unknown"]` on object of type `Person | Animal`"
+    # error: [invalid-key] "Invalid key for TypedDict `Animal`: Unknown key "surname" - did you mean "name"?"
     being["surname"] = "unknown"
 
 def _(centaur: Intersection[Person, Animal]):
@@ -619,13 +621,13 @@ def _(centaur: Intersection[Person, Animal]):
     centaur["age"] = 100
     centaur["legs"] = 4
 
-    # TODO: This should be an `invalid-key` error
+    # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "unknown""
     centaur["unknown"] = "value"
 
 def _(person: Person, union_of_keys: Literal["name", "age"], unknown_value: Any):
     person[union_of_keys] = unknown_value
 
-    # error: [invalid-assignment] "Cannot assign value of type `None` to key of type `Literal["name", "age"]` on TypedDict `Person`"
+    # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
     person[union_of_keys] = None
 
 def _(person: Person, str_key: str, literalstr_key: LiteralString):

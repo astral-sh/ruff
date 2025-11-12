@@ -1163,6 +1163,10 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) const fn is_union(&self) -> bool {
+        matches!(self, Type::Union(_))
+    }
+
     pub(crate) const fn as_union(self) -> Option<UnionType<'db>> {
         match self {
             Type::Union(union_type) => Some(union_type),

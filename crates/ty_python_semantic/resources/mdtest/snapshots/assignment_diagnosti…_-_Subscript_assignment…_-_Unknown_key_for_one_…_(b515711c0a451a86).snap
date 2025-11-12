@@ -22,19 +22,21 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
  8 |     legs: int
  9 | 
 10 | def _(being: Person | Animal) -> None:
-11 |     being["legs"] = 4  # error: [invalid-assignment]
+11 |     being["legs"] = 4  # error: [invalid-key]
 ```
 
 # Diagnostics
 
 ```
-error[invalid-assignment]: Method `__setitem__` of type `(key: Literal["name"], value: str, /) -> None` cannot be called with a key of type `Literal["legs"]` and a value of type `Literal[4]` on object of type `Person | Animal`
+error[invalid-key]: Invalid key for TypedDict `Person`
   --> src/mdtest_snippet.py:11:5
    |
 10 | def _(being: Person | Animal) -> None:
-11 |     being["legs"] = 4  # error: [invalid-assignment]
-   |     ^^^^^
+11 |     being["legs"] = 4  # error: [invalid-key]
+   |     ----- ^^^^^^ Unknown key "legs"
+   |     |
+   |     TypedDict `Person` in union type `Person | Animal`
    |
-info: rule `invalid-assignment` is enabled by default
+info: rule `invalid-key` is enabled by default
 
 ```
