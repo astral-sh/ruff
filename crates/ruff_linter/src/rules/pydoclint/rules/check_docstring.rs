@@ -528,7 +528,7 @@ impl<'a> ParametersSection<'a> {
         }
     }
 
-    fn extends_from_section(&mut self, section: &SectionContext<'a>, style: Option<SectionStyle>) {
+    fn extend_from_section(&mut self, section: &SectionContext<'a>, style: Option<SectionStyle>) {
         let mut new_entries = parse_parameters(
             section.following_lines_str(),
             section.following_range().start(),
@@ -562,7 +562,7 @@ impl<'a> DocstringSections<'a> {
                 | SectionKind::OtherParams
                 | SectionKind::OtherParameters => {
                     if let Some(ref mut parameters_section) = docstring_sections.parameters {
-                        parameters_section.extends_from_section(&section, style);
+                        parameters_section.extend_from_section(&section, style);
                     } else {
                         docstring_sections.parameters =
                             Some(ParametersSection::from_section(&section, style));
