@@ -6712,6 +6712,10 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::ConstraintSet],
                     fallback_type: Type::unknown(),
                 }),
+                KnownInstanceType::GenericContext(__call__) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::GenericContext],
+                    fallback_type: Type::unknown(),
+                }),
                 KnownInstanceType::SubscriptedProtocol(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec_inline![
                         InvalidTypeExpression::Protocol
@@ -7978,6 +7982,10 @@ pub enum KnownInstanceType<'db> {
     /// `ty_extensions.ConstraintSet`.
     ConstraintSet(TrackedConstraintSet<'db>),
 
+    /// A generic context, which is exposed in mdtests as an instance of
+    /// `ty_extensions.GenericContext`.
+    GenericContext(GenericContext<'db>),
+
     /// A single instance of `types.UnionType`, which stores the left- and
     /// right-hand sides of a PEP 604 union.
     UnionType(InternedTypes<'db>),
@@ -8015,7 +8023,9 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         KnownInstanceType::TypeAliasType(type_alias) => {
             visitor.visit_type_alias_type(db, type_alias);
         }
-        KnownInstanceType::Deprecated(_) | KnownInstanceType::ConstraintSet(_) => {
+        KnownInstanceType::Deprecated(_)
+        | KnownInstanceType::ConstraintSet(_)
+        | KnownInstanceType::GenericContext(_) => {
             // Nothing to visit
         }
         KnownInstanceType::Field(field) => {
@@ -8068,15 +8078,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeAliasType(type_alias) => {
                 Self::TypeAliasType(type_alias.normalized_impl(db, visitor))
             }
-            Self::Deprecated(deprecated) => {
-                // Nothing to normalize
-                Self::Deprecated(deprecated)
-            }
             Self::Field(field) => Self::Field(field.normalized_impl(db, visitor)),
-            Self::ConstraintSet(set) => {
-                // Nothing to normalize
-                Self::ConstraintSet(set)
-            }
             Self::UnionType(list) => Self::UnionType(list.normalized_impl(db, visitor)),
             Self::Literal(ty) => Self::Literal(ty.normalized_impl(db, visitor)),
             Self::Annotated(ty) => Self::Annotated(ty.normalized_impl(db, visitor)),
@@ -8086,6 +8088,10 @@ impl<'db> KnownInstanceType<'db> {
                 newtype
                     .map_base_class_type(db, |class_type| class_type.normalized_impl(db, visitor)),
             ),
+            Self::Deprecated(_) | Self::ConstraintSet(_) | Self::GenericContext(_) => {
+                // Nothing to normalize
+                self
+            }
         }
     }
 
@@ -8103,6 +8109,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Deprecated(_) => KnownClass::Deprecated,
             Self::Field(_) => KnownClass::Field,
             Self::ConstraintSet(_) => KnownClass::ConstraintSet,
+            Self::GenericContext(_) => KnownClass::GenericContext,
             Self::UnionType(_) => KnownClass::UnionType,
             Self::Literal(_)
             | Self::Annotated(_)
@@ -8186,6 +8193,13 @@ impl<'db> KnownInstanceType<'db> {
                             f,
                             "ty_extensions.ConstraintSet[{}]",
                             constraints.display(self.db)
+                        )
+                    }
+                    KnownInstanceType::GenericContext(generic_context) => {
+                        write!(
+                            f,
+                            "ty_extensions.GenericContext{}",
+                            generic_context.display_full(self.db)
                         )
                     }
                     KnownInstanceType::UnionType(_) => f.write_str("types.UnionType"),
@@ -8434,6 +8448,8 @@ enum InvalidTypeExpression<'db> {
     Field,
     /// Same for `ty_extensions.ConstraintSet`
     ConstraintSet,
+    /// Same for `ty_extensions.GenericContext`
+    GenericContext,
     /// Same for `typing.TypedDict`
     TypedDict,
     /// Type qualifiers are always invalid in *type expressions*,
@@ -8485,6 +8501,9 @@ impl<'db> InvalidTypeExpression<'db> {
                     }
                     InvalidTypeExpression::ConstraintSet => {
                         f.write_str("`ty_extensions.ConstraintSet` is not allowed in type expressions")
+                    }
+                    InvalidTypeExpression::GenericContext => {
+                        f.write_str("`ty_extensions.GenericContext` is not allowed in type expressions")
                     }
                     InvalidTypeExpression::TypedDict => {
                         f.write_str(

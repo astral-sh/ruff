@@ -154,8 +154,10 @@ from ty_extensions import generic_context
 
 legacy.m("string", None)  # error: [invalid-argument-type]
 reveal_type(legacy.m)  # revealed: bound method Legacy[int].m[S](x: int, y: S@m) -> S@m
-reveal_type(generic_context(Legacy))  # revealed: tuple[T@Legacy]
-reveal_type(generic_context(legacy.m))  # revealed: tuple[Self@m, S@m]
+# revealed: ty_extensions.GenericContext[T@Legacy]
+reveal_type(generic_context(Legacy))
+# revealed: ty_extensions.GenericContext[Self@m, S@m]
+reveal_type(generic_context(legacy.m))
 ```
 
 With PEP 695 syntax, it is clearer that the method uses a separate typevar:

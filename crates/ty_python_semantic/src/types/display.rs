@@ -892,6 +892,16 @@ impl<'db> GenericContext<'db> {
     pub fn display(&'db self, db: &'db dyn Db) -> DisplayGenericContext<'db> {
         Self::display_with(self, db, DisplaySettings::default())
     }
+
+    pub fn display_full(&'db self, db: &'db dyn Db) -> DisplayGenericContext<'db> {
+        DisplayGenericContext {
+            generic_context: self,
+            db,
+            settings: DisplaySettings::default(),
+            full: true,
+        }
+    }
+
     pub fn display_with(
         &'db self,
         db: &'db dyn Db,
@@ -901,6 +911,7 @@ impl<'db> GenericContext<'db> {
             generic_context: self,
             db,
             settings,
+            full: false,
         }
     }
 }
@@ -914,12 +925,9 @@ struct DisplayOptionalGenericContext<'db> {
 impl Display for DisplayOptionalGenericContext<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         if let Some(generic_context) = self.generic_context {
-            DisplayGenericContext {
-                generic_context,
-                db: self.db,
-                settings: self.settings.clone(),
-            }
-            .fmt(f)
+            generic_context
+                .display_with(self.db, self.settings.clone())
+                .fmt(f)
         } else {
             Ok(())
         }
@@ -931,10 +939,11 @@ pub struct DisplayGenericContext<'db> {
     db: &'db dyn Db,
     #[expect(dead_code)]
     settings: DisplaySettings<'db>,
+    full: bool,
 }
 
-impl Display for DisplayGenericContext<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl DisplayGenericContext<'_> {
+    fn fmt_normal(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let variables = self.generic_context.variables(self.db);
 
         let non_implicit_variables: Vec<_> = variables
@@ -953,6 +962,28 @@ impl Display for DisplayGenericContext<'_> {
             f.write_str(bound_typevar.typevar(self.db).name(self.db))?;
         }
         f.write_char(']')
+    }
+
+    fn fmt_full(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let variables = self.generic_context.variables(self.db);
+        f.write_char('[')?;
+        for (idx, bound_typevar) in variables.enumerate() {
+            if idx > 0 {
+                f.write_str(", ")?;
+            }
+            bound_typevar.identity(self.db).display(self.db).fmt(f)?;
+        }
+        f.write_char(']')
+    }
+}
+
+impl Display for DisplayGenericContext<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if self.full {
+            self.fmt_full(f)
+        } else {
+            self.fmt_normal(f)
+        }
     }
 }
 

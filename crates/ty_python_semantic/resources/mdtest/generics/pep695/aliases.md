@@ -20,17 +20,21 @@ type TypeVarAndParamSpec[T, **P] = ...
 type SingleTypeVarTuple[*Ts] = ...
 type TypeVarAndTypeVarTuple[T, *Ts] = ...
 
-# revealed: tuple[T@SingleTypevar]
+# revealed: ty_extensions.GenericContext[T@SingleTypevar]
 reveal_type(generic_context(SingleTypevar))
-# revealed: tuple[T@MultipleTypevars, S@MultipleTypevars]
+# revealed: ty_extensions.GenericContext[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
 
 # TODO: support `ParamSpec`/`TypeVarTuple` properly
 # (these should include the `ParamSpec`s and `TypeVarTuple`s in their generic contexts)
-reveal_type(generic_context(SingleParamSpec))  # revealed: tuple[()]
-reveal_type(generic_context(TypeVarAndParamSpec))  # revealed: tuple[T@TypeVarAndParamSpec]
-reveal_type(generic_context(SingleTypeVarTuple))  # revealed: tuple[()]
-reveal_type(generic_context(TypeVarAndTypeVarTuple))  # revealed: tuple[T@TypeVarAndTypeVarTuple]
+# revealed: ty_extensions.GenericContext[]
+reveal_type(generic_context(SingleParamSpec))
+# revealed: ty_extensions.GenericContext[T@TypeVarAndParamSpec]
+reveal_type(generic_context(TypeVarAndParamSpec))
+# revealed: ty_extensions.GenericContext[]
+reveal_type(generic_context(SingleTypeVarTuple))
+# revealed: ty_extensions.GenericContext[T@TypeVarAndTypeVarTuple]
+reveal_type(generic_context(TypeVarAndTypeVarTuple))
 ```
 
 You cannot use the same typevar more than once.
