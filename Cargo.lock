@@ -3177,6 +3177,7 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash",
  "schemars",
+ "scopeguard",
  "serde",
  "serde_json",
  "similar",

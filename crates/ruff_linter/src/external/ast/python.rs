@@ -1,18 +1,18 @@
 #![cfg(feature = "ext-lint")]
 #![cfg_attr(not(test), allow(dead_code))]
 
-use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyDict, PyModule, PyString, PyTuple};
-use pyo3::{Bound, PyObject};
-
-use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_ast::{ArgOrKeyword, Expr, ExprCall, Stmt};
-#[cfg(test)]
-use ruff_text_size::TextSize;
-use ruff_text_size::{Ranged, TextRange};
-
+use self::generated::GENERATED_EXPORTS;
+use self::projection::{ProjectionMode, project_typed_node};
+use self::store::{AstStoreHandle, current_store};
 use crate::Locator;
 use crate::external::ast::target::{ExprKind, StmtKind};
+use pyo3::IntoPyObject;
+use pyo3::prelude::*;
+use pyo3::types::{PyBool, PyDict, PyModule, PyString, PyTuple};
+use pyo3::{Bound, PyClassInitializer, PyObject};
+use ruff_python_ast::name::UnqualifiedName;
+use ruff_python_ast::{AnyNodeRef, Expr, ExprCall, HasNodeIndex, Stmt};
+use ruff_text_size::{Ranged, TextRange};
 
 pub(crate) fn span_tuple(py: Python<'_>, range: TextRange) -> PyResult<PyObject> {
     Ok(
@@ -23,16 +23,17 @@ pub(crate) fn span_tuple(py: Python<'_>, range: TextRange) -> PyResult<PyObject>
 }
 
 #[derive(Debug)]
-pub(crate) struct ProjectionTypes {
-    pub node: Py<PyAny>,
-    pub call_argument: Py<PyAny>,
-}
+pub(crate) struct ProjectionTypes;
+
+pub(crate) static PROJECTION_TYPES: ProjectionTypes = ProjectionTypes;
+
+pub(crate) type ProjectionTypesRef = &'static ProjectionTypes;
 
 #[derive(Debug)]
 #[allow(dead_code)]
 pub(crate) struct ModuleTypes {
     pub context: Py<PyAny>,
-    pub projection: ProjectionTypes,
+    pub projection: ProjectionTypesRef,
 }
 
 pub(crate) fn load_module_types(py: Python<'_>) -> PyResult<ModuleTypes> {
@@ -45,15 +46,12 @@ pub(crate) fn load_module_types(py: Python<'_>) -> PyResult<ModuleTypes> {
     modules.set_item("ruff_external", &module)?;
 
     let context = module.getattr("Context")?.unbind();
-    let node = module.getattr("Node")?.unbind();
-    let call_argument = module.getattr("CallArgument")?.unbind();
+
+    let projection = &PROJECTION_TYPES;
 
     Ok(ModuleTypes {
         context,
-        projection: ProjectionTypes {
-            node,
-            call_argument,
-        },
+        projection,
     })
 }
 
@@ -61,171 +59,81 @@ pub(crate) fn expr_to_python(
     py: Python<'_>,
     locator: &Locator<'_>,
     expr: &Expr,
-    types: &ProjectionTypes,
+    types: ProjectionTypesRef,
 ) -> PyResult<PyObject> {
-    let kind = ExprKind::from(expr);
-    let range = expr.range();
-    let text = locator.slice(range);
-    let repr = format!("{expr:?}");
-
-    let mut callee = None;
-    let mut function_text = None;
-    let mut function_kind = None;
-    let mut arguments = Vec::new();
-
-    if let Expr::Call(call) = expr {
-        callee = extract_callee(locator, expr, call);
-        function_text = Some(locator.slice(call.func.range()).trim().to_string());
-        function_kind = Some(ExprKind::from(call.func.as_ref()).as_str().to_owned());
-        arguments = call_arguments_to_python(py, locator, call, types)?;
-    }
-
-    make_node(
-        py,
-        types,
-        kind.as_str(),
-        range,
-        text,
-        repr,
-        callee.as_deref(),
-        function_text.as_deref(),
-        function_kind.as_deref(),
-        arguments,
-    )
+    project_or_raw(py, locator, AnyNodeRef::from(expr), types, || {
+        let store = current_store();
+        let node_id = ensure_node_id(expr, &store);
+        let kind = ExprKind::from(expr).as_str().to_string();
+        let range = expr.range();
+        let text = locator.slice(range);
+        let repr = format!("{expr:?}");
+        build_raw_node(py, kind, range, text.to_string(), repr, node_id, store)
+    })
 }
 
 pub(crate) fn stmt_to_python(
     py: Python<'_>,
     locator: &Locator<'_>,
     stmt: &Stmt,
-    types: &ProjectionTypes,
+    types: ProjectionTypesRef,
 ) -> PyResult<PyObject> {
-    let kind = StmtKind::from(stmt);
-    let range = stmt.range();
-    let text = locator.slice(range);
-    let repr = format!("{stmt:?}");
-    make_node(
-        py,
-        types,
-        kind.as_str(),
-        range,
-        text,
-        repr,
-        None,
-        None,
-        None,
-        Vec::new(),
-    )
+    project_or_raw(py, locator, AnyNodeRef::from(stmt), types, || {
+        let store = current_store();
+        let node_id = ensure_node_id(stmt, &store);
+        let kind = StmtKind::from(stmt).as_str().to_string();
+        let range = stmt.range();
+        let text = locator.slice(range);
+        let repr = format!("{stmt:?}");
+        build_raw_node(py, kind, range, text.to_string(), repr, node_id, store)
+    })
 }
 
-#[allow(clippy::too_many_arguments)]
-fn make_node(
+pub(crate) fn node_to_python(
     py: Python<'_>,
-    types: &ProjectionTypes,
-    kind: &str,
+    locator: &Locator<'_>,
+    node: AnyNodeRef<'_>,
+    types: ProjectionTypesRef,
+) -> PyResult<PyObject> {
+    project_or_raw(py, locator, node, types, || {
+        let store = current_store();
+        let node_id = ensure_node_id(&node, &store);
+        let range = node.range();
+        let text = locator.slice(range).to_string();
+        let repr = format!("{node:?}");
+        let kind = format!("{:?}", node.kind());
+
+        build_raw_node(py, kind, range, text, repr, node_id, store)
+    })
+}
+
+fn build_raw_node(
+    py: Python<'_>,
+    kind: String,
     range: TextRange,
-    text: &str,
+    text: String,
     repr: String,
-    callee: Option<&str>,
-    function_text: Option<&str>,
-    function_kind: Option<&str>,
-    arguments: Vec<PyObject>,
+    node_id: u32,
+    store: AstStoreHandle,
 ) -> PyResult<PyObject> {
-    let arguments_tuple = PyTuple::new(py, arguments)?.into_any().unbind();
-    types.node.call1(
-        py,
-        (
-            kind,
-            span_tuple(py, range)?,
-            text,
-            repr,
-            optional_str(py, callee),
-            optional_str(py, function_text),
-            optional_str(py, function_kind),
-            arguments_tuple,
-        ),
-    )
+    RawNode::new_instance(py, kind, span_tuple(py, range)?, text, repr, node_id, store)
 }
 
-fn call_arguments_to_python(
+fn project_or_raw<F>(
     py: Python<'_>,
     locator: &Locator<'_>,
-    call: &ExprCall,
-    types: &ProjectionTypes,
-) -> PyResult<Vec<PyObject>> {
-    let mut arguments = Vec::with_capacity(call.arguments.len());
-
-    for argument in call.arguments.args.iter().map(ArgOrKeyword::from) {
-        arguments.push(call_argument_to_python(py, locator, argument, types)?);
+    node: AnyNodeRef<'_>,
+    types: ProjectionTypesRef,
+    fallback: F,
+) -> PyResult<PyObject>
+where
+    F: FnOnce() -> PyResult<PyObject>,
+{
+    if let Some(typed) = project_typed_node(py, locator, node, ProjectionMode::Typed, types)? {
+        return Ok(typed);
     }
 
-    for keyword in call.arguments.keywords.iter().map(ArgOrKeyword::from) {
-        arguments.push(call_argument_to_python(py, locator, keyword, types)?);
-    }
-
-    Ok(arguments)
-}
-
-fn call_argument_to_python(
-    py: Python<'_>,
-    locator: &Locator<'_>,
-    argument: ArgOrKeyword,
-    types: &ProjectionTypes,
-) -> PyResult<PyObject> {
-    match argument {
-        ArgOrKeyword::Arg(expr) => build_argument(
-            py,
-            locator,
-            types,
-            "positional",
-            matches!(expr, Expr::Starred(_)),
-            None,
-            expr,
-        ),
-        ArgOrKeyword::Keyword(keyword) => {
-            let is_unpack = keyword.arg.is_none();
-            let name = keyword
-                .arg
-                .as_ref()
-                .map(ruff_python_ast::Identifier::as_str);
-            build_argument(
-                py,
-                locator,
-                types,
-                "keyword",
-                is_unpack,
-                name,
-                &keyword.value,
-            )
-        }
-    }
-}
-
-fn build_argument(
-    py: Python<'_>,
-    locator: &Locator<'_>,
-    types: &ProjectionTypes,
-    kind: &str,
-    is_unpack: bool,
-    name: Option<&str>,
-    expr: &Expr,
-) -> PyResult<PyObject> {
-    let binop_operator = expr_as_binop_operator(expr);
-    let call_function_text = expr_as_call_function_text(locator, expr);
-    types.call_argument.call1(
-        py,
-        (
-            kind,
-            is_unpack,
-            span_tuple(py, expr.range())?,
-            ExprKind::from(expr).as_str(),
-            matches!(expr, Expr::StringLiteral(_)),
-            matches!(expr, Expr::FString(_)),
-            optional_str(py, binop_operator.as_deref()),
-            optional_str(py, call_function_text.as_deref()),
-            optional_str(py, name),
-        ),
-    )
+    fallback()
 }
 
 fn optional_str(py: Python<'_>, value: Option<&str>) -> PyObject {
@@ -243,31 +151,27 @@ fn py_bool(py: Python<'_>, value: bool) -> PyObject {
     PyBool::new(py, value).to_owned().into_any().unbind()
 }
 
+fn py_int(py: Python<'_>, value: u32) -> PyObject {
+    value
+        .into_pyobject(py)
+        .expect("u32 to PyObject")
+        .into_any()
+        .unbind()
+}
+
 fn py_none(py: Python<'_>) -> PyObject {
     py.None()
 }
 
-fn expr_as_binop_operator(expr: &Expr) -> Option<String> {
-    if let Expr::BinOp(bin_op) = expr {
-        Some(bin_op.op.as_str().to_string())
-    } else {
-        None
-    }
+fn ensure_node_id(node: &impl HasNodeIndex, store: &AstStoreHandle) -> u32 {
+    store.assign_id(node.node_index())
 }
 
-fn expr_as_call_function_text(locator: &Locator<'_>, expr: &Expr) -> Option<String> {
-    if let Expr::Call(call) = expr {
-        Some(locator.slice(call.func.range()).trim().to_string())
-    } else {
-        None
-    }
-}
-
-fn extract_callee(locator: &Locator<'_>, expr: &Expr, call: &ExprCall) -> Option<String> {
+fn extract_callee(locator: &Locator<'_>, range: TextRange, call: &ExprCall) -> Option<String> {
     UnqualifiedName::from_expr(call.func.as_ref())
         .map(|name| name.to_string())
         .or_else(|| {
-            let text = locator.slice(expr.range());
+            let text = locator.slice(range);
             let trimmed = text.trim_start();
             trimmed
                 .find('(')
@@ -280,22 +184,53 @@ fn extract_callee(locator: &Locator<'_>, expr: &Expr, call: &ExprCall) -> Option
 #[pymodule(gil_used = false)]
 pub(crate) fn ruff_external(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<bindings::Node>()?;
-    module.add_class::<bindings::CallArgument>()?;
+    module.add_class::<RawNode>()?;
     module.add_class::<bindings::Context>()?;
-    let exports = PyTuple::new(module.py(), ["Context", "Node", "CallArgument"])?;
+    generated::add_generated_classes(module)?;
+    let mut exports = vec!["Context", "Node", "RawNode"];
+    exports.extend_from_slice(GENERATED_EXPORTS);
+    let exports = PyTuple::new(module.py(), exports)?;
     module.add("__all__", exports)?;
     Ok(())
+}
+
+mod generated;
+mod projection;
+pub(crate) mod source;
+pub(crate) mod store;
+
+#[pyclass(module = "ruff_external", extends = bindings::Node, unsendable)]
+pub(crate) struct RawNode;
+
+#[pymethods]
+impl RawNode {}
+
+impl RawNode {
+    fn new_instance(
+        py: Python<'_>,
+        kind: String,
+        span: PyObject,
+        text: String,
+        repr_value: String,
+        node_id: u32,
+        store: AstStoreHandle,
+    ) -> PyResult<PyObject> {
+        let node = bindings::Node::new_inner(py, kind, span, text, repr_value, node_id, store);
+        let initializer = PyClassInitializer::from(node).add_subclass(RawNode);
+        Ok(Py::new(py, initializer)?.into_any())
+    }
 }
 
 mod bindings {
     #![allow(clippy::used_underscore_binding)]
 
-    use super::{optional_str, py_bool, py_none, py_string};
+    use super::store::AstStoreHandle;
+    use super::{py_int, py_none, py_string};
     use pyo3::exceptions::PyKeyError;
     use pyo3::prelude::*;
-    use pyo3::types::{PyAnyMethods, PyTuple};
+    use pyo3::types::PyAnyMethods;
 
-    #[pyclass(module = "ruff_external", unsendable)]
+    #[pyclass(module = "ruff_external", unsendable, subclass)]
     pub(crate) struct Node {
         #[pyo3(get)]
         _kind: String,
@@ -305,14 +240,10 @@ mod bindings {
         _text: String,
         #[pyo3(get)]
         _repr: String,
-        #[pyo3(get)]
-        _callee: Option<String>,
-        #[pyo3(get)]
-        function_text: Option<String>,
-        #[pyo3(get)]
-        function_kind: Option<String>,
-        #[pyo3(get)]
-        arguments: PyObject,
+        #[pyo3(get, name = "node_id")]
+        py_id: u32,
+        #[allow(dead_code)]
+        store: AstStoreHandle,
     }
 
     #[pymethods]
@@ -324,43 +255,32 @@ mod bindings {
                 kind,
                 span,
                 text,
-                repr_value,
-                callee=None,
-                function_text=None,
-                function_kind=None,
-                arguments=None
-            )
+            repr_value,
+            node_id,
+        )
         )]
         fn new(
-            py: Python<'_>,
+            _py: Python<'_>,
             kind: String,
             span: PyObject,
             text: String,
             repr_value: String,
-            callee: Option<String>,
-            function_text: Option<String>,
-            function_kind: Option<String>,
-            arguments: Option<PyObject>,
+            node_id: u32,
         ) -> Self {
-            let arguments = arguments.unwrap_or_else(|| PyTuple::empty(py).into_any().unbind());
-            Self {
-                _kind: kind,
-                _span: span,
-                _text: text,
-                _repr: repr_value,
-                _callee: callee,
-                function_text,
-                function_kind,
-                arguments,
-            }
+            Self::new_inner(
+                _py,
+                kind,
+                span,
+                text,
+                repr_value,
+                node_id,
+                AstStoreHandle::new(),
+            )
         }
 
         fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
             let span_repr: String = self._span.bind(py).repr()?.extract()?;
-            Ok(format!(
-                "Node(kind={:?}, span={}, callee={:?}, function_text={:?})",
-                self._kind, span_repr, self._callee, self.function_text
-            ))
+            Ok(format!("Node(kind={:?}, span={})", self._kind, span_repr))
         }
 
         fn __getitem__(&self, py: Python<'_>, key: &str) -> PyResult<PyObject> {
@@ -374,111 +294,42 @@ mod bindings {
         }
     }
 
+    impl Node {
+        pub(crate) fn new_inner(
+            _py: Python<'_>,
+            kind: String,
+            span: PyObject,
+            text: String,
+            repr_value: String,
+            node_id: u32,
+            store: AstStoreHandle,
+        ) -> Self {
+            Self {
+                _kind: kind,
+                _span: span,
+                _text: text,
+                _repr: repr_value,
+                py_id: node_id,
+                store,
+            }
+        }
+
+        pub(crate) const fn store(&self) -> &AstStoreHandle {
+            &self.store
+        }
+
+        pub(crate) const fn node_id(&self) -> u32 {
+            self.py_id
+        }
+    }
+
     fn attribute_lookup(py: Python<'_>, key: &str, node: &Node) -> Option<PyObject> {
         match key {
             "_kind" => Some(py_string(py, &node._kind)),
             "_span" => Some(node._span.clone_ref(py)),
             "_text" => Some(py_string(py, &node._text)),
             "_repr" => Some(py_string(py, &node._repr)),
-            "_callee" => Some(optional_str(py, node._callee.as_deref())),
-            "function_text" => Some(optional_str(py, node.function_text.as_deref())),
-            "function_kind" => Some(optional_str(py, node.function_kind.as_deref())),
-            "arguments" => Some(node.arguments.clone_ref(py)),
-            _ => None,
-        }
-    }
-
-    #[pyclass(module = "ruff_external", unsendable)]
-    pub(crate) struct CallArgument {
-        #[pyo3(get)]
-        kind: String,
-        #[pyo3(get)]
-        is_unpack: bool,
-        #[pyo3(get)]
-        name: Option<String>,
-        #[pyo3(get)]
-        span: PyObject,
-        #[pyo3(get)]
-        expr_kind: String,
-        #[pyo3(get)]
-        is_string_literal: bool,
-        #[pyo3(get)]
-        is_fstring: bool,
-        #[pyo3(get)]
-        binop_operator: Option<String>,
-        #[pyo3(get)]
-        call_function_text: Option<String>,
-    }
-
-    #[pymethods]
-    impl CallArgument {
-        #[new]
-        #[allow(clippy::too_many_arguments)]
-        #[pyo3(
-            signature = (
-                kind,
-                is_unpack,
-                span,
-                expr_kind,
-                is_string_literal,
-                is_fstring,
-                binop_operator=None,
-                call_function_text=None,
-                name=None
-            )
-        )]
-        fn new(
-            kind: String,
-            is_unpack: bool,
-            span: PyObject,
-            expr_kind: String,
-            is_string_literal: bool,
-            is_fstring: bool,
-            binop_operator: Option<String>,
-            call_function_text: Option<String>,
-            name: Option<String>,
-        ) -> Self {
-            Self {
-                kind,
-                is_unpack,
-                name,
-                span,
-                expr_kind,
-                is_string_literal,
-                is_fstring,
-                binop_operator,
-                call_function_text,
-            }
-        }
-
-        fn __repr__(&self) -> String {
-            format!(
-                "CallArgument(kind={:?}, name={:?}, expr_kind={:?})",
-                self.kind, self.name, self.expr_kind
-            )
-        }
-
-        fn __getitem__(&self, py: Python<'_>, key: &str) -> PyResult<PyObject> {
-            argument_lookup(py, key, self).ok_or_else(|| PyKeyError::new_err(key.to_string()))
-        }
-
-        #[pyo3(signature = (key, default=None))]
-        fn get(&self, py: Python<'_>, key: &str, default: Option<PyObject>) -> PyObject {
-            argument_lookup(py, key, self).unwrap_or_else(|| default.unwrap_or_else(|| py_none(py)))
-        }
-    }
-
-    fn argument_lookup(py: Python<'_>, key: &str, arg: &CallArgument) -> Option<PyObject> {
-        match key {
-            "kind" => Some(py_string(py, &arg.kind)),
-            "is_unpack" => Some(py_bool(py, arg.is_unpack)),
-            "name" => Some(optional_str(py, arg.name.as_deref())),
-            "span" => Some(arg.span.clone_ref(py)),
-            "expr_kind" => Some(py_string(py, &arg.expr_kind)),
-            "is_string_literal" => Some(py_bool(py, arg.is_string_literal)),
-            "is_fstring" => Some(py_bool(py, arg.is_fstring)),
-            "binop_operator" => Some(optional_str(py, arg.binop_operator.as_deref())),
-            "call_function_text" => Some(optional_str(py, arg.call_function_text.as_deref())),
+            "node_id" => Some(py_int(py, node.py_id)),
             _ => None,
         }
     }
@@ -518,25 +369,108 @@ mod bindings {
 
 #[cfg(test)]
 mod tests {
+    use super::source::with_source_file;
+    use super::store::{AstStoreHandle, with_store};
     use super::*;
     use anyhow::anyhow;
-    use pyo3::types::{PyAnyMethods, PyTuple as PyTupleType};
+    use pyo3::types::{PyAnyMethods, PyTuple as PyTupleType, PyTuple};
+    use ruff_python_ast::{Expr, Stmt};
+    use ruff_python_parser::{parse_expression, parse_module};
+    use ruff_source_file::SourceFileBuilder;
+    use ruff_text_size::{TextRange, TextSize};
+
+    fn with_python_fixture<R>(
+        source: &str,
+        f: impl FnOnce(Python<'_>, ProjectionTypesRef, &Locator<'_>) -> R,
+    ) -> R {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let module_types = load_module_types(py).expect("module types");
+            let projection = module_types.projection;
+            let locator = Locator::new(source);
+            let source_file = SourceFileBuilder::new("test.py", source).finish();
+            with_store(AstStoreHandle::new(), || {
+                with_source_file(&source_file, || f(py, projection, &locator))
+            })
+        })
+    }
+
+    fn with_python_fixture_result<R>(
+        source: &str,
+        f: impl FnOnce(Python<'_>, ProjectionTypesRef, &Locator<'_>) -> anyhow::Result<R>,
+    ) -> anyhow::Result<R> {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let module_types = load_module_types(py).expect("module types");
+            let projection = module_types.projection;
+            let locator = Locator::new(source);
+            let source_file = SourceFileBuilder::new("test.py", source).finish();
+            with_store(AstStoreHandle::new(), || {
+                with_source_file(&source_file, || f(py, projection, &locator))
+            })
+        })
+    }
+
+    #[test]
+    fn call_expr_arguments_are_cached() {
+        with_python_fixture("foo(value)", |py, projection, locator| {
+            let parsed = parse_expression(locator.contents()).expect("parse expression");
+            let mod_expr = parsed.into_syntax();
+            let expr = *mod_expr.body;
+
+            let py_call = expr_to_python(py, locator, &expr, projection).expect("convert call");
+            let call_bound = py_call.bind(py);
+            let first = call_bound.getattr("arguments").expect("first arguments");
+            let second = call_bound.getattr("arguments").expect("second arguments");
+
+            assert_eq!(
+                first.as_ptr(),
+                second.as_ptr(),
+                "lazy loader should cache the PyTuple instance"
+            );
+
+            let args = first.getattr("args").expect("Arguments.args attribute");
+            let args_tuple = args
+                .downcast::<PyTuple>()
+                .expect("Arguments.args should be a tuple");
+            assert_eq!(args_tuple.len(), 1);
+        });
+    }
+
+    #[test]
+    fn if_expr_test_is_eager() {
+        with_python_fixture("value if cond else fallback", |py, projection, locator| {
+            let parsed = parse_expression(locator.contents()).expect("parse expression");
+            let mod_expr = parsed.into_syntax();
+            let expr = *mod_expr.body;
+            let Expr::If(_) = expr else {
+                panic!("expected IfExpr")
+            };
+
+            let py_if = expr_to_python(py, locator, &expr, projection).expect("convert if expr");
+
+            let if_bound = py_if.bind(py);
+            let first = if_bound.getattr("test").expect("first test attribute");
+            let second = if_bound.getattr("test").expect("second test attribute");
+
+            assert_eq!(
+                first.as_ptr(),
+                second.as_ptr(),
+                "eager field should be cached"
+            );
+        });
+    }
 
     #[test]
     fn call_projection_includes_callee() -> anyhow::Result<()> {
-        pyo3::prepare_freethreaded_python();
-        let source = "logging.info('x')";
-        let expr = {
-            let parsed = ruff_python_parser::parse_expression(source)?;
-            *parsed.into_syntax().body
-        };
-
-        let locator = Locator::new(source);
-        Python::with_gil(|py| {
-            let module_types = load_module_types(py)?;
-            let node = expr_to_python(py, &locator, &expr, &module_types.projection)?;
+        with_python_fixture_result("logging.info('x')", |py, projection, locator| {
+            let expr = {
+                let parsed = ruff_python_parser::parse_expression(locator.contents())?;
+                *parsed.into_syntax().body
+            };
+            let node = expr_to_python(py, locator, &expr, projection)?;
             let node = node.bind(py);
-            let callee: String = node.getattr("_callee")?.extract()?;
+            let callee: String = node.getattr("callee")?.extract()?;
             assert_eq!(callee, "logging.info");
             Ok(())
         })
@@ -544,71 +478,262 @@ mod tests {
 
     #[test]
     fn call_projection_includes_arguments() -> anyhow::Result<()> {
-        pyo3::prepare_freethreaded_python();
-        let source = "logging.info('static', msg='template {}'.format(value))";
-        let expr = {
-            let parsed = ruff_python_parser::parse_expression(source)?;
-            *parsed.into_syntax().body
-        };
+        with_python_fixture_result(
+            "logging.info('static', msg='template {}'.format(value))",
+            |py, projection, locator| {
+                let expr = {
+                    let parsed = ruff_python_parser::parse_expression(locator.contents())?;
+                    *parsed.into_syntax().body
+                };
 
-        let locator = Locator::new(source);
-        Python::with_gil(|py| {
-            let module_types = load_module_types(py)?;
-            let node = expr_to_python(py, &locator, &expr, &module_types.projection)?;
-            let node = node.bind(py);
+                let node = expr_to_python(py, locator, &expr, projection)?;
+                let node = node.bind(py);
 
-            let function_text: String = node.getattr("function_text")?.extract()?;
-            assert_eq!(function_text, "logging.info");
+                let function_text: String = node.getattr("function_text")?.extract()?;
+                assert_eq!(function_text, "logging.info");
 
-            let arguments = node.getattr("arguments")?;
-            let arguments = arguments
-                .downcast::<PyTupleType>()
-                .map_err(|err| anyhow!(err.to_string()))?;
-            assert_eq!(arguments.len(), 2);
+                let arguments = node.getattr("arguments")?;
+                let args_obj = arguments.getattr("args")?;
+                let args = args_obj
+                    .downcast::<PyTupleType>()
+                    .map_err(|err| anyhow!(err.to_string()))?;
+                assert_eq!(args.len(), 1);
 
-            let first = arguments.get_item(0)?;
-            let first_kind: String = first.getattr("kind")?.extract()?;
-            assert_eq!(first_kind, "positional");
-            let first_is_string: bool = first.getattr("is_string_literal")?.extract()?;
-            assert!(first_is_string);
+                let first = args.get_item(0)?;
+                let first_kind: String = first.getattr("_kind")?.extract()?;
+                assert_eq!(first_kind, "StringLiteral");
 
-            let second = arguments.get_item(1)?;
-            let second_kind: String = second.getattr("kind")?.extract()?;
-            assert_eq!(second_kind, "keyword");
-            let name = second.getattr("name")?;
-            if !name.is_none() {
+                let keywords_obj = arguments.getattr("keywords")?;
+                let keywords = keywords_obj
+                    .downcast::<PyTupleType>()
+                    .map_err(|err| anyhow!(err.to_string()))?;
+                assert_eq!(keywords.len(), 1);
+
+                let keyword = keywords.get_item(0)?;
+                let name = keyword.getattr("arg")?;
                 let name: String = name.extract()?;
                 assert_eq!(name, "msg");
-            } else {
-                panic!("expected keyword argument to have a name");
-            }
 
-            let call_function_text: String = second.getattr("call_function_text")?.extract()?;
-            assert!(
-                call_function_text.ends_with(".format"),
-                "unexpected call_function_text: {call_function_text}"
-            );
+                let call_function_text: String = keyword
+                    .getattr("value")?
+                    .getattr("function_text")?
+                    .extract()?;
+                assert!(
+                    call_function_text.ends_with(".format"),
+                    "unexpected call_function_text: {call_function_text}"
+                );
 
+                Ok(())
+            },
+        )
+    }
+
+    #[test]
+    fn stmt_projection_reports_kind() -> anyhow::Result<()> {
+        with_python_fixture_result("pass\n", |py, projection, locator| {
+            let stmt = ruff_python_ast::Stmt::Pass(ruff_python_ast::StmtPass {
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                range: TextRange::new(TextSize::new(0), TextSize::new(4)),
+            });
+
+            let node = stmt_to_python(py, locator, &stmt, projection)?;
+            let node = node.bind(py);
+            let kind: String = node.getattr("_kind")?.extract()?;
+            assert_eq!(kind, "Pass");
             Ok(())
         })
     }
 
     #[test]
-    fn stmt_projection_reports_kind() -> anyhow::Result<()> {
-        pyo3::prepare_freethreaded_python();
-        let source = "pass\n";
-        let stmt = ruff_python_ast::Stmt::Pass(ruff_python_ast::StmtPass {
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            range: TextRange::new(TextSize::new(0), TextSize::new(4)),
-        });
+    fn function_def_projects_decorators() -> anyhow::Result<()> {
+        with_python_fixture_result(
+            "@decorator\ndef func():\n    pass\n",
+            |py, projection, locator| {
+                let parsed = parse_module(locator.contents())?;
+                let module = parsed.into_syntax();
+                let stmt = module
+                    .body
+                    .first()
+                    .ok_or_else(|| anyhow!("missing statement"))?;
+                let Stmt::FunctionDef(_) = stmt else {
+                    return Err(anyhow!("expected FunctionDef"));
+                };
 
-        let locator = Locator::new(source);
-        Python::with_gil(|py| {
-            let module_types = load_module_types(py)?;
-            let node = stmt_to_python(py, &locator, &stmt, &module_types.projection)?;
+                let node = stmt_to_python(py, locator, stmt, projection)?;
+                let node = node.bind(py);
+                let decorators = node.getattr("decorator_list")?;
+                let decorators = decorators
+                    .downcast::<PyTupleType>()
+                    .map_err(|err| anyhow!(err.to_string()))?;
+                assert_eq!(decorators.len(), 1);
+                Ok(())
+            },
+        )
+    }
+
+    #[test]
+    fn with_stmt_projects_items() -> anyhow::Result<()> {
+        with_python_fixture_result(
+            "with open('x') as f:\n    pass\n",
+            |py, projection, locator| {
+                let parsed = parse_module(locator.contents())?;
+                let module = parsed.into_syntax();
+                let stmt = module
+                    .body
+                    .first()
+                    .ok_or_else(|| anyhow!("missing statement"))?;
+                let Stmt::With(_) = stmt else {
+                    return Err(anyhow!("expected With"));
+                };
+
+                let node = stmt_to_python(py, locator, stmt, projection)?;
+                let node = node.bind(py);
+                let items = node.getattr("items")?;
+                let items = items
+                    .downcast::<PyTupleType>()
+                    .map_err(|err| anyhow!(err.to_string()))?;
+                assert_eq!(items.len(), 1);
+                Ok(())
+            },
+        )
+    }
+
+    #[test]
+    fn import_from_projects_names_and_level() -> anyhow::Result<()> {
+        with_python_fixture_result("from os import path as p\n", |py, projection, locator| {
+            let parsed = parse_module(locator.contents())?;
+            let module = parsed.into_syntax();
+            let stmt = module
+                .body
+                .first()
+                .ok_or_else(|| anyhow!("missing statement"))?;
+            let Stmt::ImportFrom(_) = stmt else {
+                return Err(anyhow!("expected ImportFrom"));
+            };
+
+            let node = stmt_to_python(py, locator, stmt, projection)?;
             let node = node.bind(py);
-            let kind: String = node.getattr("_kind")?.extract()?;
-            assert_eq!(kind, "Pass");
+            let names = node.getattr("names")?;
+            let names = names
+                .downcast::<PyTupleType>()
+                .map_err(|err| anyhow!(err.to_string()))?;
+            assert_eq!(names.len(), 1);
+
+            let level: u32 = node.getattr("level")?.extract()?;
+            assert_eq!(level, 0);
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn try_stmt_projects_handlers() -> anyhow::Result<()> {
+        with_python_fixture_result(
+            "try:\n    pass\nexcept Exception:\n    pass\n",
+            |py, projection, locator| {
+                let parsed = parse_module(locator.contents())?;
+                let module = parsed.into_syntax();
+                let stmt = module
+                    .body
+                    .first()
+                    .ok_or_else(|| anyhow!("missing statement"))?;
+                let Stmt::Try(_) = stmt else {
+                    return Err(anyhow!("expected Try"));
+                };
+
+                let node = stmt_to_python(py, locator, stmt, projection)?;
+                let node = node.bind(py);
+                let handlers = node.getattr("handlers")?;
+                let handlers = handlers
+                    .downcast::<PyTupleType>()
+                    .map_err(|err| anyhow!(err.to_string()))?;
+                assert_eq!(handlers.len(), 1);
+                Ok(())
+            },
+        )
+    }
+
+    #[test]
+    fn comprehension_projects_generators() -> anyhow::Result<()> {
+        with_python_fixture_result("[x for x in values]", |py, projection, locator| {
+            let parsed = parse_expression(locator.contents())?;
+            let expr = parsed.into_syntax().body;
+
+            let node = expr_to_python(py, locator, &expr, projection)?;
+            let node = node.bind(py);
+            let generators = node.getattr("generators")?;
+            let generators = generators
+                .downcast::<PyTupleType>()
+                .map_err(|err| anyhow!(err.to_string()))?;
+            assert_eq!(generators.len(), 1);
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn for_stmt_projects_is_async() -> anyhow::Result<()> {
+        with_python_fixture_result(
+            "async for x in y:\n    pass\n",
+            |py, projection, locator| {
+                let parsed = parse_module(locator.contents())?;
+                let module = parsed.into_syntax();
+                let stmt = module
+                    .body
+                    .first()
+                    .ok_or_else(|| anyhow!("missing statement"))?;
+                let Stmt::For(_) = stmt else {
+                    return Err(anyhow!("expected For"));
+                };
+
+                let node = stmt_to_python(py, locator, stmt, projection)?;
+                let node = node.bind(py);
+                let is_async: bool = node.getattr("is_async")?.extract()?;
+                assert!(is_async);
+                Ok(())
+            },
+        )
+    }
+
+    #[test]
+    fn aug_assign_projects_op() -> anyhow::Result<()> {
+        with_python_fixture_result("x += 1\n", |py, projection, locator| {
+            let parsed = parse_module(locator.contents())?;
+            let module = parsed.into_syntax();
+            let stmt = module
+                .body
+                .first()
+                .ok_or_else(|| anyhow!("missing statement"))?;
+            let Stmt::AugAssign(_) = stmt else {
+                return Err(anyhow!("expected AugAssign"));
+            };
+
+            let node = stmt_to_python(py, locator, stmt, projection)?;
+            let node = node.bind(py);
+            let op: String = node.getattr("op")?.extract()?;
+            assert_eq!(op, "+");
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn global_stmt_projects_names() -> anyhow::Result<()> {
+        with_python_fixture_result("global a, b\n", |py, projection, locator| {
+            let parsed = parse_module(locator.contents())?;
+            let module = parsed.into_syntax();
+            let stmt = module
+                .body
+                .first()
+                .ok_or_else(|| anyhow!("missing statement"))?;
+            let Stmt::Global(_) = stmt else {
+                return Err(anyhow!("expected Global"));
+            };
+
+            let node = stmt_to_python(py, locator, stmt, projection)?;
+            let node = node.bind(py);
+            let names = node.getattr("names")?;
+            let names = names
+                .downcast::<PyTupleType>()
+                .map_err(|err| anyhow!(err.to_string()))?;
+            assert_eq!(names.len(), 2);
             Ok(())
         })
     }
