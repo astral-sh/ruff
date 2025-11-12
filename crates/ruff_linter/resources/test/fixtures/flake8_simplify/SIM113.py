@@ -47,6 +47,7 @@ def func():
 
 def func():
     # SIM113
+    # https://github.com/astral-sh/ruff/pull/21395
     idx = 10
     for x in range(5):
         g(x, idx)
