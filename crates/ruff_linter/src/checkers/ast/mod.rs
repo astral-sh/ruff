@@ -34,8 +34,6 @@ use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::statement_visitor;
-use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::{Visitor, walk_except_handler, walk_pattern};
 use ruff_python_ast::{
@@ -619,29 +617,6 @@ pub(crate) struct TypingImporter<'a, 'b> {
     member: &'a str,
 }
 
-#[derive(Default)]
-struct ReturnVisitor {
-    return_range: Option<TextRange>,
-}
-
-impl StatementVisitor<'_> for ReturnVisitor {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
-        match stmt {
-            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {}
-            Stmt::Return(ast::StmtReturn {
-                value: Some(_),
-                range,
-                ..
-            }) => {
-                if self.return_range.is_none() {
-                    self.return_range = Some(*range);
-                }
-            }
-            _ => statement_visitor::walk_stmt(self, stmt),
-        }
-    }
-}
-
 impl TypingImporter<'_, '_> {
     /// Create an [`Edit`] that makes the requested symbol available at `position`.
     ///
@@ -862,24 +837,6 @@ impl SemanticSyntaxContext for Checker<'_> {
                 ..
             }
         )
-    }
-
-    fn has_return(&self) -> Option<TextRange> {
-        for scope in self.semantic.current_scopes() {
-            match &scope.kind {
-                ScopeKind::Function(ast::StmtFunctionDef { body, .. }) => {
-                    let mut visitor = ReturnVisitor::default();
-                    visitor.visit_body(body);
-                    return visitor.return_range;
-                }
-                ScopeKind::Lambda(_) | ScopeKind::Class(_) => return None,
-                ScopeKind::Generator { .. }
-                | ScopeKind::Module
-                | ScopeKind::Type
-                | ScopeKind::DunderClassCell => {}
-            }
-        }
-        None
     }
 
     fn in_loop_context(&self) -> bool {

@@ -96,6 +96,10 @@ pub(crate) fn return_in_generator(checker: &Checker, function_def: &StmtFunction
         return;
     }
 
+    if function_def.is_async {
+        return;
+    }
+
     let mut visitor = ReturnInGeneratorVisitor::default();
     visitor.visit_body(&function_def.body);
 

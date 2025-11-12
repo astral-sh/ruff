@@ -3,9 +3,11 @@
 //! This checker is not responsible for traversing the AST itself. Instead, its
 //! [`SemanticSyntaxChecker::visit_stmt`] and [`SemanticSyntaxChecker::visit_expr`] methods should
 //! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
+use ruff_python_ast::statement_visitor;
+use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{
     self as ast, Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
-    StmtImportFrom,
+    StmtFunctionDef, StmtImportFrom,
     comparable::ComparableExpr,
     helpers,
     visitor::{Visitor, walk_expr},
@@ -13,7 +15,6 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use std::fmt::Display;
-
 #[derive(Debug, Default)]
 pub struct SemanticSyntaxChecker {
     /// The checker has traversed past the `__future__` import boundary.
@@ -701,7 +702,21 @@ impl SemanticSyntaxChecker {
                     self.seen_futures_boundary = true;
                 }
             }
-            Stmt::FunctionDef(_) => {
+            Stmt::FunctionDef(StmtFunctionDef { is_async, body, .. }) => {
+                if *is_async {
+                    let mut visitor = ReturnVisitor::default();
+                    visitor.visit_body(body);
+
+                    if visitor.has_yield {
+                        if let Some(return_range) = visitor.return_range {
+                            Self::add_error(
+                                ctx,
+                                SemanticSyntaxErrorKind::ReturnInAsyncGenerator,
+                                return_range,
+                            );
+                        }
+                    }
+                }
                 self.seen_futures_boundary = true;
             }
             _ => {
@@ -822,15 +837,7 @@ impl SemanticSyntaxChecker {
                     // def f(): yield *x
                     Self::invalid_star_expression(value, ctx);
                 }
-                if ctx.in_function_scope() && ctx.in_async_context() {
-                    if let Some(return_range) = ctx.has_return() {
-                        Self::add_error(
-                            ctx,
-                            SemanticSyntaxErrorKind::ReturnInAsyncGenerator,
-                            return_range,
-                        );
-                    }
-                }
+
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Yield);
             }
             Expr::YieldFrom(_) => {
@@ -1409,10 +1416,7 @@ pub enum SemanticSyntaxErrorKind {
     /// to be very rare and not worth the additional complexity to detect.
     ///
     /// [#111123]: https://github.com/python/cpython/issues/111123
-    LoadBeforeGlobalDeclaration {
-        name: String,
-        start: TextSize,
-    },
+    LoadBeforeGlobalDeclaration { name: String, start: TextSize },
 
     /// Represents the use of a `nonlocal` variable before its `nonlocal` declaration.
     ///
@@ -1430,10 +1434,7 @@ pub enum SemanticSyntaxErrorKind {
     /// ## Known Issues
     ///
     /// See [`LoadBeforeGlobalDeclaration`][Self::LoadBeforeGlobalDeclaration].
-    LoadBeforeNonlocalDeclaration {
-        name: String,
-        start: TextSize,
-    },
+    LoadBeforeNonlocalDeclaration { name: String, start: TextSize },
 
     /// Represents the use of a starred expression in an invalid location, such as a `return` or
     /// `yield` statement.
@@ -1591,6 +1592,7 @@ pub enum SemanticSyntaxErrorKind {
     /// Represents a nonlocal statement for a name that has no binding in an enclosing scope.
     NonlocalWithoutBinding(String),
 
+    /// Represents a `return` statement with a value in an asynchronous generator.
     ReturnInAsyncGenerator,
 }
 
@@ -1705,6 +1707,36 @@ impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
             }
         }
         walk_expr(self, expr);
+    }
+}
+
+#[derive(Default)]
+struct ReturnVisitor {
+    return_range: Option<TextRange>,
+    has_yield: bool,
+}
+
+impl StatementVisitor<'_> for ReturnVisitor {
+    fn visit_stmt(&mut self, stmt: &Stmt) {
+        match stmt {
+            Stmt::Expr(ast::StmtExpr { value, .. }) => match **value {
+                Expr::Yield(_) | Expr::YieldFrom(_) => {
+                    self.has_yield = true;
+                }
+                _ => {}
+            },
+            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {}
+            Stmt::Return(ast::StmtReturn {
+                value: Some(_),
+                range,
+                ..
+            }) => {
+                if self.return_range.is_none() {
+                    self.return_range = Some(*range);
+                }
+            }
+            _ => statement_visitor::walk_stmt(self, stmt),
+        }
     }
 }
 
@@ -2128,8 +2160,6 @@ pub trait SemanticSyntaxContext {
     fn in_loop_context(&self) -> bool;
 
     fn is_bound_parameter(&self, name: &str) -> bool;
-
-    fn has_return(&self) -> Option<TextRange>;
 }
 
 /// Modified version of [`std::str::EscapeDefault`] that does not escape single or double quotes.
