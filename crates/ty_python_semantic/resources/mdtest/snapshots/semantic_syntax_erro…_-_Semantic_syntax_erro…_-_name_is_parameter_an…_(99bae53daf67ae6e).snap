@@ -12,44 +12,21 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/semantic_syn
 ## mdtest_snippet.py
 
 ```
-1 | def f(a):
-2 |     global a  # error: [invalid-syntax]
+1 | a = None
+2 | def f(a):
+3 |     global a  # error: [invalid-syntax]
 ```
 
 # Diagnostics
 
 ```
 error[invalid-syntax]: name `a` is parameter and global
- --> src/mdtest_snippet.py:2:12
+ --> src/mdtest_snippet.py:3:12
   |
-1 | def f(a):
-2 |     global a  # error: [invalid-syntax]
+1 | a = None
+2 | def f(a):
+3 |     global a  # error: [invalid-syntax]
   |            ^
   |
-
-```
-
-```
-error[invalid-syntax]: name `a` is used prior to global declaration
- --> src/mdtest_snippet.py:2:12
-  |
-1 | def f(a):
-2 |     global a  # error: [invalid-syntax]
-  |            ^
-  |
-
-```
-
-```
-warning[unresolved-global]: Invalid global declaration of `a`
- --> src/mdtest_snippet.py:2:12
-  |
-1 | def f(a):
-2 |     global a  # error: [invalid-syntax]
-  |            ^ `a` has no declarations or bindings in the global scope
-  |
-info: This limits ty's ability to make accurate inferences about the boundness and types of global-scope symbols
-info: Consider adding a declaration to the global scope, e.g. `a: int`
-info: rule `unresolved-global` is enabled by default
 
 ```

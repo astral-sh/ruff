@@ -382,6 +382,8 @@ for x in range(42):
 <!-- snapshot-diagnostics -->
 
 ```py
+a = None
+
 def f(a):
     global a  # error: [invalid-syntax]
 ```
