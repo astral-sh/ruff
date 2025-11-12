@@ -301,12 +301,11 @@ impl<'db> ConstraintSet<'db> {
         }
     }
 
-    /// Reduces the set of inferable typevars for this constraint set. Any typevars that were
-    /// previously inferable but aren't in the new inferable set will be existentially quantified
-    /// away. (That is, those typevars will be removed from the constraint set, and the constraint
+    /// Reduces the set of inferable typevars for this constraint set. You provide an iterator of
+    /// the typevars that were inferable when this constraint set was created, and which should be
+    /// abstracted away. Those typevars will be removed from the constraint set, and the constraint
     /// set will return true whenever there was _any_ specialization of those typevars that
-    /// returned true before.)
-    /// XXX: fix docs
+    /// returned true before.
     pub(crate) fn reduce_inferable(
         self,
         db: &'db dyn Db,
