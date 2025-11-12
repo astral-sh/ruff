@@ -1865,7 +1865,7 @@ fn handle_unary_op_comment<'a>(
         .find(|token| token.kind == SimpleTokenKind::LParen)
         .map_or(unary_op.operand.start(), |lparen| lparen.start());
     if comment.end() < up_to {
-        CommentPlacement::leading(unary_op, comment)
+        CommentPlacement::leading(&*unary_op.operand, comment)
     } else {
         CommentPlacement::Default(comment)
     }
