@@ -465,105 +465,85 @@ import colorama
 
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
-        .arg("--python").arg(case.root().join("opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3")), @r#"
+        .arg("--python").arg(case.root().join("opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3")), @r"
     success: false
-    exit_code: 101
+    exit_code: 1
     ----- stdout -----
-    error[panic]: Panicked at crates/ty_python_semantic/src/module_resolver/resolver.rs:463:40 when checking `<temp_dir>/project/test.py`: `No root found for path '<temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages'. Known roots: FileRoots(
-        [
-            FileRoot {
-                [salsa id]: Id(0),
-                path: "<temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages",
-                kind_at_time_of_creation: LibrarySearchPath,
-                revision: FileRevision(
-                    32521175436467235861099952048,
-                ),
-            },
-            FileRoot {
-                [salsa id]: Id(1),
-                path: "<temp_dir>/project",
-                kind_at_time_of_creation: Project,
-                revision: FileRevision(
-                    32521175436467235861100391048,
-                ),
-            },
-        ],
-    )`
-    info: This indicates a bug in ty.
-    info: If you could open an issue at https://github.com/astral-sh/ty/issues/new?title=%5Bpanic%5D, we'd be very appreciative!
-    info: Platform: macos aarch64
-    info: Version: ruff/0.14.4+66 (31666498d 2025-11-12)
-    info: Args: ["/Users/gankra/dev/ruff/target/debug/ty", "check", "--python", "<temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3"]
-    info: run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information
-    info: query stacktrace:
-       0: dynamic_resolution_paths(Id(1c00))
-                 at crates/ty_python_semantic/src/module_resolver/resolver.rs:412
-       1: resolve_module_query(Id(1800))
-                 at crates/ty_python_semantic/src/module_resolver/resolver.rs:82
-       2: infer_definition_types(Id(1400))
-                 at crates/ty_python_semantic/src/types/infer.rs:94
-       3: infer_scope_types(Id(1000))
-                 at crates/ty_python_semantic/src/types/infer.rs:70
-       4: check_file_impl(Id(c00))
-                 at crates/ty_project/src/lib.rs:535
+    error[unresolved-import]: Cannot resolve imported module `bar`
+     --> test.py:2:8
+      |
+    1 | import foo
+    2 | import bar
+      |        ^^^
+    3 | import colorama
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
 
+    error[unresolved-import]: Cannot resolve imported module `colorama`
+     --> test.py:3:8
+      |
+    1 | import foo
+    2 | import bar
+    3 | import colorama
+      |        ^^^^^^^^
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
 
-    Found 1 diagnostic
+    Found 2 diagnostics
 
     ----- stderr -----
-    WARN A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details.
-    "#);
+    ");
 
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
-        .arg("--python").arg(case.root().join("opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3.13")), @r#"
+        .arg("--python").arg(case.root().join("opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3.13")), @r"
     success: false
-    exit_code: 101
+    exit_code: 1
     ----- stdout -----
-    error[panic]: Panicked at crates/ty_python_semantic/src/module_resolver/resolver.rs:463:40 when checking `<temp_dir>/project/test.py`: `No root found for path '<temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages'. Known roots: FileRoots(
-        [
-            FileRoot {
-                [salsa id]: Id(0),
-                path: "<temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages",
-                kind_at_time_of_creation: LibrarySearchPath,
-                revision: FileRevision(
-                    32521175436467235861122071048,
-                ),
-            },
-            FileRoot {
-                [salsa id]: Id(1),
-                path: "<temp_dir>/project",
-                kind_at_time_of_creation: Project,
-                revision: FileRevision(
-                    32521175436467235861122507048,
-                ),
-            },
-        ],
-    )`
-    info: This indicates a bug in ty.
-    info: If you could open an issue at https://github.com/astral-sh/ty/issues/new?title=%5Bpanic%5D, we'd be very appreciative!
-    info: Platform: macos aarch64
-    info: Version: ruff/0.14.4+66 (31666498d 2025-11-12)
-    info: Args: ["/Users/gankra/dev/ruff/target/debug/ty", "check", "--python", "<temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3.13"]
-    info: run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information
-    info: query stacktrace:
-       0: dynamic_resolution_paths(Id(1c00))
-                 at crates/ty_python_semantic/src/module_resolver/resolver.rs:412
-       1: resolve_module_query(Id(1800))
-                 at crates/ty_python_semantic/src/module_resolver/resolver.rs:82
-       2: infer_definition_types(Id(1400))
-                 at crates/ty_python_semantic/src/types/infer.rs:94
-       3: infer_scope_types(Id(1000))
-                 at crates/ty_python_semantic/src/types/infer.rs:70
-       4: check_file_impl(Id(c00))
-                 at crates/ty_project/src/lib.rs:535
+    error[unresolved-import]: Cannot resolve imported module `bar`
+     --> test.py:2:8
+      |
+    1 | import foo
+    2 | import bar
+      |        ^^^
+    3 | import colorama
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
 
+    error[unresolved-import]: Cannot resolve imported module `colorama`
+     --> test.py:3:8
+      |
+    1 | import foo
+    2 | import bar
+    3 | import colorama
+      |        ^^^^^^^^
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
 
-    Found 1 diagnostic
+    Found 2 diagnostics
 
     ----- stderr -----
-    WARN A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details.
-    "#);
+    ");
 
     Ok(())
 }
