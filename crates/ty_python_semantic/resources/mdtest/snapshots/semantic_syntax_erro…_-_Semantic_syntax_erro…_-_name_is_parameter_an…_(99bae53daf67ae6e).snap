@@ -13,19 +13,19 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/semantic_syn
 
 ```
 1 | a = None
-2 | def f(a):
-3 |     global a  # error: [invalid-syntax]
+2 | 
+3 | def f(a):
+4 |     global a  # error: [invalid-syntax]
 ```
 
 # Diagnostics
 
 ```
 error[invalid-syntax]: name `a` is parameter and global
- --> src/mdtest_snippet.py:3:12
+ --> src/mdtest_snippet.py:4:12
   |
-1 | a = None
-2 | def f(a):
-3 |     global a  # error: [invalid-syntax]
+3 | def f(a):
+4 |     global a  # error: [invalid-syntax]
   |            ^
   |
 
