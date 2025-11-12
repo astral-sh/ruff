@@ -288,6 +288,43 @@ class C[T]:
     class Bad2(Iterable[T]): ...
 ```
 
+## Class bases are evaluated within the type parameter scope
+
+```py
+class C[_T](
+    # error: [unresolved-reference] "Name `C` used when not defined"
+    C
+): ...
+
+# `D` in `list[D]` is resolved to be a type variable of class `D`.
+class D[D](list[D]): ...
+
+# error: [unresolved-reference] "Name `E` used when not defined"
+if E:
+    class E[_T](
+        # error: [unresolved-reference] "Name `E` used when not defined"
+        E
+    ): ...
+
+# error: [unresolved-reference] "Name `F` used when not defined"
+F
+
+# error: [unresolved-reference] "Name `F` used when not defined"
+class F[_T](F): ...
+
+def foo():
+    class G[_T](
+        # error: [unresolved-reference] "Name `G` used when not defined"
+        G
+    ): ...
+    # error: [unresolved-reference] "Name `H` used when not defined"
+    if H:
+        class H[_T](
+            # error: [unresolved-reference] "Name `H` used when not defined"
+            H
+        ): ...
+```
+
 ## Class scopes do not cover inner scopes
 
 Just like regular symbols, the typevars of a generic class are only available in that class's scope,

@@ -8319,6 +8319,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut nonlocal_union_builder = UnionBuilder::new(db);
             let mut found_some_definition = false;
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
+                // If the current enclosing scope is global, no place lookup is performed here,
+                // instead falling back to the module's explicit global lookup below.
+                if enclosing_scope_file_id.is_global() {
+                    break;
+                }
+
                 // Class scopes are not visible to nested scopes, and we need to handle global
                 // scope differently (because an unbound name there falls back to builtins), so
                 // check only function-like scopes.
@@ -8349,6 +8355,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // registering eager bindings for nested scopes that are actually eager, and for
                 // enclosing scopes that actually contain bindings that we should use when
                 // resolving the reference.)
+                let mut eagerly_resolved_place = None;
                 if !self.is_deferred() {
                     match self.index.enclosing_snapshot(
                         enclosing_scope_file_id,
@@ -8360,6 +8367,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 enclosing_scope_file_id,
                                 ConstraintKey::NarrowingConstraint(constraint),
                             ));
+                            // If the current scope is eager, it is certain that the place is undefined in the current scope.
+                            // Do not call the `place` query below as a fallback.
+                            if scope.scope(db).is_eager() {
+                                eagerly_resolved_place = Some(Place::Undefined.into());
+                            }
                         }
                         EnclosingSnapshotResult::FoundBindings(bindings) => {
                             let place = place_from_bindings(db, bindings).map_type(|ty| {
@@ -8421,18 +8433,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // `nonlocal` variable, but we don't enforce that here. See the
                 // `ast::Stmt::AnnAssign` handling in `SemanticIndexBuilder::visit_stmt`.)
                 if enclosing_place.is_bound() || enclosing_place.is_declared() {
-                    let local_place_and_qualifiers = place(
-                        db,
-                        enclosing_scope_id,
-                        place_expr,
-                        ConsideredDefinitions::AllReachable,
-                    )
-                    .map_type(|ty| {
-                        self.narrow_place_with_applicable_constraints(
+                    let local_place_and_qualifiers = eagerly_resolved_place.unwrap_or_else(|| {
+                        place(
+                            db,
+                            enclosing_scope_id,
                             place_expr,
-                            ty,
-                            &constraint_keys,
+                            ConsideredDefinitions::AllReachable,
                         )
+                        .map_type(|ty| {
+                            self.narrow_place_with_applicable_constraints(
+                                place_expr,
+                                ty,
+                                &constraint_keys,
+                            )
+                        })
                     });
                     // We could have `Place::Undefined` here, despite the checks above, for example if
                     // this scope contains a `del` statement but no binding or declaration.
@@ -8475,6 +8489,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     FileScopeId::global(),
                                     ConstraintKey::NarrowingConstraint(constraint),
                                 ));
+                                // Reaching here means that no bindings are found in any scope.
+                                // Since `explicit_global_symbol` may return a cycle initial value, we return `Place::Undefined` here.
+                                return Place::Undefined.into();
                             }
                             EnclosingSnapshotResult::FoundBindings(bindings) => {
                                 let place = place_from_bindings(db, bindings).map_type(|ty| {
