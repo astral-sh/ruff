@@ -13,7 +13,8 @@ use crate::checkers::ast::Checker;
 /// Checks for `for` loops with explicit loop-index variables that can be replaced
 /// with `enumerate()`.
 ///
-/// In [preview], this rule checks for index variable initialized as an instance of `int`.
+/// In [preview], this rule checks for index variables initialized with any integer rather than only
+/// a literal zero.
 ///
 /// ## Why is this bad?
 /// When iterating over a sequence, it's often desirable to keep track of the
