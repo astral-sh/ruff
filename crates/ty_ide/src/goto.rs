@@ -332,9 +332,12 @@ impl GotoTarget<'_> {
         model: &SemanticModel<'db>,
     ) -> Option<Vec<CallSignatureDetails<'db>>> {
         if let GotoTarget::Call { call, .. } = self {
-            let signature_details = call_signature_details_typed(model.db(), model, call);
-            if !signature_details.is_empty() {
-                return Some(signature_details);
+            let signature_details = call_signature_details(model.db(), model, call);
+            if signature_details.len() > 1 {
+                let signature_details = call_signature_details_typed(model.db(), model, call);
+                if !signature_details.is_empty() {
+                    return Some(signature_details);
+                }
             }
         }
         None

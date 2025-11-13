@@ -233,9 +233,10 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        (a, b) -> Unknown
-        ---------------------------------------------
-
+        def my_func(
+            a,
+            b
+        ) -> Unknown
         ---------------------------------------------
         This is such a great func!!
 
@@ -245,10 +246,11 @@ mod tests {
 
         ---------------------------------------------
         ```python
-        (a, b) -> Unknown
+        def my_func(
+            a,
+            b
+        ) -> Unknown
         ```
-        ---
-
         ---
         ```text
         This is such a great func!!
@@ -493,18 +495,14 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        (val) -> MyClass
-        ---------------------------------------------
-
+        <class 'MyClass'>
         ---------------------------------------------
         initializes MyClass (perfectly)
 
         ---------------------------------------------
         ```python
-        (val) -> MyClass
+        <class 'MyClass'>
         ```
-        ---
-
         ---
         ```text
         initializes MyClass (perfectly)
@@ -556,18 +554,14 @@ mod tests {
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (val) -> MyClass
-        ---------------------------------------------
-
+        <class 'MyClass'>
         ---------------------------------------------
         initializes MyClass (perfectly)
 
         ---------------------------------------------
         ```python
-        (val) -> MyClass
+        <class 'MyClass'>
         ```
-        ---
-
         ---
         ```text
         initializes MyClass (perfectly)
@@ -618,9 +612,7 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        (val) -> MyClass
-        ---------------------------------------------
-
+        <class 'MyClass'>
         ---------------------------------------------
         This is such a great class!!
 
@@ -630,10 +622,8 @@ mod tests {
 
         ---------------------------------------------
         ```python
-        (val) -> MyClass
+        <class 'MyClass'>
         ```
-        ---
-
         ---
         ```text
         This is such a great class!!
@@ -690,9 +680,10 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        (a, b) -> Unknown
-        ---------------------------------------------
-
+        bound method MyClass.my_method(
+            a,
+            b
+        ) -> Unknown
         ---------------------------------------------
         This is such a great func!!
 
@@ -702,10 +693,11 @@ mod tests {
 
         ---------------------------------------------
         ```python
-        (a, b) -> Unknown
+        bound method MyClass.my_method(
+            a,
+            b
+        ) -> Unknown
         ```
-        ---
-
         ---
         ```text
         This is such a great func!!
