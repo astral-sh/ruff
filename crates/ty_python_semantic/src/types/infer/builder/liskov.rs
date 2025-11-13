@@ -1,4 +1,6 @@
 use ruff_db::diagnostic::Annotation;
+
+use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
 
 use crate::{
@@ -9,7 +11,7 @@ use crate::{
         class::CodeGeneratorKind,
         context::InferContext,
         diagnostic::INVALID_METHOD_OVERRIDE,
-        ide_support::{Member, all_declarations_and_bindings},
+        ide_support::{MemberWithDefinition, all_declarations_and_bindings},
     },
 };
 
@@ -18,10 +20,10 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: ClassLite
     if class.is_known(db, KnownClass::Object) {
         return;
     }
+
     let class_specialized = class.identity_specialization(db);
-    let own_class_members: FxHashSet<_> = all_declarations_and_bindings(db, class.body_scope(db))
-        .map(|member| member.member)
-        .collect();
+    let own_class_members: FxHashSet<_> =
+        all_declarations_and_bindings(db, class.body_scope(db)).collect();
 
     for member in own_class_members {
         check_class_declaration(context, class_specialized, &member);
@@ -31,12 +33,18 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: ClassLite
 fn check_class_declaration<'db>(
     context: &InferContext<'db, '_>,
     class: ClassType<'db>,
-    member: &Member<'db>,
+    member: &MemberWithDefinition<'db>,
 ) {
     let db = context.db();
 
+    let MemberWithDefinition { member, definition } = member;
+
     // TODO: Check Liskov on non-methods too
     let Type::FunctionLiteral(function) = member.ty else {
+        return;
+    };
+
+    let Some(definition) = definition else {
         return;
     };
 
@@ -90,12 +98,18 @@ fn check_class_declaration<'db>(
             continue;
         }
 
-        let range = function
-            .literal(db)
-            .last_definition(db)
-            .spans(db)
-            .and_then(|spans| spans.signature.range())
-            .unwrap_or(function.node(db, context.file(), context.module()).range);
+        // If the function was originally defined elsewhere and simply assigned
+        // in the body of the class here, we cannot use the range associated with the `FunctionType`
+        let range = if definition.kind(db).is_function_def() {
+            function
+                .literal(db)
+                .last_definition(db)
+                .spans(db)
+                .and_then(|spans| spans.signature.range())
+                .unwrap_or_else(|| function.node(db, context.file(), context.module()).range)
+        } else {
+            definition.focus_range(db, context.module()).range()
+        };
 
         let Some(builder) = context.report_lint(&INVALID_METHOD_OVERRIDE, range) else {
             continue;
