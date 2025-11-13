@@ -173,10 +173,26 @@ def given_constraints[T]():
     static_assert(given_str.implies_subtype_of(T, str))
 ```
 
-This might require propagating constraints from other typevars.
+This might require propagating constraints from other typevars. (Note that we perform the test
+twice, with different variable orderings. Our BDD implementation uses the Salsa IDs of each typevar
+as part of the variable ordering. Reversing the typevar order helps us verify that we don't have any
+BDD logic that is dependent on which variable ordering we end up with.)
 
 ```py
 def mutually_constrained[T, U]():
+    # If [T = U ∧ U ≤ int], then [T ≤ int] must be true as well.
+    given_int = ConstraintSet.range(U, T, U) & ConstraintSet.range(Never, U, int)
+    static_assert(given_int.implies_subtype_of(T, int))
+    static_assert(not given_int.implies_subtype_of(T, bool))
+    static_assert(not given_int.implies_subtype_of(T, str))
+
+    # If [T ≤ U ∧ U ≤ int], then [T ≤ int] must be true as well.
+    given_int = ConstraintSet.range(Never, T, U) & ConstraintSet.range(Never, U, int)
+    static_assert(given_int.implies_subtype_of(T, int))
+    static_assert(not given_int.implies_subtype_of(T, bool))
+    static_assert(not given_int.implies_subtype_of(T, str))
+
+def mutually_constrained[U, T]():
     # If [T = U ∧ U ≤ int], then [T ≤ int] must be true as well.
     given_int = ConstraintSet.range(U, T, U) & ConstraintSet.range(Never, U, int)
     static_assert(given_int.implies_subtype_of(T, int))
@@ -242,6 +258,22 @@ def mutually_constrained[T, U]():
     static_assert(given_int.implies_subtype_of(Covariant[T], Covariant[int]))
     static_assert(not given_int.implies_subtype_of(Covariant[T], Covariant[bool]))
     static_assert(not given_int.implies_subtype_of(Covariant[T], Covariant[str]))
+
+# Repeat the test with a different typevar ordering
+def mutually_constrained[U, T]():
+    # If (T = U ∧ U ≤ int), then (T ≤ int) must be true as well, and therefore
+    # (Covariant[T] ≤ Covariant[int]).
+    given_int = ConstraintSet.range(U, T, U) & ConstraintSet.range(Never, U, int)
+    static_assert(given_int.implies_subtype_of(Covariant[T], Covariant[int]))
+    static_assert(not given_int.implies_subtype_of(Covariant[T], Covariant[bool]))
+    static_assert(not given_int.implies_subtype_of(Covariant[T], Covariant[str]))
+
+    # If (T ≤ U ∧ U ≤ int), then (T ≤ int) must be true as well, and therefore
+    # (Covariant[T] ≤ Covariant[int]).
+    given_int = ConstraintSet.range(Never, T, U) & ConstraintSet.range(Never, U, int)
+    static_assert(given_int.implies_subtype_of(Covariant[T], Covariant[int]))
+    static_assert(not given_int.implies_subtype_of(Covariant[T], Covariant[bool]))
+    static_assert(not given_int.implies_subtype_of(Covariant[T], Covariant[str]))
 ```
 
 Many of the relationships are reversed for typevars that appear in contravariant types.
@@ -274,6 +306,22 @@ def given_constraints[T]():
     static_assert(not given_bool.implies_subtype_of(Contravariant[str], Contravariant[T]))
 
 def mutually_constrained[T, U]():
+    # If (T = U ∧ U ≤ int), then (T ≤ int) must be true as well, and therefore
+    # (Contravariant[int] ≤ Contravariant[T]).
+    given_int = ConstraintSet.range(U, T, U) & ConstraintSet.range(Never, U, int)
+    static_assert(given_int.implies_subtype_of(Contravariant[int], Contravariant[T]))
+    static_assert(not given_int.implies_subtype_of(Contravariant[bool], Contravariant[T]))
+    static_assert(not given_int.implies_subtype_of(Contravariant[str], Contravariant[T]))
+
+    # If (T ≤ U ∧ U ≤ int), then (T ≤ int) must be true as well, and therefore
+    # (Contravariant[int] ≤ Contravariant[T]).
+    given_int = ConstraintSet.range(Never, T, U) & ConstraintSet.range(Never, U, int)
+    static_assert(given_int.implies_subtype_of(Contravariant[int], Contravariant[T]))
+    static_assert(not given_int.implies_subtype_of(Contravariant[bool], Contravariant[T]))
+    static_assert(not given_int.implies_subtype_of(Contravariant[str], Contravariant[T]))
+
+# Repeat the test with a different typevar ordering
+def mutually_constrained[U, T]():
     # If (T = U ∧ U ≤ int), then (T ≤ int) must be true as well, and therefore
     # (Contravariant[int] ≤ Contravariant[T]).
     given_int = ConstraintSet.range(U, T, U) & ConstraintSet.range(Never, U, int)
@@ -331,6 +379,25 @@ def given_constraints[T]():
     static_assert(not given_int.implies_subtype_of(Invariant[T], Invariant[str]))
 
 def mutually_constrained[T, U]():
+    # If (T = U ∧ U ≤ int), then (T ≤ int) must be true as well. But because T is invariant, that
+    # does _not_ imply that (Invariant[T] ≤ Invariant[int]).
+    given_int = ConstraintSet.range(U, T, U) & ConstraintSet.range(Never, U, int)
+    static_assert(not given_int.implies_subtype_of(Invariant[T], Invariant[int]))
+    static_assert(not given_int.implies_subtype_of(Invariant[T], Invariant[bool]))
+    static_assert(not given_int.implies_subtype_of(Invariant[T], Invariant[str]))
+
+    # If (T = U ∧ U = int), then (T = int) must be true as well. That is an equality constraint, so
+    # even though T is invariant, it does imply that (Invariant[T] ≤ Invariant[int]).
+    given_int = ConstraintSet.range(U, T, U) & ConstraintSet.range(int, U, int)
+    static_assert(given_int.implies_subtype_of(Invariant[T], Invariant[int]))
+    static_assert(given_int.implies_subtype_of(Invariant[int], Invariant[T]))
+    static_assert(not given_int.implies_subtype_of(Invariant[T], Invariant[bool]))
+    static_assert(not given_int.implies_subtype_of(Invariant[bool], Invariant[T]))
+    static_assert(not given_int.implies_subtype_of(Invariant[T], Invariant[str]))
+    static_assert(not given_int.implies_subtype_of(Invariant[str], Invariant[T]))
+
+# Repeat the test with a different typevar ordering
+def mutually_constrained[U, T]():
     # If (T = U ∧ U ≤ int), then (T ≤ int) must be true as well. But because T is invariant, that
     # does _not_ imply that (Invariant[T] ≤ Invariant[int]).
     given_int = ConstraintSet.range(U, T, U) & ConstraintSet.range(Never, U, int)
