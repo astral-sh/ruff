@@ -5,11 +5,12 @@ use ruff_python_ast::{
     StmtIf, StmtMatch, StmtTry, StmtWhile, StmtWith, Suite,
 };
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::{SourceComment, leading_alternate_branch_comments, trailing_comments};
 use crate::statement::suite::{SuiteKind, as_only_an_ellipsis};
-use crate::verbatim::write_suppressed_clause_header;
+use crate::verbatim::{verbatim_text, write_suppressed_clause_header};
 use crate::{has_skip_comment, prelude::*};
 
 /// The header of a compound statement clause.
@@ -36,7 +37,41 @@ pub(crate) enum ClauseHeader<'a> {
     OrElse(ElseClause<'a>),
 }
 
-impl ClauseHeader<'_> {
+impl<'a> ClauseHeader<'a> {
+    /// Returns the last child in the clause body immediately following this clause header.
+    ///
+    /// For most clauses, this is the last statement in
+    /// the primary body. For clauses like `try`, it specifically returns the last child
+    /// in the `try` body, not the `except`/`else`/`finally` clauses.
+    ///
+    /// This is similar to [`ruff_python_ast::AnyNodeRef::last_child_in_body`]
+    /// but restricted to the clause.
+    pub(crate) fn last_child_in_clause(self) -> Option<AnyNodeRef<'a>> {
+        match self {
+            ClauseHeader::Class(StmtClassDef { body, .. })
+            | ClauseHeader::Function(StmtFunctionDef { body, .. })
+            | ClauseHeader::If(StmtIf { body, .. })
+            | ClauseHeader::ElifElse(ElifElseClause { body, .. })
+            | ClauseHeader::Try(StmtTry { body, .. })
+            | ClauseHeader::MatchCase(MatchCase { body, .. })
+            | ClauseHeader::For(StmtFor { body, .. })
+            | ClauseHeader::While(StmtWhile { body, .. })
+            | ClauseHeader::With(StmtWith { body, .. })
+            | ClauseHeader::ExceptHandler(ExceptHandlerExceptHandler { body, .. })
+            | ClauseHeader::OrElse(
+                ElseClause::Try(StmtTry { orelse: body, .. })
+                | ElseClause::For(StmtFor { orelse: body, .. })
+                | ElseClause::While(StmtWhile { orelse: body, .. }),
+            )
+            | ClauseHeader::TryFinally(StmtTry {
+                finalbody: body, ..
+            }) => body.last().map(AnyNodeRef::from),
+            ClauseHeader::Match(StmtMatch { cases, .. }) => cases
+                .last()
+                .and_then(|case| case.body.last().map(AnyNodeRef::from)),
+        }
+    }
+
     /// The range from the clause keyword up to and including the final colon.
     pub(crate) fn range(self, source: &str) -> FormatResult<TextRange> {
         let keyword_range = self.first_keyword_range(source)?;
@@ -338,11 +373,43 @@ impl ClauseHeader<'_> {
     }
 }
 
+impl<'a> From<ClauseHeader<'a>> for AnyNodeRef<'a> {
+    fn from(value: ClauseHeader<'a>) -> Self {
+        match value {
+            ClauseHeader::Class(stmt_class_def) => stmt_class_def.into(),
+            ClauseHeader::Function(stmt_function_def) => stmt_function_def.into(),
+            ClauseHeader::If(stmt_if) => stmt_if.into(),
+            ClauseHeader::ElifElse(elif_else_clause) => elif_else_clause.into(),
+            ClauseHeader::Try(stmt_try) => stmt_try.into(),
+            ClauseHeader::ExceptHandler(except_handler_except_handler) => {
+                except_handler_except_handler.into()
+            }
+            ClauseHeader::TryFinally(stmt_try) => stmt_try.into(),
+            ClauseHeader::Match(stmt_match) => stmt_match.into(),
+            ClauseHeader::MatchCase(match_case) => match_case.into(),
+            ClauseHeader::For(stmt_for) => stmt_for.into(),
+            ClauseHeader::While(stmt_while) => stmt_while.into(),
+            ClauseHeader::With(stmt_with) => stmt_with.into(),
+            ClauseHeader::OrElse(else_clause) => else_clause.into(),
+        }
+    }
+}
+
 #[derive(Copy, Clone)]
 pub(crate) enum ElseClause<'a> {
     Try(&'a StmtTry),
     For(&'a StmtFor),
     While(&'a StmtWhile),
+}
+
+impl<'a> From<ElseClause<'a>> for AnyNodeRef<'a> {
+    fn from(value: ElseClause<'a>) -> Self {
+        match value {
+            ElseClause::Try(stmt_try) => stmt_try.into(),
+            ElseClause::For(stmt_for) => stmt_for.into(),
+            ElseClause::While(stmt_while) => stmt_while.into(),
+        }
+    }
 }
 
 pub(crate) struct FormatClauseHeader<'a, 'ast> {
@@ -423,13 +490,13 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatClauseHeader<'_, 'ast> {
     }
 }
 
-pub(crate) struct FormatClauseBody<'a> {
+struct FormatClauseBody<'a> {
     body: &'a Suite,
     kind: SuiteKind,
     trailing_comments: &'a [SourceComment],
 }
 
-pub(crate) fn clause_body<'a>(
+fn clause_body<'a>(
     body: &'a Suite,
     kind: SuiteKind,
     trailing_comments: &'a [SourceComment],
@@ -461,6 +528,58 @@ impl Format<PyFormatContext<'_>> for FormatClauseBody<'_> {
                     block_indent(&self.body.format().with_options(self.kind))
                 ]
             )
+        }
+    }
+}
+
+pub(crate) struct FormatClause<'a, 'ast> {
+    format_header: FormatClauseHeader<'a, 'ast>,
+    format_body: FormatClauseBody<'a>,
+}
+
+impl<'a> FormatClause<'a, '_> {
+    /// Sets the leading comments that precede an alternate branch.
+    #[must_use]
+    pub(crate) fn with_leading_comments<N>(
+        mut self,
+        comments: &'a [SourceComment],
+        last_node: Option<N>,
+    ) -> Self
+    where
+        N: Into<AnyNodeRef<'a>>,
+    {
+        self.format_header = self
+            .format_header
+            .with_leading_comments(comments, last_node);
+        self
+    }
+}
+
+/// Formats a clause, handling the case where the compound
+/// statement lies on a single line with `# fmt: skip` and
+/// should be suppressed.
+pub(crate) fn clause<'a, 'ast, Content>(
+    header: ClauseHeader<'a>,
+    header_formatter: &'a Content,
+    trailing_colon_comment: &'a [SourceComment],
+    body: &'a Suite,
+    kind: SuiteKind,
+) -> FormatClause<'a, 'ast>
+where
+    Content: Format<PyFormatContext<'ast>>,
+{
+    FormatClause {
+        format_header: clause_header(header, trailing_colon_comment, header_formatter),
+        format_body: clause_body(body, kind, trailing_colon_comment),
+    }
+}
+
+impl<'ast> Format<PyFormatContext<'ast>> for FormatClause<'_, 'ast> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
+        if should_suppress_clause(self, f)? {
+            write_suppressed_clause(self, f)
+        } else {
+            write!(f, [self.format_header, self.format_body])
         }
     }
 }
@@ -586,4 +705,77 @@ fn colon_range(after_keyword_or_condition: TextSize, source: &str) -> FormatResu
             ))
         }
     }
+}
+
+fn should_suppress_clause(
+    clause: &FormatClause<'_, '_>,
+    f: &mut Formatter<PyFormatContext<'_>>,
+) -> FormatResult<bool> {
+    let source = f.context().source();
+
+    let Some(last_child_in_clause) = clause.format_header.header.last_child_in_clause() else {
+        return Ok(false);
+    };
+
+    // Early return if we don't have a skip comment
+    // to avoid computing header range in the common case
+    if !has_skip_comment(
+        f.context().comments().trailing(last_child_in_clause),
+        source,
+    ) {
+        return Ok(false);
+    }
+
+    let clause_start = clause.format_header.header.range(source)?.end();
+
+    let clause_range = TextRange::new(clause_start, last_child_in_clause.end());
+
+    // Only applies to clauses on a single line
+    if source.contains_line_break(clause_range) {
+        return Ok(false);
+    }
+
+    // Recall that we already checked whether there was
+    // a skip comment
+    Ok(true)
+}
+
+#[cold]
+fn write_suppressed_clause(
+    clause: &FormatClause,
+    f: &mut Formatter<PyFormatContext<'_>>,
+) -> FormatResult<()> {
+    if let Some((leading_comments, last_node)) = clause.format_header.leading_comments {
+        leading_alternate_branch_comments(leading_comments, last_node).fmt(f)?;
+    }
+
+    let header = clause.format_header.header;
+    let clause_start = header.first_keyword_range(f.context().source())?.start();
+
+    let comments = f.context().comments().clone();
+
+    let last_child = header
+        .last_child_in_clause()
+        .expect("last child to exist if `should_suppress_clause` is `Ok(true)`");
+    let clause_end = last_child.end();
+
+    // Write the outer comments and format the node as verbatim
+    write!(
+        f,
+        [
+            source_position(clause_start),
+            verbatim_text(TextRange::new(clause_start, clause_end)),
+            source_position(clause_end),
+            trailing_comments(comments.trailing(last_child)),
+            hard_line_break()
+        ]
+    )?;
+
+    // Mark the comments for the body statements as formatted, but not the entire header node
+    // (which might include other clauses like except/else/finally for try statements).
+    for stmt in clause.format_body.body {
+        comments.mark_verbatim_node_comments_formatted(stmt.into());
+    }
+
+    Ok(())
 }

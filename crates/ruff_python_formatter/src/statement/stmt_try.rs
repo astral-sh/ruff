@@ -9,7 +9,7 @@ use crate::other::except_handler_except_handler::{
     ExceptHandlerKind, FormatExceptHandlerExceptHandler,
 };
 use crate::prelude::*;
-use crate::statement::clause::{ClauseHeader, ElseClause, clause_body, clause_header};
+use crate::statement::clause::{ClauseHeader, ElseClause, clause};
 use crate::statement::suite::SuiteKind;
 use crate::statement::{FormatRefWithRule, Stmt};
 
@@ -154,15 +154,14 @@ fn format_case<'a>(
 
         write!(
             f,
-            [
-                clause_header(header, trailing_case_comments, &token(kind.keyword()))
-                    .with_leading_comments(leading_case_comments, previous_node),
-                clause_body(
-                    body,
-                    SuiteKind::other(last_suite_in_statement),
-                    trailing_case_comments
-                ),
-            ]
+            [clause(
+                header,
+                &token(kind.keyword()),
+                trailing_case_comments,
+                body,
+                SuiteKind::other(last_suite_in_statement),
+            )
+            .with_leading_comments(leading_case_comments, previous_node),]
         )?;
         (Some(last), rest)
     } else {
