@@ -19,7 +19,7 @@ use crate::semantic_index::{
 use crate::types::bound_super::BoundSuperError;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
-use crate::types::diagnostic::INVALID_TYPE_ALIAS_TYPE;
+use crate::types::diagnostic::{CANNOT_OVERWRITE_ATTRIBUTE, INVALID_TYPE_ALIAS_TYPE};
 use crate::types::enums::enum_metadata;
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{
@@ -1394,6 +1394,16 @@ impl<'db> ClassLiteral<'db> {
         self.pep695_generic_context(db).is_some()
     }
 
+    pub(crate) fn has_dataclass_param(self, db: &dyn Db, param: DataclassFlags) -> bool {
+        self.dataclass_params(db)
+            .is_some_and(|params| params.flags(db).contains(param))
+            || self.dataclass_transformer_params(db).is_some_and(|params| {
+                DataclassParams::from_transformer_params(db, params)
+                    .flags(db)
+                    .contains(param)
+            })
+    }
+
     #[salsa::tracked(cycle_initial=generic_context_cycle_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
@@ -2202,24 +2212,7 @@ impl<'db> ClassLiteral<'db> {
         inherited_generic_context: Option<GenericContext<'db>>,
         name: &str,
     ) -> Option<Type<'db>> {
-        let dataclass_params = self.dataclass_params(db);
-
         let field_policy = CodeGeneratorKind::from_class(db, self, specialization)?;
-
-        let transformer_params =
-            if let CodeGeneratorKind::DataclassLike(Some(transformer_params)) = field_policy {
-                Some(DataclassParams::from_transformer_params(
-                    db,
-                    transformer_params,
-                ))
-            } else {
-                None
-            };
-
-        let has_dataclass_param = |param| {
-            dataclass_params.is_some_and(|params| params.flags(db).contains(param))
-                || transformer_params.is_some_and(|params| params.flags(db).contains(param))
-        };
 
         let instance_ty =
             Type::instance(db, self.apply_optional_specialization(db, specialization));
@@ -2298,7 +2291,7 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 let is_kw_only = name == "__replace__"
-                    || kw_only.unwrap_or(has_dataclass_param(DataclassFlags::KW_ONLY));
+                    || kw_only.unwrap_or(self.has_dataclass_param(db, DataclassFlags::KW_ONLY));
 
                 // Use the alias name if provided, otherwise use the field name
                 let parameter_name = alias.map(Name::new).unwrap_or(field_name);
@@ -2339,7 +2332,7 @@ impl<'db> ClassLiteral<'db> {
 
         match (field_policy, name) {
             (CodeGeneratorKind::DataclassLike(_), "__init__") => {
-                if !has_dataclass_param(DataclassFlags::INIT) {
+                if !self.has_dataclass_param(db, DataclassFlags::INIT) {
                     return None;
                 }
 
@@ -2354,7 +2347,7 @@ impl<'db> ClassLiteral<'db> {
                 signature_from_fields(vec![cls_parameter], Some(Type::none(db)))
             }
             (CodeGeneratorKind::DataclassLike(_), "__lt__" | "__le__" | "__gt__" | "__ge__") => {
-                if !has_dataclass_param(DataclassFlags::ORDER) {
+                if !self.has_dataclass_param(db, DataclassFlags::ORDER) {
                     return None;
                 }
 
@@ -2375,11 +2368,11 @@ impl<'db> ClassLiteral<'db> {
             (CodeGeneratorKind::DataclassLike(_), "__match_args__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
             {
-                if !has_dataclass_param(DataclassFlags::MATCH_ARGS) {
+                if !self.has_dataclass_param(db, DataclassFlags::MATCH_ARGS) {
                     return None;
                 }
 
-                let kw_only_default = has_dataclass_param(DataclassFlags::KW_ONLY);
+                let kw_only_default = self.has_dataclass_param(db, DataclassFlags::KW_ONLY);
 
                 let fields = self.fields(db, specialization, field_policy);
                 let match_args = fields
@@ -2397,8 +2390,8 @@ impl<'db> ClassLiteral<'db> {
             (CodeGeneratorKind::DataclassLike(_), "__weakref__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY311 =>
             {
-                if !has_dataclass_param(DataclassFlags::WEAKREF_SLOT)
-                    || !has_dataclass_param(DataclassFlags::SLOTS)
+                if !self.has_dataclass_param(db, DataclassFlags::WEAKREF_SLOT)
+                    || !self.has_dataclass_param(db, DataclassFlags::SLOTS)
                 {
                     return None;
                 }
@@ -2440,7 +2433,7 @@ impl<'db> ClassLiteral<'db> {
                 signature_from_fields(vec![self_parameter], Some(instance_ty))
             }
             (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
-                if has_dataclass_param(DataclassFlags::FROZEN) {
+                if self.has_dataclass_param(db, DataclassFlags::FROZEN) {
                     let signature = Signature::new(
                         Parameters::new([
                             Parameter::positional_or_keyword(Name::new_static("self"))
@@ -2458,11 +2451,12 @@ impl<'db> ClassLiteral<'db> {
             (CodeGeneratorKind::DataclassLike(_), "__slots__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
             {
-                has_dataclass_param(DataclassFlags::SLOTS).then(|| {
-                    let fields = self.fields(db, specialization, field_policy);
-                    let slots = fields.keys().map(|name| Type::string_literal(db, name));
-                    Type::heterogeneous_tuple(db, slots)
-                })
+                self.has_dataclass_param(db, DataclassFlags::SLOTS)
+                    .then(|| {
+                        let fields = self.fields(db, specialization, field_policy);
+                        let slots = fields.keys().map(|name| Type::string_literal(db, name));
+                        Type::heterogeneous_tuple(db, slots)
+                    })
             }
             (CodeGeneratorKind::TypedDict, "__setitem__") => {
                 let fields = self.fields(db, specialization, field_policy);
@@ -2809,6 +2803,38 @@ impl<'db> ClassLiteral<'db> {
             .flat_map(|(class, specialization)| class.own_fields(db, specialization, field_policy))
             // We collect into a FxOrderMap here to deduplicate attributes
             .collect()
+    }
+
+    pub(crate) fn validate_members(self, context: &InferContext<'db, '_>) {
+        let db = context.db();
+        let class_body_scope = self.body_scope(db);
+        let table = place_table(db, class_body_scope);
+        let use_def = use_def_map(db, class_body_scope);
+        for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
+            let result = place_from_declarations(db, declarations.clone());
+            let attr = result.ignore_conflicting_declarations();
+            let symbol = table.symbol(symbol_id);
+            let name = symbol.name();
+            if let Some(Type::FunctionLiteral(literal)) = attr.place.ignore_possibly_undefined()
+                && name == "__setattr__"
+            {
+                if let Some(CodeGeneratorKind::DataclassLike(_)) =
+                    CodeGeneratorKind::from_class(db, self, None)
+                    && self.has_dataclass_param(db, DataclassFlags::FROZEN)
+                {
+                    if let Some(builder) = context.report_lint(
+                        &CANNOT_OVERWRITE_ATTRIBUTE,
+                        literal.node(db, context.file(), context.module()),
+                    ) {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Cannot overwrite attribute __setattr__ in class {}",
+                            self.name(db)
+                        ));
+                        diagnostic.info("__setattr__");
+                    }
+                }
+            }
+        }
     }
 
     /// Returns a list of all annotated attributes defined in the body of this class. This is similar
