@@ -1160,6 +1160,16 @@
             }
           ]
         },
+        "unsound-dataclass-method-override": {
+          "title": "detects dataclasses with `frozen=True` that have a custom `__setattr__` or `__delattr__` implementation",
+          "description": "## What it does\nChecks for dataclass definitions that have both `frozen=True` and a custom `__setattr__` or\n`__delattr__` method defined.\n\n## Why is this bad?\nFrozen dataclasses synthesize `__setattr__` and `__delattr__` methods which raise a\n`FrozenInstanceError` to emulate immutability.\n\nOverriding either of these methods raises a runtime error.\n\n## Examples\n```python\nfrom dataclasses import dataclass\n\n@dataclass(frozen=True)\nclass A:\n    def __setattr__(self, name: str, value: object) -> None: ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "unsupported-base": {
           "title": "detects class bases that are unsupported as ty could not feasibly calculate the class's MRO",
           "description": "## What it does\nChecks for class definitions that have bases which are unsupported by ty.\n\n## Why is this bad?\nIf a class has a base that is an instance of a complex type such as a union type,\nty will not be able to resolve the [method resolution order] (MRO) for the class.\nThis will lead to an inferior understanding of your codebase and unpredictable\ntype-checking behavior.\n\n## Examples\n```python\nimport datetime\n\nclass A: ...\nclass B: ...\n\nif datetime.date.today().weekday() != 6:\n    C = A\nelse:\n    C = B\n\nclass D(C): ...  # error: [unsupported-base]\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order",

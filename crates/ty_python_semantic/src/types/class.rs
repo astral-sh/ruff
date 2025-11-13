@@ -21,7 +21,7 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_TYPE_ALIAS_TYPE, SUPER_CALL_IN_NAMED_TUPLE_METHOD,
-    report_conflicting_metaclass_from_bases,
+    UNSOUND_DATACLASS_METHOD_OVERRIDE, report_conflicting_metaclass_from_bases,
 };
 use crate::types::enums::{
     enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value,
@@ -2661,6 +2661,69 @@ impl<'db> StaticClassLiteral<'db> {
         Some(typed_dict_params_from_class_def(class_stmt))
     }
 
+    /// Returns dataclass params for this class, sourced from both dataclass params and dataclass
+    /// transform params
+    fn merged_dataclass_params(
+        self,
+        db: &'db dyn Db,
+        field_policy: CodeGeneratorKind<'db>,
+    ) -> (Option<DataclassParams<'db>>, Option<DataclassParams<'db>>) {
+        let dataclass_params = self.dataclass_params(db);
+
+        let mut transformer_params =
+            if let CodeGeneratorKind::DataclassLike(Some(transformer_params)) = field_policy {
+                Some(DataclassParams::from_transformer_params(
+                    db,
+                    transformer_params,
+                ))
+            } else {
+                None
+            };
+
+        // Dataclass transformer flags can be overwritten using class arguments.
+        if let Some(transformer_params) = transformer_params.as_mut() {
+            if let Some(class_def) = self.definition(db).kind(db).as_class() {
+                let module = parsed_module(db, self.file(db)).load(db);
+
+                if let Some(arguments) = &class_def.node(&module).arguments {
+                    let mut flags = transformer_params.flags(db);
+
+                    for keyword in &arguments.keywords {
+                        if let Some(arg_name) = &keyword.arg {
+                            if let Some(is_set) =
+                                keyword.value.as_boolean_literal_expr().map(|b| b.value)
+                            {
+                                for (flag_name, flag) in DATACLASS_FLAGS {
+                                    if arg_name.as_str() == *flag_name {
+                                        flags.set(*flag, is_set);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    *transformer_params =
+                        DataclassParams::new(db, flags, transformer_params.field_specifiers(db));
+                }
+            }
+        }
+
+        (dataclass_params, transformer_params)
+    }
+
+    /// Checks if the given dataclass parameter flag is set for this class.
+    /// This checks both the `dataclass_params` and `transformer_params`.
+    fn has_dataclass_param(
+        self,
+        db: &'db dyn Db,
+        field_policy: CodeGeneratorKind<'db>,
+        param: DataclassFlags,
+    ) -> bool {
+        let (dataclass_params, transformer_params) = self.merged_dataclass_params(db, field_policy);
+        dataclass_params.is_some_and(|params| params.flags(db).contains(param))
+            || transformer_params.is_some_and(|params| params.flags(db).contains(param))
+    }
+
     /// Return the explicit `metaclass` of this class, if one is defined.
     ///
     /// ## Note
@@ -3009,8 +3072,6 @@ impl<'db> StaticClassLiteral<'db> {
         inherited_generic_context: Option<GenericContext<'db>>,
         name: &str,
     ) -> Option<Type<'db>> {
-        let dataclass_params = self.dataclass_params(db);
-
         // Handle `@functools.total_ordering`: synthesize comparison methods
         // for classes that have `@total_ordering` and define at least one
         // ordering method. The decorator requires at least one of __lt__,
@@ -3060,53 +3121,6 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let field_policy = CodeGeneratorKind::from_class(db, self.into(), specialization)?;
-
-        let mut transformer_params =
-            if let CodeGeneratorKind::DataclassLike(Some(transformer_params)) = field_policy {
-                Some(DataclassParams::from_transformer_params(
-                    db,
-                    transformer_params,
-                ))
-            } else {
-                None
-            };
-
-        // Dataclass transformer flags can be overwritten using class arguments.
-        // TODO this should be done more generally, not just in `own_synthesized_member`, so that
-        // `dataclass_params` always reflects the transformer params.
-        if let Some(transformer_params) = transformer_params.as_mut() {
-            if let Some(class_def) = self.definition(db).kind(db).as_class() {
-                let module = parsed_module(db, self.file(db)).load(db);
-
-                if let Some(arguments) = &class_def.node(&module).arguments {
-                    let mut flags = transformer_params.flags(db);
-
-                    for keyword in &arguments.keywords {
-                        if let Some(arg_name) = &keyword.arg {
-                            if let Some(is_set) =
-                                keyword.value.as_boolean_literal_expr().map(|b| b.value)
-                            {
-                                for (flag_name, flag) in DATACLASS_FLAGS {
-                                    if arg_name.as_str() == *flag_name {
-                                        flags.set(*flag, is_set);
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    *transformer_params =
-                        DataclassParams::new(db, flags, transformer_params.field_specifiers(db));
-                }
-            }
-        }
-
-        let has_dataclass_param = |param| {
-            dataclass_params.is_some_and(|params| params.flags(db).contains(param))
-                // TODO if we were correctly initializing `dataclass_params` from the
-                // transformer params, this fallback shouldn't be needed here.
-                || transformer_params.is_some_and(|params| params.flags(db).contains(param))
-        };
 
         let instance_ty =
             Type::instance(db, self.apply_optional_specialization(db, specialization));
@@ -3229,7 +3243,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         match (field_policy, name) {
             (CodeGeneratorKind::DataclassLike(_), "__init__") => {
-                if !has_dataclass_param(DataclassFlags::INIT) {
+                if !self.has_dataclass_param(db, field_policy, DataclassFlags::INIT) {
                     return None;
                 }
 
@@ -3281,7 +3295,7 @@ impl<'db> StaticClassLiteral<'db> {
                 )
             }
             (CodeGeneratorKind::DataclassLike(_), "__lt__" | "__le__" | "__gt__" | "__ge__") => {
-                if !has_dataclass_param(DataclassFlags::ORDER) {
+                if !self.has_dataclass_param(db, field_policy, DataclassFlags::ORDER) {
                     return None;
                 }
 
@@ -3303,9 +3317,10 @@ impl<'db> StaticClassLiteral<'db> {
                 Some(Type::function_like_callable(db, signature))
             }
             (CodeGeneratorKind::DataclassLike(_), "__hash__") => {
-                let unsafe_hash = has_dataclass_param(DataclassFlags::UNSAFE_HASH);
-                let frozen = has_dataclass_param(DataclassFlags::FROZEN);
-                let eq = has_dataclass_param(DataclassFlags::EQ);
+                let unsafe_hash =
+                    self.has_dataclass_param(db, field_policy, DataclassFlags::UNSAFE_HASH);
+                let frozen = self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN);
+                let eq = self.has_dataclass_param(db, field_policy, DataclassFlags::EQ);
 
                 if unsafe_hash || (frozen && eq) {
                     let signature = Signature::new(
@@ -3328,11 +3343,12 @@ impl<'db> StaticClassLiteral<'db> {
             (CodeGeneratorKind::DataclassLike(_), "__match_args__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
             {
-                if !has_dataclass_param(DataclassFlags::MATCH_ARGS) {
+                if !self.has_dataclass_param(db, field_policy, DataclassFlags::MATCH_ARGS) {
                     return None;
                 }
 
-                let kw_only_default = has_dataclass_param(DataclassFlags::KW_ONLY);
+                let kw_only_default =
+                    self.has_dataclass_param(db, field_policy, DataclassFlags::KW_ONLY);
 
                 let fields = self.fields(db, specialization, field_policy);
                 let match_args = fields
@@ -3350,8 +3366,8 @@ impl<'db> StaticClassLiteral<'db> {
             (CodeGeneratorKind::DataclassLike(_), "__weakref__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY311 =>
             {
-                if !has_dataclass_param(DataclassFlags::WEAKREF_SLOT)
-                    || !has_dataclass_param(DataclassFlags::SLOTS)
+                if !self.has_dataclass_param(db, field_policy, DataclassFlags::WEAKREF_SLOT)
+                    || !self.has_dataclass_param(db, field_policy, DataclassFlags::SLOTS)
                 {
                     return None;
                 }
@@ -3394,7 +3410,7 @@ impl<'db> StaticClassLiteral<'db> {
                 signature_from_fields(vec![self_parameter], instance_ty)
             }
             (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
-                if has_dataclass_param(DataclassFlags::FROZEN) {
+                if self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN) {
                     let signature = Signature::new(
                         Parameters::new(
                             db,
@@ -3415,11 +3431,12 @@ impl<'db> StaticClassLiteral<'db> {
             (CodeGeneratorKind::DataclassLike(_), "__slots__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
             {
-                has_dataclass_param(DataclassFlags::SLOTS).then(|| {
-                    let fields = self.fields(db, specialization, field_policy);
-                    let slots = fields.keys().map(|name| Type::string_literal(db, name));
-                    Type::heterogeneous_tuple(db, slots)
-                })
+                self.has_dataclass_param(db, field_policy, DataclassFlags::SLOTS)
+                    .then(|| {
+                        let fields = self.fields(db, specialization, field_policy);
+                        let slots = fields.keys().map(|name| Type::string_literal(db, name));
+                        Type::heterogeneous_tuple(db, slots)
+                    })
             }
             (CodeGeneratorKind::TypedDict, "__setitem__") => {
                 let fields = self.fields(db, specialization, field_policy);
@@ -3861,6 +3878,42 @@ impl<'db> StaticClassLiteral<'db> {
             .flat_map(|(class, specialization)| class.own_fields(db, specialization, field_policy))
             // We collect into a FxOrderMap here to deduplicate attributes
             .collect()
+    }
+
+    pub(crate) fn validate_members(self, context: &InferContext<'db, '_>) {
+        let db = context.db();
+        let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self, None) else {
+            return;
+        };
+        let class_body_scope = self.body_scope(db);
+        let table = place_table(db, class_body_scope);
+        let use_def = use_def_map(db, class_body_scope);
+        for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
+            let result = place_from_declarations(db, declarations.clone());
+            let attr = result.ignore_conflicting_declarations();
+            let symbol = table.symbol(symbol_id);
+            let name = symbol.name();
+            if let Some(Type::FunctionLiteral(literal)) = attr.place.ignore_possibly_undefined()
+                && matches!(name.as_str(), "__setattr__" | "__delattr__")
+            {
+                if let Some(CodeGeneratorKind::DataclassLike(_)) =
+                    CodeGeneratorKind::from_static_class(db, self, None)
+                    && self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN)
+                {
+                    if let Some(builder) = context.report_lint(
+                        &UNSOUND_DATACLASS_METHOD_OVERRIDE,
+                        literal.node(db, context.file(), context.module()),
+                    ) {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Cannot overwrite attribute `{}` in class `{}`",
+                            name,
+                            self.name(db)
+                        ));
+                        diagnostic.info(name);
+                    }
+                }
+            }
+        }
     }
 
     /// Returns a list of all annotated attributes defined in the body of this class. This is similar

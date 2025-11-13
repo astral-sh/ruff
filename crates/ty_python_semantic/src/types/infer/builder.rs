@@ -1212,6 +1212,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
+
+            class.validate_members(&self.context);
         }
     }
 
