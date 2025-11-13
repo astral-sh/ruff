@@ -564,7 +564,7 @@ impl<'db> SemanticTokenVisitor<'db> {
             self.add_token(
                 parameter.name.range(),
                 token_type,
-                SemanticTokenModifier::empty(),
+                SemanticTokenModifier::DEFINITION,
             );
 
             // Handle parameter type annotations
@@ -1092,13 +1092,13 @@ class MyClass:
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "MyClass" @ 7..14: Class [definition]
         "method" @ 24..30: Method [definition]
-        "self" @ 31..35: SelfParameter
-        "x" @ 37..38: Parameter
+        "self" @ 31..35: SelfParameter [definition]
+        "x" @ 37..38: Parameter [definition]
         "self" @ 49..53: SelfParameter
         "x" @ 54..55: Variable
         "10" @ 58..60: Number
         "method_unidiomatic_self" @ 70..93: Method [definition]
-        "self2" @ 94..99: SelfParameter
+        "self2" @ 94..99: SelfParameter [definition]
         "print" @ 110..115: Function
         "self2" @ 116..121: SelfParameter
         "x" @ 122..123: Variable
@@ -1121,8 +1121,8 @@ class MyClass:
         "MyClass" @ 7..14: Class [definition]
         "classmethod" @ 21..32: Decorator
         "method" @ 41..47: Method [definition]
-        "cls" @ 48..51: ClsParameter
-        "x" @ 53..54: Parameter
+        "cls" @ 48..51: ClsParameter [definition]
+        "x" @ 53..54: Parameter [definition]
         "#);
     }
 
@@ -1142,8 +1142,8 @@ class MyClass:
         "MyClass" @ 7..14: Class [definition]
         "staticmethod" @ 21..33: Decorator
         "method" @ 42..48: Method [definition]
-        "x" @ 49..50: Parameter
-        "y" @ 52..53: Parameter
+        "x" @ 49..50: Parameter [definition]
+        "y" @ 52..53: Parameter [definition]
         "#);
     }
 
@@ -1164,19 +1164,19 @@ class MyClass:
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "MyClass" @ 7..14: Class [definition]
         "method" @ 24..30: Method [definition]
-        "instance" @ 31..39: SelfParameter
-        "x" @ 41..42: Parameter
+        "instance" @ 31..39: SelfParameter [definition]
+        "x" @ 41..42: Parameter [definition]
         "classmethod" @ 55..66: Decorator
         "other" @ 75..80: Method [definition]
-        "klass" @ 81..86: ClsParameter
-        "y" @ 88..89: Parameter
+        "klass" @ 81..86: ClsParameter [definition]
+        "y" @ 88..89: Parameter [definition]
         "complex_method" @ 105..119: Method [definition]
-        "instance" @ 120..128: SelfParameter
-        "posonly" @ 130..137: Parameter
-        "regular" @ 142..149: Parameter
-        "args" @ 152..156: Parameter
-        "kwonly" @ 158..164: Parameter
-        "kwargs" @ 168..174: Parameter
+        "instance" @ 120..128: SelfParameter [definition]
+        "posonly" @ 130..137: Parameter [definition]
+        "regular" @ 142..149: Parameter [definition]
+        "args" @ 152..156: Parameter [definition]
+        "kwonly" @ 158..164: Parameter [definition]
+        "kwargs" @ 168..174: Parameter [definition]
         "#);
     }
 
@@ -1197,7 +1197,7 @@ class MyClass:
         "CONSTANT" @ 20..28: Variable [definition, readonly]
         "42" @ 31..33: Number
         "method" @ 48..54: Method [definition, async]
-        "self" @ 55..59: SelfParameter
+        "self" @ 55..59: SelfParameter [definition]
         "#);
     }
 
@@ -1274,7 +1274,7 @@ result = check(None)
 
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "check" @ 5..10: Function [definition]
-        "value" @ 11..16: Parameter
+        "value" @ 11..16: Parameter [definition]
         "value" @ 26..31: Parameter
         "None" @ 35..39: BuiltinConstant
         "False" @ 56..61: BuiltinConstant
@@ -1548,11 +1548,11 @@ u = List.__name__        # __name__ should be variable
         "CONSTANT" @ 102..110: Variable [definition, readonly]
         "42" @ 113..115: Number
         "method" @ 125..131: Method [definition]
-        "self" @ 132..136: SelfParameter
+        "self" @ 132..136: SelfParameter [definition]
         "\"hello\"" @ 154..161: String
         "property" @ 168..176: Decorator
         "prop" @ 185..189: Method [definition]
-        "self" @ 190..194: SelfParameter
+        "self" @ 190..194: SelfParameter [definition]
         "self" @ 212..216: SelfParameter
         "CONSTANT" @ 217..225: Variable [readonly]
         "obj" @ 227..230: Variable [definition]
@@ -1677,9 +1677,9 @@ y: Optional[str] = None
         "List" @ 20..24: Variable
         "Optional" @ 26..34: Variable
         "function_with_annotations" @ 40..65: Function [definition]
-        "param1" @ 66..72: Parameter
+        "param1" @ 66..72: Parameter [definition]
         "int" @ 74..77: Class
-        "param2" @ 79..85: Parameter
+        "param2" @ 79..85: Parameter [definition]
         "str" @ 87..90: Class
         "Optional" @ 95..103: Variable
         "List" @ 104..108: Variable
@@ -1761,9 +1761,9 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
         "Optional" @ 26..34: Variable
         "MyClass" @ 42..49: Class [definition]
         "test_function" @ 65..78: Function [definition]
-        "param" @ 79..84: Parameter
+        "param" @ 79..84: Parameter [definition]
         "int" @ 86..89: Class
-        "other" @ 91..96: Parameter
+        "other" @ 91..96: Parameter [definition]
         "MyClass" @ 98..105: Class
         "Optional" @ 110..118: Variable
         "List" @ 119..123: Variable
@@ -1804,10 +1804,10 @@ def test_function(param: MyProtocol) -> None:
         "MyProtocol" @ 36..46: Class [definition]
         "Protocol" @ 47..55: Variable
         "method" @ 66..72: Method [definition]
-        "self" @ 73..77: SelfParameter
+        "self" @ 73..77: SelfParameter [definition]
         "int" @ 82..85: Class
         "test_function" @ 96..109: Function [definition]
-        "param" @ 110..115: Parameter
+        "param" @ 110..115: Parameter [definition]
         "MyProtocol" @ 117..127: Class
         "None" @ 132..136: BuiltinConstant
         "#);
@@ -1839,12 +1839,12 @@ def test_function(param: MyProtocol) -> MyProtocol:
         "MyProtocol" @ 36..46: Class [definition]
         "Protocol" @ 47..55: Variable
         "method" @ 66..72: Method [definition]
-        "self" @ 73..77: SelfParameter
+        "self" @ 73..77: SelfParameter [definition]
         "int" @ 82..85: Class
         "my_protocol_var" @ 166..181: Class [definition]
         "MyProtocol" @ 184..194: Class
         "test_function" @ 244..257: Function [definition]
-        "param" @ 258..263: Parameter
+        "param" @ 258..263: Parameter [definition]
         "MyProtocol" @ 265..275: Class
         "MyProtocol" @ 280..290: Class
         "param" @ 303..308: Parameter
@@ -1872,7 +1872,7 @@ def test_function(param: my_type_alias): ...
         "Test" @ 37..41: Class
         "str" @ 42..45: Class
         "test_function" @ 109..122: Function [definition]
-        "param" @ 123..128: Parameter
+        "param" @ 123..128: Parameter [definition]
         "my_type_alias" @ 130..143: Class
         "#);
     }
@@ -1894,7 +1894,7 @@ def test_function(param: my_type_alias): ...
         "type" @ 17..21: Class
         "str" @ 22..25: Class
         "test_function" @ 32..45: Function [definition]
-        "param" @ 46..51: Parameter
+        "param" @ 46..51: Parameter [definition]
         "my_type_alias" @ 53..66: Variable
         "#);
     }
@@ -1943,13 +1943,13 @@ class BoundedContainer[T: int, U = str]:
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "func" @ 87..91: Function [definition]
         "T" @ 92..93: TypeParameter [definition]
-        "x" @ 95..96: Parameter
+        "x" @ 95..96: Parameter [definition]
         "T" @ 98..99: TypeParameter
         "T" @ 104..105: TypeParameter
         "x" @ 118..119: Parameter
         "func_tuple" @ 162..172: Function [definition]
         "Ts" @ 174..176: TypeParameter [definition]
-        "args" @ 178..182: Parameter
+        "args" @ 178..182: Parameter [definition]
         "tuple" @ 184..189: Class
         "Ts" @ 191..193: Variable
         "tuple" @ 199..204: Class
@@ -1957,7 +1957,7 @@ class BoundedContainer[T: int, U = str]:
         "args" @ 222..226: Parameter
         "func_paramspec" @ 266..280: Function [definition]
         "P" @ 283..284: TypeParameter [definition]
-        "func" @ 286..290: Parameter
+        "func" @ 286..290: Parameter [definition]
         "Callable" @ 292..300: Variable
         "P" @ 301..302: Variable
         "int" @ 304..307: Class
@@ -1965,10 +1965,10 @@ class BoundedContainer[T: int, U = str]:
         "P" @ 322..323: Variable
         "str" @ 325..328: Class
         "wrapper" @ 339..346: Function [definition]
-        "args" @ 348..352: Parameter
+        "args" @ 348..352: Parameter [definition]
         "P" @ 354..355: Variable
         "args" @ 356..360: Variable
-        "kwargs" @ 364..370: Parameter
+        "kwargs" @ 364..370: Parameter [definition]
         "P" @ 372..373: Variable
         "kwargs" @ 374..380: Variable
         "str" @ 385..388: Class
@@ -1981,10 +1981,10 @@ class BoundedContainer[T: int, U = str]:
         "T" @ 514..515: TypeParameter [definition]
         "U" @ 517..518: TypeParameter [definition]
         "__init__" @ 529..537: Method [definition]
-        "self" @ 538..542: SelfParameter
-        "value1" @ 544..550: Parameter
+        "self" @ 538..542: SelfParameter [definition]
+        "value1" @ 544..550: Parameter [definition]
         "T" @ 552..553: TypeParameter
-        "value2" @ 555..561: Parameter
+        "value2" @ 555..561: Parameter [definition]
         "U" @ 563..564: TypeParameter
         "self" @ 575..579: SelfParameter
         "value1" @ 580..586: Variable
@@ -1995,12 +1995,12 @@ class BoundedContainer[T: int, U = str]:
         "U" @ 620..621: TypeParameter
         "value2" @ 624..630: Parameter
         "get_first" @ 640..649: Method [definition]
-        "self" @ 650..654: SelfParameter
+        "self" @ 650..654: SelfParameter [definition]
         "T" @ 659..660: TypeParameter
         "self" @ 677..681: SelfParameter
         "value1" @ 682..688: Variable
         "get_second" @ 698..708: Method [definition]
-        "self" @ 709..713: SelfParameter
+        "self" @ 709..713: SelfParameter [definition]
         "U" @ 718..719: TypeParameter
         "self" @ 736..740: SelfParameter
         "value2" @ 741..747: Variable
@@ -2010,10 +2010,10 @@ class BoundedContainer[T: int, U = str]:
         "U" @ 821..822: TypeParameter [definition]
         "str" @ 825..828: Class
         "process" @ 839..846: Method [definition]
-        "self" @ 847..851: SelfParameter
-        "x" @ 853..854: Parameter
+        "self" @ 847..851: SelfParameter [definition]
+        "x" @ 853..854: Parameter [definition]
         "T" @ 856..857: TypeParameter
-        "y" @ 859..860: Parameter
+        "y" @ 859..860: Parameter [definition]
         "U" @ 862..863: TypeParameter
         "tuple" @ 868..873: Class
         "T" @ 874..875: TypeParameter
@@ -2040,7 +2040,7 @@ def generic_function[T](value: T) -> T:
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "generic_function" @ 5..21: Function [definition]
         "T" @ 22..23: TypeParameter [definition]
-        "value" @ 25..30: Parameter
+        "value" @ 25..30: Parameter [definition]
         "T" @ 32..33: TypeParameter
         "T" @ 38..39: TypeParameter
         "result" @ 98..104: Variable [definition]
@@ -2348,7 +2348,7 @@ def process_data(data):
 
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "process_data" @ 5..17: Function [definition]
-        "data" @ 18..22: Parameter
+        "data" @ 18..22: Parameter [definition]
         "data" @ 35..39: Parameter
         "\"name\"" @ 55..61: String
         "name" @ 63..67: Variable
@@ -2443,7 +2443,7 @@ class C:
         "Self" @ 20..24: Variable
         "C" @ 33..34: Class [definition]
         "__init__" @ 44..52: Method [definition]
-        "self" @ 53..57: SelfParameter
+        "self" @ 53..57: SelfParameter [definition]
         "Self" @ 59..63: Variable
         "self" @ 74..78: SelfParameter
         "annotated" @ 79..88: Variable
@@ -2474,9 +2474,9 @@ def foo(self, **key, value=10):
 
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "foo" @ 5..8: Function [definition]
-        "self" @ 9..13: Parameter
-        "key" @ 17..20: Parameter
-        "value" @ 22..27: Parameter
+        "self" @ 9..13: Parameter [definition]
+        "key" @ 17..20: Parameter [definition]
+        "value" @ 22..27: Parameter [definition]
         "10" @ 28..30: Number
         "#);
     }
