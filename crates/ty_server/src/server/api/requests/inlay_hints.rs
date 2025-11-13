@@ -1,15 +1,16 @@
 use std::borrow::Cow;
 
+use lsp_types::request::InlayHintRequest;
+use lsp_types::{InlayHintParams, Url};
+use ty_ide::{InlayHintKind, InlayHintLabel, inlay_hints};
+use ty_project::ProjectDatabase;
+
 use crate::document::{RangeExt, TextSizeExt};
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
-use lsp_types::request::InlayHintRequest;
-use lsp_types::{InlayHintParams, Url};
-use ty_ide::{InlayHintKind, InlayHintLabel, inlay_hints};
-use ty_project::ProjectDatabase;
 
 pub(crate) struct InlayHintRequestHandler;
 
@@ -35,7 +36,7 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_file(db) else {
+        let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
 

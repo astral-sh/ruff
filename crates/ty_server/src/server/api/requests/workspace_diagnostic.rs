@@ -1,3 +1,23 @@
+use std::collections::BTreeMap;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+
+use lsp_server::RequestId;
+use lsp_types::request::WorkspaceDiagnosticRequest;
+use lsp_types::{
+    FullDocumentDiagnosticReport, PreviousResultId, ProgressToken,
+    UnchangedDocumentDiagnosticReport, Url, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
+    WorkspaceDiagnosticReportPartialResult, WorkspaceDiagnosticReportResult,
+    WorkspaceDocumentDiagnosticReport, WorkspaceFullDocumentDiagnosticReport,
+    WorkspaceUnchangedDocumentDiagnosticReport, notification::Notification,
+};
+use ruff_db::diagnostic::Diagnostic;
+use ruff_db::files::File;
+use ruff_db::source::source_text;
+use rustc_hash::FxHashMap;
+use serde::{Deserialize, Serialize};
+use ty_project::{ProgressReporter, ProjectDatabase};
+
 use crate::PositionEncoding;
 use crate::document::DocumentKey;
 use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
@@ -10,23 +30,6 @@ use crate::session::client::Client;
 use crate::session::index::Index;
 use crate::session::{SessionSnapshot, SuspendedWorkspaceDiagnosticRequest};
 use crate::system::file_to_url;
-use lsp_server::RequestId;
-use lsp_types::request::WorkspaceDiagnosticRequest;
-use lsp_types::{
-    FullDocumentDiagnosticReport, PreviousResultId, ProgressToken,
-    UnchangedDocumentDiagnosticReport, Url, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
-    WorkspaceDiagnosticReportPartialResult, WorkspaceDiagnosticReportResult,
-    WorkspaceDocumentDiagnosticReport, WorkspaceFullDocumentDiagnosticReport,
-    WorkspaceUnchangedDocumentDiagnosticReport, notification::Notification,
-};
-use ruff_db::diagnostic::Diagnostic;
-use ruff_db::files::File;
-use rustc_hash::FxHashMap;
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::sync::Mutex;
-use std::time::{Duration, Instant};
-use ty_project::{ProgressReporter, ProjectDatabase};
 
 /// Handler for [Workspace diagnostics](workspace-diagnostics)
 ///
@@ -368,6 +371,15 @@ impl<'a> ResponseWriter<'a> {
             tracing::debug!("Failed to convert file path to URL at {}", file.path(db));
             return;
         };
+
+        if source_text(db, file).is_notebook() {
+            // Notebooks only support publish diagnostics.
+            // and we can't convert text ranges to notebook ranges unless
+            // the document is open in the editor, in which case
+            // we publish the diagnostics already.
+            return;
+        }
+
         let key = DocumentKey::from_url(&url);
         let version = self
             .index
@@ -394,7 +406,7 @@ impl<'a> ResponseWriter<'a> {
             new_id => {
                 let lsp_diagnostics = diagnostics
                     .iter()
-                    .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, self.position_encoding))
+                    .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, self.position_encoding).1)
                     .collect::<Vec<_>>();
 
                 WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {

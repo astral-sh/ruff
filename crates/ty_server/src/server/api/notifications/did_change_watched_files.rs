@@ -26,8 +26,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         let mut events_by_db: FxHashMap<_, Vec<ChangeEvent>> = FxHashMap::default();
 
         for change in params.changes {
-            let key = DocumentKey::from_url(&change.uri);
-            let path = key.to_file_path();
+            let path = DocumentKey::from_url(&change.uri).into_file_path();
 
             let system_path = match path {
                 AnySystemPath::System(system) => system,
@@ -93,10 +92,9 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
             );
         } else {
             for key in session.text_document_handles() {
-                publish_diagnostics(session, key.url(), client);
+                publish_diagnostics(&key, session, client);
             }
         }
-        // TODO: always publish diagnostics for notebook files (since they don't use pull diagnostics)
 
         if client_capabilities.supports_inlay_hint_refresh() {
             client.send_request::<types::request::InlayHintRefreshRequest>(session, (), |_, ()| {});

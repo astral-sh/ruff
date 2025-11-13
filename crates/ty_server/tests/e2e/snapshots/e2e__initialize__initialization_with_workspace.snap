@@ -1,6 +1,5 @@
 ---
 source: crates/ty_server/tests/e2e/initialize.rs
-assertion_line: 32
 expression: initialization_result
 ---
 {
@@ -9,6 +8,18 @@ expression: initialization_result
     "textDocumentSync": {
       "openClose": true,
       "change": 2
+    },
+    "notebookDocumentSync": {
+      "notebookSelector": [
+        {
+          "cells": [
+            {
+              "language": "python"
+            }
+          ]
+        }
+      ],
+      "save": false
     },
     "selectionRangeProvider": true,
     "hoverProvider": true,
