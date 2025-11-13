@@ -312,7 +312,7 @@ impl CellOffsets {
     /// import os
     /// ```
     ///
-    /// The range `import c`..`import os`, contains a cell boundary because it starts before cell 2 and ends in cell 2 (end=cell2_boundary).
+    /// The range `import c`..`import os`, contains a cell boundary because it starts before cell 2 and ends in cell 2 (`end=cell2_boundary`).
     /// The `import os` contains no cell boundary because it starts at the start of cell 2 (at the cell boundary) but doesn't cross into another cell.
     pub fn has_cell_boundary(&self, range: TextRange) -> bool {
         let after_range_start = self.partition_point(|offset| *offset <= range.start());
