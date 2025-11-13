@@ -11486,7 +11486,15 @@ impl<'db> PEP695TypeAliasType<'db> {
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
 
-        definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
+        let ty =
+            definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value);
+        // A type alias where a value type points to itself is meaningless and would lead to infinite recursion. Replace it with `Unknown`.
+        if ty == Type::TypeAlias(TypeAliasType::PEP695(self)) {
+            // TODO: Emit a diagnostic for invalid recursive type alias.
+            Type::unknown()
+        } else {
+            ty
+        }
     }
 
     fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
