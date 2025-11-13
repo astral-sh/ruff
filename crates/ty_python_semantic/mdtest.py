@@ -13,6 +13,8 @@ import argparse
 import json
 import os
 import subprocess
+import sys
+import threading
 from pathlib import Path
 from typing import Final, Literal, assert_never
 
@@ -28,6 +30,7 @@ DIRS_TO_WATCH: Final = (
     CRATE_ROOT.parent / "ty_test/src",
 )
 MDTEST_DIR: Final = CRATE_ROOT / "resources" / "mdtest"
+MDTEST_README: Final = CRATE_ROOT / "resources" / "README.md"
 
 
 class MDTestRunner:
@@ -175,6 +178,16 @@ class MDTestRunner:
             print(line)
 
     def watch(self):
+        def keyboard_input() -> None:
+            for _ in sys.stdin:
+                # This is silly, but there is no other way to inject events into
+                # the main `watch` loop. We use changes to the `README.md` file
+                # as a trigger to re-run all mdtests:
+                MDTEST_README.touch()
+
+        input_thread = threading.Thread(target=keyboard_input, daemon=True)
+        input_thread.start()
+
         self._recompile_tests("Compiling tests...", message_on_success=False)
         self._run_mdtest(self.filters)
         self.console.print("[dim]Ready to watch for changes...[/dim]")
@@ -187,6 +200,11 @@ class MDTestRunner:
 
             for change, path_str in changes:
                 path = Path(path_str)
+
+                # See above: `README.md` changes trigger a full re-run of all tests
+                if path == MDTEST_README:
+                    self._run_mdtest(self.filters)
+                    continue
 
                 match path.suffix:
                     case ".rs":
