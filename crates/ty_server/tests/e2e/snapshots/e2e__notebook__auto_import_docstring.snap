@@ -1,0 +1,90 @@
+---
+source: crates/ty_server/tests/e2e/notebook.rs
+expression: completions
+---
+[
+  {
+    "label": "Literal (import typing)",
+    "kind": 6,
+    "sortText": " 43",
+    "insertText": "Literal",
+    "additionalTextEdits": [
+      {
+        "range": {
+          "start": {
+            "line": 1,
+            "character": 0
+          },
+          "end": {
+            "line": 1,
+            "character": 0
+          }
+        },
+        "newText": "from typing import Literal\n"
+      }
+    ]
+  },
+  {
+    "label": "Literal (import typing_extensions)",
+    "kind": 6,
+    "sortText": " 44",
+    "insertText": "Literal",
+    "additionalTextEdits": [
+      {
+        "range": {
+          "start": {
+            "line": 1,
+            "character": 0
+          },
+          "end": {
+            "line": 1,
+            "character": 0
+          }
+        },
+        "newText": "from typing_extensions import Literal\n"
+      }
+    ]
+  },
+  {
+    "label": "LiteralString (import typing)",
+    "kind": 6,
+    "sortText": " 45",
+    "insertText": "LiteralString",
+    "additionalTextEdits": [
+      {
+        "range": {
+          "start": {
+            "line": 1,
+            "character": 0
+          },
+          "end": {
+            "line": 1,
+            "character": 0
+          }
+        },
+        "newText": "from typing import LiteralString\n"
+      }
+    ]
+  },
+  {
+    "label": "LiteralString (import typing_extensions)",
+    "kind": 6,
+    "sortText": " 46",
+    "insertText": "LiteralString",
+    "additionalTextEdits": [
+      {
+        "range": {
+          "start": {
+            "line": 1,
+            "character": 0
+          },
+          "end": {
+            "line": 1,
+            "character": 0
+          }
+        },
+        "newText": "from typing_extensions import LiteralString\n"
+      }
+    ]
+  }
+]
