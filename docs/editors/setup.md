@@ -361,16 +361,38 @@ and [LSP-ruff](https://github.com/sublimelsp/LSP-ruff) package.
 
 ## PyCharm
 
-PyCharm users can enable native Ruff support in the settings:
+### Via External Tool
+
+Ruff can be installed as an [External Tool](https://www.jetbrains.com/help/pycharm/configuring-third-party-tools.html)
+in PyCharm. Open the Preferences pane, then navigate to "Tools", then "External Tools". From there,
+add a new tool with the following configuration:
+
+![Install Ruff as an External Tool](https://github.com/user-attachments/assets/2b7af3e4-8196-4c64-a721-5bc3d7564a72)
+
+Ruff should then appear as a runnable action:
+
+![Ruff as a runnable action](https://user-images.githubusercontent.com/1309177/193156026-732b0aaf-3dd9-4549-9b4d-2de6d2168a33.png)
+
+### Via third-party plugin
+
+Ruff is also available as the [Ruff](https://plugins.jetbrains.com/plugin/20574-ruff) plugin on the
+IntelliJ Marketplace (maintained by [@koxudaxi](https://github.com/koxudaxi)).
+
+### Native support
+
+Starting with version 2025.3, PyCharm users can enable native Ruff support in the settings:
 
 1. Go to **Python | Tools | Ruff** in the Settings dialog.
-2. Select the **Enable** checkbox.
-3. In the Execution mode setting, select how PyCharm should search for the executable:
 
-   **Interpreter** mode: PyCharm searches for an executable installed in your interpreter. To install the Ruff package for the selected interpreter, click _Install Ruff_.
+1. Select the **Enable** checkbox.
 
-   **Path** mode: PyCharm searches for an executable in `$PATH`. If the executable is not found, you can specify the path by clicking the Browse... icon.
-4. Select which options should be enabled.
+1. In the Execution mode setting, select how PyCharm should search for the executable:
+
+    **Interpreter** mode: PyCharm searches for an executable installed in your interpreter. To install the Ruff package for the selected interpreter, click _Install Ruff_.
+
+    **Path** mode: PyCharm searches for an executable in `$PATH`. If the executable is not found, you can specify the path by clicking the Browse... icon.
+
+1. Select which options should be enabled.
 
 For more information, refer to [PyCharm documentation](https://www.jetbrains.com/help/pycharm/2025.3/lsp-tools.html#ruff).
 
