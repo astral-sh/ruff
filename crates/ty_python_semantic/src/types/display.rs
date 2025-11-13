@@ -16,6 +16,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::Db;
 use crate::module_resolver::file_to_module;
+use crate::semantic_index::definition::Definition;
 use crate::semantic_index::{scope::ScopeKind, semantic_index};
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
@@ -40,6 +41,9 @@ pub struct DisplaySettings<'db> {
     pub qualified: Rc<FxHashMap<&'db str, QualificationLevel>>,
     /// Whether long unions and literals are displayed in full
     pub preserve_full_unions: bool,
+    /// Disallow Signature printing to introduce a name
+    /// (presumably because we rendered one already)
+    pub disallow_signature_name: bool,
 }
 
 impl<'db> DisplaySettings<'db> {
@@ -55,6 +59,14 @@ impl<'db> DisplaySettings<'db> {
     pub fn singleline(&self) -> Self {
         Self {
             multiline: false,
+            ..self.clone()
+        }
+    }
+
+    #[must_use]
+    pub fn disallow_signature_name(&self) -> Self {
+        Self {
+            disallow_signature_name: true,
             ..self.clone()
         }
     }
@@ -473,7 +485,7 @@ impl Display for DisplayRepresentation<'_> {
                             type_parameters = type_parameters,
                             signature = signature
                                 .bind_self(self.db, Some(typing_self_ty))
-                                .display_with(self.db, self.settings.clone())
+                                .display_with(self.db, self.settings.disallow_signature_name())
                         )
                     }
                     signatures => {
@@ -768,7 +780,7 @@ impl Display for DisplayOverloadLiteral<'_> {
             "def {name}{type_parameters}{signature}",
             name = self.literal.name(self.db),
             type_parameters = type_parameters,
-            signature = signature.display_with(self.db, self.settings.clone())
+            signature = signature.display_with(self.db, self.settings.disallow_signature_name())
         )
     }
 }
@@ -810,7 +822,8 @@ impl Display for DisplayFunctionType<'_> {
                     "def {name}{type_parameters}{signature}",
                     name = self.ty.name(self.db),
                     type_parameters = type_parameters,
-                    signature = signature.display_with(self.db, self.settings.clone())
+                    signature =
+                        signature.display_with(self.db, self.settings.disallow_signature_name())
                 )
             }
             signatures => {
@@ -1081,6 +1094,7 @@ impl<'db> Signature<'db> {
         settings: DisplaySettings<'db>,
     ) -> DisplaySignature<'db> {
         DisplaySignature {
+            definition: self.definition(),
             parameters: self.parameters(),
             return_ty: self.return_ty,
             db,
@@ -1090,6 +1104,7 @@ impl<'db> Signature<'db> {
 }
 
 pub(crate) struct DisplaySignature<'db> {
+    definition: Option<Definition<'db>>,
     parameters: &'db Parameters<'db>,
     return_ty: Option<Type<'db>>,
     db: &'db dyn Db,
@@ -1111,6 +1126,18 @@ impl DisplaySignature<'_> {
     /// Internal method to write signature with the signature writer
     fn write_signature(&self, writer: &mut SignatureWriter) -> fmt::Result {
         let multiline = self.settings.multiline && self.parameters.len() > 1;
+        // If we're multiline printing and a name hasn't been emitted, try to
+        // make one up to make things more pretty
+        if multiline && !self.settings.disallow_signature_name {
+            writer.write_str("def ")?;
+            if let Some(definition) = self.definition
+                && let Some(name) = definition.name(self.db)
+            {
+                writer.write_str(&name)?;
+            } else {
+                writer.write_str("_")?;
+            }
+        }
         // Opening parenthesis
         writer.write_char('(')?;
         if multiline {
@@ -1979,7 +2006,7 @@ mod tests {
                 Some(Type::none(&db))
             ),
             @r"
-        (
+        def _(
             x=int,
             y: str = str
         ) -> None
@@ -1997,7 +2024,7 @@ mod tests {
                 Some(Type::none(&db))
             ),
             @r"
-        (
+        def _(
             x,
             y,
             /
@@ -2016,7 +2043,7 @@ mod tests {
                 Some(Type::none(&db))
             ),
             @r"
-        (
+        def _(
             x,
             /,
             y
@@ -2035,7 +2062,7 @@ mod tests {
                 Some(Type::none(&db))
             ),
             @r"
-        (
+        def _(
             *,
             x,
             y
@@ -2054,7 +2081,7 @@ mod tests {
                 Some(Type::none(&db))
             ),
             @r"
-        (
+        def _(
             x,
             *,
             y
@@ -2093,7 +2120,7 @@ mod tests {
                 Some(KnownClass::Bytes.to_instance(&db))
             ),
             @r"
-        (
+        def _(
             a,
             b: int,
             c=Literal[1],
