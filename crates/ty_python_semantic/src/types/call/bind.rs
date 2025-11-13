@@ -2797,11 +2797,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         })
                 };
 
+                eprintln!("===> infer spec");
+                eprintln!(" --> arg   {}", argument_type.display(self.db));
+                eprintln!(" --> param {}", expected_type.display(self.db));
                 if let Err(error) = builder.infer_filter(
                     expected_type,
                     variadic_argument_type.unwrap_or(argument_type),
                     filter,
                 ) {
+                    eprintln!(" --> SPEC ERROR");
                     self.errors.push(BindingError::SpecializationError {
                         error,
                         argument_index: adjusted_argument_index,
@@ -2863,6 +2867,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             // TODO: Soon we will go further, and build the actual specializations from the
             // constraint set that we get from this assignability check, instead of inferring and
             // building them in an earlier separate step.
+            let when =
+                argument_type.when_assignable_to(self.db, expected_ty, self.inferable_typevars);
+            eprintln!("===> check argument");
+            eprintln!(" --> arg   {}", argument_type.display(self.db));
+            eprintln!(" --> param {}", expected_ty.display(self.db));
+            eprintln!(" --> when  {}", when.display(self.db));
+            eprintln!(
+                " --> sat   {}",
+                when.satisfied_by_all_typevars(self.db, self.inferable_typevars)
+            );
             if !argument_type
                 .when_assignable_to(self.db, expected_ty, self.inferable_typevars)
                 .satisfied_by_all_typevars(self.db, self.inferable_typevars)

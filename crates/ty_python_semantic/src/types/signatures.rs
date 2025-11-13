@@ -833,19 +833,22 @@ impl<'db> Signature<'db> {
         let mut check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
             let type1 = type1.unwrap_or(Type::unknown());
             let type2 = type2.unwrap_or(Type::unknown());
-            !result
-                .intersect(
-                    db,
-                    type1.has_relation_to_impl(
-                        db,
-                        type2,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    ),
-                )
-                .is_never_satisfied(db)
+            eprintln!(" --> check param");
+            eprintln!("     {}", type1.display(db));
+            eprintln!("     {}", type2.display(db));
+            let x = type1.has_relation_to_impl(
+                db,
+                type2,
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            );
+            eprintln!("     x {}", x.display(db),);
+            let y = result.intersect(db, x);
+            eprintln!("     y {}", y.display(db),);
+            eprintln!("     ? {}", !y.is_never_satisfied(db));
+            !y.is_never_satisfied(db)
         };
 
         // Return types are covariant.
@@ -889,6 +892,7 @@ impl<'db> Signature<'db> {
             let Some(next_parameter) = parameters.next() else {
                 // All parameters have been checked or both the parameter lists were empty. In
                 // either case, `self` is a subtype of `other`.
+                eprintln!(" --> X1 {}", result.display(db));
                 return result;
             };
 
@@ -909,6 +913,7 @@ impl<'db> Signature<'db> {
                         // `other`, then the non-variadic parameters in `self` must have a default
                         // value.
                         if default_type.is_none() {
+                            eprintln!(" --> X2");
                             return ConstraintSet::from(false);
                         }
                     }
@@ -921,6 +926,7 @@ impl<'db> Signature<'db> {
                 EitherOrBoth::Right(_) => {
                     // If there are more parameters in `other` than in `self`, then `self` is not a
                     // subtype of `other`.
+                    eprintln!(" --> X3");
                     return ConstraintSet::from(false);
                 }
 
@@ -941,12 +947,14 @@ impl<'db> Signature<'db> {
                             },
                         ) => {
                             if self_default.is_none() && other_default.is_some() {
+                                eprintln!(" --> X4");
                                 return ConstraintSet::from(false);
                             }
                             if !check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
+                                eprintln!(" --> X5");
                                 return result;
                             }
                         }
@@ -962,16 +970,19 @@ impl<'db> Signature<'db> {
                             },
                         ) => {
                             if self_name != other_name {
+                                eprintln!(" --> X6");
                                 return ConstraintSet::from(false);
                             }
                             // The following checks are the same as positional-only parameters.
                             if self_default.is_none() && other_default.is_some() {
+                                eprintln!(" --> X7");
                                 return ConstraintSet::from(false);
                             }
                             if !check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
+                                eprintln!(" --> X8");
                                 return result;
                             }
                         }
@@ -985,6 +996,7 @@ impl<'db> Signature<'db> {
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
+                                eprintln!(" --> X9");
                                 return result;
                             }
 
@@ -1025,6 +1037,7 @@ impl<'db> Signature<'db> {
                                     other_parameter.annotated_type(),
                                     self_parameter.annotated_type(),
                                 ) {
+                                    eprintln!(" --> X10");
                                     return result;
                                 }
                                 parameters.next_other();
@@ -1036,6 +1049,7 @@ impl<'db> Signature<'db> {
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
+                                eprintln!(" --> X11");
                                 return result;
                             }
                         }
@@ -1051,12 +1065,16 @@ impl<'db> Signature<'db> {
                             break;
                         }
 
-                        _ => return ConstraintSet::from(false),
+                        _ => {
+                            eprintln!(" --> X12");
+                            return ConstraintSet::from(false);
+                        }
                     }
                 }
             }
         }
 
+        eprintln!(" --> YYY");
         // At this point, the remaining parameters in `other` are keyword-only or keyword variadic.
         // But, `self` could contain any unmatched positional parameters.
         let (self_parameters, other_parameters) = parameters.into_remaining();
