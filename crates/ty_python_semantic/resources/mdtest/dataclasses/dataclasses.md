@@ -452,8 +452,7 @@ from dataclasses import dataclass
 class MyFrozenClass:
     x: int
 
-    # TODO: Emit a diagnostic here
-    def __setattr__(self, name: str, value: object) -> None: ...
+    def __setattr__(self, name: str, value: object) -> None: ...  # error: [cannot-overwrite-attribute]
 
     # TODO: Emit a diagnostic here
     def __delattr__(self, name: str) -> None: ...
