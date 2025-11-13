@@ -324,7 +324,7 @@ fn document_revision(document: &Document, index: &Index) -> FileRevision {
 
             // Use higher 64 bits for notebook version and lower 64 bits for cell revisions
             let notebook_version_high = (notebook.version() as u128) << 64;
-            let cell_versions_low = (hasher.finish() as u128) & 0xFFFF_FFFF_FFFF_FFFF;
+            let cell_versions_low = u128::from(hasher.finish()) & 0xFFFF_FFFF_FFFF_FFFF;
             let combined_revision = notebook_version_high | cell_versions_low;
 
             FileRevision::new(combined_revision)
