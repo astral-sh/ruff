@@ -69,7 +69,7 @@ def name_or_age() -> Literal["name", "age"]:
 carol: Person = {NAME: "Carol", AGE: 20}
 
 reveal_type(carol[NAME])  # revealed: str
-# error: [invalid-key] "Invalid key of type `str` for TypedDict `Person`"
+# error: [invalid-key] "TypedDict `Person` can only be subscripted with string literal keys, got key of type `str`"
 reveal_type(carol[non_literal()])  # revealed: Unknown
 reveal_type(carol[name_or_age()])  # revealed: str | int | None
 
@@ -553,7 +553,7 @@ def _(
     # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "non_existing""
     reveal_type(person["non_existing"])  # revealed: Unknown
 
-    # error: [invalid-key] "Invalid key of type `str` for TypedDict `Person`"
+    # error: [invalid-key] "TypedDict `Person` can only be subscripted with string literal keys, got key of type `str`"
     reveal_type(person[str_key])  # revealed: Unknown
 
     # No error here:
@@ -631,10 +631,10 @@ def _(person: Person, union_of_keys: Literal["name", "age"], unknown_value: Any)
     person[union_of_keys] = None
 
 def _(person: Person, str_key: str, literalstr_key: LiteralString):
-    # error: [invalid-key] "Cannot access `Person` with a key of type `str`. Only string literals are allowed as keys on TypedDicts."
+    # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`."
     person[str_key] = None
 
-    # error: [invalid-key] "Cannot access `Person` with a key of type `LiteralString`. Only string literals are allowed as keys on TypedDicts."
+    # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `LiteralString`."
     person[literalstr_key] = None
 
 def _(person: Person, unknown_key: Any):

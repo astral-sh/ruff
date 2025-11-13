@@ -89,7 +89,7 @@ info: rule `invalid-key` is enabled by default
 ```
 
 ```
-error[invalid-key]: Invalid key of type `str` for TypedDict `Person`
+error[invalid-key]: TypedDict `Person` can only be subscripted with string literal keys, got key of type `str`
   --> src/mdtest_snippet.py:16:12
    |
 15 | def access_with_str_key(person: Person, str_key: str):
@@ -146,7 +146,7 @@ info: rule `invalid-key` is enabled by default
 ```
 
 ```
-error[invalid-key]: Cannot access `Person` with a key of type `str`. Only string literals are allowed as keys on TypedDicts.
+error[invalid-key]: TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`.
   --> src/mdtest_snippet.py:25:12
    |
 24 | def write_to_non_literal_string_key(person: Person, str_key: str):
