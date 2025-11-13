@@ -104,3 +104,27 @@ from typing import Callable
 def _(c: Callable[]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
+
+### `typing.Tuple`
+
+```py
+from typing import Tuple
+
+# error: [invalid-syntax] "Expected index or slice expression"
+InvalidEmptyTuple = Tuple[]
+
+def _(t: InvalidEmptyTuple):
+    reveal_type(t)  # revealed: tuple[Unknown]
+```
+
+### `typing.Union`
+
+```py
+from typing import Union
+
+# error: [invalid-syntax] "Expected index or slice expression"
+InvalidEmptyUnion = Union[]
+
+def _(u: InvalidEmptyUnion):
+    reveal_type(u)  # revealed: Unknown
+```

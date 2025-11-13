@@ -1,6 +1,6 @@
 # Regression test for https://github.com/astral-sh/ruff/pull/20962
 # error message:
-# `place_by_id(Id(3002)): execute: too many cycle iterations`
+# `place_by_id: execute: too many cycle iterations`
 
 name_5(name_3)
 [0 for unique_name_0 in unique_name_1 for unique_name_2 in name_3]

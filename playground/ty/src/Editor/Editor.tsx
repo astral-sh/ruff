@@ -70,13 +70,16 @@ export default function Editor({
   const serverRef = useRef<PlaygroundServer | null>(null);
 
   if (serverRef.current != null) {
-    serverRef.current.update({
-      files,
-      workspace,
-      onOpenFile,
-      onVendoredFileChange,
-      onBackToUserFile,
-    });
+    serverRef.current.update(
+      {
+        files,
+        workspace,
+        onOpenFile,
+        onVendoredFileChange,
+        onBackToUserFile,
+      },
+      isViewingVendoredFile,
+    );
   }
 
   // Update the diagnostics in the editor.
@@ -200,6 +203,7 @@ class PlaygroundServer
   private rangeSemanticTokensDisposable: IDisposable;
   private signatureHelpDisposable: IDisposable;
   private documentHighlightDisposable: IDisposable;
+  private inVendoredFileCondition: editor.IContextKey<boolean>;
   // Cache for vendored file handles
   private vendoredFileHandles = new Map<string, FileHandle>();
 
@@ -249,8 +253,16 @@ class PlaygroundServer
     this.documentHighlightDisposable =
       monaco.languages.registerDocumentHighlightProvider("python", this);
 
+    this.inVendoredFileCondition = editor.createContextKey<boolean>(
+      "inVendoredFile",
+      false,
+    );
     // Register Esc key command
-    editor.addCommand(monaco.KeyCode.Escape, this.props.onBackToUserFile);
+    editor.addCommand(
+      monaco.KeyCode.Escape,
+      () => this.props.onBackToUserFile(),
+      "inVendoredFile",
+    );
   }
 
   triggerCharacters: string[] = ["."];
@@ -452,8 +464,9 @@ class PlaygroundServer
     return undefined;
   }
 
-  update(props: PlaygroundServerProps) {
+  update(props: PlaygroundServerProps, isViewingVendoredFile: boolean) {
     this.props = props;
+    this.inVendoredFileCondition.set(isViewingVendoredFile);
   }
 
   private getOrCreateVendoredFileHandle(vendoredPath: string): FileHandle {

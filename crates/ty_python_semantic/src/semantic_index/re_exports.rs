@@ -39,7 +39,13 @@ pub(super) fn exported_names(db: &dyn Db, file: File) -> Box<[Name]> {
     let module = parsed_module(db, file).load(db);
     let mut finder = ExportFinder::new(db, file);
     finder.visit_body(module.suite());
-    finder.resolve_exports()
+
+    let mut exports = finder.resolve_exports();
+
+    // Sort the exports to ensure convergence regardless of hash map
+    // or insertion order. See <https://github.com/astral-sh/ty/issues/444>
+    exports.sort_unstable();
+    exports.into()
 }
 
 struct ExportFinder<'db> {
@@ -69,7 +75,7 @@ impl<'db> ExportFinder<'db> {
         }
     }
 
-    fn resolve_exports(self) -> Box<[Name]> {
+    fn resolve_exports(self) -> Vec<Name> {
         match self.dunder_all {
             DunderAll::NotPresent => self
                 .exports

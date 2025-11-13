@@ -5,15 +5,15 @@ mod notebook;
 mod range;
 mod text_document;
 
-pub(crate) use location::ToLink;
 use lsp_types::{PositionEncodingKind, Url};
+use ruff_db::system::{SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 
 use crate::system::AnySystemPath;
+pub(crate) use location::ToLink;
 pub use notebook::NotebookDocument;
 pub(crate) use range::{FileRangeExt, PositionExt, RangeExt, TextSizeExt, ToRangeExt};
-use ruff_db::system::{SystemPathBuf, SystemVirtualPath};
-pub(crate) use text_document::DocumentVersion;
 pub use text_document::TextDocument;
+pub(crate) use text_document::{DocumentVersion, LanguageId};
 
 /// A convenient enumeration for supported text encodings. Can be converted to [`lsp_types::PositionEncodingKind`].
 // Please maintain the order from least to greatest priority for the derived `Ord` impl.
@@ -84,13 +84,6 @@ impl DocumentKey {
         }
     }
 
-    pub(crate) fn as_opaque(&self) -> Option<&str> {
-        match self {
-            Self::Opaque(uri) => Some(uri),
-            Self::File(_) => None,
-        }
-    }
-
     /// Returns the corresponding [`AnySystemPath`] for this document key.
     ///
     /// Note, calling this method on a `DocumentKey::Opaque` representing a cell document
@@ -102,6 +95,13 @@ impl DocumentKey {
             Self::Opaque(uri) => {
                 AnySystemPath::SystemVirtual(SystemVirtualPath::new(uri).to_path_buf())
             }
+        }
+    }
+
+    pub(super) fn into_file_path(self) -> AnySystemPath {
+        match self {
+            Self::File(path) => AnySystemPath::System(path),
+            Self::Opaque(uri) => AnySystemPath::SystemVirtual(SystemVirtualPathBuf::from(uri)),
         }
     }
 }

@@ -766,11 +766,12 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
     }
 
     for operation in fixer.with_renames() {
-        checker.report_diagnostic(
+        let mut diagnostic = checker.report_diagnostic(
             DeprecatedImport {
                 deprecation: Deprecation::WithRename(operation),
             },
             import_from_stmt.range(),
         );
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
 }

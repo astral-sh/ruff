@@ -491,6 +491,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [PyTorch](https://github.com/pytorch/pytorch)
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [Pylint](https://github.com/PyCQA/pylint)
+- [PyScripter](https://github.com/pyscripter/pyscripter)
 - [PyVista](https://github.com/pyvista/pyvista)
 - [Reflex](https://github.com/reflex-dev/reflex)
 - [River](https://github.com/online-ml/river)

@@ -186,35 +186,66 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_scope_info().file_scope_id
     }
 
-    /// Returns the scope ID of the surrounding class body scope if the current scope
-    /// is a method inside a class body. Returns `None` otherwise, e.g. if the current
-    /// scope is a function body outside of a class, or if the current scope is not a
+    /// Returns the scope ID of the current scope if the current scope
+    /// is a method inside a class body or an eagerly executed scope inside a method.
+    /// Returns `None` otherwise, e.g. if the current scope is a function body outside of a class, or if the current scope is not a
     /// function body.
-    fn is_method_of_class(&self) -> Option<FileScopeId> {
-        let mut scopes_rev = self.scope_stack.iter().rev();
+    fn is_method_or_eagerly_executed_in_method(&self) -> Option<FileScopeId> {
+        let mut scopes_rev = self
+            .scope_stack
+            .iter()
+            .rev()
+            .skip_while(|scope| self.scopes[scope.file_scope_id].is_eager());
         let current = scopes_rev.next()?;
 
         if self.scopes[current.file_scope_id].kind() != ScopeKind::Function {
             return None;
         }
 
+        let maybe_method = current.file_scope_id;
         let parent = scopes_rev.next()?;
 
         match self.scopes[parent.file_scope_id].kind() {
-            ScopeKind::Class => Some(parent.file_scope_id),
+            ScopeKind::Class => Some(maybe_method),
             ScopeKind::TypeParams => {
                 // If the function is generic, the parent scope is an annotation scope.
                 // In this case, we need to go up one level higher to find the class scope.
                 let grandparent = scopes_rev.next()?;
 
                 if self.scopes[grandparent.file_scope_id].kind() == ScopeKind::Class {
-                    Some(grandparent.file_scope_id)
+                    Some(maybe_method)
                 } else {
                     None
                 }
             }
             _ => None,
         }
+    }
+
+    /// Checks if a symbol name is bound in any intermediate eager scopes
+    /// between the current scope and the specified method scope.
+    ///
+    fn is_symbol_bound_in_intermediate_eager_scopes(
+        &self,
+        symbol_name: &str,
+        method_scope_id: FileScopeId,
+    ) -> bool {
+        for scope_info in self.scope_stack.iter().rev() {
+            let scope_id = scope_info.file_scope_id;
+
+            if scope_id == method_scope_id {
+                break;
+            }
+
+            if let Some(symbol_id) = self.place_tables[scope_id].symbol_id(symbol_name) {
+                let symbol = self.place_tables[scope_id].symbol(symbol_id);
+                if symbol.is_bound() {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 
     /// Push a new loop, returning the outer loop, if any.
@@ -283,6 +314,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     // Records snapshots of the place states visible from the current eager scope.
     fn record_eager_snapshots(&mut self, popped_scope_id: FileScopeId) {
+        let popped_scope = &self.scopes[popped_scope_id];
+        let popped_scope_is_annotation_scope = popped_scope.kind().is_annotation();
+
         // If the scope that we just popped off is an eager scope, we need to "lock" our view of
         // which bindings reach each of the uses in the scope. Loop through each enclosing scope,
         // looking for any that bind each place.
@@ -297,6 +331,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // ```
         for enclosing_scope_info in self.scope_stack.iter().rev() {
             let enclosing_scope_id = enclosing_scope_info.file_scope_id;
+            let is_immediately_enclosing_scope = popped_scope.parent() == Some(enclosing_scope_id);
             let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();
             let enclosing_place_table = &self.place_tables[enclosing_scope_id];
 
@@ -324,6 +359,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         enclosing_place_id,
                         enclosing_scope_kind,
                         enclosing_place,
+                        popped_scope_is_annotation_scope && is_immediately_enclosing_scope,
                     );
                 self.enclosing_snapshots.insert(key, eager_snapshot);
             }
@@ -398,6 +434,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     enclosed_symbol_id.into(),
                     enclosing_scope_kind,
                     enclosing_place.into(),
+                    false,
                 );
                 self.enclosing_snapshots.insert(key, lazy_snapshot);
             }
@@ -1451,7 +1488,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 // If we see:
                 //
-                // * `from .x.y import z` (must be relative!)
+                // * `from .x.y import z` (or `from whatever.thispackage.x.y`)
                 // * And we are in an `__init__.py(i)` (hereafter `thispackage`)
                 // * And this is the first time we've seen `from .x` in this module
                 // * And we're in the global scope
@@ -1465,25 +1502,35 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // reasons but it works well for most practical purposes. In particular it's nice
                 // that `x` can be freely overwritten, and that we don't assume that an import
                 // in one function is visible in another function.
-                //
-                // TODO: Also support `from thispackage.x.y import z`?
-                if self.current_scope() == FileScopeId::global()
-                    && node.level == 1
-                    && let Some(submodule) = &node.module
-                    && let Some(parsed_submodule) = ModuleName::new(submodule.as_str())
-                    && let Some(direct_submodule) = parsed_submodule.components().next()
-                    && self.file.is_package(self.db)
-                    && !self.seen_submodule_imports.contains(direct_submodule)
+                let mut is_self_import = false;
+                if self.file.is_package(self.db)
+                    && let Ok(module_name) = ModuleName::from_identifier_parts(
+                        self.db,
+                        self.file,
+                        node.module.as_deref(),
+                        node.level,
+                    )
+                    && let Ok(thispackage) = ModuleName::package_for_file(self.db, self.file)
                 {
-                    self.seen_submodule_imports
-                        .insert(direct_submodule.to_owned());
+                    // Record whether this is equivalent to `from . import ...`
+                    is_self_import = module_name == thispackage;
 
-                    let direct_submodule_name = Name::new(direct_submodule);
-                    let symbol = self.add_symbol(direct_submodule_name);
-                    self.add_definition(
-                        symbol.into(),
-                        ImportFromSubmoduleDefinitionNodeRef { node, submodule },
-                    );
+                    if node.module.is_some()
+                        && let Some(relative_submodule) = module_name.relative_to(&thispackage)
+                        && let Some(direct_submodule) = relative_submodule.components().next()
+                        && !self.seen_submodule_imports.contains(direct_submodule)
+                        && self.current_scope().is_global()
+                    {
+                        self.seen_submodule_imports
+                            .insert(direct_submodule.to_owned());
+
+                        let direct_submodule_name = Name::new(direct_submodule);
+                        let symbol = self.add_symbol(direct_submodule_name);
+                        self.add_definition(
+                            symbol.into(),
+                            ImportFromSubmoduleDefinitionNodeRef { node },
+                        );
+                    }
                 }
 
                 let mut found_star = false;
@@ -1595,13 +1642,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // It's re-exported if it's `from ... import x as x`
                         (&asname.id, asname.id == alias.name.id)
                     } else {
-                        // It's re-exported if it's `from . import x` in an `__init__.pyi`
-                        (
-                            &alias.name.id,
-                            node.level == 1
-                                && node.module.is_none()
-                                && self.file.is_package(self.db),
-                        )
+                        // As a non-standard rule to handle stubs in the wild, we consider
+                        // `from . import x` and `from whatever.thispackage import x` in an
+                        // `__init__.pyi` to re-export `x` (as long as it wasn't renamed)
+                        (&alias.name.id, is_self_import)
                     };
 
                     // Look for imports `from __future__ import annotations`, ignore `as ...`
@@ -1693,7 +1737,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
-                    if self.is_method_of_class().is_some() {
+                    if self.is_method_or_eagerly_executed_in_method().is_some() {
                         // Record the right-hand side of the assignment as a standalone expression
                         // if we're inside a method. This allows type inference to infer the type
                         // of the value for annotated assignments like `self.CONSTANT: Final = 1`,
@@ -2365,14 +2409,21 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
             | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
                 if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
-                    if self.is_method_of_class().is_some() {
+                    if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method() {
                         if let PlaceExpr::Member(member) = &mut place_expr {
                             if member.is_instance_attribute_candidate() {
                                 // We specifically mark attribute assignments to the first parameter of a method,
                                 // i.e. typically `self` or `cls`.
-                                let accessed_object_refers_to_first_parameter = self
-                                    .current_first_parameter_name
-                                    .is_some_and(|first| member.symbol_name() == first);
+                                // However, we must check that the symbol hasn't been shadowed by an intermediate
+                                // scope (e.g., a comprehension variable: `for self in [...]`).
+                                let accessed_object_refers_to_first_parameter =
+                                    self.current_first_parameter_name.is_some_and(|first| {
+                                        member.symbol_name() == first
+                                            && !self.is_symbol_bound_in_intermediate_eager_scopes(
+                                                first,
+                                                method_scope_id,
+                                            )
+                                    });
 
                                 if accessed_object_refers_to_first_parameter {
                                     member.mark_instance_attribute();

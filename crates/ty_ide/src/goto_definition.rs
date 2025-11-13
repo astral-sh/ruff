@@ -1592,6 +1592,111 @@ a = Test()
         ");
     }
 
+    #[test]
+    fn float_annotation() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+a: float<CURSOR> = 3.14
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+           --> stdlib/builtins.pyi:346:7
+            |
+        345 | @disjoint_base
+        346 | class int:
+            |       ^^^
+        347 |     """int([x]) -> integer
+        348 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: float = 3.14
+          |    ^^^^^
+          |
+
+        info[goto-definition]: Definition
+           --> stdlib/builtins.pyi:659:7
+            |
+        658 | @disjoint_base
+        659 | class float:
+            |       ^^^^^
+        660 |     """Convert a string or number to a floating-point number, if possible."""
+            |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: float = 3.14
+          |    ^^^^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn complex_annotation() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+a: complex<CURSOR> = 3.14
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+           --> stdlib/builtins.pyi:346:7
+            |
+        345 | @disjoint_base
+        346 | class int:
+            |       ^^^
+        347 |     """int([x]) -> integer
+        348 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: complex = 3.14
+          |    ^^^^^^^
+          |
+
+        info[goto-definition]: Definition
+           --> stdlib/builtins.pyi:659:7
+            |
+        658 | @disjoint_base
+        659 | class float:
+            |       ^^^^^
+        660 |     """Convert a string or number to a floating-point number, if possible."""
+            |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: complex = 3.14
+          |    ^^^^^^^
+          |
+
+        info[goto-definition]: Definition
+           --> stdlib/builtins.pyi:820:7
+            |
+        819 | @disjoint_base
+        820 | class complex:
+            |       ^^^^^^^
+        821 |     """Create a complex number from a string or numbers.
+            |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: complex = 3.14
+          |    ^^^^^^^
+          |
+        "#);
+    }
+
     /// Regression test for <https://github.com/astral-sh/ty/issues/1451>.
     /// We must ensure we respect re-import convention for stub files for
     /// imports in builtins.pyi.

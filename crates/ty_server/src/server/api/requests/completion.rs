@@ -44,7 +44,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_file(db) else {
+        let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
 
@@ -56,7 +56,6 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
         ) else {
             return Ok(None);
         };
-
         let settings = CompletionSettings {
             auto_import: snapshot.global_settings().is_auto_import_enabled(),
         };

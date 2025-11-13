@@ -415,8 +415,13 @@ pub struct CheckCommand {
     )]
     pub statistics: bool,
     /// Enable automatic additions of `noqa` directives to failing lines.
+    /// Optionally provide a reason to append after the codes.
     #[arg(
         long,
+        value_name = "REASON",
+        default_missing_value = "",
+        num_args = 0..=1,
+        require_equals = true,
         // conflicts_with = "add_noqa",
         conflicts_with = "show_files",
         conflicts_with = "show_settings",
@@ -428,7 +433,7 @@ pub struct CheckCommand {
         conflicts_with = "fix",
         conflicts_with = "diff",
     )]
-    pub add_noqa: bool,
+    pub add_noqa: Option<String>,
     /// See the files Ruff will be run against with the current settings.
     #[arg(
         long,
@@ -1057,7 +1062,7 @@ Possible choices:
 /// etc.).
 #[expect(clippy::struct_excessive_bools)]
 pub struct CheckArguments {
-    pub add_noqa: bool,
+    pub add_noqa: Option<String>,
     pub diff: bool,
     pub exit_non_zero_on_fix: bool,
     pub exit_zero: bool,

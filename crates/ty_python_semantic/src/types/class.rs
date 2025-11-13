@@ -3165,30 +3165,47 @@ impl<'db> ClassLiteral<'db> {
             union_of_inferred_types = union_of_inferred_types.add(Type::unknown());
         }
 
-        for (attribute_assignments, method_scope_id) in
+        for (attribute_assignments, attribute_binding_scope_id) in
             attribute_assignments(db, class_body_scope, &name)
         {
-            let method_scope = index.scope(method_scope_id);
-            if !is_valid_scope(method_scope) {
+            let binding_scope = index.scope(attribute_binding_scope_id);
+            if !is_valid_scope(binding_scope) {
                 continue;
             }
 
-            // The attribute assignment inherits the reachability of the method which contains it
-            let is_method_reachable = if let Some(method_def) = method_scope.node().as_function() {
-                let method = index.expect_single_definition(method_def);
-                let method_place = class_table
-                    .symbol_id(&method_def.node(&module).name)
-                    .unwrap();
-                class_map
-                    .all_reachable_symbol_bindings(method_place)
-                    .find_map(|bind| {
-                        (bind.binding.is_defined_and(|def| def == method))
-                            .then(|| class_map.binding_reachability(db, &bind))
-                    })
-                    .unwrap_or(Truthiness::AlwaysFalse)
-            } else {
-                Truthiness::AlwaysFalse
+            let scope_for_reachability_analysis = {
+                if binding_scope.node().as_function().is_some() {
+                    binding_scope
+                } else if binding_scope.is_eager() {
+                    let mut eager_scope_parent = binding_scope;
+                    while eager_scope_parent.is_eager()
+                        && let Some(parent) = eager_scope_parent.parent()
+                    {
+                        eager_scope_parent = index.scope(parent);
+                    }
+                    eager_scope_parent
+                } else {
+                    binding_scope
+                }
             };
+
+            // The attribute assignment inherits the reachability of the method which contains it
+            let is_method_reachable =
+                if let Some(method_def) = scope_for_reachability_analysis.node().as_function() {
+                    let method = index.expect_single_definition(method_def);
+                    let method_place = class_table
+                        .symbol_id(&method_def.node(&module).name)
+                        .unwrap();
+                    class_map
+                        .all_reachable_symbol_bindings(method_place)
+                        .find_map(|bind| {
+                            (bind.binding.is_defined_and(|def| def == method))
+                                .then(|| class_map.binding_reachability(db, &bind))
+                        })
+                        .unwrap_or(Truthiness::AlwaysFalse)
+                } else {
+                    Truthiness::AlwaysFalse
+                };
             if is_method_reachable.is_always_false() {
                 continue;
             }

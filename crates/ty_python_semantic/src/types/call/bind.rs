@@ -1359,7 +1359,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             overload_call_return_type: None,
-            matching_overload_index: None,
+            matching_overload_before_type_checking: None,
             overloads: smallvec_inline![from],
         };
         Bindings {
@@ -1413,21 +1413,16 @@ pub(crate) struct CallableBinding<'db> {
     /// [`Unknown`]: crate::types::DynamicType::Unknown
     overload_call_return_type: Option<OverloadCallReturnType<'db>>,
 
-    /// The index of the overload that matched for this overloaded callable.
+    /// The index of the overload that matched for this overloaded callable before type checking.
     ///
-    /// This is [`Some`] only for step 1 and 4 of the [overload call evaluation algorithm][1].
-    ///
-    /// The main use of this field is to surface the diagnostics for a matching overload directly
-    /// instead of using the `no-matching-overload` diagnostic. This is mentioned in the spec:
-    ///
-    /// > If only one candidate overload remains, it is the winning match. Evaluate it as if it
-    /// > were a non-overloaded function call and stop.
-    ///
-    /// Other steps of the algorithm do not set this field because this use case isn't relevant for
-    /// them.
+    /// This is [`Some`] only for step 1 of the [overload call evaluation algorithm][1] to surface
+    /// the diagnostics for the matching overload directly instead of using the
+    /// `no-matching-overload` diagnostic. The [`Self::matching_overload_index`] method cannot be
+    /// used here because a single overload could be matched in step 1 but then filtered out in the
+    /// following steps.
     ///
     /// [1]: https://typing.python.org/en/latest/spec/overload.html#overload-call-evaluation
-    matching_overload_index: Option<usize>,
+    matching_overload_before_type_checking: Option<usize>,
 
     /// The bindings of each overload of this callable. Will be empty if the type is not callable.
     ///
@@ -1451,7 +1446,7 @@ impl<'db> CallableBinding<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             overload_call_return_type: None,
-            matching_overload_index: None,
+            matching_overload_before_type_checking: None,
             overloads,
         }
     }
@@ -1463,7 +1458,7 @@ impl<'db> CallableBinding<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             overload_call_return_type: None,
-            matching_overload_index: None,
+            matching_overload_before_type_checking: None,
             overloads: smallvec![],
         }
     }
@@ -1521,7 +1516,7 @@ impl<'db> CallableBinding<'db> {
             MatchingOverloadIndex::Single(index) => {
                 // If only one candidate overload remains, it is the winning match. Evaluate it as
                 // a regular (non-overloaded) call.
-                self.matching_overload_index = Some(index);
+                self.matching_overload_before_type_checking = Some(index);
                 self.overloads[index].check_types(db, argument_types.as_ref(), call_expression_tcx);
                 return None;
             }
@@ -1556,10 +1551,8 @@ impl<'db> CallableBinding<'db> {
                         tracing::debug!("All overloads have been filtered out in step 4");
                         return None;
                     }
-                    MatchingOverloadIndex::Single(index) => {
+                    MatchingOverloadIndex::Single(_) => {
                         // If only one candidate overload remains, it is the winning match.
-                        // Evaluate it as a regular (non-overloaded) call.
-                        self.matching_overload_index = Some(index);
                         return None;
                     }
                     MatchingOverloadIndex::Multiple(indexes) => {
@@ -1692,10 +1685,7 @@ impl<'db> CallableBinding<'db> {
                                 );
                                 None
                             }
-                            MatchingOverloadIndex::Single(index) => {
-                                self.matching_overload_index = Some(index);
-                                Some(self.return_type())
-                            }
+                            MatchingOverloadIndex::Single(_) => Some(self.return_type()),
                             MatchingOverloadIndex::Multiple(indexes) => {
                                 self.filter_overloads_using_any_or_unknown(
                                     db,
@@ -2141,7 +2131,7 @@ impl<'db> CallableBinding<'db> {
 
                 // If there is a single matching overload, the diagnostics should be reported
                 // directly for that overload.
-                if let Some(matching_overload_index) = self.matching_overload_index {
+                if let Some(matching_overload_index) = self.matching_overload_before_type_checking {
                     let callable_description =
                         CallableDescription::new(context.db(), self.signature_type);
                     let matching_overload =
@@ -3648,6 +3638,31 @@ impl<'db> BindingError<'db> {
                 expected_ty,
                 provided_ty,
             } => {
+                // Certain special forms in the typing module are aliases for classes
+                // elsewhere in the standard library. These special forms are not instances of `type`,
+                // and you cannot use them in place of their aliased classes in *all* situations:
+                // for example, `dict()` succeeds at runtime, but `typing.Dict()` fails. However,
+                // they *can* all be used as the second argument to `isinstance` and `issubclass`.
+                // We model that specific aspect of their behaviour here.
+                //
+                // This is implemented as a special case in call-binding machinery because overriding
+                // typeshed's signatures for `isinstance()` and `issubclass()` would be complex and
+                // error-prone, due to the fact that they are annotated with recursive type aliases.
+                if parameter.index == 1
+                    && *argument_index == Some(1)
+                    && matches!(
+                        callable_ty
+                            .as_function_literal()
+                            .and_then(|function| function.known(context.db())),
+                        Some(KnownFunction::IsInstance | KnownFunction::IsSubclass)
+                    )
+                    && provided_ty
+                        .as_special_form()
+                        .is_some_and(SpecialFormType::is_valid_isinstance_target)
+                {
+                    return;
+                }
+
                 // TODO: Ideally we would not emit diagnostics for `TypedDict` literal arguments
                 // here (see `diagnostic::is_invalid_typed_dict_literal`). However, we may have
                 // silenced diagnostics during overload evaluation, and rely on the assignability

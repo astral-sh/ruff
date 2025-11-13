@@ -33,7 +33,7 @@ g(None)
 We also support unions in type aliases:
 
 ```py
-from typing_extensions import Any, Never, Literal, LiteralString, Tuple, Annotated, Optional
+from typing_extensions import Any, Never, Literal, LiteralString, Tuple, Annotated, Optional, Union
 from ty_extensions import Unknown
 
 IntOrStr = int | str
@@ -41,6 +41,8 @@ IntOrStrOrBytes1 = int | str | bytes
 IntOrStrOrBytes2 = (int | str) | bytes
 IntOrStrOrBytes3 = int | (str | bytes)
 IntOrStrOrBytes4 = IntOrStr | bytes
+IntOrStrOrBytes5 = int | Union[str, bytes]
+IntOrStrOrBytes6 = Union[int, str] | bytes
 BytesOrIntOrStr = bytes | IntOrStr
 IntOrNone = int | None
 NoneOrInt = None | int
@@ -70,6 +72,8 @@ reveal_type(IntOrStrOrBytes1)  # revealed: types.UnionType
 reveal_type(IntOrStrOrBytes2)  # revealed: types.UnionType
 reveal_type(IntOrStrOrBytes3)  # revealed: types.UnionType
 reveal_type(IntOrStrOrBytes4)  # revealed: types.UnionType
+reveal_type(IntOrStrOrBytes5)  # revealed: types.UnionType
+reveal_type(IntOrStrOrBytes6)  # revealed: types.UnionType
 reveal_type(BytesOrIntOrStr)  # revealed: types.UnionType
 reveal_type(IntOrNone)  # revealed: types.UnionType
 reveal_type(NoneOrInt)  # revealed: types.UnionType
@@ -100,6 +104,8 @@ def _(
     int_or_str_or_bytes2: IntOrStrOrBytes2,
     int_or_str_or_bytes3: IntOrStrOrBytes3,
     int_or_str_or_bytes4: IntOrStrOrBytes4,
+    int_or_str_or_bytes5: IntOrStrOrBytes5,
+    int_or_str_or_bytes6: IntOrStrOrBytes6,
     bytes_or_int_or_str: BytesOrIntOrStr,
     int_or_none: IntOrNone,
     none_or_int: NoneOrInt,
@@ -129,6 +135,8 @@ def _(
     reveal_type(int_or_str_or_bytes2)  # revealed: int | str | bytes
     reveal_type(int_or_str_or_bytes3)  # revealed: int | str | bytes
     reveal_type(int_or_str_or_bytes4)  # revealed: int | str | bytes
+    reveal_type(int_or_str_or_bytes5)  # revealed: int | str | bytes
+    reveal_type(int_or_str_or_bytes6)  # revealed: int | str | bytes
     reveal_type(bytes_or_int_or_str)  # revealed: bytes | int | str
     reveal_type(int_or_none)  # revealed: int | None
     reveal_type(none_or_int)  # revealed: None | int
@@ -270,6 +278,54 @@ def g(
     arg1: Y,  # error: [invalid-type-form]
     arg2: Z,  # error: [invalid-type-form]
 ): ...
+```
+
+## `|` unions in stubs and `TYPE_CHECKING` blocks
+
+In runtime contexts, `|` unions are only permitted on Python 3.10+. But in suites of code that are
+never executed at runtime (stub files, `if TYPE_CHECKING` blocks, and stringified annotations), they
+are permitted even if the target version is set to Python 3.9 or earlier.
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+`bar.pyi`:
+
+```pyi
+Z = int | str
+GLOBAL_CONSTANT: Z
+```
+
+`foo.py`:
+
+```py
+from typing import TYPE_CHECKING
+from bar import GLOBAL_CONSTANT
+
+reveal_type(GLOBAL_CONSTANT)  # revealed: int | str
+
+if TYPE_CHECKING:
+    class ItsQuiteCloudyInManchester:
+        X = int | str
+
+        def f(obj: X):
+            reveal_type(obj)  # revealed: int | str
+
+    # TODO: we currently only understand code as being inside a `TYPE_CHECKING` block
+    # if a whole *scope* is inside the `if TYPE_CHECKING` block
+    # (like the `ItsQuiteCloudyInManchester` class above); this is a false-positive
+    Y = int | str  # error: [unsupported-operator]
+
+    def g(obj: Y):
+        # TODO: should be `int | str`
+        reveal_type(obj)  # revealed: Unknown
+
+Y = list["int | str"]
+
+def g(obj: Y):
+    reveal_type(obj)  # revealed: list[int | str]
 ```
 
 ## Generic types
@@ -457,13 +513,90 @@ def _(
 
 ## `Tuple`
 
+We support implicit type aliases using `typing.Tuple`:
+
 ```py
 from typing import Tuple
 
 IntAndStr = Tuple[int, str]
+SingleInt = Tuple[int]
+Ints = Tuple[int, ...]
+EmptyTuple = Tuple[()]
 
-def _(int_and_str: IntAndStr):
+def _(int_and_str: IntAndStr, single_int: SingleInt, ints: Ints, empty_tuple: EmptyTuple):
     reveal_type(int_and_str)  # revealed: tuple[int, str]
+    reveal_type(single_int)  # revealed: tuple[int]
+    reveal_type(ints)  # revealed: tuple[int, ...]
+    reveal_type(empty_tuple)  # revealed: tuple[()]
+```
+
+Invalid uses cause diagnostics:
+
+```py
+from typing import Tuple
+
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+Invalid = Tuple[int, 1]
+
+def _(invalid: Invalid):
+    reveal_type(invalid)  # revealed: tuple[int, Unknown]
+```
+
+## `Union`
+
+We support implicit type aliases using `typing.Union`:
+
+```py
+from typing import Union
+
+IntOrStr = Union[int, str]
+IntOrStrOrBytes = Union[int, Union[str, bytes]]
+
+reveal_type(IntOrStr)  # revealed: types.UnionType
+reveal_type(IntOrStrOrBytes)  # revealed: types.UnionType
+
+def _(
+    int_or_str: IntOrStr,
+    int_or_str_or_bytes: IntOrStrOrBytes,
+):
+    reveal_type(int_or_str)  # revealed: int | str
+    reveal_type(int_or_str_or_bytes)  # revealed: int | str | bytes
+```
+
+If a single type is given, no `types.UnionType` instance is created:
+
+```py
+JustInt = Union[int]
+
+reveal_type(JustInt)  # revealed: <class 'int'>
+
+def _(just_int: JustInt):
+    reveal_type(just_int)  # revealed: int
+```
+
+An empty `typing.Union` leads to a `TypeError` at runtime, so we emit an error. We still infer
+`Never` when used as a type expression, which seems reasonable for an empty union:
+
+```py
+# error: [invalid-type-form] "`typing.Union` requires at least one type argument"
+EmptyUnion = Union[()]
+
+reveal_type(EmptyUnion)  # revealed: types.UnionType
+
+def _(empty: EmptyUnion):
+    reveal_type(empty)  # revealed: Never
+```
+
+Other invalid uses are also caught:
+
+```py
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+Invalid = Union[str, 1]
+
+def _(
+    invalid: Invalid,
+):
+    reveal_type(invalid)  # revealed: str | Unknown
 ```
 
 ## Stringified annotations?
@@ -496,10 +629,19 @@ We *do* support stringified annotations if they appear in a position where a typ
 syntactically expected:
 
 ```py
-ListOfInts = list["int"]
+from typing import Union
 
-def _(list_of_ints: ListOfInts):
+ListOfInts = list["int"]
+StrOrStyle = Union[str, "Style"]
+
+class Style: ...
+
+def _(
+    list_of_ints: ListOfInts,
+    str_or_style: StrOrStyle,
+):
     reveal_type(list_of_ints)  # revealed: list[int]
+    reveal_type(str_or_style)  # revealed: str | Style
 ```
 
 ## Recursive

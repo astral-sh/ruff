@@ -319,12 +319,20 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         warn_user!("Detected debug build without --no-cache.");
     }
 
-    if cli.add_noqa {
+    if let Some(reason) = &cli.add_noqa {
         if !fix_mode.is_generate() {
             warn_user!("--fix is incompatible with --add-noqa.");
         }
+        if reason.contains(['\n', '\r']) {
+            return Err(anyhow::anyhow!(
+                "--add-noqa <reason> cannot contain newline characters"
+            ));
+        }
+
+        let reason_opt = (!reason.is_empty()).then_some(reason.as_str());
+
         let modifications =
-            commands::add_noqa::add_noqa(&files, &pyproject_config, &config_arguments)?;
+            commands::add_noqa::add_noqa(&files, &pyproject_config, &config_arguments, reason_opt)?;
         if modifications > 0 && config_arguments.log_level >= LogLevel::Default {
             let s = if modifications == 1 { "" } else { "s" };
             #[expect(clippy::print_stderr)]

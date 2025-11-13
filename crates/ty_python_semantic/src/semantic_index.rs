@@ -1,4 +1,4 @@
-use std::iter::FusedIterator;
+use std::iter::{FusedIterator, once};
 use std::sync::Arc;
 
 use ruff_db::files::File;
@@ -148,29 +148,56 @@ pub(crate) fn attribute_declarations<'db, 's>(
 ///
 /// Only call this when doing type inference on the same file as `class_body_scope`, otherwise it
 /// introduces a direct dependency on that file's AST.
-pub(crate) fn attribute_scopes<'db, 's>(
+pub(crate) fn attribute_scopes<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
-) -> impl Iterator<Item = FileScopeId> + use<'s, 'db> {
+) -> impl Iterator<Item = FileScopeId> + 'db {
     let file = class_body_scope.file(db);
     let index = semantic_index(db, file);
     let class_scope_id = class_body_scope.file_scope_id(db);
+    ChildrenIter::new(&index.scopes, class_scope_id)
+        .filter_map(move |(child_scope_id, scope)| {
+            let (function_scope_id, function_scope) =
+                if scope.node().scope_kind() == ScopeKind::TypeParams {
+                    // This could be a generic method with a type-params scope.
+                    // Go one level deeper to find the function scope. The first
+                    // descendant is the (potential) function scope.
+                    let function_scope_id = scope.descendants().start;
+                    (function_scope_id, index.scope(function_scope_id))
+                } else {
+                    (child_scope_id, scope)
+                };
+            function_scope.node().as_function()?;
+            Some(function_scope_id)
+        })
+        .flat_map(move |func_id| {
+            // Add any descendent scope that is eager and have eager scopes between the scope
+            // and the method scope. Since attributes can be defined in this scope.
+            let nested = index.descendent_scopes(func_id).filter_map(move |(id, s)| {
+                let is_eager = s.kind().is_eager();
+                let parents_are_eager = {
+                    let mut all_parents_eager = true;
+                    let mut current = Some(id);
 
-    ChildrenIter::new(&index.scopes, class_scope_id).filter_map(move |(child_scope_id, scope)| {
-        let (function_scope_id, function_scope) =
-            if scope.node().scope_kind() == ScopeKind::TypeParams {
-                // This could be a generic method with a type-params scope.
-                // Go one level deeper to find the function scope. The first
-                // descendant is the (potential) function scope.
-                let function_scope_id = scope.descendants().start;
-                (function_scope_id, index.scope(function_scope_id))
-            } else {
-                (child_scope_id, scope)
-            };
+                    while let Some(scope_id) = current {
+                        if scope_id == func_id {
+                            break;
+                        }
+                        let scope = index.scope(scope_id);
+                        if !scope.is_eager() {
+                            all_parents_eager = false;
+                            break;
+                        }
+                        current = scope.parent();
+                    }
 
-        function_scope.node().as_function()?;
-        Some(function_scope_id)
-    })
+                    all_parents_eager
+                };
+
+                (parents_are_eager && is_eager).then_some(id)
+            });
+            once(func_id).chain(nested)
+        })
 }
 
 /// Returns the module global scope of `file`.
