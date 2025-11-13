@@ -1,6 +1,63 @@
 # Generator expressions
 
+## Basic
+
+We infer specialized `GeneratorType` instance types for generator expressions:
+
 ```py
-# revealed: GeneratorType[@Todo(generator expression yield type), @Todo(generator expression send type), @Todo(generator expression return type)]
-reveal_type((x for x in range(42)))
+# revealed: GeneratorType[int, None, None]
+reveal_type(x for x in range(10))
+
+# revealed: GeneratorType[tuple[int, str], None, None]
+reveal_type((x, str(y)) for x in range(3) for y in range(3))
+```
+
+When used in a loop, the yielded type can be inferred:
+
+```py
+squares = (x**2 for x in range(10))
+
+for s in squares:
+    reveal_type(s)  # revealed: int
+```
+
+When explicitly annotated, the yield type can be widened:
+
+```py
+from types import GeneratorType
+
+maybe_ints: GeneratorType[int | None, None, None] = (x**2 for x in range(10))
+
+def _():
+    reveal_type(maybe_ints)  # revealed: GeneratorType[int | None, None, None]
+
+    for s in maybe_ints:
+        reveal_type(s)  # revealed: int | None
+```
+
+## Async generators
+
+For async generator expressions, we infer specialized `AsyncGeneratorType` instance types:
+
+```py
+import asyncio
+from typing import AsyncGenerator
+
+async def slow_numbers() -> AsyncGenerator[int, None]:
+    current = 0
+    while True:
+        await asyncio.sleep(1)
+        yield current
+        current += 1
+
+async def main() -> None:
+    slow_squares = (x**2 async for x in slow_numbers())
+
+    reveal_type(slow_squares)  # revealed: AsyncGeneratorType[int, None]
+
+    async for s in slow_squares:
+        reveal_type(s)  # revealed: int
+        print(s)
+
+asyncio.run(main())
 ```
