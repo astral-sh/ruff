@@ -10779,6 +10779,95 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     InternedType::new(self.db(), argument_ty),
                 ));
             }
+            // `typing` special forms with a single generic argument
+            Type::SpecialForm(
+                special_form @ (SpecialFormType::List
+                | SpecialFormType::Set
+                | SpecialFormType::FrozenSet
+                | SpecialFormType::Counter
+                | SpecialFormType::Deque),
+            ) => {
+                let slice_ty = self.infer_type_expression(slice);
+
+                let element_ty = if matches!(**slice, ast::Expr::Tuple(_)) {
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "`typing.{}` requires exactly one argument",
+                            special_form.repr()
+                        ));
+                    }
+                    Type::unknown()
+                } else {
+                    slice_ty
+                };
+
+                let class = special_form
+                    .aliased_stdlib_class()
+                    .expect("A known stdlib class is available");
+
+                return class
+                    .to_specialized_class_type(self.db(), [element_ty])
+                    .map(Type::from)
+                    .unwrap_or_else(Type::unknown);
+            }
+            // `typing` special forms with two generic arguments
+            Type::SpecialForm(
+                special_form @ (SpecialFormType::Dict
+                | SpecialFormType::ChainMap
+                | SpecialFormType::DefaultDict
+                | SpecialFormType::OrderedDict),
+            ) => {
+                let (first_ty, second_ty) = if let ast::Expr::Tuple(ast::ExprTuple {
+                    elts: ref arguments,
+                    ..
+                }) = **slice
+                {
+                    if arguments.len() != 2 {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "`typing.{}` requires exactly two arguments, got {}",
+                                special_form.repr(),
+                                arguments.len()
+                            ));
+                        }
+                    }
+
+                    if let [first_expr, second_expr] = &arguments[..] {
+                        let first_ty = self.infer_type_expression(first_expr);
+                        let second_ty = self.infer_type_expression(second_expr);
+
+                        (first_ty, second_ty)
+                    } else {
+                        for argument in arguments {
+                            self.infer_type_expression(argument);
+                        }
+
+                        (Type::unknown(), Type::unknown())
+                    }
+                } else {
+                    let first_ty = self.infer_type_expression(slice);
+
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "`typing.{}` requires exactly two arguments, got 1",
+                            special_form.repr()
+                        ));
+                    }
+
+                    (first_ty, Type::unknown())
+                };
+
+                let class = special_form
+                    .aliased_stdlib_class()
+                    .expect("Stdlib class available");
+
+                return class
+                    .to_specialized_class_type(self.db(), [first_ty, second_ty])
+                    .map(Type::from)
+                    .unwrap_or_else(Type::unknown);
+            }
             _ => {}
         }
 
