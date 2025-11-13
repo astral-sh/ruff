@@ -150,7 +150,6 @@ impl<'a> Importer<'a> {
             let insertion = if let Some(future) = self.find_last_future_import(members.at) {
                 Insertion::end_of_statement(future.stmt, self.source, self.stylist)
             } else {
-                // What we want here: Given an offset, return the range of that cell. I guess that's what containing range is
                 let range = source_text(self.db, self.file)
                     .as_notebook()
                     .and_then(|notebook| notebook.cell_offsets().containing_range(members.at));
