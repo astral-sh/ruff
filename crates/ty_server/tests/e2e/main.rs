@@ -167,6 +167,8 @@ impl TestServer {
     ) -> Result<Self> {
         setup_tracing();
 
+        tracing::debug!("Starting test client with capabilities {:#?}", capabilities);
+
         let (server_connection, client_connection) = Connection::memory();
 
         // Create OS system with the test directory as cwd
@@ -346,6 +348,7 @@ impl TestServer {
         }
 
         let id = self.next_request_id();
+        tracing::debug!("Client sends request `{}` with ID {}", R::METHOD, id);
         let request = lsp_server::Request::new(id.clone(), R::METHOD.to_string(), params);
         self.send(Message::Request(request));
         id
@@ -357,6 +360,7 @@ impl TestServer {
         N: Notification,
     {
         let notification = lsp_server::Notification::new(N::METHOD.to_string(), params);
+        tracing::debug!("Client sends notification `{}`", N::METHOD);
         self.send(Message::Notification(notification));
     }
 
@@ -540,7 +544,7 @@ impl TestServer {
     fn handle_message(&mut self, message: Message) -> Result<(), TestServerError> {
         match message {
             Message::Request(request) => {
-                tracing::debug!("Received server request {}", &request.method);
+                tracing::debug!("Received server request `{}`", &request.method);
                 self.requests.push_back(request);
             }
             Message::Response(response) => {
@@ -558,7 +562,7 @@ impl TestServer {
                 }
             }
             Message::Notification(notification) => {
-                tracing::debug!("Received notification {}", &notification.method);
+                tracing::debug!("Received notification `{}`", &notification.method);
                 self.notifications.push_back(notification);
             }
         }
