@@ -443,7 +443,7 @@ frozen_instance = MyFrozenClass(1)
 frozen_instance.x = 2  # error: [invalid-assignment]
 ```
 
-If `__setattr__()` or `__delattr__()` is defined in the class, we should emit a diagnostic.
+If `__setattr__()` or `__delattr__()` is defined in the class, a diagnostic is emitted.
 
 ```py
 from dataclasses import dataclass
@@ -452,10 +452,10 @@ from dataclasses import dataclass
 class MyFrozenClass:
     x: int
 
-    # TODO: Emit a diagnostic here
+    # error: [unsound-dataclass-method-override] "Cannot overwrite attribute `__setattr__` in class `MyFrozenClass`"
     def __setattr__(self, name: str, value: object) -> None: ...
 
-    # TODO: Emit a diagnostic here
+    # error: [unsound-dataclass-method-override] "Cannot overwrite attribute `__delattr__` in class `MyFrozenClass`"
     def __delattr__(self, name: str) -> None: ...
 ```
 
