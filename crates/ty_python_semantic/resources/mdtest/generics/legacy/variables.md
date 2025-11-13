@@ -266,7 +266,48 @@ from typing import TypeVar
 
 # error: [invalid-legacy-type-variable]
 T = TypeVar("T", invalid_keyword=True)
+```
 
+### Forward references in stubs
+
+Stubs natively support forward references, so patterns that would raise `NameError` at runtime are
+allowed in stub files:
+
+`stub.pyi`:
+
+```pyi
+from typing import TypeVar
+
+T = TypeVar("T", bound=A, default=B)
+U = TypeVar("U", C, D)
+
+class A: ...
+class B(A): ...
+class C: ...
+class D: ...
+
+def f(x: T) -> T: ...
+def g(x: U) -> U: ...
+```
+
+`main.py`:
+
+```py
+from stub import f, g, A, B, C, D
+
+reveal_type(f(A()))  # revealed: A
+reveal_type(f(B()))  # revealed: B
+reveal_type(g(C()))  # revealed: C
+reveal_type(g(D()))  # revealed: D
+
+# TODO: one diagnostic would probably be sufficient here...?
+#
+# error: [invalid-argument-type] "Argument type `C` does not satisfy upper bound `A` of type variable `T`"
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `B`, found `C`"
+reveal_type(f(C()))  # revealed: B
+
+# error: [invalid-argument-type]
+reveal_type(g(A()))  # revealed: Unknown
 ```
 
 ### Constructor signature versioning
