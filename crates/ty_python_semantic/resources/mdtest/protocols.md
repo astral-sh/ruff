@@ -3073,18 +3073,15 @@ from typing import Protocol
 from ty_extensions import static_assert, is_subtype_of, is_equivalent_to, is_disjoint_from
 
 class HasRepr(Protocol):
-    # TODO: we should emit a diagnostic here complaining about a Liskov violation
-    # (it incompatibly overrides `__repr__` from `object`, a supertype of `HasRepr`)
+    # error: [invalid-method-override]
     def __repr__(self) -> object: ...
 
 class HasReprRecursive(Protocol):
-    # TODO: we should emit a diagnostic here complaining about a Liskov violation
-    # (it incompatibly overrides `__repr__` from `object`, a supertype of `HasReprRecursive`)
+    # error: [invalid-method-override]
     def __repr__(self) -> "HasReprRecursive": ...
 
 class HasReprRecursiveAndFoo(Protocol):
-    # TODO: we should emit a diagnostic here complaining about a Liskov violation
-    # (it incompatibly overrides `__repr__` from `object`, a supertype of `HasReprRecursiveAndFoo`)
+    # error: [invalid-method-override]
     def __repr__(self) -> "HasReprRecursiveAndFoo": ...
     foo: int
 

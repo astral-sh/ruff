@@ -115,6 +115,7 @@ use crate::unpack::{EvaluationMode, UnpackPosition};
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
 
 mod annotation_expression;
+mod liskov;
 mod type_expression;
 
 /// Whether the intersection type is on the left or right side of the comparison.
@@ -948,6 +949,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
+
+            // (8) Check for Liskov violations
+            liskov::check_class(&self.context, class);
 
             if let Some(protocol) = class.into_protocol_class(self.db()) {
                 protocol.validate_members(&self.context);

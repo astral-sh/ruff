@@ -613,6 +613,16 @@
             }
           ]
         },
+        "invalid-method-override": {
+          "title": "detects missing required keys in `TypedDict` constructors",
+          "description": "## What it does\nDetects method overrides that violate the [Liskov Substitution Principle].\n\n## Why is this bad?\nViolating the Liskov Substitution Principle will lead to many of ty's assumptions and\ninferences being incorrect, which will mean that it will fail to catch many possible\ntype errors in your code.\n\n## Example\n```python\nclass Super:\n    def method(self) -> int:\n        return 42\n\nclass Sub(Super):\n    # Liskov violation: `str` is not a subtype of `int`,\n    # but the supertype method promises to return an `int`.\n    def method(self) -> str:  # error: [invalid-override]\n        return \"foo\"\n\ndef accepts_super(s: Super) -> int:\n    return s.method()\n\naccepts_super(Sub())  # The result of this call is a string, but ty will infer\n                      # it to be an `int` due to the violation of the Liskov Substitution Principle.\n```\n\n[Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-named-tuple": {
           "title": "detects invalid `NamedTuple` class definitions",
           "description": "## What it does\nChecks for invalidly defined `NamedTuple` classes.\n\n## Why is this bad?\nAn invalidly defined `NamedTuple` class may lead to the type checker\ndrawing incorrect conclusions. It may also lead to `TypeError`s at runtime.\n\n## Examples\nA class definition cannot combine `NamedTuple` with other base classes\nin multiple inheritance; doing so raises a `TypeError` at runtime. The sole\nexception to this rule is `Generic[]`, which can be used alongside `NamedTuple`\nin a class's bases list.\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple, object): ...\nTypeError: can only inherit from a NamedTuple type and Generic\n```",
