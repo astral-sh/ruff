@@ -10629,7 +10629,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if class.is_tuple(self.db()) {
                     return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(slice));
                 } else if class.is_known(self.db(), KnownClass::Type) {
-                    let argument_ty = self.infer_expression(slice, TypeContext::default());
+                    let argument_ty = self.infer_type_expression(slice);
                     return Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
                         InternedType::new(self.db(), argument_ty),
                     ));

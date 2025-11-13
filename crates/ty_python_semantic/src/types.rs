@@ -6608,25 +6608,15 @@ impl<'db> Type<'db> {
                         .in_type_expression(db, scope_id, typevar_binding_context)?)
                 }
                 KnownInstanceType::TypeGenericAlias(ty) => {
-                    let argument = ty.inner(db);
+                    // When `type[…]` appears in a value position (e.g. in an implicit type alias),
+                    // we infer its argument as a type expression. This ensures that we can emit
+                    // diagnostics for invalid type expressions, and more importantly, that we can
+                    // make use of stringified annotations. The drawback is that we need to turn
+                    // instances back into the corresponding subclass-of types here. This process
+                    // (`int` -> instance of `int` -> subclass of `int`) can be lossy, but it is
+                    // okay for all valid arguments to `type[…]`.
 
-                    if let Type::KnownInstance(KnownInstanceType::UnionType(union)) = argument {
-                        let mut builder = UnionBuilder::new(db);
-                        for element in union.elements(db) {
-                            builder = builder.add(SubclassOfType::from(
-                                db,
-                                SubclassOfInner::try_from_type(db, *element)
-                                    .unwrap_or(SubclassOfInner::unknown()),
-                            ));
-                        }
-                        return Ok(builder.build());
-                    }
-
-                    Ok(SubclassOfType::from(
-                        db,
-                        SubclassOfInner::try_from_type(db, ty.inner(db))
-                            .unwrap_or(SubclassOfInner::unknown()),
-                    ))
+                    Ok(ty.inner(db).to_meta_type(db))
                 }
             },
 

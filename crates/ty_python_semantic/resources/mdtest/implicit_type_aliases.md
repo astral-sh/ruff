@@ -66,6 +66,8 @@ IntOrAnnotated = int | Annotated[str, "meta"]
 AnnotatedOrInt = Annotated[str, "meta"] | int
 IntOrOptional = int | Optional[str]
 OptionalOrInt = Optional[str] | int
+IntOrTypeOfStr = int | type[str]
+TypeOfStrOrInt = type[str] | int
 
 reveal_type(IntOrStr)  # revealed: types.UnionType
 reveal_type(IntOrStrOrBytes1)  # revealed: types.UnionType
@@ -97,6 +99,8 @@ reveal_type(IntOrAnnotated)  # revealed: types.UnionType
 reveal_type(AnnotatedOrInt)  # revealed: types.UnionType
 reveal_type(IntOrOptional)  # revealed: types.UnionType
 reveal_type(OptionalOrInt)  # revealed: types.UnionType
+reveal_type(IntOrTypeOfStr)  # revealed: types.UnionType
+reveal_type(TypeOfStrOrInt)  # revealed: types.UnionType
 
 def _(
     int_or_str: IntOrStr,
@@ -129,6 +133,8 @@ def _(
     annotated_or_int: AnnotatedOrInt,
     int_or_optional: IntOrOptional,
     optional_or_int: OptionalOrInt,
+    int_or_type_of_str: IntOrTypeOfStr,
+    type_of_str_or_int: TypeOfStrOrInt,
 ):
     reveal_type(int_or_str)  # revealed: int | str
     reveal_type(int_or_str_or_bytes1)  # revealed: int | str | bytes
@@ -160,6 +166,8 @@ def _(
     reveal_type(annotated_or_int)  # revealed: str | int
     reveal_type(int_or_optional)  # revealed: int | str | None
     reveal_type(optional_or_int)  # revealed: str | None | int
+    reveal_type(int_or_type_of_str)  # revealed: int | type[str]
+    reveal_type(type_of_str_or_int)  # revealed: type[str] | int
 ```
 
 If a type is unioned with itself in a value expression, the result is just that type. No
@@ -604,32 +612,47 @@ def _(
 We support implicit type aliases using `type[…]`:
 
 ```py
-from typing import Any, Union
+from typing import Any, Union, Protocol, TypeVar, Generic
+
+T = TypeVar("T")
 
 class A: ...
 class B: ...
+class G(Generic[T]): ...
 
-SubclassOfInt = type[A]
+class P(Protocol):
+    def method(self) -> None: ...
+
+SubclassOfA = type[A]
 SubclassOfAny = type[Any]
 SubclassOfAOrB1 = type[A | B]
 SubclassOfAOrB2 = type[A] | type[B]
 SubclassOfAOrB3 = Union[type[A], type[B]]
+SubclassOfG = type[G]
+SubclassOfGInt = type[G[int]]
+SubclassOfP = type[P]
 
-reveal_type(SubclassOfInt)  # revealed: GenericAlias
+reveal_type(SubclassOfA)  # revealed: GenericAlias
 reveal_type(SubclassOfAny)  # revealed: GenericAlias
 reveal_type(SubclassOfAOrB1)  # revealed: GenericAlias
 reveal_type(SubclassOfAOrB2)  # revealed: types.UnionType
 reveal_type(SubclassOfAOrB3)  # revealed: types.UnionType
+reveal_type(SubclassOfG)  # revealed: GenericAlias
+reveal_type(SubclassOfGInt)  # revealed: GenericAlias
+reveal_type(SubclassOfP)  # revealed: GenericAlias
 
 def _(
-    subclass_of_int: SubclassOfInt,
+    subclass_of_a: SubclassOfA,
     subclass_of_any: SubclassOfAny,
     subclass_of_a_or_b1: SubclassOfAOrB1,
     subclass_of_a_or_b2: SubclassOfAOrB2,
     subclass_of_a_or_b3: SubclassOfAOrB3,
+    subclass_of_g: SubclassOfG,
+    subclass_of_g_int: SubclassOfGInt,
+    subclass_of_p: SubclassOfP,
 ):
-    reveal_type(subclass_of_int)  # revealed: type[A]
-    reveal_type(subclass_of_int())  # revealed: A
+    reveal_type(subclass_of_a)  # revealed: type[A]
+    reveal_type(subclass_of_a())  # revealed: A
 
     reveal_type(subclass_of_any)  # revealed: type[Any]
     reveal_type(subclass_of_any())  # revealed: Any
@@ -642,6 +665,14 @@ def _(
 
     reveal_type(subclass_of_a_or_b3)  # revealed: type[A] | type[B]
     reveal_type(subclass_of_a_or_b3())  # revealed: A | B
+
+    reveal_type(subclass_of_g)  # revealed: type[G[Unknown]]
+    reveal_type(subclass_of_g())  # revealed: G[Unknown]
+
+    reveal_type(subclass_of_g_int)  # revealed: type[G[int]]
+    reveal_type(subclass_of_g_int())  # revealed: G[int]
+
+    reveal_type(subclass_of_p)  # revealed: type[P]
 ```
 
 Invalid uses result in diagnostics:
@@ -649,7 +680,7 @@ Invalid uses result in diagnostics:
 ```py
 from typing import Union
 
-# TODO: this should be an error
+# error: [invalid-type-form]
 InvalidSubclass = type[1]
 ```
 
@@ -687,15 +718,18 @@ from typing import Union
 
 ListOfInts = list["int"]
 StrOrStyle = Union[str, "Style"]
+SubclassOfStyle = type["Style"]
 
 class Style: ...
 
 def _(
     list_of_ints: ListOfInts,
     str_or_style: StrOrStyle,
+    subclass_of_style: SubclassOfStyle,
 ):
     reveal_type(list_of_ints)  # revealed: list[int]
     reveal_type(str_or_style)  # revealed: str | Style
+    reveal_type(subclass_of_style)  # revealed: type[Style]
 ```
 
 ## Recursive
