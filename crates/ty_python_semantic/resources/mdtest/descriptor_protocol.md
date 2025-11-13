@@ -696,8 +696,16 @@ reveal_type(C().instance_access)  # revealed: str
 reveal_type(C.metaclass_access)  # revealed: bytes
 
 # TODO: These should emit a diagnostic
-reveal_type(C().class_object_access)  # revealed: TailoredForClassObjectAccess
-reveal_type(C.instance_access)  # revealed: TailoredForInstanceAccess
+#
+# However, we use the return-type of `__get__` as the inferred type anyway:
+# the way to specify that the descriptor object itself is returned when the
+# attribute is accessed on the instance or the class is by overload `__get__`.
+#
+# Using the return type of `__get__` even for `__get__` calls that have invalid
+# arguments passed to them avoids false positives in situations where there are
+# `__get__` calls that we don't sufficiently understand.
+reveal_type(C().class_object_access)  # revealed: int
+reveal_type(C.instance_access)  # revealed: str
 ```
 
 ### Descriptors with incorrect `__get__` signature
@@ -712,10 +720,10 @@ class C:
     descriptor: Descriptor = Descriptor()
 
 # TODO: This should be an error
-reveal_type(C.descriptor)  # revealed: Descriptor
+reveal_type(C.descriptor)  # revealed: int
 
 # TODO: This should be an error
-reveal_type(C().descriptor)  # revealed: Descriptor
+reveal_type(C().descriptor)  # revealed: int
 ```
 
 ### Undeclared descriptor arguments

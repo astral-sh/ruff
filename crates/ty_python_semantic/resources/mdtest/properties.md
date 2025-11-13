@@ -167,10 +167,9 @@ class C:
 c = C()
 c.attr = 1
 
-# TODO: An error should be emitted here, and the type should be `Unknown`
-# or `Never`. See https://github.com/astral-sh/ruff/issues/16298 for more
-# details.
-reveal_type(c.attr)  # revealed: Unknown | property
+# TODO: An error should be emitted here.
+# See https://github.com/astral-sh/ruff/issues/16298 for more details.
+reveal_type(c.attr)  # revealed: Unknown
 ```
 
 ### Wrong setter signature

@@ -3954,16 +3954,24 @@ impl<'db> Type<'db> {
         let descr_get = self.class_member(db, "__get__".into()).place;
 
         if let Place::Defined(descr_get, _, descr_get_boundness) = descr_get {
-            let return_ty = descr_get
-                .try_call(db, &CallArguments::positional([self, instance, owner]))
-                .map(|bindings| {
-                    if descr_get_boundness == Definedness::AlwaysDefined {
-                        bindings.return_type(db)
-                    } else {
-                        UnionType::from_elements(db, [bindings.return_type(db), self])
+            let return_ty =
+                match descr_get.try_call(db, &CallArguments::positional([self, instance, owner])) {
+                    Ok(bindings) => {
+                        if descr_get_boundness == Definedness::AlwaysDefined {
+                            bindings.return_type(db)
+                        } else {
+                            UnionType::from_elements(db, [bindings.return_type(db), self])
+                        }
                     }
-                })
-                .ok()?;
+                    // TODO: an error when calling `__get__` will lead to a `TypeError` or similar at runtime;
+                    // we should emit a diagnostic here instead of silently ignoring the error.
+                    Err(CallError(kind, bindings)) => {
+                        if kind == CallErrorKind::NotCallable {
+                            return None;
+                        }
+                        bindings.return_type(db)
+                    }
+                };
 
             let descriptor_kind = if self.is_data_descriptor(db) {
                 AttributeKind::DataDescriptor
