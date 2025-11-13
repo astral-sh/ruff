@@ -450,7 +450,7 @@ impl<'db> AllMembers<'db> {
 }
 
 /// A member of a type with an optional definition.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct MemberWithDefinition<'db> {
     pub member: Member<'db>,
     pub definition: Option<Definition<'db>>,

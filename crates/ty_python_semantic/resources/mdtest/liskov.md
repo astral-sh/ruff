@@ -198,3 +198,25 @@ class DataSub(DataSuper):
         self.y = y
         super().__post_init__(x)
 ```
+
+## Edge case: function defined in another module and then assigned in a class body
+
+<!-- snapshot-diagnostics -->
+
+`foo.pyi`:
+
+```pyi
+def x(self, y: str): ...
+```
+
+`bar.pyi`:
+
+```pyi
+import foo
+
+class A:
+    def x(self, y: int): ...
+
+class B(A):
+    x = foo.x  # error: [invalid-method-override]
+```
