@@ -208,3 +208,12 @@ if cond:
     var = "str"
 else:
     var = f'{first}-{second}'
+
+
+# SIM108 - annotated assignment in if block
+def f(x: object) -> int:
+    if x:
+        y: int = 1
+    else:
+        y = 2
+    return y

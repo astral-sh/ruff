@@ -383,4 +383,31 @@ help: Replace `if`-`else`-block with `var = "str" if cond else f'{first}-{second
     - else:
     -     var = f'{first}-{second}'
 207 + var = "str" if cond else f'{first}-{second}'
+208 | 
+209 | 
+210 | # SIM108 - annotated assignment in if block
+note: This is an unsafe fix and may change runtime behavior
+
+SIM108 [*] Use ternary operator `y: int = 1 if x else 2` instead of `if`-`else`-block
+   --> SIM108.py:215:5
+    |
+213 |   # SIM108 - annotated assignment in if block
+214 |   def f(x: object) -> int:
+215 | /     if x:
+216 | |         y: int = 1
+217 | |     else:
+218 | |         y = 2
+    | |_____________^
+219 |       return y
+    |
+help: Replace `if`-`else`-block with `y: int = 1 if x else 2`
+212 | 
+213 | # SIM108 - annotated assignment in if block
+214 | def f(x: object) -> int:
+    -     if x:
+    -         y: int = 1
+    -     else:
+    -         y = 2
+215 +     y: int = 1 if x else 2
+216 |     return y
 note: This is an unsafe fix and may change runtime behavior
