@@ -10,9 +10,9 @@ use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{
     attribute_scopes, global_scope, place_table, semantic_index, use_def_map,
 };
-use crate::types::CallDunderError;
 use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::signatures::Signature;
+use crate::types::{CallDunderError, UnionType};
 use crate::types::{
     ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type, TypeContext,
     TypeVarBoundOrConstraints, class::CodeGeneratorKind,
@@ -477,32 +477,17 @@ pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Member<'db>
 /// Get the primary definition kind for a name expression within a specific file.
 /// Returns the first definition kind that is reachable for this name in its scope.
 /// This is useful for IDE features like semantic tokens.
-pub fn definition_kind_for_name<'db>(
+pub fn definition_for_name<'db>(
     db: &'db dyn Db,
     file: File,
     name: &ast::ExprName,
-) -> Option<DefinitionKind<'db>> {
-    let index = semantic_index(db, file);
-    let name_str = name.id.as_str();
-
-    // Get the scope for this name expression
-    let file_scope = index.expression_scope_id(&ast::ExprRef::from(name));
-
-    // Get the place table for this scope
-    let place_table = index.place_table(file_scope);
-
-    // Look up the place by name
-    let symbol_id = place_table.symbol_id(name_str)?;
-
-    // Get the use-def map and look up definitions for this place
-    let declarations = index
-        .use_def_map(file_scope)
-        .all_reachable_symbol_declarations(symbol_id);
+) -> Option<Definition<'db>> {
+    let definitions = definitions_for_name(db, file, name);
 
     // Find the first valid definition and return its kind
-    for declaration in declarations {
-        if let Some(def) = declaration.declaration.definition() {
-            return Some(def.kind(db).clone());
+    for declaration in definitions {
+        if let Some(def) = declaration.definition() {
+            return Some(def);
         }
     }
 
@@ -617,8 +602,34 @@ pub fn definitions_for_name<'db>(
     // If we didn't find any definitions in scopes, fallback to builtins
     if resolved_definitions.is_empty() {
         let Some(builtins_scope) = builtins_module_scope(db) else {
-            return Vec::new();
+            return resolved_definitions;
         };
+
+        // Special cases for `float` and `complex` in type annotation positions.
+        // We don't know whether we're in a type annotation position, so we'll just ask `Name`'s type,
+        // which resolves to `int | float` or `int | float | complex` if `float` or `complex` is used in
+        // a type annotation position and `float` or `complex` otherwise.
+        //
+        // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
+        if matches!(name_str, "float" | "complex")
+            && let Some(union) = name.inferred_type(&SemanticModel::new(db, file)).as_union()
+            && is_float_or_complex_annotation(db, union, name_str)
+        {
+            return union
+                .elements(db)
+                .iter()
+                // Use `rev` so that `complex` and `float` come first.
+                // This is required for hover to pick up the docstring of `complex` and `float`
+                // instead of `int` (hover only shows the docstring of the first definition).
+                .rev()
+                .filter_map(|ty| ty.as_nominal_instance())
+                .map(|instance| {
+                    let definition = instance.class_literal(db).definition(db);
+                    ResolvedDefinition::Definition(definition)
+                })
+                .collect();
+        }
+
         find_symbol_in_scope(db, builtins_scope, name_str)
             .into_iter()
             .filter(|def| def.is_reexported(db))
@@ -634,6 +645,30 @@ pub fn definitions_for_name<'db>(
     } else {
         resolved_definitions
     }
+}
+
+fn is_float_or_complex_annotation(db: &dyn Db, ty: UnionType, name: &str) -> bool {
+    let float_or_complex_ty = match name {
+        "float" => UnionType::from_elements(
+            db,
+            [
+                KnownClass::Int.to_instance(db),
+                KnownClass::Float.to_instance(db),
+            ],
+        ),
+        "complex" => UnionType::from_elements(
+            db,
+            [
+                KnownClass::Int.to_instance(db),
+                KnownClass::Float.to_instance(db),
+                KnownClass::Complex.to_instance(db),
+            ],
+        ),
+        _ => return false,
+    }
+    .expect_union();
+
+    ty == float_or_complex_ty
 }
 
 /// Returns all resolved definitions for an attribute expression `x.y`.
@@ -1196,6 +1231,14 @@ mod resolve_definition {
     }
 
     impl<'db> ResolvedDefinition<'db> {
+        pub(crate) fn definition(&self) -> Option<Definition<'db>> {
+            match self {
+                ResolvedDefinition::Definition(definition) => Some(*definition),
+                ResolvedDefinition::Module(_) => None,
+                ResolvedDefinition::FileWithRange(_) => None,
+            }
+        }
+
         fn file(&self, db: &'db dyn Db) -> File {
             match self {
                 ResolvedDefinition::Definition(definition) => definition.file(db),

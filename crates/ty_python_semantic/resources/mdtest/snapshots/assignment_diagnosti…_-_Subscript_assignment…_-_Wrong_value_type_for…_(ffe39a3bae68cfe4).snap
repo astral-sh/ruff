@@ -1,0 +1,49 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: assignment_diagnostics.md - Subscript assignment diagnostics - Wrong value type for all elements of a union
+mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_diagnostics.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | def _(config: dict[str, int] | dict[str, str]) -> None:
+2 |     # error: [invalid-assignment]
+3 |     # error: [invalid-assignment]
+4 |     config["retries"] = 3.0
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Method `__setitem__` of type `bound method dict[str, int].__setitem__(key: str, value: int, /) -> None` cannot be called with a key of type `Literal["retries"]` and a value of type `float` on object of type `dict[str, int]`
+ --> src/mdtest_snippet.py:4:5
+  |
+2 |     # error: [invalid-assignment]
+3 |     # error: [invalid-assignment]
+4 |     config["retries"] = 3.0
+  |     ^^^^^^
+  |
+info: The full type of the subscripted object is `dict[str, int] | dict[str, str]`
+info: rule `invalid-assignment` is enabled by default
+
+```
+
+```
+error[invalid-assignment]: Method `__setitem__` of type `bound method dict[str, str].__setitem__(key: str, value: str, /) -> None` cannot be called with a key of type `Literal["retries"]` and a value of type `float` on object of type `dict[str, str]`
+ --> src/mdtest_snippet.py:4:5
+  |
+2 |     # error: [invalid-assignment]
+3 |     # error: [invalid-assignment]
+4 |     config["retries"] = 3.0
+  |     ^^^^^^
+  |
+info: The full type of the subscripted object is `dict[str, int] | dict[str, str]`
+info: rule `invalid-assignment` is enabled by default
+
+```

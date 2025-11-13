@@ -69,7 +69,7 @@ def name_or_age() -> Literal["name", "age"]:
 carol: Person = {NAME: "Carol", AGE: 20}
 
 reveal_type(carol[NAME])  # revealed: str
-# error: [invalid-key] "Invalid key for TypedDict `Person` of type `str`"
+# error: [invalid-key] "Invalid key of type `str` for TypedDict `Person`"
 reveal_type(carol[non_literal()])  # revealed: Unknown
 reveal_type(carol[name_or_age()])  # revealed: str | int | None
 
@@ -526,10 +526,20 @@ class Person(TypedDict):
     name: str
     age: int | None
 
+class Animal(TypedDict):
+    name: str
+
 NAME_FINAL: Final = "name"
 AGE_FINAL: Final[Literal["age"]] = "age"
 
-def _(person: Person, literal_key: Literal["age"], union_of_keys: Literal["age", "name"], str_key: str, unknown_key: Any) -> None:
+def _(
+    person: Person,
+    being: Person | Animal,
+    literal_key: Literal["age"],
+    union_of_keys: Literal["age", "name"],
+    str_key: str,
+    unknown_key: Any,
+) -> None:
     reveal_type(person["name"])  # revealed: str
     reveal_type(person["age"])  # revealed: int | None
 
@@ -543,22 +553,34 @@ def _(person: Person, literal_key: Literal["age"], union_of_keys: Literal["age",
     # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "non_existing""
     reveal_type(person["non_existing"])  # revealed: Unknown
 
-    # error: [invalid-key] "Invalid key for TypedDict `Person` of type `str`"
+    # error: [invalid-key] "Invalid key of type `str` for TypedDict `Person`"
     reveal_type(person[str_key])  # revealed: Unknown
 
     # No error here:
     reveal_type(person[unknown_key])  # revealed: Unknown
+
+    reveal_type(being["name"])  # revealed: str
+
+    # TODO: A type of `int | None | Unknown` might be better here. The `str` is mixed in
+    # because `Animal.__getitem__` can only return `str`.
+    # error: [invalid-key] "Invalid key for TypedDict `Animal`"
+    reveal_type(being["age"])  # revealed: int | None | str
 ```
 
 ### Writing
 
 ```py
 from typing_extensions import TypedDict, Final, Literal, LiteralString, Any
+from ty_extensions import Intersection
 
 class Person(TypedDict):
     name: str
     surname: str
     age: int | None
+
+class Animal(TypedDict):
+    name: str
+    legs: int
 
 NAME_FINAL: Final = "name"
 AGE_FINAL: Final[Literal["age"]] = "age"
@@ -580,13 +602,32 @@ def _(person: Person, literal_key: Literal["age"]):
 def _(person: Person, union_of_keys: Literal["name", "surname"]):
     person[union_of_keys] = "unknown"
 
-    # error: [invalid-assignment] "Cannot assign value of type `Literal[1]` to key of type `Literal["name", "surname"]` on TypedDict `Person`"
+    # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Person`: value of type `Literal[1]`"
+    # error: [invalid-assignment] "Invalid assignment to key "surname" with declared type `str` on TypedDict `Person`: value of type `Literal[1]`"
     person[union_of_keys] = 1
+
+def _(being: Person | Animal):
+    being["name"] = "Being"
+
+    # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Person`: value of type `Literal[1]`"
+    # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Animal`: value of type `Literal[1]`"
+    being["name"] = 1
+
+    # error: [invalid-key] "Invalid key for TypedDict `Animal`: Unknown key "surname" - did you mean "name"?"
+    being["surname"] = "unknown"
+
+def _(centaur: Intersection[Person, Animal]):
+    centaur["name"] = "Chiron"
+    centaur["age"] = 100
+    centaur["legs"] = 4
+
+    # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "unknown""
+    centaur["unknown"] = "value"
 
 def _(person: Person, union_of_keys: Literal["name", "age"], unknown_value: Any):
     person[union_of_keys] = unknown_value
 
-    # error: [invalid-assignment] "Cannot assign value of type `None` to key of type `Literal["name", "age"]` on TypedDict `Person`"
+    # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
     person[union_of_keys] = None
 
 def _(person: Person, str_key: str, literalstr_key: LiteralString):

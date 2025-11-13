@@ -1,3 +1,37 @@
+//! This module walks the AST and collects a set of "semantic tokens" for a file
+//! or a range within a file. Each semantic token provides a "token type" and zero
+//! or more "modifiers". This information can be used by an editor to provide
+//! color coding based on semantic meaning.
+//!
+//! Visual Studio has a very useful debugger that allows you to inspect the
+//! semantic tokens for any given position in the code. Not only is this useful
+//! to debug our semantic highlighting, it also allows easy comparison with
+//! how Pylance (or other LSPs) highlight a certain token. You can open the scope inspector,
+//! with the Command Palette (Command/Ctrl+Shift+P), then select the
+//!  `Developer: Inspect Editor Tokens and Scopes` command.
+//!
+//! Current limitations and areas for future improvement:
+//!
+//! TODO: Need to handle semantic tokens within quoted annotations.
+//!
+//! TODO: Need to properly handle Annotated expressions. All type arguments other
+//! than the first should be treated as value expressions, not as type expressions.
+//!
+//! TODO: An identifier that resolves to a parameter when used within a function
+//! should be classified as a parameter, selfParameter, or clsParameter token.
+//!
+//! TODO: Properties (or perhaps more generally, descriptor objects?) should be
+//! classified as property tokens rather than just variables.
+//!
+//! TODO: Special forms like `Protocol` and `TypedDict` should probably be classified
+//! as class tokens, but they are currently classified as variables.
+//!
+//! TODO: Type aliases (including those defined with the Python 3.12 "type" statement)
+//! do not currently have a dedicated semantic token type, but they maybe should.
+//!
+//! TODO: Additional token modifiers might be added (e.g. for static methods,
+//! abstract methods and classes).
+
 use crate::Db;
 use bitflags::bitflags;
 use itertools::Itertools;
@@ -13,42 +47,12 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
+use ty_python_semantic::semantic_index::definition::Definition;
+use ty_python_semantic::types::TypeVarKind;
 use ty_python_semantic::{
     HasType, SemanticModel, semantic_index::definition::DefinitionKind, types::Type,
-    types::ide_support::definition_kind_for_name,
+    types::ide_support::definition_for_name,
 };
-
-// This module walks the AST and collects a set of "semantic tokens" for a file
-// or a range within a file. Each semantic token provides a "token type" and zero
-// or more "modifiers". This information can be used by an editor to provide
-// color coding based on semantic meaning.
-
-// Current limitations and areas for future improvement:
-
-// TODO: Need to provide better classification for name tokens that are imported
-// from other modules. Currently, these are classified based on their types,
-// which often means they're classified as variables when they should be classes
-// in many cases.
-
-// TODO: Need to handle semantic tokens within quoted annotations.
-
-// TODO: Need to properly handle Annotated expressions. All type arguments other
-// than the first should be treated as value expressions, not as type expressions.
-
-// TODO: An identifier that resolves to a parameter when used within a function
-// should be classified as a parameter, selfParameter, or clsParameter token.
-
-// TODO: Properties (or perhaps more generally, descriptor objects?) should be
-// classified as property tokens rather than just variables.
-
-// TODO: Special forms like Protocol and TypedDict should probably be classified
-// as class tokens, but they are currently classified as variables.
-
-// TODO: Type aliases (including those defined with the Python 3.12 "type" statement)
-// do not currently have a dedicated semantic token type, but they maybe should.
-
-// TODO: Additional token modifiers might be added (e.g. for static methods,
-// abstract methods and classes).
 
 /// Semantic token types supported by the language server.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -198,6 +202,7 @@ struct SemanticTokenVisitor<'db> {
     tokens: Vec<SemanticToken>,
     in_class_scope: bool,
     in_type_annotation: bool,
+    in_target_creating_definition: bool,
     range_filter: Option<TextRange>,
 }
 
@@ -212,6 +217,7 @@ impl<'db> SemanticTokenVisitor<'db> {
             file,
             tokens: Vec::new(),
             in_class_scope: false,
+            in_target_creating_definition: false,
             in_type_annotation: false,
             range_filter,
         }
@@ -259,13 +265,11 @@ impl<'db> SemanticTokenVisitor<'db> {
 
     fn classify_name(&self, name: &ast::ExprName) -> (SemanticTokenType, SemanticTokenModifier) {
         // First try to classify the token based on its definition kind.
-        let definition_kind = definition_kind_for_name(self.semantic_model.db(), self.file, name);
+        let definition = definition_for_name(self.semantic_model.db(), self.file, name);
 
-        if let Some(definition_kind) = definition_kind {
+        if let Some(definition) = definition {
             let name_str = name.id.as_str();
-            if let Some(classification) =
-                self.classify_from_definition_kind(&definition_kind, name_str)
-            {
+            if let Some(classification) = self.classify_from_definition(definition, name_str) {
                 return classification;
             }
         }
@@ -276,14 +280,16 @@ impl<'db> SemanticTokenVisitor<'db> {
         self.classify_from_type_and_name_str(ty, name_str)
     }
 
-    fn classify_from_definition_kind(
+    fn classify_from_definition(
         &self,
-        definition_kind: &DefinitionKind<'_>,
+        definition: Definition,
         name_str: &str,
     ) -> Option<(SemanticTokenType, SemanticTokenModifier)> {
         let mut modifiers = SemanticTokenModifier::empty();
+        let db = self.semantic_model.db();
+        let model = SemanticModel::new(db, definition.file(db));
 
-        match definition_kind {
+        match definition.kind(db) {
             DefinitionKind::Function(_) => {
                 // Check if this is a method based on current scope
                 if self.in_class_scope {
@@ -294,7 +300,24 @@ impl<'db> SemanticTokenVisitor<'db> {
             }
             DefinitionKind::Class(_) => Some((SemanticTokenType::Class, modifiers)),
             DefinitionKind::TypeVar(_) => Some((SemanticTokenType::TypeParameter, modifiers)),
-            DefinitionKind::Parameter(_) => Some((SemanticTokenType::Parameter, modifiers)),
+            DefinitionKind::Parameter(parameter) => {
+                let parsed = parsed_module(db, definition.file(db));
+                let ty = parameter.node(&parsed.load(db)).inferred_type(&model);
+
+                if let Type::TypeVar(type_var) = ty {
+                    match type_var.typevar(db).kind(db) {
+                        TypeVarKind::TypingSelf => {
+                            return Some((SemanticTokenType::SelfParameter, modifiers));
+                        }
+                        TypeVarKind::Legacy
+                        | TypeVarKind::ParamSpec
+                        | TypeVarKind::Pep695ParamSpec
+                        | TypeVarKind::Pep695 => {}
+                    }
+                }
+
+                Some((SemanticTokenType::Parameter, modifiers))
+            }
             DefinitionKind::VariadicPositionalParameter(_) => {
                 Some((SemanticTokenType::Parameter, modifiers))
             }
@@ -315,6 +338,25 @@ impl<'db> SemanticTokenVisitor<'db> {
                 if Self::is_constant_name(name_str) {
                     modifiers |= SemanticTokenModifier::READONLY;
                 }
+
+                let parsed = parsed_module(db, definition.file(db));
+                let parsed = parsed.load(db);
+                let value = match definition.kind(db) {
+                    DefinitionKind::Assignment(assignment) => Some(assignment.value(&parsed)),
+                    _ => None,
+                };
+
+                if let Some(value) = value {
+                    let value_ty = value.inferred_type(&model);
+
+                    if value_ty.is_class_literal()
+                        || value_ty.is_subclass_of()
+                        || value_ty.is_generic_alias()
+                    {
+                        return Some((SemanticTokenType::Class, modifiers));
+                    }
+                }
+
                 Some((SemanticTokenType::Variable, modifiers))
             }
         }
@@ -589,6 +631,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 // Clear the in_class_scope flag so inner functions
                 // are not treated as methods
                 let prev_in_class = self.in_class_scope;
+
                 self.in_class_scope = false;
                 self.visit_body(&func.body);
                 self.in_class_scope = prev_in_class;
@@ -684,6 +727,27 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     );
                 }
             }
+            ast::Stmt::Assign(assignment) => {
+                self.in_target_creating_definition = true;
+                for element in &assignment.targets {
+                    self.visit_expr(element);
+                }
+                self.in_target_creating_definition = false;
+
+                self.visit_expr(&assignment.value);
+            }
+            ast::Stmt::AnnAssign(assignment) => {
+                self.in_target_creating_definition = true;
+                self.visit_expr(&assignment.target);
+                self.in_target_creating_definition = false;
+
+                self.visit_expr(&assignment.annotation);
+
+                if let Some(value) = &assignment.value {
+                    self.visit_expr(value);
+                }
+            }
+
             _ => {
                 // For all other statement types, let the default visitor handle them
                 walk_stmt(self, stmt);
@@ -701,7 +765,10 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
     fn visit_expr(&mut self, expr: &Expr) {
         match expr {
             ast::Expr::Name(name) => {
-                let (token_type, modifiers) = self.classify_name(name);
+                let (token_type, mut modifiers) = self.classify_name(name);
+                if self.in_target_creating_definition && name.ctx.is_store() {
+                    modifiers |= SemanticTokenModifier::DEFINITION;
+                }
                 self.add_token(name, token_type, modifiers);
                 walk_expr(self, expr);
             }
@@ -744,6 +811,15 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 
                 // Visit the lambda body
                 self.visit_expr(&lambda.body);
+            }
+
+            ast::Expr::Named(named) => {
+                let prev_in_target = self.in_target_creating_definition;
+                self.in_target_creating_definition = true;
+                self.visit_expr(&named.target);
+                self.in_target_creating_definition = prev_in_target;
+
+                self.visit_expr(&named.value);
             }
             _ => {
                 // For all other expression types, let the default visitor handle them
@@ -971,12 +1047,31 @@ y = 'hello'
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
-        "x" @ 1..2: Variable
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "x" @ 1..2: Variable [definition]
         "42" @ 5..7: Number
-        "y" @ 8..9: Variable
+        "y" @ 8..9: Variable [definition]
         "'hello'" @ 12..19: String
-        "###);
+        "#);
+    }
+
+    #[test]
+    fn test_semantic_tokens_walrus() {
+        let test = SemanticTokenTest::new(
+            "
+if x := 42:
+    y = 'hello'
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "x" @ 4..5: Variable [definition]
+        "42" @ 9..11: Number
+        "y" @ 17..18: Variable [definition]
+        "'hello'" @ 21..28: String
+        "#);
     }
 
     #[test]
@@ -984,18 +1079,30 @@ y = 'hello'
         let test = SemanticTokenTest::new(
             "
 class MyClass:
-    def method(self, x): pass
+    def method(self, x):
+        self.x = 10
+
+    def method_unidiomatic_self(self2):
+        print(self2.x))
 ",
         );
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "MyClass" @ 7..14: Class [definition]
         "method" @ 24..30: Method [definition]
         "self" @ 31..35: SelfParameter
         "x" @ 37..38: Parameter
-        "###);
+        "self" @ 49..53: SelfParameter
+        "x" @ 54..55: Variable
+        "10" @ 58..60: Number
+        "method_unidiomatic_self" @ 70..93: Method [definition]
+        "self2" @ 94..99: SelfParameter
+        "print" @ 110..115: Function
+        "self2" @ 116..121: SelfParameter
+        "x" @ 122..123: Variable
+        "#);
     }
 
     #[test]
@@ -1085,13 +1192,13 @@ class MyClass:
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "MyClass" @ 7..14: Class [definition]
-        "CONSTANT" @ 20..28: Variable [readonly]
+        "CONSTANT" @ 20..28: Variable [definition, readonly]
         "42" @ 31..33: Number
         "method" @ 48..54: Method [definition, async]
         "self" @ 55..59: SelfParameter
-        "###);
+        "#);
     }
 
     #[test]
@@ -1118,11 +1225,11 @@ z = sys.version
         "MyClass" @ 18..25: Class [definition]
         "my_function" @ 41..52: Function [definition]
         "42" @ 67..69: Number
-        "x" @ 71..72: Variable
+        "x" @ 71..72: Variable [definition]
         "MyClass" @ 75..82: Class
-        "y" @ 85..86: Variable
+        "y" @ 85..86: Variable [definition]
         "my_function" @ 89..100: Function
-        "z" @ 103..104: Variable
+        "z" @ 103..104: Variable [definition]
         "sys" @ 107..110: Namespace
         "version" @ 111..118: Variable
         "#);
@@ -1140,14 +1247,14 @@ z = None
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
-        "x" @ 1..2: Variable
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "x" @ 1..2: Variable [definition]
         "True" @ 5..9: BuiltinConstant
-        "y" @ 10..11: Variable
+        "y" @ 10..11: Variable [definition]
         "False" @ 14..19: BuiltinConstant
-        "z" @ 20..21: Variable
+        "z" @ 20..21: Variable [definition]
         "None" @ 24..28: BuiltinConstant
-        "###);
+        "#);
     }
 
     #[test]
@@ -1168,13 +1275,58 @@ result = check(None)
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "check" @ 5..10: Function [definition]
         "value" @ 11..16: Parameter
-        "value" @ 26..31: Variable
+        "value" @ 26..31: Parameter
         "None" @ 35..39: BuiltinConstant
         "False" @ 56..61: BuiltinConstant
         "True" @ 73..77: BuiltinConstant
-        "result" @ 79..85: Variable
+        "result" @ 79..85: Variable [definition]
         "check" @ 88..93: Function
         "None" @ 94..98: BuiltinConstant
+        "#);
+    }
+
+    #[test]
+    fn test_builtin_types() {
+        let test = SemanticTokenTest::new(
+            r#"
+            type U = str | int
+
+            class Test:
+                a: int
+                b: bool
+                c: str
+                d: float
+                e: list[int]
+                f: list[float]
+                g: int | float
+                h: U
+            "#,
+        );
+
+        assert_snapshot!(test.to_snapshot(&test.highlight_file()), @r#"
+        "U" @ 6..7: TypeParameter
+        "str" @ 10..13: Class
+        "int" @ 16..19: Class
+        "Test" @ 27..31: Class [definition]
+        "a" @ 37..38: Variable [definition]
+        "int" @ 40..43: Class
+        "b" @ 48..49: Variable [definition]
+        "bool" @ 51..55: Class
+        "c" @ 60..61: Variable [definition]
+        "str" @ 63..66: Class
+        "d" @ 71..72: Variable [definition]
+        "float" @ 74..79: Class
+        "e" @ 84..85: Variable [definition]
+        "list" @ 87..91: Class
+        "int" @ 92..95: Class
+        "f" @ 101..102: Variable [definition]
+        "list" @ 104..108: Class
+        "float" @ 109..114: Class
+        "g" @ 120..121: Variable [definition]
+        "int" @ 123..126: Class
+        "float" @ 129..134: Class
+        "h" @ 139..140: Variable [definition]
+        "U" @ 142..143: TypeParameter
         "#);
     }
 
@@ -1206,29 +1358,29 @@ def function2():
         assert!(range_tokens.len() < full_tokens.len());
 
         // Test both full tokens and range tokens with snapshots
-        assert_snapshot!(test.to_snapshot(&full_tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&full_tokens), @r#"
         "function1" @ 5..14: Function [definition]
-        "x" @ 22..23: Variable
+        "x" @ 22..23: Variable [definition]
         "42" @ 26..28: Number
         "x" @ 40..41: Variable
         "function2" @ 47..56: Function [definition]
-        "y" @ 64..65: Variable
+        "y" @ 64..65: Variable [definition]
         "\"hello\"" @ 68..75: String
-        "z" @ 80..81: Variable
+        "z" @ 80..81: Variable [definition]
         "True" @ 84..88: BuiltinConstant
         "y" @ 100..101: Variable
         "z" @ 104..105: Variable
-        "###);
+        "#);
 
-        assert_snapshot!(test.to_snapshot(&range_tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&range_tokens), @r#"
         "function2" @ 47..56: Function [definition]
-        "y" @ 64..65: Variable
+        "y" @ 64..65: Variable [definition]
         "\"hello\"" @ 68..75: String
-        "z" @ 80..81: Variable
+        "z" @ 80..81: Variable [definition]
         "True" @ 84..88: BuiltinConstant
         "y" @ 100..101: Variable
         "z" @ 104..105: Variable
-        "###);
+        "#);
 
         // Verify that no tokens from range_tokens have ranges outside the requested range
         for token in range_tokens.iter() {
@@ -1261,7 +1413,7 @@ z = 3
         let range_tokens = test.highlight_range(range);
 
         assert_snapshot!(test.to_snapshot(&range_tokens), @r#"
-        "y" @ 7..8: Variable
+        "y" @ 7..8: Variable [definition]
         "2" @ 11..12: Number
         "#);
     }
@@ -1314,9 +1466,9 @@ y = sys
         "sys" @ 18..21: Namespace
         "collections" @ 27..38: Namespace
         "defaultdict" @ 46..57: Class
-        "x" @ 119..120: Namespace
+        "x" @ 119..120: Variable [definition]
         "os" @ 123..125: Namespace
-        "y" @ 126..127: Namespace
+        "y" @ 126..127: Variable [definition]
         "sys" @ 130..133: Namespace
         "#);
     }
@@ -1385,7 +1537,7 @@ u = List.__name__        # __name__ should be variable
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "os" @ 8..10: Namespace
         "sys" @ 18..21: Namespace
         "collections" @ 27..38: Namespace
@@ -1393,7 +1545,7 @@ u = List.__name__        # __name__ should be variable
         "typing" @ 63..69: Namespace
         "List" @ 77..81: Variable
         "MyClass" @ 89..96: Class [definition]
-        "CONSTANT" @ 102..110: Variable [readonly]
+        "CONSTANT" @ 102..110: Variable [definition, readonly]
         "42" @ 113..115: Number
         "method" @ 125..131: Method [definition]
         "self" @ 132..136: SelfParameter
@@ -1401,29 +1553,29 @@ u = List.__name__        # __name__ should be variable
         "property" @ 168..176: Decorator
         "prop" @ 185..189: Method [definition]
         "self" @ 190..194: SelfParameter
-        "self" @ 212..216: TypeParameter
+        "self" @ 212..216: SelfParameter
         "CONSTANT" @ 217..225: Variable [readonly]
-        "obj" @ 227..230: Variable
+        "obj" @ 227..230: Variable [definition]
         "MyClass" @ 233..240: Class
-        "x" @ 278..279: Namespace
+        "x" @ 278..279: Variable [definition]
         "os" @ 282..284: Namespace
         "path" @ 285..289: Namespace
-        "y" @ 339..340: Method
+        "y" @ 339..340: Variable [definition]
         "obj" @ 343..346: Variable
         "method" @ 347..353: Method
-        "z" @ 405..406: Variable
+        "z" @ 405..406: Variable [definition]
         "obj" @ 409..412: Variable
         "CONSTANT" @ 413..421: Variable [readonly]
-        "w" @ 483..484: Variable
+        "w" @ 483..484: Variable [definition]
         "obj" @ 487..490: Variable
         "prop" @ 491..495: Variable
-        "v" @ 534..535: Function
+        "v" @ 534..535: Variable [definition]
         "MyClass" @ 538..545: Class
         "method" @ 546..552: Method
-        "u" @ 596..597: Variable
+        "u" @ 596..597: Variable [definition]
         "List" @ 600..604: Variable
         "__name__" @ 605..613: Variable
-        "###);
+        "#);
     }
 
     #[test]
@@ -1442,19 +1594,19 @@ y = obj.unknown_attr     # Should fall back to variable
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "MyClass" @ 7..14: Class [definition]
-        "some_attr" @ 20..29: Variable
+        "some_attr" @ 20..29: Variable [definition]
         "\"value\"" @ 32..39: String
-        "obj" @ 41..44: Variable
+        "obj" @ 41..44: Variable [definition]
         "MyClass" @ 47..54: Class
-        "x" @ 117..118: Variable
+        "x" @ 117..118: Variable [definition]
         "obj" @ 121..124: Variable
         "some_attr" @ 125..134: Variable
-        "y" @ 187..188: Variable
+        "y" @ 187..188: Variable [definition]
         "obj" @ 191..194: Variable
         "unknown_attr" @ 195..207: Variable
-        "###);
+        "#);
     }
 
     #[test]
@@ -1477,31 +1629,31 @@ w = obj.A             # Should not have readonly modifier (length == 1)
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "MyClass" @ 7..14: Class [definition]
-        "UPPER_CASE" @ 20..30: Variable [readonly]
+        "UPPER_CASE" @ 20..30: Variable [definition, readonly]
         "42" @ 33..35: Number
-        "lower_case" @ 40..50: Variable
+        "lower_case" @ 40..50: Variable [definition]
         "24" @ 53..55: Number
-        "MixedCase" @ 60..69: Variable
+        "MixedCase" @ 60..69: Variable [definition]
         "12" @ 72..74: Number
-        "A" @ 79..80: Variable
+        "A" @ 79..80: Variable [definition]
         "1" @ 83..84: Number
-        "obj" @ 86..89: Variable
+        "obj" @ 86..89: Variable [definition]
         "MyClass" @ 92..99: Class
-        "x" @ 102..103: Variable
+        "x" @ 102..103: Variable [definition]
         "obj" @ 106..109: Variable
         "UPPER_CASE" @ 110..120: Variable [readonly]
-        "y" @ 156..157: Variable
+        "y" @ 156..157: Variable [definition]
         "obj" @ 160..163: Variable
         "lower_case" @ 164..174: Variable
-        "z" @ 214..215: Variable
+        "z" @ 214..215: Variable [definition]
         "obj" @ 218..221: Variable
         "MixedCase" @ 222..231: Variable
-        "w" @ 272..273: Variable
+        "w" @ 272..273: Variable [definition]
         "obj" @ 276..279: Variable
         "A" @ 280..281: Variable
-        "###);
+        "#);
     }
 
     #[test]
@@ -1532,10 +1684,10 @@ y: Optional[str] = None
         "Optional" @ 95..103: Variable
         "List" @ 104..108: Variable
         "str" @ 109..112: Class
-        "x" @ 126..127: Variable
+        "x" @ 126..127: Variable [definition]
         "int" @ 129..132: Class
         "42" @ 135..137: Number
-        "y" @ 138..139: Variable
+        "y" @ 138..139: Variable [definition]
         "Optional" @ 141..149: Variable
         "str" @ 150..153: Class
         "None" @ 157..161: BuiltinConstant
@@ -1552,11 +1704,11 @@ x: int = 42
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
-        "x" @ 1..2: Variable
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "x" @ 1..2: Variable [definition]
         "int" @ 4..7: Class
         "42" @ 10..12: Number
-        "###);
+        "#);
     }
 
     #[test]
@@ -1574,7 +1726,7 @@ x: MyClass = MyClass()
 
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "MyClass" @ 7..14: Class [definition]
-        "x" @ 26..27: Variable
+        "x" @ 26..27: Variable [definition]
         "MyClass" @ 29..36: Class
         "MyClass" @ 39..46: Class
         "#);
@@ -1603,7 +1755,7 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "typing" @ 6..12: Namespace
         "List" @ 20..24: Variable
         "Optional" @ 26..34: Variable
@@ -1616,18 +1768,18 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
         "Optional" @ 110..118: Variable
         "List" @ 119..123: Variable
         "str" @ 124..127: Class
-        "x" @ 190..191: Variable
+        "x" @ 190..191: Variable [definition]
         "int" @ 193..196: Class
         "42" @ 199..201: Number
-        "y" @ 206..207: Variable
+        "y" @ 206..207: Variable [definition]
         "MyClass" @ 209..216: Class
         "MyClass" @ 219..226: Class
-        "z" @ 233..234: Variable
+        "z" @ 233..234: Variable [definition]
         "List" @ 236..240: Variable
         "str" @ 241..244: Class
         "\"hello\"" @ 249..256: String
         "None" @ 357..361: BuiltinConstant
-        "###);
+        "#);
     }
 
     #[test]
@@ -1681,7 +1833,7 @@ def test_function(param: MyProtocol) -> MyProtocol:
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "typing" @ 6..12: Namespace
         "Protocol" @ 20..28: Variable
         "MyProtocol" @ 36..46: Class [definition]
@@ -1689,14 +1841,62 @@ def test_function(param: MyProtocol) -> MyProtocol:
         "method" @ 66..72: Method [definition]
         "self" @ 73..77: SelfParameter
         "int" @ 82..85: Class
-        "my_protocol_var" @ 166..181: Class
+        "my_protocol_var" @ 166..181: Class [definition]
         "MyProtocol" @ 184..194: Class
         "test_function" @ 244..257: Function [definition]
         "param" @ 258..263: Parameter
         "MyProtocol" @ 265..275: Class
         "MyProtocol" @ 280..290: Class
         "param" @ 303..308: Parameter
-        "###);
+        "#);
+    }
+
+    #[test]
+    fn type_alias_type_of() {
+        let test = SemanticTokenTest::new(
+            "
+class Test[T]: ...
+
+my_type_alias = Test[str]  # TODO: `my_type_alias` should be classified as a Class
+
+def test_function(param: my_type_alias): ...
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "Test" @ 7..11: Class [definition]
+        "T" @ 12..13: TypeParameter [definition]
+        "my_type_alias" @ 21..34: Class [definition]
+        "Test" @ 37..41: Class
+        "str" @ 42..45: Class
+        "test_function" @ 109..122: Function [definition]
+        "param" @ 123..128: Parameter
+        "my_type_alias" @ 130..143: Class
+        "#);
+    }
+
+    #[test]
+    fn type_alias_to_generic_alias() {
+        let test = SemanticTokenTest::new(
+            "
+my_type_alias = type[str]
+
+def test_function(param: my_type_alias): ...
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "my_type_alias" @ 1..14: Variable [definition]
+        "type" @ 17..21: Class
+        "str" @ 22..25: Class
+        "test_function" @ 32..45: Function [definition]
+        "param" @ 46..51: Parameter
+        "my_type_alias" @ 53..66: Variable
+        "#);
     }
 
     #[test]
@@ -1740,7 +1940,7 @@ class BoundedContainer[T: int, U = str]:
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "func" @ 87..91: Function [definition]
         "T" @ 92..93: TypeParameter [definition]
         "x" @ 95..96: Parameter
@@ -1773,7 +1973,7 @@ class BoundedContainer[T: int, U = str]:
         "kwargs" @ 374..380: Variable
         "str" @ 385..388: Class
         "str" @ 405..408: Class
-        "func" @ 409..413: Variable
+        "func" @ 409..413: Parameter
         "args" @ 415..419: Parameter
         "kwargs" @ 423..429: Parameter
         "wrapper" @ 443..450: Function
@@ -1786,23 +1986,23 @@ class BoundedContainer[T: int, U = str]:
         "T" @ 552..553: TypeParameter
         "value2" @ 555..561: Parameter
         "U" @ 563..564: TypeParameter
-        "self" @ 575..579: TypeParameter
+        "self" @ 575..579: SelfParameter
         "value1" @ 580..586: Variable
         "T" @ 588..589: TypeParameter
         "value1" @ 592..598: Parameter
-        "self" @ 607..611: TypeParameter
+        "self" @ 607..611: SelfParameter
         "value2" @ 612..618: Variable
         "U" @ 620..621: TypeParameter
         "value2" @ 624..630: Parameter
         "get_first" @ 640..649: Method [definition]
         "self" @ 650..654: SelfParameter
         "T" @ 659..660: TypeParameter
-        "self" @ 677..681: TypeParameter
+        "self" @ 677..681: SelfParameter
         "value1" @ 682..688: Variable
         "get_second" @ 698..708: Method [definition]
         "self" @ 709..713: SelfParameter
         "U" @ 718..719: TypeParameter
-        "self" @ 736..740: TypeParameter
+        "self" @ 736..740: SelfParameter
         "value2" @ 741..747: Variable
         "BoundedContainer" @ 796..812: Class [definition]
         "T" @ 813..814: TypeParameter [definition]
@@ -1820,7 +2020,7 @@ class BoundedContainer[T: int, U = str]:
         "U" @ 877..878: TypeParameter
         "x" @ 897..898: Parameter
         "y" @ 900..901: Parameter
-        "###);
+        "#);
     }
 
     #[test]
@@ -1843,10 +2043,10 @@ def generic_function[T](value: T) -> T:
         "value" @ 25..30: Parameter
         "T" @ 32..33: TypeParameter
         "T" @ 38..39: TypeParameter
-        "result" @ 98..104: Variable
+        "result" @ 98..104: Variable [definition]
         "T" @ 106..107: TypeParameter
         "value" @ 110..115: Parameter
-        "temp" @ 120..124: TypeParameter
+        "temp" @ 120..124: Variable [definition]
         "result" @ 127..133: Variable
         "result" @ 184..190: Variable
         "#);
@@ -1894,19 +2094,19 @@ z = 'single' "mixed" 'quotes'"#,
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
-        "x" @ 0..1: Variable
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "x" @ 0..1: Variable [definition]
         "\"hello\"" @ 4..11: String
         "\"world\"" @ 12..19: String
-        "y" @ 20..21: Variable
+        "y" @ 20..21: Variable [definition]
         "\"multi\"" @ 25..32: String
         "\"line\"" @ 38..44: String
         "\"string\"" @ 50..58: String
-        "z" @ 60..61: Variable
+        "z" @ 60..61: Variable [definition]
         "'single'" @ 64..72: String
         "\"mixed\"" @ 73..80: String
         "'quotes'" @ 81..89: String
-        "###);
+        "#);
     }
 
     #[test]
@@ -1921,19 +2121,19 @@ z = b'single' b"mixed" b'quotes'"#,
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
-        "x" @ 0..1: Variable
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "x" @ 0..1: Variable [definition]
         "b\"hello\"" @ 4..12: String
         "b\"world\"" @ 13..21: String
-        "y" @ 22..23: Variable
+        "y" @ 22..23: Variable [definition]
         "b\"multi\"" @ 27..35: String
         "b\"line\"" @ 41..48: String
         "b\"bytes\"" @ 54..62: String
-        "z" @ 64..65: Variable
+        "z" @ 64..65: Variable [definition]
         "b'single'" @ 68..77: String
         "b\"mixed\"" @ 78..86: String
         "b'quotes'" @ 87..96: String
-        "###);
+        "#);
     }
 
     #[test]
@@ -1950,26 +2150,26 @@ regular_bytes = b"just bytes""#,
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
-        "string_concat" @ 39..52: Variable
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "string_concat" @ 39..52: Variable [definition]
         "\"hello\"" @ 55..62: String
         "\"world\"" @ 63..70: String
-        "bytes_concat" @ 71..83: Variable
+        "bytes_concat" @ 71..83: Variable [definition]
         "b\"hello\"" @ 86..94: String
         "b\"world\"" @ 95..103: String
-        "mixed_quotes_str" @ 104..120: Variable
+        "mixed_quotes_str" @ 104..120: Variable [definition]
         "'single'" @ 123..131: String
         "\"double\"" @ 132..140: String
         "'single'" @ 141..149: String
-        "mixed_quotes_bytes" @ 150..168: Variable
+        "mixed_quotes_bytes" @ 150..168: Variable [definition]
         "b'single'" @ 171..180: String
         "b\"double\"" @ 181..190: String
         "b'single'" @ 191..200: String
-        "regular_string" @ 201..215: Variable
+        "regular_string" @ 201..215: Variable [definition]
         "\"just a string\"" @ 218..233: String
-        "regular_bytes" @ 234..247: Variable
+        "regular_bytes" @ 234..247: Variable [definition]
         "b\"just bytes\"" @ 250..263: String
-        "###);
+        "#);
     }
 
     #[test]
@@ -1994,24 +2194,24 @@ complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
-        "name" @ 45..49: Variable
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "name" @ 45..49: Variable [definition]
         "\"Alice\"" @ 52..59: String
-        "data" @ 60..64: Variable
+        "data" @ 60..64: Variable [definition]
         "b\"hello\"" @ 67..75: String
-        "value" @ 76..81: Variable
+        "value" @ 76..81: Variable [definition]
         "42" @ 84..86: Number
-        "result" @ 153..159: Variable
+        "result" @ 153..159: Variable [definition]
         "Hello " @ 164..170: String
         "name" @ 171..175: Variable
         "! Value: " @ 176..185: String
         "value" @ 186..191: Variable
         ", Data: " @ 192..200: String
         "data" @ 201..205: Variable
-        "mixed" @ 266..271: Variable
+        "mixed" @ 266..271: Variable [definition]
         "prefix" @ 276..282: String
         "b\"suffix\"" @ 286..295: String
-        "complex_fstring" @ 340..355: Variable
+        "complex_fstring" @ 340..355: Variable [definition]
         "User: " @ 360..366: String
         "name" @ 367..371: Variable
         "upper" @ 372..377: Method
@@ -2021,7 +2221,7 @@ complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"
         ", Hex: " @ 400..407: String
         "value" @ 408..413: Variable
         "x" @ 414..415: String
-        "###);
+        "#);
     }
 
     #[test]
@@ -2055,25 +2255,25 @@ def outer():
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
-        "x" @ 1..2: Variable
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "x" @ 1..2: Variable [definition]
         "\"global_value\"" @ 5..19: String
-        "y" @ 20..21: Variable
+        "y" @ 20..21: Variable [definition]
         "\"another_global\"" @ 24..40: String
         "outer" @ 46..51: Function [definition]
-        "x" @ 59..60: Variable
+        "x" @ 59..60: Variable [definition]
         "\"outer_value\"" @ 63..76: String
-        "z" @ 81..82: Variable
+        "z" @ 81..82: Variable [definition]
         "\"outer_local\"" @ 85..98: String
         "inner" @ 108..113: Function [definition]
         "x" @ 134..135: Variable
         "z" @ 137..138: Variable
         "y" @ 189..190: Variable
-        "x" @ 239..240: Variable
+        "x" @ 239..240: Variable [definition]
         "\"modified\"" @ 243..253: String
-        "y" @ 262..263: Variable
+        "y" @ 262..263: Variable [definition]
         "\"modified_global\"" @ 266..283: String
-        "z" @ 292..293: Variable
+        "z" @ 292..293: Variable [definition]
         "\"modified_local\"" @ 296..312: String
         "deeper" @ 326..332: Function [definition]
         "x" @ 357..358: Variable
@@ -2083,7 +2283,7 @@ def outer():
         "y" @ 461..462: Variable
         "deeper" @ 479..485: Function
         "inner" @ 498..503: Function
-        "###);
+        "#);
     }
 
     #[test]
@@ -2146,10 +2346,10 @@ def process_data(data):
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "process_data" @ 5..17: Function [definition]
         "data" @ 18..22: Parameter
-        "data" @ 35..39: Variable
+        "data" @ 35..39: Parameter
         "\"name\"" @ 55..61: String
         "name" @ 63..67: Variable
         "\"age\"" @ 69..74: String
@@ -2178,7 +2378,7 @@ def process_data(data):
         "Fallback: " @ 375..385: String
         "fallback" @ 386..394: Variable
         "fallback" @ 417..425: Variable
-        "###);
+        "#);
     }
 
     #[test]
@@ -2201,7 +2401,7 @@ finally:
         let tokens = test.highlight_file();
 
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
-        "x" @ 10..11: Variable
+        "x" @ 10..11: Variable [definition]
         "1" @ 14..15: Number
         "0" @ 18..19: Number
         "ValueError" @ 27..37: Class
@@ -2244,18 +2444,18 @@ class C:
         "C" @ 33..34: Class [definition]
         "__init__" @ 44..52: Method [definition]
         "self" @ 53..57: SelfParameter
-        "Self" @ 59..63: TypeParameter
-        "self" @ 74..78: Parameter
+        "Self" @ 59..63: Variable
+        "self" @ 74..78: SelfParameter
         "annotated" @ 79..88: Variable
         "int" @ 90..93: Class
         "1" @ 96..97: Number
-        "self" @ 106..110: Parameter
+        "self" @ 106..110: SelfParameter
         "non_annotated" @ 111..124: Variable
         "1" @ 127..128: Number
-        "self" @ 137..141: Parameter
+        "self" @ 137..141: SelfParameter
         "x" @ 142..143: Variable
         "test" @ 144..148: Variable
-        "self" @ 159..163: Parameter
+        "self" @ 159..163: SelfParameter
         "x" @ 164..165: Variable
         "#);
     }

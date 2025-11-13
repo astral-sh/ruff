@@ -1,0 +1,48 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: assignment_diagnostics.md - Subscript assignment diagnostics - Invalid value type for `TypedDict`
+mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_diagnostics.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing import TypedDict
+2 | 
+3 | class Config(TypedDict):
+4 |     retries: int
+5 | 
+6 | def _(config: Config) -> None:
+7 |     config["retries"] = "three"  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Invalid assignment to key "retries" with declared type `int` on TypedDict `Config`
+ --> src/mdtest_snippet.py:7:5
+  |
+6 | def _(config: Config) -> None:
+7 |     config["retries"] = "three"  # error: [invalid-assignment]
+  |     ------ ---------    ^^^^^^^ value of type `Literal["three"]`
+  |     |      |
+  |     |      key has declared type `int`
+  |     TypedDict `Config`
+  |
+info: Item declaration
+ --> src/mdtest_snippet.py:4:5
+  |
+3 | class Config(TypedDict):
+4 |     retries: int
+  |     ------------ Item declared here
+5 |
+6 | def _(config: Config) -> None:
+  |
+info: rule `invalid-assignment` is enabled by default
+
+```

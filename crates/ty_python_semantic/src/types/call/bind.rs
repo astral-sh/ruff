@@ -3647,6 +3647,31 @@ impl<'db> BindingError<'db> {
                 expected_ty,
                 provided_ty,
             } => {
+                // Certain special forms in the typing module are aliases for classes
+                // elsewhere in the standard library. These special forms are not instances of `type`,
+                // and you cannot use them in place of their aliased classes in *all* situations:
+                // for example, `dict()` succeeds at runtime, but `typing.Dict()` fails. However,
+                // they *can* all be used as the second argument to `isinstance` and `issubclass`.
+                // We model that specific aspect of their behaviour here.
+                //
+                // This is implemented as a special case in call-binding machinery because overriding
+                // typeshed's signatures for `isinstance()` and `issubclass()` would be complex and
+                // error-prone, due to the fact that they are annotated with recursive type aliases.
+                if parameter.index == 1
+                    && *argument_index == Some(1)
+                    && matches!(
+                        callable_ty
+                            .as_function_literal()
+                            .and_then(|function| function.known(context.db())),
+                        Some(KnownFunction::IsInstance | KnownFunction::IsSubclass)
+                    )
+                    && provided_ty
+                        .as_special_form()
+                        .is_some_and(SpecialFormType::is_valid_isinstance_target)
+                {
+                    return;
+                }
+
                 // TODO: Ideally we would not emit diagnostics for `TypedDict` literal arguments
                 // here (see `diagnostic::is_invalid_typed_dict_literal`). However, we may have
                 // silenced diagnostics during overload evaluation, and rely on the assignability

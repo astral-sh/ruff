@@ -274,3 +274,8 @@ pub(crate) const fn is_extended_i18n_function_matching_enabled(settings: &Linter
 pub(crate) const fn is_extended_snmp_api_path_detection_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/21395
+pub(crate) const fn is_enumerate_for_loop_int_index_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}

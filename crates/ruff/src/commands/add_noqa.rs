@@ -21,6 +21,7 @@ pub(crate) fn add_noqa(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
     config_arguments: &ConfigArguments,
+    reason: Option<&str>,
 ) -> Result<usize> {
     // Collect all the files to check.
     let start = Instant::now();
@@ -76,7 +77,14 @@ pub(crate) fn add_noqa(
                     return None;
                 }
             };
-            match add_noqa_to_path(path, package, &source_kind, source_type, &settings.linter) {
+            match add_noqa_to_path(
+                path,
+                package,
+                &source_kind,
+                source_type,
+                &settings.linter,
+                reason,
+            ) {
                 Ok(count) => Some(count),
                 Err(e) => {
                     error!("Failed to add noqa to {}: {e}", path.display());
