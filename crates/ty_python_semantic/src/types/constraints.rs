@@ -60,7 +60,7 @@ use std::cmp::Ordering;
 use std::fmt::Display;
 
 use itertools::Itertools;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 
 use crate::Db;
@@ -1840,6 +1840,307 @@ impl<'db> ConstraintAssignment<'db> {
         DisplayConstraintAssignment {
             constraint: self,
             db,
+        }
+    }
+}
+
+/// A collection of _sequents_ that describe how the constraints mentioned in a BDD relate to each
+/// other. These are used when evaluating checking satisfiability of a BDD. Both of those
+/// operations involve walking one or more paths from the root node to a terminal node. Each
+/// sequent describes paths that are invalid; these paths are pruned from the search.
+///
+/// We support several kinds of sequent:
+///
+/// - `C₁ ∧ C₂ → false`: This indicates that `C₁` and `C₂` are disjoint: it is not possible for
+///   both to hold. Any path that assumes both is impossible and can be pruned.
+///
+/// - `C₁ ∧ C₂ → D`: This indicates that the intersection of `C₁` and `C₂` can be simplified to
+///   `D`. Any path that assumes both `C₁` and `C₂` hold, but assumes `D` does _not_, is impossible
+///   and can be pruned.
+///
+/// - `C → D`: This indicates that `C` on its own is enough to imply `D`. Any path that assumes `C`
+///   holds but `D` does _not_ is impossible and can be pruned.
+///
+/// XXX: Note that `C`, `C₁`, `C₂`, and `D` are all [`ConstraintAssignment`]s, which means that they can
+/// check whether a [`ConstrainedTypeVar`] is true or false. #[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
+struct SequentMap<'db> {
+    /// Sequents of the form `C₁ ∧ C₂ → false`
+    impossibilities: FxHashSet<(ConstrainedTypeVar<'db>, ConstrainedTypeVar<'db>)>,
+    /// Sequents of the form `C₁ ∧ C₂ → D`
+    pair_implications:
+        FxHashMap<(ConstrainedTypeVar<'db>, ConstrainedTypeVar<'db>), Vec<ConstrainedTypeVar<'db>>>,
+    /// Sequents of the form `C₁ ∧ C₂ → D`
+    single_implications: FxHashMap<ConstrainedTypeVar<'db>, Vec<ConstrainedTypeVar<'db>>>,
+    /// Constraints that we have already processed
+    processed: FxHashSet<ConstrainedTypeVar<'db>>,
+}
+
+impl<'db> SequentMap<'db> {
+    fn add(&mut self, db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) {
+        // If we've already seen this constraint, we can skip it.
+        if !self.processed.insert(constraint) {
+            return;
+        }
+
+        // Otherwise, check this constraint against all of the other ones we've seen so far, seeing
+        // if they're related to each other.
+        let processed = std::mem::take(&mut self.processed);
+        for other in &processed {
+            self.add_sequents_for_pair(db, constraint, *other);
+        }
+        self.processed = processed;
+
+        // And see if we can create any sequents from the constraint on its own.
+        self.add_sequents_for_single(db, constraint);
+    }
+
+    fn pair_key(
+        db: &'db dyn Db,
+        ante1: ConstrainedTypeVar<'db>,
+        ante2: ConstrainedTypeVar<'db>,
+    ) -> (ConstrainedTypeVar<'db>, ConstrainedTypeVar<'db>) {
+        if ante1.ordering(db) < ante2.ordering(db) {
+            (ante1, ante2)
+        } else {
+            (ante2, ante1)
+        }
+    }
+
+    fn add_impossibility(
+        &mut self,
+        db: &'db dyn Db,
+        ante1: ConstrainedTypeVar<'db>,
+        ante2: ConstrainedTypeVar<'db>,
+    ) {
+        self.impossibilities
+            .insert(Self::pair_key(db, ante1, ante2));
+    }
+
+    fn add_pair_implication(
+        &mut self,
+        db: &'db dyn Db,
+        ante1: ConstrainedTypeVar<'db>,
+        ante2: ConstrainedTypeVar<'db>,
+        post: ConstrainedTypeVar<'db>,
+    ) {
+        self.pair_implications
+            .entry(Self::pair_key(db, ante1, ante2))
+            .or_default()
+            .push(post);
+    }
+
+    fn add_single_implication(
+        &mut self,
+        ante: ConstrainedTypeVar<'db>,
+        post: ConstrainedTypeVar<'db>,
+    ) {
+        self.single_implications.entry(ante).or_default().push(post);
+    }
+
+    fn add_sequents_for_single(&mut self, db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) {
+        // If the lower or upper bound of this constraint is a typevar, we can propagate the
+        // constraint:
+        //
+        //   1. `(S ≤ T ≤ U) → (S ≤ U)`
+        //   2. `(S ≤ T ≤ τ) → (S ≤ τ)`
+        //   3. `(τ ≤ T ≤ U) → (τ ≤ U)`
+        //
+        // Technically, (1) also allows `(S = T) → (S = S)`, but the rhs of that is vacuously true,
+        // so we don't add a sequent for that case.
+
+        let lower = constraint.lower(db);
+        let upper = constraint.upper(db);
+        match (lower, upper) {
+            // Case 1
+            (Type::TypeVar(lower_typevar), Type::TypeVar(upper_typevar))
+                if !lower_typevar.is_same_typevar_as(db, upper_typevar) =>
+            {
+                let post_constraint =
+                    ConstrainedTypeVar::new(db, lower_typevar, Type::Never, upper);
+                self.add_single_implication(constraint, post_constraint);
+            }
+
+            // Case 2
+            (Type::TypeVar(lower_typevar), _) => {
+                let post_constraint =
+                    ConstrainedTypeVar::new(db, lower_typevar, Type::Never, upper);
+                self.add_single_implication(constraint, post_constraint);
+            }
+
+            // Case 3
+            (_, Type::TypeVar(upper_typevar)) => {
+                let post_constraint =
+                    ConstrainedTypeVar::new(db, upper_typevar, lower, Type::object());
+                self.add_single_implication(constraint, post_constraint);
+            }
+
+            _ => {}
+        }
+    }
+
+    fn add_sequents_for_pair(
+        &mut self,
+        db: &'db dyn Db,
+        left_constraint: ConstrainedTypeVar<'db>,
+        right_constraint: ConstrainedTypeVar<'db>,
+    ) {
+        // If either of the constraints has another typevar as a lower/upper bound, the only
+        // sequents we can add are for the transitive closure. For instance, if we have
+        // `(S ≤ T) ∧ (T ≤ int)`, then `(S ≤ int)` will also hold, and we should add a sequent for
+        // this implication. These are the `mutual_sequents` mentioned below — sequents that come
+        // about because two typevars are mutually constrained.
+        //
+        // Complicating things is that `(S ≤ T)` will be encoded differently depending on how `S`
+        // and `T` compare in our arbitrary BDD variable ordering.
+        //
+        // When `S` comes before `T`, `(S ≤ T)` will be encoded as `(Never ≤ S ≤ T)`, and the
+        // overall antecedent will be `(Never ≤ S ≤ T) ∧ (T ≤ int)`. Those two individual
+        // constraints constrain different typevars (`S` and `T`, respectively), and are handled by
+        // `add_mutual_sequents_for_different_typevars`.
+        //
+        // When `T` comes before `S`, `(S ≤ T)` will be encoded as `(S ≤ T ≤ object)`, and the
+        // overall antecedent will be `(S ≤ T ≤ object) ∧ (T ≤ int)`. Those two individual
+        // constraints both constrain `T`, and are handled by
+        // `add_mutual_sequents_for_same_typevars`.
+        //
+        // If all of the lower and upper bounds are concrete (i.e., not typevars), then there
+        // several _other_ sequents that we can add, as handled by `add_concrete_sequents`.
+        let left_typevar = left_constraint.typevar(db);
+        let right_typevar = right_constraint.typevar(db);
+        if !left_typevar.is_same_typevar_as(db, right_typevar) {
+            self.add_mutual_sequents_for_different_typevars(db, left_constraint, right_constraint);
+        } else if left_constraint.lower(db).is_type_var()
+            || left_constraint.upper(db).is_type_var()
+            || right_constraint.lower(db).is_type_var()
+            || right_constraint.upper(db).is_type_var()
+        {
+            self.add_mutual_sequents_for_same_typevars(db, left_constraint, right_constraint);
+        } else {
+            self.add_concrete_sequents(db, left_constraint, right_constraint);
+        }
+    }
+
+    fn add_mutual_sequents_for_different_typevars(
+        &mut self,
+        db: &'db dyn Db,
+        left_constraint: ConstrainedTypeVar<'db>,
+        right_constraint: ConstrainedTypeVar<'db>,
+    ) {
+        // We've structured our constraints so that a typevar's upper/lower bound can only
+        // be another typevar if the bound is "later" in our arbitrary ordering. That means
+        // we only have to check this pair of constraints in one direction — though we do
+        // have to figure out which of the two typevars is constrained, and which one is
+        // the upper/lower bound.
+        let left_typevar = left_constraint.typevar(db);
+        let right_typevar = right_constraint.typevar(db);
+        let (bound_typevar, bound_constraint, constrained_typevar, constrained_constraint) =
+            if left_typevar.can_be_bound_for(db, right_typevar) {
+                (
+                    left_typevar,
+                    left_constraint,
+                    right_typevar,
+                    right_constraint,
+                )
+            } else {
+                (
+                    right_typevar,
+                    right_constraint,
+                    left_typevar,
+                    left_constraint,
+                )
+            };
+
+        // We then look for cases where the "constrained" typevar's upper and/or lower bound
+        // matches the "bound" typevar. If so, we're going to add an implication sequent that
+        // replaces the upper/lower bound that matched with the bound constraint's corresponding
+        // bound.
+        let (new_lower, new_upper) = match (
+            constrained_constraint.lower(db),
+            constrained_constraint.upper(db),
+        ) {
+            // (B ≤ C ≤ B) ∧ (BL ≤ B ≤ BU) → (BL ≤ C ≤ BU)
+            (Type::TypeVar(constrained_lower), Type::TypeVar(constrained_upper))
+                if constrained_lower.is_same_typevar_as(db, bound_typevar)
+                    && constrained_upper.is_same_typevar_as(db, bound_typevar) =>
+            {
+                (bound_constraint.lower(db), bound_constraint.upper(db))
+            }
+
+            // (CL ≤ C ≤ B) ∧ (BL ≤ B ≤ BU) → (CL ≤ C ≤ BU)
+            (constrained_lower, Type::TypeVar(constrained_upper))
+                if constrained_upper.is_same_typevar_as(db, bound_typevar) =>
+            {
+                (constrained_lower, bound_constraint.upper(db))
+            }
+
+            // (B ≤ C ≤ CU) ∧ (BL ≤ B ≤ BU) → (BL ≤ C ≤ CU)
+            (Type::TypeVar(constrained_lower), constrained_upper)
+                if constrained_lower.is_same_typevar_as(db, bound_typevar) =>
+            {
+                (bound_constraint.lower(db), constrained_upper)
+            }
+
+            _ => return,
+        };
+
+        let post_constraint =
+            ConstrainedTypeVar::new(db, constrained_typevar, new_lower, new_upper);
+        self.add_pair_implication(db, left_constraint, right_constraint, post_constraint);
+    }
+
+    fn add_mutual_sequents_for_same_typevars(
+        &mut self,
+        db: &'db dyn Db,
+        left_constraint: ConstrainedTypeVar<'db>,
+        right_constraint: ConstrainedTypeVar<'db>,
+    ) {
+        let mut try_one_direction =
+            |left_constraint: ConstrainedTypeVar<'db>,
+             right_constraint: ConstrainedTypeVar<'db>| {
+                let left_lower = left_constraint.lower(db);
+                let left_upper = left_constraint.upper(db);
+                let right_lower = right_constraint.lower(db);
+                let right_upper = right_constraint.upper(db);
+                let post_constraint = match (left_lower, left_upper) {
+                    (Type::TypeVar(bound_typevar), Type::TypeVar(other_bound_typevar))
+                        if bound_typevar.is_same_typevar_as(db, other_bound_typevar) =>
+                    {
+                        ConstrainedTypeVar::new(db, bound_typevar, right_lower, right_upper)
+                    }
+                    (Type::TypeVar(bound_typevar), _) => {
+                        ConstrainedTypeVar::new(db, bound_typevar, Type::Never, right_upper)
+                    }
+                    (_, Type::TypeVar(bound_typevar)) => {
+                        ConstrainedTypeVar::new(db, bound_typevar, right_lower, Type::object())
+                    }
+                    _ => return,
+                };
+                self.add_pair_implication(db, left_constraint, right_constraint, post_constraint);
+            };
+
+        try_one_direction(left_constraint, right_constraint);
+        try_one_direction(right_constraint, left_constraint);
+    }
+
+    fn add_concrete_sequents(
+        &mut self,
+        db: &'db dyn Db,
+        left_constraint: ConstrainedTypeVar<'db>,
+        right_constraint: ConstrainedTypeVar<'db>,
+    ) {
+        match left_constraint.intersect(db, right_constraint) {
+            Some(intersection_constraint) => {
+                self.add_pair_implication(
+                    db,
+                    left_constraint,
+                    right_constraint,
+                    intersection_constraint,
+                );
+            }
+            None => {
+                self.add_impossibility(db, left_constraint, right_constraint);
+            }
         }
     }
 }
