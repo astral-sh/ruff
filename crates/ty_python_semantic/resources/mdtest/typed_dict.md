@@ -631,10 +631,10 @@ def _(person: Person, union_of_keys: Literal["name", "age"], unknown_value: Any)
     person[union_of_keys] = None
 
 def _(person: Person, str_key: str, literalstr_key: LiteralString):
-    # error: [invalid-key] "TypedDict `Person` can only be subscripted with string literal keys, got key type `str`."
+    # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`."
     person[str_key] = None
 
-    # error: [invalid-key] "TypedDict `Person` can only be subscripted with string literal keys, got key type `LiteralString`."
+    # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `LiteralString`."
     person[literalstr_key] = None
 
 def _(person: Person, unknown_key: Any):

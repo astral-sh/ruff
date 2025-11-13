@@ -3700,7 +3700,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .report_lint(&INVALID_KEY, target.slice.as_ref())
                         {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "TypedDict `{value_d}` can only be subscripted with string literal keys, got key type `{}`.",
+                                "TypedDict `{value_d}` can only be subscripted with a string literal key, got key of type `{}`.",
                                 slice_ty.display(db)
                             ));
                             attach_original_type_info(&mut diagnostic);
@@ -3801,8 +3801,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                     .map(|s| s.types(db))
                                             {
                                                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                                                    "Cannot assign to a subscript on object of type `{object_d}` with key of type `{}` \
-                                                    and a value of type `{assigned_d}`",
+                                                    "Invalid subscript assignment with key of type `{}` and value of \
+                                                     type `{assigned_d}` on object of type `{object_d}`",
                                                     slice_ty.display(db),
                                                 ));
 
@@ -3874,7 +3874,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 attach_original_type_info(&mut diagnostic);
 
                                 // Use `KnownClass` as a crude proxy for checking if this is not a user-defined class. Otherwise,
-                                // we end up suggesting things like "`None` may be missing a `__setitem__` method."
+                                // we end up suggesting things like "Consider adding a `__setitem__` method to `None`".
                                 if object_ty
                                     .as_nominal_instance()
                                     .is_some_and(|instance| instance.class(db).known(db).is_some())
@@ -3885,7 +3885,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     ));
                                 } else {
                                     diagnostic.info(format_args!(
-                                        "`{}` may be missing a `__setitem__` method.",
+                                        "Consider adding a `__setitem__` method to `{}`.",
                                         object_ty.display(db),
                                     ));
                                 }
