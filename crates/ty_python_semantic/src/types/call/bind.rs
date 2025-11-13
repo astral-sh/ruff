@@ -1285,13 +1285,15 @@ impl<'db> Bindings<'db> {
                         else {
                             continue;
                         };
-                        if let Ok(specialization) =
-                            generic_context.specialize_constrained(db, constraints.constraints(db))
-                        {
-                            overload.set_return_type(Type::KnownInstance(
+                        let specialization =
+                            generic_context.specialize_constrained(db, constraints.constraints(db));
+                        let result = match specialization {
+                            Ok(specialization) => Type::KnownInstance(
                                 KnownInstanceType::Specialization(specialization),
-                            ));
-                        }
+                            ),
+                            Err(_) => Type::none(db),
+                        };
+                        overload.set_return_type(result);
                     }
 
                     Type::ClassLiteral(class) => match class.known(db) {

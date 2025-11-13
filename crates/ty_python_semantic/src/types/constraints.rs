@@ -2903,15 +2903,21 @@ impl<'db> GenericContext<'db> {
             // constraint set can be satisfied. Each of those is a conjunction of individual
             // constraints. We choose the "highest" (i.e. least upper bound, "closest to `object`")
             // type that satisfies all of those individual constraints.
+            //
+            // Note that we track whether there is any satisfiable representative type separately
+            // from the union builder, since we specializing the typevar to `Never` is different
+            // from not being able to specialize it to anything.
+            let mut satisfied = false;
             let mut builder = UnionBuilder::new(db);
             abstracted.find_representative_types(db, bound_typevar.identity(db), |ty| {
-                builder.add_in_place(ty)
+                satisfied = true;
+                builder.add_in_place(ty);
             });
-            let Some(specialized_type) = builder.try_build() else {
+            if !satisfied {
                 // TODO: Construct a useful error here
                 return Err(());
-            };
-            types[i] = specialized_type;
+            }
+            types[i] = builder.build();
         }
         Ok(self.specialize(db, types.into_boxed_slice()))
     }
