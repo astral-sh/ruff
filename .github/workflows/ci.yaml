@@ -331,7 +331,9 @@ jobs:
         with:
           enable-cache: "true"
       - name: "Run tests"
-        run: cargo insta test --release --all-features --unreferenced reject --test-runner nextest
+        run: cargo nextest run --cargo-profile profiling --all-features
+      - name: "Run doctests"
+        run: cargo test --doc --profile profiling --all-features
 
   cargo-test-other:
     strategy:

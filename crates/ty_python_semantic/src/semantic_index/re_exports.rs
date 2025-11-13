@@ -20,14 +20,13 @@
 //! to handle cycles. We do this using fixpoint iteration; adding fixpoint iteration to the
 //! whole [`super::semantic_index()`] query would probably be prohibitively expensive.
 
-use std::collections::BTreeMap;
-
 use ruff_db::{files::File, parsed::parsed_module};
 use ruff_python_ast::{
     self as ast,
     name::Name,
     visitor::{Visitor, walk_expr, walk_pattern, walk_stmt},
 };
+use rustc_hash::FxHashMap;
 
 use crate::{Db, module_name::ModuleName, resolve_module};
 
@@ -40,18 +39,20 @@ pub(super) fn exported_names(db: &dyn Db, file: File) -> Box<[Name]> {
     let module = parsed_module(db, file).load(db);
     let mut finder = ExportFinder::new(db, file);
     finder.visit_body(module.suite());
-    finder.resolve_exports()
+
+    let mut exports = finder.resolve_exports();
+
+    // Sort the exports to ensure convergence regardless of hash map
+    // or insertion order. See <https://github.com/astral-sh/ty/issues/444>
+    exports.sort_unstable();
+    exports.into()
 }
 
 struct ExportFinder<'db> {
     db: &'db dyn Db,
     file: File,
     visiting_stub_file: bool,
-
-    // The use of a `BTreeMap` here over a `FxHashMap` is to ensure
-    // `exported_names` converges regardless of in which order the names
-    // are inserted. See <https://github.com/astral-sh/ty/issues/444>
-    exports: BTreeMap<&'db Name, PossibleExportKind>,
+    exports: FxHashMap<&'db Name, PossibleExportKind>,
     dunder_all: DunderAll,
 }
 
@@ -61,7 +62,7 @@ impl<'db> ExportFinder<'db> {
             db,
             file,
             visiting_stub_file: file.is_stub(db),
-            exports: BTreeMap::default(),
+            exports: FxHashMap::default(),
             dunder_all: DunderAll::NotPresent,
         }
     }
@@ -74,7 +75,7 @@ impl<'db> ExportFinder<'db> {
         }
     }
 
-    fn resolve_exports(self) -> Box<[Name]> {
+    fn resolve_exports(self) -> Vec<Name> {
         match self.dunder_all {
             DunderAll::NotPresent => self
                 .exports
