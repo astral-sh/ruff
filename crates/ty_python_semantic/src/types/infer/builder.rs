@@ -10771,6 +10771,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
+            Type::SpecialForm(SpecialFormType::Type) => {
+                // Similar to the branch above that handles `type[…]`, handle `typing.Type[…]`
+                let argument_ty = self.infer_type_expression(slice);
+                return Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
+                    InternedType::new(self.db(), argument_ty),
+                ));
+            }
             _ => {}
         }
 

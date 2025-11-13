@@ -607,7 +607,9 @@ def _(
     reveal_type(invalid)  # revealed: str | Unknown
 ```
 
-## `type[…]`
+## `type[…]` and `Type[…]`
+
+### `type[…]`
 
 We support implicit type aliases using `type[…]`:
 
@@ -678,10 +680,83 @@ def _(
 Invalid uses result in diagnostics:
 
 ```py
-from typing import Union
-
 # error: [invalid-type-form]
 InvalidSubclass = type[1]
+```
+
+### `Type[…]`
+
+The same also works for `typing.Type[…]`:
+
+```py
+from typing import Any, Union, Protocol, TypeVar, Generic, Type
+
+T = TypeVar("T")
+
+class A: ...
+class B: ...
+class G(Generic[T]): ...
+
+class P(Protocol):
+    def method(self) -> None: ...
+
+SubclassOfA = Type[A]
+SubclassOfAny = Type[Any]
+SubclassOfAOrB1 = Type[A | B]
+SubclassOfAOrB2 = Type[A] | Type[B]
+SubclassOfAOrB3 = Union[Type[A], Type[B]]
+SubclassOfG = Type[G]
+SubclassOfGInt = Type[G[int]]
+SubclassOfP = Type[P]
+
+reveal_type(SubclassOfA)  # revealed: GenericAlias
+reveal_type(SubclassOfAny)  # revealed: GenericAlias
+reveal_type(SubclassOfAOrB1)  # revealed: GenericAlias
+reveal_type(SubclassOfAOrB2)  # revealed: types.UnionType
+reveal_type(SubclassOfAOrB3)  # revealed: types.UnionType
+reveal_type(SubclassOfG)  # revealed: GenericAlias
+reveal_type(SubclassOfGInt)  # revealed: GenericAlias
+reveal_type(SubclassOfP)  # revealed: GenericAlias
+
+def _(
+    subclass_of_a: SubclassOfA,
+    subclass_of_any: SubclassOfAny,
+    subclass_of_a_or_b1: SubclassOfAOrB1,
+    subclass_of_a_or_b2: SubclassOfAOrB2,
+    subclass_of_a_or_b3: SubclassOfAOrB3,
+    subclass_of_g: SubclassOfG,
+    subclass_of_g_int: SubclassOfGInt,
+    subclass_of_p: SubclassOfP,
+):
+    reveal_type(subclass_of_a)  # revealed: type[A]
+    reveal_type(subclass_of_a())  # revealed: A
+
+    reveal_type(subclass_of_any)  # revealed: type[Any]
+    reveal_type(subclass_of_any())  # revealed: Any
+
+    reveal_type(subclass_of_a_or_b1)  # revealed: type[A] | type[B]
+    reveal_type(subclass_of_a_or_b1())  # revealed: A | B
+
+    reveal_type(subclass_of_a_or_b2)  # revealed: type[A] | type[B]
+    reveal_type(subclass_of_a_or_b2())  # revealed: A | B
+
+    reveal_type(subclass_of_a_or_b3)  # revealed: type[A] | type[B]
+    reveal_type(subclass_of_a_or_b3())  # revealed: A | B
+
+    reveal_type(subclass_of_g)  # revealed: type[G[Unknown]]
+    reveal_type(subclass_of_g())  # revealed: G[Unknown]
+
+    reveal_type(subclass_of_g_int)  # revealed: type[G[int]]
+    reveal_type(subclass_of_g_int())  # revealed: G[int]
+
+    reveal_type(subclass_of_p)  # revealed: type[P]
+```
+
+Invalid uses result in diagnostics:
+
+```py
+# error: [invalid-type-form]
+InvalidSubclass = Type[1]
 ```
 
 ## Stringified annotations?
