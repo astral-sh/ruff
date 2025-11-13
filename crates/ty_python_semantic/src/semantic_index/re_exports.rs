@@ -20,13 +20,14 @@
 //! to handle cycles. We do this using fixpoint iteration; adding fixpoint iteration to the
 //! whole [`super::semantic_index()`] query would probably be prohibitively expensive.
 
+use std::collections::BTreeMap;
+
 use ruff_db::{files::File, parsed::parsed_module};
 use ruff_python_ast::{
     self as ast,
     name::Name,
     visitor::{Visitor, walk_expr, walk_pattern, walk_stmt},
 };
-use rustc_hash::FxHashMap;
 
 use crate::{Db, module_name::ModuleName, resolve_module};
 
@@ -46,7 +47,11 @@ struct ExportFinder<'db> {
     db: &'db dyn Db,
     file: File,
     visiting_stub_file: bool,
-    exports: FxHashMap<&'db Name, PossibleExportKind>,
+
+    // The use of a `BTreeMap` here over a `FxHashMap` is to ensure
+    // `exported_names` converges regardless of in which order the names
+    // are inserted. See <https://github.com/astral-sh/ty/issues/444>
+    exports: BTreeMap<&'db Name, PossibleExportKind>,
     dunder_all: DunderAll,
 }
 
@@ -56,7 +61,7 @@ impl<'db> ExportFinder<'db> {
             db,
             file,
             visiting_stub_file: file.is_stub(db),
-            exports: FxHashMap::default(),
+            exports: BTreeMap::default(),
             dunder_all: DunderAll::NotPresent,
         }
     }
