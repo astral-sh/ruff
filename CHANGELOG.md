@@ -1,5 +1,58 @@
 # Changelog
 
+## 0.14.5
+
+Released on 2025-11-13.
+
+### Preview features
+
+- \[`flake8-simplify`\] Apply `SIM113` when index variable is of type `int` ([#21395](https://github.com/astral-sh/ruff/pull/21395))
+- \[`pydoclint`\] Fix false positive when Sphinx directives follow a "Raises" section (`DOC502`) ([#20535](https://github.com/astral-sh/ruff/pull/20535))
+- \[`pydoclint`\] Support NumPy-style comma-separated parameters (`DOC102`) ([#20972](https://github.com/astral-sh/ruff/pull/20972))
+- \[`refurb`\] Auto-fix annotated assignments (`FURB101`) ([#21278](https://github.com/astral-sh/ruff/pull/21278))
+- \[`ruff`\] Ignore `str()` when not used for simple conversion (`RUF065`) ([#21330](https://github.com/astral-sh/ruff/pull/21330))
+
+### Bug fixes
+
+- Fix syntax error false positive on alternative `match` patterns ([#21362](https://github.com/astral-sh/ruff/pull/21362))
+- \[`flake8-simplify`\] Fix false positive for iterable initializers with generator arguments (`SIM222`) ([#21187](https://github.com/astral-sh/ruff/pull/21187))
+- \[`pyupgrade`\] Fix false positive on relative imports from local `.builtins` module (`UP029`) ([#21309](https://github.com/astral-sh/ruff/pull/21309))
+- \[`pyupgrade`\] Consistently set the deprecated tag (`UP035`) ([#21396](https://github.com/astral-sh/ruff/pull/21396))
+
+### Rule changes
+
+- \[`refurb`\] Detect empty f-strings (`FURB105`) ([#21348](https://github.com/astral-sh/ruff/pull/21348))
+
+### CLI
+
+- Add option to provide a reason to `--add-noqa` ([#21294](https://github.com/astral-sh/ruff/pull/21294))
+- Add upstream linter URL to `ruff linter --output-format=json` ([#21316](https://github.com/astral-sh/ruff/pull/21316))
+- Add color to `--help` ([#21337](https://github.com/astral-sh/ruff/pull/21337))
+
+### Documentation
+
+- Add a new "Opening a PR" section to the contribution guide ([#21298](https://github.com/astral-sh/ruff/pull/21298))
+- Added the PyScripter IDE to the list of "Who is using Ruff?" ([#21402](https://github.com/astral-sh/ruff/pull/21402))
+- Update PyCharm setup instructions ([#21409](https://github.com/astral-sh/ruff/pull/21409))
+- \[`flake8-annotations`\] Add link to `allow-star-arg-any` option (`ANN401`) ([#21326](https://github.com/astral-sh/ruff/pull/21326))
+
+### Other changes
+
+- \[`configuration`\] Improve error message when `line-length` exceeds `u16::MAX` ([#21329](https://github.com/astral-sh/ruff/pull/21329))
+
+### Contributors
+
+- [@njhearp](https://github.com/njhearp)
+- [@11happy](https://github.com/11happy)
+- [@hugovk](https://github.com/hugovk)
+- [@Gankra](https://github.com/Gankra)
+- [@ntBre](https://github.com/ntBre)
+- [@pyscripter](https://github.com/pyscripter)
+- [@danparizher](https://github.com/danparizher)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@henryiii](https://github.com/henryiii)
+- [@charliecloudberry](https://github.com/charliecloudberry)
+
 ## 0.14.4
 
 Released on 2025-11-06.
