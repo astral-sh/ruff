@@ -35,8 +35,6 @@ mod tests {
     #[test_case(Rule::RequestWithNoCertValidation, Path::new("S501.py"))]
     #[test_case(Rule::RequestWithoutTimeout, Path::new("S113.py"))]
     #[test_case(Rule::SSHNoHostKeyVerification, Path::new("S507.py"))]
-    #[test_case(Rule::SnmpInsecureVersion, Path::new("S508.py"))]
-    #[test_case(Rule::SnmpWeakCryptography, Path::new("S509.py"))]
     #[test_case(Rule::SslInsecureVersion, Path::new("S502.py"))]
     #[test_case(Rule::SslWithBadDefaults, Path::new("S503.py"))]
     #[test_case(Rule::SslWithNoVersion, Path::new("S504.py"))]
@@ -110,6 +108,21 @@ mod tests {
             rule_code.noqa_code(),
             path.to_string_lossy()
         );
+        let diagnostics = test_path(
+            Path::new("flake8_bandit").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::SnmpInsecureVersion, Path::new("S508.py"))]
+    #[test_case(Rule::SnmpWeakCryptography, Path::new("S509.py"))]
+    fn snmp_rules_with_preview(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_bandit").join(path).as_path(),
             &LinterSettings {
