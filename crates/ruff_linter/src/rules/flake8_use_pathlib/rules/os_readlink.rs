@@ -38,6 +38,9 @@ use crate::{FixAvailability, Violation};
 ///
 /// ## Fix Safety
 /// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+/// Additionally, the fix is marked as unsafe because `os.readlink()` returns a `str`, while `Path.readlink()` returns a `Path` object.
+/// This change in return type can break code that uses the return value.
+/// The fix is safe when the function call is a top-level expression in its statement (i.e., the return value is not used).
 ///
 /// ## References
 /// - [Python documentation: `Path.readlink`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.readline)

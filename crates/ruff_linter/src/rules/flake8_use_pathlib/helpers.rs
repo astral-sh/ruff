@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprCall};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprCall, Stmt};
 use ruff_python_semantic::{SemanticModel, analyze::typing};
 use ruff_text_size::Ranged;
 
@@ -94,12 +94,22 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
         let fix = match applicability {
             Some(Applicability::Unsafe) => Fix::unsafe_edits(edit, [import_edit]),
             _ => {
-                let applicability = if checker.comment_ranges().intersects(range) {
+                let determined_applicability = if checker.comment_ranges().intersects(range) {
                     Applicability::Unsafe
+                } else if applicability.is_none() {
+                    // When applicability is None, we need to determine it based on return type changes
+                    if is_top_level_expression_call(checker, call) {
+                        // Safe when the call is a top-level expression (return value not used)
+                        Applicability::Safe
+                    } else {
+                        // Unsafe because the return type changes (str/bytes -> Path or None -> Path)
+                        Applicability::Unsafe
+                    }
                 } else {
+                    // applicability is Some(Applicability::Safe), use it
                     Applicability::Safe
                 };
-                Fix::applicable_edits(edit, [import_edit], applicability)
+                Fix::applicable_edits(edit, [import_edit], determined_applicability)
             }
         };
 
@@ -176,8 +186,12 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
 
             let applicability = if checker.comment_ranges().intersects(range) {
                 Applicability::Unsafe
-            } else {
+            } else if is_top_level_expression_call(checker, call) {
+                // Safe when the call is a top-level expression (return value not used)
                 Applicability::Safe
+            } else {
+                // Unsafe because the return type changes (None -> Path)
+                Applicability::Unsafe
             };
 
             Ok(Fix::applicable_edits(
@@ -208,4 +222,23 @@ pub(crate) fn is_argument_non_default(arguments: &Arguments, name: &str, positio
     arguments
         .find_argument_value(name, position)
         .is_some_and(|expr| !expr.is_none_literal_expr())
+}
+
+/// Returns `true` if the given call is a top-level expression in its statement.
+/// This means the call's return value is not used, so return type changes don't matter.
+pub(crate) fn is_top_level_expression_call(checker: &Checker, call: &ExprCall) -> bool {
+    if let Stmt::Expr(ast::StmtExpr {
+        value: child,
+        range: _,
+        node_index: _,
+    }) = checker.semantic().current_statement()
+    {
+        // Check if the call is the same expression as the statement's value
+        // We compare by checking if the call's range is contained within the child's range
+        // and if they're the same expression node
+        if let Expr::Call(call_expr) = child.as_ref() {
+            return call_expr.range() == call.range();
+        }
+    }
+    false
 }

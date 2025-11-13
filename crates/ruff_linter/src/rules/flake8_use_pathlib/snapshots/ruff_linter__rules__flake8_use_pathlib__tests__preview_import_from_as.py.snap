@@ -240,6 +240,7 @@ help: Replace with `Path(...).exists()`
 26 | bb = xexpanduser(p)
 27 | bbb = xisdir(p)
 28 | bbbb = xisfile(p)
+note: This is an unsafe fix and may change runtime behavior
 
 PTH111 [*] `os.path.expanduser()` should be replaced by `Path.expanduser()`
   --> import_from_as.py:25:6
@@ -297,6 +298,7 @@ help: Replace with `Path(...).is_dir()`
 28 | bbbb = xisfile(p)
 29 | bbbbb = xislink(p)
 30 | xreadlink(p)
+note: This is an unsafe fix and may change runtime behavior
 
 PTH113 [*] `os.path.isfile()` should be replaced by `Path.is_file()`
   --> import_from_as.py:27:8
@@ -325,6 +327,7 @@ help: Replace with `Path(...).is_file()`
 29 | bbbbb = xislink(p)
 30 | xreadlink(p)
 31 | xstat(p)
+note: This is an unsafe fix and may change runtime behavior
 
 PTH114 [*] `os.path.islink()` should be replaced by `Path.is_symlink()`
   --> import_from_as.py:28:9
@@ -353,6 +356,7 @@ help: Replace with `Path(...).is_symlink()`
 30 | xreadlink(p)
 31 | xstat(p)
 32 | xisabs(p)
+note: This is an unsafe fix and may change runtime behavior
 
 PTH115 [*] `os.readlink()` should be replaced by `Path.readlink()`
   --> import_from_as.py:29:1

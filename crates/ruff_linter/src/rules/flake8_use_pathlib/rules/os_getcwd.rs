@@ -1,6 +1,7 @@
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_getcwd_enabled;
+use crate::rules::flake8_use_pathlib::helpers::is_top_level_expression_call;
 use crate::{FixAvailability, Violation};
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -37,6 +38,9 @@ use ruff_text_size::Ranged;
 ///
 /// ## Fix Safety
 /// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+/// Additionally, the fix is marked as unsafe because `os.getcwd()` and `os.getcwdb()` return `str` or `bytes`,
+/// while `Path.cwd()` returns a `Path` object. This change in return type can break code that uses the return value.
+/// The fix is safe when the function call is a top-level expression in its statement (i.e., the return value is not used).
 ///
 /// ## References
 /// - [Python documentation: `Path.cwd`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.cwd)
@@ -85,8 +89,12 @@ pub(crate) fn os_getcwd(checker: &Checker, call: &ExprCall, segments: &[&str]) {
 
             let applicability = if checker.comment_ranges().intersects(range) {
                 Applicability::Unsafe
-            } else {
+            } else if is_top_level_expression_call(checker, call) {
+                // Safe when the call is a top-level expression (return value not used)
                 Applicability::Safe
+            } else {
+                // Unsafe because the return type changes (str/bytes -> Path)
+                Applicability::Unsafe
             };
 
             let replacement = format!("{binding}.cwd()");

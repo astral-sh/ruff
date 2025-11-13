@@ -38,6 +38,9 @@ use ruff_python_ast::ExprCall;
 ///
 /// ## Fix Safety
 /// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+/// Additionally, the fix is marked as unsafe because `os.rename()` returns `None`, while `Path.rename()` returns a `Path` object.
+/// This change in return type can break code that uses the return value.
+/// The fix is safe when the function call is a top-level expression in its statement (i.e., the return value is not used).
 ///
 /// ## References
 /// - [Python documentation: `Path.rename`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.rename)
