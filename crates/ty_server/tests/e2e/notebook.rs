@@ -305,7 +305,7 @@ b: Litera
 
     builder.open(&mut server);
 
-    server.collect_publish_diagnostics(2)?;
+    server.collect_publish_diagnostic_notifications(2)?;
 
     let completions = literal_completions(&mut server, &second_cell, Position::new(1, 9))?;
 
@@ -336,7 +336,7 @@ b: Litera
 
     builder.open(&mut server);
 
-    server.collect_publish_diagnostics(1)?;
+    server.collect_publish_diagnostic_notifications(1)?;
 
     let completions = literal_completions(&mut server, &first_cell, Position::new(1, 9))?;
 
@@ -369,7 +369,7 @@ b: Litera
 
     builder.open(&mut server);
 
-    server.collect_publish_diagnostics(2)?;
+    server.collect_publish_diagnostic_notifications(2)?;
 
     let completions = literal_completions(&mut server, &second_cell, Position::new(1, 9))?;
 
@@ -405,7 +405,7 @@ b: Litera
 
     builder.open(&mut server);
 
-    server.collect_publish_diagnostics(2)?;
+    server.collect_publish_diagnostic_notifications(2)?;
 
     let completions = literal_completions(&mut server, &second_cell, Position::new(1, 9))?;
 
