@@ -107,6 +107,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&REDUNDANT_CAST);
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
+    registry.register_lint(&INVALID_METHOD_OVERRIDE);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -1927,6 +1928,42 @@ declare_lint! {
     /// alice["age"]  # KeyError
     /// ```
     pub(crate) static MISSING_TYPED_DICT_KEY = {
+        summary: "detects missing required keys in `TypedDict` constructors",
+        status: LintStatus::stable("0.0.1-alpha.20"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects method overrides that violate the [Liskov Substitution Principle].
+    ///
+    /// ## Why is this bad?
+    /// Violating the Liskov Substitution Principle will lead to many of ty's assumptions and
+    /// inferences being incorrect, which will mean that it will fail to catch many possible
+    /// type errors in your code.
+    ///
+    /// ## Example
+    /// ```python
+    /// class Super:
+    ///     def method(self) -> int:
+    ///         return 42
+    ///
+    /// class Sub(Super):
+    ///     # Liskov violation: `str` is not a subtype of `int`,
+    ///     # but the supertype method promises to return an `int`.
+    ///     def method(self) -> str:  # error: [invalid-override]
+    ///         return "foo"
+    ///
+    /// def accepts_super(s: Super) -> int:
+    ///     return s.method()
+    ///
+    /// accepts_super(Sub())  # The result of this call is a string, but ty will infer
+    ///                       # it to be an `int` due to the violation of the Liskov Substitution Principle.
+    /// ```
+    ///
+    /// [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
+    pub(crate) static INVALID_METHOD_OVERRIDE = {
         summary: "detects missing required keys in `TypedDict` constructors",
         status: LintStatus::stable("0.0.1-alpha.20"),
         default_level: Level::Error,

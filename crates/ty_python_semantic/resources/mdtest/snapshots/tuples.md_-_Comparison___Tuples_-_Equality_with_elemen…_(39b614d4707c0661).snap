@@ -12,27 +12,52 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/tuples.md
 ## mdtest_snippet.py
 
 ```
-1 | class NotBoolable:
-2 |     __bool__: None = None
-3 | 
-4 | class A:
-5 |     def __eq__(self, other) -> NotBoolable:
-6 |         return NotBoolable()
-7 | 
-8 | # error: [unsupported-bool-conversion]
-9 | (A(),) == (A(),)
+ 1 | class NotBoolable:
+ 2 |     __bool__: None = None
+ 3 | 
+ 4 | class A:
+ 5 |     # error: [invalid-method-override]
+ 6 |     def __eq__(self, other) -> NotBoolable:
+ 7 |         return NotBoolable()
+ 8 | 
+ 9 | # error: [unsupported-bool-conversion]
+10 | (A(),) == (A(),)
 ```
 
 # Diagnostics
 
 ```
+error[invalid-method-override]: Invalid override of method `__eq__`
+   --> src/mdtest_snippet.py:6:9
+    |
+  4 | class A:
+  5 |     # error: [invalid-method-override]
+  6 |     def __eq__(self, other) -> NotBoolable:
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `object.__eq__`
+  7 |         return NotBoolable()
+    |
+   ::: stdlib/builtins.pyi:141:9
+    |
+139 |     def __setattr__(self, name: str, value: Any, /) -> None: ...
+140 |     def __delattr__(self, name: str, /) -> None: ...
+141 |     def __eq__(self, value: object, /) -> bool: ...
+    |         -------------------------------------- `object.__eq__` defined here
+142 |     def __ne__(self, value: object, /) -> bool: ...
+143 |     def __str__(self) -> str: ...  # noqa: Y029
+    |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
 error[unsupported-bool-conversion]: Boolean conversion is unsupported for type `NotBoolable`
- --> src/mdtest_snippet.py:9:1
-  |
-8 | # error: [unsupported-bool-conversion]
-9 | (A(),) == (A(),)
-  | ^^^^^^^^^^^^^^^^
-  |
+  --> src/mdtest_snippet.py:10:1
+   |
+ 9 | # error: [unsupported-bool-conversion]
+10 | (A(),) == (A(),)
+   | ^^^^^^^^^^^^^^^^
+   |
 info: `__bool__` on `NotBoolable` must be callable
 info: rule `unsupported-bool-conversion` is enabled by default
 
