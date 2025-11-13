@@ -51,8 +51,6 @@ fn is_notebook(system: &dyn System, path: &FilePath) -> bool {
     let with_extension_fallback =
         source_type.or_else(|| PySourceType::try_from_extension(path.extension()?));
 
-    tracing::debug!("with_extension_fallback: {:?}", with_extension_fallback);
-
     with_extension_fallback == Some(PySourceType::Ipynb)
 }
 

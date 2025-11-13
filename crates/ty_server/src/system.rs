@@ -1,6 +1,7 @@
 use std::any::Any;
 use std::fmt;
 use std::fmt::Display;
+use std::hash::{DefaultHasher, Hash, Hasher as _};
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
@@ -155,7 +156,7 @@ impl System for LSPSystem {
 
         if let Some(document) = document {
             Ok(Metadata::new(
-                document_revision(document),
+                document_revision(document, self.index()),
                 None,
                 FileType::File,
             ))
@@ -300,9 +301,33 @@ fn virtual_path_not_found(path: impl Display) -> std::io::Error {
 }
 
 /// Helper function to get the [`FileRevision`] of the given document.
-fn document_revision(document: &Document) -> FileRevision {
+fn document_revision(document: &Document, index: &Index) -> FileRevision {
     // The file revision is just an opaque number which doesn't have any significant meaning other
     // than that the file has changed if the revisions are different.
     #[expect(clippy::cast_sign_loss)]
-    FileRevision::new(document.version() as u128)
+    match document {
+        Document::Text(text) => FileRevision::new(text.version() as u128),
+        Document::Notebook(notebook) => {
+            // VS Code doesn't always bump the notebook version when the cell content changes.
+            // Specifically, I noticed that VS Code re-uses the same version when:
+            // 1. Adding a new cell
+            // 2. Pasting some code that has an error
+            //
+            // The notification updating the cell content on paste re-used the same version as when the cell was added.
+            // Because of that, hash all cell versions and the notebook versions together.
+            let mut hasher = DefaultHasher::new();
+            for cell_url in notebook.cell_urls() {
+                if let Ok(cell) = index.document(&DocumentKey::from_url(cell_url)) {
+                    cell.version().hash(&mut hasher);
+                }
+            }
+
+            // Use higher 64 bits for notebook version and lower 64 bits for cell revisions
+            let notebook_version_high = (notebook.version() as u128) << 64;
+            let cell_versions_low = (hasher.finish() as u128) & 0xFFFF_FFFF_FFFF_FFFF;
+            let combined_revision = notebook_version_high | cell_versions_low;
+
+            FileRevision::new(combined_revision)
+        }
+    }
 }

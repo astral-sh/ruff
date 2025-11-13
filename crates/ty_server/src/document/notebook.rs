@@ -141,14 +141,14 @@ impl NotebookDocument {
             new_cells.into_iter().map(NotebookCell::new),
         );
 
-        // Re-build the cell-index if new cells were added or deleted
+        // Re-build the cell-index if new cells were added, deleted or removed
         if !deleted_range.is_empty() || added > 0 {
             self.cell_index.clear();
             self.cell_index.extend(
                 self.cells
                     .iter()
                     .enumerate()
-                    .map(|(cell_index, cell)| (cell.url.clone(), cell_index)),
+                    .map(|(i, cell)| (cell.url.clone(), i)),
             );
         }
 

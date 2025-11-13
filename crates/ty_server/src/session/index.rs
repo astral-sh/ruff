@@ -97,6 +97,11 @@ impl Index {
                 )
             });
 
+        tracing::info!(
+            "version: {}, new_version: {}",
+            notebook.version(),
+            new_version
+        );
         notebook.update(array, data.unwrap_or_default(), metadata, new_version)?;
 
         let notebook_path = notebook_key.to_file_path();
@@ -117,6 +122,10 @@ impl Index {
             let Ok(document_mut) =
                 self.document_mut(&DocumentKey::from_url(&updated_cell.document.uri))
             else {
+                tracing::warn!(
+                    "Could not find document for cell {}",
+                    updated_cell.document.uri
+                );
                 continue;
             };
 
@@ -126,20 +135,23 @@ impl Index {
 
             if updated_cell.changes.is_empty() {
                 document.update_version(updated_cell.document.version);
-                return Ok(());
+            } else {
+                document.apply_changes(
+                    updated_cell.changes,
+                    updated_cell.document.version,
+                    encoding,
+                );
             }
-
-            document.apply_changes(
-                updated_cell.changes,
-                updated_cell.document.version,
-                encoding,
-            );
         }
 
         // VS Code sends a separate `didClose` request for every cell
         // and they're removed from the metadata (notebook document)
         // because they get deleted as part of `change.cells.structure.array`
         let _ = did_close;
+
+        let notebook = self.document(notebook_key).unwrap().as_notebook().unwrap();
+        let ruff_notebook = notebook.to_ruff_notebook(self);
+        tracing::debug!("Updated notebook: {:?}", ruff_notebook.source_code());
 
         Ok(())
     }
