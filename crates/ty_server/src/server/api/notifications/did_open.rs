@@ -83,5 +83,5 @@ pub(super) fn opened_document(document: &DocumentHandle, session: &mut Session, 
         }
     }
 
-    publish_diagnostics(session, document.url(), client);
+    publish_diagnostics(session, document, client);
 }

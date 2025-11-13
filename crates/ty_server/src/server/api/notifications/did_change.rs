@@ -55,5 +55,5 @@ pub(super) fn file_changed(document: &DocumentHandle, session: &mut Session, cli
 
     session.apply_changes(path, changes);
 
-    publish_diagnostics(session, document.url(), client);
+    publish_diagnostics(session, document, client);
 }

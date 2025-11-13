@@ -14,7 +14,7 @@ use ty_project::{Db as _, ProjectDatabase};
 
 use crate::Db;
 use crate::document::{FileRangeExt, ToRangeExt};
-use crate::session::DocumentSnapshot;
+use crate::session::DocumentHandle;
 use crate::session::client::Client;
 use crate::system::{AnySystemPath, file_to_url};
 use crate::{PositionEncoding, Session};
@@ -147,24 +147,15 @@ pub(super) fn clear_diagnostics(uri: &lsp_types::Url, client: &Client) {
 /// This function is a no-op for simple text files when the client supports pull diagnostics.
 ///
 /// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
-pub(super) fn publish_diagnostics(session: &Session, url: &lsp_types::Url, client: &Client) {
-    let snapshot = match session.snapshot_document(url) {
-        Ok(document) => document,
-        Err(err) => {
-            tracing::debug!("Failed to resolve document for URL `{}`: {}", url, err);
-            return;
-        }
-    };
-
-    if !snapshot.document().is_cell_or_notebook()
-        && session.client_capabilities().supports_pull_diagnostics()
+pub(super) fn publish_diagnostics(session: &Session, document: &DocumentHandle, client: &Client) {
+    if !document.is_cell_or_notebook() && session.client_capabilities().supports_pull_diagnostics()
     {
         return;
     }
 
-    let db = session.project_db(snapshot.notebook_or_file_path());
+    let db = session.project_db(document.notebook_or_file_path());
 
-    let Some(diagnostics) = compute_diagnostics(db, &snapshot) else {
+    let Some(diagnostics) = compute_diagnostics(db, document, session.position_encoding()) else {
         return;
     };
 
@@ -173,13 +164,13 @@ pub(super) fn publish_diagnostics(session: &Session, url: &lsp_types::Url, clien
         client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
             uri,
             diagnostics,
-            version: Some(snapshot.document().version()),
+            version: Some(document.version()),
         });
     };
 
     match diagnostics.to_lsp_diagnostics(db) {
         LspDiagnostics::TextDocument(diagnostics) => {
-            publish_diagnostics_notification(url.clone(), diagnostics);
+            publish_diagnostics_notification(document.url().clone(), diagnostics);
         }
         LspDiagnostics::NotebookDocument(cell_diagnostics) => {
             for (cell_url, diagnostics) in cell_diagnostics {
@@ -262,12 +253,13 @@ pub(crate) fn publish_settings_diagnostics(
 
 pub(super) fn compute_diagnostics(
     db: &ProjectDatabase,
-    snapshot: &DocumentSnapshot,
+    document: &DocumentHandle,
+    encoding: PositionEncoding,
 ) -> Option<Diagnostics> {
-    let Some(file) = snapshot.to_notebook_or_file(db) else {
+    let Some(file) = document.notebook_or_file(db) else {
         tracing::info!(
             "No file found for snapshot for `{}`",
-            snapshot.notebook_or_file_path()
+            document.notebook_or_file_path()
         );
         return None;
     };
@@ -276,7 +268,7 @@ pub(super) fn compute_diagnostics(
 
     Some(Diagnostics {
         items: diagnostics,
-        encoding: snapshot.encoding(),
+        encoding,
         file_or_notebook: file,
     })
 }
