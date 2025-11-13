@@ -40,6 +40,16 @@ bitflags::bitflags! {
     }
 }
 
+impl std::fmt::Display for ResolvedClientCapabilities {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut f = f.debug_list();
+        for (name, _) in self.iter_names() {
+            f.entry(&name);
+        }
+        f.finish()
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum SupportedCommand {
     Debug,

@@ -5,7 +5,6 @@ use lsp_types::{
     CodeDescription, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag,
     NumberOrString, PublishDiagnosticsParams, Url,
 };
-use ruff_db::source::source_text;
 use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
@@ -274,7 +273,6 @@ pub(super) fn compute_diagnostics(
         return None;
     };
 
-    tracing::debug!("source text: {}", source_text(db, file).as_str());
     let diagnostics = db.check_file(file);
 
     Some(Diagnostics {
