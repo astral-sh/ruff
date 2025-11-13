@@ -194,7 +194,18 @@ def foo():
     ):
         pass
 
-# Regression test for https://github.com/astral-sh/ruff/issues/19226
+# Regression tests for https://github.com/astral-sh/ruff/issues/19226
 if '' and (not #
 0):
+    pass
+
+if '' and (not #
+(0)
+):
+    pass
+
+if '' and (not
+	(  #
+	0
+)):
     pass
