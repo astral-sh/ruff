@@ -6607,6 +6607,27 @@ impl<'db> Type<'db> {
                         .inner(db)
                         .in_type_expression(db, scope_id, typevar_binding_context)?)
                 }
+                KnownInstanceType::TypeGenericAlias(ty) => {
+                    let argument = ty.inner(db);
+
+                    if let Type::KnownInstance(KnownInstanceType::UnionType(union)) = argument {
+                        let mut builder = UnionBuilder::new(db);
+                        for element in union.elements(db) {
+                            builder = builder.add(SubclassOfType::from(
+                                db,
+                                SubclassOfInner::try_from_type(db, *element)
+                                    .unwrap_or(SubclassOfInner::unknown()),
+                            ));
+                        }
+                        return Ok(builder.build());
+                    }
+
+                    Ok(SubclassOfType::from(
+                        db,
+                        SubclassOfInner::try_from_type(db, ty.inner(db))
+                            .unwrap_or(SubclassOfInner::unknown()),
+                    ))
+                }
             },
 
             Type::SpecialForm(special_form) => match special_form {
@@ -7847,6 +7868,9 @@ pub enum KnownInstanceType<'db> {
     /// A single instance of `typing.Annotated`
     Annotated(InternedType<'db>),
 
+    /// An instance of `typing.GenericAlias` representing a `type[...]` expression.
+    TypeGenericAlias(InternedType<'db>),
+
     /// An identity callable created with `typing.NewType(name, base)`, which behaves like a
     /// subtype of `base` in type expressions. See the `struct NewType` payload for an example.
     NewType(NewType<'db>),
@@ -7881,7 +7905,9 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
                 visitor.visit_type(db, *element);
             }
         }
-        KnownInstanceType::Literal(ty) | KnownInstanceType::Annotated(ty) => {
+        KnownInstanceType::Literal(ty)
+        | KnownInstanceType::Annotated(ty)
+        | KnownInstanceType::TypeGenericAlias(ty) => {
             visitor.visit_type(db, ty.inner(db));
         }
         KnownInstanceType::NewType(newtype) => {
@@ -7928,6 +7954,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::UnionType(list) => Self::UnionType(list.normalized_impl(db, visitor)),
             Self::Literal(ty) => Self::Literal(ty.normalized_impl(db, visitor)),
             Self::Annotated(ty) => Self::Annotated(ty.normalized_impl(db, visitor)),
+            Self::TypeGenericAlias(ty) => Self::TypeGenericAlias(ty.normalized_impl(db, visitor)),
             Self::NewType(newtype) => Self::NewType(
                 newtype
                     .map_base_class_type(db, |class_type| class_type.normalized_impl(db, visitor)),
@@ -7950,8 +7977,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::Field(_) => KnownClass::Field,
             Self::ConstraintSet(_) => KnownClass::ConstraintSet,
             Self::UnionType(_) => KnownClass::UnionType,
-            Self::Literal(_) => KnownClass::GenericAlias,
-            Self::Annotated(_) => KnownClass::GenericAlias,
+            Self::Literal(_) | Self::Annotated(_) | Self::TypeGenericAlias(_) => {
+                KnownClass::GenericAlias
+            }
             Self::NewType(_) => KnownClass::NewType,
         }
     }
@@ -8037,6 +8065,7 @@ impl<'db> KnownInstanceType<'db> {
                     KnownInstanceType::Annotated(_) => {
                         f.write_str("<typing.Annotated special form>")
                     }
+                    KnownInstanceType::TypeGenericAlias(_) => f.write_str("GenericAlias"),
                     KnownInstanceType::NewType(declaration) => {
                         write!(f, "<NewType pseudo-class '{}'>", declaration.name(self.db))
                     }

@@ -599,6 +599,60 @@ def _(
     reveal_type(invalid)  # revealed: str | Unknown
 ```
 
+## `type[…]`
+
+We support implicit type aliases using `type[…]`:
+
+```py
+from typing import Any, Union
+
+class A: ...
+class B: ...
+
+SubclassOfInt = type[A]
+SubclassOfAny = type[Any]
+SubclassOfAOrB1 = type[A | B]
+SubclassOfAOrB2 = type[A] | type[B]
+SubclassOfAOrB3 = Union[type[A], type[B]]
+
+reveal_type(SubclassOfInt)  # revealed: GenericAlias
+reveal_type(SubclassOfAny)  # revealed: GenericAlias
+reveal_type(SubclassOfAOrB1)  # revealed: GenericAlias
+reveal_type(SubclassOfAOrB2)  # revealed: types.UnionType
+reveal_type(SubclassOfAOrB3)  # revealed: types.UnionType
+
+def _(
+    subclass_of_int: SubclassOfInt,
+    subclass_of_any: SubclassOfAny,
+    subclass_of_a_or_b1: SubclassOfAOrB1,
+    subclass_of_a_or_b2: SubclassOfAOrB2,
+    subclass_of_a_or_b3: SubclassOfAOrB3,
+):
+    reveal_type(subclass_of_int)  # revealed: type[A]
+    reveal_type(subclass_of_int())  # revealed: A
+
+    reveal_type(subclass_of_any)  # revealed: type[Any]
+    reveal_type(subclass_of_any())  # revealed: Any
+
+    reveal_type(subclass_of_a_or_b1)  # revealed: type[A] | type[B]
+    reveal_type(subclass_of_a_or_b1())  # revealed: A | B
+
+    reveal_type(subclass_of_a_or_b2)  # revealed: type[A] | type[B]
+    reveal_type(subclass_of_a_or_b2())  # revealed: A | B
+
+    reveal_type(subclass_of_a_or_b3)  # revealed: type[A] | type[B]
+    reveal_type(subclass_of_a_or_b3())  # revealed: A | B
+```
+
+Invalid uses result in diagnostics:
+
+```py
+from typing import Union
+
+# TODO: this should be an error
+InvalidSubclass = type[1]
+```
+
 ## Stringified annotations?
 
 From the [typing spec on type aliases](https://typing.python.org/en/latest/spec/aliases.html):
