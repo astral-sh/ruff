@@ -836,7 +836,8 @@ impl<'a> Operand<'a> {
                 let leading = comments.leading(*expression);
                 if is_expression_parenthesized((*expression).into(), comments.ranges(), source) {
                     leading.iter().any(|comment| {
-                        !comment.is_formatted()
+                        comment.end() <= expression.start()
+                            && !comment.is_formatted()
                             && matches!(
                                 SimpleTokenizer::new(
                                     source,
@@ -922,7 +923,8 @@ impl Format<PyFormatContext<'_>> for Operand<'_> {
             let leading_before_parentheses_end = leading
                 .iter()
                 .rposition(|comment| {
-                    comment.is_unformatted()
+                    comment.end() <= expression.start()
+                        && comment.is_unformatted()
                         && matches!(
                             SimpleTokenizer::new(
                                 f.context().source(),

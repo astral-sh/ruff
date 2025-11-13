@@ -200,9 +200,20 @@ def foo():
     ):
         pass
 
-# Regression test for https://github.com/astral-sh/ruff/issues/19226
+# Regression tests for https://github.com/astral-sh/ruff/issues/19226
 if '' and (not #
 0):
+    pass
+
+if '' and (not #
+(0)
+):
+    pass
+
+if '' and (not
+	(  #
+	0
+)):
     pass
 ```
 
@@ -322,28 +333,31 @@ if (
 
 ## Trailing operator comments
 
-if (
-    not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  # comment
+if (  # comment
+    not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 
 if (
-    ~aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  # comment
+    # comment
+    ~aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 if (
-    -aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  # comment
+    # comment
+    -aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 
 if (
-    +aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  # comment
+    # comment
+    +aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
@@ -368,7 +382,9 @@ if (
 ):
     pass
 
-if not a:  # comment
+if (  # comment
+    not a
+):
     pass
 
 # Regression test for: https://github.com/astral-sh/ruff/issues/7423
@@ -416,9 +432,21 @@ def foo():
         pass
 
 
-# Regression test for https://github.com/astral-sh/ruff/issues/19226
+# Regression tests for https://github.com/astral-sh/ruff/issues/19226
+if "" and (  #
+    not 0
+):
+    pass
+
+if "" and (  #
+    not (0)
+):
+    pass
+
 if "" and (
-    not 0  #
+    not (  #
+        0
+    )
 ):
     pass
 ```
