@@ -273,12 +273,12 @@ impl EmbeddedFileSourceMap {
         }
     }
 
+    /// On error, returns the last valid absolute line number in the embedded source.
     pub(crate) fn to_absolute_line_number(
         &self,
         relative_line_number: OneIndexed,
-    ) -> anyhow::Result<OneIndexed> {
+    ) -> std::result::Result<OneIndexed, OneIndexed> {
         let mut relative_line_number = relative_line_number.get();
-        let original_relative_line_number = relative_line_number;
 
         for (start_line, line_count) in &self.start_line_and_line_count {
             if relative_line_number > *line_count {
@@ -290,12 +290,9 @@ impl EmbeddedFileSourceMap {
             }
         }
 
-        let total: usize = self.start_line_and_line_count.iter().map(|(_, c)| *c).sum();
-        bail!(
-            "Relative line {original_relative_line_number} exceeds \
-             total embedded code lines ({total}). This usually means a trailing `# revealed:` without \
-             a matching `reveal_type(...)` line above."
-        );
+        Err(self
+            .last_absolute_line_number()
+            .expect("embedded file source map should contain at least one code block"))
     }
 
     pub(crate) fn last_absolute_line_number(&self) -> Option<OneIndexed> {
@@ -965,16 +962,14 @@ mod tests {
             start_line_and_line_count: vec![(9, 2)],
         };
 
+        let last_line_number = map.last_absolute_line_number().unwrap();
+
         let error = map
             .to_absolute_line_number(OneIndexed::new(3).unwrap())
             .unwrap_err();
 
-        assert!(
-            error
-                .to_string()
-                .contains("Relative line 3 exceeds total embedded code lines (2)")
-        );
-        assert_eq!(map.last_absolute_line_number().unwrap().get(), 11);
+        assert_eq!(error, last_line_number);
+        assert_eq!(error.get(), 11);
     }
 
     #[test]
