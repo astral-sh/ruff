@@ -15,7 +15,8 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
-    call_signature_details, definitions_for_keyword_argument,
+    CallSignatureDetails, call_signature_details, call_signature_details_typed,
+    definitions_for_keyword_argument,
 };
 use ty_python_semantic::{
     HasDefinition, HasType, ImportAliasResolution, SemanticModel, definitions_for_imported_symbol,
@@ -324,6 +325,19 @@ impl GotoTarget<'_> {
         };
 
         Some(ty)
+    }
+
+    pub(crate) fn signature<'db>(
+        &self,
+        model: &SemanticModel<'db>,
+    ) -> Option<Vec<CallSignatureDetails<'db>>> {
+        if let GotoTarget::Call { call, .. } = self {
+            let signature_details = call_signature_details_typed(model.db(), model, call);
+            if !signature_details.is_empty() {
+                return Some(signature_details);
+            }
+        }
+        None
     }
 
     /// Gets the definitions for this goto target.

@@ -973,6 +973,57 @@ pub fn call_signature_details<'db>(
     }
 }
 
+/// Extract signature details from a function call expression using type info.
+///
+/// Unlike [`call_signature_details`][] we reduce down to the exact match if possible.
+pub fn call_signature_details_typed<'db>(
+    db: &'db dyn Db,
+    model: &SemanticModel<'db>,
+    call_expr: &ast::ExprCall,
+) -> Vec<CallSignatureDetails<'db>> {
+    let func_type = call_expr.func.inferred_type(model);
+
+    // Use into_callable to handle all the complex type conversions
+    if let Some(callable_type) = func_type.try_upcast_to_callable(db) {
+        // Really shove as much type info in as we can
+        let call_arguments =
+            CallArguments::from_arguments_typed(&call_expr.arguments, |_, splatted_value| {
+                splatted_value.inferred_type(model)
+            });
+
+        // Extract signature details from all callable bindings
+        callable_type
+            .bindings(db)
+            .match_parameters(db, &call_arguments)
+            .check_types(db, &call_arguments, TypeContext::default(), &[])
+            // Only use the Ok
+            .iter()
+            .flatten()
+            // The first matching overload is the one to use
+            .filter_map(|binding| binding.matching_overloads().next())
+            .map(|(_, binding)| {
+                let argument_to_parameter_mapping = binding.argument_matches().to_vec();
+                let signature = binding.signature.clone();
+                let display_details = signature.display(db).to_string_parts();
+                let parameter_label_offsets = display_details.parameter_ranges;
+                let parameter_names = display_details.parameter_names;
+
+                CallSignatureDetails {
+                    definition: signature.definition(),
+                    signature,
+                    label: display_details.label,
+                    parameter_label_offsets,
+                    parameter_names,
+                    argument_to_parameter_mapping,
+                }
+            })
+            .collect()
+    } else {
+        // Type is not callable, return empty signatures
+        vec![]
+    }
+}
+
 /// Returns the definitions of the binary operation along with its callable type.
 pub fn definitions_for_bin_op<'db>(
     db: &'db dyn Db,

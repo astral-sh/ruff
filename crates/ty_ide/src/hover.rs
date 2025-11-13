@@ -6,6 +6,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
+use ty_python_semantic::types::ide_support::CallSignatureDetails;
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarVariance};
 use ty_python_semantic::{DisplaySettings, SemanticModel};
 
@@ -20,7 +21,6 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     }
 
     let model = SemanticModel::new(db, file);
-    let ty = goto_target.inferred_type(&model);
     let docs = goto_target
         .get_definition_targets(
             file,
@@ -30,9 +30,10 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         .and_then(|definitions| definitions.docstring(db))
         .map(HoverContent::Docstring);
 
-    // TODO: Render the symbol's signature instead of just its type.
     let mut contents = Vec::new();
-    if let Some(ty) = ty {
+    if let Some(signature) = goto_target.signature(&model) {
+        contents.push(HoverContent::Signature(signature));
+    } else if let Some(ty) = goto_target.inferred_type(&model) {
         tracing::debug!("Inferred type of covering node is {}", ty.display(db));
         contents.push(match ty {
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => typevar
@@ -62,7 +63,7 @@ pub struct Hover<'db> {
 
 impl<'db> Hover<'db> {
     /// Renders the hover to a string using the specified markup kind.
-    pub const fn display<'a>(&'a self, db: &'a dyn Db, kind: MarkupKind) -> DisplayHover<'a> {
+    pub const fn display<'a>(&'a self, db: &'db dyn Db, kind: MarkupKind) -> DisplayHover<'db, 'a> {
         DisplayHover {
             db,
             hover: self,
@@ -93,13 +94,13 @@ impl<'a, 'db> IntoIterator for &'a Hover<'db> {
     }
 }
 
-pub struct DisplayHover<'a> {
-    db: &'a dyn Db,
-    hover: &'a Hover<'a>,
+pub struct DisplayHover<'db, 'a> {
+    db: &'db dyn Db,
+    hover: &'a Hover<'db>,
     kind: MarkupKind,
 }
 
-impl fmt::Display for DisplayHover<'_> {
+impl fmt::Display for DisplayHover<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut first = true;
         for content in &self.hover.contents {
@@ -115,8 +116,9 @@ impl fmt::Display for DisplayHover<'_> {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum HoverContent<'db> {
+    Signature(Vec<CallSignatureDetails<'db>>),
     Type(Type<'db>, Option<TypeVarVariance>),
     Docstring(Docstring),
 }
@@ -140,6 +142,15 @@ pub(crate) struct DisplayHoverContent<'a, 'db> {
 impl fmt::Display for DisplayHoverContent<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.content {
+            HoverContent::Signature(signatures) => {
+                for signature in signatures {
+                    self.kind
+                        .fenced_code_block(&signature.label, "python")
+                        .fmt(f)?;
+                    self.kind.horizontal_line().fmt(f)?;
+                }
+                Ok(())
+            }
             HoverContent::Type(ty, variance) => {
                 let variance = match variance {
                     Some(TypeVarVariance::Covariant) => " (covariant)",
@@ -222,10 +233,9 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        def my_func(
-            a,
-            b
-        ) -> Unknown
+        (a, b) -> Unknown
+        ---------------------------------------------
+
         ---------------------------------------------
         This is such a great func!!
 
@@ -235,11 +245,10 @@ mod tests {
 
         ---------------------------------------------
         ```python
-        def my_func(
-            a,
-            b
-        ) -> Unknown
+        (a, b) -> Unknown
         ```
+        ---
+
         ---
         ```text
         This is such a great func!!
@@ -484,14 +493,18 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        <class 'MyClass'>
+        (val) -> MyClass
+        ---------------------------------------------
+
         ---------------------------------------------
         initializes MyClass (perfectly)
 
         ---------------------------------------------
         ```python
-        <class 'MyClass'>
+        (val) -> MyClass
         ```
+        ---
+
         ---
         ```text
         initializes MyClass (perfectly)
@@ -543,14 +556,18 @@ mod tests {
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        <class 'MyClass'>
+        (val) -> MyClass
+        ---------------------------------------------
+
         ---------------------------------------------
         initializes MyClass (perfectly)
 
         ---------------------------------------------
         ```python
-        <class 'MyClass'>
+        (val) -> MyClass
         ```
+        ---
+
         ---
         ```text
         initializes MyClass (perfectly)
@@ -601,7 +618,9 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        <class 'MyClass'>
+        (val) -> MyClass
+        ---------------------------------------------
+
         ---------------------------------------------
         This is such a great class!!
 
@@ -611,8 +630,10 @@ mod tests {
 
         ---------------------------------------------
         ```python
-        <class 'MyClass'>
+        (val) -> MyClass
         ```
+        ---
+
         ---
         ```text
         This is such a great class!!
@@ -669,10 +690,9 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        bound method MyClass.my_method(
-            a,
-            b
-        ) -> Unknown
+        (a, b) -> Unknown
+        ---------------------------------------------
+
         ---------------------------------------------
         This is such a great func!!
 
@@ -682,11 +702,10 @@ mod tests {
 
         ---------------------------------------------
         ```python
-        bound method MyClass.my_method(
-            a,
-            b
-        ) -> Unknown
+        (a, b) -> Unknown
         ```
+        ---
+
         ---
         ```text
         This is such a great func!!
@@ -961,15 +980,17 @@ def ab(a: str): ...
 
         assert_snapshot!(test.hover(), @r"
         (a: int) -> Unknown
-        (a: str) -> Unknown
+        ---------------------------------------------
+
         ---------------------------------------------
         the int overload
 
         ---------------------------------------------
         ```python
         (a: int) -> Unknown
-        (a: str) -> Unknown
         ```
+        ---
+
         ---
         ```text
         the int overload
@@ -1025,16 +1046,18 @@ def ab(a: str):
             .build();
 
         assert_snapshot!(test.hover(), @r#"
-        (a: int) -> Unknown
         (a: str) -> Unknown
+        ---------------------------------------------
+
         ---------------------------------------------
         the int overload
 
         ---------------------------------------------
         ```python
-        (a: int) -> Unknown
         (a: str) -> Unknown
         ```
+        ---
+
         ---
         ```text
         the int overload
@@ -1090,22 +1113,18 @@ def ab(a: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (
-            a: int,
-            b: int
-        ) -> Unknown
-        (a: int) -> Unknown
+        (a: int, b: int) -> Unknown
+        ---------------------------------------------
+
         ---------------------------------------------
         the two arg overload
 
         ---------------------------------------------
         ```python
-        (
-            a: int,
-            b: int
-        ) -> Unknown
-        (a: int) -> Unknown
+        (a: int, b: int) -> Unknown
         ```
+        ---
+
         ---
         ```text
         the two arg overload
@@ -1161,22 +1180,18 @@ def ab(a: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (
-            a: int,
-            b: int
-        ) -> Unknown
         (a: int) -> Unknown
+        ---------------------------------------------
+
         ---------------------------------------------
         the two arg overload
 
         ---------------------------------------------
         ```python
-        (
-            a: int,
-            b: int
-        ) -> Unknown
         (a: int) -> Unknown
         ```
+        ---
+
         ---
         ```text
         the two arg overload
@@ -1236,34 +1251,18 @@ def ab(a: int, *, c: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (a: int) -> Unknown
-        (
-            a: int,
-            *,
-            b: int
-        ) -> Unknown
-        (
-            a: int,
-            *,
-            c: int
-        ) -> Unknown
+        (a: int, *, b: int) -> Unknown
+        ---------------------------------------------
+
         ---------------------------------------------
         keywordless overload
 
         ---------------------------------------------
         ```python
-        (a: int) -> Unknown
-        (
-            a: int,
-            *,
-            b: int
-        ) -> Unknown
-        (
-            a: int,
-            *,
-            c: int
-        ) -> Unknown
+        (a: int, *, b: int) -> Unknown
         ```
+        ---
+
         ---
         ```text
         keywordless overload
@@ -1323,34 +1322,18 @@ def ab(a: int, *, c: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (a: int) -> Unknown
-        (
-            a: int,
-            *,
-            b: int
-        ) -> Unknown
-        (
-            a: int,
-            *,
-            c: int
-        ) -> Unknown
+        (a: int, *, c: int) -> Unknown
+        ---------------------------------------------
+
         ---------------------------------------------
         keywordless overload
 
         ---------------------------------------------
         ```python
-        (a: int) -> Unknown
-        (
-            a: int,
-            *,
-            b: int
-        ) -> Unknown
-        (
-            a: int,
-            *,
-            c: int
-        ) -> Unknown
+        (a: int, *, c: int) -> Unknown
         ```
+        ---
+
         ---
         ```text
         keywordless overload
@@ -1397,28 +1380,18 @@ def ab(a: int, *, c: int):
         );
 
         assert_snapshot!(test.hover(), @r#"
-        (
-            a: int,
-            b
-        ) -> Unknown
-        (
-            a: str,
-            b
-        ) -> Unknown
+        (a: int, b) -> Unknown
+        ---------------------------------------------
+
         ---------------------------------------------
         The first overload
 
         ---------------------------------------------
         ```python
-        (
-            a: int,
-            b
-        ) -> Unknown
-        (
-            a: str,
-            b
-        ) -> Unknown
+        (a: int, b) -> Unknown
         ```
+        ---
+
         ---
         ```text
         The first overload
@@ -1465,15 +1438,17 @@ def ab(a: int, *, c: int):
 
         assert_snapshot!(test.hover(), @r#"
         (a: int) -> Unknown
-        (a: str) -> Unknown
+        ---------------------------------------------
+
         ---------------------------------------------
         The first overload
 
         ---------------------------------------------
         ```python
         (a: int) -> Unknown
-        (a: str) -> Unknown
         ```
+        ---
+
         ---
         ```text
         The first overload
