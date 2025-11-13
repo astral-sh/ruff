@@ -146,6 +146,14 @@ fn try_metaclass_cycle_initial<'db>(
     })
 }
 
+fn decorators_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: ClassLiteral<'db>,
+) -> Box<[Type<'db>]> {
+    Box::default()
+}
+
 /// A category of classes with code generation capabilities (with synthesized methods).
 #[derive(Clone, Copy, Debug, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum CodeGeneratorKind<'db> {
@@ -1715,7 +1723,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Return the types of the decorators on this class
-    #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(deref), cycle_initial=decorators_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::decorators: {}", self.name(db));
 
