@@ -3884,7 +3884,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         object_ty.display(db),
                                     ));
                                 } else {
-                                    diagnostic.info(format_args!(
+                                    diagnostic.help(format_args!(
                                         "Consider adding a `__setitem__` method to `{}`.",
                                         object_ty.display(db),
                                     ));
