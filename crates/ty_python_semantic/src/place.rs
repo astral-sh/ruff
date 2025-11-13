@@ -12,7 +12,7 @@ use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map
 use crate::types::{
     ApplyTypeMappingVisitor, DynamicType, KnownClass, MaterializationKind, Truthiness, Type,
     TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type, declaration_type,
-    join_with_previous_cycle_place, todo_type,
+    todo_type,
 };
 use crate::{Db, FxOrderSet, Program, resolve_module};
 
@@ -87,7 +87,7 @@ impl TypeOrigin {
 /// bound_or_declared:   Place::Defined(Literal[1], TypeOrigin::Inferred, Definedness::PossiblyUndefined),
 /// non_existent:        Place::Undefined,
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum Place<'db> {
     Defined(Type<'db>, TypeOrigin, Definedness),
     Undefined,
@@ -530,7 +530,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
 /// that this comes with a [`CLASS_VAR`] type qualifier.
 ///
 /// [`CLASS_VAR`]: crate::types::TypeQualifiers::CLASS_VAR
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct PlaceAndQualifiers<'db> {
     pub(crate) place: Place<'db>,
     pub(crate) qualifiers: TypeQualifiers,
@@ -687,6 +687,35 @@ impl<'db> PlaceAndQualifiers<'db> {
             .or_else(|lookup_error| lookup_error.or_fall_back_to(db, fallback_fn()))
             .into()
     }
+
+    pub(crate) fn cycle_normalized(
+        self,
+        db: &'db dyn Db,
+        previous_place: Self,
+        cycle_heads: &salsa::CycleHeads,
+    ) -> Self {
+        let place = match (previous_place.place, self.place) {
+            // In fixed-point iteration of type inference, the member type must be monotonically widened and not "oscillate".
+            // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
+            (Place::Defined(prev_ty, _, _), Place::Defined(ty, origin, definedness)) => {
+                Place::Defined(
+                    ty.cycle_normalized(db, prev_ty, cycle_heads),
+                    origin,
+                    definedness,
+                )
+            }
+            (_, Place::Defined(ty, origin, definedness)) => Place::Defined(
+                ty.recursive_type_normalized(db, cycle_heads),
+                origin,
+                definedness,
+            ),
+            (_, Place::Undefined) => Place::Undefined,
+        };
+        PlaceAndQualifiers {
+            place,
+            qualifiers: self.qualifiers,
+        }
+    }
 }
 
 impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
@@ -706,7 +735,7 @@ fn place_cycle_initial<'db>(
     Place::bound(Type::divergent(id)).into()
 }
 
-#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
+#[allow(clippy::too_many_arguments)]
 fn place_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle_heads: &salsa::CycleHeads,
@@ -718,10 +747,7 @@ fn place_cycle_recover<'db>(
     _requires_explicit_reexport: RequiresExplicitReExport,
     _considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
-    PlaceAndQualifiers {
-        place: join_with_previous_cycle_place(db, &previous_place.place, &place.place, cycle_heads),
-        qualifiers: place.qualifiers,
-    }
+    place.cycle_normalized(db, *previous_place, cycle_heads)
 }
 
 #[salsa::tracked(cycle_fn=place_cycle_recover, cycle_initial=place_cycle_initial, heap_size=ruff_memory_usage::heap_size)]

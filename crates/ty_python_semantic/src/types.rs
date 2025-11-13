@@ -412,7 +412,7 @@ fn member_lookup_cycle_initial<'db>(
     Place::bound(Type::divergent(id)).into()
 }
 
-#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
+#[allow(clippy::too_many_arguments)]
 fn member_lookup_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle_heads: &salsa::CycleHeads,
@@ -423,12 +423,7 @@ fn member_lookup_cycle_recover<'db>(
     _name: Name,
     _policy: MemberLookupPolicy,
 ) -> PlaceAndQualifiers<'db> {
-    let place =
-        join_with_previous_cycle_place(db, &previous_member.place, &member.place, cycle_heads);
-    PlaceAndQualifiers {
-        place,
-        qualifiers: member.qualifiers,
-    }
+    member.cycle_normalized(db, *previous_member, cycle_heads)
 }
 
 fn class_lookup_cycle_initial<'db>(
@@ -441,30 +436,7 @@ fn class_lookup_cycle_initial<'db>(
     Place::bound(Type::divergent(id)).into()
 }
 
-pub(crate) fn join_with_previous_cycle_place<'db>(
-    db: &'db dyn Db,
-    previous_place: &Place<'db>,
-    place: &Place<'db>,
-    cycle_heads: &salsa::CycleHeads,
-) -> Place<'db> {
-    match (previous_place, place) {
-        // In fixed-point iteration of type inference, the member type must be monotonically widened and not "oscillate".
-        // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
-        (Place::Defined(prev_ty, _, _), Place::Defined(ty, origin, definedness)) => Place::Defined(
-            ty.cycle_normalized(db, *prev_ty, cycle_heads),
-            *origin,
-            *definedness,
-        ),
-        (_, Place::Defined(ty, origin, definedness)) => Place::Defined(
-            ty.recursive_type_normalized(db, cycle_heads),
-            *origin,
-            *definedness,
-        ),
-        (_, Place::Undefined) => Place::Undefined,
-    }
-}
-
-#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
+#[allow(clippy::too_many_arguments)]
 fn class_lookup_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle_heads: &salsa::CycleHeads,
@@ -475,12 +447,7 @@ fn class_lookup_cycle_recover<'db>(
     _name: Name,
     _policy: MemberLookupPolicy,
 ) -> PlaceAndQualifiers<'db> {
-    let place =
-        join_with_previous_cycle_place(db, &previous_member.place, &member.place, cycle_heads);
-    PlaceAndQualifiers {
-        place,
-        qualifiers: member.qualifiers,
-    }
+    member.cycle_normalized(db, *previous_member, cycle_heads)
 }
 
 fn variance_cycle_initial<'db, T>(
@@ -4857,7 +4824,7 @@ impl<'db> Type<'db> {
                 let owner_attr = bound_super.find_name_in_mro_after_pivot(db, name_str, policy);
 
                 bound_super
-                    .try_call_dunder_get_on_attribute(db, owner_attr.clone())
+                    .try_call_dunder_get_on_attribute(db, owner_attr)
                     .unwrap_or(owner_attr)
             }
         }

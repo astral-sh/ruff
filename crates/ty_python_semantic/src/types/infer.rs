@@ -84,16 +84,11 @@ fn scope_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle_heads: &salsa::CycleHeads,
     previous_inference: &ScopeInference<'db>,
-    mut inference: ScopeInference<'db>,
+    inference: ScopeInference<'db>,
     _count: u32,
     _scope: ScopeId<'db>,
 ) -> ScopeInference<'db> {
-    for (expr, ty) in &mut inference.expressions {
-        let previous_ty = previous_inference.expression_type(*expr);
-        *ty = ty.cycle_normalized(db, previous_ty, cycle_heads);
-    }
-
-    inference
+    inference.cycle_normalized(db, previous_inference, cycle_heads)
 }
 
 fn scope_cycle_initial<'db>(
@@ -134,46 +129,7 @@ fn definition_cycle_recover<'db>(
     _count: u32,
     _definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
-    definition_cycle_recover_inner(db, cycle_heads, previous_inference, inference)
-}
-
-fn definition_cycle_recover_inner<'db>(
-    db: &'db dyn Db,
-    cycle_heads: &salsa::CycleHeads,
-    previous_inference: &DefinitionInference<'db>,
-    mut inference: DefinitionInference<'db>,
-) -> DefinitionInference<'db> {
-    for (expr, ty) in &mut inference.expressions {
-        let previous_ty = previous_inference.expression_type(*expr);
-        *ty = ty.cycle_normalized(db, previous_ty, cycle_heads);
-    }
-    for (binding, binding_ty) in &mut inference.bindings {
-        if let Some((_, previous_binding)) = previous_inference
-            .bindings
-            .iter()
-            .find(|(previous_binding, _)| previous_binding == binding)
-        {
-            *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, cycle_heads);
-        } else {
-            *binding_ty = binding_ty.recursive_type_normalized(db, cycle_heads);
-        }
-    }
-    for (declaration, declaration_ty) in &mut inference.declarations {
-        if let Some((_, previous_declaration)) = previous_inference
-            .declarations
-            .iter()
-            .find(|(previous_declaration, _)| previous_declaration == declaration)
-        {
-            *declaration_ty = declaration_ty.map_type(|decl_ty| {
-                decl_ty.cycle_normalized(db, previous_declaration.inner_type(), cycle_heads)
-            });
-        } else {
-            *declaration_ty = declaration_ty
-                .map_type(|decl_ty| decl_ty.recursive_type_normalized(db, cycle_heads));
-        }
-    }
-
-    inference
+    inference.cycle_normalized(db, previous_inference, cycle_heads)
 }
 
 fn definition_cycle_initial<'db>(
@@ -217,7 +173,7 @@ fn deferred_cycle_recovery<'db>(
     _count: u32,
     _definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
-    definition_cycle_recover_inner(db, cycle_heads, previous_inference, inference)
+    inference.cycle_normalized(db, previous_inference, cycle_heads)
 }
 
 fn deferred_cycle_initial<'db>(
@@ -290,33 +246,11 @@ fn expression_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle_heads: &salsa::CycleHeads,
     previous_inference: &ExpressionInference<'db>,
-    mut inference: ExpressionInference<'db>,
+    inference: ExpressionInference<'db>,
     _count: u32,
     _input: InferExpression<'db>,
 ) -> ExpressionInference<'db> {
-    if let Some(extra) = inference.extra.as_mut() {
-        for (binding, binding_ty) in &mut extra.bindings {
-            if let Some((_, previous_binding)) =
-                previous_inference.extra.as_deref().and_then(|extra| {
-                    extra
-                        .bindings
-                        .iter()
-                        .find(|(previous_binding, _)| previous_binding == binding)
-                })
-            {
-                *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, cycle_heads);
-            } else {
-                *binding_ty = binding_ty.recursive_type_normalized(db, cycle_heads);
-            }
-        }
-    }
-
-    for (expr, ty) in &mut inference.expressions {
-        let previous_ty = previous_inference.expression_type(*expr);
-        *ty = ty.cycle_normalized(db, previous_ty, cycle_heads);
-    }
-
-    inference
+    inference.cycle_normalized(db, previous_inference, cycle_heads)
 }
 
 fn expression_cycle_initial<'db>(
@@ -530,16 +464,11 @@ fn unpack_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle_heads: &salsa::CycleHeads,
     previous_cycle_result: &UnpackResult<'db>,
-    mut result: UnpackResult<'db>,
+    result: UnpackResult<'db>,
     _count: u32,
     _unpack: Unpack<'db>,
 ) -> UnpackResult<'db> {
-    for (expr, ty) in &mut result.targets {
-        let previous_ty = previous_cycle_result.expression_type(*expr);
-        *ty = ty.cycle_normalized(db, previous_ty, cycle_heads);
-    }
-
-    result
+    result.cycle_normalized(db, previous_cycle_result, cycle_heads)
 }
 
 /// Returns the type of the nearest enclosing class for the given scope.
@@ -646,6 +575,20 @@ impl<'db> ScopeInference<'db> {
         }
     }
 
+    fn cycle_normalized(
+        mut self,
+        db: &'db dyn Db,
+        previous_inference: &ScopeInference<'db>,
+        cycle_heads: &salsa::CycleHeads,
+    ) -> ScopeInference<'db> {
+        for (expr, ty) in &mut self.expressions {
+            let previous_ty = previous_inference.expression_type(*expr);
+            *ty = ty.cycle_normalized(db, previous_ty, cycle_heads);
+        }
+
+        self
+    }
+
     pub(crate) fn diagnostics(&self) -> Option<&TypeCheckDiagnostics> {
         self.extra.as_deref().map(|extra| &extra.diagnostics)
     }
@@ -727,6 +670,45 @@ impl<'db> DefinitionInference<'db> {
                 ..DefinitionInferenceExtra::default()
             })),
         }
+    }
+
+    fn cycle_normalized(
+        mut self,
+        db: &'db dyn Db,
+        previous_inference: &DefinitionInference<'db>,
+        cycle_heads: &salsa::CycleHeads,
+    ) -> DefinitionInference<'db> {
+        for (expr, ty) in &mut self.expressions {
+            let previous_ty = previous_inference.expression_type(*expr);
+            *ty = ty.cycle_normalized(db, previous_ty, cycle_heads);
+        }
+        for (binding, binding_ty) in &mut self.bindings {
+            if let Some((_, previous_binding)) = previous_inference
+                .bindings
+                .iter()
+                .find(|(previous_binding, _)| previous_binding == binding)
+            {
+                *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, cycle_heads);
+            } else {
+                *binding_ty = binding_ty.recursive_type_normalized(db, cycle_heads);
+            }
+        }
+        for (declaration, declaration_ty) in &mut self.declarations {
+            if let Some((_, previous_declaration)) = previous_inference
+                .declarations
+                .iter()
+                .find(|(previous_declaration, _)| previous_declaration == declaration)
+            {
+                *declaration_ty = declaration_ty.map_type(|decl_ty| {
+                    decl_ty.cycle_normalized(db, previous_declaration.inner_type(), cycle_heads)
+                });
+            } else {
+                *declaration_ty = declaration_ty
+                    .map_type(|decl_ty| decl_ty.recursive_type_normalized(db, cycle_heads));
+            }
+        }
+
+        self
     }
 
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
@@ -845,6 +827,35 @@ impl<'db> ExpressionInference<'db> {
             #[cfg(debug_assertions)]
             scope,
         }
+    }
+
+    fn cycle_normalized(
+        mut self,
+        db: &'db dyn Db,
+        previous: &ExpressionInference<'db>,
+        cycle_heads: &salsa::CycleHeads,
+    ) -> ExpressionInference<'db> {
+        if let Some(extra) = self.extra.as_mut() {
+            for (binding, binding_ty) in &mut extra.bindings {
+                if let Some((_, previous_binding)) = previous.extra.as_deref().and_then(|extra| {
+                    extra
+                        .bindings
+                        .iter()
+                        .find(|(previous_binding, _)| previous_binding == binding)
+                }) {
+                    *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, cycle_heads);
+                } else {
+                    *binding_ty = binding_ty.recursive_type_normalized(db, cycle_heads);
+                }
+            }
+        }
+
+        for (expr, ty) in &mut self.expressions {
+            let previous_ty = previous.expression_type(*expr);
+            *ty = ty.cycle_normalized(db, previous_ty, cycle_heads);
+        }
+
+        self
     }
 
     pub(crate) fn try_expression_type(

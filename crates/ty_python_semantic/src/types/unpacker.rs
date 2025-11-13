@@ -191,7 +191,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
 #[derive(Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct UnpackResult<'db> {
-    pub(crate) targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
     diagnostics: TypeCheckDiagnostics,
 
     /// The fallback type for missing expressions.
@@ -237,5 +237,19 @@ impl<'db> UnpackResult<'db> {
             diagnostics: TypeCheckDiagnostics::default(),
             cycle_recovery: Some(cycle_recovery),
         }
+    }
+
+    pub(crate) fn cycle_normalized(
+        mut self,
+        db: &'db dyn Db,
+        previous_cycle_result: &UnpackResult<'db>,
+        cycle_heads: &salsa::CycleHeads,
+    ) -> Self {
+        for (expr, ty) in &mut self.targets {
+            let previous_ty = previous_cycle_result.expression_type(*expr);
+            *ty = ty.cycle_normalized(db, previous_ty, cycle_heads);
+        }
+
+        self
     }
 }

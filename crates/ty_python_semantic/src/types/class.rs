@@ -38,7 +38,6 @@ use crate::types::{
     MaterializationKind, NormalizedVisitor, PropertyInstanceType, RecursiveTypeNormalizedVisitor,
     StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation, TypedDictParams,
     UnionBuilder, VarianceInferable, binding_type, declaration_type, determine_upper_bound,
-    join_with_previous_cycle_place,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -109,18 +108,10 @@ fn implicit_attribute_cycle_recover<'db>(
     _name: String,
     _target_method_decorator: MethodDecorator,
 ) -> Member<'db> {
-    let place = join_with_previous_cycle_place(
-        db,
-        &previous_member.inner.place,
-        &member.inner.place,
-        cycle_heads,
-    );
-    Member {
-        inner: PlaceAndQualifiers {
-            place,
-            qualifiers: member.inner.qualifiers,
-        },
-    }
+    let inner = member
+        .inner
+        .cycle_normalized(db, previous_member.inner, cycle_heads);
+    Member { inner }
 }
 
 fn try_mro_cycle_initial<'db>(
