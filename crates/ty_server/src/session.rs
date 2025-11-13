@@ -22,7 +22,7 @@ use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ty_combine::Combine;
 use ty_project::metadata::Options;
-use ty_project::watch::ChangeEvent;
+use ty_project::watch::{ChangeEvent, CreatedKind};
 use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetadata};
 
 use index::DocumentError;
@@ -874,7 +874,7 @@ impl Session {
     /// Returns a handle to the opened document.
     pub(crate) fn open_notebook_document(&mut self, document: NotebookDocument) -> DocumentHandle {
         let handle = self.index_mut().open_notebook_document(document);
-        self.bump_revision();
+        self.open_document_in_db(&handle);
         handle
     }
 
@@ -884,9 +884,49 @@ impl Session {
     /// Returns a handle to the opened document.
     pub(crate) fn open_text_document(&mut self, document: TextDocument) -> DocumentHandle {
         let handle = self.index_mut().open_text_document(document);
+        self.open_document_in_db(&handle);
+        handle
+    }
+
+    fn open_document_in_db(&mut self, document: &DocumentHandle) {
+        let path = document.notebook_or_file_path();
+
+        // This is a "maybe" because the `File` might've not been interned yet i.e., the
+        // `try_system` call will return `None` which doesn't mean that the file is new, it's just
+        // that the server didn't need the file yet.
+        let is_maybe_new_system_file = path.as_system().is_some_and(|system_path| {
+            let db = self.project_db(path);
+            db.files()
+                .try_system(db, system_path)
+                .is_none_or(|file| !file.exists(db))
+        });
+
+        match path {
+            AnySystemPath::System(system_path) => {
+                let event = if is_maybe_new_system_file {
+                    ChangeEvent::Created {
+                        path: system_path.clone(),
+                        kind: CreatedKind::File,
+                    }
+                } else {
+                    ChangeEvent::Opened(system_path.clone())
+                };
+                self.apply_changes(path, vec![event]);
+
+                let db = self.project_db_mut(path);
+                match system_path_to_file(db, system_path) {
+                    Ok(file) => db.project().open_file(db, file),
+                    Err(err) => tracing::warn!("Failed to open file {system_path}: {err}"),
+                }
+            }
+            AnySystemPath::SystemVirtual(virtual_path) => {
+                let db = self.project_db_mut(path);
+                let virtual_file = db.files().virtual_file(db, virtual_path);
+                db.project().open_file(db, virtual_file.file());
+            }
+        }
 
         self.bump_revision();
-        handle
     }
 
     /// Returns a reference to the index.
@@ -1437,20 +1477,23 @@ impl DocumentHandle {
         new_version: DocumentVersion,
     ) -> crate::Result<()> {
         let position_encoding = session.position_encoding();
-        let mut index = session.index_mut();
+        {
+            let mut index = session.index_mut();
 
-        let document_mut = index.document_mut(&self.key())?;
+            let document_mut = index.document_mut(&self.key())?;
 
-        let Some(document) = document_mut.as_text_mut() else {
-            anyhow::bail!("Text document path does not point to a text document");
-        };
+            let Some(document) = document_mut.as_text_mut() else {
+                anyhow::bail!("Text document path does not point to a text document");
+            };
 
-        if content_changes.is_empty() {
-            document.update_version(new_version);
-            return Ok(());
+            if content_changes.is_empty() {
+                document.update_version(new_version);
+            } else {
+                document.apply_changes(content_changes, new_version, position_encoding);
+            }
         }
 
-        document.apply_changes(content_changes, new_version, position_encoding);
+        self.update_in_db(session);
 
         Ok(())
     }
@@ -1463,16 +1506,92 @@ impl DocumentHandle {
         new_version: DocumentVersion,
     ) -> crate::Result<()> {
         let position_encoding = session.position_encoding();
-        let mut index = session.index_mut();
+        {
+            let mut index = session.index_mut();
 
-        index.update_notebook_document(&self.key(), cells, metadata, new_version, position_encoding)
+            index.update_notebook_document(
+                &self.key(),
+                cells,
+                metadata,
+                new_version,
+                position_encoding,
+            )?;
+        }
+
+        self.update_in_db(session);
+        Ok(())
+    }
+
+    fn update_in_db(&self, session: &mut Session) {
+        let path = self.notebook_or_file_path();
+        let changes = match path {
+            AnySystemPath::System(system_path) => {
+                vec![ChangeEvent::file_content_changed(system_path.clone())]
+            }
+            AnySystemPath::SystemVirtual(virtual_path) => {
+                vec![ChangeEvent::ChangedVirtual(virtual_path.clone())]
+            }
+        };
+
+        session.apply_changes(path, changes);
     }
 
     /// De-registers a document, specified by its key.
     /// Calling this multiple times for the same document is a logic error.
-    pub(crate) fn close(self, session: &mut Session) -> crate::Result<()> {
+    ///
+    /// Returns `true` if the client needs to clear the diagnostics for this document.
+    pub(crate) fn close(&self, session: &mut Session) -> crate::Result<bool> {
+        let is_cell = self.is_cell();
+        let path = self.notebook_or_file_path();
         session.index_mut().close_document(&self.key())?;
+
+        // Close the text or notebook file in the database but skip this
+        // step for cells because closing a cell doesn't close its notebook.
+        let requires_clear_diagnostics = if is_cell {
+            true
+        } else {
+            let db = session.project_db_mut(path);
+
+            match path {
+                AnySystemPath::System(system_path) => {
+                    if let Some(file) = db.files().try_system(db, system_path) {
+                        db.project().close_file(db, file);
+                    } else {
+                        // This can only fail when the path is a directory or it doesn't exists but the
+                        // file should exists for this handler in this branch. This is because every
+                        // close call is preceded by an open call, which ensures that the file is
+                        // interned in the lookup table (`Files`).
+                        tracing::warn!("Salsa file does not exists for {}", system_path);
+                    }
+
+                    // For non-virtual files, we clear diagnostics if:
+                    //
+                    // 1. The file does not belong to any workspace e.g., opening a random file from
+                    //    outside the workspace because closing it acts like the file doesn't exists
+                    // 2. The diagnostic mode is set to open-files only
+                    session.workspaces().for_path(system_path).is_none()
+                        || session
+                            .global_settings()
+                            .diagnostic_mode()
+                            .is_open_files_only()
+                }
+                AnySystemPath::SystemVirtual(virtual_path) => {
+                    if let Some(virtual_file) = db.files().try_virtual_file(virtual_path) {
+                        db.project().close_file(db, virtual_file.file());
+                        virtual_file.close(db);
+                    } else {
+                        tracing::warn!("Salsa virtual file does not exists for {}", virtual_path);
+                    }
+
+                    // Always clear diagnostics for virtual files, as they don't really exist on disk
+                    // which means closing them is like deleting the file.
+                    true
+                }
+            }
+        };
+
         session.bump_revision();
-        Ok(())
+
+        Ok(requires_clear_diagnostics)
     }
 }

@@ -40,7 +40,11 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
             return Ok(None);
         };
 
-        let mut range = None;
+        // If this document is a notebook cell, limit the highlighting range
+        // to the lines of this cell (instead of highlighting the entire notebook).
+        // Not only avoids this unnecessary work, this is also required
+        // because all ranges in the response must be within this **this document**.
+        let mut cell_range = None;
 
         if snapshot.document().is_cell()
             && let Some(notebook_document) = db.notebook_document(file)
@@ -48,13 +52,13 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
         {
             let cell_index = notebook_document.cell_index_by_uri(snapshot.url());
 
-            range = cell_index.and_then(|index| notebook.cell_range(index));
+            cell_range = cell_index.and_then(|index| notebook.cell_range(index));
         }
 
         let lsp_tokens = generate_semantic_tokens(
             db,
             file,
-            range,
+            cell_range,
             snapshot.encoding(),
             snapshot
                 .resolved_client_capabilities()

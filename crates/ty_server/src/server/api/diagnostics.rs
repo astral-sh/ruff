@@ -113,15 +113,16 @@ impl LspDiagnostics {
 }
 
 pub(super) fn clear_diagnostics_if_needed(
+    document: &DocumentHandle,
     session: &Session,
-    uri: &lsp_types::Url,
     client: &Client,
 ) {
-    if session.client_capabilities().supports_pull_diagnostics() {
+    if session.client_capabilities().supports_pull_diagnostics() && !document.is_cell_or_notebook()
+    {
         return;
     }
 
-    clear_diagnostics(uri, client);
+    clear_diagnostics(document.url(), client);
 }
 
 /// Clears the diagnostics for the document identified by `uri`.
@@ -138,21 +139,29 @@ pub(super) fn clear_diagnostics(uri: &lsp_types::Url, client: &Client) {
 }
 
 /// Publishes the diagnostics for the given document snapshot using the [publish diagnostics
-/// notification].
+/// notification] .
 ///
-/// This function publishes the diagnostics for the entire notebook if `url` points to a notebook or a cell,
-/// even if the client supports pull diagnostics. This is because VS Code
+/// Unlike [`publish_diagnostics`], this function only publishes diagnostics if a client doesn't support
+/// pull diagnostics and `document` is not a notebook or cell (VS Code
 /// does not support pull diagnostics for notebooks or cells (as of 2025-11-12).
 ///
-/// This function is a no-op for simple text files when the client supports pull diagnostics.
-///
 /// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
-pub(super) fn publish_diagnostics(session: &Session, document: &DocumentHandle, client: &Client) {
+pub(super) fn publish_diagnostics_if_needed(
+    document: &DocumentHandle,
+    session: &Session,
+    client: &Client,
+) {
     if !document.is_cell_or_notebook() && session.client_capabilities().supports_pull_diagnostics()
     {
         return;
     }
 
+    publish_diagnostics(document, session, client);
+}
+
+/// Publishes the diagnostics for the given document snapshot using the [publish diagnostics
+/// notification].
+pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, client: &Client) {
     let db = session.project_db(document.notebook_or_file_path());
 
     let Some(diagnostics) = compute_diagnostics(db, document, session.position_encoding()) else {

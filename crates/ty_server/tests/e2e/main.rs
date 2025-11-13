@@ -434,11 +434,11 @@ impl TestServer {
         ))
     }
 
-    /// Collects `N` publish diagnostics into a map, indexed by the document url.
+    /// Collects `N` publish diagnostic notifications into a map, indexed by the document url.
     ///
     /// ## Panics
     /// If there are multiple publish diagnostics notifications for the same document.
-    pub(crate) fn collect_publish_diagnostics(
+    pub(crate) fn collect_publish_diagnostic_notifications(
         &mut self,
         count: usize,
     ) -> Result<BTreeMap<lsp_types::Url, Vec<lsp_types::Diagnostic>>> {

@@ -88,7 +88,7 @@ IOError"#,
 
     let notebook_url = builder.open(&mut server);
 
-    server.collect_publish_diagnostics(3)?;
+    server.collect_publish_diagnostic_notifications(3)?;
 
     server.send_notification::<lsp_types::notification::DidChangeNotebookDocument>(
         lsp_types::DidChangeNotebookDocumentParams {
@@ -120,7 +120,7 @@ IOError"#,
         },
     );
 
-    let diagnostics = server.collect_publish_diagnostics(3)?;
+    let diagnostics = server.collect_publish_diagnostic_notifications(3)?;
     assert_json_snapshot!(diagnostics);
 
     Ok(())
@@ -168,7 +168,7 @@ type Style = Literal["italic", "bold", "underline"]"#,
 
     assert_json_snapshot!([cell1_tokens, cell2_tokens, cell3_tokens]);
 
-    server.collect_publish_diagnostics(3)?;
+    server.collect_publish_diagnostic_notifications(3)?;
 
     Ok(())
 }
@@ -194,7 +194,7 @@ fn swap_cells() -> anyhow::Result<()> {
 
     let notebook = builder.open(&mut server);
 
-    let diagnostics = server.collect_publish_diagnostics(3)?;
+    let diagnostics = server.collect_publish_diagnostic_notifications(3)?;
     assert_json_snapshot!(diagnostics, @r###"
     {
       "vscode-notebook-cell://src/test.ipynb#0": [
@@ -263,7 +263,7 @@ fn swap_cells() -> anyhow::Result<()> {
         },
     );
 
-    let diagnostics = server.collect_publish_diagnostics(3)?;
+    let diagnostics = server.collect_publish_diagnostic_notifications(3)?;
 
     assert_json_snapshot!(diagnostics, @r###"
     {

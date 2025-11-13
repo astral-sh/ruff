@@ -4,7 +4,7 @@ use lsp_types::notification as notif;
 
 use crate::server::Result;
 use crate::server::api::LSPResult;
-use crate::server::api::notifications::did_change::file_changed;
+use crate::server::api::diagnostics::publish_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
@@ -32,7 +32,8 @@ impl SyncNotificationHandler for DidChangeNotebookHandler {
             .update_notebook_document(session, cells, metadata, version)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        file_changed(&document, session, client);
+        // Always publish diagnostics because notebooks only support publish diagnostics.
+        publish_diagnostics(&document, session, client);
 
         Ok(())
     }

@@ -78,7 +78,7 @@ impl LspPosition {
 }
 
 pub(crate) trait RangeExt {
-    /// Convert an LSP Range to internal [`TextRange`].
+    /// Convert an LSP Range to a [`TextRange`].
     ///
     /// Returns `None` if `file` is a notebook and the
     /// cell identified by `url` can't be looked up or if the notebook
@@ -148,13 +148,14 @@ impl PositionExt for lsp_types::Position {
                 index.source_location(cell_start_offset, source.as_str(), encoding.into());
             assert_eq!(cell_start_location.character_offset, OneIndexed::MIN);
 
-            let absolute_start = SourceLocation {
+            // Absolute position into the concatenated notebook source text.
+            let absolute_position = SourceLocation {
                 line: cell_start_location
                     .line
                     .saturating_add(cell_relative_line.to_zero_indexed()),
                 character_offset: OneIndexed::from_zero_indexed(u32_index_to_usize(self.character)),
             };
-            return Some(index.offset(absolute_start, &source, encoding.into()));
+            return Some(index.offset(absolute_position, &source, encoding.into()));
         }
 
         Some(lsp_position_to_text_size(*self, &source, &index, encoding))
@@ -162,7 +163,7 @@ impl PositionExt for lsp_types::Position {
 }
 
 pub(crate) trait TextSizeExt {
-    /// Converts self into a position into an LSP text document (can be a cell or regular document).
+    /// Converts `self` into a position in an LSP text document (can be a cell or regular document).
     ///
     /// Returns `None` if the position can't be converted:
     ///
@@ -297,12 +298,8 @@ impl ToRangeExt for TextRange {
             let start_in_concatenated =
                 index.source_location(self.start(), &source, encoding.into());
             let cell_index = notebook_index.cell(start_in_concatenated.line)?;
-            let cell_range = notebook.cell_range(cell_index)?;
 
-            // Clamp the end offset to the end of the cell.
-            let end_offset = self.end().min(cell_range.end());
-
-            let end_in_concatenated = index.source_location(end_offset, &source, encoding.into());
+            let end_in_concatenated = index.source_location(self.end(), &source, encoding.into());
 
             let start_in_cell = source_location_to_position(
                 &notebook_index.translate_source_location(&start_in_concatenated),

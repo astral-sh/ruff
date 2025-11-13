@@ -6,7 +6,7 @@ use crate::TextDocument;
 use crate::document::NotebookDocument;
 use crate::server::Result;
 use crate::server::api::LSPResult;
-use crate::server::api::notifications::did_open::opened_document;
+use crate::server::api::diagnostics::publish_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
@@ -36,16 +36,17 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
                 .with_failure_code(ErrorCode::InternalError)?;
 
         let document = session.open_notebook_document(notebook);
-        let path = document.notebook_or_file_path();
+        let notebook_path = document.notebook_or_file_path();
 
         for cell in params.cell_text_documents {
             let cell_document = TextDocument::new(cell.uri, cell.text, cell.version)
                 .with_language_id(&cell.language_id)
-                .with_notebook(path.clone());
+                .with_notebook(notebook_path.clone());
             session.open_text_document(cell_document);
         }
 
-        opened_document(&document, session, client);
+        // Always publish diagnostics because notebooks only support publish diagnostics.
+        publish_diagnostics(&document, session, client);
 
         Ok(())
     }
