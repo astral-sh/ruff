@@ -1,4 +1,7 @@
-use std::error::Error;
+use core::fmt;
+use itertools::Itertools;
+use std::{error::Error, fmt::Formatter};
+use thiserror::Error;
 
 use ruff_python_trivia::{CommentRanges, Cursor};
 use ruff_text_size::{TextRange, TextSize};
@@ -52,33 +55,93 @@ pub(crate) struct Suppression {
     comments: Vec<SuppressionComment>,
 }
 
+impl Suppression {
+    pub(crate) fn load(source: &str, comment_ranges: &CommentRanges) -> Vec<SuppressionComment> {
+        comment_ranges
+            .iter()
+            .flat_map(|comment_range| {
+                let mut parser = SuppressionParser::new(source, comment_range);
+                parser.parse_comment()
+            })
+            .collect::<Vec<_>>()
+    }
+}
+
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+enum ParseErrorKind {
+    #[error("not a suppression comment")]
+    NotASuppression,
+
+    #[error("comment doesn't start with `#`")]
+    CommentWithoutHash,
+
+    #[error("unknown ruff directive")]
+    UnknownDirective,
+
+    #[error("missing suppression codes")]
+    MissingCodes,
+
+    #[error("missing closing bracket")]
+    MissingBracket,
+
+    #[error("missing comma between codes")]
+    MissingComma,
+
+    #[error("invalid error code")]
+    InvalidCode,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ParseError {
+    kind: ParseErrorKind,
+    range: TextRange,
+}
+
+impl ParseError {
+    fn new(kind: ParseErrorKind, range: TextRange) -> Self {
+        Self { kind, range }
+    }
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.kind.fmt(f)
+    }
+}
+
+impl Error for ParseError {}
+
 struct SuppressionParser<'src> {
     cursor: Cursor<'src>,
     range: TextRange,
 }
 
 impl<'src> SuppressionParser<'src> {
-    fn new(source: &'src str, range: TextRange) -> Self {
+    fn new(source: &'src str, range: &TextRange) -> Self {
+        let range = range.clone();
         let cursor = Cursor::new(&source[range]);
         Self { cursor, range }
     }
 
-    fn parse_comment(&mut self) -> Option<SuppressionComment> {
+    fn parse_comment(&mut self) -> Result<SuppressionComment, ParseError> {
         self.cursor.start_token();
 
         if !self.cursor.eat_char('#') {
-            return None;
+            return self.error(ParseErrorKind::CommentWithoutHash);
         }
 
         self.eat_whitespace();
 
         let action = self.eat_action()?;
         let codes = self.eat_codes()?;
+        if codes.is_empty() {
+            return Err(ParseError::new(ParseErrorKind::MissingCodes, self.range));
+        }
 
         self.eat_whitespace();
         let reason = TextRange::new(self.offset(), self.range.end());
 
-        Some(SuppressionComment {
+        Ok(SuppressionComment {
             range: self.range,
             action,
             codes,
@@ -86,55 +149,55 @@ impl<'src> SuppressionParser<'src> {
         })
     }
 
-    fn eat_action(&mut self) -> Option<SuppressionAction> {
+    fn eat_action(&mut self) -> Result<SuppressionAction, ParseError> {
         if !self.cursor.as_str().starts_with("ruff") {
-            return None;
+            return self.error(ParseErrorKind::NotASuppression);
         }
 
         self.cursor.skip_bytes("ruff".len());
         self.eat_whitespace();
 
         if !self.cursor.eat_char(':') {
-            return None;
+            return self.error(ParseErrorKind::NotASuppression);
         }
         self.eat_whitespace();
 
         if self.cursor.as_str().starts_with("disable") {
             self.cursor.skip_bytes("disable".len());
-            Some(SuppressionAction::Disable)
+            Ok(SuppressionAction::Disable)
         } else if self.cursor.as_str().starts_with("enable") {
             self.cursor.skip_bytes("enable".len());
-            Some(SuppressionAction::Enable)
+            Ok(SuppressionAction::Enable)
         } else if self.cursor.as_str().starts_with("ignore") {
             self.cursor.skip_bytes("ignore".len());
-            Some(SuppressionAction::Ignore)
+            Ok(SuppressionAction::Ignore)
         } else {
-            None
+            self.error(ParseErrorKind::UnknownDirective)
         }
     }
 
-    fn eat_codes(&mut self) -> Option<SmallVec<[TextRange; 2]>> {
+    fn eat_codes(&mut self) -> Result<SmallVec<[TextRange; 2]>, ParseError> {
         self.eat_whitespace();
         if !self.cursor.eat_char('[') {
-            return None;
+            return self.error(ParseErrorKind::MissingCodes);
         }
 
         let mut codes: SmallVec<[TextRange; 2]> = smallvec![];
 
         loop {
             if self.cursor.is_eof() {
-                return None; // Missing closing bracket
+                return self.error(ParseErrorKind::MissingBracket);
             }
 
             self.eat_whitespace();
 
             if self.cursor.eat_char(']') {
-                break Some(codes);
+                break Ok(codes);
             }
 
             let code_start = self.offset();
             if !self.eat_word() {
-                return None; // Invalid code
+                return self.error(ParseErrorKind::InvalidCode);
             }
 
             codes.push(TextRange::new(code_start, self.offset()));
@@ -142,10 +205,14 @@ impl<'src> SuppressionParser<'src> {
             self.eat_whitespace();
             if !self.cursor.eat_char(',') {
                 if self.cursor.eat_char(']') {
-                    break Some(codes);
+                    break Ok(codes);
                 }
 
-                return None; // Missing comma
+                return if self.cursor.is_eof() {
+                    self.error(ParseErrorKind::MissingBracket)
+                } else {
+                    self.error(ParseErrorKind::MissingComma)
+                };
             }
         }
     }
@@ -173,24 +240,209 @@ impl<'src> SuppressionParser<'src> {
     fn offset(&self) -> TextSize {
         self.range.start() + self.range.len() - self.cursor.text_len()
     }
+
+    fn error<T>(&self, kind: ParseErrorKind) -> Result<T, ParseError> {
+        Err(ParseError::new(
+            kind,
+            TextRange::new(self.offset(), self.range.end()),
+        ))
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_debug_snapshot;
     use ruff_text_size::{TextRange, TextSize};
     use similar::DiffableStr;
 
-    use crate::suppression::{SuppressionAction, SuppressionParser};
+    use crate::suppression::{
+        ParseError, SuppressionAction, SuppressionComment, SuppressionParser,
+    };
 
-    #[test]
-    fn test_parse_comment() {
-        let source = "# ruff: ignore[foo, bar] hello world";
+    fn parse_suppression_comment(source: &str) -> Result<SuppressionComment, ParseError> {
         let mut parser = SuppressionParser::new(
             source,
-            TextRange::new(0.into(), TextSize::try_from(source.len()).unwrap()),
+            &TextRange::new(0.into(), TextSize::try_from(source.len()).unwrap()),
+        );
+        parser.parse_comment()
+    }
+
+    #[test]
+    fn unrelated_comment() {
+        assert_debug_snapshot!(
+            parse_suppression_comment("# hello world"),
+            @r"
+        Err(
+            ParseError {
+                kind: NotASuppression,
+                range: 2..13,
+            },
+        )
+        ",
+        );
+    }
+
+    #[test]
+    fn invalid_action() {
+        assert_debug_snapshot!(
+            parse_suppression_comment("# ruff: lol[hi]"),
+            @r"
+        Err(
+            ParseError {
+                kind: UnknownDirective,
+                range: 8..15,
+            },
+        )
+        ",
+        );
+    }
+
+    #[test]
+    fn missing_codes() {
+        assert_debug_snapshot!(
+            parse_suppression_comment("# ruff: ignore"),
+            @r"
+        Err(
+            ParseError {
+                kind: MissingCodes,
+                range: 14..14,
+            },
+        )
+        ",
+        );
+    }
+
+    #[test]
+    fn empty_codes() {
+        assert_debug_snapshot!(
+            parse_suppression_comment("# ruff: ignore[]"),
+            @r"
+        Err(
+            ParseError {
+                kind: MissingCodes,
+                range: 0..16,
+            },
+        )
+        ",
+        );
+    }
+
+    #[test]
+    fn missing_bracket() {
+        assert_debug_snapshot!(
+            parse_suppression_comment("# ruff: ignore[foo"),
+            @r"
+        Err(
+            ParseError {
+                kind: MissingBracket,
+                range: 18..18,
+            },
+        )
+        ",
+        );
+    }
+
+    #[test]
+    fn missing_comma() {
+        assert_debug_snapshot!(
+            parse_suppression_comment("# ruff: ignore[foo bar]"),
+            @r"
+        Err(
+            ParseError {
+                kind: MissingComma,
+                range: 19..23,
+            },
+        )
+        ",
+        );
+    }
+
+    #[test]
+    fn ignore_single_code() {
+        assert_debug_snapshot!(
+            parse_suppression_comment("# ruff: ignore[foo]"),
+            @r"
+        Ok(
+            SuppressionComment {
+                range: 0..19,
+                action: Ignore,
+                codes: [
+                    15..18,
+                ],
+                reason: 19..19,
+            },
+        )
+        ",
+        );
+    }
+
+    #[test]
+    fn ignore_single_code_with_reason() {
+        assert_debug_snapshot!(
+            parse_suppression_comment("# ruff: ignore[foo] I like bar better"),
+            @r"
+        Ok(
+            SuppressionComment {
+                range: 0..37,
+                action: Ignore,
+                codes: [
+                    15..18,
+                ],
+                reason: 20..37,
+            },
+        )
+        ",
+        );
+    }
+
+    #[test]
+    fn ignore_multiple_codes() {
+        assert_debug_snapshot!(
+            parse_suppression_comment("# ruff: ignore[foo, bar]"),
+            @r"
+        Ok(
+            SuppressionComment {
+                range: 0..24,
+                action: Ignore,
+                codes: [
+                    15..18,
+                    20..23,
+                ],
+                reason: 24..24,
+            },
+        )
+        ",
+        );
+    }
+
+    #[test]
+    fn disable_single_code() {
+        assert_debug_snapshot!(
+            parse_suppression_comment("# ruff: disable[some-thing]"),
+            @r"
+        Ok(
+            SuppressionComment {
+                range: 0..27,
+                action: Disable,
+                codes: [
+                    16..26,
+                ],
+                reason: 27..27,
+            },
+        )
+        ",
+        );
+    }
+
+    #[test]
+    fn comment_attributes() {
+        let source = "# ruff: disable[foo, bar] hello world";
+        let mut parser = SuppressionParser::new(
+            source,
+            &TextRange::new(0.into(), TextSize::try_from(source.len()).unwrap()),
         );
         let comment = parser.parse_comment().unwrap();
-        assert_eq!(comment.action, SuppressionAction::Ignore);
+        assert_eq!(comment.action, SuppressionAction::Disable);
         assert_eq!(
             comment
                 .codes
