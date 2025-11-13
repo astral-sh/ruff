@@ -1359,7 +1359,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             overload_call_return_type: None,
-            matching_overload_after_parameter_matching: None,
+            matching_overload_before_type_checking: None,
             overloads: smallvec_inline![from],
         };
         Bindings {
@@ -1413,7 +1413,7 @@ pub(crate) struct CallableBinding<'db> {
     /// [`Unknown`]: crate::types::DynamicType::Unknown
     overload_call_return_type: Option<OverloadCallReturnType<'db>>,
 
-    /// The index of the overload that matched for this overloaded callable.
+    /// The index of the overload that matched for this overloaded callable before type checking.
     ///
     /// This is [`Some`] only for step 1 of the [overload call evaluation algorithm][1] to surface
     /// the diagnostics for the matching overload directly instead of using the
@@ -1422,7 +1422,7 @@ pub(crate) struct CallableBinding<'db> {
     /// following steps.
     ///
     /// [1]: https://typing.python.org/en/latest/spec/overload.html#overload-call-evaluation
-    matching_overload_after_parameter_matching: Option<usize>,
+    matching_overload_before_type_checking: Option<usize>,
 
     /// The bindings of each overload of this callable. Will be empty if the type is not callable.
     ///
@@ -1446,7 +1446,7 @@ impl<'db> CallableBinding<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             overload_call_return_type: None,
-            matching_overload_after_parameter_matching: None,
+            matching_overload_before_type_checking: None,
             overloads,
         }
     }
@@ -1458,7 +1458,7 @@ impl<'db> CallableBinding<'db> {
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             overload_call_return_type: None,
-            matching_overload_after_parameter_matching: None,
+            matching_overload_before_type_checking: None,
             overloads: smallvec![],
         }
     }
@@ -1516,7 +1516,7 @@ impl<'db> CallableBinding<'db> {
             MatchingOverloadIndex::Single(index) => {
                 // If only one candidate overload remains, it is the winning match. Evaluate it as
                 // a regular (non-overloaded) call.
-                self.matching_overload_after_parameter_matching = Some(index);
+                self.matching_overload_before_type_checking = Some(index);
                 self.overloads[index].check_types(db, argument_types.as_ref(), call_expression_tcx);
                 return None;
             }
@@ -2131,9 +2131,7 @@ impl<'db> CallableBinding<'db> {
 
                 // If there is a single matching overload, the diagnostics should be reported
                 // directly for that overload.
-                if let Some(matching_overload_index) =
-                    self.matching_overload_after_parameter_matching
-                {
+                if let Some(matching_overload_index) = self.matching_overload_before_type_checking {
                     let callable_description =
                         CallableDescription::new(context.db(), self.signature_type);
                     let matching_overload =
