@@ -9,11 +9,12 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import subprocess
 from pathlib import Path
-from typing import Final, Literal, Never, assert_never
+from typing import Final, Literal, assert_never
 
 from rich.console import Console
 from watchfiles import Change, watch
@@ -32,10 +33,15 @@ MDTEST_DIR: Final = CRATE_ROOT / "resources" / "mdtest"
 class MDTestRunner:
     mdtest_executable: Path | None
     console: Console
+    filters: list[str]
 
-    def __init__(self) -> None:
+    def __init__(self, filters: list[str] | None = None) -> None:
         self.mdtest_executable = None
         self.console = Console()
+        self.filters = [
+            f.removesuffix(".md").replace("/", "_").replace("-", "_")
+            for f in (filters or [])
+        ]
 
     def _run_cargo_test(self, *, message_format: Literal["human", "json"]) -> str:
         return subprocess.check_output(
@@ -117,13 +123,23 @@ class MDTestRunner:
             check=False,
         )
 
-    def _run_mdtests_for_file(self, markdown_file: Path) -> None:
-        path_mangled = (
+    def _mangle_path(self, markdown_file: Path) -> str:
+        return (
             markdown_file.as_posix()
             .replace("/", "_")
             .replace("-", "_")
             .removesuffix(".md")
         )
+
+    def _matches_filter(self, markdown_file: Path) -> bool:
+        if not self.filters:
+            return True
+
+        path_mangled = self._mangle_path(markdown_file)
+        return any(filter in path_mangled for filter in self.filters)
+
+    def _run_mdtests_for_file(self, markdown_file: Path) -> None:
+        path_mangled = self._mangle_path(markdown_file)
         test_name = f"mdtest__{path_mangled}"
 
         output = self._run_mdtest(["--exact", test_name], capture_output=True)
@@ -165,9 +181,9 @@ class MDTestRunner:
 
             print(line)
 
-    def watch(self) -> Never:
+    def watch(self):
         self._recompile_tests("Compiling tests...", message_on_success=False)
-        self._run_mdtest()
+        self._run_mdtest(self.filters)
         self.console.print("[dim]Ready to watch for changes...[/dim]")
 
         for changes in watch(*DIRS_TO_WATCH):
@@ -214,12 +230,12 @@ class MDTestRunner:
 
             if rust_code_has_changed:
                 if self._recompile_tests("Rust code has changed, recompiling tests..."):
-                    self._run_mdtest()
+                    self._run_mdtest(self.filters)
             elif vendored_typeshed_has_changed:
                 if self._recompile_tests(
                     "Vendored typeshed has changed, recompiling tests..."
                 ):
-                    self._run_mdtest()
+                    self._run_mdtest(self.filters)
             elif new_md_files:
                 files = " ".join(file.as_posix() for file in new_md_files)
                 self._recompile_tests(
@@ -227,12 +243,24 @@ class MDTestRunner:
                 )
 
             for path in new_md_files | changed_md_files:
-                self._run_mdtests_for_file(path)
+                if self._matches_filter(path):
+                    self._run_mdtests_for_file(path)
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="A runner for Markdown-based tests for ty"
+    )
+    parser.add_argument(
+        "filters",
+        nargs="*",
+        help="Partial paths or mangled names, e.g., 'loops/for.md' or 'loops_for'",
+    )
+
+    args = parser.parse_args()
+
     try:
-        runner = MDTestRunner()
+        runner = MDTestRunner(filters=args.filters)
         runner.watch()
     except KeyboardInterrupt:
         print()
