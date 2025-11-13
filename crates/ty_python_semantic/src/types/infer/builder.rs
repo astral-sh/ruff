@@ -3801,7 +3801,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                     .map(|s| s.types(db))
                                             {
                                                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                                                    "Cannot assign to `{object_d}` with key of type `{}` \
+                                                    "Cannot assign to a subscript on object of type `{object_d}` with key of type `{}` \
                                                     and a value of type `{assigned_d}`",
                                                     slice_ty.display(db),
                                                 ));
@@ -3877,8 +3877,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 // we end up suggesting things like "`None` may be missing a `__setitem__` method."
                                 if object_ty
                                     .as_nominal_instance()
-                                    .is_none_or(|instance| instance.class(db).known(db).is_none())
+                                    .is_some_and(|instance| instance.class(db).known(db).is_some())
                                 {
+                                    diagnostic.info(format_args!(
+                                        "`{}` does not have a `__setitem__` method.",
+                                        object_ty.display(db),
+                                    ));
+                                } else {
                                     diagnostic.info(format_args!(
                                         "`{}` may be missing a `__setitem__` method.",
                                         object_ty.display(db),

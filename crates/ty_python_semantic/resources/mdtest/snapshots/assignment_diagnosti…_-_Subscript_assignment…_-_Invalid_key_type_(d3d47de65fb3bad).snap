@@ -19,7 +19,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
 # Diagnostics
 
 ```
-error[invalid-assignment]: Cannot assign to `dict[str, int]` with key of type `Literal[0]` and a value of type `Literal[3]`
+error[invalid-assignment]: Cannot assign to a subscript on object of type `dict[str, int]` with key of type `Literal[0]` and a value of type `Literal[3]`
  --> src/mdtest_snippet.py:2:1
   |
 1 | config: dict[str, int] = {}
