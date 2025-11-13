@@ -3963,7 +3963,9 @@ impl<'db> Type<'db> {
                         UnionType::from_elements(db, [bindings.return_type(db), self])
                     }
                 })
-                .ok()?;
+                // TODO: an error when calling `__get__` will lead to a `TypeError` or similar at runtime;
+                // we should emit a diagnostic here instead of silently ignoring the error.
+                .unwrap_or_else(|CallError(_, bindings)| bindings.return_type(db));
 
             let descriptor_kind = if self.is_data_descriptor(db) {
                 AttributeKind::DataDescriptor
