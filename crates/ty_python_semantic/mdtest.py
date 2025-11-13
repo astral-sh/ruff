@@ -131,13 +131,6 @@ class MDTestRunner:
             .removesuffix(".md")
         )
 
-    def _matches_filter(self, markdown_file: Path) -> bool:
-        if not self.filters:
-            return True
-
-        path_mangled = self._mangle_path(markdown_file)
-        return any(filter in path_mangled for filter in self.filters)
-
     def _run_mdtests_for_file(self, markdown_file: Path) -> None:
         path_mangled = self._mangle_path(markdown_file)
         test_name = f"mdtest__{path_mangled}"
@@ -243,8 +236,7 @@ class MDTestRunner:
                 )
 
             for path in new_md_files | changed_md_files:
-                if self._matches_filter(path):
-                    self._run_mdtests_for_file(path)
+                self._run_mdtests_for_file(path)
 
 
 def main() -> None:
