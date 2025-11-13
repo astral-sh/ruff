@@ -6,7 +6,6 @@ use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_semantic::types::ide_support::CallSignatureDetails;
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarVariance};
 use ty_python_semantic::{DisplaySettings, SemanticModel};
 
@@ -31,7 +30,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         .map(HoverContent::Docstring);
 
     let mut contents = Vec::new();
-    if let Some(signature) = goto_target.signature(&model) {
+    if let Some(signature) = goto_target.call_type_simplified_by_overloads(&model) {
         contents.push(HoverContent::Signature(signature));
     } else if let Some(ty) = goto_target.inferred_type(&model) {
         tracing::debug!("Inferred type of covering node is {}", ty.display(db));
@@ -118,7 +117,7 @@ impl fmt::Display for DisplayHover<'_, '_> {
 
 #[derive(Debug, Clone)]
 pub enum HoverContent<'db> {
-    Signature(Vec<CallSignatureDetails<'db>>),
+    Signature(String),
     Type(Type<'db>, Option<TypeVarVariance>),
     Docstring(Docstring),
 }
@@ -142,14 +141,8 @@ pub(crate) struct DisplayHoverContent<'a, 'db> {
 impl fmt::Display for DisplayHoverContent<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.content {
-            HoverContent::Signature(signatures) => {
-                for signature in signatures {
-                    self.kind
-                        .fenced_code_block(&signature.label, "python")
-                        .fmt(f)?;
-                    self.kind.horizontal_line().fmt(f)?;
-                }
-                Ok(())
+            HoverContent::Signature(signature) => {
+                self.kind.fenced_code_block(&signature, "python").fmt(f)
             }
             HoverContent::Type(ty, variance) => {
                 let variance = match variance {
@@ -973,16 +966,12 @@ def ab(a: str): ...
         assert_snapshot!(test.hover(), @r"
         (a: int) -> Unknown
         ---------------------------------------------
-
-        ---------------------------------------------
         the int overload
 
         ---------------------------------------------
         ```python
         (a: int) -> Unknown
         ```
-        ---
-
         ---
         ```text
         the int overload
@@ -1040,16 +1029,12 @@ def ab(a: str):
         assert_snapshot!(test.hover(), @r#"
         (a: str) -> Unknown
         ---------------------------------------------
-
-        ---------------------------------------------
         the int overload
 
         ---------------------------------------------
         ```python
         (a: str) -> Unknown
         ```
-        ---
-
         ---
         ```text
         the int overload
@@ -1105,18 +1090,20 @@ def ab(a: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (a: int, b: int) -> Unknown
-        ---------------------------------------------
-
+        (
+            a: int,
+            b: int
+        ) -> Unknown
         ---------------------------------------------
         the two arg overload
 
         ---------------------------------------------
         ```python
-        (a: int, b: int) -> Unknown
+        (
+            a: int,
+            b: int
+        ) -> Unknown
         ```
-        ---
-
         ---
         ```text
         the two arg overload
@@ -1174,16 +1161,12 @@ def ab(a: int):
         assert_snapshot!(test.hover(), @r"
         (a: int) -> Unknown
         ---------------------------------------------
-
-        ---------------------------------------------
         the two arg overload
 
         ---------------------------------------------
         ```python
         (a: int) -> Unknown
         ```
-        ---
-
         ---
         ```text
         the two arg overload
@@ -1243,18 +1226,22 @@ def ab(a: int, *, c: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (a: int, *, b: int) -> Unknown
-        ---------------------------------------------
-
+        (
+            a: int,
+            *,
+            b: int
+        ) -> Unknown
         ---------------------------------------------
         keywordless overload
 
         ---------------------------------------------
         ```python
-        (a: int, *, b: int) -> Unknown
+        (
+            a: int,
+            *,
+            b: int
+        ) -> Unknown
         ```
-        ---
-
         ---
         ```text
         keywordless overload
@@ -1314,18 +1301,22 @@ def ab(a: int, *, c: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (a: int, *, c: int) -> Unknown
-        ---------------------------------------------
-
+        (
+            a: int,
+            *,
+            c: int
+        ) -> Unknown
         ---------------------------------------------
         keywordless overload
 
         ---------------------------------------------
         ```python
-        (a: int, *, c: int) -> Unknown
+        (
+            a: int,
+            *,
+            c: int
+        ) -> Unknown
         ```
-        ---
-
         ---
         ```text
         keywordless overload
@@ -1372,18 +1363,28 @@ def ab(a: int, *, c: int):
         );
 
         assert_snapshot!(test.hover(), @r#"
-        (a: int, b) -> Unknown
-        ---------------------------------------------
-
+        (
+            a: int,
+            b
+        ) -> Unknown
+        (
+            a: str,
+            b
+        ) -> Unknown
         ---------------------------------------------
         The first overload
 
         ---------------------------------------------
         ```python
-        (a: int, b) -> Unknown
+        (
+            a: int,
+            b
+        ) -> Unknown
+        (
+            a: str,
+            b
+        ) -> Unknown
         ```
-        ---
-
         ---
         ```text
         The first overload
@@ -1430,17 +1431,15 @@ def ab(a: int, *, c: int):
 
         assert_snapshot!(test.hover(), @r#"
         (a: int) -> Unknown
-        ---------------------------------------------
-
+        (a: str) -> Unknown
         ---------------------------------------------
         The first overload
 
         ---------------------------------------------
         ```python
         (a: int) -> Unknown
+        (a: str) -> Unknown
         ```
-        ---
-
         ---
         ```text
         The first overload

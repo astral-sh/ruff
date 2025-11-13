@@ -15,8 +15,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
-    CallSignatureDetails, call_signature_details, call_signature_details_typed,
-    definitions_for_keyword_argument,
+    call_signature_details, call_type_simplified_by_overloads, definitions_for_keyword_argument,
 };
 use ty_python_semantic::{
     HasDefinition, HasType, ImportAliasResolution, SemanticModel, definitions_for_imported_symbol,
@@ -327,20 +326,16 @@ impl GotoTarget<'_> {
         Some(ty)
     }
 
-    pub(crate) fn signature<'db>(
+    /// Try to get a simplified display of this callable type by resolving overloads
+    pub(crate) fn call_type_simplified_by_overloads(
         &self,
-        model: &SemanticModel<'db>,
-    ) -> Option<Vec<CallSignatureDetails<'db>>> {
+        model: &SemanticModel,
+    ) -> Option<String> {
         if let GotoTarget::Call { call, .. } = self {
-            let signature_details = call_signature_details(model.db(), model, call);
-            if signature_details.len() > 1 {
-                let signature_details = call_signature_details_typed(model.db(), model, call);
-                if !signature_details.is_empty() {
-                    return Some(signature_details);
-                }
-            }
+            call_type_simplified_by_overloads(model.db(), model, call)
+        } else {
+            None
         }
-        None
     }
 
     /// Gets the definitions for this goto target.

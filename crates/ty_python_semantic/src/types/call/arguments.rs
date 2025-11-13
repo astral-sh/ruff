@@ -67,6 +67,9 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     }
 
     /// Like [`Self::from_arguments`] but fills as much typing info in as possible.
+    ///
+    /// This currently only exists for the LSP usecase, and shouldn't be used in normal
+    /// typechecking.
     pub(crate) fn from_arguments_typed(
         arguments: &'a ast::Arguments,
         mut infer_argument_type: impl FnMut(Option<&ast::Expr>, &ast::Expr) -> Type<'db>,
