@@ -200,7 +200,7 @@ pub(crate) type ApplyTypeMappingVisitor<'db> = TypeTransformer<'db, TypeMapping<
 
 /// A [`PairVisitor`] that is used in `has_relation_to` methods.
 pub(crate) type HasRelationToVisitor<'db> =
-    CycleDetector<TypeRelation, (Type<'db>, Type<'db>, TypeRelation), ConstraintSet<'db>>;
+    CycleDetector<TypeRelation<'db>, (Type<'db>, Type<'db>, TypeRelation<'db>), ConstraintSet<'db>>;
 
 impl Default for HasRelationToVisitor<'_> {
     fn default() -> Self {
@@ -1623,6 +1623,25 @@ impl<'db> Type<'db> {
         self.has_relation_to(db, target, inferable, TypeRelation::Subtyping)
     }
 
+    /// Return the constraints under which this type is a subtype of type `target`, assuming that
+    /// all of the restrictions in `constraints` hold.
+    ///
+    /// See [`TypeRelation::SubtypingAssuming`] for more details.
+    fn when_subtype_of_assuming(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+        assuming: ConstraintSet<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> ConstraintSet<'db> {
+        self.has_relation_to(
+            db,
+            target,
+            inferable,
+            TypeRelation::SubtypingAssuming(assuming),
+        )
+    }
+
     /// Return true if this type is assignable to type `target`.
     ///
     /// See [`TypeRelation::Assignability`] for more details.
@@ -1654,7 +1673,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         target: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
     ) -> ConstraintSet<'db> {
         self.has_relation_to_impl(
             db,
@@ -1671,7 +1690,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         target: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -1682,6 +1701,14 @@ impl<'db> Type<'db> {
         // and unnecessary. This early return is only an optimisation.
         if (!relation.is_subtyping() || self.subtyping_is_always_reflexive()) && self == target {
             return ConstraintSet::from(true);
+        }
+
+        // Handle constraint implication first. If either `self` or `target` is a typevar, check
+        // the constraint set to see if the corresponding constraint is satisfied.
+        if let TypeRelation::SubtypingAssuming(constraints) = relation
+            && (self.is_type_var() || target.is_type_var())
+        {
+            return constraints.implies_subtype_of(db, self, target);
         }
 
         match (self, target) {
@@ -1763,7 +1790,7 @@ impl<'db> Type<'db> {
                     "DynamicType::Divergent should have been handled in an earlier branch"
                 );
                 ConstraintSet::from(match relation {
-                    TypeRelation::Subtyping => false,
+                    TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => false,
                     TypeRelation::Assignability => true,
                     TypeRelation::Redundancy => match target {
                         Type::Dynamic(_) => true,
@@ -1773,7 +1800,7 @@ impl<'db> Type<'db> {
                 })
             }
             (_, Type::Dynamic(_)) => ConstraintSet::from(match relation {
-                TypeRelation::Subtyping => false,
+                TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => false,
                 TypeRelation::Assignability => true,
                 TypeRelation::Redundancy => match self {
                     Type::Dynamic(_) => true,
@@ -1970,12 +1997,16 @@ impl<'db> Type<'db> {
                     // to non-transitivity (highly undesirable); and pragmatically, a full implementation
                     // of redundancy may not generally lead to simpler types in many situations.
                     let self_ty = match relation {
-                        TypeRelation::Subtyping | TypeRelation::Redundancy => self,
+                        TypeRelation::Subtyping
+                        | TypeRelation::Redundancy
+                        | TypeRelation::SubtypingAssuming(_) => self,
                         TypeRelation::Assignability => self.bottom_materialization(db),
                     };
                     intersection.negative(db).iter().when_all(db, |&neg_ty| {
                         let neg_ty = match relation {
-                            TypeRelation::Subtyping | TypeRelation::Redundancy => neg_ty,
+                            TypeRelation::Subtyping
+                            | TypeRelation::Redundancy
+                            | TypeRelation::SubtypingAssuming(_) => neg_ty,
                             TypeRelation::Assignability => neg_ty.bottom_materialization(db),
                         };
                         self_ty.is_disjoint_from_impl(
@@ -10322,7 +10353,7 @@ impl<'db> ConstructorCallError<'db> {
 
 /// A non-exhaustive enumeration of relations that can exist between types.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub(crate) enum TypeRelation {
+pub(crate) enum TypeRelation<'db> {
     /// The "subtyping" relation.
     ///
     /// A [fully static] type `B` is a subtype of a fully static type `A` if and only if
@@ -10446,9 +10477,46 @@ pub(crate) enum TypeRelation {
     /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
     /// [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
     Redundancy,
+
+    /// The "constraint implication" relationship, aka "implies subtype of".
+    ///
+    /// This relationship tests whether one type is a [subtype][Self::Subtyping] of another,
+    /// assuming that the constraints in a particular constraint set hold.
+    ///
+    /// For concrete types (types that do not contain typevars), this relationship is the same as
+    /// [subtyping][Self::Subtyping]. (Constraint sets place restrictions on typevars, so if you
+    /// are not comparing typevars, the constraint set can have no effect on whether subtyping
+    /// holds.)
+    ///
+    /// If you're comparing a typevar, we have to consider what restrictions the constraint set
+    /// places on that typevar to determine if subtyping holds. For instance, if you want to check
+    /// whether `T ≤ int`, then the answer will depend on what constraint set you are considering:
+    ///
+    /// ```text
+    /// implies_subtype_of(T ≤ bool, T, int) ⇒ true
+    /// implies_subtype_of(T ≤ int, T, int)  ⇒ true
+    /// implies_subtype_of(T ≤ str, T, int)  ⇒ false
+    /// ```
+    ///
+    /// In the first two cases, the constraint set ensures that `T` will always specialize to a
+    /// type that is a subtype of `int`. In the final case, the constraint set requires `T` to
+    /// specialize to a subtype of `str`, and there is no such type that is also a subtype of
+    /// `int`.
+    ///
+    /// There are two constraint sets that deserve special consideration.
+    ///
+    /// - The "always true" constraint set does not place any restrictions on any typevar. In this
+    ///   case, `implies_subtype_of` will return the same result as `when_subtype_of`, even if
+    ///   you're comparing against a typevar.
+    ///
+    /// - The "always false" constraint set represents an impossible situation. In this case, every
+    ///   subtype check will be vacuously true, even if you're comparing two concrete types that
+    ///   are not actually subtypes of each other. (That is, `implies_subtype_of(false, int, str)`
+    ///   will return true!)
+    SubtypingAssuming(ConstraintSet<'db>),
 }
 
-impl TypeRelation {
+impl TypeRelation<'_> {
     pub(crate) const fn is_assignability(self) -> bool {
         matches!(self, TypeRelation::Assignability)
     }
@@ -10615,7 +10683,7 @@ impl<'db> BoundMethodType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -10782,7 +10850,7 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -10891,7 +10959,7 @@ impl<'db> KnownBoundMethodType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {

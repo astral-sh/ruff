@@ -1216,10 +1216,10 @@ impl<'db> Bindings<'db> {
                             continue;
                         };
 
-                        let result = tracked.constraints(db).when_subtype_of_given(
+                        let result = ty_a.when_subtype_of_assuming(
                             db,
-                            *ty_a,
                             *ty_b,
+                            tracked.constraints(db),
                             InferableTypeVars::None,
                         );
                         let tracked = TrackedConstraintSet::new(db, result);
