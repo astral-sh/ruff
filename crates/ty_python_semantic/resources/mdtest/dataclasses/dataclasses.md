@@ -623,7 +623,18 @@ reveal_type(B.__slots__)  # revealed: tuple[Literal["x"], Literal["y"]]
 
 ### `weakref_slot`
 
-To do
+When a dataclass is defined with `weakref_slot=True`, the `__weakref__` attribute is generated. For now,
+we do not attempt to infer a more precise type for it.
+
+```py
+from dataclasses import dataclass
+
+@dataclass(slots=True, weakref_slot=True)
+class C:
+    x: int
+
+reveal_type(C.__weakref__)  # revealed: Any
+```
 
 ## `Final` fields
 

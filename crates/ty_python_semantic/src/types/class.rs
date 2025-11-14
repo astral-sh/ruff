@@ -2375,6 +2375,17 @@ impl<'db> ClassLiteral<'db> {
 
                 Some(CallableType::function_like(db, signature))
             }
+            (CodeGeneratorKind::DataclassLike(_), "__weakref__") => {
+                if !has_dataclass_param(DataclassFlags::WEAKREF_SLOT)
+                    || !has_dataclass_param(DataclassFlags::SLOTS)
+                {
+                    return None;
+                }
+
+                // This could probably be `weakref | None`, but it does not seem important enough to
+                // model it precisely.
+                Some(Type::any())
+            }
             (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
                 KnownClass::NamedTupleFallback
                     .to_class_literal(db)

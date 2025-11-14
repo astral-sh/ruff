@@ -680,6 +680,22 @@ static_assert(has_member(C, "__slots__"))
 static_assert(has_member(C(1), "__slots__"))
 ```
 
+#### `weakref_slot=True`
+
+When `weakref_slot=True`, the corresponding dunder attribute becomes available:
+
+```py
+from ty_extensions import has_member, static_assert
+from dataclasses import dataclass
+
+@dataclass(slots=True, weakref_slot=True)
+class C:
+    x: int
+
+static_assert(has_member(C, "__weakref__"))
+static_assert(has_member(C(1), "__weakref__"))
+```
+
 #### `__replace__` in Python 3.13+
 
 Since Python 3.13, dataclasses have a `__replace__` method:
