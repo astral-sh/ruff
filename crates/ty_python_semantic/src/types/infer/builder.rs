@@ -6894,7 +6894,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::Compare(compare) => self.infer_compare_expression(compare),
             ast::Expr::Subscript(subscript) => self.infer_subscript_expression(subscript),
             ast::Expr::Slice(slice) => self.infer_slice_expression(slice),
-            ast::Expr::If(if_expression) => self.infer_if_expression(if_expression),
+            ast::Expr::If(if_expression) => self.infer_if_expression(if_expression, tcx),
             ast::Expr::Lambda(lambda_expression) => self.infer_lambda_expression(lambda_expression),
             ast::Expr::Call(call_expression) => self.infer_call_expression(call_expression, tcx),
             ast::Expr::Starred(starred) => self.infer_starred_expression(starred),
@@ -7722,7 +7722,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         })
     }
 
-    fn infer_if_expression(&mut self, if_expression: &ast::ExprIf) -> Type<'db> {
+    fn infer_if_expression(
+        &mut self,
+        if_expression: &ast::ExprIf,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         let ast::ExprIf {
             range: _,
             node_index: _,
@@ -7732,8 +7736,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = if_expression;
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
-        let body_ty = self.infer_expression(body, TypeContext::default());
-        let orelse_ty = self.infer_expression(orelse, TypeContext::default());
+        let body_ty = self.infer_expression(body, tcx);
+        let orelse_ty = self.infer_expression(orelse, tcx);
 
         match test_ty.try_bool(self.db()).unwrap_or_else(|err| {
             err.report_diagnostic(&self.context, &**test);
