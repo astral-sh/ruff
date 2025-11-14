@@ -5,6 +5,7 @@ use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_path_islink_enabled;
 use crate::rules::flake8_use_pathlib::helpers::check_os_pathlib_single_arg_calls;
 use crate::{FixAvailability, Violation};
+use ruff_diagnostics::Applicability;
 
 /// ## What it does
 /// Checks for uses of `os.path.islink`.
@@ -73,6 +74,6 @@ pub(crate) fn os_path_islink(checker: &Checker, call: &ExprCall, segments: &[&st
         "path",
         is_fix_os_path_islink_enabled(checker.settings()),
         OsPathIslink,
-        None,
+        Some(Applicability::Safe),
     );
 }

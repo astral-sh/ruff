@@ -38,9 +38,8 @@ use ruff_text_size::Ranged;
 ///
 /// ## Fix Safety
 /// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
-/// Additionally, the fix is marked as unsafe because `os.getcwd()` and `os.getcwdb()` return `str` or `bytes`,
-/// while `Path.cwd()` returns a `Path` object. This change in return type can break code that uses the return value.
-/// The fix is safe when the function call is a top-level expression in its statement (i.e., the return value is not used).
+/// Additionally, the fix is marked as unsafe when the return value is used because the type changes
+/// from `str` or `bytes` to a `Path` object.
 ///
 /// ## References
 /// - [Python documentation: `Path.cwd`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.cwd)
@@ -87,14 +86,13 @@ pub(crate) fn os_getcwd(checker: &Checker, call: &ExprCall, segments: &[&str]) {
                 checker.semantic(),
             )?;
 
-            let applicability = if checker.comment_ranges().intersects(range) {
+            // Unsafe when the fix would delete comments or change a used return value
+            let applicability = if checker.comment_ranges().intersects(range)
+                || !is_top_level_expression_call(checker, call)
+            {
                 Applicability::Unsafe
-            } else if is_top_level_expression_call(checker, call) {
-                // Safe when the call is a top-level expression (return value not used)
-                Applicability::Safe
             } else {
-                // Unsafe because the return type changes (str/bytes -> Path)
-                Applicability::Unsafe
+                Applicability::Safe
             };
 
             let replacement = format!("{binding}.cwd()");

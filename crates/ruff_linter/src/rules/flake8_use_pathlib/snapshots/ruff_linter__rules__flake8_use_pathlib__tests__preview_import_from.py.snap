@@ -240,7 +240,6 @@ help: Replace with `Path(...).exists()`
 21 | bb = expanduser(p)
 22 | bbb = isdir(p)
 23 | bbbb = isfile(p)
-note: This is an unsafe fix and may change runtime behavior
 
 PTH111 [*] `os.path.expanduser()` should be replaced by `Path.expanduser()`
   --> import_from.py:20:6
@@ -298,7 +297,6 @@ help: Replace with `Path(...).is_dir()`
 23 | bbbb = isfile(p)
 24 | bbbbb = islink(p)
 25 | readlink(p)
-note: This is an unsafe fix and may change runtime behavior
 
 PTH113 [*] `os.path.isfile()` should be replaced by `Path.is_file()`
   --> import_from.py:22:8
@@ -327,7 +325,6 @@ help: Replace with `Path(...).is_file()`
 24 | bbbbb = islink(p)
 25 | readlink(p)
 26 | stat(p)
-note: This is an unsafe fix and may change runtime behavior
 
 PTH114 [*] `os.path.islink()` should be replaced by `Path.is_symlink()`
   --> import_from.py:23:9
@@ -356,7 +353,6 @@ help: Replace with `Path(...).is_symlink()`
 25 | readlink(p)
 26 | stat(p)
 27 | isabs(p)
-note: This is an unsafe fix and may change runtime behavior
 
 PTH115 [*] `os.readlink()` should be replaced by `Path.readlink()`
   --> import_from.py:24:1

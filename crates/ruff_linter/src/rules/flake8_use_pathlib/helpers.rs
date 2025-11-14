@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprCall, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprCall};
 use ruff_python_semantic::{SemanticModel, analyze::typing};
 use ruff_text_size::Ranged;
 
@@ -226,19 +226,6 @@ pub(crate) fn is_argument_non_default(arguments: &Arguments, name: &str, positio
 
 /// Returns `true` if the given call is a top-level expression in its statement.
 /// This means the call's return value is not used, so return type changes don't matter.
-pub(crate) fn is_top_level_expression_call(checker: &Checker, call: &ExprCall) -> bool {
-    if let Stmt::Expr(ast::StmtExpr {
-        value: child,
-        range: _,
-        node_index: _,
-    }) = checker.semantic().current_statement()
-    {
-        // Check if the call is the same expression as the statement's value
-        // We compare by checking if the call's range is contained within the child's range
-        // and if they're the same expression node
-        if let Expr::Call(call_expr) = child.as_ref() {
-            return call_expr.range() == call.range();
-        }
-    }
-    false
+pub(crate) fn is_top_level_expression_call(checker: &Checker, _call: &ExprCall) -> bool {
+    checker.semantic().current_expression_parent().is_none()
 }
