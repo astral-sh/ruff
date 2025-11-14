@@ -11356,11 +11356,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_class_literal()
                 .is_some_and(|class| class.iter_mro(db, None).contains(&ClassBase::Generic))
             {
-                report_non_subscriptable(context, value_node.into(), value_ty, "__class_getitem__");
+                report_non_subscriptable(context, subscript, value_ty, "__class_getitem__");
             }
         } else {
             if expr_context != ExprContext::Store {
-                report_non_subscriptable(context, value_node.into(), value_ty, "__getitem__");
+                report_non_subscriptable(context, subscript, value_ty, "__getitem__");
             }
         }
 

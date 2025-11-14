@@ -2,10 +2,12 @@
 
 ## `__getitem__` unbound
 
+<!-- snapshot-diagnostics -->
+
 ```py
 class NotSubscriptable: ...
 
-a = NotSubscriptable()[0]  # error: "Cannot subscript object of type `NotSubscriptable` with no `__getitem__` method"
+a = NotSubscriptable()[0]  # error: [non-subscriptable]
 ```
 
 ## `__getitem__` not callable
