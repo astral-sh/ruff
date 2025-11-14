@@ -103,6 +103,9 @@ pub(crate) enum TestServerError {
 
     #[error("Failed to receive message from server: {0}")]
     RecvTimeoutError(RecvTimeoutError),
+
+    #[error("Failed to deserialize response: {0}")]
+    DeserializationError(#[from] serde_json::Error),
 }
 
 impl TestServerError {
@@ -164,7 +167,7 @@ impl TestServer {
         test_context: TestContext,
         capabilities: ClientCapabilities,
         initialization_options: Option<ClientOptions>,
-    ) -> Result<Self> {
+    ) -> Self {
         setup_tracing();
 
         tracing::debug!("Starting test client with capabilities {:#?}", capabilities);
@@ -227,7 +230,7 @@ impl TestServer {
         workspace_folders: Vec<WorkspaceFolder>,
         capabilities: ClientCapabilities,
         initialization_options: Option<ClientOptions>,
-    ) -> Result<Self> {
+    ) -> Self {
         let init_params = InitializeParams {
             capabilities,
             workspace_folders: Some(workspace_folders),
@@ -240,10 +243,10 @@ impl TestServer {
         };
 
         let init_request_id = self.send_request::<Initialize>(init_params);
-        self.initialize_response = Some(self.await_response::<Initialize>(&init_request_id)?);
+        self.initialize_response = Some(self.await_response::<Initialize>(&init_request_id));
         self.send_notification::<Initialized>(InitializedParams {});
 
-        Ok(self)
+        self
     }
 
     /// Wait until the server has initialized all workspaces.
@@ -252,10 +255,11 @@ impl TestServer {
     /// server, and handles the request.
     ///
     /// This should only be called if the server is expected to send this request.
-    pub(crate) fn wait_until_workspaces_are_initialized(mut self) -> Result<Self> {
-        let (request_id, params) = self.await_request::<WorkspaceConfiguration>()?;
-        self.handle_workspace_configuration_request(request_id, &params)?;
-        Ok(self)
+    #[track_caller]
+    pub(crate) fn wait_until_workspaces_are_initialized(mut self) -> Self {
+        let (request_id, params) = self.await_request::<WorkspaceConfiguration>();
+        self.handle_workspace_configuration_request(request_id, &params);
+        self
     }
 
     /// Drain all messages from the server.
@@ -372,8 +376,56 @@ impl TestServer {
     /// This method will remove the response from the internal data structure, so it can only be
     /// called once per request ID.
     ///
-    /// [`send_request`]: TestServer::send_request
-    pub(crate) fn await_response<R>(&mut self, id: &RequestId) -> Result<R::Result>
+    /// # Panics
+    ///
+    /// If the server didn't send a response, the response failed with an error code, failed to deserialize,
+    /// or the server responded twice. Use [`Self::try_await_response`] if you want a non-panicking version.
+    #[track_caller]
+    pub(crate) fn await_response<R>(&mut self, id: &RequestId) -> R::Result
+    where
+        R: Request,
+    {
+        match self.try_await_response::<R>(id, None) {
+            Ok(result) => result,
+            Err(err) => match err {
+                TestServerError::ResponseError(response_error) => {
+                    panic!(
+                        "Request {id} failed: {message} ({code})",
+                        code = response_error.code,
+                        message = response_error.message
+                    )
+                }
+                TestServerError::InvalidResponse(request_id, response) => {
+                    panic!("Invalid response for request {request_id}: {response:?}")
+                }
+                TestServerError::DuplicateResponse(request_id, response) => {
+                    panic!("Received duplicate response for request {request_id}: {response:?}")
+                }
+                TestServerError::RecvTimeoutError(RecvTimeoutError::Disconnected) => {
+                    panic!("Server disconnected while waiting for response for {id}")
+                }
+                TestServerError::RecvTimeoutError(RecvTimeoutError::Timeout) => {
+                    panic!("Request {id} timed out while waiting for response.")
+                }
+                TestServerError::DeserializationError(error) => {
+                    panic!("Failed to deserialize response {id}: {error}")
+                }
+            },
+        }
+    }
+
+    /// Wait for a server response corresponding to the given request ID.
+    ///
+    /// This should only be called if a request was already sent to the server via [`send_request`]
+    /// which returns the request ID that should be used here.
+    ///
+    /// This method will remove the response from the internal data structure, so it can only be
+    /// called once per request ID.
+    pub(crate) fn try_await_response<R>(
+        &mut self,
+        id: &RequestId,
+        timeout: Option<Duration>,
+    ) -> Result<R::Result, TestServerError>
     where
         R: Request,
     {
@@ -392,19 +444,18 @@ impl TestServer {
                         result: None,
                         ..
                     } => {
-                        return Err(TestServerError::ResponseError(err).into());
+                        return Err(TestServerError::ResponseError(err));
                     }
                     response => {
                         return Err(TestServerError::InvalidResponse(
                             id.clone(),
                             Box::new(response),
-                        )
-                        .into());
+                        ));
                     }
                 }
             }
 
-            self.receive_or_panic()?;
+            self.receive_or_panic(timeout)?;
         }
     }
 
@@ -417,7 +468,54 @@ impl TestServer {
     ///
     /// This method will remove the notification from the internal data structure, so it should
     /// only be called if the notification is expected to be sent by the server.
-    pub(crate) fn await_notification<N: Notification>(&mut self) -> Result<N::Params> {
+    ///
+    /// # Panics
+    ///
+    /// If the server doesn't send the notification within the default timeout or
+    /// the notification failed to deserialize. Use [`Self::try_await_notification`] for
+    /// a panic-free alternative.
+    #[track_caller]
+    pub(crate) fn await_notification<N: Notification>(&mut self) -> N::Params {
+        match self.try_await_notification::<N>(None) {
+            Ok(params) => params,
+            Err(err) => match err {
+                TestServerError::RecvTimeoutError(RecvTimeoutError::Disconnected) => {
+                    panic!(
+                        "Server disconnected while waiting for `{}` notification",
+                        N::METHOD
+                    )
+                }
+                TestServerError::RecvTimeoutError(RecvTimeoutError::Timeout) => {
+                    panic!("Waiting for `{}` notification timed out", N::METHOD)
+                }
+                TestServerError::DeserializationError(error) => {
+                    panic!(
+                        "Failed to deserialize `{}` notification: {}",
+                        N::METHOD,
+                        error
+                    )
+                }
+                // Response specific error codes
+                TestServerError::InvalidResponse(..)
+                | TestServerError::DuplicateResponse(..)
+                | TestServerError::ResponseError(..) => unreachable!(),
+            },
+        }
+    }
+
+    /// Wait for a notification of the specified type from the server and return its parameters.
+    ///
+    /// The caller should ensure that the server is expected to send this notification type. It
+    /// will keep polling the server for this notification up to 10 times before giving up after
+    /// which it will return an error. It will also return an error if the notification is not
+    /// received within `recv_timeout` duration.
+    ///
+    /// This method will remove the notification from the internal data structure, so it should
+    /// only be called if the notification is expected to be sent by the server.
+    pub(crate) fn try_await_notification<N: Notification>(
+        &mut self,
+        timeout: Option<Duration>,
+    ) -> Result<N::Params, TestServerError> {
         for retry_count in 0..RETRY_COUNT {
             if retry_count > 0 {
                 tracing::info!("Retrying to receive `{}` notification", N::METHOD);
@@ -428,29 +526,30 @@ impl TestServer {
                 .position(|notification| N::METHOD == notification.method)
                 .and_then(|index| self.notifications.remove(index));
             if let Some(notification) = notification {
-                return Ok(serde_json::from_value(notification.params)?);
+                let params = serde_json::from_value(notification.params)?;
+                return Ok(params);
             }
-            self.receive_or_panic()?;
+
+            self.receive_or_panic(timeout)?;
         }
-        Err(anyhow::anyhow!(
-            "Failed to receive `{}` notification after {RETRY_COUNT} retries",
-            N::METHOD
-        ))
+
+        Err(TestServerError::RecvTimeoutError(RecvTimeoutError::Timeout))
     }
 
     /// Collects `N` publish diagnostic notifications into a map, indexed by the document url.
     ///
     /// ## Panics
     /// If there are multiple publish diagnostics notifications for the same document.
+    #[track_caller]
     pub(crate) fn collect_publish_diagnostic_notifications(
         &mut self,
         count: usize,
-    ) -> Result<BTreeMap<lsp_types::Url, Vec<lsp_types::Diagnostic>>> {
+    ) -> BTreeMap<lsp_types::Url, Vec<lsp_types::Diagnostic>> {
         let mut results = BTreeMap::default();
 
         for _ in 0..count {
             let notification =
-                self.await_notification::<lsp_types::notification::PublishDiagnostics>()?;
+                self.await_notification::<lsp_types::notification::PublishDiagnostics>();
 
             if let Some(existing) =
                 results.insert(notification.uri.clone(), notification.diagnostics)
@@ -462,7 +561,7 @@ impl TestServer {
             }
         }
 
-        Ok(results)
+        results
     }
 
     /// Wait for a request of the specified type from the server and return the request ID and
@@ -475,7 +574,50 @@ impl TestServer {
     ///
     /// This method will remove the request from the internal data structure, so it should only be
     /// called if the request is expected to be sent by the server.
-    pub(crate) fn await_request<R: Request>(&mut self) -> Result<(RequestId, R::Params)> {
+    ///
+    /// # Panics
+    ///
+    /// If receiving the request fails.
+    #[track_caller]
+    pub(crate) fn await_request<R: Request>(&mut self) -> (RequestId, R::Params) {
+        match self.try_await_request::<R>(None) {
+            Ok(request) => request,
+            Err(err) => match err {
+                TestServerError::RecvTimeoutError(RecvTimeoutError::Disconnected) => {
+                    panic!(
+                        "Server disconnected while waiting for `{}` request",
+                        R::METHOD
+                    )
+                }
+                TestServerError::RecvTimeoutError(RecvTimeoutError::Timeout) => {
+                    panic!("Waiting for `{}` request timed out", R::METHOD)
+                }
+                TestServerError::DeserializationError(error) => {
+                    panic!("Failed to deserialize request `{}`: {error}", R::METHOD);
+                }
+                // Response specific error codes
+                TestServerError::InvalidResponse(..)
+                | TestServerError::DuplicateResponse(..)
+                | TestServerError::ResponseError(..) => unreachable!(),
+            },
+        }
+    }
+
+    /// Wait for a request of the specified type from the server and return the request ID and
+    /// parameters.
+    ///
+    /// The caller should ensure that the server is expected to send this request type. It will
+    /// keep polling the server for this request up to 10 times before giving up after which it
+    /// will return an error. It can also return an error if the request is not received within
+    /// `recv_timeout` duration.
+    ///
+    /// This method will remove the request from the internal data structure, so it should only be
+    /// called if the request is expected to be sent by the server.
+    #[track_caller]
+    pub(crate) fn try_await_request<R: Request>(
+        &mut self,
+        timeout: Option<Duration>,
+    ) -> Result<(RequestId, R::Params), TestServerError> {
         for retry_count in 0..RETRY_COUNT {
             if retry_count > 0 {
                 tracing::info!("Retrying to receive `{}` request", R::METHOD);
@@ -489,12 +631,10 @@ impl TestServer {
                 let params = serde_json::from_value(request.params)?;
                 return Ok((request.id, params));
             }
-            self.receive_or_panic()?;
+
+            self.receive_or_panic(timeout)?;
         }
-        Err(anyhow::anyhow!(
-            "Failed to receive `{}` request after {RETRY_COUNT} retries",
-            R::METHOD
-        ))
+        Err(TestServerError::RecvTimeoutError(RecvTimeoutError::Timeout))
     }
 
     /// Receive a message from the server.
@@ -524,8 +664,8 @@ impl TestServer {
     /// disconnected. It will pass other errors as is.
     ///
     /// [`receive`]: TestServer::receive
-    fn receive_or_panic(&mut self) -> Result<(), TestServerError> {
-        if let Err(err) = self.receive(None) {
+    fn receive_or_panic(&mut self, timeout: Option<Duration>) -> Result<(), TestServerError> {
+        if let Err(err) = self.receive(timeout) {
             if err.is_disconnected() {
                 self.panic_on_server_disconnect();
             } else {
@@ -599,11 +739,12 @@ impl TestServer {
     /// Use the [`get_request`] method to wait for the server to send this request.
     ///
     /// [`get_request`]: TestServer::get_request
+    #[track_caller]
     fn handle_workspace_configuration_request(
         &mut self,
         request_id: RequestId,
         params: &ConfigurationParams,
-    ) -> Result<()> {
+    ) {
         let mut results = Vec::new();
 
         for item in &params.items {
@@ -618,7 +759,12 @@ impl TestServer {
                 // > If the client can't provide a configuration setting for a given scope
                 // > then null needs to be present in the returned array.
                 match item.section.as_deref() {
-                    Some("ty") => serde_json::to_value(options)?,
+                    Some("ty") => match serde_json::to_value(options) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            panic!("Failed to deserialize workspace configuration options: {err}",)
+                        }
+                    },
                     Some(section) => {
                         tracing::debug!("Unrecognized section `{section}` for {scope_uri}");
                         serde_json::Value::Null
@@ -639,8 +785,6 @@ impl TestServer {
 
         let response = Response::new_ok(request_id, results);
         self.send(Message::Response(response));
-
-        Ok(())
     }
 
     /// Get the initialization result
@@ -711,7 +855,7 @@ impl TestServer {
         &mut self,
         path: impl AsRef<SystemPath>,
         previous_result_id: Option<String>,
-    ) -> Result<DocumentDiagnosticReportResult> {
+    ) -> DocumentDiagnosticReportResult {
         let params = DocumentDiagnosticParams {
             text_document: TextDocumentIdentifier {
                 uri: self.file_uri(path),
@@ -730,7 +874,7 @@ impl TestServer {
         &mut self,
         work_done_token: Option<lsp_types::NumberOrString>,
         previous_result_ids: Option<Vec<PreviousResultId>>,
-    ) -> Result<WorkspaceDiagnosticReportResult> {
+    ) -> WorkspaceDiagnosticReportResult {
         let params = WorkspaceDiagnosticParams {
             identifier: Some("ty".to_string()),
             previous_result_ids: previous_result_ids.unwrap_or_default(),
@@ -747,7 +891,7 @@ impl TestServer {
         &mut self,
         path: impl AsRef<SystemPath>,
         position: Position,
-    ) -> Result<Option<Hover>> {
+    ) -> Option<Hover> {
         let params = HoverParams {
             text_document_position_params: TextDocumentPositionParams {
                 text_document: TextDocumentIdentifier {
@@ -766,7 +910,7 @@ impl TestServer {
         &mut self,
         path: impl AsRef<SystemPath>,
         range: Range,
-    ) -> Result<Option<Vec<InlayHint>>> {
+    ) -> Option<Vec<InlayHint>> {
         let params = InlayHintParams {
             text_document: TextDocumentIdentifier {
                 uri: self.file_uri(path),
@@ -803,7 +947,7 @@ impl Drop for TestServer {
         // it dropped the client connection.
         let shutdown_error = if self.server_thread.is_some() && !self.shutdown_requested {
             let shutdown_id = self.send_request::<Shutdown>(());
-            match self.await_response::<Shutdown>(&shutdown_id) {
+            match self.try_await_response::<Shutdown>(&shutdown_id, None) {
                 Ok(()) => {
                     self.send_notification::<Exit>(());
 
@@ -1048,7 +1192,7 @@ impl TestServerBuilder {
     }
 
     /// Build the test server
-    pub(crate) fn build(self) -> Result<TestServer> {
+    pub(crate) fn build(self) -> TestServer {
         TestServer::new(
             self.workspaces,
             self.test_context,

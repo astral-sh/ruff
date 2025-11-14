@@ -25,14 +25,14 @@ y = foo(1)
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .enable_inlay_hints(true)
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, &foo_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>()?;
+    let _ = server.await_notification::<PublishDiagnostics>();
 
     let hints = server
-        .inlay_hints_request(foo, Range::new(Position::new(0, 0), Position::new(6, 0)))?
+        .inlay_hints_request(foo, Range::new(Position::new(0, 0), Position::new(6, 0)))
         .unwrap();
 
     insta::assert_json_snapshot!(hints, @r#"
@@ -87,14 +87,14 @@ fn variable_inlay_hints_disabled() -> Result<()> {
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .enable_inlay_hints(true)
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, &foo_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>()?;
+    let _ = server.await_notification::<PublishDiagnostics>();
 
     let hints = server
-        .inlay_hints_request(foo, Range::new(Position::new(0, 0), Position::new(0, 5)))?
+        .inlay_hints_request(foo, Range::new(Position::new(0, 0), Position::new(0, 5)))
         .unwrap();
 
     assert!(

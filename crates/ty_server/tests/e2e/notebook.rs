@@ -8,8 +8,8 @@ use crate::{TestServer, TestServerBuilder};
 #[test]
 fn publish_diagnostics_open() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
     server.initialization_result().unwrap();
 
@@ -42,11 +42,11 @@ type Style = Literal["italic", "bold", "underline"]"#,
     builder.open(&mut server);
 
     let cell1_diagnostics =
-        server.await_notification::<lsp_types::notification::PublishDiagnostics>()?;
+        server.await_notification::<lsp_types::notification::PublishDiagnostics>();
     let cell2_diagnostics =
-        server.await_notification::<lsp_types::notification::PublishDiagnostics>()?;
+        server.await_notification::<lsp_types::notification::PublishDiagnostics>();
     let cell3_diagnostics =
-        server.await_notification::<lsp_types::notification::PublishDiagnostics>()?;
+        server.await_notification::<lsp_types::notification::PublishDiagnostics>();
 
     assert_json_snapshot!([cell1_diagnostics, cell2_diagnostics, cell3_diagnostics]);
 
@@ -56,8 +56,8 @@ type Style = Literal["italic", "bold", "underline"]"#,
 #[test]
 fn diagnostic_end_of_file() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
     server.initialization_result().unwrap();
 
@@ -90,7 +90,7 @@ IOError"#,
 
     let notebook_url = builder.open(&mut server);
 
-    server.collect_publish_diagnostic_notifications(3)?;
+    server.collect_publish_diagnostic_notifications(3);
 
     server.send_notification::<lsp_types::notification::DidChangeNotebookDocument>(
         lsp_types::DidChangeNotebookDocumentParams {
@@ -122,7 +122,7 @@ IOError"#,
         },
     );
 
-    let diagnostics = server.collect_publish_diagnostic_notifications(3)?;
+    let diagnostics = server.collect_publish_diagnostic_notifications(3);
     assert_json_snapshot!(diagnostics);
 
     Ok(())
@@ -131,8 +131,8 @@ IOError"#,
 #[test]
 fn semantic_tokens() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
     server.initialization_result().unwrap();
 
@@ -164,13 +164,13 @@ type Style = Literal["italic", "bold", "underline"]"#,
 
     builder.open(&mut server);
 
-    let cell1_tokens = semantic_tokens_full_for_cell(&mut server, &first_cell)?;
-    let cell2_tokens = semantic_tokens_full_for_cell(&mut server, &second_cell)?;
-    let cell3_tokens = semantic_tokens_full_for_cell(&mut server, &third_cell)?;
+    let cell1_tokens = semantic_tokens_full_for_cell(&mut server, &first_cell);
+    let cell2_tokens = semantic_tokens_full_for_cell(&mut server, &second_cell);
+    let cell3_tokens = semantic_tokens_full_for_cell(&mut server, &third_cell);
 
     assert_json_snapshot!([cell1_tokens, cell2_tokens, cell3_tokens]);
 
-    server.collect_publish_diagnostic_notifications(3)?;
+    server.collect_publish_diagnostic_notifications(3);
 
     Ok(())
 }
@@ -178,8 +178,8 @@ type Style = Literal["italic", "bold", "underline"]"#,
 #[test]
 fn swap_cells() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
     server.initialization_result().unwrap();
 
@@ -196,7 +196,7 @@ fn swap_cells() -> anyhow::Result<()> {
 
     let notebook = builder.open(&mut server);
 
-    let diagnostics = server.collect_publish_diagnostic_notifications(3)?;
+    let diagnostics = server.collect_publish_diagnostic_notifications(3);
     assert_json_snapshot!(diagnostics, @r###"
     {
       "vscode-notebook-cell://src/test.ipynb#0": [
@@ -265,7 +265,7 @@ fn swap_cells() -> anyhow::Result<()> {
         },
     );
 
-    let diagnostics = server.collect_publish_diagnostic_notifications(3)?;
+    let diagnostics = server.collect_publish_diagnostic_notifications(3);
 
     assert_json_snapshot!(diagnostics, @r###"
     {
@@ -285,8 +285,8 @@ fn auto_import() -> anyhow::Result<()> {
             SystemPath::new("src"),
             Some(ClientOptions::default().with_experimental_auto_import(true)),
         )?
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
     server.initialization_result().unwrap();
 
@@ -305,9 +305,9 @@ b: Litera
 
     builder.open(&mut server);
 
-    server.collect_publish_diagnostic_notifications(2)?;
+    server.collect_publish_diagnostic_notifications(2);
 
-    let completions = literal_completions(&mut server, &second_cell, Position::new(1, 9))?;
+    let completions = literal_completions(&mut server, &second_cell, Position::new(1, 9));
 
     assert_json_snapshot!(completions);
 
@@ -321,8 +321,8 @@ fn auto_import_same_cell() -> anyhow::Result<()> {
             SystemPath::new("src"),
             Some(ClientOptions::default().with_experimental_auto_import(true)),
         )?
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
     server.initialization_result().unwrap();
 
@@ -336,9 +336,9 @@ b: Litera
 
     builder.open(&mut server);
 
-    server.collect_publish_diagnostic_notifications(1)?;
+    server.collect_publish_diagnostic_notifications(1);
 
-    let completions = literal_completions(&mut server, &first_cell, Position::new(1, 9))?;
+    let completions = literal_completions(&mut server, &first_cell, Position::new(1, 9));
 
     assert_json_snapshot!(completions);
 
@@ -352,8 +352,8 @@ fn auto_import_from_future() -> anyhow::Result<()> {
             SystemPath::new("src"),
             Some(ClientOptions::default().with_experimental_auto_import(true)),
         )?
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
     server.initialization_result().unwrap();
 
@@ -369,9 +369,9 @@ b: Litera
 
     builder.open(&mut server);
 
-    server.collect_publish_diagnostic_notifications(2)?;
+    server.collect_publish_diagnostic_notifications(2);
 
-    let completions = literal_completions(&mut server, &second_cell, Position::new(1, 9))?;
+    let completions = literal_completions(&mut server, &second_cell, Position::new(1, 9));
 
     assert_json_snapshot!(completions);
 
@@ -385,8 +385,8 @@ fn auto_import_docstring() -> anyhow::Result<()> {
             SystemPath::new("src"),
             Some(ClientOptions::default().with_experimental_auto_import(true)),
         )?
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
     server.initialization_result().unwrap();
 
@@ -405,9 +405,9 @@ b: Litera
 
     builder.open(&mut server);
 
-    server.collect_publish_diagnostic_notifications(2)?;
+    server.collect_publish_diagnostic_notifications(2);
 
-    let completions = literal_completions(&mut server, &second_cell, Position::new(1, 9))?;
+    let completions = literal_completions(&mut server, &second_cell, Position::new(1, 9));
 
     assert_json_snapshot!(completions);
 
@@ -417,7 +417,7 @@ b: Litera
 fn semantic_tokens_full_for_cell(
     server: &mut TestServer,
     cell_uri: &lsp_types::Url,
-) -> crate::Result<Option<lsp_types::SemanticTokensResult>> {
+) -> Option<lsp_types::SemanticTokensResult> {
     let cell1_tokens_req_id = server.send_request::<lsp_types::request::SemanticTokensFullRequest>(
         lsp_types::SemanticTokensParams {
             work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
@@ -502,7 +502,7 @@ fn literal_completions(
     server: &mut TestServer,
     cell: &lsp_types::Url,
     position: Position,
-) -> crate::Result<Vec<lsp_types::CompletionItem>> {
+) -> Vec<lsp_types::CompletionItem> {
     let completions_id =
         server.send_request::<lsp_types::request::Completion>(lsp_types::CompletionParams {
             text_document_position: lsp_types::TextDocumentPositionParams {
@@ -520,14 +520,14 @@ fn literal_completions(
     // There are a ton of imports we don't care about in here...
     // The import bit is that an edit is always restricted to the current cell. That means,
     // we can't add `Literal` to the `from typing import TYPE_CHECKING` import in cell 1
-    let completions = server.await_response::<lsp_types::request::Completion>(&completions_id)?;
+    let completions = server.await_response::<lsp_types::request::Completion>(&completions_id);
     let mut items = match completions {
         Some(CompletionResponse::Array(array)) => array,
         Some(CompletionResponse::List(lsp_types::CompletionList { items, .. })) => items,
-        None => return Ok(vec![]),
+        None => return vec![],
     };
 
     items.retain(|item| item.label.starts_with("Litera"));
 
-    Ok(items)
+    items
 }
