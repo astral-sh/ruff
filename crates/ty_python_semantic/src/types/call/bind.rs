@@ -53,6 +53,9 @@ pub(crate) struct Bindings<'db> {
     /// The type that is (hopefully) callable.
     callable_type: Type<'db>,
 
+    /// The type of the instance being constructed, if this signature is for a constructor.
+    constructor_instance_type: Option<Type<'db>>,
+
     /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a non-union
     /// type.
     elements: SmallVec<[CallableBinding<'db>; 1]>,
@@ -77,6 +80,7 @@ impl<'db> Bindings<'db> {
             callable_type,
             elements,
             argument_forms: ArgumentForms::new(0),
+            constructor_instance_type: None,
         }
     }
 
@@ -87,6 +91,22 @@ impl<'db> Bindings<'db> {
         for binding in &mut self.elements {
             binding.replace_callable_type(before, after);
         }
+    }
+
+    pub(crate) fn with_constructor_instance_type(
+        mut self,
+        constructor_instance_type: Type<'db>,
+    ) -> Self {
+        self.constructor_instance_type = Some(constructor_instance_type);
+
+        for binding in &mut self.elements {
+            binding.constructor_instance_type = Some(constructor_instance_type);
+            for binding in &mut binding.overloads {
+                binding.constructor_instance_type = Some(constructor_instance_type);
+            }
+        }
+
+        self
     }
 
     pub(crate) fn set_dunder_call_is_possibly_unbound(&mut self) {
@@ -107,6 +127,7 @@ impl<'db> Bindings<'db> {
         Self {
             callable_type: self.callable_type,
             argument_forms: self.argument_forms,
+            constructor_instance_type: self.constructor_instance_type,
             elements: self.elements.into_iter().map(f).collect(),
         }
     }
@@ -238,6 +259,10 @@ impl<'db> Bindings<'db> {
 
     pub(crate) fn callable_type(&self) -> Type<'db> {
         self.callable_type
+    }
+
+    pub(crate) fn constructor_instance_type(&self) -> Option<Type<'db>> {
+        self.constructor_instance_type
     }
 
     /// Returns the return type of the call. For successful calls, this is the actual return type.
@@ -1357,6 +1382,7 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
             callable_type: from.callable_type,
             elements: smallvec_inline![from],
             argument_forms: ArgumentForms::new(0),
+            constructor_instance_type: None,
         }
     }
 }
@@ -1370,6 +1396,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
+            constructor_instance_type: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads: smallvec_inline![from],
@@ -1378,6 +1405,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             callable_type,
             elements: smallvec_inline![callable_binding],
             argument_forms: ArgumentForms::new(0),
+            constructor_instance_type: None,
         }
     }
 }
@@ -1408,6 +1436,9 @@ pub(crate) struct CallableBinding<'db> {
 
     /// The type of the bound `self` or `cls` parameter if this signature is for a bound method.
     pub(crate) bound_type: Option<Type<'db>>,
+
+    /// The type of the instance being constructed, if this signature is for a constructor.
+    pub(crate) constructor_instance_type: Option<Type<'db>>,
 
     /// The return type of this overloaded callable.
     ///
@@ -1457,6 +1488,7 @@ impl<'db> CallableBinding<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
+            constructor_instance_type: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads,
@@ -1469,6 +1501,7 @@ impl<'db> CallableBinding<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
+            constructor_instance_type: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads: smallvec![],
@@ -2689,7 +2722,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     arguments: &'a CallArguments<'a, 'db>,
     argument_matches: &'a [MatchedArgument<'db>],
     parameter_tys: &'a mut [Option<Type<'db>>],
-    callable_type: Type<'db>,
+    constructor_instance_type: Option<Type<'db>>,
     call_expression_tcx: TypeContext<'db>,
     return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
@@ -2706,7 +2739,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         arguments: &'a CallArguments<'a, 'db>,
         argument_matches: &'a [MatchedArgument<'db>],
         parameter_tys: &'a mut [Option<Type<'db>>],
-        callable_type: Type<'db>,
+        constructor_instance_type: Option<Type<'db>>,
         call_expression_tcx: TypeContext<'db>,
         return_ty: Type<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
@@ -2717,7 +2750,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             arguments,
             argument_matches,
             parameter_tys,
-            callable_type,
+            constructor_instance_type,
             call_expression_tcx,
             return_ty,
             errors,
@@ -2759,8 +2792,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         };
 
         let return_with_tcx = self
-            .callable_type
-            .synthesized_constructor_return_ty(self.db)
+            .constructor_instance_type
             .or(self.signature.return_ty)
             .zip(self.call_expression_tcx.annotation);
 
@@ -3109,6 +3141,9 @@ pub(crate) struct Binding<'db> {
     /// it may be a `__call__` method.
     pub(crate) signature_type: Type<'db>,
 
+    /// The type of the instance being constructed, if this signature is for a constructor.
+    pub(crate) constructor_instance_type: Option<Type<'db>>,
+
     /// Return type of the call.
     return_ty: Type<'db>,
 
@@ -3140,6 +3175,7 @@ impl<'db> Binding<'db> {
             signature,
             callable_type: signature_type,
             signature_type,
+            constructor_instance_type: None,
             return_ty: Type::unknown(),
             inferable_typevars: InferableTypeVars::None,
             specialization: None,
@@ -3204,7 +3240,7 @@ impl<'db> Binding<'db> {
             arguments,
             &self.argument_matches,
             &mut self.parameter_tys,
-            self.callable_type,
+            self.constructor_instance_type,
             call_expression_tcx,
             self.return_ty,
             &mut self.errors,
