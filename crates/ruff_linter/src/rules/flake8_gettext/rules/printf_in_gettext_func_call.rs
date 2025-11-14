@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_gettext::helpers;
 
 /// ## What it does
 /// Checks for printf-style formatted strings in `gettext` function calls.
@@ -52,7 +53,8 @@ impl Violation for PrintfInGetTextFuncCall {
 }
 
 /// INT003
-pub(crate) fn printf_in_gettext_func_call(checker: &Checker, args: &[Expr]) {
+pub(crate) fn printf_in_gettext_func_call(checker: &Checker, func: &Expr, args: &[Expr]) {
+    // Check first argument (singular)
     if let Some(first) = args.first() {
         if let Expr::BinOp(ast::ExprBinOp {
             op: Operator::Mod,
@@ -62,6 +64,22 @@ pub(crate) fn printf_in_gettext_func_call(checker: &Checker, args: &[Expr]) {
         {
             if left.is_string_literal_expr() {
                 checker.report_diagnostic(PrintfInGetTextFuncCall {}, first.range());
+            }
+        }
+    }
+
+    // Check second argument (plural) for ngettext calls
+    if helpers::is_ngettext_call(checker, func) {
+        if let Some(second) = args.get(1) {
+            if let Expr::BinOp(ast::ExprBinOp {
+                op: Operator::Mod,
+                left,
+                ..
+            }) = &second
+            {
+                if left.is_string_literal_expr() {
+                    checker.report_diagnostic(PrintfInGetTextFuncCall {}, second.range());
+                }
             }
         }
     }

@@ -1039,13 +1039,13 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 &checker.settings().flake8_gettext.functions_names,
             ) {
                 if checker.is_rule_enabled(Rule::FStringInGetTextFuncCall) {
-                    flake8_gettext::rules::f_string_in_gettext_func_call(checker, args);
+                    flake8_gettext::rules::f_string_in_gettext_func_call(checker, func, args);
                 }
                 if checker.is_rule_enabled(Rule::FormatInGetTextFuncCall) {
-                    flake8_gettext::rules::format_in_gettext_func_call(checker, args);
+                    flake8_gettext::rules::format_in_gettext_func_call(checker, func, args);
                 }
                 if checker.is_rule_enabled(Rule::PrintfInGetTextFuncCall) {
-                    flake8_gettext::rules::printf_in_gettext_func_call(checker, args);
+                    flake8_gettext::rules::printf_in_gettext_func_call(checker, func, args);
                 }
             }
             if checker.is_rule_enabled(Rule::UncapitalizedEnvironmentVariables) {
