@@ -324,25 +324,25 @@ class X[T]:
     def __init__(self, value: T):
         self.value = value
 
-a: X[int] = X(1)
-reveal_type(a)  # revealed: X[int]
+x1: X[int] = X(1)
+reveal_type(x1)  # revealed: X[int]
 
-b: X[int | None] = X(1)
-reveal_type(b)  # revealed: X[int | None]
+x2: X[int | None] = X(1)
+reveal_type(x2)  # revealed: X[int | None]
 
-c: X[int | None] | None = X(1)
-reveal_type(c)  # revealed: X[int | None]
+x3: X[int | None] | None = X(1)
+reveal_type(x3)  # revealed: X[int | None]
 
-def _[T](a: X[T]):
-    b: X[T | int] = X(a.value)
-    reveal_type(b)  # revealed: X[T@_ | int]
+def _[T](x1: X[T]):
+    x2: X[T | int] = X(x1.value)
+    reveal_type(x2)  # revealed: X[T@_ | int]
 
-d: X[Any] = X(1)
-reveal_type(d)  # revealed: X[Any]
+x4: X[Any] = X(1)
+reveal_type(x4)  # revealed: X[Any]
 
 def _(flag: bool):
-    a: X[int | None] = X(1) if flag else X(2)
-    reveal_type(a)  # revealed: X[int | None]
+    x5: X[int | None] = X(1) if flag else X(2)
+    reveal_type(x5)  # revealed: X[int | None]
 ```
 
 ```py
@@ -353,8 +353,7 @@ class Y[T]:
     value: T
 
 y1: Y[Any] = Y(value=1)
-# TODO: This should reveal `Y[Any]`.
-reveal_type(y1)  # revealed: Y[int]
+reveal_type(y1)  # revealed: Y[Any]
 ```
 
 ```py
@@ -363,8 +362,7 @@ class Z[T]:
         return super().__new__(cls)
 
 z1: Z[Any] = Z(1)
-# TODO: This should reveal `Z[Any]`.
-reveal_type(z1)  # revealed: Z[int]
+reveal_type(z1)  # revealed: Z[Any]
 ```
 
 ## PEP-604 annotations are supported

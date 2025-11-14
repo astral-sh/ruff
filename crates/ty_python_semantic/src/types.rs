@@ -1132,22 +1132,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// If the type is a generic class constructor, returns the class instance type.
-    pub(crate) fn synthesized_constructor_return_ty(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        // TODO: This does not correctly handle unions or intersections. It also does not handle
-        // constructors that are not represented as bound methods, e.g. `__new__`, or synthesized
-        // dataclass initializers.
-        if let Type::BoundMethod(method) = self
-            && let Type::NominalInstance(instance) = method.self_instance(db)
-            && method.function(db).name(db).as_str() == "__init__"
-        {
-            let class_ty = instance.class_literal(db).identity_specialization(db);
-            Some(Type::instance(db, class_ty))
-        } else {
-            None
-        }
-    }
-
     pub const fn is_property_instance(&self) -> bool {
         matches!(self, Type::PropertyInstance(..))
     }
@@ -6340,8 +6324,12 @@ impl<'db> Type<'db> {
         let new_call_outcome = new_method.and_then(|new_method| {
             match new_method.place.try_call_dunder_get(db, self_type) {
                 Place::Defined(new_method, _, boundness) => {
-                    let result =
-                        new_method.try_call(db, argument_types.with_self(Some(self_type)).as_ref());
+                    let argument_types = argument_types.with_self(Some(self_type));
+                    let result = new_method
+                        .bindings(db)
+                        .with_constructor_instance_type(init_ty)
+                        .match_parameters(db, &argument_types)
+                        .check_types(db, &argument_types, tcx, &[]);
 
                     if boundness == Definedness::PossiblyUndefined {
                         Some(Err(DunderNewCallError::PossiblyUnbound(result.err())))
@@ -6354,7 +6342,35 @@ impl<'db> Type<'db> {
         });
 
         let init_call_outcome = if new_call_outcome.is_none() || !init_method.is_undefined() {
-            Some(init_ty.try_call_dunder(db, "__init__", argument_types, tcx))
+            let call_result = match init_ty
+                .member_lookup_with_policy(
+                    db,
+                    "__init__".into(),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place
+            {
+                Place::Undefined => Err(CallDunderError::MethodNotAvailable),
+                Place::Defined(dunder_callable, _, boundness) => {
+                    let bindings = dunder_callable
+                        .bindings(db)
+                        .with_constructor_instance_type(init_ty);
+
+                    bindings
+                        .match_parameters(db, &argument_types)
+                        .check_types(db, &argument_types, tcx, &[])
+                        .map_err(CallDunderError::from)
+                        .and_then(|bindings| {
+                            if boundness == Definedness::PossiblyUndefined {
+                                Err(CallDunderError::PossiblyUnbound(Box::new(bindings)))
+                            } else {
+                                Ok(bindings)
+                            }
+                        })
+                }
+            };
+
+            Some(call_result)
         } else {
             None
         };
