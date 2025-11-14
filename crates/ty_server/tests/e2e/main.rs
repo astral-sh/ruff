@@ -34,7 +34,6 @@ mod notebook;
 mod publish_diagnostics;
 mod pull_diagnostics;
 
-use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::num::NonZeroUsize;
 use std::sync::{Arc, OnceLock};
@@ -88,33 +87,67 @@ fn setup_tracing() {
     });
 }
 
-/// Errors that can occur during testing
+/// Errors when receiving a notification or request from the server.
 #[derive(thiserror::Error, Debug)]
-pub(crate) enum TestServerError {
-    /// The response came back, but was an error response, not a successful one.
-    #[error("Response error: {0:?}")]
-    ResponseError(ResponseError),
+pub(crate) enum ServerMessageError {
+    #[error("waiting for message timed out")]
+    Timeout,
 
-    #[error("Invalid response message for request {0}: {1:?}")]
-    InvalidResponse(RequestId, Box<Response>),
+    #[error("server disconnected")]
+    ServerDisconnected,
 
-    #[error("Got a duplicate response for request ID {0}: {1:?}")]
-    DuplicateResponse(RequestId, Box<Response>),
-
-    #[error("Failed to receive message from server: {0}")]
-    RecvTimeoutError(RecvTimeoutError),
-
-    #[error("Failed to deserialize response: {0}")]
+    #[error("Failed to deserialize message body: {0}")]
     DeserializationError(#[from] serde_json::Error),
 }
 
-impl TestServerError {
-    fn is_disconnected(&self) -> bool {
-        matches!(
-            self,
-            TestServerError::RecvTimeoutError(RecvTimeoutError::Disconnected)
-        )
+impl From<ReceiveError> for ServerMessageError {
+    fn from(value: ReceiveError) -> Self {
+        match value {
+            ReceiveError::Timeout => Self::Timeout,
+            ReceiveError::ServerDisconnected => Self::ServerDisconnected,
+        }
     }
+}
+
+/// Errors when receiving a response from the server.
+#[derive(thiserror::Error, Debug)]
+pub(crate) enum AwaitResponseError {
+    /// The response came back, but was an error response, not a successful one.
+    #[error("request failed because the server replied with an error: {0:?}")]
+    RequestFailed(ResponseError),
+
+    #[error("malformed response message with both result and error: {0:#?}")]
+    MalformedResponse(Box<Response>),
+
+    #[error("received multiple responses for the same request ID: {0:#?}")]
+    MultipleResponses(Box<[Response]>),
+
+    #[error("waiting for response timed out")]
+    Timeout,
+
+    #[error("server disconnected")]
+    ServerDisconnected,
+
+    #[error("failed to deserialize response result: {0}")]
+    DeserializationError(#[from] serde_json::Error),
+}
+
+impl From<ReceiveError> for AwaitResponseError {
+    fn from(err: ReceiveError) -> Self {
+        match err {
+            ReceiveError::Timeout => Self::Timeout,
+            ReceiveError::ServerDisconnected => Self::ServerDisconnected,
+        }
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub(crate) enum ReceiveError {
+    #[error("waiting for message timed out")]
+    Timeout,
+
+    #[error("server disconnected")]
+    ServerDisconnected,
 }
 
 /// A test server for the ty language server that provides helpers for sending requests,
@@ -140,8 +173,12 @@ pub(crate) struct TestServer {
     /// Incrementing counter to automatically generate request IDs
     request_counter: i32,
 
-    /// A mapping of request IDs to responses received from the server
-    responses: FxHashMap<RequestId, Response>,
+    /// A mapping of request IDs to responses received from the server.
+    ///
+    /// Valid responses contain exactly one response but may contain multiple responses
+    /// when the server sends multiple responses for a single request.
+    /// The responses are guaranteed to never be empty.
+    responses: FxHashMap<RequestId, smallvec::SmallVec<[Response; 1]>>,
 
     /// An ordered queue of all the notifications received from the server
     notifications: VecDeque<lsp_server::Notification>,
@@ -264,20 +301,9 @@ impl TestServer {
 
     /// Drain all messages from the server.
     fn drain_messages(&mut self) {
-        loop {
-            // Don't wait too long to drain the messages, as this is called in the `Drop`
-            // implementation which happens everytime the test ends.
-            match self.receive(Some(Duration::from_millis(10))) {
-                Ok(()) => {}
-                Err(TestServerError::RecvTimeoutError(_)) => {
-                    // Only break if we have no more messages to process.
-                    break;
-                }
-                Err(err) => {
-                    tracing::error!("Error while draining messages: {err:?}");
-                }
-            }
-        }
+        // Don't wait too long to drain the messages, as this is called in the `Drop`
+        // implementation which happens everytime the test ends.
+        while let Ok(()) = self.receive(Some(Duration::from_millis(10))) {}
     }
 
     /// Validate that there are no pending messages from the server.
@@ -380,38 +406,15 @@ impl TestServer {
     ///
     /// If the server didn't send a response, the response failed with an error code, failed to deserialize,
     /// or the server responded twice. Use [`Self::try_await_response`] if you want a non-panicking version.
+    ///
+    /// [`send_request`]: TestServer::send_request
     #[track_caller]
     pub(crate) fn await_response<R>(&mut self, id: &RequestId) -> R::Result
     where
         R: Request,
     {
-        match self.try_await_response::<R>(id, None) {
-            Ok(result) => result,
-            Err(err) => match err {
-                TestServerError::ResponseError(response_error) => {
-                    panic!(
-                        "Request {id} failed: {message} ({code})",
-                        code = response_error.code,
-                        message = response_error.message
-                    )
-                }
-                TestServerError::InvalidResponse(request_id, response) => {
-                    panic!("Invalid response for request {request_id}: {response:?}")
-                }
-                TestServerError::DuplicateResponse(request_id, response) => {
-                    panic!("Received duplicate response for request {request_id}: {response:?}")
-                }
-                TestServerError::RecvTimeoutError(RecvTimeoutError::Disconnected) => {
-                    panic!("Server disconnected while waiting for response for {id}")
-                }
-                TestServerError::RecvTimeoutError(RecvTimeoutError::Timeout) => {
-                    panic!("Request {id} timed out while waiting for response.")
-                }
-                TestServerError::DeserializationError(error) => {
-                    panic!("Failed to deserialize response {id}: {error}")
-                }
-            },
-        }
+        self.try_await_response::<R>(id, None)
+            .unwrap_or_else(|err| panic!("Failed to receive response for request {id}: {err}"))
     }
 
     /// Wait for a server response corresponding to the given request ID.
@@ -421,16 +424,26 @@ impl TestServer {
     ///
     /// This method will remove the response from the internal data structure, so it can only be
     /// called once per request ID.
+    ///
+    /// [`send_request`]: TestServer::send_request
     pub(crate) fn try_await_response<R>(
         &mut self,
         id: &RequestId,
         timeout: Option<Duration>,
-    ) -> Result<R::Result, TestServerError>
+    ) -> Result<R::Result, AwaitResponseError>
     where
         R: Request,
     {
         loop {
-            if let Some(response) = self.responses.remove(id) {
+            if let Some(mut responses) = self.responses.remove(id) {
+                if responses.len() > 1 {
+                    return Err(AwaitResponseError::MultipleResponses(
+                        responses.into_boxed_slice(),
+                    ));
+                }
+
+                let response = responses.pop().unwrap();
+
                 match response {
                     Response {
                         error: None,
@@ -444,18 +457,15 @@ impl TestServer {
                         result: None,
                         ..
                     } => {
-                        return Err(TestServerError::ResponseError(err));
+                        return Err(AwaitResponseError::RequestFailed(err));
                     }
                     response => {
-                        return Err(TestServerError::InvalidResponse(
-                            id.clone(),
-                            Box::new(response),
-                        ));
+                        return Err(AwaitResponseError::MalformedResponse(Box::new(response)));
                     }
                 }
             }
 
-            self.receive_or_panic(timeout)?;
+            self.receive(timeout)?;
         }
     }
 
@@ -476,31 +486,8 @@ impl TestServer {
     /// a panic-free alternative.
     #[track_caller]
     pub(crate) fn await_notification<N: Notification>(&mut self) -> N::Params {
-        match self.try_await_notification::<N>(None) {
-            Ok(params) => params,
-            Err(err) => match err {
-                TestServerError::RecvTimeoutError(RecvTimeoutError::Disconnected) => {
-                    panic!(
-                        "Server disconnected while waiting for `{}` notification",
-                        N::METHOD
-                    )
-                }
-                TestServerError::RecvTimeoutError(RecvTimeoutError::Timeout) => {
-                    panic!("Waiting for `{}` notification timed out", N::METHOD)
-                }
-                TestServerError::DeserializationError(error) => {
-                    panic!(
-                        "Failed to deserialize `{}` notification: {}",
-                        N::METHOD,
-                        error
-                    )
-                }
-                // Response specific error codes
-                TestServerError::InvalidResponse(..)
-                | TestServerError::DuplicateResponse(..)
-                | TestServerError::ResponseError(..) => unreachable!(),
-            },
-        }
+        self.try_await_notification::<N>(None)
+            .unwrap_or_else(|err| panic!("Failed to receive notification `{}`: {err}", N::METHOD))
     }
 
     /// Wait for a notification of the specified type from the server and return its parameters.
@@ -515,7 +502,7 @@ impl TestServer {
     pub(crate) fn try_await_notification<N: Notification>(
         &mut self,
         timeout: Option<Duration>,
-    ) -> Result<N::Params, TestServerError> {
+    ) -> Result<N::Params, ServerMessageError> {
         for retry_count in 0..RETRY_COUNT {
             if retry_count > 0 {
                 tracing::info!("Retrying to receive `{}` notification", N::METHOD);
@@ -530,10 +517,10 @@ impl TestServer {
                 return Ok(params);
             }
 
-            self.receive_or_panic(timeout)?;
+            self.receive(timeout)?;
         }
 
-        Err(TestServerError::RecvTimeoutError(RecvTimeoutError::Timeout))
+        Err(ServerMessageError::Timeout)
     }
 
     /// Collects `N` publish diagnostic notifications into a map, indexed by the document url.
@@ -580,27 +567,8 @@ impl TestServer {
     /// If receiving the request fails.
     #[track_caller]
     pub(crate) fn await_request<R: Request>(&mut self) -> (RequestId, R::Params) {
-        match self.try_await_request::<R>(None) {
-            Ok(request) => request,
-            Err(err) => match err {
-                TestServerError::RecvTimeoutError(RecvTimeoutError::Disconnected) => {
-                    panic!(
-                        "Server disconnected while waiting for `{}` request",
-                        R::METHOD
-                    )
-                }
-                TestServerError::RecvTimeoutError(RecvTimeoutError::Timeout) => {
-                    panic!("Waiting for `{}` request timed out", R::METHOD)
-                }
-                TestServerError::DeserializationError(error) => {
-                    panic!("Failed to deserialize request `{}`: {error}", R::METHOD);
-                }
-                // Response specific error codes
-                TestServerError::InvalidResponse(..)
-                | TestServerError::DuplicateResponse(..)
-                | TestServerError::ResponseError(..) => unreachable!(),
-            },
-        }
+        self.try_await_request::<R>(None)
+            .unwrap_or_else(|err| panic!("Failed to receive server request `{}`: {err}", R::METHOD))
     }
 
     /// Wait for a request of the specified type from the server and return the request ID and
@@ -617,7 +585,7 @@ impl TestServer {
     pub(crate) fn try_await_request<R: Request>(
         &mut self,
         timeout: Option<Duration>,
-    ) -> Result<(RequestId, R::Params), TestServerError> {
+    ) -> Result<(RequestId, R::Params), ServerMessageError> {
         for retry_count in 0..RETRY_COUNT {
             if retry_count > 0 {
                 tracing::info!("Retrying to receive `{}` request", R::METHOD);
@@ -632,9 +600,9 @@ impl TestServer {
                 return Ok((request.id, params));
             }
 
-            self.receive_or_panic(timeout)?;
+            self.receive(timeout)?;
         }
-        Err(TestServerError::RecvTimeoutError(RecvTimeoutError::Timeout))
+        Err(ServerMessageError::Timeout)
     }
 
     /// Receive a message from the server.
@@ -643,35 +611,23 @@ impl TestServer {
     /// within that time, it will return an error.
     ///
     /// If `timeout` is `None`, it will use a default timeout of 10 second.
-    fn receive(&mut self, timeout: Option<Duration>) -> Result<(), TestServerError> {
+    fn receive(&mut self, timeout: Option<Duration>) -> Result<(), ReceiveError> {
         static DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 
         let receiver = self.client_connection.as_ref().unwrap().receiver.clone();
         let message = receiver
             .recv_timeout(timeout.unwrap_or(DEFAULT_TIMEOUT))
-            .map_err(TestServerError::RecvTimeoutError)?;
+            .map_err(|err| match err {
+                RecvTimeoutError::Disconnected => ReceiveError::ServerDisconnected,
+                RecvTimeoutError::Timeout => ReceiveError::Timeout,
+            })?;
 
-        self.handle_message(message)?;
+        self.handle_message(message);
 
         for message in receiver.try_iter() {
-            self.handle_message(message)?;
+            self.handle_message(message);
         }
 
-        Ok(())
-    }
-
-    /// This is a convenience method that's same as [`receive`], but panics if the server got
-    /// disconnected. It will pass other errors as is.
-    ///
-    /// [`receive`]: TestServer::receive
-    fn receive_or_panic(&mut self, timeout: Option<Duration>) -> Result<(), TestServerError> {
-        if let Err(err) = self.receive(timeout) {
-            if err.is_disconnected() {
-                self.panic_on_server_disconnect();
-            } else {
-                return Err(err);
-            }
-        }
         Ok(())
     }
 
@@ -681,7 +637,7 @@ impl TestServer {
     /// - Requests are stored in `self.requests`
     /// - Responses are stored in `self.responses` with the request ID as the key
     /// - Notifications are stored in `self.notifications`
-    fn handle_message(&mut self, message: Message) -> Result<(), TestServerError> {
+    fn handle_message(&mut self, message: Message) {
         match message {
             Message::Request(request) => {
                 tracing::debug!("Received server request `{}`", &request.method);
@@ -689,24 +645,16 @@ impl TestServer {
             }
             Message::Response(response) => {
                 tracing::debug!("Received server response for request {}", &response.id);
-                match self.responses.entry(response.id.clone()) {
-                    Entry::Occupied(existing) => {
-                        return Err(TestServerError::DuplicateResponse(
-                            response.id,
-                            Box::new(existing.get().clone()),
-                        ));
-                    }
-                    Entry::Vacant(entry) => {
-                        entry.insert(response);
-                    }
-                }
+                self.responses
+                    .entry(response.id.clone())
+                    .or_default()
+                    .push(response);
             }
             Message::Notification(notification) => {
                 tracing::debug!("Received notification `{}`", &notification.method);
                 self.notifications.push_back(notification);
             }
         }
-        Ok(())
     }
 
     #[track_caller]
@@ -978,10 +926,7 @@ impl Drop for TestServer {
                         );
                     }
                     Ok(message) => {
-                        // Ignore any errors: A duplicate pending message
-                        // won't matter that much because `assert_no_pending_messages` will
-                        // panic anyway.
-                        let _ = self.handle_message(message);
+                        self.handle_message(message);
                     }
                 }
             }

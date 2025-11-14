@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use anyhow::Result;
-use crossbeam::channel::RecvTimeoutError;
 use insta::{assert_compact_debug_snapshot, assert_debug_snapshot};
 use lsp_server::RequestId;
 use lsp_types::request::WorkspaceDiagnosticRequest;
@@ -12,7 +11,7 @@ use lsp_types::{
 use ruff_db::system::SystemPath;
 use ty_server::{ClientOptions, DiagnosticMode, PartialWorkspaceProgress};
 
-use crate::{TestServer, TestServerBuilder, TestServerError};
+use crate::{AwaitResponseError, TestServer, TestServerBuilder};
 
 #[test]
 fn on_did_open() -> Result<()> {
@@ -947,7 +946,7 @@ fn assert_workspace_diagnostics_suspends_for_long_polling(
         Ok(_) => {
             panic!("Expected workspace diagnostic request to suspend for long-polling.");
         }
-        Err(TestServerError::RecvTimeoutError(RecvTimeoutError::Timeout)) => {
+        Err(AwaitResponseError::Timeout) => {
             // Ok
         }
         Err(err) => {
