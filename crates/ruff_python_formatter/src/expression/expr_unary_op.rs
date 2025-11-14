@@ -1,8 +1,7 @@
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprUnaryOp;
 use ruff_python_ast::UnaryOp;
-use ruff_python_trivia::SimpleTokenKind;
-use ruff_python_trivia::SimpleTokenizer;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::leading_comments;
@@ -17,6 +16,8 @@ pub struct FormatExprUnaryOp;
 
 impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
     fn fmt_fields(&self, item: &ExprUnaryOp, f: &mut PyFormatter) -> FormatResult<()> {
+        token("<cursor>").fmt(f)?;
+        dbg!("unary op");
         let ExprUnaryOp {
             range: _,
             node_index: _,

@@ -14,6 +14,7 @@ use ruff_text_size::Ranged;
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{LeadingDanglingTrailingComments, leading_comments, trailing_comments};
 use crate::context::{NodeLevel, WithNodeLevel};
+use crate::expression::expr_unary_op::operand_start;
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize, is_expression_parenthesized,
     optional_parentheses, parenthesized,
@@ -125,10 +126,12 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             let comments = f.context().comments().clone();
             let node_comments = comments.leading_dangling_trailing(expression);
             if !node_comments.has_leading() && !node_comments.has_trailing() {
+                dbg!("okay");
                 parenthesized("(", &format_expr, ")")
                     .with_hugging(is_expression_huggable(expression, f.context()))
                     .fmt(f)
             } else {
+                dbg!("disaster");
                 format_with_parentheses_comments(expression, &node_comments, f)
             }
         } else {
@@ -373,11 +376,23 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
 
         let comments = f.context().comments().clone();
         let node_comments = comments.leading_dangling_trailing(*expression);
+        let up_to = expression
+            .as_unary_op_expr()
+            .map(|unary_op| operand_start(unary_op, f.context().source()));
 
         // If the expression has comments, we always want to preserve the parentheses. This also
         // ensures that we correctly handle parenthesized comments, and don't need to worry about
         // them in the implementation below.
-        if node_comments.has_leading() || node_comments.has_trailing_own_line() {
+        if node_comments.has_leading()
+            || node_comments.has_trailing_own_line()
+            || dbg!(up_to.is_some_and(|up_to| {
+                node_comments
+                    .dangling
+                    .iter()
+                    .any(|comment| comment.end() < up_to)
+            }))
+        {
+            token("<maybe cursor>").fmt(f)?;
             return expression.format().with_options(Parentheses::Always).fmt(f);
         }
 
