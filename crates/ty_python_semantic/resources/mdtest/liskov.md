@@ -142,6 +142,10 @@ on its grandparent class. This is because type checkers will treat the child cla
 the grandparent class just as much as they treat it as a subtype of the parent class, so
 substitutability with respect to the grandparent class is just as important:
 
+<!-- snapshot-diagnostics -->
+
+`stub.pyi`:
+
 ```pyi
 class Grandparent:
     def method(self, x: int) -> None: ...
@@ -156,6 +160,27 @@ class Child(Parent):
 class OtherChild(Parent):
     # compatible with the signature of `Grandparent.method`, but not with `Parent.method`:
     def method(self, x: int) -> None: ...  # error: [invalid-method-override]
+```
+
+`other_stub.pyi`:
+
+```pyi
+class A:
+    def get(self, default): ...
+
+class B(A):
+    def get(self, default, /): ...  # error: [invalid-method-override]
+
+get = 56
+
+class C(B):
+    # `get` appears in the symbol table of `C`,
+    # but that doesn't confuse our diagnostic...
+    foo = get
+
+class D(C):
+    # compatible with `C.get` and `B.get`, but not with `A.get`
+    def get(self, my_default): ...  # error: [invalid-method-override]
 ```
 
 ## Excluded methods
