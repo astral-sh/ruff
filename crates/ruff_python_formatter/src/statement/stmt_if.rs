@@ -22,7 +22,7 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
         } = item;
 
         let comments = f.context().comments().clone();
-        let trailing_colon_comment = comments.dangling(item);
+        let trailing_colon_comment = dbg!(comments.dangling(item));
 
         write!(
             f,
@@ -33,6 +33,7 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
                     &format_args![
                         token("if"),
                         space(),
+                        token("<cursor>"),
                         maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
                     ],
                 ),

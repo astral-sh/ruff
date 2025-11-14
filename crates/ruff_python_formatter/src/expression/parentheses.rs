@@ -179,12 +179,15 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
         let indented = format_with(|f| {
             let content = Arguments::from(&self.content);
             if self.comments.is_empty() {
+                dbg!("empty?");
                 if self.hug {
                     content.fmt(f)
                 } else {
+                    dbg!("no hug");
                     group(&soft_block_indent(&content)).fmt(f)
                 }
             } else {
+                dbg!("this is dangling");
                 group(&format_args![
                     dangling_open_parenthesis_comments(self.comments),
                     soft_block_indent(&content),

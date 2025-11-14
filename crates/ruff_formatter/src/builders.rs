@@ -1206,11 +1206,12 @@ enum IndentMode {
 
 impl<Context> Format<Context> for BlockIndent<'_, Context> {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
+        token("<<>>").fmt(f)?;
         let snapshot = f.snapshot();
 
         f.write_element(FormatElement::Tag(StartIndent));
 
-        match self.mode {
+        match dbg!(self.mode) {
             IndentMode::Soft => write!(f, [soft_line_break()])?,
             IndentMode::Block => write!(f, [hard_line_break()])?,
             IndentMode::SoftLineOrSpace | IndentMode::SoftSpace => {
