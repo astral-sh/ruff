@@ -223,10 +223,10 @@ def given_constraints[T]():
     static_assert(given_bool.implies_subtype_of(Covariant[T], Covariant[bool]))
     static_assert(not given_bool.implies_subtype_of(Covariant[T], Covariant[str]))
 
-    given_bool_le_t_le_int = ConstraintSet.range(bool, T, int)
-    static_assert(not given_bool_le_t_le_int.implies_subtype_of(Covariant[int], Covariant[T]))
-    static_assert(given_bool_le_t_le_int.implies_subtype_of(Covariant[bool], Covariant[T]))
-    static_assert(not given_bool_le_t_le_int.implies_subtype_of(Covariant[str], Covariant[T]))
+    given_bool_int = ConstraintSet.range(bool, T, int)
+    static_assert(not given_bool_int.implies_subtype_of(Covariant[int], Covariant[T]))
+    static_assert(given_bool_int.implies_subtype_of(Covariant[bool], Covariant[T]))
+    static_assert(not given_bool_int.implies_subtype_of(Covariant[str], Covariant[T]))
 
 def mutually_constrained[T, U]():
     # If (T = U ∧ U ≤ int), then (T ≤ int) must be true as well, and therefore
