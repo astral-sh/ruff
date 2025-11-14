@@ -5486,10 +5486,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.dataclass_field_specifiers = specifiers;
             }
 
-            let inferred_ty = self.infer_maybe_standalone_expression(
-                value,
-                TypeContext::new(Some(declared.inner_type())),
-            );
+            // We defer the r.h.s. of PEP-613 `TypeAlias` assignments in stub files.
+            let declared_type = declared.inner_type();
+            let previous_deferred_state = self.deferred_state;
+
+            if matches!(
+                declared_type,
+                Type::SpecialForm(SpecialFormType::TypeAlias)
+                    | Type::Dynamic(DynamicType::TodoTypeAlias)
+            ) && self.in_stub()
+            {
+                self.deferred_state = DeferredExpressionState::Deferred;
+            }
+
+            let inferred_ty = self
+                .infer_maybe_standalone_expression(value, TypeContext::new(Some(declared_type)));
+
+            self.deferred_state = previous_deferred_state;
 
             self.dataclass_field_specifiers.clear();
 
