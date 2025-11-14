@@ -259,6 +259,7 @@ impl<'a> SelectedExternalLinter<'a> {
                 description: self.linter.description.clone(),
                 enabled: self.linter.enabled,
                 rules: rules.iter().map(|&rule| rule.clone()).collect(),
+                config: self.linter.config.clone(),
             },
         }
     }

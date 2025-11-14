@@ -22,7 +22,8 @@ use ruff_cache::cache_dir;
 use ruff_formatter::IndentStyle;
 use ruff_graph::{AnalyzeSettings, Direction, StringImports};
 use ruff_linter::external::{
-    ExternalLintRegistry, PyprojectExternalLinterEntry, load_linter_into_registry,
+    ExternalLintRegistry, ExternalLinterConfig, PyprojectExternalLinterEntry,
+    load_linter_into_registry,
 };
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::{INCOMPATIBLE_CODES, Rule, RuleNamespace, RuleSet};
@@ -46,11 +47,12 @@ use ruff_python_ast as ast;
 use ruff_python_formatter::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, QuoteStyle,
 };
+use toml::value::{Table as TomlTable, Value as TomlValue};
 
 use crate::options::{
-    AnalyzeOptions, Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BooleanTrapOptions,
-    Flake8BugbearOptions, Flake8BuiltinsOptions, Flake8ComprehensionsOptions,
-    Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
+    AnalyzeOptions, ExternalAstLinterOptions, Flake8AnnotationsOptions, Flake8BanditOptions,
+    Flake8BooleanTrapOptions, Flake8BugbearOptions, Flake8BuiltinsOptions,
+    Flake8ComprehensionsOptions, Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
     Flake8ImplicitStrConcatOptions, Flake8ImportConventionsOptions, Flake8PytestStyleOptions,
     Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
     Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
@@ -182,6 +184,84 @@ fn resolve_external_rule_selections(
 pub struct ExternalLinterEntry {
     pub path: PathBuf,
     pub enabled: bool,
+    pub definition_root: PathBuf,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExternalLinterConfigContribution {
+    pub scope: PathBuf,
+    pub config: TomlTable,
+}
+
+fn merge_toml_value(target: &mut TomlValue, update: &TomlValue) {
+    if let (TomlValue::Table(target_table), TomlValue::Table(update_table)) = (&mut *target, update)
+    {
+        merge_toml_table(target_table, update_table);
+    } else {
+        *target = update.clone();
+    }
+}
+
+fn merge_toml_table(target: &mut TomlTable, update: &TomlTable) {
+    for (key, value) in update {
+        match target.get_mut(key) {
+            Some(existing) => merge_toml_value(existing, value),
+            None => {
+                target.insert(key.clone(), value.clone());
+            }
+        }
+    }
+}
+
+fn resolve_external_linter_configs(
+    entries: Option<&BTreeMap<String, ExternalLinterEntry>>,
+    configs: &BTreeMap<String, Vec<ExternalLinterConfigContribution>>,
+) -> Result<BTreeMap<String, TomlTable>> {
+    if configs.is_empty() {
+        return Ok(BTreeMap::default());
+    }
+
+    let entries = entries.ok_or_else(|| {
+        anyhow!("External linter configuration was provided, but no external linters were defined")
+    })?;
+
+    let mut resolved = BTreeMap::new();
+    for (id, contributions) in configs {
+        let entry = entries
+            .get(id)
+            .ok_or_else(|| anyhow!("External linter `{id}` is not defined"))?;
+        let mut table = TomlTable::new();
+        for contribution in contributions {
+            if !contribution.scope.starts_with(&entry.definition_root) {
+                return Err(anyhow!(
+                    "Configuration for external linter `{id}` can only be set in `{}` or its subdirectories; attempted to configure it from `{}`",
+                    entry.definition_root.display(),
+                    contribution.scope.display()
+                ));
+            }
+            merge_toml_table(&mut table, &contribution.config);
+        }
+        if !table.is_empty() {
+            resolved.insert(id.clone(), table);
+        }
+    }
+    Ok(resolved)
+}
+
+fn merge_external_linter_entries(
+    first: Option<BTreeMap<String, ExternalLinterEntry>>,
+    second: Option<BTreeMap<String, ExternalLinterEntry>>,
+) -> Option<BTreeMap<String, ExternalLinterEntry>> {
+    match (first, second) {
+        (None, None) => None,
+        (Some(map), None) | (None, Some(map)) => Some(map),
+        (Some(mut first_map), Some(second_map)) => {
+            for (key, value) in second_map {
+                first_map.entry(key).or_insert(value);
+            }
+            Some(first_map)
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -337,17 +417,26 @@ impl Configuration {
         let mut external_codes = lint.external.unwrap_or_default();
         let mut seen_external_codes = external_codes.iter().cloned().collect::<FxHashSet<_>>();
 
-        let external_ast_registry = match lint.external_ast.as_ref() {
+        let mut external_ast_registry = match lint.external_ast.as_ref() {
             Some(entries) => build_external_registry(entries)?,
             None => None,
         };
+        let external_config_tables = resolve_external_linter_configs(
+            lint.external_ast.as_ref(),
+            &lint.external_linter_configs,
+        )?;
 
-        if let Some(registry) = external_ast_registry.as_ref() {
+        if let Some(registry) = external_ast_registry.as_mut() {
             ruff_linter::external::verify_registry_scripts(registry)?;
             for rule in registry.iter_enabled_rules() {
                 let code = rule.code.as_str().to_owned();
                 if seen_external_codes.insert(code.clone()) {
                     external_codes.push(code);
+                }
+            }
+            if !external_config_tables.is_empty() {
+                for (id, table) in &external_config_tables {
+                    registry.set_linter_config(id, ExternalLinterConfig::new(table.clone()));
                 }
             }
         }
@@ -716,7 +805,7 @@ impl Configuration {
             // files at present.
             extension: None,
 
-            lint: LintConfiguration::from_options(lint, project_root)?,
+            lint: LintConfiguration::from_options(lint, project_root, path)?,
             format: FormatConfiguration::from_options(
                 options.format.unwrap_or_default(),
                 project_root,
@@ -793,6 +882,7 @@ pub struct LintConfiguration {
     pub dummy_variable_rgx: Option<Regex>,
     pub external: Option<Vec<String>>,
     pub external_ast: Option<BTreeMap<String, ExternalLinterEntry>>,
+    pub external_linter_configs: BTreeMap<String, Vec<ExternalLinterConfigContribution>>,
     pub ignore_init_module_imports: Option<bool>,
     pub logger_objects: Option<Vec<String>>,
     pub task_tags: Option<Vec<String>>,
@@ -831,7 +921,11 @@ pub struct LintConfiguration {
 }
 
 impl LintConfiguration {
-    fn from_options(options: LintOptions, project_root: &Path) -> Result<Self> {
+    fn from_options(
+        options: LintOptions,
+        project_root: &Path,
+        config_path: Option<&Path>,
+    ) -> Result<Self> {
         #[expect(deprecated)]
         let ignore = options
             .common
@@ -945,29 +1039,51 @@ impl LintConfiguration {
             ));
         }
 
+        let mut external_linter_configs: BTreeMap<String, Vec<ExternalLinterConfigContribution>> =
+            BTreeMap::default();
+
+        let config_scope = config_path
+            .and_then(Path::parent)
+            .unwrap_or(project_root)
+            .to_path_buf();
+
         let external_ast_entries = options
             .external_ast
             .map(|entries| {
-                entries
-                    .into_iter()
-                    .map(|(id, entry)| {
-                        let raw_path = entry
-                            .path
-                            .ok_or_else(|| anyhow!("external linter `{id}` must define `path`"))?;
+                let mut map = BTreeMap::new();
+                for (id, entry) in entries {
+                    let ExternalAstLinterOptions {
+                        path,
+                        enabled,
+                        config,
+                    } = entry;
+                    if let Some(config_table) = config {
+                        external_linter_configs.entry(id.clone()).or_default().push(
+                            ExternalLinterConfigContribution {
+                                scope: config_scope.clone(),
+                                config: config_table,
+                            },
+                        );
+                    }
+                    if let Some(raw_path) = path {
                         let path = if raw_path.is_absolute() {
                             raw_path
                         } else {
                             project_root.join(raw_path)
                         };
-                        Ok((
+                        map.insert(
                             id,
                             ExternalLinterEntry {
                                 path,
-                                enabled: entry.enabled.unwrap_or(true),
+                                enabled: enabled.unwrap_or(true),
+                                definition_root: config_scope.clone(),
                             },
-                        ))
-                    })
-                    .collect::<Result<BTreeMap<_, _>>>()
+                        );
+                    } else if !external_linter_configs.contains_key(&id) {
+                        return Err(anyhow!("external linter `{id}` must define `path`"));
+                    }
+                }
+                Ok(map)
             })
             .transpose()?;
 
@@ -1020,6 +1136,7 @@ impl LintConfiguration {
                 .unwrap_or_default(),
             external: options.common.external,
             external_ast: external_ast_entries,
+            external_linter_configs,
             ignore_init_module_imports,
             explicit_preview_rules: options.common.explicit_preview_rules,
             per_file_ignores: options.common.per_file_ignores.map(|per_file_ignores| {
@@ -1403,6 +1520,13 @@ impl LintConfiguration {
         extend_per_file_ignores.extend(self.extend_per_file_ignores);
         let mut external_rule_selections = config.external_rule_selections;
         external_rule_selections.extend(self.external_rule_selections);
+        let mut external_linter_configs = config.external_linter_configs;
+        for (id, mut contributions) in self.external_linter_configs {
+            external_linter_configs
+                .entry(id)
+                .or_default()
+                .append(&mut contributions);
+        }
 
         Self {
             exclude: self.exclude.or(config.exclude),
@@ -1415,7 +1539,8 @@ impl LintConfiguration {
             dummy_variable_rgx: self.dummy_variable_rgx.or(config.dummy_variable_rgx),
             extend_per_file_ignores,
             external: self.external.or(config.external),
-            external_ast: self.external_ast.or(config.external_ast),
+            external_ast: merge_external_linter_entries(self.external_ast, config.external_ast),
+            external_linter_configs,
             ignore_init_module_imports: self
                 .ignore_init_module_imports
                 .or(config.ignore_init_module_imports),
