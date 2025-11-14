@@ -2281,14 +2281,15 @@ impl<'db> SequentPath<'db> {
     ) -> bool {
         // The `path` is guaranteed to be in sorted order (by the `ConstrainedTypeVar` of each
         // assignment), due to the inherent structure of the BDD that we're walking.
-        self.path
-            .binary_search_by(|path_element| {
-                path_element
-                    .constraint()
-                    .ordering(db)
-                    .cmp(&assignment.constraint().ordering(db))
-            })
-            .is_ok()
+        let Ok(index) = self.path.binary_search_by(|path_element| {
+            path_element
+                .constraint()
+                .ordering(db)
+                .cmp(&assignment.constraint().ordering(db))
+        }) else {
+            return false;
+        };
+        self.path[index] == assignment
     }
 
     fn path_should_be_pruned(&self, db: &'db dyn Db, map: &SequentMap<'db>) -> bool {
