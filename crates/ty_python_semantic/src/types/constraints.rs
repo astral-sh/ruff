@@ -718,7 +718,7 @@ impl<'db> Node<'db> {
             Node::AlwaysFalse => false,
             Node::Interior(interior) => {
                 let map = interior.sequent_map(db);
-                let mut path = SequentPath::default();
+                let mut path = PathAssignments::default();
                 self.is_always_satisfied_inner(db, map, &mut path)
             }
         }
@@ -728,7 +728,7 @@ impl<'db> Node<'db> {
         self,
         db: &'db dyn Db,
         map: &SequentMap<'db>,
-        path: &mut SequentPath<'db>,
+        path: &mut PathAssignments<'db>,
     ) -> bool {
         match self {
             Node::AlwaysTrue => true,
@@ -739,7 +739,7 @@ impl<'db> Node<'db> {
                 // them as passing the "always satisfied" check.
                 let constraint = interior.constraint(db);
                 let true_always_satisfied = path
-                    .with_assignment(db, map, constraint.when_true(), |path| {
+                    .with_assignment(map, constraint.when_true(), |path| {
                         interior
                             .if_true(db)
                             .is_always_satisfied_inner(db, map, path)
@@ -750,7 +750,7 @@ impl<'db> Node<'db> {
                 }
 
                 // Ditto for the if_false branch
-                path.with_assignment(db, map, constraint.when_false(), |path| {
+                path.with_assignment(map, constraint.when_false(), |path| {
                     interior
                         .if_false(db)
                         .is_always_satisfied_inner(db, map, path)
@@ -767,7 +767,7 @@ impl<'db> Node<'db> {
             Node::AlwaysFalse => true,
             Node::Interior(interior) => {
                 let map = interior.sequent_map(db);
-                let mut path = SequentPath::default();
+                let mut path = PathAssignments::default();
                 self.is_never_satisfied_inner(db, map, &mut path)
             }
         }
@@ -777,7 +777,7 @@ impl<'db> Node<'db> {
         self,
         db: &'db dyn Db,
         map: &SequentMap<'db>,
-        path: &mut SequentPath<'db>,
+        path: &mut PathAssignments<'db>,
     ) -> bool {
         match self {
             Node::AlwaysTrue => false,
@@ -788,7 +788,7 @@ impl<'db> Node<'db> {
                 // them as passing the "never satisfied" check.
                 let constraint = interior.constraint(db);
                 let true_never_satisfied = path
-                    .with_assignment(db, map, constraint.when_true(), |path| {
+                    .with_assignment(map, constraint.when_true(), |path| {
                         interior.if_true(db).is_never_satisfied_inner(db, map, path)
                     })
                     .unwrap_or(true);
@@ -797,7 +797,7 @@ impl<'db> Node<'db> {
                 }
 
                 // Ditto for the if_false branch
-                path.with_assignment(db, map, constraint.when_false(), |path| {
+                path.with_assignment(map, constraint.when_false(), |path| {
                     interior
                         .if_false(db)
                         .is_never_satisfied_inner(db, map, path)
@@ -2299,91 +2299,89 @@ impl<'db> SequentMap<'db> {
 }
 
 #[derive(Debug, Default)]
-struct SequentPath<'db> {
-    path: Vec<ConstraintAssignment<'db>>,
+struct PathAssignments<'db> {
+    /// The assignments that we know are true at a certain point when traversing a BDD.
+    assignments: FxHashSet<ConstraintAssignment<'db>>,
 }
 
-impl<'db> SequentPath<'db> {
+impl<'db> PathAssignments<'db> {
     fn with_assignment<R>(
         &mut self,
-        db: &'db dyn Db,
         map: &SequentMap<'db>,
         assignment: ConstraintAssignment<'db>,
         f: impl FnOnce(&mut Self) -> R,
     ) -> Option<R> {
-        self.path.push(assignment);
-        let result = if self.path_should_be_pruned(db, map) {
+        let old_assignments = self.assignments.clone();
+        let result = if self.add_assignment(map, assignment).is_err() {
             None
         } else {
             Some(f(self))
         };
-        self.path.pop();
+        self.assignments = old_assignments;
         result
     }
 
-    fn path_contains_assignment(
-        &self,
-        db: &'db dyn Db,
-        assignment: ConstraintAssignment<'db>,
-    ) -> bool {
-        // The `path` is guaranteed to be in sorted order (by the `ConstrainedTypeVar` of each
-        // assignment), due to the inherent structure of the BDD that we're walking.
-        let Ok(index) = self.path.binary_search_by(|path_element| {
-            path_element
-                .constraint()
-                .ordering(db)
-                .cmp(&assignment.constraint().ordering(db))
-        }) else {
-            return false;
-        };
-        self.path[index] == assignment
+    fn assignment_holds(&self, assignment: ConstraintAssignment<'db>) -> bool {
+        self.assignments.contains(&assignment)
     }
 
-    fn path_should_be_pruned(&self, db: &'db dyn Db, map: &SequentMap<'db>) -> bool {
+    fn add_assignment(
+        &mut self,
+        map: &SequentMap<'db>,
+        assignment: ConstraintAssignment<'db>,
+    ) -> Result<(), PathAssignmentConflict> {
+        // First add this assignment. If it causes a conflict, return that as an error. If we've
+        // already know this assignment holds, just return.
+        if self.assignments.contains(&assignment.negated()) {
+            return Err(PathAssignmentConflict);
+        }
+        if !self.assignments.insert(assignment) {
+            return Ok(());
+        }
+
+        // Then use our sequents to add additional facts that we know to be true.
         // TODO: This is very naive at the moment, partly for expediency, and partly because we
-        // don't anticipate the sequent maps to be very large. That said, the `path` is guaranteed
-        // to be in sorted order, due to the inherent structure of the BDD that we're walking, so
-        // we should be able to build up state about which sequents have been partially matched,
-        // avoiding the need to do this brute force search each time.
+        // don't anticipate the sequent maps to be very large. We might consider avoiding the
+        // brute-force search.
 
         for (ante1, ante2) in &map.impossibilities {
-            if self.path_contains_assignment(db, ante1.when_true())
-                && self.path_contains_assignment(db, ante2.when_true())
+            if self.assignment_holds(ante1.when_true()) && self.assignment_holds(ante2.when_true())
             {
                 // The sequent map says (ante1 ∧ ante2) is an impossible combination, and the
                 // current path asserts that both are true.
-                return true;
+                return Err(PathAssignmentConflict);
             }
         }
 
         for ((ante1, ante2), posts) in &map.pair_implications {
             for post in posts {
-                if self.path_contains_assignment(db, ante1.when_true())
-                    && self.path_contains_assignment(db, ante2.when_true())
-                    && self.path_contains_assignment(db, post.when_false())
+                if self.assignment_holds(ante1.when_true())
+                    && self.assignment_holds(ante2.when_true())
                 {
-                    // The sequent map says (ante1 ∧ ante2 → post) must hold, and the current path
-                    // asserts that ante1 and ante2 are true, and that post is false. That violates
-                    // the implication.
-                    return true;
+                    self.add_assignment(map, post.when_true())?;
                 }
             }
         }
 
         for (ante, posts) in &map.single_implications {
             for post in posts {
-                if self.path_contains_assignment(db, ante.when_true())
-                    && self.path_contains_assignment(db, post.when_false())
-                {
-                    // The sequent map says (ante1 → post) must hold, and the current path asserts
-                    // that ante is true and that post is false. That violates the implication.
-                    return true;
+                if self.assignment_holds(ante.when_true()) {
+                    self.add_assignment(map, post.when_true())?;
                 }
             }
         }
 
-        false
+        Ok(())
     }
+}
+
+#[derive(Debug)]
+struct PathAssignmentConflict;
+
+enum PathAssignmentOutcome {
+    Added,
+    Existing,
+    Conflict,
 }
 
 /// A single clause in the DNF representation of a BDD
