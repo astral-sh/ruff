@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::importer::ImportRequest;
 use crate::rules::refurb::helpers::{FileOpen, find_file_opens};
-use crate::{FixAvailability, Violation};
+use crate::{FixAvailability, Locator, Violation};
 
 /// ## What it does
 /// Checks for uses of `open` and `write` that can be replaced by `pathlib`
@@ -129,7 +129,7 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
                 let open = self.candidates.remove(open);
 
                 if self.loop_counter == 0 {
-                    let suggestion = make_suggestion(&open, content, self.checker.generator());
+                    let suggestion = make_suggestion(&open, content, self.checker.locator());
 
                     let mut diagnostic = self.checker.report_diagnostic(
                         WriteWholeFile {
@@ -172,27 +172,21 @@ fn match_write_call(expr: &Expr) -> Option<(&Expr, &Expr)> {
     Some((&*attr.value, call.arguments.args.first()?))
 }
 
-fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, generator: Generator) -> String {
-    let name = ast::ExprName {
-        id: open.mode.pathlib_method(),
-        ctx: ast::ExprContext::Load,
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    let mut arg = arg.clone();
-    relocate_expr(&mut arg, TextRange::default());
-    let call = ast::ExprCall {
-        func: Box::new(name.into()),
-        arguments: ast::Arguments {
-            args: Box::new([arg]),
-            keywords: open.keywords.iter().copied().cloned().collect(),
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        },
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    generator.expr(&call.into())
+fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, locator: &Locator) -> String {
+    let method_name = open.mode.pathlib_method();
+    let arg_code = locator.slice(arg.range());
+
+    if open.keywords.is_empty() {
+        format!("{method_name}({arg_code})")
+    } else {
+        format!(
+            "{method_name}({arg_code}, {})",
+            itertools::join(
+                open.keywords.iter().map(|kw| locator.slice(kw.range())),
+                ", "
+            )
+        )
+    }
 }
 
 fn generate_fix(
