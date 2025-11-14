@@ -223,6 +223,11 @@ def given_constraints[T]():
     static_assert(given_bool.implies_subtype_of(Covariant[T], Covariant[bool]))
     static_assert(not given_bool.implies_subtype_of(Covariant[T], Covariant[str]))
 
+    given_bool_le_t_le_int = ConstraintSet.range(bool, T, int)
+    static_assert(not given_bool_le_t_le_int.implies_subtype_of(Covariant[int], Covariant[T]))
+    static_assert(given_bool_le_t_le_int.implies_subtype_of(Covariant[bool], Covariant[T]))
+    static_assert(not given_bool_le_t_le_int.implies_subtype_of(Covariant[str], Covariant[T]))
+
 def mutually_constrained[T, U]():
     # If (T = U ∧ U ≤ int), then (T ≤ int) must be true as well, and therefore
     # (Covariant[T] ≤ Covariant[int]).
@@ -337,8 +342,11 @@ def mutually_constrained[T, U]():
     # even though T is invariant, it does imply that (Invariant[T] ≤ Invariant[int]).
     given_int = ConstraintSet.range(U, T, U) & ConstraintSet.range(int, U, int)
     static_assert(given_int.implies_subtype_of(Invariant[T], Invariant[int]))
+    static_assert(given_int.implies_subtype_of(Invariant[int], Invariant[T]))
     static_assert(not given_int.implies_subtype_of(Invariant[T], Invariant[bool]))
+    static_assert(not given_int.implies_subtype_of(Invariant[bool], Invariant[T]))
     static_assert(not given_int.implies_subtype_of(Invariant[T], Invariant[str]))
+    static_assert(not given_int.implies_subtype_of(Invariant[str], Invariant[T]))
 ```
 
 [subtyping]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence

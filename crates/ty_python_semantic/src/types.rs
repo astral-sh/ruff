@@ -10353,7 +10353,7 @@ pub(crate) enum TypeRelation<'db> {
     ///
     /// If you're comparing a typevar, we have to consider what restrictions the constraint set
     /// places on that typevar to determine if subtyping holds. For instance, if you want to check
-    /// whether `T ≤ int`, then answer will depend on what constraint set you are considering:
+    /// whether `T ≤ int`, then the answer will depend on what constraint set you are considering:
     ///
     /// ```text
     /// when_subtype_of_given(T ≤ bool, T, int) ⇒ true
