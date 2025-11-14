@@ -1175,18 +1175,12 @@ impl<'db> Node<'db> {
         interior.if_false(db).for_each_constraint(db, f);
     }
 
-    /// Returns a simplified version of a BDD, along with the BDD's domain.
-    fn simplify_and_domain(self, db: &'db dyn Db) -> (Self, Self) {
-        match self {
-            Node::AlwaysTrue | Node::AlwaysFalse => (self, Node::AlwaysTrue),
-            Node::Interior(interior) => interior.simplify(db),
-        }
-    }
-
     /// Simplifies a BDD, replacing constraints with simpler or smaller constraints where possible.
     fn simplify(self, db: &'db dyn Db) -> Self {
-        let (simplified, _) = self.simplify_and_domain(db);
-        simplified
+        match self {
+            Node::AlwaysTrue | Node::AlwaysFalse => self,
+            Node::Interior(interior) => interior.simplify(db),
+        }
     }
 
     /// Returns clauses describing all of the variable assignments that cause this BDD to evaluate
@@ -1552,14 +1546,13 @@ impl<'db> InteriorNode<'db> {
         map
     }
 
-    /// Returns a simplified version of a BDD, along with the BDD's domain.
+    /// Returns a simplified version of a BDD.
     ///
-    /// Both are calculated by looking at the relationships that exist between the constraints that
+    /// This is calculated by looking at the relationships that exist between the constraints that
     /// are mentioned in the BDD. For instance, if one constraint implies another (`x → y`), then
-    /// `x ∧ ¬y` is not a valid input, and is excluded from the BDD's domain. At the same time, we
-    /// can rewrite any occurrences of `x ∨ y` into `y`.
+    /// `x ∧ ¬y` is not a valid input, and we can rewrite any occurrences of `x ∨ y` into `y`.
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn simplify(self, db: &'db dyn Db) -> (Node<'db>, Node<'db>) {
+    fn simplify(self, db: &'db dyn Db) -> Node<'db> {
         // To simplify a non-terminal BDD, we find all pairs of constraints that are mentioned in
         // the BDD. If any of those pairs can be simplified to some other BDD, we perform a
         // substitution to replace the pair with the simplification.
@@ -1586,7 +1579,6 @@ impl<'db> InteriorNode<'db> {
         // Repeatedly pop constraint pairs off of the visit queue, checking whether each pair can
         // be simplified.
         let mut simplified = Node::Interior(self);
-        let mut domain = Node::AlwaysTrue;
         while let Some((left_constraint, right_constraint)) = to_visit.pop() {
             // If the constraints refer to different typevars, the only simplifications we can make
             // are of the form `S ≤ T ∧ T ≤ int → S ≤ int`.
@@ -1659,9 +1651,6 @@ impl<'db> InteriorNode<'db> {
                 let positive_right_node =
                     Node::new_satisfied_constraint(db, right_constraint.when_true());
                 let lhs = positive_left_node.and(db, positive_right_node);
-                let implication = lhs.implies(db, new_node);
-                domain = domain.and(db, implication);
-
                 let intersection = new_node.ite(db, lhs, Node::AlwaysFalse);
                 simplified = simplified.and(db, intersection);
                 continue;
@@ -1694,13 +1683,6 @@ impl<'db> InteriorNode<'db> {
                     Node::new_satisfied_constraint(db, larger_constraint.when_true());
                 let negative_larger_node =
                     Node::new_satisfied_constraint(db, larger_constraint.when_false());
-
-                let positive_smaller_node =
-                    Node::new_satisfied_constraint(db, smaller_constraint.when_true());
-
-                // smaller → larger
-                let implication = positive_smaller_node.implies(db, positive_larger_node);
-                domain = domain.and(db, implication);
 
                 // larger ∨ smaller = larger
                 simplified = simplified.substitute_union(
@@ -1767,11 +1749,6 @@ impl<'db> InteriorNode<'db> {
                     let negative_right_node =
                         Node::new_satisfied_constraint(db, right_constraint.when_false());
 
-                    // (left ∧ right) → intersection
-                    let implication = (positive_left_node.and(db, positive_right_node))
-                        .implies(db, positive_intersection_node);
-                    domain = domain.and(db, implication);
-
                     // left ∧ right = intersection
                     simplified = simplified.substitute_intersection(
                         db,
@@ -1836,11 +1813,6 @@ impl<'db> InteriorNode<'db> {
                     let positive_right_node =
                         Node::new_satisfied_constraint(db, right_constraint.when_true());
 
-                    // (left ∧ right) → false
-                    let implication = (positive_left_node.and(db, positive_right_node))
-                        .implies(db, Node::AlwaysFalse);
-                    domain = domain.and(db, implication);
-
                     // left ∧ right = false
                     simplified = simplified.substitute_intersection(
                         db,
@@ -1878,7 +1850,7 @@ impl<'db> InteriorNode<'db> {
             }
         }
 
-        (simplified, domain)
+        simplified
     }
 }
 
