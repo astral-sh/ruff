@@ -112,6 +112,14 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
     pub(crate) fn level(&self) -> usize {
         *self.level.borrow()
     }
+
+    pub(crate) fn inc_level(&self) {
+        *self.level.borrow_mut() += 1;
+    }
+
+    pub(crate) fn dec_level(&self) {
+        *self.level.borrow_mut() -= 1;
+    }
 }
 
 impl<Tag, T: Hash + Eq + Clone, R: Default + Clone> Default for CycleDetector<Tag, T, R> {

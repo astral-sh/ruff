@@ -278,6 +278,14 @@ impl<'db> RecursiveTypeNormalizedVisitor<'db> {
     fn level(&self) -> usize {
         self.transformer.level()
     }
+
+    fn inc_level(&self) {
+        self.transformer.inc_level();
+    }
+
+    fn dec_level(&self) {
+        self.transformer.dec_level();
+    }
 }
 
 /// How a generic type has been specialized.
@@ -8171,7 +8179,12 @@ impl<'db> KnownInstanceType<'db> {
                 Self::ConstraintSet(set)
             }
             Self::UnionType(union_type) => {
-                Self::UnionType(union_type.recursive_type_normalized_impl(db, visitor))
+                // The `Divergent` elimination rules are different within union types.
+                // See `Type::recursive_type_normalized_impl` for details.
+                visitor.dec_level();
+                let res = Self::UnionType(union_type.recursive_type_normalized_impl(db, visitor));
+                visitor.inc_level();
+                res
             }
             Self::Literal(ty) => Self::Literal(ty.recursive_type_normalized_impl(db, visitor)),
             Self::Annotated(ty) => Self::Annotated(ty.recursive_type_normalized_impl(db, visitor)),
