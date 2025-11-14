@@ -214,6 +214,9 @@ pub(crate) struct UnionBuilder<'db> {
     db: &'db dyn Db,
     unpack_aliases: bool,
     order_elements: bool,
+    // This is enabled when joining types in a `cycle_recovery` function.
+    // Since a cycle cannot be created within a `cycle_recovery` function, execution of `is_redundant_with` is skipped.
+    cycle_recovery: bool,
 }
 
 impl<'db> UnionBuilder<'db> {
@@ -223,6 +226,7 @@ impl<'db> UnionBuilder<'db> {
             elements: vec![],
             unpack_aliases: true,
             order_elements: false,
+            cycle_recovery: false,
         }
     }
 
@@ -233,6 +237,14 @@ impl<'db> UnionBuilder<'db> {
 
     pub(crate) fn order_elements(mut self, val: bool) -> Self {
         self.order_elements = val;
+        self
+    }
+
+    pub(crate) fn cycle_recovery(mut self, val: bool) -> Self {
+        self.cycle_recovery = val;
+        if self.cycle_recovery {
+            self.unpack_aliases = false;
+        }
         self
     }
 
@@ -466,7 +478,7 @@ impl<'db> UnionBuilder<'db> {
         // If an alias gets here, it means we aren't unpacking aliases, and we also
         // shouldn't try to simplify aliases out of the union, because that will require
         // unpacking them.
-        let should_simplify_full = !matches!(ty, Type::TypeAlias(_));
+        let should_simplify_full = !matches!(ty, Type::TypeAlias(_)) && !self.cycle_recovery;
 
         let mut to_remove = SmallVec::<[usize; 2]>::new();
         let ty_negated = if should_simplify_full {

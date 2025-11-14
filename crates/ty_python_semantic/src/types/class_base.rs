@@ -4,8 +4,8 @@ use crate::types::generics::Specialization;
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
-    MaterializationKind, MroError, MroIterator, NormalizedVisitor, SpecialFormType, Type,
-    TypeContext, TypeMapping, todo_type,
+    MaterializationKind, MroError, MroIterator, NormalizedVisitor, RecursiveTypeNormalizedVisitor,
+    SpecialFormType, Type, TypeContext, TypeMapping, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -18,7 +18,7 @@ use crate::types::{
 /// automatically construct the default specialization for that class.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum ClassBase<'db> {
-    Dynamic(DynamicType<'db>),
+    Dynamic(DynamicType),
     Class(ClassType<'db>),
     /// Although `Protocol` is not a class in typeshed's stubs, it is at runtime,
     /// and can appear in the MRO of a class.
@@ -39,6 +39,18 @@ impl<'db> ClassBase<'db> {
         match self {
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
+            Self::Protocol | Self::Generic | Self::TypedDict => self,
+        }
+    }
+
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        match self {
+            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.recursive_type_normalized()),
+            Self::Class(class) => Self::Class(class.recursive_type_normalized_impl(db, visitor)),
             Self::Protocol | Self::Generic | Self::TypedDict => self,
         }
     }

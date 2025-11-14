@@ -6,8 +6,8 @@ use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, KnownClass,
-    MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type, TypeContext,
-    TypeMapping, TypeRelation,
+    MaterializationKind, MemberLookupPolicy, NormalizedVisitor, RecursiveTypeNormalizedVisitor,
+    SpecialFormType, Type, TypeContext, TypeMapping, TypeRelation,
 };
 use crate::{Db, FxOrderSet};
 
@@ -193,6 +193,16 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        Self {
+            subclass_of: self.subclass_of.recursive_type_normalized_impl(db, visitor),
+        }
+    }
+
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
         match self.subclass_of {
             SubclassOfInner::Class(class) => Type::instance(db, class),
@@ -233,7 +243,7 @@ impl<'db> VarianceInferable<'db> for SubclassOfType<'db> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum SubclassOfInner<'db> {
     Class(ClassType<'db>),
-    Dynamic(DynamicType<'db>),
+    Dynamic(DynamicType),
 }
 
 impl<'db> SubclassOfInner<'db> {
@@ -252,7 +262,7 @@ impl<'db> SubclassOfInner<'db> {
         }
     }
 
-    pub(crate) const fn into_dynamic(self) -> Option<DynamicType<'db>> {
+    pub(crate) const fn into_dynamic(self) -> Option<DynamicType> {
         match self {
             Self::Class(_) => None,
             Self::Dynamic(dynamic) => Some(dynamic),
@@ -263,6 +273,17 @@ impl<'db> SubclassOfInner<'db> {
         match self {
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
+        }
+    }
+
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        match self {
+            Self::Class(class) => Self::Class(class.recursive_type_normalized_impl(db, visitor)),
+            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.recursive_type_normalized()),
         }
     }
 
@@ -283,8 +304,8 @@ impl<'db> From<ClassType<'db>> for SubclassOfInner<'db> {
     }
 }
 
-impl<'db> From<DynamicType<'db>> for SubclassOfInner<'db> {
-    fn from(value: DynamicType<'db>) -> Self {
+impl From<DynamicType> for SubclassOfInner<'_> {
+    fn from(value: DynamicType) -> Self {
         SubclassOfInner::Dynamic(value)
     }
 }

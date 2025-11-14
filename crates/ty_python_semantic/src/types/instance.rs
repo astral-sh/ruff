@@ -11,11 +11,11 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::walk_protocol_interface;
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
-    TypeMapping, TypeRelation, VarianceInferable,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor,
+    RecursiveTypeNormalizedVisitor, TypeContext, TypeMapping, TypeRelation, VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
 
@@ -72,10 +72,7 @@ impl<'db> Type<'db> {
     {
         Type::tuple(TupleType::heterogeneous(
             db,
-            elements
-                .into_iter()
-                .map(Into::into)
-                .map(|element| element.fallback_to_divergent(db)),
+            elements.into_iter().map(Into::into),
         ))
     }
 
@@ -203,7 +200,15 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
     nominal: NominalInstanceType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, nominal.class(db).into());
+    match nominal.0 {
+        NominalInstanceInner::ExactTuple(tuple) => {
+            walk_tuple_type(db, tuple, visitor);
+        }
+        NominalInstanceInner::Object => {}
+        NominalInstanceInner::NonTuple(class) => {
+            visitor.visit_type(db, class.into());
+        }
+    }
 }
 
 impl<'db> NominalInstanceType<'db> {
@@ -362,6 +367,22 @@ impl<'db> NominalInstanceType<'db> {
                 NominalInstanceInner::NonTuple(class.normalized_impl(db, visitor)),
             )),
             NominalInstanceInner::Object => Type::object(),
+        }
+    }
+
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        match self.0 {
+            NominalInstanceInner::ExactTuple(tuple) => Self(NominalInstanceInner::ExactTuple(
+                tuple.recursive_type_normalized_impl(db, visitor),
+            )),
+            NominalInstanceInner::NonTuple(class) => Self(NominalInstanceInner::NonTuple(
+                class.recursive_type_normalized_impl(db, visitor),
+            )),
+            NominalInstanceInner::Object => Self(NominalInstanceInner::Object),
         }
     }
 
@@ -716,6 +737,17 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        Self {
+            inner: self.inner.recursive_type_normalized_impl(db, visitor),
+            _phantom: PhantomData,
+        }
+    }
+
     /// Return `true` if this protocol type is equivalent to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
@@ -824,6 +856,21 @@ impl<'db> Protocol<'db> {
             Self::Synthesized(synthesized) => synthesized.interface(),
         }
     }
+
+    fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &crate::types::RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        match self {
+            Self::FromClass(class) => {
+                Self::FromClass(class.recursive_type_normalized_impl(db, visitor))
+            }
+            Self::Synthesized(synthesized) => {
+                Self::Synthesized(synthesized.recursive_type_normalized_impl(db, visitor))
+            }
+        }
+    }
 }
 
 impl<'db> VarianceInferable<'db> for Protocol<'db> {
@@ -892,6 +939,14 @@ mod synthesized_protocol {
 
         pub(in crate::types) fn interface(self) -> ProtocolInterface<'db> {
             self.0
+        }
+
+        pub(in crate::types) fn recursive_type_normalized_impl(
+            self,
+            db: &'db dyn Db,
+            visitor: &crate::types::RecursiveTypeNormalizedVisitor<'db>,
+        ) -> Self {
+            Self(self.0.recursive_type_normalized_impl(db, visitor))
         }
     }
 

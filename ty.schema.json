@@ -373,6 +373,16 @@
             }
           ]
         },
+        "cyclic-type-alias-definition": {
+          "title": "detects cyclic type alias definitions",
+          "description": "## What it does\nChecks for type alias definitions that (directly or mutually) refer to themselves.\n\n## Why is it bad?\nAlthough it is permitted to define a recursive type alias, it is not meaningful\nto have a type alias whose expansion can only result in itself, and is therefore not allowed.\n\n## Examples\n```python\ntype Itself = Itself\n\ntype A = B\ntype B = A\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "deprecated": {
           "title": "detects uses of deprecated items",
           "description": "## What it does\nChecks for uses of deprecated items\n\n## Why is this bad?\nDeprecated items should no longer be used.\n\n## Examples\n```python\n@warnings.deprecated(\"use new_func instead\")\ndef old_func(): ...\n\nold_func()  # emits [deprecated] diagnostic\n```",

@@ -82,8 +82,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
-    NormalizedVisitor, SpecialFormType, Truthiness, Type, TypeContext, TypeMapping, TypeRelation,
-    UnionBuilder, binding_type, todo_type, walk_signature,
+    NormalizedVisitor, RecursiveTypeNormalizedVisitor, SpecialFormType, Truthiness, Type,
+    TypeContext, TypeMapping, TypeRelation, UnionBuilder, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -1044,6 +1044,26 @@ impl<'db> FunctionType<'db> {
         let updated_last_definition_signature = self
             .updated_last_definition_signature(db)
             .map(|signature| signature.normalized_impl(db, visitor));
+        Self::new(
+            db,
+            literal,
+            updated_signature,
+            updated_last_definition_signature,
+        )
+    }
+
+    pub(crate) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        let literal = self.literal(db);
+        let updated_signature = self
+            .updated_signature(db)
+            .map(|signature| signature.recursive_type_normalized_impl(db, visitor));
+        let updated_last_definition_signature = self
+            .updated_last_definition_signature(db)
+            .map(|signature| signature.recursive_type_normalized_impl(db, visitor));
         Self::new(
             db,
             literal,
