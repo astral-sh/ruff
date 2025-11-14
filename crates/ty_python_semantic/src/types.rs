@@ -3412,16 +3412,18 @@ impl<'db> Type<'db> {
             match self {
                 Type::Union(union) => {
                     for element in union.elements(db) {
-                        element.visit_specialization(db, tcx, &mut *f);
+                        element.visit_specialization_impl(db, tcx, polarity, f, visitor);
                     }
                 }
                 Type::Intersection(intersection) => {
                     for element in intersection.positive(db) {
-                        element.visit_specialization(db, tcx, &mut *f);
+                        element.visit_specialization_impl(db, tcx, polarity, f, visitor);
                     }
                 }
                 Type::TypeAlias(alias) => visitor.visit(self, || {
-                    alias.value_type(db).visit_specialization(db, tcx, f);
+                    alias
+                        .value_type(db)
+                        .visit_specialization_impl(db, tcx, polarity, f, visitor);
                 }),
                 _ => {}
             }
