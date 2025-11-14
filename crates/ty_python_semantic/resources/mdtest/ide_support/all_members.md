@@ -736,12 +736,10 @@ from dataclasses import dataclass
 class C:
     x: int
 
-# TODO: add support for `__match_args__`:
-static_assert(has_member(C, "__match_args__"))  # error: [static-assert-error]
+static_assert(has_member(C, "__match_args__"))
 
 def _(c: C):
-    # TODO: add support for `__match_args__`:
-    static_assert(has_member(c, "__match_args__"))  # error: [static-assert-error]
+    static_assert(has_member(c, "__match_args__"))
 ```
 
 ### Attributes not available at runtime

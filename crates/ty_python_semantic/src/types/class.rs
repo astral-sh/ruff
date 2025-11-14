@@ -2375,6 +2375,26 @@ impl<'db> ClassLiteral<'db> {
 
                 Some(CallableType::function_like(db, signature))
             }
+            (CodeGeneratorKind::DataclassLike(_), "__match_args__") => {
+                if !has_dataclass_param(DataclassFlags::MATCH_ARGS) {
+                    return None;
+                }
+
+                let kw_only_default = has_dataclass_param(DataclassFlags::KW_ONLY);
+
+                let fields = self.fields(db, specialization, field_policy);
+                let match_args = fields
+                    .iter()
+                    .filter(|(_, field)| {
+                        if let FieldKind::Dataclass { init, kw_only, .. } = &field.kind {
+                            *init && !kw_only.unwrap_or(kw_only_default)
+                        } else {
+                            false
+                        }
+                    })
+                    .map(|(name, _)| Type::string_literal(db, name));
+                Some(Type::heterogeneous_tuple(db, match_args))
+            }
             (CodeGeneratorKind::DataclassLike(_), "__weakref__") => {
                 if !has_dataclass_param(DataclassFlags::WEAKREF_SLOT)
                     || !has_dataclass_param(DataclassFlags::SLOTS)
