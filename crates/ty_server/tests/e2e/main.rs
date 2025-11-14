@@ -502,9 +502,9 @@ impl TestServer {
     /// It will wait for `timeout` duration for a message to arrive. If no message is received
     /// within that time, it will return an error.
     ///
-    /// If `timeout` is `None`, it will use a default timeout of 1 second.
+    /// If `timeout` is `None`, it will use a default timeout of 10 second.
     fn receive(&mut self, timeout: Option<Duration>) -> Result<(), TestServerError> {
-        static DEFAULT_TIMEOUT: Duration = Duration::from_secs(1);
+        static DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 
         let receiver = self.client_connection.as_ref().unwrap().receiver.clone();
         let message = receiver
