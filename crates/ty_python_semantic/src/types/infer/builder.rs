@@ -6929,6 +6929,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ty
     }
 
+    #[track_caller]
     fn store_expression_type(&mut self, expression: &ast::Expr, ty: Type<'db>) {
         if self.deferred_state.in_string_annotation() {
             // Avoid storing the type of expressions that are part of a string annotation because
@@ -9464,7 +9465,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::KnownInstance(
                     KnownInstanceType::UnionType(_)
                     | KnownInstanceType::Literal(_)
-                    | KnownInstanceType::Annotated(_),
+                    | KnownInstanceType::Annotated(_)
+                    | KnownInstanceType::TypeGenericAlias(_),
                 ),
                 Type::ClassLiteral(..)
                 | Type::SubclassOf(..)
@@ -9473,7 +9475,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::KnownInstance(
                     KnownInstanceType::UnionType(_)
                     | KnownInstanceType::Literal(_)
-                    | KnownInstanceType::Annotated(_),
+                    | KnownInstanceType::Annotated(_)
+                    | KnownInstanceType::TypeGenericAlias(_),
                 ),
                 ast::Operator::BitOr,
             ) if pep_604_unions_allowed() => {
@@ -10634,7 +10637,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // special cases, too.
                 if class.is_tuple(self.db()) {
                     return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(slice));
+                } else if class.is_known(self.db(), KnownClass::Type) {
+                    let argument_ty = self.infer_type_expression(slice);
+                    return Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
+                        InternedType::new(self.db(), argument_ty),
+                    ));
                 }
+
                 if let Some(generic_context) = class.generic_context(self.db()) {
                     return self.infer_explicit_class_specialization(
                         subscript,
@@ -10770,6 +10779,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return self.infer_expression(slice, TypeContext::default());
                     }
                 }
+            }
+            Type::SpecialForm(SpecialFormType::Type) => {
+                // Similar to the branch above that handles `type[…]`, handle `typing.Type[…]`
+                let argument_ty = self.infer_type_expression(slice);
+                return Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
+                    InternedType::new(self.db(), argument_ty),
+                ));
             }
             _ => {}
         }

@@ -20,6 +20,18 @@ use crate::types::{
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer the type of a type expression.
     pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        // `DeferredExpressionState::InStringAnnotation` takes precedence over other states.
+        // However, if it's not a stringified annotation, we must still ensure that annotation expressions
+        // are always deferred in stub files.
+        match self.deferred_state {
+            DeferredExpressionState::None => {
+                if self.in_stub() {
+                    self.deferred_state = DeferredExpressionState::Deferred;
+                }
+            }
+            DeferredExpressionState::InStringAnnotation(_) | DeferredExpressionState::Deferred => {}
+        }
+
         let ty = self.infer_type_expression_no_store(expression);
         self.store_expression_type(expression, ty);
         ty
@@ -810,7 +822,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_type_expression(slice);
                     todo_type!("Generic specialization of types.UnionType")
                 }
-                KnownInstanceType::Literal(ty) => {
+                KnownInstanceType::Literal(ty) | KnownInstanceType::TypeGenericAlias(ty) => {
                     self.infer_type_expression(slice);
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(

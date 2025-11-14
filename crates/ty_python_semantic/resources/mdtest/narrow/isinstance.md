@@ -82,7 +82,7 @@ def _(x: int | str | bytes | memoryview | range):
     if isinstance(x, int | str):
         reveal_type(x)  # revealed: int | str
     elif isinstance(x, bytes | memoryview):
-        reveal_type(x)  # revealed: bytes | memoryview[Unknown]
+        reveal_type(x)  # revealed: bytes | memoryview[int]
     else:
         reveal_type(x)  # revealed: range
 ```
@@ -242,11 +242,11 @@ def _(flag: bool):
 def _(flag: bool):
     x = 1 if flag else "a"
 
-    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Unknown, ...]`, found `Literal["a"]"
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["a"]"
     if isinstance(x, "a"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 
-    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Unknown, ...]`, found `Literal["int"]"
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["int"]"
     if isinstance(x, "int"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 ```
