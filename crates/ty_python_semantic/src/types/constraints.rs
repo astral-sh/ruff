@@ -916,7 +916,7 @@ impl<'db> Node<'db> {
             _ => panic!("at least one type should be a typevar"),
         };
 
-        self.satisfies(db, constraint)
+        self.implies(db, constraint)
     }
 
     fn satisfied_by_all_typevars(
@@ -937,19 +937,13 @@ impl<'db> Node<'db> {
 
         // Returns if some specialization satisfies this constraint set.
         let some_specialization_satisfies = move |specializations: Node<'db>| {
-            let when_satisfied = specializations
-                .satisfies(db, self)
-                .and(db, specializations)
-                .simplify(db);
+            let when_satisfied = specializations.implies(db, self).and(db, specializations);
             !when_satisfied.is_never_satisfied(db)
         };
 
         // Returns if all specializations satisfy this constraint set.
         let all_specializations_satisfy = move |specializations: Node<'db>| {
-            let when_satisfied = specializations
-                .satisfies(db, self)
-                .and(db, specializations)
-                .simplify(db);
+            let when_satisfied = specializations.implies(db, self).and(db, specializations);
             when_satisfied
                 .iff(db, specializations)
                 .is_always_satisfied(db)
