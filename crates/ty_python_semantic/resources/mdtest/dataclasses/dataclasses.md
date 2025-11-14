@@ -461,7 +461,51 @@ del frozen.x  # TODO this should emit an [invalid-assignment]
 
 ### `match_args`
 
-To do
+If `match_args` is set to `True` (the default), the `__match_args__` attribute is a tuple created
+from the list of non keyword-only parameters to the synthesized `__init__` method (even if
+`__init__` is not actually generated).
+
+```py
+from dataclasses import dataclass, field
+
+@dataclass
+class WithMatchArgs:
+    normal_a: str
+    normal_b: int
+    kw_only: int = field(kw_only=True)
+
+reveal_type(WithMatchArgs.__match_args__)  # revealed: tuple[Literal["normal_a"], Literal["normal_b"]]
+
+@dataclass(kw_only=True)
+class KwOnlyDefaultMatchArgs:
+    normal_a: str = field(kw_only=False)
+    normal_b: int = field(kw_only=False)
+    kw_only: int
+
+reveal_type(KwOnlyDefaultMatchArgs.__match_args__)  # revealed: tuple[Literal["normal_a"], Literal["normal_b"]]
+
+@dataclass(match_args=True)
+class ExplicitMatchArgs:
+    normal: str
+
+reveal_type(ExplicitMatchArgs.__match_args__)  # revealed: tuple[Literal["normal"]]
+
+@dataclass
+class Empty: ...
+
+reveal_type(Empty.__match_args__)  # revealed: tuple[()]
+```
+
+When `match_args` is explicitly set to `False`, the `__match_args__` attribute is not available:
+
+```py
+@dataclass(match_args=False)
+class NoMatchArgs:
+    x: int
+    y: str
+
+NoMatchArgs.__match_args__  # error: [unresolved-attribute]
+```
 
 ### `kw_only`
 
@@ -623,7 +667,18 @@ reveal_type(B.__slots__)  # revealed: tuple[Literal["x"], Literal["y"]]
 
 ### `weakref_slot`
 
-To do
+When a dataclass is defined with `weakref_slot=True`, the `__weakref__` attribute is generated. For
+now, we do not attempt to infer a more precise type for it.
+
+```py
+from dataclasses import dataclass
+
+@dataclass(slots=True, weakref_slot=True)
+class C:
+    x: int
+
+reveal_type(C.__weakref__)  # revealed: Any | None
+```
 
 ## `Final` fields
 
