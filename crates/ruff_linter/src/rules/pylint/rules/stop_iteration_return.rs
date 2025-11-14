@@ -77,7 +77,7 @@ struct GeneratorAnalyzer<'a, 'b> {
     stop_iteration_raises: Vec<&'a ast::StmtRaise>,
 }
 
-impl<'a, 'b> Visitor<'a> for GeneratorAnalyzer<'a, 'b> {
+impl<'a> Visitor<'a> for GeneratorAnalyzer<'a, '_> {
     fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
         match stmt {
             ast::Stmt::FunctionDef(_) => {}
