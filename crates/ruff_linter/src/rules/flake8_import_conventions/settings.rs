@@ -18,9 +18,7 @@ const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("numpy.typing", "npt"),
     ("pandas", "pd"),
     ("plotly.express", "px"),
-    ("plotly.graph_objects", "go"),
     ("seaborn", "sns"),
-    ("statsmodels.api", "sm"),
     ("tensorflow", "tf"),
     ("tkinter", "tk"),
     ("holoviews", "hv"),
@@ -29,6 +27,9 @@ const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("pyarrow", "pa"),
     ("xml.etree.ElementTree", "ET"),
 ];
+
+const PREVIEW_ALIASES: &[(&str, &str)] =
+    &[("plotly.graph_objects", "go"), ("statsmodels.api", "sm")];
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -75,7 +76,14 @@ pub fn default_aliases() -> FxHashMap<String, String> {
         .collect::<FxHashMap<_, _>>()
 }
 
-pub fn default_banned_aliases() -> FxHashMap<String, BannedAliases> {
+pub fn preview_aliases() -> FxHashMap<String, String> {
+    PREVIEW_ALIASES
+        .iter()
+        .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+        .collect::<FxHashMap<_, _>>()
+}
+
+pub fn preview_banned_aliases() -> FxHashMap<String, BannedAliases> {
     FxHashMap::from_iter([(
         "geopandas".to_string(),
         BannedAliases::from_iter(["gpd".to_string()]),
@@ -86,7 +94,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             aliases: default_aliases(),
-            banned_aliases: default_banned_aliases(),
+            banned_aliases: FxHashMap::default(),
             banned_from: FxHashSet::default(),
         }
     }

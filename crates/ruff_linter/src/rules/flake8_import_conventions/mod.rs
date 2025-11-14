@@ -12,20 +12,20 @@ mod tests {
     use crate::assert_diagnostics;
     use crate::registry::Rule;
     use crate::rules::flake8_import_conventions::settings::{BannedAliases, default_aliases};
-    use crate::settings::LinterSettings;
+    use crate::settings::{LinterSettings, types::PreviewMode};
     use crate::test::test_path;
 
     #[test]
     fn defaults() -> Result<()> {
+        let mut settings = LinterSettings {
+            flake8_import_conventions: super::settings::Settings::default(),
+            ..LinterSettings::for_rules([Rule::UnconventionalImportAlias, Rule::BannedImportAlias])
+        };
+        // Enable preview mode to test preview-only conventions
+        settings.preview = PreviewMode::Enabled;
         let diagnostics = test_path(
             Path::new("flake8_import_conventions/defaults.py"),
-            &LinterSettings {
-                flake8_import_conventions: super::settings::Settings::default(),
-                ..LinterSettings::for_rules([
-                    Rule::UnconventionalImportAlias,
-                    Rule::BannedImportAlias,
-                ])
-            },
+            &settings,
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
