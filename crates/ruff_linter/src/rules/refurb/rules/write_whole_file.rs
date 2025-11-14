@@ -2,11 +2,9 @@ use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     self as ast, Expr, Stmt,
-    relocate::relocate_expr,
     visitor::{self, Visitor},
 };
-use ruff_python_codegen::Generator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
