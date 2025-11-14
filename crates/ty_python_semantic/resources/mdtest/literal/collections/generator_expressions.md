@@ -21,18 +21,17 @@ for s in squares:
     reveal_type(s)  # revealed: int
 ```
 
-When explicitly annotated, the yield type can be widened:
+`GeneratorType` is covariant in its yielded type, so it can be used where a wider yielded type is
+expected:
 
 ```py
-from types import GeneratorType
+from typing import Iterator
 
-maybe_ints: GeneratorType[int | None, None, None] = (x**2 for x in range(10))
+def process_numbers(x: Iterator[float]): ...
 
-def _():
-    reveal_type(maybe_ints)  # revealed: GeneratorType[int | None, None, None]
-
-    for s in maybe_ints:
-        reveal_type(s)  # revealed: int | None
+numbers = (x for x in range(10))
+reveal_type(numbers)  # revealed: GeneratorType[int, None, None]
+process_numbers(numbers)
 ```
 
 ## Async generators
