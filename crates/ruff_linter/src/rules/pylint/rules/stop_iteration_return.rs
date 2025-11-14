@@ -53,68 +53,65 @@ impl Violation for StopIterationReturn {
 }
 
 /// PLR1708
-pub(crate) fn stop_iteration_return(checker: &Checker, raise_stmt: &ast::StmtRaise) {
-    // Fast-path: only continue if this is `raise StopIteration` (with or without args)
-    let Some(exc) = &raise_stmt.exc else {
-        return;
+pub(crate) fn stop_iteration_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
+    let mut analyzer = GeneratorAnalyzer {
+        checker,
+        has_yield: false,
+        stop_iteration_raises: Vec::new(),
     };
 
-    let is_stop_iteration = match exc.as_ref() {
+    for stmt in &function_def.body {
+        analyzer.visit_stmt(stmt);
+    }
+
+    if analyzer.has_yield {
+        for raise_stmt in analyzer.stop_iteration_raises {
+            checker.report_diagnostic(StopIterationReturn, raise_stmt.range());
+        }
+    }
+}
+
+struct GeneratorAnalyzer<'a, 'b> {
+    checker: &'a Checker<'b>,
+    has_yield: bool,
+    stop_iteration_raises: Vec<&'a ast::StmtRaise>,
+}
+
+impl<'a, 'b> Visitor<'a> for GeneratorAnalyzer<'a, 'b> {
+    fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
+        match stmt {
+            ast::Stmt::FunctionDef(_) => {}
+            ast::Stmt::Raise(stmt_raise) => {
+                if is_stop_iteration_raise(stmt_raise, self.checker) {
+                    self.stop_iteration_raises.push(stmt_raise);
+                }
+                walk_stmt(self, stmt);
+            }
+            _ => walk_stmt(self, stmt),
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &'a ast::Expr) {
+        match expr {
+            ast::Expr::Lambda(_) => {}
+            ast::Expr::Yield(_) | ast::Expr::YieldFrom(_) => {
+                self.has_yield = true;
+                walk_expr(self, expr);
+            }
+            _ => walk_expr(self, expr),
+        }
+    }
+}
+
+fn is_stop_iteration_raise(stmt_raise: &ast::StmtRaise, checker: &Checker) -> bool {
+    let Some(exc) = &stmt_raise.exc else {
+        return false;
+    };
+
+    match exc.as_ref() {
         ast::Expr::Call(ast::ExprCall { func, .. }) => {
             checker.semantic().match_builtin_expr(func, "StopIteration")
         }
         expr => checker.semantic().match_builtin_expr(expr, "StopIteration"),
-    };
-
-    if !is_stop_iteration {
-        return;
     }
-
-    // Now check the (more expensive) generator context
-    if !in_generator_context(checker) {
-        return;
-    }
-
-    checker.report_diagnostic(StopIterationReturn, raise_stmt.range());
-}
-
-/// Returns true if we're inside a function that contains any `yield`/`yield from`.
-fn in_generator_context(checker: &Checker) -> bool {
-    if let ScopeKind::Function(function_def) = checker.semantic().current_scope().kind {
-        return contains_yield_statement(&function_def.body);
-    }
-    false
-}
-
-/// Check if a statement list contains any yield statements
-fn contains_yield_statement(body: &[ast::Stmt]) -> bool {
-    struct YieldFinder {
-        found: bool,
-    }
-
-    impl Visitor<'_> for YieldFinder {
-        fn visit_stmt(&mut self, stmt: &ast::Stmt) {
-            match stmt {
-                ast::Stmt::FunctionDef(_) | ast::Stmt::ClassDef(_) => {}
-                _ => walk_stmt(self, stmt),
-            }
-        }
-
-        fn visit_expr(&mut self, expr: &ast::Expr) {
-            if matches!(expr, ast::Expr::Yield(_) | ast::Expr::YieldFrom(_)) {
-                self.found = true;
-            } else {
-                walk_expr(self, expr);
-            }
-        }
-    }
-
-    let mut finder = YieldFinder { found: false };
-    for stmt in body {
-        finder.visit_stmt(stmt);
-        if finder.found {
-            return true;
-        }
-    }
-    false
 }

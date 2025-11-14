@@ -131,13 +131,20 @@ def generator_with_lambda():
     yield 2
 
 # See: https://github.com/astral-sh/ruff/issues/21162
-def f():
+def foo():
     def g():
         yield 1
-    raise StopIteration
+    raise StopIteration  # Should not trigger
 
 
-def g():
-    def f():
-        raise StopIteration
+def foo():
+    def g():
+        raise StopIteration  # Should not trigger
     yield 1
+
+# https://github.com/astral-sh/ruff/pull/21177#pullrequestreview-3430209718
+def foo():
+    yield 1
+    class C:
+        raise StopIteration  # Should trigger
+    yield C
