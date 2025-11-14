@@ -11,6 +11,7 @@ use crate::semantic_index::{
     attribute_scopes, global_scope, place_table, semantic_index, use_def_map,
 };
 use crate::types::call::{CallArguments, MatchedArgument};
+use crate::types::generics::Specialization;
 use crate::types::signatures::Signature;
 use crate::types::{CallDunderError, UnionType};
 use crate::types::{
@@ -27,6 +28,23 @@ use rustc_hash::FxHashSet;
 
 pub use resolve_definition::{ImportAliasResolution, ResolvedDefinition, map_stub_definition};
 use resolve_definition::{find_symbol_in_scope, resolve_definition};
+
+// `__init__`, `__repr__`, `__eq__`, `__ne__` and `__hash__` are always included via `object`,
+// so we don't need to list them here.
+const SYNTHETIC_DATACLASS_ATTRIBUTES: &[&str] = &[
+    "__lt__",
+    "__le__",
+    "__gt__",
+    "__ge__",
+    "__replace__",
+    "__setattr__",
+    "__delattr__",
+    "__slots__",
+    "__weakref__",
+    "__match_args__",
+    "__dataclass_fields__",
+    "__dataclass_params__",
+];
 
 pub(crate) fn all_declarations_and_bindings<'db>(
     db: &'db dyn Db,
@@ -119,13 +137,9 @@ impl<'db> AllMembers<'db> {
             ),
 
             Type::NominalInstance(instance) => {
-                let class_literal = instance.class_literal(db);
+                let (class_literal, specialization) = instance.class(db).class_literal(db);
                 self.extend_with_instance_members(db, ty, class_literal);
-
-                // If this is a NamedTuple instance, include members from NamedTupleFallback
-                if CodeGeneratorKind::NamedTuple.matches(db, class_literal, None) {
-                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
-                }
+                self.extend_with_synthetic_members(db, ty, class_literal, specialization);
             }
 
             Type::NewTypeInstance(newtype) => {
@@ -146,10 +160,7 @@ impl<'db> AllMembers<'db> {
 
             Type::ClassLiteral(class_literal) => {
                 self.extend_with_class_members(db, ty, class_literal);
-
-                if CodeGeneratorKind::NamedTuple.matches(db, class_literal, None) {
-                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
-                }
+                self.extend_with_synthetic_members(db, ty, class_literal, None);
 
                 if let Type::ClassLiteral(meta_class_literal) = ty.to_meta_type(db) {
                     self.extend_with_class_members(db, ty, meta_class_literal);
@@ -158,23 +169,15 @@ impl<'db> AllMembers<'db> {
 
             Type::GenericAlias(generic_alias) => {
                 let class_literal = generic_alias.origin(db);
-                if CodeGeneratorKind::NamedTuple.matches(db, class_literal, None) {
-                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
-                }
                 self.extend_with_class_members(db, ty, class_literal);
+                self.extend_with_synthetic_members(db, ty, class_literal, None);
             }
 
             Type::SubclassOf(subclass_of_type) => {
                 if let Some(class_type) = subclass_of_type.subclass_of().into_class() {
-                    let class_literal = class_type.class_literal(db).0;
+                    let (class_literal, specialization) = class_type.class_literal(db);
                     self.extend_with_class_members(db, ty, class_literal);
-
-                    if CodeGeneratorKind::NamedTuple.matches(db, class_literal, None) {
-                        self.extend_with_type(
-                            db,
-                            KnownClass::NamedTupleFallback.to_class_literal(db),
-                        );
-                    }
+                    self.extend_with_synthetic_members(db, ty, class_literal, specialization);
                 }
             }
 
@@ -412,6 +415,36 @@ impl<'db> AllMembers<'db> {
                     ty,
                 });
             }
+        }
+    }
+
+    fn extend_with_synthetic_members(
+        &mut self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        class_literal: ClassLiteral<'db>,
+        specialization: Option<Specialization<'db>>,
+    ) {
+        match CodeGeneratorKind::from_class(db, class_literal, specialization) {
+            Some(CodeGeneratorKind::NamedTuple) => {
+                if ty.is_nominal_instance() {
+                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_instance(db));
+                } else {
+                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
+                }
+            }
+            Some(CodeGeneratorKind::TypedDict) => {}
+            Some(CodeGeneratorKind::DataclassLike(_)) => {
+                for attr in SYNTHETIC_DATACLASS_ATTRIBUTES {
+                    if let Place::Defined(synthetic_member, _, _) = ty.member(db, attr).place {
+                        self.members.insert(Member {
+                            name: Name::from(*attr),
+                            ty: synthetic_member,
+                        });
+                    }
+                }
+            }
+            None => {}
         }
     }
 }
