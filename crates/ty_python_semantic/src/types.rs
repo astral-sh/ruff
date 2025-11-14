@@ -1708,7 +1708,7 @@ impl<'db> Type<'db> {
         if let TypeRelation::ConstraintImplication(constraints) = relation
             && (self.is_type_var() || target.is_type_var())
         {
-            return constraints.when_subtype_of_given(db, self, target);
+            return constraints.implies_subtype_of(db, self, target);
         }
 
         match (self, target) {
@@ -10493,9 +10493,9 @@ pub(crate) enum TypeRelation<'db> {
     /// whether `T ≤ int`, then the answer will depend on what constraint set you are considering:
     ///
     /// ```text
-    /// when_subtype_of_given(T ≤ bool, T, int) ⇒ true
-    /// when_subtype_of_given(T ≤ int, T, int)  ⇒ true
-    /// when_subtype_of_given(T ≤ str, T, int)  ⇒ false
+    /// implies_subtype_of(T ≤ bool, T, int) ⇒ true
+    /// implies_subtype_of(T ≤ int, T, int)  ⇒ true
+    /// implies_subtype_of(T ≤ str, T, int)  ⇒ false
     /// ```
     ///
     /// In the first two cases, the constraint set ensures that `T` will always specialize to a
@@ -10506,13 +10506,13 @@ pub(crate) enum TypeRelation<'db> {
     /// There are two constraint sets that deserve special consideration.
     ///
     /// - The "always true" constraint set does not place any restrictions on any typevar. In this
-    ///   case, `when_subtype_of_given` will return the same result as `when_subtype_of`, even if
+    ///   case, `implies_subtype_of` will return the same result as `when_subtype_of`, even if
     ///   you're comparing against a typevar.
     ///
     /// - The "always false" constraint set represents an impossible situation. In this case, every
     ///   subtype check will be vacuously true, even if you're comparing two concrete types that
-    ///   are not actually subtypes of each other. (That is,
-    ///   `when_subtype_of_given(false, int, str)` will return true!)
+    ///   are not actually subtypes of each other. (That is, `implies_subtype_of(false, int, str)`
+    ///   will return true!)
     ConstraintImplication(ConstraintSet<'db>),
 }
 
