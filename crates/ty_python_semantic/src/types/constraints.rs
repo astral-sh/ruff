@@ -1464,6 +1464,8 @@ impl<'db> InteriorNode<'db> {
                         path.assignments[new_range]
                             .iter()
                             .filter(|assignment| {
+                                // Don't add back any derived facts if they reference the typevar
+                                // that we're trying to remove!
                                 !assignment
                                     .constraint()
                                     .typevar(db)
@@ -1482,6 +1484,8 @@ impl<'db> InteriorNode<'db> {
                         path.assignments[new_range]
                             .iter()
                             .filter(|assignment| {
+                                // Don't add back any derived facts if they reference the typevar
+                                // that we're trying to remove!
                                 !assignment
                                     .constraint()
                                     .typevar(db)
