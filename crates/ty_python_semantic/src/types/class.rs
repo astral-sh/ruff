@@ -2404,7 +2404,7 @@ impl<'db> ClassLiteral<'db> {
 
                 // This could probably be `weakref | None`, but it does not seem important enough to
                 // model it precisely.
-                Some(Type::any())
+                Some(UnionType::from_elements(db, [Type::any(), Type::none(db)]))
             }
             (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
                 KnownClass::NamedTupleFallback

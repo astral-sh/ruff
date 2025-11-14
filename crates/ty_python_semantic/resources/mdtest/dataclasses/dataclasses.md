@@ -677,7 +677,7 @@ from dataclasses import dataclass
 class C:
     x: int
 
-reveal_type(C.__weakref__)  # revealed: Any
+reveal_type(C.__weakref__)  # revealed: Any | None
 ```
 
 ## `Final` fields
