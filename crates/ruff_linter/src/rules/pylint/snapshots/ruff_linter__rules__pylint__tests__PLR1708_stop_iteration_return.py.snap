@@ -113,7 +113,7 @@ PLR1708 Explicit `raise StopIteration` in generator
     |
 147 |     yield 1
 148 |     class C:
-149 |         raise StopIteration
+149 |         raise StopIteration  # Should trigger
     |         ^^^^^^^^^^^^^^^^^^^
 150 |     yield C
     |
