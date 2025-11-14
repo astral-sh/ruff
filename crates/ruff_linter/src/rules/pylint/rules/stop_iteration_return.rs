@@ -3,7 +3,6 @@ use ruff_python_ast::{
     self as ast,
     visitor::{Visitor, walk_expr, walk_stmt},
 };
-use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
