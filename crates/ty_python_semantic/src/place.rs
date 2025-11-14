@@ -10,9 +10,9 @@ use crate::semantic_index::{
 };
 use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
-    ApplyTypeMappingVisitor, DynamicType, KnownClass, MaterializationKind, Truthiness, Type,
-    TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type, declaration_type,
-    todo_type,
+    ApplyTypeMappingVisitor, DynamicType, KnownClass, MaterializationKind, MemberLookupPolicy,
+    Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type,
+    declaration_type, todo_type,
 };
 use crate::{Db, FxOrderSet, Program, resolve_module};
 
@@ -364,7 +364,9 @@ pub(crate) fn imported_symbol<'db>(
         } else if name == "__builtins__" {
             Place::bound(Type::any()).into()
         } else {
-            KnownClass::ModuleType.to_instance(db).member(db, name)
+            KnownClass::ModuleType
+                .to_instance(db)
+                .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NO_GETATTR_LOOKUP)
         }
     })
 }
@@ -1374,7 +1376,9 @@ mod implicit_globals {
     use crate::place::{Definedness, PlaceAndQualifiers, TypeOrigin};
     use crate::semantic_index::symbol::Symbol;
     use crate::semantic_index::{place_table, use_def_map};
-    use crate::types::{CallableType, KnownClass, Parameter, Parameters, Signature, Type};
+    use crate::types::{
+        CallableType, KnownClass, MemberLookupPolicy, Parameter, Parameters, Signature, Type,
+    };
     use ruff_python_ast::PythonVersion;
 
     use super::{Place, place_from_declarations};
@@ -1473,7 +1477,13 @@ mod implicit_globals {
                 .iter()
                 .any(|module_type_member| &**module_type_member == name) =>
             {
-                KnownClass::ModuleType.to_instance(db).member(db, name)
+                KnownClass::ModuleType
+                    .to_instance(db)
+                    .member_lookup_with_policy(
+                        db,
+                        name.into(),
+                        MemberLookupPolicy::NO_GETATTR_LOOKUP,
+                    )
             }
 
             _ => Place::Undefined.into(),

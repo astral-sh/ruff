@@ -396,3 +396,34 @@ B = NewType("B", list[Any])
 T = TypeVar("T")
 C = NewType("C", list[T])  # TODO: should be "error: [invalid-newtype]"
 ```
+
+## Forward references in stub files
+
+Stubs natively support forward references, so patterns that would raise `NameError` at runtime are
+allowed in stub files:
+
+`stub.pyi`:
+
+```pyi
+from typing import NewType
+
+N = NewType("N", A)
+
+class A: ...
+```
+
+`main.py`:
+
+```py
+from stub import N, A
+
+n = N(A())  # fine
+
+def f(x: A): ...
+
+f(n)  # fine
+
+class Invalid: ...
+
+bad = N(Invalid())  # error: [invalid-argument-type]
+```

@@ -2034,7 +2034,7 @@ pub(super) fn report_index_out_of_bounds(
 /// Emit a diagnostic declaring that a type does not support subscripting.
 pub(super) fn report_non_subscriptable(
     context: &InferContext,
-    node: AnyNodeRef,
+    node: &ast::ExprSubscript,
     non_subscriptable_ty: Type,
     method: &str,
 ) {
@@ -3063,6 +3063,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
     typed_dict_node: AnyNodeRef,
     key_node: AnyNodeRef,
     typed_dict_ty: Type<'db>,
+    full_object_ty: Option<Type<'db>>,
     key_ty: Type<'db>,
     items: &FxOrderMap<Name, Field<'db>>,
 ) {
@@ -3077,11 +3078,21 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                     "Invalid key for TypedDict `{typed_dict_name}`",
                 ));
 
-                diagnostic.annotate(
+                diagnostic.annotate(if let Some(full_object_ty) = full_object_ty {
+                    context.secondary(typed_dict_node).message(format_args!(
+                        "TypedDict `{typed_dict_name}` in {kind} type `{full_object_ty}`",
+                        kind = if full_object_ty.is_union() {
+                            "union"
+                        } else {
+                            "intersection"
+                        },
+                        full_object_ty = full_object_ty.display(db)
+                    ))
+                } else {
                     context
                         .secondary(typed_dict_node)
-                        .message(format_args!("TypedDict `{typed_dict_name}`")),
-                );
+                        .message(format_args!("TypedDict `{typed_dict_name}`"))
+                });
 
                 let existing_keys = items.iter().map(|(name, _)| name.as_str());
 
@@ -3093,15 +3104,23 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         String::new()
                     }
                 ));
-
-                diagnostic
             }
-            _ => builder.into_diagnostic(format_args!(
-                "Invalid key for TypedDict `{}` of type `{}`",
-                typed_dict_ty.display(db),
-                key_ty.display(db),
-            )),
-        };
+            _ => {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "TypedDict `{}` can only be subscripted with string literal keys, \
+                     got key of type `{}`",
+                    typed_dict_ty.display(db),
+                    key_ty.display(db),
+                ));
+
+                if let Some(full_object_ty) = full_object_ty {
+                    diagnostic.info(format_args!(
+                        "The full type of the subscripted object is `{}`",
+                        full_object_ty.display(db)
+                    ));
+                }
+            }
+        }
     }
 }
 

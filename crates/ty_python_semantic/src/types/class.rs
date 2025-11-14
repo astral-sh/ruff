@@ -550,7 +550,7 @@ impl<'db> ClassType<'db> {
                 ClassBase::Dynamic(_) => match relation {
                     TypeRelation::Subtyping
                     | TypeRelation::Redundancy
-                    | TypeRelation::ConstraintImplication(_) => {
+                    | TypeRelation::SubtypingAssuming(_) => {
                         ConstraintSet::from(other.is_object(db))
                     }
                     TypeRelation::Assignability => ConstraintSet::from(!other.is_final(db)),
@@ -1478,14 +1478,9 @@ impl<'db> ClassLiteral<'db> {
         visitor.typevars.into_inner()
     }
 
-    /// Returns the generic context that should be inherited by any constructor methods of this
-    /// class.
-    ///
-    /// When inferring a specialization of the class's generic context from a constructor call, we
-    /// promote any typevars that are inferred as a literal to the corresponding instance type.
+    /// Returns the generic context that should be inherited by any constructor methods of this class.
     fn inherited_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         self.generic_context(db)
-            .map(|generic_context| generic_context.promote_literals(db))
     }
 
     pub(super) fn file(self, db: &dyn Db) -> File {
@@ -2124,18 +2119,25 @@ impl<'db> ClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> Member<'db> {
-        if name == "__dataclass_fields__" && self.dataclass_params(db).is_some() {
-            // Make this class look like a subclass of the `DataClassInstance` protocol
-            return Member {
-                inner: Place::declared(KnownClass::Dict.to_specialized_instance(
-                    db,
-                    [
-                        KnownClass::Str.to_instance(db),
-                        KnownClass::Field.to_specialized_instance(db, [Type::any()]),
-                    ],
-                ))
-                .with_qualifiers(TypeQualifiers::CLASS_VAR),
-            };
+        if self.dataclass_params(db).is_some() {
+            if name == "__dataclass_fields__" {
+                // Make this class look like a subclass of the `DataClassInstance` protocol
+                return Member {
+                    inner: Place::declared(KnownClass::Dict.to_specialized_instance(
+                        db,
+                        [
+                            KnownClass::Str.to_instance(db),
+                            KnownClass::Field.to_specialized_instance(db, [Type::any()]),
+                        ],
+                    ))
+                    .with_qualifiers(TypeQualifiers::CLASS_VAR),
+                };
+            } else if name == "__dataclass_params__" {
+                // There is no typeshed class for this. For now, we model it as `Any`.
+                return Member {
+                    inner: Place::declared(Type::any()).with_qualifiers(TypeQualifiers::CLASS_VAR),
+                };
+            }
         }
 
         if CodeGeneratorKind::NamedTuple.matches(db, self, specialization) {
@@ -2370,6 +2372,41 @@ impl<'db> ClassLiteral<'db> {
 
                 Some(CallableType::function_like(db, signature))
             }
+            (CodeGeneratorKind::DataclassLike(_), "__match_args__")
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
+            {
+                if !has_dataclass_param(DataclassFlags::MATCH_ARGS) {
+                    return None;
+                }
+
+                let kw_only_default = has_dataclass_param(DataclassFlags::KW_ONLY);
+
+                let fields = self.fields(db, specialization, field_policy);
+                let match_args = fields
+                    .iter()
+                    .filter(|(_, field)| {
+                        if let FieldKind::Dataclass { init, kw_only, .. } = &field.kind {
+                            *init && !kw_only.unwrap_or(kw_only_default)
+                        } else {
+                            false
+                        }
+                    })
+                    .map(|(name, _)| Type::string_literal(db, name));
+                Some(Type::heterogeneous_tuple(db, match_args))
+            }
+            (CodeGeneratorKind::DataclassLike(_), "__weakref__")
+                if Program::get(db).python_version(db) >= PythonVersion::PY311 =>
+            {
+                if !has_dataclass_param(DataclassFlags::WEAKREF_SLOT)
+                    || !has_dataclass_param(DataclassFlags::SLOTS)
+                {
+                    return None;
+                }
+
+                // This could probably be `weakref | None`, but it does not seem important enough to
+                // model it precisely.
+                Some(UnionType::from_elements(db, [Type::any(), Type::none(db)]))
+            }
             (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
                 KnownClass::NamedTupleFallback
                     .to_class_literal(db)
@@ -2418,7 +2455,9 @@ impl<'db> ClassLiteral<'db> {
                 }
                 None
             }
-            (CodeGeneratorKind::DataclassLike(_), "__slots__") => {
+            (CodeGeneratorKind::DataclassLike(_), "__slots__")
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
+            {
                 has_dataclass_param(DataclassFlags::SLOTS).then(|| {
                     let fields = self.fields(db, specialization, field_policy);
                     let slots = fields.keys().map(|name| Type::string_literal(db, name));
@@ -3121,30 +3160,47 @@ impl<'db> ClassLiteral<'db> {
             union_of_inferred_types = union_of_inferred_types.add(Type::unknown());
         }
 
-        for (attribute_assignments, method_scope_id) in
+        for (attribute_assignments, attribute_binding_scope_id) in
             attribute_assignments(db, class_body_scope, &name)
         {
-            let method_scope = index.scope(method_scope_id);
-            if !is_valid_scope(method_scope) {
+            let binding_scope = index.scope(attribute_binding_scope_id);
+            if !is_valid_scope(binding_scope) {
                 continue;
             }
 
-            // The attribute assignment inherits the reachability of the method which contains it
-            let is_method_reachable = if let Some(method_def) = method_scope.node().as_function() {
-                let method = index.expect_single_definition(method_def);
-                let method_place = class_table
-                    .symbol_id(&method_def.node(&module).name)
-                    .unwrap();
-                class_map
-                    .all_reachable_symbol_bindings(method_place)
-                    .find_map(|bind| {
-                        (bind.binding.is_defined_and(|def| def == method))
-                            .then(|| class_map.binding_reachability(db, &bind))
-                    })
-                    .unwrap_or(Truthiness::AlwaysFalse)
-            } else {
-                Truthiness::AlwaysFalse
+            let scope_for_reachability_analysis = {
+                if binding_scope.node().as_function().is_some() {
+                    binding_scope
+                } else if binding_scope.is_eager() {
+                    let mut eager_scope_parent = binding_scope;
+                    while eager_scope_parent.is_eager()
+                        && let Some(parent) = eager_scope_parent.parent()
+                    {
+                        eager_scope_parent = index.scope(parent);
+                    }
+                    eager_scope_parent
+                } else {
+                    binding_scope
+                }
             };
+
+            // The attribute assignment inherits the reachability of the method which contains it
+            let is_method_reachable =
+                if let Some(method_def) = scope_for_reachability_analysis.node().as_function() {
+                    let method = index.expect_single_definition(method_def);
+                    let method_place = class_table
+                        .symbol_id(&method_def.node(&module).name)
+                        .unwrap();
+                    class_map
+                        .all_reachable_symbol_bindings(method_place)
+                        .find_map(|bind| {
+                            (bind.binding.is_defined_and(|def| def == method))
+                                .then(|| class_map.binding_reachability(db, &bind))
+                        })
+                        .unwrap_or(Truthiness::AlwaysFalse)
+                } else {
+                    Truthiness::AlwaysFalse
+                };
             if is_method_reachable.is_always_false() {
                 continue;
             }

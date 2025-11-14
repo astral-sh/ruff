@@ -190,7 +190,7 @@ impl<'db> ConstraintSet<'db> {
         let (lower, upper) = match relation {
             TypeRelation::Subtyping
             | TypeRelation::Redundancy
-            | TypeRelation::ConstraintImplication(_) => (
+            | TypeRelation::SubtypingAssuming(_) => (
                 lower.top_materialization(db),
                 upper.bottom_materialization(db),
             ),
@@ -218,14 +218,14 @@ impl<'db> ConstraintSet<'db> {
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
     /// constraints in this constraint set hold. Panics if neither of the types being compared are
     /// a typevar. (That case is handled by `Type::has_relation_to`.)
-    pub(crate) fn when_subtype_of_given(
+    pub(crate) fn implies_subtype_of(
         self,
         db: &'db dyn Db,
         lhs: Type<'db>,
         rhs: Type<'db>,
     ) -> Self {
         Self {
-            node: self.node.when_subtype_of_given(db, lhs, rhs),
+            node: self.node.implies_subtype_of(db, lhs, rhs),
         }
     }
 
@@ -813,7 +813,7 @@ impl<'db> Node<'db> {
         simplified.and(db, domain)
     }
 
-    fn when_subtype_of_given(self, db: &'db dyn Db, lhs: Type<'db>, rhs: Type<'db>) -> Self {
+    fn implies_subtype_of(self, db: &'db dyn Db, lhs: Type<'db>, rhs: Type<'db>) -> Self {
         // When checking subtyping involving a typevar, we can turn the subtyping check into a
         // constraint (i.e, "is `T` a subtype of `int` becomes the constraint `T ≤ int`), and then
         // check when the BDD implies that constraint.

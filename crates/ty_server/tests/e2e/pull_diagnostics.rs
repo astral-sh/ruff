@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::Result;
 use insta::{assert_compact_debug_snapshot, assert_debug_snapshot};
 use lsp_server::RequestId;
@@ -9,7 +11,7 @@ use lsp_types::{
 use ruff_db::system::SystemPath;
 use ty_server::{ClientOptions, DiagnosticMode, PartialWorkspaceProgress};
 
-use crate::{TestServer, TestServerBuilder, TestServerError};
+use crate::{AwaitResponseError, TestServer, TestServerBuilder};
 
 #[test]
 fn on_did_open() -> Result<()> {
@@ -26,11 +28,11 @@ def foo() -> str:
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .enable_pull_diagnostics(true)
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, &foo_content, 1);
-    let diagnostics = server.document_diagnostic_request(foo, None)?;
+    let diagnostics = server.document_diagnostic_request(foo, None);
 
     assert_debug_snapshot!(diagnostics);
 
@@ -52,13 +54,13 @@ def foo() -> str:
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .enable_pull_diagnostics(true)
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, &foo_content, 1);
 
     // First request with no previous result ID
-    let first_response = server.document_diagnostic_request(foo, None)?;
+    let first_response = server.document_diagnostic_request(foo, None);
 
     // Extract result ID from first response
     let result_id = match &first_response {
@@ -74,7 +76,7 @@ def foo() -> str:
     };
 
     // Second request with the previous result ID - should return Unchanged
-    let second_response = server.document_diagnostic_request(foo, Some(result_id))?;
+    let second_response = server.document_diagnostic_request(foo, Some(result_id));
 
     // Verify it's an unchanged report
     match second_response {
@@ -108,13 +110,13 @@ def foo() -> str:
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content_v1)?
         .enable_pull_diagnostics(true)
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, &foo_content_v1, 1);
 
     // First request with no previous result ID
-    let first_response = server.document_diagnostic_request(foo, None)?;
+    let first_response = server.document_diagnostic_request(foo, None);
 
     // Extract result ID from first response
     let result_id = match &first_response {
@@ -141,7 +143,7 @@ def foo() -> str:
     );
 
     // Second request with the previous result ID - should return a new full report
-    let second_response = server.document_diagnostic_request(foo, Some(result_id))?;
+    let second_response = server.document_diagnostic_request(foo, Some(result_id));
 
     // Verify it's a full report (not unchanged)
     match second_response {
@@ -228,16 +230,14 @@ def foo() -> str:
         .with_file(file_d, file_d_content_v1)?
         .with_file(file_e, file_e_content_v1)?
         .enable_pull_diagnostics(true)
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
     server.open_text_document(file_a, &file_a_content, 1);
 
     // First request with no previous result IDs
-    let mut first_response = server.workspace_diagnostic_request(
-        Some(NumberOrString::String("progress-1".to_string())),
-        None,
-    )?;
+    let mut first_response = server
+        .workspace_diagnostic_request(Some(NumberOrString::String("progress-1".to_string())), None);
     sort_workspace_diagnostic_response(&mut first_response);
 
     assert_debug_snapshot!("workspace_diagnostic_initial_state", first_response);
@@ -309,7 +309,7 @@ def foo() -> str:
     let mut second_response = server.workspace_diagnostic_request(
         Some(NumberOrString::String("progress-2".to_string())),
         Some(previous_result_ids),
-    )?;
+    );
     sort_workspace_diagnostic_response(&mut second_response);
 
     // Consume all progress notifications sent during the second workspace diagnostics
@@ -339,10 +339,10 @@ def foo() -> str:
             ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .enable_pull_diagnostics(true)
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
-    let first_response = server.workspace_diagnostic_request(None, None).unwrap();
+    let first_response = server.workspace_diagnostic_request(None, None);
 
     // Extract result IDs from the first response
     let mut previous_result_ids = extract_result_ids_from_response(&first_response);
@@ -366,7 +366,7 @@ def foo() -> str:
     // The server needs to match the previous result IDs by the path, not the URL.
     assert_workspace_diagnostics_suspends_for_long_polling(&mut server, &workspace_request_id);
 
-    let second_response = shutdown_and_await_workspace_diagnostic(server, &workspace_request_id)?;
+    let second_response = shutdown_and_await_workspace_diagnostic(server, &workspace_request_id);
 
     assert_compact_debug_snapshot!(second_response, @"Report(WorkspaceDiagnosticReport { items: [] })");
 
@@ -382,7 +382,7 @@ fn filter_result_id() -> insta::internals::SettingsBindDropGuard {
 
 fn consume_all_progress_notifications(server: &mut TestServer) -> Result<()> {
     // Always consume Begin
-    let begin_params = server.await_notification::<lsp_types::notification::Progress>()?;
+    let begin_params = server.await_notification::<lsp_types::notification::Progress>();
 
     // The params are already the ProgressParams type
     let lsp_types::ProgressParamsValue::WorkDone(lsp_types::WorkDoneProgress::Begin(_)) =
@@ -394,7 +394,7 @@ fn consume_all_progress_notifications(server: &mut TestServer) -> Result<()> {
     // Consume Report notifications - there may be multiple based on number of files
     // Keep consuming until we hit the End notification
     loop {
-        let params = server.await_notification::<lsp_types::notification::Progress>()?;
+        let params = server.await_notification::<lsp_types::notification::Progress>();
 
         if let lsp_types::ProgressParamsValue::WorkDone(lsp_types::WorkDoneProgress::End(_)) =
             params.value
@@ -442,8 +442,8 @@ def foo() -> str:
 
     let mut server = builder
         .enable_pull_diagnostics(true)
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
     let partial_token = lsp_types::ProgressToken::String("streaming-diagnostics".to_string());
     let request_id = server.send_request::<WorkspaceDiagnosticRequest>(WorkspaceDiagnosticParams {
@@ -461,7 +461,7 @@ def foo() -> str:
 
     // First, read the response of the workspace diagnostic request.
     // Note: This response comes after the progress notifications but it simplifies the test to read it first.
-    let final_response = server.await_response::<WorkspaceDiagnosticRequest>(&request_id)?;
+    let final_response = server.await_response::<WorkspaceDiagnosticRequest>(&request_id);
 
     // Process the final report.
     // This should always be a partial report. However, the type definition in the LSP specification
@@ -478,7 +478,9 @@ def foo() -> str:
     received_results += response_items.len();
 
     // Collect any partial results sent via progress notifications
-    while let Ok(params) = server.await_notification::<PartialWorkspaceProgress>() {
+    while let Ok(params) =
+        server.try_await_notification::<PartialWorkspaceProgress>(Some(Duration::from_secs(1)))
+    {
         if params.token == partial_token {
             let streamed_items = match params.value {
                 // Ideally we'd assert that only the first response is a full report
@@ -531,15 +533,15 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
 
     let mut server = builder
         .enable_pull_diagnostics(true)
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
     server.open_text_document(SystemPath::new("src/error_0.py"), &error_content, 1);
     server.open_text_document(SystemPath::new("src/error_1.py"), &error_content, 1);
     server.open_text_document(SystemPath::new("src/error_2.py"), &error_content, 1);
 
     // First request to get result IDs (non-streaming for simplicity)
-    let first_response = server.workspace_diagnostic_request(None, None)?;
+    let first_response = server.workspace_diagnostic_request(None, None);
 
     let result_ids = extract_result_ids_from_response(&first_response);
 
@@ -590,7 +592,7 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
             },
         });
 
-    let final_response2 = server.await_response::<WorkspaceDiagnosticRequest>(&request2_id)?;
+    let final_response2 = server.await_response::<WorkspaceDiagnosticRequest>(&request2_id);
 
     let mut all_items = Vec::new();
 
@@ -605,7 +607,9 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
     all_items.extend(items);
 
     // Collect any partial results sent via progress notifications
-    while let Ok(params) = server.await_notification::<PartialWorkspaceProgress>() {
+    while let Ok(params) =
+        server.try_await_notification::<PartialWorkspaceProgress>(Some(Duration::from_secs(1)))
+    {
         if params.token == partial_token {
             let streamed_items = match params.value {
                 // Ideally we'd assert that only the first response is a full report
@@ -679,7 +683,7 @@ def hello() -> str:
     assert_workspace_diagnostics_suspends_for_long_polling(&mut server, &request_id);
 
     // The workspace diagnostic request should now respond with an empty report
-    let workspace_response = shutdown_and_await_workspace_diagnostic(server, &request_id)?;
+    let workspace_response = shutdown_and_await_workspace_diagnostic(server, &request_id);
 
     // Verify we got an empty report (default response during shutdown)
     assert_debug_snapshot!(
@@ -733,7 +737,7 @@ def hello() -> str:
     );
 
     // The workspace diagnostic request should now complete with the new diagnostic
-    let workspace_response = server.await_response::<WorkspaceDiagnosticRequest>(&request_id)?;
+    let workspace_response = server.await_response::<WorkspaceDiagnosticRequest>(&request_id);
 
     // Verify we got a report with one file containing the new diagnostic
     assert_debug_snapshot!(
@@ -775,7 +779,7 @@ def hello() -> str:
     server.cancel(&request_id);
 
     // The workspace diagnostic request should now respond with a cancellation response (Err).
-    let result = server.await_response::<WorkspaceDiagnosticRequest>(&request_id);
+    let result = server.try_await_response::<WorkspaceDiagnosticRequest>(&request_id, None);
     assert_debug_snapshot!(
         "workspace_diagnostic_long_polling_cancellation_result",
         result
@@ -833,7 +837,7 @@ def hello() -> str:
     );
 
     // First request should complete with diagnostics
-    let first_response = server.await_response::<WorkspaceDiagnosticRequest>(&request_id_1)?;
+    let first_response = server.await_response::<WorkspaceDiagnosticRequest>(&request_id_1);
 
     // Extract result IDs from the first response for the second request
     let previous_result_ids = extract_result_ids_from_response(&first_response);
@@ -866,7 +870,7 @@ def hello() -> str:
     );
 
     // Second request should complete with the fix (no diagnostics)
-    let second_response = server.await_response::<WorkspaceDiagnosticRequest>(&request_id_2)?;
+    let second_response = server.await_response::<WorkspaceDiagnosticRequest>(&request_id_2);
 
     // Snapshot both responses to verify the full cycle
     assert_debug_snapshot!(
@@ -887,15 +891,15 @@ fn create_workspace_server_with_file(
     file_path: &SystemPath,
     file_content: &str,
 ) -> Result<TestServer> {
-    TestServerBuilder::new()?
+    Ok(TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_file(file_path, file_content)?
         .with_initialization_options(
             ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .enable_pull_diagnostics(true)
-        .build()?
-        .wait_until_workspaces_are_initialized()
+        .build()
+        .wait_until_workspaces_are_initialized())
 }
 
 /// Sends a workspace diagnostic request to the server.
@@ -917,7 +921,7 @@ fn send_workspace_diagnostic_request(server: &mut TestServer) -> lsp_server::Req
 fn shutdown_and_await_workspace_diagnostic(
     mut server: TestServer,
     request_id: &RequestId,
-) -> Result<WorkspaceDiagnosticReportResult> {
+) -> WorkspaceDiagnosticReportResult {
     // Send shutdown request - this should cause the suspended workspace diagnostic request to respond
     let shutdown_id = server.send_request::<lsp_types::request::Shutdown>(());
 
@@ -925,7 +929,7 @@ fn shutdown_and_await_workspace_diagnostic(
     let workspace_response = server.await_response::<WorkspaceDiagnosticRequest>(request_id);
 
     // Complete shutdown sequence
-    server.await_response::<lsp_types::request::Shutdown>(&shutdown_id)?;
+    server.await_response::<lsp_types::request::Shutdown>(&shutdown_id);
     server.send_notification::<lsp_types::notification::Exit>(());
 
     workspace_response
@@ -936,19 +940,19 @@ fn assert_workspace_diagnostics_suspends_for_long_polling(
     server: &mut TestServer,
     request_id: &lsp_server::RequestId,
 ) {
-    match server.await_response::<WorkspaceDiagnosticRequest>(request_id) {
+    match server
+        .try_await_response::<WorkspaceDiagnosticRequest>(request_id, Some(Duration::from_secs(2)))
+    {
         Ok(_) => {
             panic!("Expected workspace diagnostic request to suspend for long-polling.");
         }
-        Err(error) => {
-            if let Some(test_error) = error.downcast_ref::<TestServerError>() {
-                assert!(
-                    matches!(test_error, TestServerError::RecvTimeoutError(_)),
-                    "Response should time out because the request is suspended for long-polling"
-                );
-            } else {
-                panic!("Unexpected error type: {error:?}");
-            }
+        Err(AwaitResponseError::Timeout) => {
+            // Ok
+        }
+        Err(err) => {
+            panic!(
+                "Response should time out because the request is suspended for long-polling but errored with: {err}"
+            )
         }
     }
 }
