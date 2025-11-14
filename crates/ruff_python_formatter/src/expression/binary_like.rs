@@ -515,6 +515,44 @@ const fn is_simple_power_operand(expr: &Expr) -> bool {
     }
 }
 
+/// Safely checks if there's an `LParen` token between a comment and expression start,
+/// with special handling for unary operations to avoid `TextRange` panics.
+fn has_lparen_between_comment_and_expression(
+    comment: &SourceComment,
+    expression: &Expr,
+    source: &str,
+) -> bool {
+    // For unary operations, we need to use the operand's start position instead of the
+    // expression's start position. This prevents panics when comments appear between
+    // the unary operator and its operand.
+    //
+    // Example that would panic without this fix:
+    //   if '' and (
+    //   not
+    //   # comment
+    //   0):
+    //       pass
+    //
+    // In this case:
+    //   - expression.start() points to 'not'
+    //   - comment.end() points after '#'
+    //   - expression.start() < comment.end(), so TextRange::new would panic
+    //   - comment.end() <= operand.start(), so using operand works correctly
+    let operand_start = match expression {
+        Expr::UnaryOp(unary_op) => unary_op.operand.start(),
+        _ => expression.start(),
+    };
+    let tokenizer = SimpleTokenizer::new(source, TextRange::new(comment.end(), operand_start));
+
+    matches!(
+        tokenizer.skip_trivia().next(),
+        Some(SimpleToken {
+            kind: SimpleTokenKind::LParen,
+            ..
+        })
+    )
+}
+
 /// Owned [`FlatBinaryExpressionSlice`]. Read the [`FlatBinaryExpressionSlice`] documentation for more details about the data structure.
 #[derive(Debug)]
 struct FlatBinaryExpression<'a>(SmallVec<[OperandOrOperator<'a>; 8]>);
@@ -837,17 +875,8 @@ impl<'a> Operand<'a> {
                 if is_expression_parenthesized((*expression).into(), comments.ranges(), source) {
                     leading.iter().any(|comment| {
                         !comment.is_formatted()
-                            && matches!(
-                                SimpleTokenizer::new(
-                                    source,
-                                    TextRange::new(comment.end(), expression.start()),
-                                )
-                                .skip_trivia()
-                                .next(),
-                                Some(SimpleToken {
-                                    kind: SimpleTokenKind::LParen,
-                                    ..
-                                })
+                            && has_lparen_between_comment_and_expression(
+                                comment, expression, source,
                             )
                     })
                 } else {
@@ -923,17 +952,10 @@ impl Format<PyFormatContext<'_>> for Operand<'_> {
                 .iter()
                 .rposition(|comment| {
                     comment.is_unformatted()
-                        && matches!(
-                            SimpleTokenizer::new(
-                                f.context().source(),
-                                TextRange::new(comment.end(), expression.start()),
-                            )
-                            .skip_trivia()
-                            .next(),
-                            Some(SimpleToken {
-                                kind: SimpleTokenKind::LParen,
-                                ..
-                            })
+                        && has_lparen_between_comment_and_expression(
+                            comment,
+                            expression,
+                            f.context().source(),
                         )
                 })
                 .map_or(0, |position| position + 1);
