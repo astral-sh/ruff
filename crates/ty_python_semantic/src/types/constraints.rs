@@ -885,13 +885,6 @@ impl<'db> Node<'db> {
             .or(db, self.negate(db).and(db, else_node))
     }
 
-    fn satisfies(self, db: &'db dyn Db, other: Self) -> Self {
-        let simplified_self = self.simplify(db);
-        let implication = simplified_self.implies(db, other);
-        let (simplified, domain) = implication.simplify_and_domain(db);
-        simplified.and(db, domain)
-    }
-
     fn implies_subtype_of(self, db: &'db dyn Db, lhs: Type<'db>, rhs: Type<'db>) -> Self {
         // When checking subtyping involving a typevar, we can turn the subtyping check into a
         // constraint (i.e, "is `T` a subtype of `int` becomes the constraint `T ≤ int`), and then
@@ -1194,12 +1187,6 @@ impl<'db> Node<'db> {
     fn simplify(self, db: &'db dyn Db) -> Self {
         let (simplified, _) = self.simplify_and_domain(db);
         simplified
-    }
-
-    /// Returns the domain (the set of allowed inputs) for a BDD.
-    fn domain(self, db: &'db dyn Db) -> Self {
-        let (_, domain) = self.simplify_and_domain(db);
-        domain
     }
 
     /// Returns clauses describing all of the variable assignments that cause this BDD to evaluate
@@ -2314,6 +2301,7 @@ impl<'db> SequentMap<'db> {
         }
     }
 
+    #[expect(dead_code)] // Keep this around for debugging purposes
     fn display<'a>(&'a self, db: &'db dyn Db, prefix: &'a dyn Display) -> impl Display + 'a {
         struct DisplaySequentMap<'a, 'db> {
             map: &'a SequentMap<'db>,
@@ -2455,12 +2443,6 @@ impl<'db> PathAssignments<'db> {
 
 #[derive(Debug)]
 struct PathAssignmentConflict;
-
-enum PathAssignmentOutcome {
-    Added,
-    Existing,
-    Conflict,
-}
 
 /// A single clause in the DNF representation of a BDD
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
