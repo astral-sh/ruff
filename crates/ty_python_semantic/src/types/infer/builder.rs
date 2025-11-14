@@ -7392,14 +7392,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
-    fn infer_first_comprehension_iter(&mut self, comprehensions: &[ast::Comprehension]) -> bool {
+    /// Returns the evaluation mode (async or sync) of the comprehension.
+    fn infer_first_comprehension_iter(
+        &mut self,
+        comprehensions: &[ast::Comprehension],
+    ) -> EvaluationMode {
         let mut comprehensions_iter = comprehensions.iter();
         let Some(first_comprehension) = comprehensions_iter.next() else {
             unreachable!("Comprehension must contain at least one generator");
         };
         self.infer_standalone_expression(&first_comprehension.iter, TypeContext::default());
 
-        first_comprehension.is_async
+        if first_comprehension.is_async {
+            EvaluationMode::Async
+        } else {
+            EvaluationMode::Sync
+        }
     }
 
     fn infer_generator_expression(&mut self, generator: &ast::ExprGenerator) -> Type<'db> {
@@ -7411,7 +7419,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parenthesized: _,
         } = generator;
 
-        let is_async = self.infer_first_comprehension_iter(generators);
+        let evaluation_mode = self.infer_first_comprehension_iter(generators);
 
         let scope_id = self
             .index
@@ -7420,7 +7428,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inference = infer_scope_types(self.db(), scope);
         let yield_type = inference.expression_type(elt.as_ref());
 
-        if is_async {
+        if evaluation_mode.is_async() {
             KnownClass::AsyncGeneratorType
                 .to_specialized_instance(self.db(), [yield_type, Type::none(self.db())])
         } else {
