@@ -1626,7 +1626,7 @@ impl<'db> Type<'db> {
     /// Return the constraints under which this type is a subtype of type `target`, assuming that
     /// all of the restrictions in `constraints` hold.
     ///
-    /// See [`TypeRelation::ConstraintImplication`] for more details.
+    /// See [`TypeRelation::SubtypingAssuming`] for more details.
     fn when_subtype_of_given(
         self,
         db: &'db dyn Db,
@@ -1638,7 +1638,7 @@ impl<'db> Type<'db> {
             db,
             target,
             inferable,
-            TypeRelation::ConstraintImplication(constraints),
+            TypeRelation::SubtypingAssuming(constraints),
         )
     }
 
@@ -1705,7 +1705,7 @@ impl<'db> Type<'db> {
 
         // Handle constraint implication first. If either `self` or `target` is a typevar, check
         // the constraint set to see if the corresponding constraint is satisfied.
-        if let TypeRelation::ConstraintImplication(constraints) = relation
+        if let TypeRelation::SubtypingAssuming(constraints) = relation
             && (self.is_type_var() || target.is_type_var())
         {
             return constraints.implies_subtype_of(db, self, target);
@@ -1790,7 +1790,7 @@ impl<'db> Type<'db> {
                     "DynamicType::Divergent should have been handled in an earlier branch"
                 );
                 ConstraintSet::from(match relation {
-                    TypeRelation::Subtyping | TypeRelation::ConstraintImplication(_) => false,
+                    TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => false,
                     TypeRelation::Assignability => true,
                     TypeRelation::Redundancy => match target {
                         Type::Dynamic(_) => true,
@@ -1800,7 +1800,7 @@ impl<'db> Type<'db> {
                 })
             }
             (_, Type::Dynamic(_)) => ConstraintSet::from(match relation {
-                TypeRelation::Subtyping | TypeRelation::ConstraintImplication(_) => false,
+                TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => false,
                 TypeRelation::Assignability => true,
                 TypeRelation::Redundancy => match self {
                     Type::Dynamic(_) => true,
@@ -1999,14 +1999,14 @@ impl<'db> Type<'db> {
                     let self_ty = match relation {
                         TypeRelation::Subtyping
                         | TypeRelation::Redundancy
-                        | TypeRelation::ConstraintImplication(_) => self,
+                        | TypeRelation::SubtypingAssuming(_) => self,
                         TypeRelation::Assignability => self.bottom_materialization(db),
                     };
                     intersection.negative(db).iter().when_all(db, |&neg_ty| {
                         let neg_ty = match relation {
                             TypeRelation::Subtyping
                             | TypeRelation::Redundancy
-                            | TypeRelation::ConstraintImplication(_) => neg_ty,
+                            | TypeRelation::SubtypingAssuming(_) => neg_ty,
                             TypeRelation::Assignability => neg_ty.bottom_materialization(db),
                         };
                         self_ty.is_disjoint_from_impl(
@@ -10513,7 +10513,7 @@ pub(crate) enum TypeRelation<'db> {
     ///   subtype check will be vacuously true, even if you're comparing two concrete types that
     ///   are not actually subtypes of each other. (That is, `implies_subtype_of(false, int, str)`
     ///   will return true!)
-    ConstraintImplication(ConstraintSet<'db>),
+    SubtypingAssuming(ConstraintSet<'db>),
 }
 
 impl TypeRelation<'_> {

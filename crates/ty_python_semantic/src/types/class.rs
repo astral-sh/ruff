@@ -550,7 +550,7 @@ impl<'db> ClassType<'db> {
                 ClassBase::Dynamic(_) => match relation {
                     TypeRelation::Subtyping
                     | TypeRelation::Redundancy
-                    | TypeRelation::ConstraintImplication(_) => {
+                    | TypeRelation::SubtypingAssuming(_) => {
                         ConstraintSet::from(other.is_object(db))
                     }
                     TypeRelation::Assignability => ConstraintSet::from(!other.is_final(db)),

@@ -981,9 +981,7 @@ impl<'db> FunctionType<'db> {
         // of each other if they result in subtype signatures.
         if matches!(
             relation,
-            TypeRelation::Subtyping
-                | TypeRelation::Redundancy
-                | TypeRelation::ConstraintImplication(_)
+            TypeRelation::Subtyping | TypeRelation::Redundancy | TypeRelation::SubtypingAssuming(_)
         ) && self.normalized(db) == other.normalized(db)
         {
             return ConstraintSet::from(true);

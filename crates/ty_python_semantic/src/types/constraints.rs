@@ -190,7 +190,7 @@ impl<'db> ConstraintSet<'db> {
         let (lower, upper) = match relation {
             TypeRelation::Subtyping
             | TypeRelation::Redundancy
-            | TypeRelation::ConstraintImplication(_) => (
+            | TypeRelation::SubtypingAssuming(_) => (
                 lower.top_materialization(db),
                 upper.bottom_materialization(db),
             ),
