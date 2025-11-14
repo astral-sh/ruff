@@ -206,8 +206,8 @@ impl<'db> ConstraintSet<'db> {
     }
 
     /// Returns whether this constraint set never holds
-    pub(crate) fn is_never_satisfied(self, _db: &'db dyn Db) -> bool {
-        self.node.is_never_satisfied()
+    pub(crate) fn is_never_satisfied(self, db: &'db dyn Db) -> bool {
+        self.node.is_never_satisfied(db)
     }
 
     /// Returns whether this constraint set always holds
@@ -753,8 +753,42 @@ impl<'db> Node<'db> {
     }
 
     /// Returns whether this BDD represent the constant function `false`.
-    fn is_never_satisfied(self) -> bool {
-        matches!(self, Node::AlwaysFalse)
+    fn is_never_satisfied(self, db: &'db dyn Db) -> bool {
+        match self {
+            Node::AlwaysTrue => false,
+            Node::AlwaysFalse => true,
+            Node::Interior(interior) => {
+                let map = interior.sequent_map(db);
+                let mut path = SequentPath::default();
+                self.is_never_satisfied_inner(db, map, &mut path)
+            }
+        }
+    }
+
+    fn is_never_satisfied_inner(
+        self,
+        db: &'db dyn Db,
+        map: &SequentMap<'db>,
+        path: &mut SequentPath<'db>,
+    ) -> bool {
+        match self {
+            Node::AlwaysTrue => false,
+            Node::AlwaysFalse => true,
+            Node::Interior(interior) => {
+                let constraint = interior.constraint(db);
+                path.with_assignment(db, map, constraint.when_true(), |path| {
+                    interior.if_true(db).is_never_satisfied_inner(db, map, path)
+                })
+                .unwrap_or(true)
+                    && path
+                        .with_assignment(db, map, constraint.when_false(), |path| {
+                            interior
+                                .if_false(db)
+                                .is_never_satisfied_inner(db, map, path)
+                        })
+                        .unwrap_or(true)
+            }
+        }
     }
 
     /// Returns the negation of this BDD.
@@ -891,7 +925,7 @@ impl<'db> Node<'db> {
                 .satisfies(db, self)
                 .and(db, specializations)
                 .simplify(db);
-            !when_satisfied.is_never_satisfied()
+            !when_satisfied.is_never_satisfied(db)
         };
 
         // Returns if all specializations satisfy this constraint set.
