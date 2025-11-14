@@ -1,5 +1,4 @@
 use core::fmt;
-use itertools::Itertools;
 use std::{error::Error, fmt::Formatter};
 use thiserror::Error;
 
@@ -14,6 +13,7 @@ enum SuppressionAction {
     Ignore,
 }
 
+#[allow(unused)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum SuppressionKind {
     /// multi-line range suppression
@@ -41,6 +41,7 @@ pub(crate) struct SuppressionComment {
     reason: TextRange,
 }
 
+#[allow(unused)]
 #[derive(Debug)]
 pub(crate) struct Suppression {
     kind: SuppressionKind,
@@ -60,7 +61,7 @@ impl Suppression {
         comment_ranges
             .iter()
             .flat_map(|comment_range| {
-                let mut parser = SuppressionParser::new(source, comment_range);
+                let mut parser = SuppressionParser::new(source, *comment_range);
                 parser.parse_comment()
             })
             .collect::<Vec<_>>()
@@ -117,8 +118,7 @@ struct SuppressionParser<'src> {
 }
 
 impl<'src> SuppressionParser<'src> {
-    fn new(source: &'src str, range: &TextRange) -> Self {
-        let range = range.clone();
+    fn new(source: &'src str, range: TextRange) -> Self {
         let cursor = Cursor::new(&source[range]);
         Self { cursor, range }
     }
@@ -262,7 +262,7 @@ mod tests {
     fn parse_suppression_comment(source: &str) -> Result<SuppressionComment, ParseError> {
         let mut parser = SuppressionParser::new(
             source,
-            &TextRange::new(0.into(), TextSize::try_from(source.len()).unwrap()),
+            TextRange::new(0.into(), TextSize::try_from(source.len()).unwrap()),
         );
         parser.parse_comment()
     }
@@ -439,7 +439,7 @@ mod tests {
         let source = "# ruff: disable[foo, bar] hello world";
         let mut parser = SuppressionParser::new(
             source,
-            &TextRange::new(0.into(), TextSize::try_from(source.len()).unwrap()),
+            TextRange::new(0.into(), TextSize::try_from(source.len()).unwrap()),
         );
         let comment = parser.parse_comment().unwrap();
         assert_eq!(comment.action, SuppressionAction::Disable);
