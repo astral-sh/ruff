@@ -1685,9 +1685,7 @@ impl Flake8ImportConventionsOptions {
 
         Ok(flake8_import_conventions::settings::Settings {
             aliases: normalized_aliases,
-            banned_aliases: self
-                .banned_aliases
-                .unwrap_or_else(FxHashMap::default),
+            banned_aliases: self.banned_aliases.unwrap_or_default(),
             banned_from: self.banned_from.unwrap_or_default(),
         })
     }
