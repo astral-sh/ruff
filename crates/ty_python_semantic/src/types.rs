@@ -1627,18 +1627,18 @@ impl<'db> Type<'db> {
     /// all of the restrictions in `constraints` hold.
     ///
     /// See [`TypeRelation::SubtypingAssuming`] for more details.
-    fn when_subtype_of_given(
+    fn when_subtype_of_assuming(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        constraints: ConstraintSet<'db>,
+        assuming: ConstraintSet<'db>,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db> {
         self.has_relation_to(
             db,
             target,
             inferable,
-            TypeRelation::SubtypingAssuming(constraints),
+            TypeRelation::SubtypingAssuming(assuming),
         )
     }
 

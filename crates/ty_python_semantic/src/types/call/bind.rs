@@ -1216,7 +1216,7 @@ impl<'db> Bindings<'db> {
                             continue;
                         };
 
-                        let result = ty_a.when_subtype_of_given(
+                        let result = ty_a.when_subtype_of_assuming(
                             db,
                             *ty_b,
                             tracked.constraints(db),
