@@ -69,3 +69,18 @@ log(logging.INFO, "Octal: %s", oct(255))
 info("Hex: %s", hex(42))
 log(logging.INFO, "Hex: %s", hex(255))
 
+# Complex conversion specifiers that make oct() and hex() necessary
+# These should NOT be flagged because the behavior differs between %s and %#o/%#x
+
+# %06s with oct() - zero-pad flag with width (should NOT be flagged)
+logging.warning("%06s", oct(123))
+
+# % s with oct() - blank sign flag (should NOT be flagged)
+logging.warning("% s", oct(123))
+
+# %+s with oct() - sign char flag (should NOT be flagged)
+logging.warning("%+s", oct(123))
+
+# %.3s with hex() - precision (should NOT be flagged)
+logging.warning("%.3s", hex(123))
+
