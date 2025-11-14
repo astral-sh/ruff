@@ -58,17 +58,18 @@
 
 use std::cmp::Ordering;
 use std::fmt::Display;
+use std::ops::Range;
 
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 
-use crate::Db;
 use crate::types::generics::InferableTypeVars;
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation,
     TypeVarBoundOrConstraints, UnionType,
 };
+use crate::{Db, FxOrderSet};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -739,7 +740,7 @@ impl<'db> Node<'db> {
                 // them as passing the "always satisfied" check.
                 let constraint = interior.constraint(db);
                 let true_always_satisfied = path
-                    .with_assignment(map, constraint.when_true(), |path| {
+                    .with_assignment(map, constraint.when_true(), |path, _| {
                         interior
                             .if_true(db)
                             .is_always_satisfied_inner(db, map, path)
@@ -750,7 +751,7 @@ impl<'db> Node<'db> {
                 }
 
                 // Ditto for the if_false branch
-                path.with_assignment(map, constraint.when_false(), |path| {
+                path.with_assignment(map, constraint.when_false(), |path, _| {
                     interior
                         .if_false(db)
                         .is_always_satisfied_inner(db, map, path)
@@ -788,7 +789,7 @@ impl<'db> Node<'db> {
                 // them as passing the "never satisfied" check.
                 let constraint = interior.constraint(db);
                 let true_never_satisfied = path
-                    .with_assignment(map, constraint.when_true(), |path| {
+                    .with_assignment(map, constraint.when_true(), |path, _| {
                         interior.if_true(db).is_never_satisfied_inner(db, map, path)
                     })
                     .unwrap_or(true);
@@ -797,7 +798,7 @@ impl<'db> Node<'db> {
                 }
 
                 // Ditto for the if_false branch
-                path.with_assignment(map, constraint.when_false(), |path| {
+                path.with_assignment(map, constraint.when_false(), |path, _| {
                     interior
                         .if_false(db)
                         .is_never_satisfied_inner(db, map, path)
@@ -995,7 +996,7 @@ impl<'db> Node<'db> {
     ) -> Self {
         bound_typevars
             .into_iter()
-            .fold(self.simplify(db), |abstracted, bound_typevar| {
+            .fold(self, |abstracted, bound_typevar| {
                 abstracted.exists_one(db, bound_typevar)
             })
     }
@@ -1005,6 +1006,20 @@ impl<'db> Node<'db> {
             Node::AlwaysTrue => Node::AlwaysTrue,
             Node::AlwaysFalse => Node::AlwaysFalse,
             Node::Interior(interior) => interior.exists_one(db, bound_typevar),
+        }
+    }
+
+    fn exists_one_inner(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarIdentity<'db>,
+        map: &SequentMap<'db>,
+        path: &mut PathAssignments<'db>,
+    ) -> Self {
+        match self {
+            Node::AlwaysTrue => Node::AlwaysTrue,
+            Node::AlwaysFalse => Node::AlwaysFalse,
+            Node::Interior(interior) => interior.exists_one_inner(db, bound_typevar, map, path),
         }
     }
 
@@ -1423,25 +1438,87 @@ impl<'db> InteriorNode<'db> {
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn exists_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
+        let map = self.sequent_map(db);
+        let mut path = PathAssignments::default();
+        self.exists_one_inner(db, bound_typevar, map, &mut path)
+    }
+
+    fn exists_one_inner(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarIdentity<'db>,
+        map: &SequentMap<'db>,
+        path: &mut PathAssignments<'db>,
+    ) -> Node<'db> {
         let self_constraint = self.constraint(db);
-        let self_typevar = self_constraint.typevar(db).identity(db);
-        match bound_typevar.cmp(&self_typevar) {
+        let self_typevar = self_constraint.typevar(db);
+        match bound_typevar.cmp(&self_typevar.identity(db)) {
             // If the typevar that this node checks is "later" than the typevar we're abstracting
             // over, then we have reached a point in the BDD where the abstraction can no longer
             // affect the result, and we can return early.
             Ordering::Less => Node::Interior(self),
+
             // If the typevar that this node checks _is_ the typevar we're abstracting over, then
             // we replace this node with the OR of its if_false/if_true edges. That is, the result
             // is true if there's any assignment of this node's constraint that is true.
+            //
+            // We also have to check if there are any derived facts that depend on the constraint
+            // we're about to remove. If so, we need to "remember" them by AND-ing them in with the
+            // corresponding branch.
             Ordering::Equal => {
-                let if_true = self.if_true(db).exists_one(db, bound_typevar);
-                let if_false = self.if_false(db).exists_one(db, bound_typevar);
+                let if_true = path
+                    .with_assignment(map, self_constraint.when_true(), |path, new_range| {
+                        let branch =
+                            self.if_true(db)
+                                .exists_one_inner(db, bound_typevar, map, path);
+                        path.assignments[new_range]
+                            .iter()
+                            .filter(|assignment| {
+                                !assignment
+                                    .constraint()
+                                    .typevar(db)
+                                    .is_same_typevar_as(db, self_typevar)
+                            })
+                            .fold(branch, |branch, assignment| {
+                                branch.and(db, Node::new_satisfied_constraint(db, *assignment))
+                            })
+                    })
+                    .unwrap_or(Node::AlwaysFalse);
+                let if_false = path
+                    .with_assignment(map, self_constraint.when_false(), |path, new_range| {
+                        let branch =
+                            self.if_false(db)
+                                .exists_one_inner(db, bound_typevar, map, path);
+                        path.assignments[new_range]
+                            .iter()
+                            .filter(|assignment| {
+                                !assignment
+                                    .constraint()
+                                    .typevar(db)
+                                    .is_same_typevar_as(db, self_typevar)
+                            })
+                            .fold(branch, |branch, assignment| {
+                                branch.and(db, Node::new_satisfied_constraint(db, *assignment))
+                            })
+                    })
+                    .unwrap_or(Node::AlwaysFalse);
                 if_true.or(db, if_false)
             }
+
             // Otherwise, we abstract the if_false/if_true edges recursively.
             Ordering::Greater => {
-                let if_true = self.if_true(db).exists_one(db, bound_typevar);
-                let if_false = self.if_false(db).exists_one(db, bound_typevar);
+                let if_true = path
+                    .with_assignment(map, self_constraint.when_true(), |path, _| {
+                        self.if_true(db)
+                            .exists_one_inner(db, bound_typevar, map, path)
+                    })
+                    .unwrap_or(Node::AlwaysFalse);
+                let if_false = path
+                    .with_assignment(map, self_constraint.when_false(), |path, _| {
+                        self.if_false(db)
+                            .exists_one_inner(db, bound_typevar, map, path)
+                    })
+                    .unwrap_or(Node::AlwaysFalse);
                 Node::new(db, self_constraint, if_true, if_false)
             }
         }
@@ -2301,7 +2378,7 @@ impl<'db> SequentMap<'db> {
 #[derive(Debug, Default)]
 struct PathAssignments<'db> {
     /// The assignments that we know are true at a certain point when traversing a BDD.
-    assignments: FxHashSet<ConstraintAssignment<'db>>,
+    assignments: FxOrderSet<ConstraintAssignment<'db>>,
 }
 
 impl<'db> PathAssignments<'db> {
@@ -2309,15 +2386,16 @@ impl<'db> PathAssignments<'db> {
         &mut self,
         map: &SequentMap<'db>,
         assignment: ConstraintAssignment<'db>,
-        f: impl FnOnce(&mut Self) -> R,
+        f: impl FnOnce(&mut Self, Range<usize>) -> R,
     ) -> Option<R> {
-        let old_assignments = self.assignments.clone();
+        let start = self.assignments.len();
         let result = if self.add_assignment(map, assignment).is_err() {
             None
         } else {
-            Some(f(self))
+            let end = self.assignments.len();
+            Some(f(self, start..end))
         };
-        self.assignments = old_assignments;
+        self.assignments.truncate(start);
         result
     }
 
