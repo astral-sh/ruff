@@ -735,12 +735,12 @@ impl<'db> Node<'db> {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
             Node::Interior(interior) => {
-                // with_assignment will return None if this node's constraint (or anything we can
-                // derive from it) causes the if_true edge to become impossible. We want to ignore
+                // walk_edge will return None if this node's constraint (or anything we can derive
+                // from it) causes the if_true edge to become impossible. We want to ignore
                 // impossible paths, and so we treat them as passing the "always satisfied" check.
                 let constraint = interior.constraint(db);
                 let true_always_satisfied = path
-                    .with_assignment(map, constraint.when_true(), |path, _| {
+                    .walk_edge(map, constraint.when_true(), |path, _| {
                         interior
                             .if_true(db)
                             .is_always_satisfied_inner(db, map, path)
@@ -751,7 +751,7 @@ impl<'db> Node<'db> {
                 }
 
                 // Ditto for the if_false branch
-                path.with_assignment(map, constraint.when_false(), |path, _| {
+                path.walk_edge(map, constraint.when_false(), |path, _| {
                     interior
                         .if_false(db)
                         .is_always_satisfied_inner(db, map, path)
@@ -784,12 +784,12 @@ impl<'db> Node<'db> {
             Node::AlwaysTrue => false,
             Node::AlwaysFalse => true,
             Node::Interior(interior) => {
-                // with_assignment will return None if this node's constraint (or anything we can
-                // derive from it) causes the if_true edge to become impossible. We want to ignore
+                // walk_edge will return None if this node's constraint (or anything we can derive
+                // from it) causes the if_true edge to become impossible. We want to ignore
                 // impossible paths, and so we treat them as passing the "never satisfied" check.
                 let constraint = interior.constraint(db);
                 let true_never_satisfied = path
-                    .with_assignment(map, constraint.when_true(), |path, _| {
+                    .walk_edge(map, constraint.when_true(), |path, _| {
                         interior.if_true(db).is_never_satisfied_inner(db, map, path)
                     })
                     .unwrap_or(true);
@@ -798,7 +798,7 @@ impl<'db> Node<'db> {
                 }
 
                 // Ditto for the if_false branch
-                path.with_assignment(map, constraint.when_false(), |path, _| {
+                path.walk_edge(map, constraint.when_false(), |path, _| {
                     interior
                         .if_false(db)
                         .is_never_satisfied_inner(db, map, path)
@@ -1468,7 +1468,7 @@ impl<'db> InteriorNode<'db> {
             // corresponding branch.
             Ordering::Equal => {
                 let if_true = path
-                    .with_assignment(map, self_constraint.when_true(), |path, new_range| {
+                    .walk_edge(map, self_constraint.when_true(), |path, new_range| {
                         let branch =
                             self.if_true(db)
                                 .exists_one_inner(db, bound_typevar, map, path);
@@ -1486,7 +1486,7 @@ impl<'db> InteriorNode<'db> {
                     })
                     .unwrap_or(Node::AlwaysFalse);
                 let if_false = path
-                    .with_assignment(map, self_constraint.when_false(), |path, new_range| {
+                    .walk_edge(map, self_constraint.when_false(), |path, new_range| {
                         let branch =
                             self.if_false(db)
                                 .exists_one_inner(db, bound_typevar, map, path);
@@ -1509,13 +1509,13 @@ impl<'db> InteriorNode<'db> {
             // Otherwise, we abstract the if_false/if_true edges recursively.
             Ordering::Greater => {
                 let if_true = path
-                    .with_assignment(map, self_constraint.when_true(), |path, _| {
+                    .walk_edge(map, self_constraint.when_true(), |path, _| {
                         self.if_true(db)
                             .exists_one_inner(db, bound_typevar, map, path)
                     })
                     .unwrap_or(Node::AlwaysFalse);
                 let if_false = path
-                    .with_assignment(map, self_constraint.when_false(), |path, _| {
+                    .walk_edge(map, self_constraint.when_false(), |path, _| {
                         self.if_false(db)
                             .exists_one_inner(db, bound_typevar, map, path)
                     })
@@ -1984,9 +1984,11 @@ impl<'db> ConstraintAssignment<'db> {
 }
 
 /// A collection of _sequents_ that describe how the constraints mentioned in a BDD relate to each
-/// other. These are used when evaluating checking satisfiability of a BDD. Both of those
-/// operations involve walking one or more paths from the root node to a terminal node. Each
-/// sequent describes paths that are invalid; these paths are pruned from the search.
+/// other. These are used in several BDD operations that need to know about "derived facts" even if
+/// they are not mentioned in the BDD directly. These operations involve walking one or more paths
+/// from the root node to a terminal node. Each sequent describes paths that are invalid (which are
+/// pruned from the search), and new constraints that we can assume to be true even if we haven't
+/// seen them directly.
 ///
 /// We support several kinds of sequent:
 ///
@@ -2352,26 +2354,64 @@ impl<'db> SequentMap<'db> {
     }
 }
 
+/// The collection of constraints that we know to be true or false at a certain point when
+/// traversing a BDD.
 #[derive(Debug, Default)]
 struct PathAssignments<'db> {
-    /// The assignments that we know are true at a certain point when traversing a BDD.
     assignments: FxOrderSet<ConstraintAssignment<'db>>,
 }
 
 impl<'db> PathAssignments<'db> {
-    fn with_assignment<R>(
+    /// Walks one of the outgoing edges of an internal BDD node. `assignment` describes the
+    /// constraint that the BDD node checks, and whether we are following the `if_true` or
+    /// `if_false` edge.
+    ///
+    /// This new assignment might cause this path to become impossible — for instance, if we were
+    /// already assuming (from an earlier edge in the path) a constraint that is disjoint with this
+    /// one. We might also be able to infer _other_ assignments that do not appear in the BDD
+    /// directly, but which are implied from a combination of constraints that we _have_ seen.
+    ///
+    /// To handle all of this, you provide a callback. If the path has become impossible, we will
+    /// return `None` _without invoking the callback_. If the path does not contain any
+    /// contradictions, we will invoke the callback and return its result (wrapped in `Some`).
+    ///
+    /// Your callback will also be provided a slice of all of the constraints that we were able to
+    /// infer from `assignment` combined with the information we already knew. (For borrow-check
+    /// reasons, we provide this as a [`Range`]; use that range to index into `self.assignments` to
+    /// get the list of all of the assignments that we learned from this edge.)
+    ///
+    /// You will presumably end up making a recursive call of some kind to keep progressing through
+    /// the BDD. You should make this call from inside of your callback, so that as you get further
+    /// down into the BDD structure, we remember all of the information that we have learned from
+    /// the path we're on.
+    fn walk_edge<R>(
         &mut self,
         map: &SequentMap<'db>,
         assignment: ConstraintAssignment<'db>,
         f: impl FnOnce(&mut Self, Range<usize>) -> R,
     ) -> Option<R> {
+        // Record a snapshot of the assignments that we already knew held — both so that we can
+        // pass along the range of which assignments are new, and so that we can reset back to this
+        // point before returning.
         let start = self.assignments.len();
+
+        // Add the new assignment and anything we can derive from it.
         let result = if self.add_assignment(map, assignment).is_err() {
+            // If that results in the path now being impossible due to a contradiction, return
+            // without invoking the callback.
             None
         } else {
+            // Otherwise invoke the callback to keep traversing the BDD. The callback will likely
+            // traverse additional edges, which might add more to our `assignments` set. But even
+            // if that happens, `start..end` will mark the assignments that were added by the
+            // `add_assignment` call above — that is, the new assignment for this edge along with
+            // the derived information we inferred from it.
             let end = self.assignments.len();
             Some(f(self, start..end))
         };
+
+        // Reset back to where we were before following this edge, so that the caller can reuse a
+        // single instance for the entire BDD traversal.
         self.assignments.truncate(start);
         result
     }
@@ -2380,6 +2420,9 @@ impl<'db> PathAssignments<'db> {
         self.assignments.contains(&assignment)
     }
 
+    /// Adds a new assignment, along with any derived information that we can infer from the new
+    /// assignment combined with the assignments we've already seen. If any of this causes the path
+    /// to become invalid, due to a contradiction, returns a [`PathAssignmentConflict`] error.
     fn add_assignment(
         &mut self,
         map: &SequentMap<'db>,
