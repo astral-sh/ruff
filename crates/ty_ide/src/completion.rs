@@ -244,7 +244,7 @@ pub fn completion<'db>(
     let tokens = tokens_start_before(parsed.tokens(), offset);
     let typed = find_typed_text(db, file, &parsed, offset);
 
-    if is_in_no_completions_place(db, tokens, file) {
+    if is_in_no_completions_place(db, file, tokens, typed.as_deref()) {
         return vec![];
     }
     if let Some(completions) = only_keyword_completion(tokens, typed.as_deref()) {
@@ -930,8 +930,9 @@ fn find_typed_text(
     let last = tokens.last()?;
     // It's odd to include `TokenKind::Import` here, but it
     // indicates that the user has typed `import`. This is
-    // useful to know in some contexts.
-    if !matches!(last.kind(), TokenKind::Name | TokenKind::Import) {
+    // useful to know in some contexts. And this applies also
+    // to the other keywords.
+    if !matches!(last.kind(), TokenKind::Name) && !last.kind().is_keyword() {
         return None;
     }
     // This one's weird, but if the cursor is beyond
@@ -947,8 +948,13 @@ fn find_typed_text(
 }
 
 /// Whether the last token is in a place where we should not provide completions.
-fn is_in_no_completions_place(db: &dyn Db, tokens: &[Token], file: File) -> bool {
-    is_in_comment(tokens) || is_in_string(tokens) || is_in_definition_place(db, tokens, file)
+fn is_in_no_completions_place(
+    db: &dyn Db,
+    file: File,
+    tokens: &[Token],
+    typed: Option<&str>,
+) -> bool {
+    is_in_comment(tokens) || is_in_string(tokens) || is_in_definition_place(db, file, tokens, typed)
 }
 
 /// Whether the last token is within a comment or not.
@@ -969,13 +975,18 @@ fn is_in_string(tokens: &[Token]) -> bool {
     })
 }
 
-/// Returns true when the tokens indicate that the definition of a new name is being introduced at the end.
-fn is_in_definition_place(db: &dyn Db, tokens: &[Token], file: File) -> bool {
-    let is_definition_keyword = |token: &Token| {
-        if matches!(
+/// Returns true when the tokens indicate that the definition of a new
+/// name is being introduced at the end.
+fn is_in_definition_place(db: &dyn Db, file: File, tokens: &[Token], typed: Option<&str>) -> bool {
+    fn is_definition_token(token: &Token) -> bool {
+        matches!(
             token.kind(),
-            TokenKind::Def | TokenKind::Class | TokenKind::Type
-        ) {
+            TokenKind::Def | TokenKind::Class | TokenKind::Type | TokenKind::As
+        )
+    }
+
+    let is_definition_keyword = |token: &Token| {
+        if is_definition_token(token) {
             true
         } else if token.kind() == TokenKind::Name {
             let source = source_text(db, file);
@@ -984,12 +995,11 @@ fn is_in_definition_place(db: &dyn Db, tokens: &[Token], file: File) -> bool {
             false
         }
     };
-
-    tokens
-        .len()
-        .checked_sub(2)
-        .and_then(|i| tokens.get(i))
-        .is_some_and(is_definition_keyword)
+    match tokens {
+        [.., penultimate, _] if typed.is_some() => is_definition_keyword(penultimate),
+        [.., last] if typed.is_none() => is_definition_keyword(last),
+        _ => false,
+    }
 }
 
 /// Order completions according to the following rules:
@@ -3158,8 +3168,13 @@ import foo as ba<CURSOR>
         // which is kind of annoying. So just assert that it
         // runs without panicking and produces some non-empty
         // output.
+        //
+        // ... some time passes ...
+        //
+        // Actually, this shouldn't offer any completions since
+        // the context here is introducing a new name.
         assert!(
-            !builder
+            builder
                 .skip_keywords()
                 .skip_builtins()
                 .build()
@@ -4578,7 +4593,6 @@ foo = 1
 def f<CURSOR>
     ",
         );
-
         assert!(builder.build().completions().is_empty());
     }
 
@@ -4589,9 +4603,7 @@ def f<CURSOR>
 def <CURSOR>
         ",
         );
-
-        // This is okay because the ide will not request completions when the cursor is in this position.
-        assert!(!builder.build().completions().is_empty());
+        assert!(builder.build().completions().is_empty());
     }
 
     #[test]
@@ -4603,7 +4615,6 @@ foo = 1
 class f<CURSOR>
     ",
         );
-
         assert!(builder.build().completions().is_empty());
     }
 
@@ -4614,9 +4625,7 @@ class f<CURSOR>
 class <CURSOR>
         ",
         );
-
-        // This is okay because the ide will not request completions when the cursor is in this position.
-        assert!(!builder.build().completions().is_empty());
+        assert!(builder.build().completions().is_empty());
     }
 
     #[test]
@@ -4641,7 +4650,6 @@ foo = 1
 type f<CURSOR>
        ",
         );
-
         assert!(builder.build().completions().is_empty());
     }
 
@@ -4652,9 +4660,98 @@ type f<CURSOR>
 type <CURSOR>
         ",
         );
+        assert!(builder.build().completions().is_empty());
+    }
 
-        // This is okay because the ide will not request completions when the cursor is in this position.
-        assert!(!builder.build().completions().is_empty());
+    #[test]
+    fn no_completions_in_import_alias() {
+        let builder = completion_test_builder(
+            "\
+foo = 1
+import collections as f<CURSOR>
+    ",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn no_completions_in_from_import_alias() {
+        let builder = completion_test_builder(
+            "\
+foo = 1
+from collections import defaultdict as f<CURSOR>
+    ",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn no_completions_in_with_alias() {
+        let builder = completion_test_builder(
+            "\
+foo = 1
+with open('bar') as f<CURSOR>
+    ",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn no_completions_in_except_alias() {
+        let builder = completion_test_builder(
+            "\
+foo = 1
+try:
+    [][0]
+except IndexError as f<CURSOR>
+    ",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn no_completions_in_match_alias() {
+        let builder = completion_test_builder(
+            "\
+foo = 1
+status = 400
+match status:
+    case 400 as f<CURSOR>:
+        return 'Bad request'
+    ",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+
+        // Also check that completions are suppressed
+        // when nothing has been typed.
+        let builder = completion_test_builder(
+            "\
+foo = 1
+status = 400
+match status:
+    case 400 as <CURSOR>:
+        return 'Bad request'
+    ",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]
