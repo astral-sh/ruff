@@ -20,10 +20,12 @@ use crate::types::{
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer the type of a type expression.
     pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        let previous_deferred_state = self.deferred_state;
+
         // `DeferredExpressionState::InStringAnnotation` takes precedence over other states.
         // However, if it's not a stringified annotation, we must still ensure that annotation expressions
         // are always deferred in stub files.
-        match self.deferred_state {
+        match previous_deferred_state {
             DeferredExpressionState::None => {
                 if self.in_stub() {
                     self.deferred_state = DeferredExpressionState::Deferred;
@@ -31,8 +33,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             DeferredExpressionState::InStringAnnotation(_) | DeferredExpressionState::Deferred => {}
         }
-
         let mut ty = self.infer_type_expression_no_store(expression);
+        self.deferred_state = previous_deferred_state;
+
         let divergent = Type::divergent(Some(self.scope()));
         if ty.has_divergent_type(self.db(), divergent) {
             ty = divergent;
