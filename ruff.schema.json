@@ -954,6 +954,9 @@
     "ExternalAstLinterOptions": {
       "type": "object",
       "properties": {
+        "config": {
+          "description": "Arbitrary configuration that will be exposed to the external linter via `Context.config`."
+        },
         "enabled": {
           "description": "Whether this external linter should be considered during lint runs.",
           "type": [
@@ -2092,6 +2095,15 @@
             "null"
           ]
         },
+        "ext-lint": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/definitions/ExternalAstLinterOptions"
+          }
+        },
         "extend-fixable": {
           "description": "A list of rule codes or prefixes to consider fixable, in addition to those\nspecified by [`fixable`](#lint_fixable).",
           "type": [
@@ -2195,15 +2207,6 @@
           ],
           "items": {
             "type": "string"
-          }
-        },
-        "external-ast": {
-          "type": [
-            "object",
-            "null"
-          ],
-          "additionalProperties": {
-            "$ref": "#/definitions/ExternalAstLinterOptions"
           }
         },
         "fixable": {

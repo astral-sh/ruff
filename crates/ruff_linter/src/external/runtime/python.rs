@@ -23,14 +23,16 @@ use crate::external::ast::registry::ExternalLintRegistry;
 use crate::external::ast::target::{AstTarget, ExprKind, StmtKind};
 use crate::external::error::ExternalLinterError;
 use crate::warn_user;
+use pyo3::conversion::IntoPyObject;
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyModule};
+use pyo3::types::{PyAny, PyDict, PyList, PyModule};
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{Expr, Stmt};
 use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
+use toml::value::{Table as TomlTable, Value as TomlValue};
 
 thread_local! {
     static RUNTIME_CACHE: RefCell<FxHashMap<u64, RegistryRuntime>> =
@@ -48,17 +50,28 @@ pub(crate) struct ExternalRuleHandle {
 #[derive(Clone, Debug)]
 pub(crate) struct RuntimeEnvironment {
     module_types: Arc<ModuleTypes>,
+    linter_configs: Arc<FxHashMap<String, PyObject>>,
 }
 
 impl RuntimeEnvironment {
-    fn new(module_types: ModuleTypes) -> Self {
+    fn new(module_types: ModuleTypes, linter_configs: FxHashMap<String, PyObject>) -> Self {
         Self {
             module_types: Arc::new(module_types),
+            linter_configs: Arc::new(linter_configs),
         }
     }
 
     fn module_types(&self) -> Arc<ModuleTypes> {
         Arc::clone(&self.module_types)
+    }
+
+    fn linter_config(&self, py: Python<'_>, id: &str) -> PyObject {
+        let Some(config) = self.linter_configs.get(id) else {
+            return PyDict::new(py).into();
+        };
+        // We could return `dict.copy()` here to guard against user mutation leaking across callbacks;
+        // for now we rely on callers not to mutate the cached config.
+        config.clone_ref(py)
     }
 }
 
@@ -156,7 +169,7 @@ impl ExternalLintRuntime {
                     let context = ExternalCheckerContext::new(checker, module_types.projection);
                     context.with_checker_context(|| {
                         for &rule_locator in locators {
-                            let (_linter, rule) = self.registry.expect_entry(rule_locator);
+                            let (linter, rule) = self.registry.expect_entry(rule_locator);
                             if !should_run(rule) {
                                 continue;
                             }
@@ -169,9 +182,11 @@ impl ExternalLintRuntime {
                                             node,
                                             context.projection(),
                                         )?;
+                                        let config = environment.linter_config(py, &linter.id);
                                         let runtime_context = build_context(
                                             py,
                                             module_types.as_ref(),
+                                            &config,
                                             rule,
                                             node.range(),
                                         )?;
@@ -254,8 +269,8 @@ impl RuntimeCache {
 fn create_registry_runtime(
     registry: &ExternalLintRegistry,
 ) -> Result<RegistryRuntime, ExternalLinterError> {
-    let (module_types, compiled) = compile_scripts(registry)?;
-    let environment = RuntimeEnvironment::new(module_types);
+    let (module_types, compiled, linter_configs) = compile_scripts(registry)?;
+    let environment = RuntimeEnvironment::new(module_types, linter_configs);
     Ok(RegistryRuntime {
         environment,
         compiled,
@@ -300,7 +315,7 @@ where
 
 fn compile_scripts(
     registry: &ExternalLintRegistry,
-) -> Result<(ModuleTypes, CompiledCodeMap), ExternalLinterError> {
+) -> Result<(ModuleTypes, CompiledCodeMap, FxHashMap<String, PyObject>), ExternalLinterError> {
     with_attached_python(|py| -> Result<_, ExternalLinterError> {
         let module_types =
             load_module_types(py).map_err(|err| ExternalLinterError::ScriptCompile {
@@ -385,8 +400,26 @@ fn compile_scripts(
             });
         }
 
-        Ok((module_types, compiled))
+        let linter_configs = build_linter_configs(py, registry).map_err(|err| {
+            ExternalLinterError::ScriptCompile {
+                message: format!("failed to convert external linter configuration: {err}"),
+            }
+        })?;
+
+        Ok((module_types, compiled, linter_configs))
     })
+}
+
+fn build_linter_configs(
+    py: Python<'_>,
+    registry: &ExternalLintRegistry,
+) -> PyResult<FxHashMap<String, PyObject>> {
+    let mut configs = FxHashMap::default();
+    for linter in registry.linters() {
+        let config = config_to_python(py, linter.config())?;
+        configs.insert(linter.id.clone(), config);
+    }
+    Ok(configs)
 }
 
 fn build_rule_handle(
@@ -502,6 +535,7 @@ impl Drop for ExternalCheckerContext {
 fn build_context(
     py: Python<'_>,
     module_types: &ModuleTypes,
+    config: &PyObject,
     rule: &crate::external::ast::rule::ExternalAstRule,
     range: TextRange,
 ) -> PyResult<RuntimeContext> {
@@ -512,11 +546,63 @@ fn build_context(
         .call1((
             rule.code.as_str(),
             rule.name.as_str(),
+            config.clone_ref(py),
             reporter.clone_ref(py),
         ))?
         .into();
 
     Ok(RuntimeContext { context, reporter })
+}
+
+fn config_to_python(
+    py: Python<'_>,
+    config: Option<&crate::external::ast::rule::ExternalLinterConfig>,
+) -> PyResult<PyObject> {
+    match config {
+        Some(config) => table_to_python(py, config.data()),
+        None => Ok(PyDict::new(py).into()),
+    }
+}
+
+fn table_to_python(py: Python<'_>, table: &TomlTable) -> PyResult<PyObject> {
+    let dict = PyDict::new(py);
+    for (key, value) in table {
+        dict.set_item(key, value_to_python(py, value)?)?;
+    }
+    Ok(dict.into())
+}
+
+fn value_to_python(py: Python<'_>, value: &TomlValue) -> PyResult<PyObject> {
+    match value {
+        TomlValue::Boolean(v) => {
+            let obj = (*v).into_pyobject(py)?;
+            Ok((*obj).clone().into())
+        }
+        TomlValue::Integer(v) => {
+            let obj = (*v).into_pyobject(py)?;
+            Ok((*obj).clone().into())
+        }
+        TomlValue::Float(v) => {
+            let obj = (*v).into_pyobject(py)?;
+            Ok((*obj).clone().into())
+        }
+        TomlValue::String(v) => {
+            let obj = v.clone().into_pyobject(py)?;
+            Ok((*obj).clone().into())
+        }
+        TomlValue::Datetime(v) => {
+            let obj = v.to_string().into_pyobject(py)?;
+            Ok((*obj).clone().into())
+        }
+        TomlValue::Array(items) => {
+            let list = PyList::empty(py);
+            for item in items {
+                list.append(value_to_python(py, item)?)?;
+            }
+            Ok(list.into())
+        }
+        TomlValue::Table(table) => table_to_python(py, table),
+    }
 }
 
 fn rule_applicable_to_expr(

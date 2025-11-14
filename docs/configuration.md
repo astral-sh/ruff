@@ -454,6 +454,35 @@ rule detect imports at the top of a file, but for notebooks it detects imports a
 **cell**. For a given rule, the rule's documentation will always specify if it has different
 behavior when applied to Jupyter Notebook files.
 
+## External AST linters
+
+Ruff can load additional AST-based linters from TOML definition files via the
+`[lint.ext-lint.<name>]` table. In addition to providing the `path` to the
+definition file and the optional `enabled` flag, each external linter may expose
+arbitrary configuration to its Python rules with a nested
+`[lint.ext-lint.<name>.config]` table. The values you set in this table are
+surfaced to your Python callbacks via the `ctx.config` mapping on the `Context`
+object:
+
+```toml title="pyproject.toml"
+[tool.ruff.lint.ext-lint.custom]
+path = "lint/custom.toml"
+
+[tool.ruff.lint.ext-lint.custom.config]
+enabled = true
+message = "Hello from Ruff!"
+```
+
+```python title="lint/custom_rules.py"
+def check_stmt(node, ctx):
+    if ctx.config.get("enabled"):
+        ctx.report(ctx.config["message"])
+```
+
+Only the configuration file that defines a given external linter (and configuration
+files in its subdirectories) may provide configuration for that linter. Attempting to
+configure a linter from a parent directory results in an error.
+
 ## Command-line interface
 
 Some configuration options can be provided or overridden via dedicated flags on the command line.

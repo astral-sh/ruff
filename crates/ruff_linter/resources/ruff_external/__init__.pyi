@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, Mapping, Optional, Tuple
 
 Span = Tuple[int, int]
 Reporter = Callable[[str, Optional[Span]], None]
@@ -29,9 +29,10 @@ class RawNode(Node):
 class Context:
     code: str
     name: str
+    config: Mapping[str, Any]
     _report: Reporter
 
-    def __init__(self, code: str, name: str, reporter: Reporter) -> None: ...
+    def __init__(self, code: str, name: str, config: Mapping[str, Any], reporter: Reporter) -> None: ...
 
     def report(self, message: str, span: Optional[Span] = ...) -> None: ...
 
