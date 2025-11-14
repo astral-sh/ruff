@@ -132,8 +132,29 @@ def f(x: int | str):
 Inside an `if TYPE_CHECKING` block, we allow "stub" style function definitions with empty bodies,
 since these functions will never actually be called.
 
+`compat/__init__.py`:
+
+```py
+```
+
+`compat/sub/__init__.py`:
+
+```py
+```
+
+`compat/sub/sub.py`:
+
 ```py
 from typing import TYPE_CHECKING
+```
+
+`main.py`:
+
+```py
+from typing import TYPE_CHECKING
+import typing
+import typing as t
+import compat.sub.sub
 
 if TYPE_CHECKING:
     def f() -> int: ...
@@ -199,6 +220,24 @@ if get_bool():
 if TYPE_CHECKING:
     if not TYPE_CHECKING:
         def n() -> str: ...
+
+if typing.TYPE_CHECKING:
+    def o() -> str: ...
+
+if not typing.TYPE_CHECKING:
+    def p() -> str: ...  # error: [invalid-return-type]
+
+if compat.sub.sub.TYPE_CHECKING:
+    def q() -> str: ...
+
+if not compat.sub.sub.TYPE_CHECKING:
+    def r() -> str: ...  # error: [invalid-return-type]
+
+if t.TYPE_CHECKING:
+    def s() -> str: ...
+
+if not t.TYPE_CHECKING:
+    def t() -> str: ...  # error: [invalid-return-type]
 ```
 
 ## Conditional return type

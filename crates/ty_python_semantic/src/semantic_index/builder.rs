@@ -3131,15 +3131,31 @@ impl ExpressionsScopeMapBuilder {
 
 /// Returns if the expression is a `TYPE_CHECKING` expression.
 fn is_if_type_checking(expr: &ast::Expr) -> bool {
-    matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING")
+    fn is_dotted_name(expr: &ast::Expr) -> bool {
+        match expr {
+            ast::Expr::Name(_) => true,
+            ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => is_dotted_name(value),
+            _ => false,
+        }
+    }
+
+    match expr {
+        ast::Expr::Name(ast::ExprName { id, .. }) => id == "TYPE_CHECKING",
+        ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+            attr == "TYPE_CHECKING" && is_dotted_name(value)
+        }
+        _ => false,
+    }
 }
 
 /// Returns if the expression is a `not TYPE_CHECKING` expression.
 fn is_if_not_type_checking(expr: &ast::Expr) -> bool {
-    matches!(expr, ast::Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) if *op == ruff_python_ast::UnaryOp::Not
-        && matches!(
-            &**operand,
-            ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING"
-        )
+    matches!(
+        expr,
+        ast::Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::Not,
+            operand,
+            ..
+        }) if is_if_type_checking(operand)
     )
 }
