@@ -330,7 +330,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::If(if_expression) => {
-                self.infer_if_expression(if_expression);
+                self.infer_if_expression(if_expression, TypeContext::default());
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("`if` expressions are not allowed in type expressions"),

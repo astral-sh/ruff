@@ -281,6 +281,27 @@ A(f(1))
 A(f([]))
 ```
 
+## Conditional expressions
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+The type context is propagated through both branches of conditional expressions:
+
+```py
+def f[T](x: T) -> list[T]:
+    raise NotImplementedError
+
+def _(flag: bool):
+    x1 = f(1) if flag else f(2)
+    reveal_type(x1)  # revealed: list[Literal[1]] | list[Literal[2]]
+
+    x2: list[int | None] = f(1) if flag else f(2)
+    reveal_type(x2)  # revealed: list[int | None]
+```
+
 ## Multi-inference diagnostics
 
 ```toml

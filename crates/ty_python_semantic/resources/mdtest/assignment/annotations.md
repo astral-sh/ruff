@@ -341,8 +341,6 @@ d: X[Any] = X(1)
 reveal_type(d)  # revealed: X[Any]
 
 def _(flag: bool):
-    # TODO: Handle unions correctly.
-    # error: [invalid-assignment] "Object of type `X[int]` is not assignable to `X[int | None]`"
     a: X[int | None] = X(1) if flag else X(2)
     reveal_type(a)  # revealed: X[int | None]
 ```
