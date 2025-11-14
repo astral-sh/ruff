@@ -7392,33 +7392,51 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
-    fn infer_first_comprehension_iter(&mut self, comprehensions: &[ast::Comprehension]) {
+    /// Returns the evaluation mode (async or sync) of the comprehension.
+    fn infer_first_comprehension_iter(
+        &mut self,
+        comprehensions: &[ast::Comprehension],
+    ) -> EvaluationMode {
         let mut comprehensions_iter = comprehensions.iter();
         let Some(first_comprehension) = comprehensions_iter.next() else {
             unreachable!("Comprehension must contain at least one generator");
         };
         self.infer_standalone_expression(&first_comprehension.iter, TypeContext::default());
+
+        if first_comprehension.is_async {
+            EvaluationMode::Async
+        } else {
+            EvaluationMode::Sync
+        }
     }
 
     fn infer_generator_expression(&mut self, generator: &ast::ExprGenerator) -> Type<'db> {
         let ast::ExprGenerator {
             range: _,
             node_index: _,
-            elt: _,
+            elt,
             generators,
             parenthesized: _,
         } = generator;
 
-        self.infer_first_comprehension_iter(generators);
+        let evaluation_mode = self.infer_first_comprehension_iter(generators);
 
-        KnownClass::GeneratorType.to_specialized_instance(
-            self.db(),
-            [
-                todo_type!("generator expression yield type"),
-                todo_type!("generator expression send type"),
-                todo_type!("generator expression return type"),
-            ],
-        )
+        let scope_id = self
+            .index
+            .node_scope(NodeWithScopeRef::GeneratorExpression(generator));
+        let scope = scope_id.to_scope_id(self.db(), self.file());
+        let inference = infer_scope_types(self.db(), scope);
+        let yield_type = inference.expression_type(elt.as_ref());
+
+        if evaluation_mode.is_async() {
+            KnownClass::AsyncGeneratorType
+                .to_specialized_instance(self.db(), [yield_type, Type::none(self.db())])
+        } else {
+            KnownClass::GeneratorType.to_specialized_instance(
+                self.db(),
+                [yield_type, Type::none(self.db()), Type::none(self.db())],
+            )
+        }
     }
 
     /// Return a specialization of the collection class (list, dict, set) based on the type context and the inferred
