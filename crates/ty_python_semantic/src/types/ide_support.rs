@@ -41,7 +41,9 @@ const SYNTHETIC_DATACLASS_ATTRIBUTES: &[&str] = &[
     "__delattr__",
     "__slots__",
     "__weakref__",
+    "__match_args__",
     "__dataclass_fields__",
+    "__dataclass_params__",
 ];
 
 pub(crate) fn all_declarations_and_bindings<'db>(

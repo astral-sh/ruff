@@ -2122,18 +2122,25 @@ impl<'db> ClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> Member<'db> {
-        if name == "__dataclass_fields__" && self.dataclass_params(db).is_some() {
-            // Make this class look like a subclass of the `DataClassInstance` protocol
-            return Member {
-                inner: Place::declared(KnownClass::Dict.to_specialized_instance(
-                    db,
-                    [
-                        KnownClass::Str.to_instance(db),
-                        KnownClass::Field.to_specialized_instance(db, [Type::any()]),
-                    ],
-                ))
-                .with_qualifiers(TypeQualifiers::CLASS_VAR),
-            };
+        if self.dataclass_params(db).is_some() {
+            if name == "__dataclass_fields__" {
+                // Make this class look like a subclass of the `DataClassInstance` protocol
+                return Member {
+                    inner: Place::declared(KnownClass::Dict.to_specialized_instance(
+                        db,
+                        [
+                            KnownClass::Str.to_instance(db),
+                            KnownClass::Field.to_specialized_instance(db, [Type::any()]),
+                        ],
+                    ))
+                    .with_qualifiers(TypeQualifiers::CLASS_VAR),
+                };
+            } else if name == "__dataclass_params__" {
+                // There is no typeshed class for this. For now, we model it as `Any`.
+                return Member {
+                    inner: Place::declared(Type::any()).with_qualifiers(TypeQualifiers::CLASS_VAR),
+                };
+            }
         }
 
         if CodeGeneratorKind::NamedTuple.matches(db, self, specialization) {

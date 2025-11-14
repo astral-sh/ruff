@@ -570,6 +570,7 @@ static_assert(has_member(Person, "name"))
 static_assert(has_member(Person, "age"))
 
 static_assert(has_member(Person, "__dataclass_fields__"))
+static_assert(has_member(Person, "__dataclass_params__"))
 
 # These are always available, since they are also defined on `object`:
 static_assert(has_member(Person, "__init__"))
@@ -599,6 +600,7 @@ def _(person: Person):
     static_assert(has_member(person, "age"))
 
     static_assert(has_member(person, "__dataclass_fields__"))
+    static_assert(has_member(person, "__dataclass_params__"))
 
     static_assert(has_member(person, "__init__"))
     static_assert(has_member(person, "__repr__"))
