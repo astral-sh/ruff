@@ -2,7 +2,9 @@ use ast::FStringFlags;
 use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr, StringFlags, str::Quote};
+use ruff_python_ast::{
+    self as ast, Arguments, Expr, StringFlags, str::Quote, str_prefix::StringLiteralPrefix,
+};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -74,14 +76,26 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
     // If all elements are string constants, join them into a single string.
     if joinees.iter().all(Expr::is_string_literal_expr) {
         let mut flags: Option<ast::StringLiteralFlags> = None;
+        let mut any_raw = false;
+
+        for expr in joinees {
+            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
+                let curr_flags = value.first_literal_flags();
+                let is_raw = curr_flags.prefix().is_raw();
+
+                if flags.is_none() {
+                    flags = Some(curr_flags);
+                    any_raw = is_raw;
+                } else if is_raw {
+                    any_raw = true;
+                }
+            }
+        }
+
         let content = joinees
             .iter()
             .filter_map(|expr| {
                 if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
-                    if flags.is_none() {
-                        // Take the flags from the first Expr
-                        flags = Some(value.first_literal_flags());
-                    }
                     Some(value.to_str())
                 } else {
                     None
@@ -90,6 +104,25 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
             .join(joiner);
 
         let mut flags = flags?;
+
+        // If any input was raw but the content cannot be safely represented as a raw string,
+        // use non-raw representation. This handles cases where raw strings would create invalid
+        // syntax or behavior changes.
+        if any_raw && !content.is_empty() {
+            let needs_non_raw = content.contains(['\r', '\0']) || {
+                // Check if content contains characters that would break raw string syntax
+                let quote_char = flags.quote_str();
+                // A raw string cannot end with a single backslash if it's immediately
+                // followed by the quote delimiter, as that would be invalid syntax.
+                let ends_with_backslash = content.ends_with('\\')
+                    && (content.len() == 1 || content.chars().nth_back(1) != Some('\\'));
+                content.contains(quote_char) || ends_with_backslash
+            };
+
+            if needs_non_raw {
+                flags = flags.with_prefix(StringLiteralPrefix::Empty);
+            }
+        }
 
         // If the result is a raw string and contains a newline, use triple quotes.
         if flags.prefix().is_raw() && content.contains(['\n', '\r']) {
