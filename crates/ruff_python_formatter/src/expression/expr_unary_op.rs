@@ -3,8 +3,7 @@ use ruff_python_ast::ExprUnaryOp;
 use ruff_python_ast::UnaryOp;
 use ruff_python_trivia::SimpleTokenKind;
 use ruff_python_trivia::SimpleTokenizer;
-use ruff_text_size::Ranged;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::leading_comments;
 use crate::comments::trailing_comments;
@@ -28,22 +27,7 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
 
-        let mut tokenizer = SimpleTokenizer::new(
-            f.context().source(),
-            TextRange::new(item.start(), operand.start()),
-        )
-        .skip_trivia();
-        let op_token = tokenizer.next();
-        debug_assert!(op_token.is_some_and(|token| matches!(
-            token.kind,
-            SimpleTokenKind::Tilde
-                | SimpleTokenKind::Not
-                | SimpleTokenKind::Plus
-                | SimpleTokenKind::Minus
-        )));
-        let up_to = tokenizer
-            .find(|token| token.kind == SimpleTokenKind::LParen)
-            .map_or(operand.start(), |lparen| lparen.start());
+        let up_to = operand_start(item, f.context());
 
         let pivot = dangling.partition_point(|comment| comment.end() < up_to);
         dbg!(pivot);
@@ -113,10 +97,37 @@ impl NeedsParentheses for ExprUnaryOp {
             context.source(),
         ) {
             OptionalParentheses::Never
+        } else if context
+            .comments()
+            .dangling(self)
+            .iter()
+            .any(|comment| comment.end() < operand_start(self, context))
+        {
+            OptionalParentheses::Multiline
         } else if context.comments().has(self.operand.as_ref()) {
             OptionalParentheses::Always
         } else {
             self.operand.needs_parentheses(self.into(), context)
         }
     }
+}
+
+/// Returns the start of `unary_op`'s operand, or its leading parenthesis, if it has one.
+fn operand_start(unary_op: &ExprUnaryOp, context: &PyFormatContext<'_>) -> TextSize {
+    let mut tokenizer = SimpleTokenizer::new(
+        context.source(),
+        TextRange::new(unary_op.start(), unary_op.operand.start()),
+    )
+    .skip_trivia();
+    let op_token = tokenizer.next();
+    debug_assert!(op_token.is_some_and(|token| matches!(
+        token.kind,
+        SimpleTokenKind::Tilde
+            | SimpleTokenKind::Not
+            | SimpleTokenKind::Plus
+            | SimpleTokenKind::Minus
+    )));
+    tokenizer
+        .find(|token| token.kind == SimpleTokenKind::LParen)
+        .map_or(unary_op.operand.start(), |lparen| lparen.start())
 }
