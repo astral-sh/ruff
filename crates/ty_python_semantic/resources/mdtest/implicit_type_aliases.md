@@ -680,8 +680,21 @@ def _(
 Invalid uses result in diagnostics:
 
 ```py
+from typing import Literal
+
 # error: [invalid-type-form]
-InvalidSubclass = type[1]
+InvalidSubclassOf1 = type[1]
+
+# TODO: This should be an error
+InvalidSubclassOfLiteral = type[Literal[42]]
+
+def _(
+    invalid_subclass_of_1: InvalidSubclassOf1,
+    invalid_subclass_of_literal: InvalidSubclassOfLiteral,
+):
+    reveal_type(invalid_subclass_of_1)  # revealed: type[Unknown]
+    # TODO: this should be `type[Unknown]` or `Unknown`
+    reveal_type(invalid_subclass_of_literal)  # revealed: <class 'int'>
 ```
 
 ### `Type[…]`
@@ -759,6 +772,178 @@ Invalid uses result in diagnostics:
 InvalidSubclass = Type[1]
 ```
 
+## Other `typing` special forms
+
+The following special forms from the `typing` module are also supported in implicit type aliases:
+
+```py
+from typing import List, Dict, Set, FrozenSet, ChainMap, Counter, DefaultDict, Deque, OrderedDict
+
+MyList = List[str]
+MySet = Set[str]
+MyDict = Dict[str, int]
+MyFrozenSet = FrozenSet[str]
+MyChainMap = ChainMap[str, int]
+MyCounter = Counter[str]
+MyDefaultDict = DefaultDict[str, int]
+MyDeque = Deque[str]
+MyOrderedDict = OrderedDict[str, int]
+
+reveal_type(MyList)  # revealed: <class 'list[str]'>
+reveal_type(MySet)  # revealed: <class 'set[str]'>
+reveal_type(MyDict)  # revealed: <class 'dict[str, int]'>
+reveal_type(MyFrozenSet)  # revealed: <class 'frozenset[str]'>
+reveal_type(MyChainMap)  # revealed: <class 'ChainMap[str, int]'>
+reveal_type(MyCounter)  # revealed: <class 'Counter[str]'>
+reveal_type(MyDefaultDict)  # revealed: <class 'defaultdict[str, int]'>
+reveal_type(MyDeque)  # revealed: <class 'deque[str]'>
+reveal_type(MyOrderedDict)  # revealed: <class 'OrderedDict[str, int]'>
+
+def _(
+    my_list: MyList,
+    my_set: MySet,
+    my_dict: MyDict,
+    my_frozen_set: MyFrozenSet,
+    my_chain_map: MyChainMap,
+    my_counter: MyCounter,
+    my_default_dict: MyDefaultDict,
+    my_deque: MyDeque,
+    my_ordered_dict: MyOrderedDict,
+):
+    reveal_type(my_list)  # revealed: list[str]
+    reveal_type(my_set)  # revealed: set[str]
+    reveal_type(my_dict)  # revealed: dict[str, int]
+    reveal_type(my_frozen_set)  # revealed: frozenset[str]
+    reveal_type(my_chain_map)  # revealed: ChainMap[str, int]
+    reveal_type(my_counter)  # revealed: Counter[str]
+    reveal_type(my_default_dict)  # revealed: defaultdict[str, int]
+    reveal_type(my_deque)  # revealed: deque[str]
+    reveal_type(my_ordered_dict)  # revealed: OrderedDict[str, int]
+```
+
+All of them are supported in unions:
+
+```py
+NoneOrList = None | List[str]
+NoneOrSet = None | Set[str]
+NoneOrDict = None | Dict[str, int]
+NoneOrFrozenSet = None | FrozenSet[str]
+NoneOrChainMap = None | ChainMap[str, int]
+NoneOrCounter = None | Counter[str]
+NoneOrDefaultDict = None | DefaultDict[str, int]
+NoneOrDeque = None | Deque[str]
+NoneOrOrderedDict = None | OrderedDict[str, int]
+
+ListOrNone = List[int] | None
+SetOrNone = Set[int] | None
+DictOrNone = Dict[str, int] | None
+FrozenSetOrNone = FrozenSet[int] | None
+ChainMapOrNone = ChainMap[str, int] | None
+CounterOrNone = Counter[str] | None
+DefaultDictOrNone = DefaultDict[str, int] | None
+DequeOrNone = Deque[str] | None
+OrderedDictOrNone = OrderedDict[str, int] | None
+
+reveal_type(NoneOrList)  # revealed: types.UnionType
+reveal_type(NoneOrSet)  # revealed: types.UnionType
+reveal_type(NoneOrDict)  # revealed: types.UnionType
+reveal_type(NoneOrFrozenSet)  # revealed: types.UnionType
+reveal_type(NoneOrChainMap)  # revealed: types.UnionType
+reveal_type(NoneOrCounter)  # revealed: types.UnionType
+reveal_type(NoneOrDefaultDict)  # revealed: types.UnionType
+reveal_type(NoneOrDeque)  # revealed: types.UnionType
+reveal_type(NoneOrOrderedDict)  # revealed: types.UnionType
+
+reveal_type(ListOrNone)  # revealed: types.UnionType
+reveal_type(SetOrNone)  # revealed: types.UnionType
+reveal_type(DictOrNone)  # revealed: types.UnionType
+reveal_type(FrozenSetOrNone)  # revealed: types.UnionType
+reveal_type(ChainMapOrNone)  # revealed: types.UnionType
+reveal_type(CounterOrNone)  # revealed: types.UnionType
+reveal_type(DefaultDictOrNone)  # revealed: types.UnionType
+reveal_type(DequeOrNone)  # revealed: types.UnionType
+reveal_type(OrderedDictOrNone)  # revealed: types.UnionType
+
+def _(
+    none_or_list: NoneOrList,
+    none_or_set: NoneOrSet,
+    none_or_dict: NoneOrDict,
+    none_or_frozen_set: NoneOrFrozenSet,
+    none_or_chain_map: NoneOrChainMap,
+    none_or_counter: NoneOrCounter,
+    none_or_default_dict: NoneOrDefaultDict,
+    none_or_deque: NoneOrDeque,
+    none_or_ordered_dict: NoneOrOrderedDict,
+    list_or_none: ListOrNone,
+    set_or_none: SetOrNone,
+    dict_or_none: DictOrNone,
+    frozen_set_or_none: FrozenSetOrNone,
+    chain_map_or_none: ChainMapOrNone,
+    counter_or_none: CounterOrNone,
+    default_dict_or_none: DefaultDictOrNone,
+    deque_or_none: DequeOrNone,
+    ordered_dict_or_none: OrderedDictOrNone,
+):
+    reveal_type(none_or_list)  # revealed: None | list[str]
+    reveal_type(none_or_set)  # revealed: None | set[str]
+    reveal_type(none_or_dict)  # revealed: None | dict[str, int]
+    reveal_type(none_or_frozen_set)  # revealed: None | frozenset[str]
+    reveal_type(none_or_chain_map)  # revealed: None | ChainMap[str, int]
+    reveal_type(none_or_counter)  # revealed: None | Counter[str]
+    reveal_type(none_or_default_dict)  # revealed: None | defaultdict[str, int]
+    reveal_type(none_or_deque)  # revealed: None | deque[str]
+    reveal_type(none_or_ordered_dict)  # revealed: None | OrderedDict[str, int]
+
+    reveal_type(list_or_none)  # revealed: list[int] | None
+    reveal_type(set_or_none)  # revealed: set[int] | None
+    reveal_type(dict_or_none)  # revealed: dict[str, int] | None
+    reveal_type(frozen_set_or_none)  # revealed: frozenset[int] | None
+    reveal_type(chain_map_or_none)  # revealed: ChainMap[str, int] | None
+    reveal_type(counter_or_none)  # revealed: Counter[str] | None
+    reveal_type(default_dict_or_none)  # revealed: defaultdict[str, int] | None
+    reveal_type(deque_or_none)  # revealed: deque[str] | None
+    reveal_type(ordered_dict_or_none)  # revealed: OrderedDict[str, int] | None
+```
+
+Invalid uses result in diagnostics:
+
+```py
+from typing import List, Dict
+
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+InvalidList = List[1]
+
+# error: [invalid-type-form] "`typing.typing.List` requires exactly one argument"
+ListTooManyArgs = List[int, str]
+
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+InvalidDict1 = Dict[1, str]
+
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+InvalidDict2 = Dict[str, 2]
+
+# error: [invalid-type-form] "`typing.typing.Dict` requires exactly two arguments, got 1"
+DictTooFewArgs = Dict[str]
+
+# error: [invalid-type-form] "`typing.typing.Dict` requires exactly two arguments, got 3"
+DictTooManyArgs = Dict[str, int, float]
+
+def _(
+    invalid_list: InvalidList,
+    list_too_many_args: ListTooManyArgs,
+    invalid_dict1: InvalidDict1,
+    invalid_dict2: InvalidDict2,
+    dict_too_few_args: DictTooFewArgs,
+    dict_too_many_args: DictTooManyArgs,
+):
+    reveal_type(invalid_list)  # revealed: list[Unknown]
+    reveal_type(list_too_many_args)  # revealed: list[Unknown]
+    reveal_type(invalid_dict1)  # revealed: dict[Unknown, str]
+    reveal_type(invalid_dict2)  # revealed: dict[str, Unknown]
+    reveal_type(dict_too_few_args)  # revealed: dict[str, Unknown]
+    reveal_type(dict_too_many_args)  # revealed: dict[Unknown, Unknown]
+```
+
 ## Stringified annotations?
 
 From the [typing spec on type aliases](https://typing.python.org/en/latest/spec/aliases.html):
@@ -789,22 +974,28 @@ We *do* support stringified annotations if they appear in a position where a typ
 syntactically expected:
 
 ```py
-from typing import Union
+from typing import Union, List, Dict
 
-ListOfInts = list["int"]
+ListOfInts1 = list["int"]
+ListOfInts2 = List["int"]
 StrOrStyle = Union[str, "Style"]
 SubclassOfStyle = type["Style"]
+DictStrToStyle = Dict[str, "Style"]
 
 class Style: ...
 
 def _(
-    list_of_ints: ListOfInts,
+    list_of_ints1: ListOfInts1,
+    list_of_ints2: ListOfInts2,
     str_or_style: StrOrStyle,
     subclass_of_style: SubclassOfStyle,
+    dict_str_to_style: DictStrToStyle,
 ):
-    reveal_type(list_of_ints)  # revealed: list[int]
+    reveal_type(list_of_ints1)  # revealed: list[int]
+    reveal_type(list_of_ints2)  # revealed: list[int]
     reveal_type(str_or_style)  # revealed: str | Style
     reveal_type(subclass_of_style)  # revealed: type[Style]
+    reveal_type(dict_str_to_style)  # revealed: dict[str, Style]
 ```
 
 ## Recursive
@@ -828,8 +1019,27 @@ python-version = "3.12"
 ```
 
 ```py
-Recursive = list["Recursive" | None]
+from typing import List, Dict
 
-def _(r: Recursive):
-    reveal_type(r)  # revealed: list[Divergent]
+RecursiveList1 = list["RecursiveList1" | None]
+RecursiveList2 = List["RecursiveList2" | None]
+RecursiveDict1 = dict[str, "RecursiveDict1" | None]
+RecursiveDict2 = Dict[str, "RecursiveDict2" | None]
+RecursiveDict3 = dict["RecursiveDict3", int]
+RecursiveDict4 = Dict["RecursiveDict4", int]
+
+def _(
+    recursive_list1: RecursiveList1,
+    recursive_list2: RecursiveList2,
+    recursive_dict1: RecursiveDict1,
+    recursive_dict2: RecursiveDict2,
+    recursive_dict3: RecursiveDict3,
+    recursive_dict4: RecursiveDict4,
+):
+    reveal_type(recursive_list1)  # revealed: list[Divergent]
+    reveal_type(recursive_list2)  # revealed: list[Divergent]
+    reveal_type(recursive_dict1)  # revealed: dict[str, Divergent]
+    reveal_type(recursive_dict2)  # revealed: dict[str, Divergent]
+    reveal_type(recursive_dict3)  # revealed: dict[Divergent, int]
+    reveal_type(recursive_dict4)  # revealed: dict[Divergent, int]
 ```
