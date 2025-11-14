@@ -978,10 +978,10 @@ reveal_type(ParentDataclass.__init__)
 reveal_type(ChildOfParentDataclass.__init__)
 
 result_int = uses_dataclass(42)
-reveal_type(result_int)  # revealed: ChildOfParentDataclass[Literal[42]]
+reveal_type(result_int)  # revealed: ChildOfParentDataclass[int]
 
 result_str = uses_dataclass("hello")
-reveal_type(result_str)  # revealed: ChildOfParentDataclass[Literal["hello"]]
+reveal_type(result_str)  # revealed: ChildOfParentDataclass[str]
 ```
 
 ## Descriptor-typed fields

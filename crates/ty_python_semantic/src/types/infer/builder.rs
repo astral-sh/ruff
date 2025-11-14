@@ -6707,7 +6707,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         SpecializationBuilder::new(db, generic_context.inferable_typevars(db));
 
                     let _ = builder.infer(return_ty, declared_return_ty);
-                    let specialization = builder.build(generic_context, call_expression_tcx);
+                    let specialization = builder.build(generic_context);
 
                     parameter_type = parameter_type.apply_specialization(db, specialization);
                 }
@@ -7394,9 +7394,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let class_type = class_literal.apply_specialization(self.db(), |_| {
-            builder.build(generic_context, TypeContext::default())
-        });
+        let class_type =
+            class_literal.apply_specialization(self.db(), |_| builder.build(generic_context));
 
         Type::from(class_type).to_instance(self.db())
     }

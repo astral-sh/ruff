@@ -9,7 +9,7 @@ use std::fmt;
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
@@ -38,8 +38,8 @@ use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, ClassLiteral, DataclassFlags, DataclassParams,
     FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
     NominalInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
-    TypeAliasType, TypeContext, UnionBuilder, UnionType, WrapperDescriptorKind, enums, ide_support,
-    infer_isolated_expression, todo_type,
+    TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
+    enums, ide_support, infer_isolated_expression, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
@@ -2808,6 +2808,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             Some(builder.type_mappings().clone())
         });
 
+        // For a given type variable, we track the variance of any assignments to that type variable
+        // in the argument types.
+        let mut variance_in_arguments: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
+            FxHashMap::default();
+
         let parameters = self.signature.parameters();
         for (argument_index, adjusted_argument_index, _, argument_type) in
             self.enumerate_argument_types()
@@ -2820,22 +2825,32 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     continue;
                 };
 
-                let filter = |declared_ty: BoundTypeVarIdentity<'_>, inferred_ty: Type<'_>| {
-                    // Avoid widening the inferred type if it is already assignable to the
-                    // preferred declared type.
-                    preferred_type_mappings
-                        .as_ref()
-                        .and_then(|types| types.get(&declared_ty))
-                        .is_none_or(|preferred_ty| {
-                            !inferred_ty.is_assignable_to(self.db, *preferred_ty)
-                        })
-                };
-
-                if let Err(error) = builder.infer_filter(
+                let specialization_result = builder.infer_map(
                     expected_type,
                     variadic_argument_type.unwrap_or(argument_type),
-                    filter,
-                ) {
+                    |(identity, variance, inferred_ty)| {
+                        // Avoid widening the inferred type if it is already assignable to the
+                        // preferred declared type.
+                        if preferred_type_mappings
+                            .as_ref()
+                            .and_then(|types| types.get(&identity))
+                            .is_some_and(|preferred_ty| {
+                                inferred_ty.is_assignable_to(self.db, *preferred_ty)
+                            })
+                        {
+                            return None;
+                        }
+
+                        variance_in_arguments
+                            .entry(identity)
+                            .and_modify(|current| *current = current.join(variance))
+                            .or_insert(variance);
+
+                        Some(inferred_ty)
+                    },
+                );
+
+                if let Err(error) = specialization_result {
                     self.errors.push(BindingError::SpecializationError {
                         error,
                         argument_index: adjusted_argument_index,
@@ -2844,8 +2859,59 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
+        // Attempt to promote any literal types assigned to the specialization.
+        let maybe_promote = |identity, typevar, ty: Type<'db>| {
+            let Some(return_ty) = self.constructor_instance_type.or(self.signature.return_ty)
+            else {
+                return ty;
+            };
+
+            let mut combined_tcx = TypeContext::default();
+            let mut variance_in_return = TypeVarVariance::Bivariant;
+
+            // Find all occurrences of the type variable in the return type.
+            let visit_return_ty = |_, ty, variance, tcx: TypeContext<'db>| {
+                if ty != Type::TypeVar(typevar) {
+                    return;
+                }
+
+                // We always prefer the declared type when attempting literal promotion,
+                // so we take the union of every applicable type context.
+                match (tcx.annotation, &mut combined_tcx.annotation) {
+                    (Some(_), None) => combined_tcx = tcx,
+                    (Some(ty), Some(combined_ty)) => {
+                        *combined_ty = UnionType::from_elements(self.db, [*combined_ty, ty]);
+                    }
+                    _ => {}
+                }
+
+                variance_in_return = variance_in_return.join(variance);
+            };
+
+            return_ty.visit_specialization(self.db, self.call_expression_tcx, visit_return_ty);
+
+            // Promotion is only useful if the type variable is in invariant or contravariant
+            // position in the return type.
+            if variance_in_return.is_covariant() {
+                return ty;
+            }
+
+            // If the type variable is a non-covariant position in the argument, then we avoid
+            // promotion, respecting any literals in the parameter type.
+            if variance_in_arguments
+                .get(&identity)
+                .is_some_and(|variance| !variance.is_covariant())
+            {
+                return ty;
+            }
+
+            ty.promote_literals(self.db, combined_tcx)
+        };
+
         // Build the specialization first without inferring the complete type context.
-        let isolated_specialization = builder.build(generic_context, self.call_expression_tcx);
+        let isolated_specialization = builder
+            .mapped(generic_context, maybe_promote)
+            .build(generic_context);
         let isolated_return_ty = self
             .return_ty
             .apply_specialization(self.db, isolated_specialization);
@@ -2870,7 +2936,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             builder.infer(return_ty, call_expression_tcx).ok()?;
 
             // Otherwise, build the specialization again after inferring the complete type context.
-            let specialization = builder.build(generic_context, self.call_expression_tcx);
+            let specialization = builder
+                .mapped(generic_context, maybe_promote)
+                .build(generic_context);
             let return_ty = return_ty.apply_specialization(self.db, specialization);
 
             Some((Some(specialization), return_ty))

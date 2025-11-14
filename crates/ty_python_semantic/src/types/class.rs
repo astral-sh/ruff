@@ -1476,14 +1476,9 @@ impl<'db> ClassLiteral<'db> {
         visitor.typevars.into_inner()
     }
 
-    /// Returns the generic context that should be inherited by any constructor methods of this
-    /// class.
-    ///
-    /// When inferring a specialization of the class's generic context from a constructor call, we
-    /// promote any typevars that are inferred as a literal to the corresponding instance type.
+    /// Returns the generic context that should be inherited by any constructor methods of this class.
     fn inherited_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         self.generic_context(db)
-            .map(|generic_context| generic_context.promote_literals(db))
     }
 
     pub(super) fn file(self, db: &dyn Db) -> File {

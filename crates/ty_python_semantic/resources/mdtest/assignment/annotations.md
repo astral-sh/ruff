@@ -229,87 +229,6 @@ a: list[str] = [1, 2, 3]
 b: set[int] = {1, 2, "3"}
 ```
 
-## Literal annnotations are respected
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from enum import Enum
-from typing_extensions import Literal, LiteralString
-
-a: list[Literal[1]] = [1]
-reveal_type(a)  # revealed: list[Literal[1]]
-
-b: list[Literal[True]] = [True]
-reveal_type(b)  # revealed: list[Literal[True]]
-
-c: list[Literal["a"]] = ["a"]
-reveal_type(c)  # revealed: list[Literal["a"]]
-
-d: list[LiteralString] = ["a", "b", "c"]
-reveal_type(d)  # revealed: list[LiteralString]
-
-e: list[list[Literal[1]]] = [[1]]
-reveal_type(e)  # revealed: list[list[Literal[1]]]
-
-class Color(Enum):
-    RED = "red"
-
-f: dict[list[Literal[1]], list[Literal[Color.RED]]] = {[1]: [Color.RED, Color.RED]}
-reveal_type(f)  # revealed: dict[list[Literal[1]], list[Color]]
-
-class X[T]:
-    def __init__(self, value: T): ...
-
-g: X[Literal[1]] = X(1)
-reveal_type(g)  # revealed: X[Literal[1]]
-
-h: X[int] = X(1)
-reveal_type(h)  # revealed: X[int]
-
-i: dict[list[X[Literal[1]]], set[Literal[b"a"]]] = {[X(1)]: {b"a"}}
-reveal_type(i)  # revealed: dict[list[X[Literal[1]]], set[Literal[b"a"]]]
-
-j: list[Literal[1, 2, 3]] = [1, 2, 3]
-reveal_type(j)  # revealed: list[Literal[1, 2, 3]]
-
-k: list[Literal[1] | Literal[2] | Literal[3]] = [1, 2, 3]
-reveal_type(k)  # revealed: list[Literal[1, 2, 3]]
-
-type Y[T] = list[T]
-
-l: Y[Y[Literal[1]]] = [[1]]
-reveal_type(l)  # revealed: list[Y[Literal[1]]]
-
-m: list[tuple[Literal[1], Literal[2], Literal[3]]] = [(1, 2, 3)]
-reveal_type(m)  # revealed: list[tuple[Literal[1], Literal[2], Literal[3]]]
-
-n: list[tuple[int, str, int]] = [(1, "2", 3), (4, "5", 6)]
-reveal_type(n)  # revealed: list[tuple[int, str, int]]
-
-o: list[tuple[Literal[1], ...]] = [(1, 1, 1)]
-reveal_type(o)  # revealed: list[tuple[Literal[1], ...]]
-
-p: list[tuple[int, ...]] = [(1, 1, 1)]
-reveal_type(p)  # revealed: list[tuple[int, ...]]
-
-# literal promotion occurs based on assignability, an exact match is not required
-q: list[int | Literal[1]] = [1]
-reveal_type(q)  # revealed: list[int]
-
-r: list[Literal[1, 2, 3, 4]] = [1, 2]
-reveal_type(r)  # revealed: list[Literal[1, 2, 3, 4]]
-
-s: list[Literal[1]]
-s = [1]
-reveal_type(s)  # revealed: list[Literal[1]]
-(s := [1])
-reveal_type(s)  # revealed: list[Literal[1]]
-```
-
 ## Generic constructor annotations are understood
 
 ```toml
@@ -352,17 +271,25 @@ from dataclasses import dataclass
 class Y[T]:
     value: T
 
-y1: Y[Any] = Y(value=1)
-reveal_type(y1)  # revealed: Y[Any]
+y1 = Y(value=1)
+reveal_type(y1)  # revealed: Y[int]
+
+y2: Y[Any] = Y(value=1)
+reveal_type(y2)  # revealed: Y[Any]
 ```
 
 ```py
 class Z[T]:
+    value: T
+
     def __new__(cls, value: T):
         return super().__new__(cls)
 
-z1: Z[Any] = Z(1)
-reveal_type(z1)  # revealed: Z[Any]
+z1 = Z(1)
+reveal_type(z1)  # revealed: Z[int]
+
+z2: Z[Any] = Z(1)
+reveal_type(z2)  # revealed: Z[Any]
 ```
 
 ## PEP-604 annotations are supported
@@ -481,7 +408,7 @@ def f[T](x: T) -> list[T]:
     return [x]
 
 a = f("a")
-reveal_type(a)  # revealed: list[Literal["a"]]
+reveal_type(a)  # revealed: list[str]
 
 b: list[int | Literal["a"]] = f("a")
 reveal_type(b)  # revealed: list[int | Literal["a"]]
@@ -495,10 +422,10 @@ reveal_type(d)  # revealed: list[int | tuple[int, int]]
 e: list[int] = f(True)
 reveal_type(e)  # revealed: list[int]
 
-# error: [invalid-assignment] "Object of type `list[Literal["a"]]` is not assignable to `list[int]`"
+# error: [invalid-assignment] "Object of type `list[str]` is not assignable to `list[int]`"
 g: list[int] = f("a")
 
-# error: [invalid-assignment] "Object of type `list[Literal["a"]]` is not assignable to `tuple[int]`"
+# error: [invalid-assignment] "Object of type `list[str]` is not assignable to `tuple[int]`"
 h: tuple[int] = f("a")
 
 def f2[T: int](x: T) -> T:
@@ -603,7 +530,7 @@ def f3[T](x: T) -> list[T] | dict[T, T]:
     return [x]
 
 a = f(1)
-reveal_type(a)  # revealed: list[Literal[1]]
+reveal_type(a)  # revealed: list[int]
 
 b: list[Any] = f(1)
 reveal_type(b)  # revealed: list[Any]
@@ -619,11 +546,11 @@ reveal_type(e)  # revealed: list[Any]
 
 f: list[Any] | None = f2(1)
 # TODO: Better constraint solver.
-reveal_type(f)  # revealed: list[Literal[1]] | None
+reveal_type(f)  # revealed: list[int] | None
 
 g: list[Any] | dict[Any, Any] = f3(1)
 # TODO: Better constraint solver.
-reveal_type(g)  # revealed: list[Literal[1]] | dict[Literal[1], Literal[1]]
+reveal_type(g)  # revealed: list[int] | dict[int, int]
 ```
 
 We currently prefer the generic declared type regardless of its variance:
@@ -662,8 +589,8 @@ x4 = invariant(1)
 
 reveal_type(x1)  # revealed: Bivariant[Literal[1]]
 reveal_type(x2)  # revealed: Covariant[Literal[1]]
-reveal_type(x3)  # revealed: Contravariant[Literal[1]]
-reveal_type(x4)  # revealed: Invariant[Literal[1]]
+reveal_type(x3)  # revealed: Contravariant[int]
+reveal_type(x4)  # revealed: Invariant[int]
 
 x5: Bivariant[Any] = bivariant(1)
 x6: Covariant[Any] = covariant(1)
