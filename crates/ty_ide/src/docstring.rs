@@ -65,11 +65,10 @@ impl Docstring {
     /// Render the docstring for markdown display
     pub fn render_markdown(&self) -> String {
         let trimmed = documentation_trim(&self.0);
-        // TODO: now actually parse it and "render" it to markdown.
-        //
-        // For now we just wrap the content in a plaintext codeblock
-        // to avoid the contents erroneously being interpreted as markdown.
-        format!("```text\n{trimmed}\n```")
+
+        // Try to parse and render the contents as markdown,
+        // and if we fail, wrap it in a codeblock and display it raw.
+        try_render_markdown(&trimmed).unwrap_or_else(|| format!("```text\n{trimmed}\n```"))
     }
 
     /// Extract parameter documentation from popular docstring formats.
@@ -151,6 +150,26 @@ fn documentation_trim(docs: &str) -> String {
     }
 
     output
+}
+
+fn try_render_markdown(docstring: &str) -> Option<String> {
+    let mut output = String::new();
+    let mut first_line = true;
+    for line in docstring.lines() {
+        // We can assume leading whitespace has been normalized
+        let trimmed_line = line.trim_start_matches(' ');
+        let num_leading_spaces = line.len() - trimmed_line.len();
+
+        if !first_line {
+            output.push_str("  \n");
+        }
+        for _ in 0..num_leading_spaces {
+            output.push_str("&nbsp;");
+        }
+        output.push_str(trimmed_line);
+        first_line = false;
+    }
+    Some(output)
 }
 
 /// Extract parameter documentation from Google-style docstrings.
