@@ -386,4 +386,31 @@ a = None
 
 def f(a):
     global a  # error: [invalid-syntax]
+
+def g(a):
+    if True:
+        global a  # error: [invalid-syntax]
+
+def h(a):
+    def inner():
+        global a
+
+def i(a):
+    try:
+        global a  # error: [invalid-syntax]
+    except Exception:
+        pass
+
+def f(a):
+    a = 1
+    global a  # error: [invalid-syntax]
+
+def f(a):
+    a = 1
+    a = 2
+    global a  # error: [invalid-syntax]
+
+def f(a):
+    class Inner:
+        global a  # ok
 ```

@@ -2822,24 +2822,12 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     fn in_loop_context(&self) -> bool {
         self.current_scope_info().current_loop.is_some()
     }
+
     fn is_bound_parameter(&self, name: &str) -> bool {
-        for scope_info in self.scope_stack.iter().rev() {
-            let scope = &self.scopes[scope_info.file_scope_id];
-            match scope.node() {
-                NodeWithScopeKind::Function(func) => {
-                    let parameters = &func.node(self.module).parameters;
-                    return parameters.includes(name);
-                }
-                NodeWithScopeKind::Lambda(lambda) => {
-                    if let Some(parameters) = lambda.node(self.module).parameters.as_ref() {
-                        return parameters.includes(name);
-                    }
-                }
-                NodeWithScopeKind::Class(_) => return false,
-                _ => {}
-            }
-        }
-        false
+        self.scopes[self.current_scope()]
+            .node()
+            .as_function()
+            .is_some_and(|func| func.node(self.module).parameters.includes(name))
     }
 }
 
