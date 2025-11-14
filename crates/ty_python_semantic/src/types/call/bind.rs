@@ -993,7 +993,11 @@ impl<'db> Bindings<'db> {
                                     flags |= DataclassFlags::FROZEN;
                                 }
                                 if to_bool(match_args, true) {
-                                    flags |= DataclassFlags::MATCH_ARGS;
+                                    if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                                        flags |= DataclassFlags::MATCH_ARGS;
+                                    } else {
+                                        // TODO: emit diagnostic
+                                    }
                                 }
                                 if to_bool(kw_only, false) {
                                     if Program::get(db).python_version(db) >= PythonVersion::PY310 {
@@ -1003,10 +1007,18 @@ impl<'db> Bindings<'db> {
                                     }
                                 }
                                 if to_bool(slots, false) {
-                                    flags |= DataclassFlags::SLOTS;
+                                    if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                                        flags |= DataclassFlags::SLOTS;
+                                    } else {
+                                        // TODO: emit diagnostic
+                                    }
                                 }
                                 if to_bool(weakref_slot, false) {
-                                    flags |= DataclassFlags::WEAKREF_SLOT;
+                                    if Program::get(db).python_version(db) >= PythonVersion::PY311 {
+                                        flags |= DataclassFlags::WEAKREF_SLOT;
+                                    } else {
+                                        // TODO: emit diagnostic
+                                    }
                                 }
 
                                 let params = DataclassParams::from_flags(db, flags);

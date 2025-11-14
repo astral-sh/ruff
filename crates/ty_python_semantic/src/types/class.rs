@@ -2397,7 +2397,9 @@ impl<'db> ClassLiteral<'db> {
                     .map(|(name, _)| Type::string_literal(db, name));
                 Some(Type::heterogeneous_tuple(db, match_args))
             }
-            (CodeGeneratorKind::DataclassLike(_), "__weakref__") => {
+            (CodeGeneratorKind::DataclassLike(_), "__weakref__")
+                if Program::get(db).python_version(db) >= PythonVersion::PY311 =>
+            {
                 if !has_dataclass_param(DataclassFlags::WEAKREF_SLOT)
                     || !has_dataclass_param(DataclassFlags::SLOTS)
                 {
@@ -2456,7 +2458,9 @@ impl<'db> ClassLiteral<'db> {
                 }
                 None
             }
-            (CodeGeneratorKind::DataclassLike(_), "__slots__") => {
+            (CodeGeneratorKind::DataclassLike(_), "__slots__")
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
+            {
                 has_dataclass_param(DataclassFlags::SLOTS).then(|| {
                     let fields = self.fields(db, specialization, field_policy);
                     let slots = fields.keys().map(|name| Type::string_literal(db, name));
