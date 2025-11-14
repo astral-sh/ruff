@@ -1999,9 +1999,6 @@ impl<'db> ConstraintAssignment<'db> {
 ///
 /// - `C → D`: This indicates that `C` on its own is enough to imply `D`. Any path that assumes `C`
 ///   holds but `D` does _not_ is impossible and can be pruned.
-///
-/// XXX: Note that `C`, `C₁`, `C₂`, and `D` are all [`ConstraintAssignment`]s, which means that they can
-/// check whether a [`ConstrainedTypeVar`] is true or false. #[derive(Clone, Debug, Default)]
 #[derive(Debug, Default, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
 struct SequentMap<'db> {
     /// Sequents of the form `C₁ ∧ C₂ → false`
