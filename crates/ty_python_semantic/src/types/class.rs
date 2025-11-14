@@ -2375,7 +2375,9 @@ impl<'db> ClassLiteral<'db> {
 
                 Some(CallableType::function_like(db, signature))
             }
-            (CodeGeneratorKind::DataclassLike(_), "__match_args__") => {
+            (CodeGeneratorKind::DataclassLike(_), "__match_args__")
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
+            {
                 if !has_dataclass_param(DataclassFlags::MATCH_ARGS) {
                     return None;
                 }
