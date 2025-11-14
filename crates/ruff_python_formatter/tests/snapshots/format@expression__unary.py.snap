@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/unary.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -200,6 +199,22 @@ def foo():
         not (aaaaaaaaaaaaaaaaaaaaa[bbbbbbbb, ccccccc]) and dddddddddd < eeeeeeeeeeeeeee
     ):
         pass
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/19226
+if '' and (not #
+0):
+    pass
+
+if '' and (not #
+(0)
+):
+    pass
+
+if '' and (not
+	(  #
+	0
+)):
+    pass
 ```
 
 ## Output
@@ -318,7 +333,8 @@ if (
 
 ## Trailing operator comments
 
-if (  # comment
+if (
+    # comment
     not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
@@ -367,7 +383,8 @@ if (
 ):
     pass
 
-if (  # comment
+if (
+    # comment
     not a
 ):
     pass
@@ -415,4 +432,25 @@ def foo():
         not (aaaaaaaaaaaaaaaaaaaaa[bbbbbbbb, ccccccc]) and dddddddddd < eeeeeeeeeeeeeee
     ):
         pass
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/19226
+if "" and (
+    #
+    not 0
+):
+    pass
+
+if "" and (
+    #
+    not (0)
+):
+    pass
+
+if "" and (
+    not (  #
+        0
+    )
+):
+    pass
 ```

@@ -27,10 +27,9 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
 
-        let up_to = operand_start(item, f.context());
+        let up_to = operand_start(item, f.context().source());
 
         let pivot = dangling.partition_point(|comment| comment.end() < up_to);
-        dbg!(pivot);
         let leading = &dangling[..pivot];
 
         // Split off the comments that follow after the operator and format them as trailing comments.
@@ -39,9 +38,9 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
         //      a)
         // ```
         if !leading.is_empty() {
-            hard_line_break().fmt(f)?;
-            leading_comments(&dangling[..pivot]).fmt(f)?;
+            // hard_line_break().fmt(f)?;
         }
+        leading_comments(leading).fmt(f)?;
         trailing_comments(&dangling[pivot..]).fmt(f)?;
 
         let operator = match op {
@@ -101,7 +100,7 @@ impl NeedsParentheses for ExprUnaryOp {
             .comments()
             .dangling(self)
             .iter()
-            .any(|comment| comment.end() < operand_start(self, context))
+            .any(|comment| comment.end() < operand_start(self, context.source()))
         {
             OptionalParentheses::Multiline
         } else if context.comments().has(self.operand.as_ref()) {
@@ -113,9 +112,9 @@ impl NeedsParentheses for ExprUnaryOp {
 }
 
 /// Returns the start of `unary_op`'s operand, or its leading parenthesis, if it has one.
-fn operand_start(unary_op: &ExprUnaryOp, context: &PyFormatContext<'_>) -> TextSize {
+pub(crate) fn operand_start(unary_op: &ExprUnaryOp, source: &str) -> TextSize {
     let mut tokenizer = SimpleTokenizer::new(
-        context.source(),
+        source,
         TextRange::new(unary_op.start(), unary_op.operand.start()),
     )
     .skip_trivia();
