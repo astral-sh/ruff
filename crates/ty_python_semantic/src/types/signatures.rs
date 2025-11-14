@@ -29,9 +29,10 @@ use crate::types::generics::{
 };
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind,
-    NormalizedVisitor, TypeContext, TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassLiteral,
+    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
+    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, ParamSpecAttrKind,
+    TypeContext, TypeMapping, TypeRelation, TypeVarInstance, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -1169,10 +1170,56 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) struct Parameters<'db> {
-    // TODO: use SmallVec here once invariance bug is fixed
-    value: Vec<Parameter<'db>>,
+#[derive(
+    Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, Ord, PartialOrd, get_size2::GetSize,
+)]
+pub(crate) enum ParamSpecOrigin<'db> {
+    Bounded(BoundTypeVarInstance<'db>),
+    Unbounded(TypeVarInstance<'db>),
+}
+
+impl<'db> ParamSpecOrigin<'db> {
+    pub(crate) fn with_paramspec_attr(
+        self,
+        db: &'db dyn Db,
+        paramspec_attr: ParamSpecAttrKind,
+    ) -> Self {
+        match self {
+            ParamSpecOrigin::Bounded(typevar) => {
+                ParamSpecOrigin::Bounded(typevar.with_paramspec_attr(db, paramspec_attr))
+            }
+            ParamSpecOrigin::Unbounded(_) => self,
+        }
+    }
+
+    pub(crate) fn name(&self, db: &'db dyn Db) -> &ast::name::Name {
+        match self {
+            ParamSpecOrigin::Bounded(bound) => bound.typevar(db).name(db),
+            ParamSpecOrigin::Unbounded(unbound) => unbound.name(db),
+        }
+    }
+
+    pub(crate) fn binding_context(&self, db: &'db dyn Db) -> Option<BindingContext<'db>> {
+        match self {
+            ParamSpecOrigin::Bounded(bound) => Some(bound.binding_context(db)),
+            ParamSpecOrigin::Unbounded(_) => None,
+        }
+    }
+
+    pub(crate) fn into_type(self) -> Type<'db> {
+        match self {
+            ParamSpecOrigin::Bounded(bound) => Type::TypeVar(bound),
+            ParamSpecOrigin::Unbounded(unbound) => {
+                Type::KnownInstance(KnownInstanceType::TypeVar(unbound))
+            }
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) enum ParametersKind<'db> {
+    #[default]
+    Standard,
 
     /// Whether this parameter list represents a gradual form using `...` as the only parameter.
     ///
@@ -1193,27 +1240,41 @@ pub(crate) struct Parameters<'db> {
     /// some adjustments to represent that.
     ///
     ///   [the typing specification]: https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable
-    is_gradual: bool,
+    Gradual,
+
+    // TODO: Need to store the name of the paramspec variable for the display implementation.
+    ParamSpec(ParamSpecOrigin<'db>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) struct Parameters<'db> {
+    // TODO: use SmallVec here once invariance bug is fixed
+    value: Vec<Parameter<'db>>,
+    kind: ParametersKind<'db>,
 }
 
 impl<'db> Parameters<'db> {
     pub(crate) fn new(parameters: impl IntoIterator<Item = Parameter<'db>>) -> Self {
         let value: Vec<Parameter<'db>> = parameters.into_iter().collect();
-        let is_gradual = value.len() == 2
+        let kind = if value.len() == 2
             && value
                 .iter()
                 .any(|p| p.is_variadic() && p.annotated_type().is_none_or(|ty| ty.is_dynamic()))
             && value.iter().any(|p| {
                 p.is_keyword_variadic() && p.annotated_type().is_none_or(|ty| ty.is_dynamic())
-            });
-        Self { value, is_gradual }
+            }) {
+            ParametersKind::Gradual
+        } else {
+            ParametersKind::Standard
+        };
+        Self { value, kind }
     }
 
     /// Create an empty parameter list.
     pub(crate) fn empty() -> Self {
         Self {
             value: Vec::new(),
-            is_gradual: false,
+            kind: ParametersKind::Standard,
         }
     }
 
@@ -1221,8 +1282,12 @@ impl<'db> Parameters<'db> {
         self.value.as_slice()
     }
 
+    pub(crate) const fn kind(&self) -> ParametersKind<'db> {
+        self.kind
+    }
+
     pub(crate) const fn is_gradual(&self) -> bool {
-        self.is_gradual
+        matches!(self.kind, ParametersKind::Gradual)
     }
 
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
@@ -1234,7 +1299,7 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(todo_type!("todo signature **kwargs")),
             ],
-            is_gradual: true,
+            kind: ParametersKind::Gradual,
         }
     }
 
@@ -1251,7 +1316,25 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Any)),
             ],
-            is_gradual: true,
+            kind: ParametersKind::Gradual,
+        }
+    }
+
+    pub(crate) fn paramspec(db: &'db dyn Db, origin: ParamSpecOrigin<'db>) -> Self {
+        Self {
+            value: vec![
+                Parameter::variadic(Name::new_static("args")).with_annotated_type(
+                    origin
+                        .with_paramspec_attr(db, ParamSpecAttrKind::Args)
+                        .into_type(),
+                ),
+                Parameter::keyword_variadic(Name::new_static("kwargs")).with_annotated_type(
+                    origin
+                        .with_paramspec_attr(db, ParamSpecAttrKind::Kwargs)
+                        .into_type(),
+                ),
+            ],
+            kind: ParametersKind::ParamSpec(origin),
         }
     }
 
@@ -1269,7 +1352,7 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
             ],
-            is_gradual: true,
+            kind: ParametersKind::Gradual,
         }
     }
 
@@ -1281,7 +1364,7 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::object()),
             ],
-            is_gradual: false,
+            kind: ParametersKind::Standard,
         }
     }
 
@@ -1471,13 +1554,13 @@ impl<'db> Parameters<'db> {
             // Note that we've already flipped the materialization in Signature.apply_type_mapping_impl(),
             // so the "top" materialization here is the bottom materialization of the whole Signature.
             // It might make sense to flip the materialization here instead.
-            TypeMapping::Materialize(MaterializationKind::Top) if self.is_gradual => {
+            TypeMapping::Materialize(MaterializationKind::Top) if self.is_gradual() => {
                 Parameters::object()
             }
             // TODO: This is wrong, the empty Parameters is not a subtype of all materializations.
             // The bottom materialization is not currently representable and implementing it
             // properly requires extending the Parameters struct.
-            TypeMapping::Materialize(MaterializationKind::Bottom) if self.is_gradual => {
+            TypeMapping::Materialize(MaterializationKind::Bottom) if self.is_gradual() => {
                 Parameters::empty()
             }
             _ => Self {
@@ -1486,7 +1569,7 @@ impl<'db> Parameters<'db> {
                     .iter()
                     .map(|param| param.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
                     .collect(),
-                is_gradual: self.is_gradual,
+                kind: self.kind,
             },
         }
     }

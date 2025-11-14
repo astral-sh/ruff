@@ -55,16 +55,16 @@ use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind, Meth
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
-    CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION,
-    DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
-    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
-    INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS,
-    INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT,
-    INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NON_SUBSCRIPTABLE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
-    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
+    self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
+    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO,
+    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
+    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE,
+    INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD,
+    INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_FORM,
+    INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases,
+    NON_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
+    SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
+    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
     hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_cannot_pop_required_field_on_typed_dict,
@@ -103,11 +103,11 @@ use crate::types::{
     CallDunderError, CallableBinding, CallableType, ClassLiteral, ClassType, DataclassParams,
     DynamicType, InferredAs, InternedType, InternedTypes, IntersectionBuilder, IntersectionType,
     KnownClass, KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
-    PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType, SubclassOfType,
-    TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
-    binding_type, todo_type,
+    PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, SpecialFormType,
+    SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
+    TypeContext, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
+    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
+    UnionType, binding_type, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -2539,7 +2539,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo_type!("PEP 646")
             } else {
                 let annotated_type = self.file_expression_type(annotation);
-                Type::homogeneous_tuple(self.db(), annotated_type)
+                if let Type::TypeVar(typevar) = annotated_type
+                    && typevar.kind(self.db()).is_paramspec()
+                {
+                    match typevar.paramspec_attr(self.db()) {
+                        // `*args: P.args`
+                        Some(ParamSpecAttrKind::Args) => annotated_type,
+
+                        // `*args: P.kwargs`
+                        Some(ParamSpecAttrKind::Kwargs) => {
+                            if let Some(builder) =
+                                self.context.report_lint(&INVALID_TYPE_FORM, annotation)
+                            {
+                                let name = typevar.name(self.db());
+                                let mut diag = builder.into_diagnostic(format_args!(
+                                    "`{name}.kwargs` is valid only in `**kwargs` annotation",
+                                ));
+                                diag.set_primary_message(format_args!(
+                                    "Did you mean `{name}.args`?"
+                                ));
+                                diagnostic::add_type_expression_reference_link(diag);
+                            }
+                            // TODO: Should this be `Unknown` instead?
+                            Type::homogeneous_tuple(self.db(), Type::unknown())
+                        }
+
+                        // `*args: P`
+                        None => {
+                            // TODO: Should this be `Unknown` instead?
+                            Type::homogeneous_tuple(self.db(), Type::unknown())
+                        }
+                    }
+                } else {
+                    Type::homogeneous_tuple(self.db(), annotated_type)
+                }
             };
 
             self.add_declaration_with_binding(
@@ -2622,7 +2655,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         typing_self(db, self.scope(), Some(method_definition), class_literal)
     }
 
-    /// Set initial declared/inferred types for a `*args` variadic positional parameter.
+    /// Set initial declared/inferred types for a `**kwargs` keyword-variadic parameter.
     ///
     /// The annotated type is implicitly wrapped in a string-keyed dictionary.
     ///
@@ -2635,11 +2668,47 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         if let Some(annotation) = parameter.annotation() {
-            let annotated_ty = self.file_expression_type(annotation);
-            let ty = KnownClass::Dict.to_specialized_instance(
-                self.db(),
-                [KnownClass::Str.to_instance(self.db()), annotated_ty],
-            );
+            let annotated_type = self.file_expression_type(annotation);
+            tracing::debug!("annotated_type: {}", annotated_type.display(self.db()));
+            let ty = if let Type::TypeVar(typevar) = annotated_type
+                && typevar.kind(self.db()).is_paramspec()
+            {
+                match typevar.paramspec_attr(self.db()) {
+                    // `**kwargs: P.args`
+                    Some(ParamSpecAttrKind::Args) => {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, annotation)
+                        {
+                            let name = typevar.name(self.db());
+                            let mut diag = builder.into_diagnostic(format_args!(
+                                "`{name}.args` is valid only in `*args` annotation",
+                            ));
+                            diag.set_primary_message(format_args!("Did you mean `{name}.kwargs`?"));
+                            diagnostic::add_type_expression_reference_link(diag);
+                        }
+                        // TODO: Should this be `Unknown` instead?
+                        KnownClass::Dict.to_specialized_instance(
+                            self.db(),
+                            [KnownClass::Str.to_instance(self.db()), Type::unknown()],
+                        )
+                    }
+
+                    // `**kwargs: P.kwargs`
+                    Some(ParamSpecAttrKind::Kwargs) => annotated_type,
+
+                    // `**kwargs: P`
+                    // TODO: Should this be `Unknown` instead?
+                    None => KnownClass::Dict.to_specialized_instance(
+                        self.db(),
+                        [KnownClass::Str.to_instance(self.db()), Type::unknown()],
+                    ),
+                }
+            } else {
+                KnownClass::Dict.to_specialized_instance(
+                    self.db(),
+                    [KnownClass::Str.to_instance(self.db()), annotated_type],
+                )
+            };
             self.add_declaration_with_binding(
                 parameter.into(),
                 definition,
@@ -8875,9 +8944,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_attribute_load(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
         let ast::ExprAttribute { value, attr, .. } = attribute;
 
-        let value_type = self.infer_maybe_standalone_expression(value, TypeContext::default());
+        let mut value_type = self.infer_maybe_standalone_expression(value, TypeContext::default());
         let db = self.db();
         let mut constraint_keys = vec![];
+
+        tracing::debug!(
+            "value_type for attribute access: {}",
+            value_type.display(db)
+        );
+        if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_type
+            && typevar.kind(db).is_paramspec()
+            && let Some(bound_typevar) = bind_typevar(
+                db,
+                self.index,
+                self.scope().file_scope_id(db),
+                self.typevar_binding_context,
+                typevar,
+            )
+        {
+            value_type = Type::TypeVar(bound_typevar);
+            tracing::debug!("updated value_type: {}", value_type.display(db));
+        }
 
         let mut assigned_type = None;
         if let Some(place_expr) = PlaceExpr::try_from_expr(attribute) {
@@ -8890,6 +8977,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assigned_type = Some(ty);
             }
         }
+        tracing::debug!("assigned_type for attribute access: {:?}", assigned_type);
         let fallback_place = value_type.member(db, &attr.id);
         // Exclude non-definitely-bound places for purposes of reachability
         // analysis. We currently do not perform boundness analysis for implicit
@@ -8987,6 +9075,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             })
             .inner_type();
+
+        tracing::debug!(
+            "resolved_type for attribute access: {}",
+            resolved_type.display(db)
+        );
 
         self.check_deprecated(attr, resolved_type);
 

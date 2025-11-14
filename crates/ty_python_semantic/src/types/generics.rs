@@ -64,7 +64,7 @@ pub(crate) fn bind_typevar<'db>(
             if outer.kind().is_class() {
                 if let NodeWithScopeKind::Function(function) = inner.node() {
                     let definition = index.expect_single_definition(function);
-                    return Some(typevar.with_binding_context(db, definition));
+                    return Some(typevar.as_bound_type_var_instance(db, definition));
                 }
             }
         }
@@ -73,7 +73,7 @@ pub(crate) fn bind_typevar<'db>(
         .find_map(|enclosing_context| enclosing_context.binds_typevar(db, typevar))
         .or_else(|| {
             typevar_binding_context.map(|typevar_binding_context| {
-                typevar.with_binding_context(db, typevar_binding_context)
+                typevar.as_bound_type_var_instance(db, typevar_binding_context)
             })
         })
 }
@@ -358,7 +358,7 @@ impl<'db> GenericContext<'db> {
                 else {
                     return None;
                 };
-                Some(typevar.with_binding_context(db, binding_context))
+                Some(typevar.as_bound_type_var_instance(db, binding_context))
             }
             // TODO: Support these!
             ast::TypeParam::ParamSpec(_) => None,

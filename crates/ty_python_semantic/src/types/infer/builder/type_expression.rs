@@ -2,14 +2,15 @@ use itertools::Either;
 use ruff_python_ast as ast;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
+use crate::semantic_index::semantic_index;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NON_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_callable,
 };
-use crate::types::signatures::Signature;
+use crate::types::generics::bind_typevar;
+use crate::types::signatures::{ParamSpecOrigin, Signature};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
-use crate::types::visitor::any_over_type;
 use crate::types::{
     CallableType, DynamicType, IntersectionBuilder, KnownClass, KnownInstanceType,
     LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType, Type,
@@ -1535,21 +1536,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // `Callable[]`.
                     return None;
                 }
-                if any_over_type(
-                    self.db(),
-                    self.infer_name_load(name),
-                    &|ty| match ty {
-                        Type::KnownInstance(known_instance) => {
-                            known_instance.class(self.db()) == KnownClass::ParamSpec
-                        }
-                        Type::NominalInstance(nominal) => {
-                            nominal.has_known_class(self.db(), KnownClass::ParamSpec)
-                        }
-                        _ => false,
-                    },
-                    true,
-                ) {
-                    return Some(Parameters::todo());
+                let name_ty = self.infer_name_load(name);
+                if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = name_ty
+                    && typevar.kind(self.db()).is_paramspec()
+                {
+                    let index = semantic_index(self.db(), self.scope().file(self.db()));
+                    let origin = bind_typevar(
+                        self.db(),
+                        index,
+                        self.scope().file_scope_id(self.db()),
+                        self.typevar_binding_context,
+                        typevar,
+                    )
+                    .map_or(
+                        ParamSpecOrigin::Unbounded(typevar),
+                        ParamSpecOrigin::Bounded,
+                    );
+                    return Some(Parameters::paramspec(self.db(), origin));
                 }
             }
             _ => {}

@@ -20,7 +20,9 @@ use crate::semantic_index::{scope::ScopeKind, semantic_index};
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
-use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
+use crate::types::signatures::{
+    CallableSignature, Parameter, Parameters, ParametersKind, Signature,
+};
 use crate::types::tuple::TupleSpec;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
@@ -643,6 +645,9 @@ impl Display for DisplayBoundTypeVarIdentity<'_> {
         if let Some(binding_context) = self.bound_typevar_identity.binding_context.name(self.db) {
             write!(f, "@{binding_context}")?;
         }
+        if let Some(paramspec_attr) = self.bound_typevar_identity.paramspec_attr {
+            write!(f, ".{paramspec_attr}")?;
+        }
         Ok(())
     }
 }
@@ -1116,57 +1121,69 @@ impl DisplaySignature<'_> {
         if multiline {
             writer.write_str("\n    ")?;
         }
-        if self.parameters.is_gradual() {
-            // We represent gradual form as `...` in the signature, internally the parameters still
-            // contain `(*args, **kwargs)` parameters.
-            writer.write_str("...")?;
-        } else {
-            let mut star_added = false;
-            let mut needs_slash = false;
-            let mut first = true;
-            let arg_separator = if multiline { ",\n    " } else { ", " };
+        match self.parameters.kind() {
+            ParametersKind::Standard => {
+                let mut star_added = false;
+                let mut needs_slash = false;
+                let mut first = true;
+                let arg_separator = if multiline { ",\n    " } else { ", " };
 
-            for parameter in self.parameters.as_slice() {
-                // Handle special separators
-                if !star_added && parameter.is_keyword_only() {
+                for parameter in self.parameters.as_slice() {
+                    // Handle special separators
+                    if !star_added && parameter.is_keyword_only() {
+                        if !first {
+                            writer.write_str(arg_separator)?;
+                        }
+                        writer.write_char('*')?;
+                        star_added = true;
+                        first = false;
+                    }
+                    if parameter.is_positional_only() {
+                        needs_slash = true;
+                    } else if needs_slash {
+                        if !first {
+                            writer.write_str(arg_separator)?;
+                        }
+                        writer.write_char('/')?;
+                        needs_slash = false;
+                        first = false;
+                    }
+
+                    // Add comma before parameter if not first
                     if !first {
                         writer.write_str(arg_separator)?;
                     }
-                    writer.write_char('*')?;
-                    star_added = true;
+
+                    // Write parameter with range tracking
+                    let param_name = parameter.display_name();
+                    writer.write_parameter(
+                        &parameter.display_with(self.db, self.settings.singleline()),
+                        param_name.as_deref(),
+                    )?;
+
                     first = false;
                 }
-                if parameter.is_positional_only() {
-                    needs_slash = true;
-                } else if needs_slash {
+
+                if needs_slash {
                     if !first {
                         writer.write_str(arg_separator)?;
                     }
                     writer.write_char('/')?;
-                    needs_slash = false;
-                    first = false;
                 }
-
-                // Add comma before parameter if not first
-                if !first {
-                    writer.write_str(arg_separator)?;
-                }
-
-                // Write parameter with range tracking
-                let param_name = parameter.display_name();
-                writer.write_parameter(
-                    &parameter.display_with(self.db, self.settings.singleline()),
-                    param_name.as_deref(),
-                )?;
-
-                first = false;
             }
-
-            if needs_slash {
-                if !first {
-                    writer.write_str(arg_separator)?;
+            ParametersKind::Gradual => {
+                // We represent gradual form as `...` in the signature, internally the parameters still
+                // contain `(*args, **kwargs)` parameters.
+                writer.write_str("...")?;
+            }
+            ParametersKind::ParamSpec(origin) => {
+                writer.write_str(&format!("**{}", origin.name(self.db)))?;
+                if let Some(name) = origin
+                    .binding_context(self.db)
+                    .and_then(|binding_context| binding_context.name(self.db))
+                {
+                    writer.write_str(&format!("@{name}"))?;
                 }
-                writer.write_char('/')?;
             }
         }
 
