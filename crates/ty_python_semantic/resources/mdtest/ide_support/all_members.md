@@ -682,7 +682,12 @@ static_assert(has_member(C(1), "__slots__"))
 
 #### `weakref_slot=True`
 
-When `weakref_slot=True`, the corresponding dunder attribute becomes available:
+When `weakref_slot=True` on Python >=3.11, the corresponding dunder attribute becomes available:
+
+```toml
+[environment]
+python-version = "3.11"
+```
 
 ```py
 from ty_extensions import has_member, static_assert
@@ -740,6 +745,32 @@ static_assert(has_member(C, "__match_args__"))
 
 def _(c: C):
     static_assert(has_member(c, "__match_args__"))
+```
+
+### Attributes added on new Python versions are not synthesized on older Python versions
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+from dataclasses import dataclass
+from ty_extensions import static_assert, has_member
+
+# TODO: these parameters don't exist on Python 3.9;
+# we should emit a diagnostic (or two)
+@dataclass(slots=True, weakref_slot=True)
+class F: ...
+
+static_assert(not has_member(F, "__slots__"))
+static_assert(not has_member(F, "__match_args__"))
+
+# In actual fact, all non-slotted instances have this attribute
+# (and even slotted instances can, if `__weakref__` is included in `__slots__`);
+# we could possibly model that more fully?
+# It's not added by the dataclasses machinery, though
+static_assert(not has_member(F(), "__weakref__"))
 ```
 
 ### Attributes not available at runtime

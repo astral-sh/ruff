@@ -2411,6 +2411,73 @@ Answer.<CURSOR>
         );
     }
 
+    #[test]
+    fn namedtuple_methods() {
+        let builder = completion_test_builder(
+            "\
+from typing import NamedTuple
+
+class Quux(NamedTuple):
+    x: int
+    y: str
+
+quux = Quux()
+quux.<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r"
+        count :: bound method Quux.count(value: Any, /) -> int
+        index :: bound method Quux.index(value: Any, start: SupportsIndex = Literal[0], stop: SupportsIndex = int, /) -> int
+        x :: int
+        y :: str
+        __add__ :: Overload[(value: tuple[int | str, ...], /) -> tuple[int | str, ...], (value: tuple[_T@__add__, ...], /) -> tuple[int | str | _T@__add__, ...]]
+        __annotations__ :: dict[str, Any]
+        __class__ :: type[Quux]
+        __class_getitem__ :: bound method type[Quux].__class_getitem__(item: Any, /) -> GenericAlias
+        __contains__ :: bound method Quux.__contains__(key: object, /) -> bool
+        __delattr__ :: bound method Quux.__delattr__(name: str, /) -> None
+        __dict__ :: dict[str, Any]
+        __dir__ :: bound method Quux.__dir__() -> Iterable[str]
+        __doc__ :: str | None
+        __eq__ :: bound method Quux.__eq__(value: object, /) -> bool
+        __format__ :: bound method Quux.__format__(format_spec: str, /) -> str
+        __ge__ :: bound method Quux.__ge__(value: tuple[int | str, ...], /) -> bool
+        __getattribute__ :: bound method Quux.__getattribute__(name: str, /) -> Any
+        __getitem__ :: Overload[(index: Literal[-2, 0], /) -> int, (index: Literal[-1, 1], /) -> str, (index: SupportsIndex, /) -> int | str, (index: slice[Any, Any, Any], /) -> tuple[int | str, ...]]
+        __getstate__ :: bound method Quux.__getstate__() -> object
+        __gt__ :: bound method Quux.__gt__(value: tuple[int | str, ...], /) -> bool
+        __hash__ :: bound method Quux.__hash__() -> int
+        __init__ :: bound method Quux.__init__() -> None
+        __init_subclass__ :: bound method type[Quux].__init_subclass__() -> None
+        __iter__ :: bound method Quux.__iter__() -> Iterator[int | str]
+        __le__ :: bound method Quux.__le__(value: tuple[int | str, ...], /) -> bool
+        __len__ :: () -> Literal[2]
+        __lt__ :: bound method Quux.__lt__(value: tuple[int | str, ...], /) -> bool
+        __module__ :: str
+        __mul__ :: bound method Quux.__mul__(value: SupportsIndex, /) -> tuple[int | str, ...]
+        __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
+        __new__ :: (x: int, y: str) -> None
+        __orig_bases__ :: tuple[Any, ...]
+        __reduce__ :: bound method Quux.__reduce__() -> str | tuple[Any, ...]
+        __reduce_ex__ :: bound method Quux.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
+        __replace__ :: bound method NamedTupleFallback.__replace__(**kwargs: Any) -> NamedTupleFallback
+        __repr__ :: bound method Quux.__repr__() -> str
+        __reversed__ :: bound method Quux.__reversed__() -> Iterator[int | str]
+        __rmul__ :: bound method Quux.__rmul__(value: SupportsIndex, /) -> tuple[int | str, ...]
+        __setattr__ :: bound method Quux.__setattr__(name: str, value: Any, /) -> None
+        __sizeof__ :: bound method Quux.__sizeof__() -> int
+        __str__ :: bound method Quux.__str__() -> str
+        __subclasshook__ :: bound method type[Quux].__subclasshook__(subclass: type, /) -> bool
+        _asdict :: bound method NamedTupleFallback._asdict() -> dict[str, Any]
+        _field_defaults :: dict[str, Any]
+        _fields :: tuple[str, ...]
+        _make :: bound method type[NamedTupleFallback]._make(iterable: Iterable[Any]) -> NamedTupleFallback
+        _replace :: bound method NamedTupleFallback._replace(**kwargs: Any) -> NamedTupleFallback
+        ");
+    }
+
     // We don't yet take function parameters into account.
     #[test]
     fn call_prefix1() {

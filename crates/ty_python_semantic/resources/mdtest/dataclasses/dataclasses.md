@@ -667,8 +667,13 @@ reveal_type(B.__slots__)  # revealed: tuple[Literal["x"], Literal["y"]]
 
 ### `weakref_slot`
 
-When a dataclass is defined with `weakref_slot=True`, the `__weakref__` attribute is generated. For
-now, we do not attempt to infer a more precise type for it.
+When a dataclass is defined with `weakref_slot=True` on Python >=3.11, the `__weakref__` attribute
+is generated. For now, we do not attempt to infer a more precise type for it.
+
+```toml
+[environment]
+python-version = "3.11"
+```
 
 ```py
 from dataclasses import dataclass
@@ -678,6 +683,58 @@ class C:
     x: int
 
 reveal_type(C.__weakref__)  # revealed: Any | None
+```
+
+The `__weakref__` attribute is correctly not modeled as existing on instances of slotted dataclasses
+where the class definition was not marked with `weakref=True`:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(slots=True)
+class C: ...
+
+# error: [unresolved-attribute]
+reveal_type(C().__weakref__)  # revealed: Unknown
+```
+
+### New features are not available on old Python versions
+
+Certain parameters to `@dataclass` were added on newer Python versions; we do not infer them as
+having any effect on older Python versions:
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+from dataclasses import dataclass
+
+# fmt: off
+
+# TODO: these nonexistent keyword arguments should cause us to emit diagnostics on Python 3.9
+@dataclass(
+    slots=True,
+    weakref_slot=True,
+    match_args=True
+)
+class Foo: ...
+
+# fmt: on
+
+# error: [unresolved-attribute]
+reveal_type(Foo.__slots__)  # revealed: Unknown
+# error: [unresolved-attribute]
+reveal_type(Foo.__match_args__)  # revealed: Unknown
+
+# TODO: this actually *does* exist at runtime
+# (all classes and non-slotted instances have it available by default).
+# We could try to model that more fully...?
+# It's not added by the dataclasses machinery, though.
+#
+# error: [unresolved-attribute]
+reveal_type(Foo.__weakref__)  # revealed: Unknown
 ```
 
 ## `Final` fields
