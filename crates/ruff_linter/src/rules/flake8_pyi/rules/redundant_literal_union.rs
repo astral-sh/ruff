@@ -1,16 +1,23 @@
 use std::fmt;
 
+use anyhow::Result;
+use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
+use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, LiteralExpressionRef};
+use ruff_python_ast::{
+    self as ast, Expr, ExprBinOp, ExprContext, ExprName, ExprSubscript, LiteralExpressionRef,
+    Operator,
+};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing::traverse_union;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
-use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::importer::ImportRequest;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for redundant unions between a `Literal` and a builtin supertype of
@@ -41,19 +48,43 @@ use crate::fix::snippet::SourceCodeSnippet;
 pub(crate) struct RedundantLiteralUnion {
     literal: SourceCodeSnippet,
     builtin_type: ExprType,
+    union_kind: UnionKind,
 }
 
 impl Violation for RedundantLiteralUnion {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let RedundantLiteralUnion {
             literal,
             builtin_type,
+            ..
         } = self;
         if let Some(literal) = literal.full_display() {
             format!("`Literal[{literal}]` is redundant in a union with `{builtin_type}`")
         } else {
             format!("`Literal` is redundant in a union with `{builtin_type}`")
+        }
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let RedundantLiteralUnion {
+            literal,
+            builtin_type,
+            union_kind,
+        } = self;
+        if let Some(literal) = literal.full_display() {
+            match union_kind {
+                UnionKind::TypingUnion => Some(format!(
+                    "Replace `typing.Union[Literal[{literal}], {builtin_type}]` with `{builtin_type}`"
+                )),
+                UnionKind::PEP604 => Some(format!(
+                    "Replace `Literal[{literal}] | {builtin_type}` with `{builtin_type}`"
+                )),
+            }
+        } else {
+            Some(format!("Replace with `{builtin_type}`"))
         }
     }
 }
@@ -62,12 +93,33 @@ impl Violation for RedundantLiteralUnion {
 pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
     let mut typing_literal_exprs = Vec::new();
     let mut builtin_types_in_union = FxHashSet::default();
+    let mut literal_subscript = None;
+    let mut literal_exprs = Vec::new();
+    let subscript = union.as_subscript_expr();
+    let union_kind = match subscript {
+        Some(subscript) => {
+            if !checker
+                .semantic()
+                .match_typing_expr(&subscript.value, "Union")
+            {
+                return;
+            }
+            UnionKind::TypingUnion
+        }
+        None => UnionKind::PEP604,
+    };
 
     // Adds a member to `literal_exprs` for each value in a `Literal`, and any builtin types
     // to `builtin_types_in_union`.
     let mut func = |expr: &'a Expr, _parent: &'a Expr| {
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if checker.semantic().match_typing_expr(value, "Literal") {
+                literal_exprs.push(expr);
+
+                if literal_subscript.is_none() {
+                    literal_subscript = Some(value.as_ref());
+                }
+
                 if let Expr::Tuple(tuple) = &**slice {
                     typing_literal_exprs.extend(tuple);
                 } else {
@@ -85,23 +137,226 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
 
     traverse_union(&mut func, checker.semantic(), union);
 
+    let Some(literal_subscript) = literal_subscript else {
+        return;
+    };
+
+    let mut diagnostics: Vec<(RedundantLiteralUnion, TextRange)> = Vec::new();
+    let mut non_redundant_literal_types = Vec::new();
+
     for typing_literal_expr in typing_literal_exprs {
         let Some(literal_type) = match_literal_type(typing_literal_expr) else {
             continue;
         };
 
         if builtin_types_in_union.contains(&literal_type) {
-            checker.report_diagnostic(
+            diagnostics.push((
                 RedundantLiteralUnion {
                     literal: SourceCodeSnippet::from_str(
                         checker.locator().slice(typing_literal_expr),
                     ),
                     builtin_type: literal_type,
+                    union_kind,
                 },
                 typing_literal_expr.range(),
-            );
+            ));
+        } else {
+            non_redundant_literal_types.push(typing_literal_expr);
         }
     }
+
+    if checker.settings().preview.is_disabled() {
+        for (kind, range) in diagnostics {
+            let _ = checker.report_diagnostic(kind, range);
+        }
+        return;
+    }
+
+    let mut new_literal_expr_types: Vec<LiteralExprType<'a>> = Vec::new();
+
+    // Group all the non-redundant literal types together based on the `Literals`
+    let mut func = |expr: &'a Expr, _parent: &'a Expr| {
+        if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
+            if checker.semantic().match_typing_expr(value, "Literal") {
+                let mut group = Vec::new();
+
+                if let Expr::Tuple(tuple) = &**slice {
+                    for tuple_slice in tuple {
+                        if non_redundant_literal_types.contains(&tuple_slice) {
+                            group.push(tuple_slice);
+                        }
+                    }
+                } else {
+                    if non_redundant_literal_types.contains(&slice.as_ref()) {
+                        group.push(slice);
+                    }
+                }
+                if !group.is_empty() {
+                    new_literal_expr_types.push(LiteralExprType::NonRedundantTypes(group.clone()));
+                }
+            }
+            return;
+        }
+        let Some(_) = match_builtin_type(expr, checker.semantic()) else {
+            return;
+        };
+        new_literal_expr_types.push(LiteralExprType::BuiltinType(expr));
+    };
+
+    traverse_union(&mut func, checker.semantic(), union);
+
+    // This generates new individual `Literal` exprs and builtins
+    let mut new_exprs = Vec::new();
+    for group in new_literal_expr_types {
+        match group {
+            LiteralExprType::BuiltinType(expr) => {
+                new_exprs.push(expr.to_owned());
+            }
+            LiteralExprType::NonRedundantTypes(group) => {
+                let new_literal_expr = Expr::Subscript(ast::ExprSubscript {
+                    node_index: Default::default(),
+                    value: Box::new(literal_subscript.clone()),
+                    range: TextRange::default(),
+                    ctx: ExprContext::Load,
+                    slice: Box::new(if group.len() > 1 {
+                        Expr::Tuple(ast::ExprTuple {
+                            node_index: Default::default(),
+                            elts: group.into_iter().cloned().collect(),
+                            range: TextRange::default(),
+                            ctx: ExprContext::Load,
+                            parenthesized: true,
+                        })
+                    } else {
+                        let Some(group) = group.first() else {
+                            return;
+                        };
+                        group.to_owned().clone()
+                    }),
+                });
+                new_exprs.push(new_literal_expr);
+            }
+        }
+    }
+
+    let applicability = if checker.comment_ranges().intersects(union.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    for (kind, range) in diagnostics {
+        let mut diagnostic = checker.report_diagnostic(kind, range);
+        match union_kind {
+            UnionKind::PEP604 => {
+                diagnostic.try_set_optional_fix(|| -> anyhow::Result<Option<Fix>> {
+                    Ok(generate_pep604_fix(
+                        checker,
+                        &new_exprs,
+                        union,
+                        applicability,
+                    ))
+                });
+            }
+            UnionKind::TypingUnion => {
+                diagnostic.try_set_optional_fix(|| -> anyhow::Result<Option<Fix>> {
+                    generate_typing_union_fix(checker, &new_exprs, union, applicability)
+                });
+            }
+        }
+    }
+}
+
+fn generate_pep604_fix(
+    checker: &Checker,
+    new_exprs: &[Expr],
+    union: &Expr,
+    applicability: Applicability,
+) -> Option<Fix> {
+    if let [new_expr] = new_exprs {
+        return Some(Fix::applicable_edit(
+            Edit::range_replacement(checker.generator().expr(new_expr), union.range()),
+            applicability,
+        ));
+    }
+
+    let new_expr = new_exprs.iter().fold(None, |acc, right| {
+        if let Some(left) = acc {
+            Some(Expr::BinOp(ExprBinOp {
+                node_index: Default::default(),
+                left: Box::new(left),
+                op: Operator::BitOr,
+                right: Box::new(right.clone()),
+                range: TextRange::default(),
+            }))
+        } else {
+            Some(right.clone())
+        }
+    })?;
+
+    Some(Fix::applicable_edit(
+        Edit::range_replacement(checker.generator().expr(&new_expr), union.range()),
+        applicability,
+    ))
+}
+
+fn generate_typing_union_fix(
+    checker: &Checker,
+    new_exprs: &[Expr],
+    union: &Expr,
+    applicability: Applicability,
+) -> Result<Option<Fix>> {
+    let (import_edit, binding) = checker.importer().get_or_import_symbol(
+        &ImportRequest::import_from("typing", "Union"),
+        union.range().start(),
+        checker.semantic(),
+    )?;
+
+    // Construct the expression as `Subscript[typing.Union, Tuple[expr, [expr, ...]]]`
+    let new_expr = Expr::Subscript(ExprSubscript {
+        node_index: Default::default(),
+        range: TextRange::default(),
+        value: Box::new(Expr::Name(ExprName {
+            node_index: Default::default(),
+            id: Name::new(binding),
+            ctx: ExprContext::Store,
+            range: TextRange::default(),
+        })),
+        slice: Box::new(if new_exprs.len() > 1 {
+            Expr::Tuple(ast::ExprTuple {
+                node_index: Default::default(),
+                elts: new_exprs.to_vec(),
+                range: TextRange::default(),
+                ctx: ExprContext::Load,
+                parenthesized: true,
+            })
+        } else {
+            let Some(new_exprs) = new_exprs.first() else {
+                return Ok(None);
+            };
+            new_exprs.clone()
+        }),
+        ctx: ExprContext::Load,
+    });
+
+    Ok(Some(Fix::applicable_edits(
+        Edit::range_replacement(checker.generator().expr(&new_expr), union.range()),
+        [import_edit],
+        applicability,
+    )))
+}
+
+#[derive(Debug, Clone)]
+enum LiteralExprType<'a> {
+    NonRedundantTypes(Vec<&'a Expr>),
+    BuiltinType(&'a Expr),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UnionKind {
+    /// E.g., `typing.Union[int, str]`
+    TypingUnion,
+    /// E.g., `int | str`
+    PEP604,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
