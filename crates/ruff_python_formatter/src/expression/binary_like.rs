@@ -835,22 +835,9 @@ impl<'a> Operand<'a> {
             Operand::Middle { expression } | Operand::Right { expression, .. } => {
                 let leading = comments.leading(*expression);
                 if is_expression_parenthesized((*expression).into(), comments.ranges(), source) {
-                    leading.iter().any(|comment| {
-                        comment.end() <= expression.start()
-                            && !comment.is_formatted()
-                            && matches!(
-                                SimpleTokenizer::new(
-                                    source,
-                                    TextRange::new(comment.end(), expression.start()),
-                                )
-                                .skip_trivia()
-                                .next(),
-                                Some(SimpleToken {
-                                    kind: SimpleTokenKind::LParen,
-                                    ..
-                                })
-                            )
-                    })
+                    leading
+                        .iter()
+                        .any(|comment| has_parenthesis_between(comment, expression, source))
                 } else {
                     !leading.is_empty()
                 }
@@ -876,6 +863,53 @@ impl<'a> Operand<'a> {
             } => Some(trailing_comments),
         }
     }
+}
+
+/// Returns `true` if a left parenthesis is the first non-trivia token found between `comment` and
+/// `expression`.
+///
+/// This can be used to detect unparenthesized leading comments, for example:
+///
+/// ```py
+/// # leading comment
+/// (
+///     expression
+/// )
+/// ```
+fn has_parenthesis_between(comment: &SourceComment, expression: &Expr, source: &str) -> bool {
+    // We adjust the comment placement for unary operators to avoid splitting the operator and its
+    // operand as in:
+    //
+    // ```py
+    // (
+    //     not
+    //     # comment
+    //     True
+    // )
+    // ```
+    //
+    // but making these leading comments means that the comment range falls after the start of the
+    // expression.
+    //
+    // This case can only occur when the comment is after the operator, so it's safe to return
+    // `false` here. The comment will definitely be parenthesized if the the operator is.
+    //
+    // Unary operators are the only known case of this, so `debug_assert!` that it stays that way.
+    debug_assert!(
+        expression.is_unary_op_expr() || comment.end() <= expression.start(),
+        "Expected leading comment to come before its expression",
+    );
+    comment.end() <= expression.start()
+        && !comment.is_formatted()
+        && matches!(
+            SimpleTokenizer::new(source, TextRange::new(comment.end(), expression.start()),)
+                .skip_trivia()
+                .next(),
+            Some(SimpleToken {
+                kind: SimpleTokenKind::LParen,
+                ..
+            })
+        )
 }
 
 impl Format<PyFormatContext<'_>> for Operand<'_> {
@@ -923,20 +957,7 @@ impl Format<PyFormatContext<'_>> for Operand<'_> {
             let leading_before_parentheses_end = leading
                 .iter()
                 .rposition(|comment| {
-                    comment.end() <= expression.start()
-                        && comment.is_unformatted()
-                        && matches!(
-                            SimpleTokenizer::new(
-                                f.context().source(),
-                                TextRange::new(comment.end(), expression.start()),
-                            )
-                            .skip_trivia()
-                            .next(),
-                            Some(SimpleToken {
-                                kind: SimpleTokenKind::LParen,
-                                ..
-                            })
-                        )
+                    has_parenthesis_between(comment, expression, f.context().source())
                 })
                 .map_or(0, |position| position + 1);
 
