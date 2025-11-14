@@ -1176,7 +1176,27 @@ impl<'db> Node<'db> {
     }
 
     /// Simplifies a BDD, replacing constraints with simpler or smaller constraints where possible.
-    fn simplify(self, db: &'db dyn Db) -> Self {
+    ///
+    /// TODO: [Historical note] This is now used only for display purposes, but previously was also
+    /// used to ensure that we added the "transitive closure" to each BDD. The constraints in a BDD
+    /// are not independent; some combinations of constraints can imply other constraints. This
+    /// affects us in two ways: First, it means that certain combinations are impossible. (If
+    /// `a → b` then `a ∧ ¬b` can never happen.) Second, it means that certain constraints can be
+    /// inferred even if they do not explicitly appear in the BDD. It is important to take this
+    /// into account in several BDD operations (satisfiability, existential quantification, etc).
+    /// Before, we used this method to _add_ the transitive closure to a BDD, in an attempt to make
+    /// sure that it holds "all the facts" that would be needed to satisfy any query we might make.
+    /// We also used this method to calculate the "domain" of the BDD to help rule out invalid
+    /// inputs. However, this was at odds with using this method for display purposes, where our
+    /// goal is to _remove_ redundant information, so as to not clutter up the display. To resolve
+    /// this dilemma, all of the correctness uses have been refactored to use [`SequentMap`]
+    /// instead. It tracks the same information in a more efficient and lazy way, and never tries
+    /// to remove redundant information. For expediency, however, we did not make any changes to
+    /// this method, other than to stop tracking the domain (which was never used for display
+    /// purposes). That means we have some tech debt here, since there is a lot of duplicate logic
+    /// between `simplify_for_display` and `SequentMap`. It would be nice to update our display
+    /// logic to use the sequenet map as much as possible. But that can happen later.
+    fn simplify_for_display(self, db: &'db dyn Db) -> Self {
         match self {
             Node::AlwaysTrue | Node::AlwaysFalse => self,
             Node::Interior(interior) => interior.simplify(db),
