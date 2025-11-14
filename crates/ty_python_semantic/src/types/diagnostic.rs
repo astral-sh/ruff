@@ -2034,7 +2034,7 @@ pub(super) fn report_index_out_of_bounds(
 /// Emit a diagnostic declaring that a type does not support subscripting.
 pub(super) fn report_non_subscriptable(
     context: &InferContext,
-    node: AnyNodeRef,
+    node: &ast::ExprSubscript,
     non_subscriptable_ty: Type,
     method: &str,
 ) {
