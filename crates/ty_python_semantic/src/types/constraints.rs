@@ -734,20 +734,28 @@ impl<'db> Node<'db> {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
             Node::Interior(interior) => {
+                // with_assignment will return None if this node's constraint causes the if_true
+                // edge to become impossible. We want to ignore impossible paths, and so we treat
+                // them as passing the "always satisfied" check.
                 let constraint = interior.constraint(db);
-                path.with_assignment(db, map, constraint.when_true(), |path| {
+                let true_always_satisfied = path
+                    .with_assignment(db, map, constraint.when_true(), |path| {
+                        interior
+                            .if_true(db)
+                            .is_always_satisfied_inner(db, map, path)
+                    })
+                    .unwrap_or(true);
+                if !true_always_satisfied {
+                    return false;
+                }
+
+                // Ditto for the if_false branch
+                path.with_assignment(db, map, constraint.when_false(), |path| {
                     interior
-                        .if_true(db)
+                        .if_false(db)
                         .is_always_satisfied_inner(db, map, path)
                 })
                 .unwrap_or(true)
-                    && path
-                        .with_assignment(db, map, constraint.when_false(), |path| {
-                            interior
-                                .if_false(db)
-                                .is_always_satisfied_inner(db, map, path)
-                        })
-                        .unwrap_or(true)
             }
         }
     }
@@ -775,18 +783,26 @@ impl<'db> Node<'db> {
             Node::AlwaysTrue => false,
             Node::AlwaysFalse => true,
             Node::Interior(interior) => {
+                // with_assignment will return None if this node's constraint causes the if_true
+                // edge to become impossible. We want to ignore impossible paths, and so we treat
+                // them as passing the "never satisfied" check.
                 let constraint = interior.constraint(db);
-                path.with_assignment(db, map, constraint.when_true(), |path| {
-                    interior.if_true(db).is_never_satisfied_inner(db, map, path)
+                let true_never_satisfied = path
+                    .with_assignment(db, map, constraint.when_true(), |path| {
+                        interior.if_true(db).is_never_satisfied_inner(db, map, path)
+                    })
+                    .unwrap_or(true);
+                if !true_never_satisfied {
+                    return false;
+                }
+
+                // Ditto for the if_false branch
+                path.with_assignment(db, map, constraint.when_false(), |path| {
+                    interior
+                        .if_false(db)
+                        .is_never_satisfied_inner(db, map, path)
                 })
                 .unwrap_or(true)
-                    && path
-                        .with_assignment(db, map, constraint.when_false(), |path| {
-                            interior
-                                .if_false(db)
-                                .is_never_satisfied_inner(db, map, path)
-                        })
-                        .unwrap_or(true)
             }
         }
     }
