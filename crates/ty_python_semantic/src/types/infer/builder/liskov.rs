@@ -83,10 +83,13 @@ fn check_class_declaration<'db>(
             break;
         };
 
-        let class_symbol_table = place_table(db, class.class_literal(db).0.body_scope(db));
+        let class_symbol_table = place_table(db, supercls.class_literal(db).0.body_scope(db));
 
         // If the member is not defined on the class itself, skip it
-        if class_symbol_table.symbol_by_name(&member.name).is_none() {
+        let Some(symbol) = class_symbol_table.symbol_by_name(&member.name) else {
+            continue;
+        };
+        if !(symbol.is_bound() || symbol.is_declared()) {
             continue;
         }
 
