@@ -5,6 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use strum::IntoEnumIterator;
+use toml::value::Table as TomlTable;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::settings::LineEnding;
@@ -554,7 +555,7 @@ pub struct LintOptions {
         "#
     )]
     pub future_annotations: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "ext-lint")]
     pub external_ast: Option<BTreeMap<String, ExternalAstLinterOptions>>,
 }
 
@@ -572,7 +573,7 @@ impl OptionsMetadata for DeprecatedTopLevelLintOptions {
 }
 
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[derive(Clone, Debug, PartialEq, Eq, OptionsMetadata, CombineOptions, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, OptionsMetadata, CombineOptions, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct ExternalAstLinterOptions {
     /// Path to the TOML file containing external lint rule definitions.
@@ -586,7 +587,22 @@ pub struct ExternalAstLinterOptions {
     #[option(default = "true", value_type = "bool", example = "enabled = false")]
     #[serde(default)]
     pub enabled: Option<bool>,
+    /// Arbitrary configuration that will be exposed to the external linter via `Context.config`.
+    #[option(
+        default = "null",
+        value_type = "dict[str, Any]",
+        example = r#"
+            [lint.ext-lint.demo.config]
+            message = "Hello from Ruff!"
+            retry-count = 3
+        "#
+    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "schemars", schemars(with = "Option<serde_json::Value>"))]
+    pub config: Option<TomlTable>,
 }
+
+impl Eq for ExternalAstLinterOptions {}
 
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
@@ -3993,6 +4009,7 @@ pub struct LintOptionsWire {
     extend_fixable: Option<Vec<RuleSelector>>,
     extend_unfixable: Option<Vec<RuleSelector>>,
     external: Option<Vec<String>>,
+    #[serde(rename = "ext-lint")]
     external_ast: Option<BTreeMap<String, ExternalAstLinterOptions>>,
     fixable: Option<Vec<RuleSelector>>,
     ignore: Option<Vec<RuleSelector>>,

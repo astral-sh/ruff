@@ -243,7 +243,7 @@ def check_expr(node, ctx):
     let linter_path = test.root().join("lint/external/demo.toml");
     let config = format!(
         r#"
-[lint.external-ast.demo]
+[lint.ext-lint.demo]
 path = "{}"
 
 [lint]
@@ -309,7 +309,7 @@ def check_expr(node, ctx):
     let linter_path = test.root().join("lint/external/demo.toml");
     let config = format!(
         r#"
-[lint.external-ast.demo]
+[lint.ext-lint.demo]
 path = "{}"
 "#,
         toml_path(&linter_path)
@@ -368,7 +368,7 @@ def check_stmt(node, ctx):
     let linter_path = test.root().join("lint/external/demo.toml");
     let config = format!(
         r#"
-[lint.external-ast.demo]
+[lint.ext-lint.demo]
 path = "{}"
 "#,
         toml_path(&linter_path)
@@ -396,7 +396,7 @@ path = "{}"
 extend-select = ["RUF300"]
 select-external = ["EXT001"]
 
-[lint.external-ast.demo]
+[lint.ext-lint.demo]
 path = "{}"
 "#,
         toml_path(&linter_path)
@@ -449,7 +449,7 @@ def check_stmt(node, ctx):
     };
     let config = format!(
         r#"
-[lint.external-ast.disabled]
+[lint.ext-lint.disabled]
 path = "{}"
 
 [lint]
@@ -489,7 +489,7 @@ fn external_ast_ignore_external_cli() -> Result<()> {
 [lint]
 select-external = ["EXT001"]
 
-[lint.external-ast.demo]
+[lint.ext-lint.demo]
 path = "{}"
 "#,
         toml_path(&linter_path)
@@ -542,7 +542,7 @@ fn external_ast_select_external_overrides_config() -> Result<()> {
 [lint]
 select-external = ["EXT001"]
 
-[lint.external-ast.demo]
+[lint.ext-lint.demo]
 path = "{}"
 "#,
         toml_path(&linter_path)
@@ -588,7 +588,7 @@ fn cli_select_disables_configured_external_linters() -> Result<()> {
 select = ["RUF300"]
 select-external = ["EXT001"]
 
-[lint.external-ast.demo]
+[lint.ext-lint.demo]
 path = "{}"
 "#,
         toml_path(&linter_path)
@@ -667,7 +667,7 @@ fn external_ast_select_external_overrides_nested_config() -> Result<()> {
 [lint]
 select-external = ["EXT001", "EXT002"]
 
-[lint.external-ast.demo]
+[lint.ext-lint.demo]
 path = "{}"
 "#,
         toml_path(&linter_path)
@@ -716,7 +716,7 @@ fn select_external_cli_allows_nested_registry() -> Result<()> {
 
     let nested_config = format!(
         r#"
-[lint.external-ast.demo]
+[lint.ext-lint.demo]
 path = "{}"
 "#,
         toml_path(&linter_path)
@@ -800,7 +800,7 @@ select-external = ["EXT001"]
 extend-select-external = ["EXT002"]
 ignore-external = ["EXT002"]
 
-[lint.external-ast.demo]
+[lint.ext-lint.demo]
 path = "{}"
 "#,
         toml_path(&linter_path)
@@ -850,7 +850,7 @@ fn external_ast_ignore_external_nested_config() -> Result<()> {
 select-external = ["EXT001", "EXT002"]
 ignore-external = ["EXT002"]
 
-[lint.external-ast.demo]
+[lint.ext-lint.demo]
 path = "{}"
 "#,
         toml_path(&linter_path)
