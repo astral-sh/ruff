@@ -183,6 +183,26 @@ class D(C):
     def get(self, my_default): ...  # error: [invalid-method-override]
 ```
 
+## Fully qualified names are used in diagnostics where appropriate
+
+<!-- snapshot-diagnostics -->
+
+`a.pyi`:
+
+```pyi
+class A:
+    def foo(self, x): ...
+```
+
+`b.pyi`:
+
+```pyi
+import a
+
+class A(a.A):
+    def foo(self, y): ...  # error: [invalid-method-override]
+```
+
 ## Excluded methods
 
 Certain special constructor methods are excluded from Liskov checks. None of the following classes
