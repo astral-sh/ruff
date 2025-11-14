@@ -10,7 +10,6 @@ use smallvec::{SmallVec, smallvec};
 enum SuppressionAction {
     Disable,
     Enable,
-    Ignore,
 }
 
 #[allow(unused)]
@@ -168,9 +167,6 @@ impl<'src> SuppressionParser<'src> {
         } else if self.cursor.as_str().starts_with("enable") {
             self.cursor.skip_bytes("enable".len());
             Ok(SuppressionAction::Enable)
-        } else if self.cursor.as_str().starts_with("ignore") {
-            self.cursor.skip_bytes("ignore".len());
-            Ok(SuppressionAction::Ignore)
         } else {
             self.error(ParseErrorKind::UnknownDirective)
         }
@@ -300,12 +296,12 @@ mod tests {
     #[test]
     fn missing_codes() {
         assert_debug_snapshot!(
-            parse_suppression_comment("# ruff: ignore"),
+            parse_suppression_comment("# ruff: disable"),
             @r"
         Err(
             ParseError {
                 kind: MissingCodes,
-                range: 14..14,
+                range: 15..15,
             },
         )
         ",
@@ -315,12 +311,12 @@ mod tests {
     #[test]
     fn empty_codes() {
         assert_debug_snapshot!(
-            parse_suppression_comment("# ruff: ignore[]"),
+            parse_suppression_comment("# ruff: disable[]"),
             @r"
         Err(
             ParseError {
                 kind: MissingCodes,
-                range: 0..16,
+                range: 0..17,
             },
         )
         ",
@@ -330,12 +326,12 @@ mod tests {
     #[test]
     fn missing_bracket() {
         assert_debug_snapshot!(
-            parse_suppression_comment("# ruff: ignore[foo"),
+            parse_suppression_comment("# ruff: disable[foo"),
             @r"
         Err(
             ParseError {
                 kind: MissingBracket,
-                range: 18..18,
+                range: 19..19,
             },
         )
         ",
@@ -345,70 +341,12 @@ mod tests {
     #[test]
     fn missing_comma() {
         assert_debug_snapshot!(
-            parse_suppression_comment("# ruff: ignore[foo bar]"),
+            parse_suppression_comment("# ruff: disable[foo bar]"),
             @r"
         Err(
             ParseError {
                 kind: MissingComma,
-                range: 19..23,
-            },
-        )
-        ",
-        );
-    }
-
-    #[test]
-    fn ignore_single_code() {
-        assert_debug_snapshot!(
-            parse_suppression_comment("# ruff: ignore[foo]"),
-            @r"
-        Ok(
-            SuppressionComment {
-                range: 0..19,
-                action: Ignore,
-                codes: [
-                    15..18,
-                ],
-                reason: 19..19,
-            },
-        )
-        ",
-        );
-    }
-
-    #[test]
-    fn ignore_single_code_with_reason() {
-        assert_debug_snapshot!(
-            parse_suppression_comment("# ruff: ignore[foo] I like bar better"),
-            @r"
-        Ok(
-            SuppressionComment {
-                range: 0..37,
-                action: Ignore,
-                codes: [
-                    15..18,
-                ],
-                reason: 20..37,
-            },
-        )
-        ",
-        );
-    }
-
-    #[test]
-    fn ignore_multiple_codes() {
-        assert_debug_snapshot!(
-            parse_suppression_comment("# ruff: ignore[foo, bar]"),
-            @r"
-        Ok(
-            SuppressionComment {
-                range: 0..24,
-                action: Ignore,
-                codes: [
-                    15..18,
-                    20..23,
-                ],
-                reason: 24..24,
+                range: 20..24,
             },
         )
         ",
@@ -418,16 +356,74 @@ mod tests {
     #[test]
     fn disable_single_code() {
         assert_debug_snapshot!(
-            parse_suppression_comment("# ruff: disable[some-thing]"),
+            parse_suppression_comment("# ruff: disable[foo]"),
             @r"
         Ok(
             SuppressionComment {
-                range: 0..27,
+                range: 0..20,
                 action: Disable,
                 codes: [
-                    16..26,
+                    16..19,
                 ],
-                reason: 27..27,
+                reason: 20..20,
+            },
+        )
+        ",
+        );
+    }
+
+    #[test]
+    fn disable_single_code_with_reason() {
+        assert_debug_snapshot!(
+            parse_suppression_comment("# ruff: disable[foo] I like bar better"),
+            @r"
+        Ok(
+            SuppressionComment {
+                range: 0..38,
+                action: Disable,
+                codes: [
+                    16..19,
+                ],
+                reason: 21..38,
+            },
+        )
+        ",
+        );
+    }
+
+    #[test]
+    fn disable_multiple_codes() {
+        assert_debug_snapshot!(
+            parse_suppression_comment("# ruff: disable[foo, bar]"),
+            @r"
+        Ok(
+            SuppressionComment {
+                range: 0..25,
+                action: Disable,
+                codes: [
+                    16..19,
+                    21..24,
+                ],
+                reason: 25..25,
+            },
+        )
+        ",
+        );
+    }
+
+    #[test]
+    fn enable_single_code() {
+        assert_debug_snapshot!(
+            parse_suppression_comment("# ruff: enable[some-thing]"),
+            @r"
+        Ok(
+            SuppressionComment {
+                range: 0..26,
+                action: Enable,
+                codes: [
+                    15..25,
+                ],
+                reason: 26..26,
             },
         )
         ",
