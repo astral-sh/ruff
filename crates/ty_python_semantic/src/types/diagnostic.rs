@@ -16,6 +16,7 @@ use crate::types::KnownInstanceType;
 use crate::types::call::CallError;
 use crate::types::class::{DisjointBase, DisjointBaseKind, Field};
 use crate::types::function::KnownFunction;
+use crate::types::ide_support::Member;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
@@ -3342,6 +3343,54 @@ pub(crate) fn report_rebound_typevar<'db>(
         diagnostic.annotate(Annotation::secondary(span).message(format_args!(
             "Type variable `{typevar_name}` is bound in this enclosing scope",
         )));
+    }
+}
+
+pub(super) fn report_invalid_method_override<'db>(
+    context: &InferContext<'db, '_>,
+    range: impl Ranged,
+    member: &Member<'db>,
+    class: ClassType<'db>,
+    supercls: ClassType<'db>,
+    type_on_supercls: Type<'db>,
+) {
+    let Some(builder) = context.report_lint(&INVALID_METHOD_OVERRIDE, range) else {
+        return;
+    };
+
+    let db = context.db();
+
+    let mut diagnostic =
+        builder.into_diagnostic(format_args!("Invalid override of method `{}`", member.name));
+
+    let supercls_name = supercls.name(db);
+
+    let overridden_method = if class.name(db) != supercls_name {
+        format!("{}.{}", supercls_name, member.name)
+    } else {
+        let mut buffer = supercls.class_literal(db).0.qualified_name(db);
+        buffer.push('.');
+        buffer.push_str(&member.name);
+        buffer
+    };
+
+    diagnostic.set_primary_message(format_args!(
+        "Definition is incompatible with `{overridden_method}`"
+    ));
+
+    diagnostic.info("This violates the Liskov Substitution Principle");
+
+    if let Type::BoundMethod(method_on_supercls) = type_on_supercls
+        && let Some(spans) = method_on_supercls
+            .function(db)
+            .literal(db)
+            .last_definition(db)
+            .spans(db)
+    {
+        diagnostic.annotate(
+            Annotation::secondary(spans.signature)
+                .message(format_args!("`{overridden_method}` defined here")),
+        );
     }
 }
 

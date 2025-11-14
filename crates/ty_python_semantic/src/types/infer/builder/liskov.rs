@@ -1,5 +1,3 @@
-use ruff_db::diagnostic::Annotation;
-
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
 
@@ -10,7 +8,7 @@ use crate::{
         ClassBase, ClassLiteral, ClassType, KnownClass, Type,
         class::CodeGeneratorKind,
         context::InferContext,
-        diagnostic::INVALID_METHOD_OVERRIDE,
+        diagnostic::report_invalid_method_override,
         ide_support::{MemberWithDefinition, all_declarations_and_bindings},
     },
 };
@@ -114,37 +112,12 @@ fn check_class_declaration<'db>(
             definition.focus_range(db, context.module()).range()
         };
 
-        let Some(builder) = context.report_lint(&INVALID_METHOD_OVERRIDE, range) else {
-            continue;
-        };
-
-        let mut diagnostic =
-            builder.into_diagnostic(format_args!("Invalid override of method `{}`", member.name));
-
-        diagnostic.set_primary_message(format_args!(
-            "Definition is incompatible with `{}.{}`",
-            supercls.name(db),
-            member.name
-        ));
-
-        diagnostic.info("This violates the Liskov Substitution Principle");
-
-        if let Type::BoundMethod(method_on_supercls) = type_on_supercls
-            && let Some(spans) = method_on_supercls
-                .function(db)
-                .literal(db)
-                .last_definition(db)
-                .spans(db)
-        {
-            diagnostic.annotate(Annotation::secondary(spans.signature).message(format_args!(
-                "`{}.{}` defined here",
-                supercls.name(db),
-                member.name
-            )));
-        }
+        report_invalid_method_override(context, range, member, class, supercls, type_on_supercls);
 
         // Only one diagnostic should be emitted per each invalid override,
         // even if it overrides multiple superclasses incorrectly!
+        // It's possible `report_invalid_method_override` didn't emit a diagnostic because there's a
+        // suppression comment, but that too should cause us to exit early here.
         break;
     }
 }

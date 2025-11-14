@@ -321,6 +321,16 @@ impl<'db> ClassLiteral<'db> {
         name_parts.reverse();
         name_parts
     }
+
+    pub(super) fn qualified_name(self, db: &'db dyn Db) -> String {
+        let mut qualified_name = String::new();
+        for parent in self.qualified_name_components(db) {
+            qualified_name.push_str(&parent);
+            qualified_name.push('.');
+        }
+        qualified_name.push_str(self.name(db));
+        qualified_name
+    }
 }
 
 struct ClassDisplay<'db> {
