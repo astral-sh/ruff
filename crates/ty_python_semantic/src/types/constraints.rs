@@ -2145,6 +2145,93 @@ impl<'db> SequentMap<'db> {
     }
 }
 
+#[derive(Debug)]
+struct SequentPath<'db> {
+    path: Vec<ConstraintAssignment<'db>>,
+}
+
+impl<'db> SequentPath<'db> {
+    fn with_assignment<R>(
+        &mut self,
+        db: &'db dyn Db,
+        map: &SequentMap<'db>,
+        assignment: ConstraintAssignment<'db>,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> Option<R> {
+        self.path.push(assignment);
+        let result = if self.path_should_be_pruned(db, map) {
+            None
+        } else {
+            Some(f(self))
+        };
+        self.path.pop();
+        result
+    }
+
+    fn path_contains_assignment(
+        &self,
+        db: &'db dyn Db,
+        assignment: ConstraintAssignment<'db>,
+    ) -> bool {
+        // The `path` is guaranteed to be in sorted order (by the `ConstrainedTypeVar` of each
+        // assignment), due to the inherent structure of the BDD that we're walking.
+        self.path
+            .binary_search_by(|path_element| {
+                path_element
+                    .constraint()
+                    .ordering(db)
+                    .cmp(&assignment.constraint().ordering(db))
+            })
+            .is_ok()
+    }
+
+    fn path_should_be_pruned(&self, db: &'db dyn Db, map: &SequentMap<'db>) -> bool {
+        // TODO: This is very naive at the moment, partly for expediency, and partly because we
+        // don't anticipate the sequent maps to be very large. That said, the `path` is guaranteed
+        // to be in sorted order, due to the inherent structure of the BDD that we're walking, so
+        // we should be able to build up state about which sequents have been partially matched,
+        // avoiding the need to do this brute force search each time.
+
+        for (ante1, ante2) in &map.impossibilities {
+            if self.path_contains_assignment(db, ante1.when_true())
+                && self.path_contains_assignment(db, ante2.when_true())
+            {
+                // The sequent map says (ante1 ∧ ante2) is an impossible combination, and the
+                // current path asserts that both are true.
+                return true;
+            }
+        }
+
+        for ((ante1, ante2), posts) in &map.pair_implications {
+            for post in posts {
+                if self.path_contains_assignment(db, ante1.when_true())
+                    && self.path_contains_assignment(db, ante2.when_true())
+                    && self.path_contains_assignment(db, post.when_false())
+                {
+                    // The sequent map says (ante1 ∧ ante2 → post) must hold, and the current path
+                    // asserts that ante1 and ante2 are true, and that post is false. That violates
+                    // the implication.
+                    return true;
+                }
+            }
+        }
+
+        for (ante, posts) in &map.single_implications {
+            for post in posts {
+                if self.path_contains_assignment(db, ante.when_true())
+                    && self.path_contains_assignment(db, post.when_false())
+                {
+                    // The sequent map says (ante1 → post) must hold, and the current path asserts
+                    // that ante is true and that post is false. That violates the implication.
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+}
+
 /// A single clause in the DNF representation of a BDD
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct SatisfiedClause<'db> {
