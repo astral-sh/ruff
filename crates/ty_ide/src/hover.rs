@@ -1090,7 +1090,7 @@ def ab(a: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (
+        def ab(
             a: int,
             b: int
         ) -> Unknown
@@ -1099,7 +1099,7 @@ def ab(a: int):
 
         ---------------------------------------------
         ```python
-        (
+        def ab(
             a: int,
             b: int
         ) -> Unknown
@@ -1226,7 +1226,7 @@ def ab(a: int, *, c: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (
+        def ab(
             a: int,
             *,
             b: int
@@ -1236,7 +1236,7 @@ def ab(a: int, *, c: int):
 
         ---------------------------------------------
         ```python
-        (
+        def ab(
             a: int,
             *,
             b: int
@@ -1301,7 +1301,7 @@ def ab(a: int, *, c: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (
+        def ab(
             a: int,
             *,
             c: int
@@ -1311,7 +1311,7 @@ def ab(a: int, *, c: int):
 
         ---------------------------------------------
         ```python
-        (
+        def ab(
             a: int,
             *,
             c: int
@@ -1363,11 +1363,11 @@ def ab(a: int, *, c: int):
         );
 
         assert_snapshot!(test.hover(), @r#"
-        (
+        def foo(
             a: int,
             b
         ) -> Unknown
-        (
+        def foo(
             a: str,
             b
         ) -> Unknown
@@ -1376,11 +1376,11 @@ def ab(a: int, *, c: int):
 
         ---------------------------------------------
         ```python
-        (
+        def foo(
             a: int,
             b
         ) -> Unknown
-        (
+        def foo(
             a: str,
             b
         ) -> Unknown
