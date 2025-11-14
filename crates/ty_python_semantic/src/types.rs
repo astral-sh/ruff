@@ -6561,15 +6561,17 @@ impl<'db> Type<'db> {
                 KnownInstanceType::TypeAliasType(alias) => Ok(Type::TypeAlias(*alias)),
                 KnownInstanceType::NewType(newtype) => Ok(Type::NewTypeInstance(*newtype)),
                 KnownInstanceType::TypeVar(typevar) => {
-                    // A `ParamSpec` type variable cannot be used in type expressions.
-                    if typevar.kind(db).is_paramspec() {
-                        return Err(InvalidTypeExpressionError {
-                            invalid_expressions: smallvec::smallvec_inline![
-                                InvalidTypeExpression::InvalidType(*self, scope_id)
-                            ],
-                            fallback_type: Type::unknown(),
-                        });
-                    }
+                    // TODO: A `ParamSpec` type variable cannot be used in type expressions. This
+                    // requires storing additional context as it's allowed in some places
+                    // (`Concatenate`, `Callable`) but not others.
+                    // if typevar.kind(db).is_paramspec() {
+                    //     return Err(InvalidTypeExpressionError {
+                    //         invalid_expressions: smallvec::smallvec_inline![
+                    //             InvalidTypeExpression::InvalidType(*self, scope_id)
+                    //         ],
+                    //         fallback_type: Type::unknown(),
+                    //     });
+                    // }
                     let index = semantic_index(db, scope_id.file(db));
                     Ok(bind_typevar(
                         db,
