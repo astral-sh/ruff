@@ -326,7 +326,7 @@ impl<'db> ConstraintSet<'db> {
     }
 
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
-        self.node.simplify(db).display(db)
+        self.node.simplify_for_display(db).display(db)
     }
 }
 
@@ -2346,6 +2346,9 @@ impl<'db> SequentMap<'db> {
                     }
                 }
 
+                if first {
+                    f.write_str("[no sequents]")?;
+                }
                 Ok(())
             }
         }
