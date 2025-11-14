@@ -369,6 +369,11 @@ reveal_type(c_instance.y)  # revealed: Unknown | int
 
 #### Attributes defined in comprehensions
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 class TupleIterator:
     def __next__(self) -> tuple[int, str]:
@@ -380,19 +385,9 @@ class TupleIterable:
 
 class C:
     def __init__(self) -> None:
-        # TODO: Should not emit this diagnostic
-        # error: [unresolved-attribute]
         [... for self.a in range(3)]
-        # TODO: Should not emit this diagnostic
-        # error: [unresolved-attribute]
-        # error: [unresolved-attribute]
         [... for (self.b, self.c) in TupleIterable()]
-        # TODO: Should not emit this diagnostic
-        # error: [unresolved-attribute]
-        # error: [unresolved-attribute]
         [... for self.d in range(3) for self.e in range(3)]
-        # TODO: Should not emit this diagnostic
-        # error: [unresolved-attribute]
         [[... for self.f in range(3)] for _ in range(3)]
         [[... for self.g in range(3)] for self in [D()]]
 
@@ -401,33 +396,72 @@ class D:
 
 c_instance = C()
 
-# TODO: no error, reveal Unknown | int
-# error: [unresolved-attribute]
-reveal_type(c_instance.a)  # revealed: Unknown
+reveal_type(c_instance.a)  # revealed: Unknown | int
 
-# TODO: no error, reveal Unknown | int
-# error: [unresolved-attribute]
-reveal_type(c_instance.b)  # revealed: Unknown
+reveal_type(c_instance.b)  # revealed: Unknown | int
 
-# TODO: no error, reveal Unknown | str
-# error: [unresolved-attribute]
-reveal_type(c_instance.c)  # revealed: Unknown
+reveal_type(c_instance.c)  # revealed: Unknown | str
 
-# TODO: no error, reveal Unknown | int
-# error: [unresolved-attribute]
-reveal_type(c_instance.d)  # revealed: Unknown
+reveal_type(c_instance.d)  # revealed: Unknown | int
 
-# TODO: no error, reveal Unknown | int
-# error: [unresolved-attribute]
-reveal_type(c_instance.e)  # revealed: Unknown
+reveal_type(c_instance.e)  # revealed: Unknown | int
 
-# TODO: no error, reveal Unknown | int
-# error: [unresolved-attribute]
-reveal_type(c_instance.f)  # revealed: Unknown
+reveal_type(c_instance.f)  # revealed: Unknown | int
 
 # This one is correctly not resolved as an attribute:
 # error: [unresolved-attribute]
 reveal_type(c_instance.g)  # revealed: Unknown
+```
+
+It does not matter how much the comprehension is nested.
+
+Similarly attributes defined by the comprehension in a generic method are recognized.
+
+```py
+class C:
+    def f[T](self):
+        [... for self.a in [1]]
+        [[... for self.b in [1]] for _ in [1]]
+
+c_instance = C()
+
+reveal_type(c_instance.a)  # revealed: Unknown | int
+reveal_type(c_instance.b)  # revealed: Unknown | int
+```
+
+If the comprehension is inside another scope like function then that attribute is not inferred.
+
+```py
+class C:
+    def __init__(self):
+        def f():
+            # error: [unresolved-attribute]
+            [... for self.a in [1]]
+
+        def g():
+            # error: [unresolved-attribute]
+            [... for self.b in [1]]
+        g()
+
+c_instance = C()
+
+# This attribute is in the function f and is not reachable
+# error: [unresolved-attribute]
+reveal_type(c_instance.a)  # revealed: Unknown
+
+# error: [unresolved-attribute]
+reveal_type(c_instance.b)  # revealed: Unknown
+```
+
+If the comprehension is nested in any other eager scope it still can assign attributes.
+
+```py
+class C:
+    def __init__(self):
+        class D:
+            [[... for self.a in [1]] for _ in [1]]
+
+reveal_type(C().a)  # revealed: Unknown | int
 ```
 
 #### Conditionally declared / bound attributes

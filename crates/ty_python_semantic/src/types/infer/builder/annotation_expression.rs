@@ -18,7 +18,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         annotation: &ast::Expr,
         deferred_state: DeferredExpressionState,
     ) -> TypeAndQualifiers<'db> {
-        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, deferred_state);
+        // `DeferredExpressionState::InStringAnnotation` takes precedence over other deferred states.
+        // However, if it's not a stringified annotation, we must still ensure that annotation expressions
+        // are always deferred in stub files.
+        let state = if deferred_state.in_string_annotation() {
+            deferred_state
+        } else if self.in_stub() {
+            DeferredExpressionState::Deferred
+        } else {
+            deferred_state
+        };
+
+        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, state);
         let annotation_ty = self.infer_annotation_expression_impl(annotation);
         self.deferred_state = previous_deferred_state;
         annotation_ty

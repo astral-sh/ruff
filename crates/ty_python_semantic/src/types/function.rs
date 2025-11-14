@@ -1768,6 +1768,7 @@ impl KnownFunction {
                     Type::KnownInstance(KnownInstanceType::UnionType(_)) => {
                         fn find_invalid_elements<'db>(
                             db: &'db dyn Db,
+                            function: KnownFunction,
                             ty: Type<'db>,
                             invalid_elements: &mut Vec<Type<'db>>,
                         ) {
@@ -1775,9 +1776,19 @@ impl KnownFunction {
                                 Type::ClassLiteral(_) => {}
                                 Type::NominalInstance(instance)
                                     if instance.has_known_class(db, KnownClass::NoneType) => {}
+                                Type::SpecialForm(special_form)
+                                    if special_form.is_valid_isinstance_target() => {}
+                                // `Any` can be used in `issubclass()` calls but not `isinstance()` calls
+                                Type::SpecialForm(SpecialFormType::Any)
+                                    if function == KnownFunction::IsSubclass => {}
                                 Type::KnownInstance(KnownInstanceType::UnionType(union)) => {
                                     for element in union.elements(db) {
-                                        find_invalid_elements(db, *element, invalid_elements);
+                                        find_invalid_elements(
+                                            db,
+                                            function,
+                                            *element,
+                                            invalid_elements,
+                                        );
                                     }
                                 }
                                 _ => invalid_elements.push(ty),
@@ -1785,7 +1796,7 @@ impl KnownFunction {
                         }
 
                         let mut invalid_elements = vec![];
-                        find_invalid_elements(db, *second_argument, &mut invalid_elements);
+                        find_invalid_elements(db, self, *second_argument, &mut invalid_elements);
 
                         let Some((first_invalid_element, other_invalid_elements)) =
                             invalid_elements.split_first()

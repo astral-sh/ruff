@@ -323,6 +323,231 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// This attempts to simulate the tangled web of symlinks that a homebrew install has
+/// which can easily confuse us if we're ever told to use it.
+///
+/// The main thing this is regression-testing is a panic in one *extremely* specific case
+/// that you have to try really hard to hit (but vscode, hilariously, did hit).
+#[cfg(unix)]
+#[test]
+fn python_argument_trapped_in_a_symlink_factory() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        // This is the real python binary.
+        (
+            "opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3.13",
+            "",
+        ),
+        // There's a real site-packages here (although it's basically empty).
+        (
+            "opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages/foo.py",
+            "",
+        ),
+        // There's also a real site-packages here (although it's basically empty).
+        ("opt/homebrew/lib/python3.13/site-packages/bar.py", ""),
+        // This has the real stdlib, but the site-packages in this dir is a symlink.
+        (
+            "opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/abc.py",
+            "",
+        ),
+        // It's important that this our faux-homebrew not be in the same dir as our working directory
+        // to reproduce the crash, don't ask me why.
+        (
+            "project/test.py",
+            "\
+import foo
+import bar
+import colorama
+",
+        ),
+    ])?;
+
+    // many python symlinks pointing to a single real python (the longest path)
+    case.write_symlink(
+        "opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3.13",
+        "opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3",
+    )?;
+    case.write_symlink(
+        "opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3",
+        "opt/homebrew/Cellar/python@3.13/3.13.5/bin/python3",
+    )?;
+    case.write_symlink(
+        "opt/homebrew/Cellar/python@3.13/3.13.5/bin/python3",
+        "opt/homebrew/bin/python3",
+    )?;
+    // the "real" python's site-packages is a symlink to a different dir
+    case.write_symlink(
+        "opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages",
+        "opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages",
+    )?;
+
+    // Try all 4 pythons with absolute paths to our fauxbrew install
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .arg("--python").arg(case.root().join("opt/homebrew/bin/python3")), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `foo`
+     --> test.py:1:8
+      |
+    1 | import foo
+      |        ^^^
+    2 | import bar
+    3 | import colorama
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    error[unresolved-import]: Cannot resolve imported module `colorama`
+     --> test.py:3:8
+      |
+    1 | import foo
+    2 | import bar
+    3 | import colorama
+      |        ^^^^^^^^
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .arg("--python").arg(case.root().join("opt/homebrew/Cellar/python@3.13/3.13.5/bin/python3")), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `bar`
+     --> test.py:2:8
+      |
+    1 | import foo
+    2 | import bar
+      |        ^^^
+    3 | import colorama
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    error[unresolved-import]: Cannot resolve imported module `colorama`
+     --> test.py:3:8
+      |
+    1 | import foo
+    2 | import bar
+    3 | import colorama
+      |        ^^^^^^^^
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .arg("--python").arg(case.root().join("opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3")), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `bar`
+     --> test.py:2:8
+      |
+    1 | import foo
+    2 | import bar
+      |        ^^^
+    3 | import colorama
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    error[unresolved-import]: Cannot resolve imported module `colorama`
+     --> test.py:3:8
+      |
+    1 | import foo
+    2 | import bar
+    3 | import colorama
+      |        ^^^^^^^^
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .arg("--python").arg(case.root().join("opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3.13")), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `bar`
+     --> test.py:2:8
+      |
+    1 | import foo
+    2 | import bar
+      |        ^^^
+    3 | import colorama
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    error[unresolved-import]: Cannot resolve imported module `colorama`
+     --> test.py:3:8
+      |
+    1 | import foo
+    2 | import bar
+    3 | import colorama
+      |        ^^^^^^^^
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 /// On Unix systems, it's common for a Python installation at `.venv/bin/python` to only be a symlink
 /// to a system Python installation. We must be careful not to resolve the symlink too soon!
 /// If we do, we will incorrectly add the system installation's `site-packages` as a search path,

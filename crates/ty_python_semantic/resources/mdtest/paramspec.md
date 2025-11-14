@@ -102,6 +102,20 @@ Other values are invalid.
 P4 = ParamSpec("P4", default=int)
 ```
 
+### Forward references in stub files
+
+Stubs natively support forward references, so patterns that would raise `NameError` at runtime are
+allowed in stub files:
+
+```pyi
+from typing_extensions import ParamSpec
+
+P = ParamSpec("P", default=[A, B])
+
+class A: ...
+class B: ...
+```
+
 ### PEP 695
 
 ```toml

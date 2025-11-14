@@ -1,0 +1,117 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: semantic_syntax_errors.md - Semantic syntax error diagnostics - name is parameter and global
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/semantic_syntax_errors.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | a = None
+ 2 | 
+ 3 | def f(a):
+ 4 |     global a  # error: [invalid-syntax]
+ 5 | 
+ 6 | def g(a):
+ 7 |     if True:
+ 8 |         global a  # error: [invalid-syntax]
+ 9 | 
+10 | def h(a):
+11 |     def inner():
+12 |         global a
+13 | 
+14 | def i(a):
+15 |     try:
+16 |         global a  # error: [invalid-syntax]
+17 |     except Exception:
+18 |         pass
+19 | 
+20 | def f(a):
+21 |     a = 1
+22 |     global a  # error: [invalid-syntax]
+23 | 
+24 | def f(a):
+25 |     a = 1
+26 |     a = 2
+27 |     global a  # error: [invalid-syntax]
+28 | 
+29 | def f(a):
+30 |     class Inner:
+31 |         global a  # ok
+```
+
+# Diagnostics
+
+```
+error[invalid-syntax]: name `a` is parameter and global
+ --> src/mdtest_snippet.py:4:12
+  |
+3 | def f(a):
+4 |     global a  # error: [invalid-syntax]
+  |            ^
+5 |
+6 | def g(a):
+  |
+
+```
+
+```
+error[invalid-syntax]: name `a` is parameter and global
+  --> src/mdtest_snippet.py:8:16
+   |
+ 6 | def g(a):
+ 7 |     if True:
+ 8 |         global a  # error: [invalid-syntax]
+   |                ^
+ 9 |
+10 | def h(a):
+   |
+
+```
+
+```
+error[invalid-syntax]: name `a` is parameter and global
+  --> src/mdtest_snippet.py:16:16
+   |
+14 | def i(a):
+15 |     try:
+16 |         global a  # error: [invalid-syntax]
+   |                ^
+17 |     except Exception:
+18 |         pass
+   |
+
+```
+
+```
+error[invalid-syntax]: name `a` is parameter and global
+  --> src/mdtest_snippet.py:22:12
+   |
+20 | def f(a):
+21 |     a = 1
+22 |     global a  # error: [invalid-syntax]
+   |            ^
+23 |
+24 | def f(a):
+   |
+
+```
+
+```
+error[invalid-syntax]: name `a` is parameter and global
+  --> src/mdtest_snippet.py:27:12
+   |
+25 |     a = 1
+26 |     a = 2
+27 |     global a  # error: [invalid-syntax]
+   |            ^
+28 |
+29 | def f(a):
+   |
+
+```

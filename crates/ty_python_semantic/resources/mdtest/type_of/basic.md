@@ -149,8 +149,7 @@ from ty_extensions import reveal_mro
 
 class Foo(type[int]): ...
 
-# TODO: should be `tuple[<class 'Foo'>, <class 'type'>, <class 'object'>]
-reveal_mro(Foo)  # revealed: (<class 'Foo'>, @Todo(GenericAlias instance), <class 'object'>)
+reveal_mro(Foo)  # revealed: (<class 'Foo'>, <class 'type'>, <class 'object'>)
 ```
 
 ## Display of generic `type[]` types

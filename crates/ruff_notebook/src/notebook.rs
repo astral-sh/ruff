@@ -13,12 +13,12 @@ use thiserror::Error;
 
 use ruff_diagnostics::{SourceMap, SourceMarker};
 use ruff_source_file::{NewlineWithTrailingNewline, OneIndexed, UniversalNewlineIterator};
-use ruff_text_size::TextSize;
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::cell::CellOffsets;
 use crate::index::NotebookIndex;
 use crate::schema::{Cell, RawNotebook, SortAlphabetically, SourceValue};
-use crate::{CellMetadata, RawNotebookMetadata, schema};
+use crate::{CellMetadata, CellStart, RawNotebookMetadata, schema};
 
 /// Run round-trip source code generation on a given Jupyter notebook file path.
 pub fn round_trip(path: &Path) -> anyhow::Result<String> {
@@ -294,7 +294,7 @@ impl Notebook {
         }
     }
 
-    /// Build and return the [`JupyterIndex`].
+    /// Build and return the [`NotebookIndex`].
     ///
     /// ## Notes
     ///
@@ -320,11 +320,19 @@ impl Notebook {
     /// The index building is expensive as it needs to go through the content of
     /// every valid code cell.
     fn build_index(&self) -> NotebookIndex {
-        let mut row_to_cell = Vec::new();
-        let mut row_to_row_in_cell = Vec::new();
+        let mut cell_starts = Vec::with_capacity(self.valid_code_cells.len());
+
+        let mut current_row = OneIndexed::MIN;
 
         for &cell_index in &self.valid_code_cells {
-            let line_count = match &self.raw.cells[cell_index as usize].source() {
+            let raw_cell_index = cell_index as usize;
+            // Record the starting row of this cell
+            cell_starts.push(CellStart {
+                start_row: current_row,
+                raw_cell_index: OneIndexed::from_zero_indexed(raw_cell_index),
+            });
+
+            let line_count = match &self.raw.cells[raw_cell_index].source() {
                 SourceValue::String(string) => {
                     if string.is_empty() {
                         1
@@ -342,17 +350,11 @@ impl Notebook {
                     }
                 }
             };
-            row_to_cell.extend(std::iter::repeat_n(
-                OneIndexed::from_zero_indexed(cell_index as usize),
-                line_count,
-            ));
-            row_to_row_in_cell.extend((0..line_count).map(OneIndexed::from_zero_indexed));
+
+            current_row = current_row.saturating_add(line_count);
         }
 
-        NotebookIndex {
-            row_to_cell,
-            row_to_row_in_cell,
-        }
+        NotebookIndex { cell_starts }
     }
 
     /// Return the notebook content.
@@ -384,6 +386,21 @@ impl Notebook {
     /// the Jupyter notebook.
     pub fn cell_offsets(&self) -> &CellOffsets {
         &self.cell_offsets
+    }
+
+    /// Returns the start offset of the cell at index `cell` in the concatenated
+    /// text document.
+    pub fn cell_offset(&self, cell: OneIndexed) -> Option<TextSize> {
+        self.cell_offsets.get(cell.to_zero_indexed()).copied()
+    }
+
+    /// Returns the text range in the concatenated document of the cell
+    /// with index `cell`.
+    pub fn cell_range(&self, cell: OneIndexed) -> Option<TextRange> {
+        let start = self.cell_offsets.get(cell.to_zero_indexed()).copied()?;
+        let end = self.cell_offsets.get(cell.to_zero_indexed() + 1).copied()?;
+
+        Some(TextRange::new(start, end))
     }
 
     /// Return `true` if the notebook has a trailing newline, `false` otherwise.
@@ -456,7 +473,7 @@ mod tests {
 
     use ruff_source_file::OneIndexed;
 
-    use crate::{Cell, Notebook, NotebookError, NotebookIndex};
+    use crate::{Cell, CellStart, Notebook, NotebookError, NotebookIndex};
 
     /// Construct a path to a Jupyter notebook in the `resources/test/fixtures/jupyter` directory.
     fn notebook_path(path: impl AsRef<Path>) -> std::path::PathBuf {
@@ -548,39 +565,27 @@ print("after empty cells")
         assert_eq!(
             notebook.index(),
             &NotebookIndex {
-                row_to_cell: vec![
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(4),
-                    OneIndexed::from_zero_indexed(6),
-                    OneIndexed::from_zero_indexed(6),
-                    OneIndexed::from_zero_indexed(7)
-                ],
-                row_to_row_in_cell: vec![
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(3),
-                    OneIndexed::from_zero_indexed(4),
-                    OneIndexed::from_zero_indexed(5),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(3),
-                    OneIndexed::from_zero_indexed(4),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(0)
+                cell_starts: vec![
+                    CellStart {
+                        start_row: OneIndexed::MIN,
+                        raw_cell_index: OneIndexed::MIN
+                    },
+                    CellStart {
+                        start_row: OneIndexed::from_zero_indexed(6),
+                        raw_cell_index: OneIndexed::from_zero_indexed(2)
+                    },
+                    CellStart {
+                        start_row: OneIndexed::from_zero_indexed(11),
+                        raw_cell_index: OneIndexed::from_zero_indexed(4)
+                    },
+                    CellStart {
+                        start_row: OneIndexed::from_zero_indexed(12),
+                        raw_cell_index: OneIndexed::from_zero_indexed(6)
+                    },
+                    CellStart {
+                        start_row: OneIndexed::from_zero_indexed(14),
+                        raw_cell_index: OneIndexed::from_zero_indexed(7)
+                    }
                 ],
             }
         );

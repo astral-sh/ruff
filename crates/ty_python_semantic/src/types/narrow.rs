@@ -11,9 +11,9 @@ use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
-    ClassLiteral, ClassType, IntersectionBuilder, KnownClass, KnownInstanceType, SpecialFormType,
-    SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints,
-    UnionBuilder, infer_expression_types,
+    CallableType, ClassLiteral, ClassType, IntersectionBuilder, KnownClass, KnownInstanceType,
+    SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext,
+    TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
 };
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -229,6 +229,18 @@ impl ClassInfoConstraintFunction {
                 )
             }
 
+            // We don't have a good meta-type for `Callable`s right now,
+            // so only apply `isinstance()` narrowing, not `issubclass()`
+            Type::SpecialForm(SpecialFormType::Callable)
+                if self == ClassInfoConstraintFunction::IsInstance =>
+            {
+                Some(CallableType::unknown(db).top_materialization(db))
+            }
+
+            Type::SpecialForm(special_form) => special_form
+                .aliased_stdlib_class()
+                .and_then(|class| self.generate_constraint(db, class.to_class_literal(db))),
+
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::BooleanLiteral(_)
@@ -244,7 +256,6 @@ impl ClassInfoConstraintFunction {
             | Type::FunctionLiteral(_)
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_)
-            | Type::SpecialForm(_)
             | Type::LiteralString
             | Type::StringLiteral(_)
             | Type::IntLiteral(_)

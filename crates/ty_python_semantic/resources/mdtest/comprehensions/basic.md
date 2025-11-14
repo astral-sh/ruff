@@ -58,6 +58,24 @@ Iterating over an unbound iterable yields `Unknown`:
 # error: [not-iterable] "Object of type `int` is not iterable"
 # revealed: tuple[int, Unknown]
 [reveal_type((x, z)) for x in range(3) for z in x]
+
+# error: [unresolved-reference] "Name `foo` used when not defined"
+foo
+foo = [
+    # revealed: tuple[int, Unknown]
+    reveal_type((x, z))
+    for x in range(3)
+    # error: [unresolved-reference] "Name `foo` used when not defined"
+    for z in [foo]
+]
+
+baz = [
+    # revealed: tuple[int, Unknown]
+    reveal_type((x, z))
+    for x in range(3)
+    # error: [unresolved-reference] "Name `baz` used when not defined"
+    for z in [baz]
+]
 ```
 
 ## Starred expressions

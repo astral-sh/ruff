@@ -7,6 +7,7 @@ use ruff_source_file::LineIndex;
 
 use crate::Db;
 use crate::files::{File, FilePath};
+use crate::system::System;
 
 /// Reads the source text of a python text file (must be valid UTF8) or notebook.
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
@@ -15,7 +16,7 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let _span = tracing::trace_span!("source_text", file = %path).entered();
     let mut read_error = None;
 
-    let kind = if is_notebook(file.path(db)) {
+    let kind = if is_notebook(db.system(), path) {
         file.read_to_notebook(db)
             .unwrap_or_else(|error| {
                 tracing::debug!("Failed to read notebook '{path}': {error}");
@@ -40,18 +41,17 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     }
 }
 
-fn is_notebook(path: &FilePath) -> bool {
-    match path {
-        FilePath::System(system) => system.extension().is_some_and(|extension| {
-            PySourceType::try_from_extension(extension) == Some(PySourceType::Ipynb)
-        }),
-        FilePath::SystemVirtual(system_virtual) => {
-            system_virtual.extension().is_some_and(|extension| {
-                PySourceType::try_from_extension(extension) == Some(PySourceType::Ipynb)
-            })
-        }
-        FilePath::Vendored(_) => false,
-    }
+fn is_notebook(system: &dyn System, path: &FilePath) -> bool {
+    let source_type = match path {
+        FilePath::System(path) => system.source_type(path),
+        FilePath::SystemVirtual(system_virtual) => system.virtual_path_source_type(system_virtual),
+        FilePath::Vendored(_) => return false,
+    };
+
+    let with_extension_fallback =
+        source_type.or_else(|| PySourceType::try_from_extension(path.extension()?));
+
+    with_extension_fallback == Some(PySourceType::Ipynb)
 }
 
 /// The source text of a file containing python code.

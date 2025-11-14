@@ -65,9 +65,12 @@ impl Server {
             tracing::error!("Failed to deserialize initialization options: {error}");
         }
 
-        tracing::debug!("Initialization options: {initialization_options:?}");
+        tracing::debug!("Initialization options: {initialization_options:#?}");
 
         let resolved_client_capabilities = ResolvedClientCapabilities::new(&client_capabilities);
+
+        tracing::debug!("Resolved client capabilities: {resolved_client_capabilities}");
+
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
         let server_capabilities = server_capabilities(
             position_encoding,

@@ -1,0 +1,33 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: assignment_diagnostics.md - Subscript assignment diagnostics - Possibly missing `__setitem__` method
+mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_diagnostics.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | def _(config: dict[str, int] | None) -> None:
+2 |     config["retries"] = 3  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Cannot assign to a subscript on an object of type `None`
+ --> src/mdtest_snippet.py:2:5
+  |
+1 | def _(config: dict[str, int] | None) -> None:
+2 |     config["retries"] = 3  # error: [invalid-assignment]
+  |     ^^^^^^^^^^^^^^^^^
+  |
+info: The full type of the subscripted object is `dict[str, int] | None`
+info: `None` does not have a `__setitem__` method.
+info: rule `invalid-assignment` is enabled by default
+
+```

@@ -95,3 +95,23 @@ DOC502 Raised exception is not explicitly raised: `DivisionByZero`
 82 |           return distance / time
    |
 help: Remove `DivisionByZero` from the docstring
+
+DOC502 Raised exception is not explicitly raised: `ZeroDivisionError`
+   --> DOC502_numpy.py:139:5
+    |
+137 |   # of the exceptions
+138 |   def foo():
+139 | /     """First line.
+140 | |
+141 | |     Raises
+142 | |     ------
+143 | |     ValueError
+144 | |         some text
+145 | |         .. math:: e^{xception}
+146 | |     ZeroDivisionError
+147 | |         Will not be raised, DOC502
+148 | |     """
+    | |_______^
+149 |       raise ValueError
+    |
+help: Remove `ZeroDivisionError` from the docstring
