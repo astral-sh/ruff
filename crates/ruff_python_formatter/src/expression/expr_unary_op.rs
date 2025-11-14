@@ -37,9 +37,6 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
         // (not # comment
         //      a)
         // ```
-        if !leading.is_empty() {
-            // hard_line_break().fmt(f)?;
-        }
         leading_comments(leading).fmt(f)?;
         trailing_comments(&dangling[pivot..]).fmt(f)?;
 
