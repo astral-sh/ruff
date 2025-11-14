@@ -974,13 +974,14 @@ We *do* support stringified annotations if they appear in a position where a typ
 syntactically expected:
 
 ```py
-from typing import Union, List, Dict
+from typing import Union, List, Dict, Annotated
 
 ListOfInts1 = list["int"]
 ListOfInts2 = List["int"]
 StrOrStyle = Union[str, "Style"]
 SubclassOfStyle = type["Style"]
 DictStrToStyle = Dict[str, "Style"]
+AnnotatedStyle = Annotated["Style", "metadata"]
 
 class Style: ...
 
@@ -990,12 +991,14 @@ def _(
     str_or_style: StrOrStyle,
     subclass_of_style: SubclassOfStyle,
     dict_str_to_style: DictStrToStyle,
+    annotated_style: AnnotatedStyle,
 ):
     reveal_type(list_of_ints1)  # revealed: list[int]
     reveal_type(list_of_ints2)  # revealed: list[int]
     reveal_type(str_or_style)  # revealed: str | Style
     reveal_type(subclass_of_style)  # revealed: type[Style]
     reveal_type(dict_str_to_style)  # revealed: dict[str, Style]
+    reveal_type(annotated_style)  # revealed: Style
 ```
 
 ## Recursive

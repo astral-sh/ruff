@@ -10726,7 +10726,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.infer_expression(element, TypeContext::default());
                 }
 
-                let ty = self.infer_expression(type_expr, TypeContext::default());
+                let ty = self.infer_type_expression(type_expr);
 
                 return Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(
                     self.db(),
