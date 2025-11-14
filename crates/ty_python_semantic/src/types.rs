@@ -11934,6 +11934,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     }
 
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
+    /// Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(cycle_fn=value_type_cycle_recover, cycle_initial=value_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
@@ -11941,17 +11942,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
 
-        let value_ty =
-            definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value);
-        let expanded = value_ty.expand_eagerly(db);
-        // A type alias where a value type points to itself, i.e. the expanded type is `Divergent` is meaningless
-        // and would lead to infinite recursion. Therefore, such type aliases should not be exposed.
-        if expanded.is_divergent() {
-            // TODO: Emit a diagnostic for invalid recursive type alias.
-            expanded
-        } else {
-            value_ty
-        }
+        definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
     }
 
     fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {

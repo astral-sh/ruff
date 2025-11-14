@@ -245,7 +245,7 @@ def f(x: IntOr, y: OrInt):
     if not isinstance(y, int):
         reveal_type(y)  # revealed: Never
 
-# TODO emit a diagnostic on this line
+# error: [cyclic-type-alias-definition] "Cyclic definition of `Itself`"
 type Itself = Itself
 
 def foo(Itself: Itself):
@@ -256,13 +256,21 @@ def foo(Itself: Itself):
 foo(42)
 foo("hello")
 
-# TODO emit a diagnostic on these two lines
+# error: [cyclic-type-alias-definition] "Cyclic definition of `A`"
 type A = B
+# error: [cyclic-type-alias-definition] "Cyclic definition of `B`"
 type B = A
 
 def bar(B: B):
     x: B
     reveal_type(B)  # revealed: Divergent
+
+# error: [cyclic-type-alias-definition] "Cyclic definition of `G`"
+type G[T] = G[T]
+# error: [cyclic-type-alias-definition] "Cyclic definition of `H`"
+type H[T] = I[T]
+# error: [cyclic-type-alias-definition] "Cyclic definition of `I`"
+type I[T] = H[T]
 ```
 
 ### With legacy generic
