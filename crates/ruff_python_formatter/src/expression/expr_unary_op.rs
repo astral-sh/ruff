@@ -1,7 +1,12 @@
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprUnaryOp;
 use ruff_python_ast::UnaryOp;
+use ruff_python_trivia::SimpleTokenKind;
+use ruff_python_trivia::SimpleTokenizer;
+use ruff_text_size::Ranged;
+use ruff_text_size::TextRange;
 
+use crate::comments::leading_comments;
 use crate::comments::trailing_comments;
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
@@ -20,6 +25,41 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
             operand,
         } = item;
 
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling(item);
+
+        let mut tokenizer = SimpleTokenizer::new(
+            f.context().source(),
+            TextRange::new(item.start(), operand.start()),
+        )
+        .skip_trivia();
+        let op_token = tokenizer.next();
+        debug_assert!(op_token.is_some_and(|token| matches!(
+            token.kind,
+            SimpleTokenKind::Tilde
+                | SimpleTokenKind::Not
+                | SimpleTokenKind::Plus
+                | SimpleTokenKind::Minus
+        )));
+        let up_to = tokenizer
+            .find(|token| token.kind == SimpleTokenKind::LParen)
+            .map_or(operand.start(), |lparen| lparen.start());
+
+        let pivot = dangling.partition_point(|comment| comment.end() < up_to);
+        dbg!(pivot);
+        let leading = &dangling[..pivot];
+
+        // Split off the comments that follow after the operator and format them as trailing comments.
+        // ```python
+        // (not # comment
+        //      a)
+        // ```
+        if !leading.is_empty() {
+            hard_line_break().fmt(f)?;
+            leading_comments(&dangling[..pivot]).fmt(f)?;
+        }
+        trailing_comments(&dangling[pivot..]).fmt(f)?;
+
         let operator = match op {
             UnaryOp::Invert => "~",
             UnaryOp::Not => "not",
@@ -28,16 +68,6 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
         };
 
         token(operator).fmt(f)?;
-
-        let comments = f.context().comments().clone();
-        let dangling = comments.dangling(item);
-
-        // Split off the comments that follow after the operator and format them as trailing comments.
-        // ```python
-        // (not # comment
-        //      a)
-        // ```
-        trailing_comments(dangling).fmt(f)?;
 
         // Insert a line break if the operand has comments but itself is not parenthesized.
         // ```python

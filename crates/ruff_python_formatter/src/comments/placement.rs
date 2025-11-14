@@ -1924,8 +1924,10 @@ fn handle_unary_op_comment<'a>(
         .find(|token| token.kind == SimpleTokenKind::LParen)
         .map_or(unary_op.operand.start(), |lparen| lparen.start());
     if comment.end() < up_to {
-        CommentPlacement::leading(unary_op, comment)
+        eprintln!("leading: {}", &source[comment.range()]);
+        CommentPlacement::dangling(unary_op, comment)
     } else {
+        eprintln!("default: {}", &source[comment.range()]);
         CommentPlacement::Default(comment)
     }
 }
