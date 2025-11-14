@@ -6602,11 +6602,7 @@ impl<'db> Type<'db> {
                     Ok(builder.build())
                 }
                 KnownInstanceType::Literal(ty) => Ok(ty.inner(db)),
-                KnownInstanceType::Annotated(ty) => {
-                    Ok(ty
-                        .inner(db)
-                        .in_type_expression(db, scope_id, typevar_binding_context)?)
-                }
+                KnownInstanceType::Annotated(ty) => Ok(ty.inner(db)),
                 KnownInstanceType::TypeGenericAlias(ty) => {
                     // When `type[…]` appears in a value position (e.g. in an implicit type alias),
                     // we infer its argument as a type expression. This ensures that we can emit
