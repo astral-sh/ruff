@@ -716,10 +716,34 @@ impl<'db> Node<'db> {
         match self {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
-            Node::Interior(_) => {
-                let domain = self.domain(db);
-                let restricted = self.and(db, domain);
-                restricted == domain
+            Node::Interior(interior) => {
+                let map = interior.sequent_map(db);
+                let mut path = SequentPath::default();
+                self.is_always_satisfied_inner(db, map, &mut path)
+            }
+        }
+    }
+
+    fn is_always_satisfied_inner(
+        self,
+        db: &'db dyn Db,
+        map: &SequentMap<'db>,
+        path: &mut SequentPath<'db>,
+    ) -> bool {
+        match self {
+            Node::AlwaysTrue => true,
+            Node::AlwaysFalse => false,
+            Node::Interior(interior) => {
+                let constraint = interior.constraint(db);
+                path.assignment_satisfied(db, map, constraint.when_true(), |path| {
+                    interior
+                        .if_true(db)
+                        .is_always_satisfied_inner(db, map, path)
+                }) && path.assignment_satisfied(db, map, constraint.when_false(), |path| {
+                    interior
+                        .if_false(db)
+                        .is_always_satisfied_inner(db, map, path)
+                })
             }
         }
     }
@@ -1405,6 +1429,17 @@ impl<'db> InteriorNode<'db> {
         }
     }
 
+    /// Returns a sequent map for this BDD, which records the relationships between the constraints
+    /// that appear in the BDD.
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    fn sequent_map(self, db: &'db dyn Db) -> SequentMap<'db> {
+        let mut map = SequentMap::default();
+        Node::Interior(self).for_each_constraint(db, &mut |constraint| {
+            map.add(db, constraint);
+        });
+        map
+    }
+
     /// Returns a simplified version of a BDD, along with the BDD's domain.
     ///
     /// Both are calculated by looking at the relationships that exist between the constraints that
@@ -1863,7 +1898,7 @@ impl<'db> ConstraintAssignment<'db> {
 ///
 /// XXX: Note that `C`, `C₁`, `C₂`, and `D` are all [`ConstraintAssignment`]s, which means that they can
 /// check whether a [`ConstrainedTypeVar`] is true or false. #[derive(Clone, Debug, Default)]
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
 struct SequentMap<'db> {
     /// Sequents of the form `C₁ ∧ C₂ → false`
     impossibilities: FxHashSet<(ConstrainedTypeVar<'db>, ConstrainedTypeVar<'db>)>,
@@ -2137,32 +2172,95 @@ impl<'db> SequentMap<'db> {
                     right_constraint,
                     intersection_constraint,
                 );
+                self.add_single_implication(intersection_constraint, left_constraint);
+                self.add_single_implication(intersection_constraint, right_constraint);
             }
             None => {
                 self.add_impossibility(db, left_constraint, right_constraint);
             }
         }
     }
+
+    fn display<'a>(&'a self, db: &'db dyn Db, prefix: &'a dyn Display) -> impl Display + 'a {
+        struct DisplaySequentMap<'a, 'db> {
+            map: &'a SequentMap<'db>,
+            prefix: &'a dyn Display,
+            db: &'db dyn Db,
+        }
+
+        impl Display for DisplaySequentMap<'_, '_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let mut first = true;
+                let mut maybe_write_prefix = |f: &mut std::fmt::Formatter<'_>| {
+                    if first {
+                        first = false;
+                        Ok(())
+                    } else {
+                        write!(f, "\n{}", self.prefix)
+                    }
+                };
+
+                for (ante1, ante2) in &self.map.impossibilities {
+                    maybe_write_prefix(f)?;
+                    write!(
+                        f,
+                        "{} ∧ {} → false",
+                        ante1.display(self.db),
+                        ante2.display(self.db),
+                    )?;
+                }
+
+                for ((ante1, ante2), posts) in &self.map.pair_implications {
+                    for post in posts {
+                        maybe_write_prefix(f)?;
+                        write!(
+                            f,
+                            "{} ∧ {} → {}",
+                            ante1.display(self.db),
+                            ante2.display(self.db),
+                            post.display(self.db),
+                        )?;
+                    }
+                }
+
+                for (ante, posts) in &self.map.single_implications {
+                    for post in posts {
+                        maybe_write_prefix(f)?;
+                        write!(f, "{} → {}", ante.display(self.db), post.display(self.db))?;
+                    }
+                }
+
+                Ok(())
+            }
+        }
+
+        DisplaySequentMap {
+            map: self,
+            prefix,
+            db,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct SequentPath<'db> {
     path: Vec<ConstraintAssignment<'db>>,
 }
 
 impl<'db> SequentPath<'db> {
-    fn with_assignment<R>(
+    fn assignment_satisfied(
         &mut self,
         db: &'db dyn Db,
         map: &SequentMap<'db>,
         assignment: ConstraintAssignment<'db>,
-        f: impl FnOnce(&mut Self) -> R,
-    ) -> Option<R> {
+        f: impl FnOnce(&mut Self) -> bool,
+    ) -> bool {
         self.path.push(assignment);
         let result = if self.path_should_be_pruned(db, map) {
-            None
+            // A pruned path is vacuously satisfied
+            true
         } else {
-            Some(f(self))
+            f(self)
         };
         self.path.pop();
         result
