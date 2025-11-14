@@ -735,15 +735,19 @@ impl<'db> Node<'db> {
             Node::AlwaysFalse => false,
             Node::Interior(interior) => {
                 let constraint = interior.constraint(db);
-                path.assignment_satisfied(db, map, constraint.when_true(), |path| {
+                path.with_assignment(db, map, constraint.when_true(), |path| {
                     interior
                         .if_true(db)
                         .is_always_satisfied_inner(db, map, path)
-                }) && path.assignment_satisfied(db, map, constraint.when_false(), |path| {
-                    interior
-                        .if_false(db)
-                        .is_always_satisfied_inner(db, map, path)
                 })
+                .unwrap_or(true)
+                    && path
+                        .with_assignment(db, map, constraint.when_false(), |path| {
+                            interior
+                                .if_false(db)
+                                .is_always_satisfied_inner(db, map, path)
+                        })
+                        .unwrap_or(true)
             }
         }
     }
@@ -2256,19 +2260,18 @@ struct SequentPath<'db> {
 }
 
 impl<'db> SequentPath<'db> {
-    fn assignment_satisfied(
+    fn with_assignment<R>(
         &mut self,
         db: &'db dyn Db,
         map: &SequentMap<'db>,
         assignment: ConstraintAssignment<'db>,
-        f: impl FnOnce(&mut Self) -> bool,
-    ) -> bool {
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> Option<R> {
         self.path.push(assignment);
         let result = if self.path_should_be_pruned(db, map) {
-            // A pruned path is vacuously satisfied
-            true
+            None
         } else {
-            f(self)
+            Some(f(self))
         };
         self.path.pop();
         result
