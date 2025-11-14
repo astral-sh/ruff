@@ -404,7 +404,11 @@ To enable Ruff with automatic formatting on save, use the following configuratio
 (with-eval-after-load 'eglot
   (add-to-list 'eglot-server-programs
                '(python-mode . ("ruff" "server")))
-  (add-hook 'after-save-hook 'eglot-format))
+  (add-hook 'after-save-hook
+            (lambda ()
+              (when (and (derived-mode-p 'python-base-mode)
+                         (bound-and-true-p eglot--managed-mode))
+                (eglot-format-buffer)))))
 ```
 
 Ruff is available as [`flymake-ruff`](https://melpa.org/#/flymake-ruff) on MELPA:
