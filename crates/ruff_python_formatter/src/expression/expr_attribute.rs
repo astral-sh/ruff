@@ -14,13 +14,21 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprAttribute {
     call_chain_layout: CallChainLayout,
+    prefer_own_line: bool,
+}
+
+#[derive(Default)]
+pub struct AttributeOptions {
+    pub call_chain_layout: CallChainLayout,
+    pub prefer_own_line: bool,
 }
 
 impl FormatRuleWithOptions<ExprAttribute, PyFormatContext<'_>> for FormatExprAttribute {
-    type Options = CallChainLayout;
+    type Options = AttributeOptions;
 
     fn with_options(mut self, options: Self::Options) -> Self {
-        self.call_chain_layout = options;
+        self.call_chain_layout = options.call_chain_layout;
+        self.prefer_own_line = options.prefer_own_line;
         self
     }
 }
@@ -54,7 +62,12 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                 } else {
                     match value.as_ref() {
                         Expr::Attribute(expr) => {
-                            expr.format().with_options(call_chain_layout).fmt(f)?;
+                            expr.format()
+                                .with_options(AttributeOptions {
+                                    call_chain_layout: self.call_chain_layout,
+                                    prefer_own_line: false,
+                                })
+                                .fmt(f)?;
                         }
                         Expr::Call(expr) => {
                             expr.format().with_options(call_chain_layout).fmt(f)?;
@@ -106,7 +119,11 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             // and the value either requires parenthesizing or is a call or subscript expression
             // (it's a fluent chain but not the first element).
             else if call_chain_layout == CallChainLayout::Fluent {
-                if parenthesize_value || value.is_call_expr() || value.is_subscript_expr() {
+                if parenthesize_value
+                    || value.is_call_expr()
+                    || value.is_subscript_expr()
+                    || self.prefer_own_line
+                {
                     soft_line_break().fmt(f)?;
                 }
             }
