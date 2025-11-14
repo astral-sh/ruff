@@ -7184,7 +7184,8 @@ impl<'db> Type<'db> {
                 }
                 TypeMapping::PromoteLiterals(_)
                     | TypeMapping::ReplaceParameterDefaults
-                    | TypeMapping::BindLegacyTypevars(_) => self,
+                    | TypeMapping::BindLegacyTypevars(_)
+                    | TypeMapping::EagerExpansion => self,
                 TypeMapping::Materialize(materialization_kind)  => {
                     Type::TypeVar(bound_typevar.materialize_impl(db, *materialization_kind, visitor))
                 }
@@ -7200,7 +7201,8 @@ impl<'db> Type<'db> {
                 TypeMapping::BindSelf(_) |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Materialize(_) |
-                TypeMapping::ReplaceParameterDefaults => self,
+                TypeMapping::ReplaceParameterDefaults |
+                TypeMapping::EagerExpansion => self,
             }
 
             Type::FunctionLiteral(function) => {
@@ -7301,6 +7303,9 @@ impl<'db> Type<'db> {
             Type::TypeIs(type_is) => type_is.with_type(db, type_is.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
 
             Type::TypeAlias(alias) => {
+                if TypeMapping::EagerExpansion == *type_mapping {
+                    return alias.raw_value_type(db).expand_eagerly(db);
+                }
                 // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is performed without `visitor` inheritance.
                 // In the case of recursive type aliases, this leads to infinite recursion.
                 // Instead, call `raw_value_type` and perform the specialization after the `visitor` cache has been created.
@@ -7322,6 +7327,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Materialize(_) |
                 TypeMapping::ReplaceParameterDefaults |
+                TypeMapping::EagerExpansion |
                 TypeMapping::PromoteLiterals(PromoteLiteralsMode::Off) => self,
                 TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => self.promote_literals_impl(db, tcx)
             }
@@ -7333,7 +7339,8 @@ impl<'db> Type<'db> {
                 TypeMapping::BindSelf(_) |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::PromoteLiterals(_) |
-                TypeMapping::ReplaceParameterDefaults => self,
+                TypeMapping::ReplaceParameterDefaults |
+                TypeMapping::EagerExpansion => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
@@ -7538,6 +7545,18 @@ impl<'db> Type<'db> {
             &TypeMapping::ReplaceParameterDefaults,
             TypeContext::default(),
         )
+    }
+
+    /// Returns the eagerly expanded type.
+    /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
+    fn expand_eagerly(self, db: &'db dyn Db) -> Type<'db> {
+        self.expand_eagerly_(db, ())
+    }
+
+    #[allow(clippy::used_underscore_binding)]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_fn=expand_eagerly_cycle_recover, cycle_initial=expand_eagerly_cycle_initial)]
+    fn expand_eagerly_(self, db: &'db dyn Db, _unit: ()) -> Type<'db> {
+        self.apply_type_mapping(db, &TypeMapping::EagerExpansion, TypeContext::default())
     }
 
     /// Return the string representation of this type when converted to string as it would be
@@ -7889,6 +7908,27 @@ fn apply_specialization_cycle_initial<'db>(
     Type::divergent(id)
 }
 
+fn expand_eagerly_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    id: salsa::Id,
+    _self: Type<'db>,
+    _unit: (),
+) -> Type<'db> {
+    Type::divergent(id)
+}
+
+fn expand_eagerly_cycle_recover<'db>(
+    db: &'db dyn Db,
+    cycle_heads: &salsa::CycleHeads,
+    previous_value: &Type<'db>,
+    value: Type<'db>,
+    _count: u32,
+    _self: Type<'db>,
+    _unit: (),
+) -> Type<'db> {
+    value.cycle_normalized(db, *previous_value, cycle_heads)
+}
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub enum PromoteLiteralsMode {
     On,
@@ -7931,6 +7971,9 @@ pub enum TypeMapping<'a, 'db> {
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
     /// recursion when the type of the default value of a parameter depends on the callable itself.
     ReplaceParameterDefaults,
+    /// Apply eager expansion to the type.
+    /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
+    EagerExpansion,
 }
 
 impl<'db> TypeMapping<'_, 'db> {
@@ -7946,7 +7989,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::PromoteLiterals(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
-            | TypeMapping::ReplaceParameterDefaults => context,
+            | TypeMapping::ReplaceParameterDefaults
+            | TypeMapping::EagerExpansion => context,
             TypeMapping::BindSelf(_) => GenericContext::from_typevar_instances(
                 db,
                 context
@@ -7982,7 +8026,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::BindSelf(_)
             | TypeMapping::ReplaceSelf { .. }
-            | TypeMapping::ReplaceParameterDefaults => self.clone(),
+            | TypeMapping::ReplaceParameterDefaults
+            | TypeMapping::EagerExpansion => self.clone(),
         }
     }
 }
@@ -11890,13 +11935,23 @@ impl<'db> PEP695TypeAliasType<'db> {
 
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
     #[salsa::tracked(cycle_fn=value_type_cycle_recover, cycle_initial=value_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
+    fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
         let module = parsed_module(db, scope.file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
 
-        definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
+        let value_ty =
+            definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value);
+        let expanded = value_ty.expand_eagerly(db);
+        // A type alias where a value type points to itself, i.e. the expanded type is `Divergent` is meaningless
+        // and would lead to infinite recursion. Therefore, such type aliases should not be exposed.
+        if expanded.is_divergent() {
+            // TODO: Emit a diagnostic for invalid recursive type alias.
+            expanded
+        } else {
+            value_ty
+        }
     }
 
     fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
@@ -13155,5 +13210,83 @@ type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
                 .variance_of(&db, get_bound_typevar(&db, recursive2)),
             TypeVarVariance::Invariant
         );
+    }
+
+    #[test]
+    fn eager_expansion() {
+        use crate::db::tests::TestDb;
+        use crate::place::global_symbol;
+
+        fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> Type<'db> {
+            let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
+            let ty = global_symbol(db, module, name).place.expect_type();
+            let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
+                type_alias,
+            ))) = ty
+            else {
+                panic!("Expected `{name}` to be a type alias");
+            };
+            Type::TypeAlias(TypeAliasType::PEP695(type_alias))
+        }
+
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+
+type IntStr = int | str
+type ListIntStr = list[IntStr]
+type RecursiveList[T] = list[T | RecursiveList[T]]
+type RecursiveIntList = RecursiveList[int]
+type Itself = Itself
+type A = B
+type B = A
+type G[T] = H[T]
+type H[T] = G[T]
+"#,
+        )
+        .unwrap();
+
+        let int_str = get_type_alias(&db, "IntStr");
+        assert_eq!(
+            int_str.expand_eagerly(&db).display(&db).to_string(),
+            "int | str",
+        );
+
+        let list_int_str = get_type_alias(&db, "ListIntStr");
+        assert_eq!(
+            list_int_str.expand_eagerly(&db).display(&db).to_string(),
+            "list[int | str]",
+        );
+
+        let rec_list = get_type_alias(&db, "RecursiveList");
+        assert_eq!(
+            rec_list.expand_eagerly(&db).display(&db).to_string(),
+            "list[Divergent]",
+        );
+
+        let rec_int_list = get_type_alias(&db, "RecursiveIntList");
+        assert_eq!(
+            rec_int_list.expand_eagerly(&db).display(&db).to_string(),
+            "list[Divergent]",
+        );
+
+        let itself = get_type_alias(&db, "Itself");
+        assert_eq!(
+            itself.expand_eagerly(&db).display(&db).to_string(),
+            "Divergent",
+        );
+
+        let a = get_type_alias(&db, "A");
+        assert_eq!(a.expand_eagerly(&db).display(&db).to_string(), "Divergent",);
+
+        let b = get_type_alias(&db, "B");
+        assert_eq!(b.expand_eagerly(&db).display(&db).to_string(), "Divergent",);
+
+        let g = get_type_alias(&db, "G");
+        assert_eq!(g.expand_eagerly(&db).display(&db).to_string(), "Divergent",);
+
+        let h = get_type_alias(&db, "H");
+        assert_eq!(h.expand_eagerly(&db).display(&db).to_string(), "Divergent",);
     }
 }

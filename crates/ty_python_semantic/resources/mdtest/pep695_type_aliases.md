@@ -244,6 +244,25 @@ def f(x: IntOr, y: OrInt):
         reveal_type(x)  # revealed: Never
     if not isinstance(y, int):
         reveal_type(y)  # revealed: Never
+
+# TODO emit a diagnostic on this line
+type Itself = Itself
+
+def foo(Itself: Itself):
+    x: Itself
+    reveal_type(Itself)  # revealed: Divergent
+
+# A type alias defined with invalid recursion behaves as a dynamic type.
+foo(42)
+foo("hello")
+
+# TODO emit a diagnostic on these two lines
+type A = B
+type B = A
+
+def bar(B: B):
+    x: B
+    reveal_type(B)  # revealed: Divergent
 ```
 
 ### With legacy generic
