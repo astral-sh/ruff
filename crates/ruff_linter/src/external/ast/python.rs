@@ -341,16 +341,19 @@ mod bindings {
         #[pyo3(get)]
         name: String,
         #[pyo3(get)]
+        config: PyObject,
+        #[pyo3(get)]
         _report: Py<PyAny>,
     }
 
     #[pymethods]
     impl Context {
         #[new]
-        fn new(code: String, name: String, reporter: Py<PyAny>) -> Self {
+        fn new(code: String, name: String, config: PyObject, reporter: Py<PyAny>) -> Self {
             Self {
                 code,
                 name,
+                config,
                 _report: reporter,
             }
         }

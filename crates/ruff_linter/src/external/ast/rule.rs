@@ -1,10 +1,13 @@
+use std::hash::Hasher;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use regex::Regex;
+use ruff_cache::CacheKey;
 use ruff_db::diagnostic::SecondaryCode;
 use serde::Deserialize;
 use thiserror::Error;
+use toml::value::{Table as TomlTable, Value as TomlValue};
 
 use crate::external::ast::target::{AstTarget, AstTargetSpec};
 
@@ -140,6 +143,7 @@ pub struct ExternalAstLinter {
     pub description: Option<String>,
     pub enabled: bool,
     pub rules: Vec<ExternalAstRule>,
+    pub config: Option<ExternalLinterConfig>,
 }
 
 impl ExternalAstLinter {
@@ -156,7 +160,12 @@ impl ExternalAstLinter {
             description: description.map(Into::into),
             enabled,
             rules,
+            config: None,
         }
+    }
+
+    pub fn config(&self) -> Option<&ExternalLinterConfig> {
+        self.config.as_ref()
     }
 }
 
@@ -177,6 +186,71 @@ impl std::fmt::Display for ExternalAstLinter {
             writeln!(f, "      - {} ({})", rule.code.as_str(), rule.name)?;
         }
         writeln!(f)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ExternalLinterConfig {
+    data: TomlTable,
+}
+
+impl ExternalLinterConfig {
+    pub fn new(data: TomlTable) -> Self {
+        Self { data }
+    }
+
+    pub fn data(&self) -> &TomlTable {
+        &self.data
+    }
+}
+
+impl CacheKey for ExternalLinterConfig {
+    fn cache_key(&self, key: &mut ruff_cache::CacheKeyHasher) {
+        cache_key_for_toml_table(&self.data, key);
+    }
+}
+
+fn cache_key_for_toml_value(value: &TomlValue, key: &mut ruff_cache::CacheKeyHasher) {
+    match value {
+        TomlValue::Boolean(v) => {
+            key.write_u8(0);
+            v.cache_key(key);
+        }
+        TomlValue::Integer(v) => {
+            key.write_u8(1);
+            v.cache_key(key);
+        }
+        TomlValue::Float(v) => {
+            key.write_u8(2);
+            key.write_u64(v.to_bits());
+        }
+        TomlValue::String(v) => {
+            key.write_u8(3);
+            v.cache_key(key);
+        }
+        TomlValue::Datetime(v) => {
+            key.write_u8(4);
+            v.to_string().cache_key(key);
+        }
+        TomlValue::Array(values) => {
+            key.write_u8(5);
+            key.write_usize(values.len());
+            for item in values {
+                cache_key_for_toml_value(item, key);
+            }
+        }
+        TomlValue::Table(table) => {
+            key.write_u8(6);
+            cache_key_for_toml_table(table, key);
+        }
+    }
+}
+
+fn cache_key_for_toml_table(table: &TomlTable, key: &mut ruff_cache::CacheKeyHasher) {
+    key.write_usize(table.len());
+    for (entry_key, entry_value) in table {
+        entry_key.cache_key(key);
+        cache_key_for_toml_value(entry_value, key);
     }
 }
 

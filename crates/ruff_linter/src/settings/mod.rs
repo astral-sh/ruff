@@ -324,7 +324,7 @@ impl Display for LinterSettings {
             ]
         }
         if let Some(registry) = &self.external_ast {
-            writeln!(f, "linter.external-ast = {registry:#?}")?;
+            writeln!(f, "linter.ext-lint = {registry:#?}")?;
         }
         writeln!(f, "\n# Linter Plugins")?;
         display_settings! {

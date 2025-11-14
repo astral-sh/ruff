@@ -1,6 +1,8 @@
 use std::hash::Hasher;
 
-use crate::external::ast::rule::{CallCalleeMatcher, ExternalAstLinter, ExternalAstRule};
+use crate::external::ast::rule::{
+    CallCalleeMatcher, ExternalAstLinter, ExternalAstRule, ExternalLinterConfig,
+};
 use crate::external::ast::target::{AstTarget, ExprKind, StmtKind};
 use crate::external::error::ExternalLinterError;
 use ruff_index::{IndexVec, newtype_index};
@@ -90,6 +92,12 @@ impl ExternalLintRegistry {
         Ok(())
     }
 
+    pub fn set_linter_config(&mut self, id: &str, config: ExternalLinterConfig) {
+        if let Some(linter) = self.linters.iter_mut().find(|linter| linter.id == id) {
+            linter.config = Some(config);
+        }
+    }
+
     pub fn get_rule(&self, locator: RuleLocator) -> Option<&ExternalAstRule> {
         self.linters
             .get(locator.linter_index)
@@ -175,6 +183,7 @@ impl ruff_cache::CacheKey for ExternalLintRegistry {
             linter.enabled.cache_key(key);
             linter.name.as_str().cache_key(key);
             linter.description.as_deref().cache_key(key);
+            linter.config.as_ref().cache_key(key);
             key.write_usize(linter.rules.len());
             for rule in &linter.rules {
                 rule.code.as_str().cache_key(key);

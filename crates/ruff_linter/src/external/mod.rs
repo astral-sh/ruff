@@ -20,7 +20,8 @@ pub use ast::definition::ExternalAstLinterFile;
 pub use ast::loader::{load_linter_from_entry, load_linter_into_registry};
 pub use ast::registry::{ExternalLintRegistry, LinterIndex, RuleLocator};
 pub use ast::rule::{
-    ExternalAstLinter, ExternalAstRule, ExternalAstRuleSpec, ExternalRuleCode, ExternalRuleScript,
+    ExternalAstLinter, ExternalAstRule, ExternalAstRuleSpec, ExternalLinterConfig,
+    ExternalRuleCode, ExternalRuleScript,
 };
 pub use ast::target::{AstNodeClass, AstTarget, AstTargetSpec, ExprKind, StmtKind};
 pub use error::ExternalLinterError;
