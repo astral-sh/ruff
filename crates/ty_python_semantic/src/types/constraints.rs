@@ -1911,7 +1911,9 @@ impl<'db> SequentMap<'db> {
         // if they're related to each other.
         let processed = std::mem::take(&mut self.processed);
         for other in &processed {
-            self.add_sequents_for_pair(db, constraint, *other);
+            if constraint != *other {
+                self.add_sequents_for_pair(db, constraint, *other);
+            }
         }
         self.processed = processed;
 
@@ -1948,6 +1950,9 @@ impl<'db> SequentMap<'db> {
         ante2: ConstrainedTypeVar<'db>,
         post: ConstrainedTypeVar<'db>,
     ) {
+        if ante1 == post || ante2 == post {
+            return;
+        }
         self.pair_implications
             .entry(Self::pair_key(db, ante1, ante2))
             .or_default()
@@ -1959,6 +1964,9 @@ impl<'db> SequentMap<'db> {
         ante: ConstrainedTypeVar<'db>,
         post: ConstrainedTypeVar<'db>,
     ) {
+        if ante == post {
+            return;
+        }
         self.single_implications.entry(ante).or_default().push(post);
     }
 
