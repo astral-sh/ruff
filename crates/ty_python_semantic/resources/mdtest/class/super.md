@@ -501,8 +501,8 @@ class A[T]:
         return a
 
 class B[T](A[T]):
-    def f(self, b: T) -> T:
-        return super().f(b)
+    def f(self, a: T) -> T:
+        return super().f(a)
 ```
 
 ## Invalid Usages

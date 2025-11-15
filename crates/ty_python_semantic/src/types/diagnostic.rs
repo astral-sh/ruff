@@ -16,6 +16,7 @@ use crate::types::KnownInstanceType;
 use crate::types::call::CallError;
 use crate::types::class::{DisjointBase, DisjointBaseKind, Field};
 use crate::types::function::KnownFunction;
+use crate::types::ide_support::Member;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
@@ -107,6 +108,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&REDUNDANT_CAST);
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
+    registry.register_lint(&INVALID_METHOD_OVERRIDE);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -1933,6 +1935,42 @@ declare_lint! {
     }
 }
 
+declare_lint! {
+    /// ## What it does
+    /// Detects method overrides that violate the [Liskov Substitution Principle].
+    ///
+    /// ## Why is this bad?
+    /// Violating the Liskov Substitution Principle will lead to many of ty's assumptions and
+    /// inferences being incorrect, which will mean that it will fail to catch many possible
+    /// type errors in your code.
+    ///
+    /// ## Example
+    /// ```python
+    /// class Super:
+    ///     def method(self) -> int:
+    ///         return 42
+    ///
+    /// class Sub(Super):
+    ///     # Liskov violation: `str` is not a subtype of `int`,
+    ///     # but the supertype method promises to return an `int`.
+    ///     def method(self) -> str:  # error: [invalid-override]
+    ///         return "foo"
+    ///
+    /// def accepts_super(s: Super) -> int:
+    ///     return s.method()
+    ///
+    /// accepts_super(Sub())  # The result of this call is a string, but ty will infer
+    ///                       # it to be an `int` due to the violation of the Liskov Substitution Principle.
+    /// ```
+    ///
+    /// [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
+    pub(crate) static INVALID_METHOD_OVERRIDE = {
+        summary: "detects missing required keys in `TypedDict` constructors",
+        status: LintStatus::stable("0.0.1-alpha.20"),
+        default_level: Level::Error,
+    }
+}
+
 /// A collection of type check diagnostics.
 #[derive(Default, Eq, PartialEq, get_size2::GetSize)]
 pub struct TypeCheckDiagnostics {
@@ -3233,6 +3271,54 @@ pub(crate) fn report_rebound_typevar<'db>(
         diagnostic.annotate(Annotation::secondary(span).message(format_args!(
             "Type variable `{typevar_name}` is bound in this enclosing scope",
         )));
+    }
+}
+
+pub(super) fn report_invalid_method_override<'db>(
+    context: &InferContext<'db, '_>,
+    range: impl Ranged,
+    member: &Member<'db>,
+    class: ClassType<'db>,
+    supercls: ClassType<'db>,
+    type_on_supercls: Type<'db>,
+) {
+    let Some(builder) = context.report_lint(&INVALID_METHOD_OVERRIDE, range) else {
+        return;
+    };
+
+    let db = context.db();
+
+    let mut diagnostic =
+        builder.into_diagnostic(format_args!("Invalid override of method `{}`", member.name));
+
+    let supercls_name = supercls.name(db);
+
+    let overridden_method = if class.name(db) != supercls_name {
+        format!("{}.{}", supercls_name, member.name)
+    } else {
+        let mut buffer = supercls.class_literal(db).0.qualified_name(db);
+        buffer.push('.');
+        buffer.push_str(&member.name);
+        buffer
+    };
+
+    diagnostic.set_primary_message(format_args!(
+        "Definition is incompatible with `{overridden_method}`"
+    ));
+
+    diagnostic.info("This violates the Liskov Substitution Principle");
+
+    if let Type::BoundMethod(method_on_supercls) = type_on_supercls
+        && let Some(spans) = method_on_supercls
+            .function(db)
+            .literal(db)
+            .last_definition(db)
+            .spans(db)
+    {
+        diagnostic.annotate(
+            Annotation::secondary(spans.signature)
+                .message(format_args!("`{overridden_method}` defined here")),
+        );
     }
 }
 
