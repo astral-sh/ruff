@@ -127,7 +127,7 @@ x = lambda y: y
 reveal_type(x.__code__)  # revealed: CodeType
 reveal_type(x.__name__)  # revealed: str
 reveal_type(x.__defaults__)  # revealed: tuple[Any, ...] | None
-reveal_type(x.__annotations__)  # revealed: dict[str, @Todo(Support for `typing.TypeAlias`)]
+reveal_type(x.__annotations__)  # revealed: dict[str, Any]
 reveal_type(x.__dict__)  # revealed: dict[str, Any]
 reveal_type(x.__doc__)  # revealed: str | None
 reveal_type(x.__kwdefaults__)  # revealed: dict[str, Any] | None
