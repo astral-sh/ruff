@@ -273,20 +273,32 @@ impl EmbeddedFileSourceMap {
         }
     }
 
-    pub(crate) fn to_absolute_line_number(&self, relative_line_number: OneIndexed) -> OneIndexed {
-        let mut absolute_line_number = 0;
+    /// On error, returns the last valid absolute line number in the embedded source.
+    pub(crate) fn to_absolute_line_number(
+        &self,
+        relative_line_number: OneIndexed,
+    ) -> std::result::Result<OneIndexed, OneIndexed> {
         let mut relative_line_number = relative_line_number.get();
 
         for (start_line, line_count) in &self.start_line_and_line_count {
             if relative_line_number > *line_count {
                 relative_line_number -= *line_count;
             } else {
-                absolute_line_number = start_line + relative_line_number;
-                break;
+                let absolute_line_number = start_line + relative_line_number;
+                return Ok(OneIndexed::new(absolute_line_number)
+                    .expect("absolute line number must be >= 1"));
             }
         }
 
-        OneIndexed::new(absolute_line_number).expect("Relative line number out of bounds")
+        Err(self
+            .last_absolute_line_number()
+            .expect("embedded file source map should contain at least one code block"))
+    }
+
+    pub(crate) fn last_absolute_line_number(&self) -> Option<OneIndexed> {
+        self.start_line_and_line_count
+            .last()
+            .and_then(|(start_line, line_count)| OneIndexed::new(start_line + line_count))
     }
 }
 
@@ -919,6 +931,7 @@ impl MdtestDirectives {
 mod tests {
     use ruff_python_ast::PySourceType;
     use ruff_python_trivia::textwrap::dedent;
+    use ruff_source_file::OneIndexed;
 
     use insta::assert_snapshot;
 
@@ -929,6 +942,34 @@ mod tests {
         let mf = super::parse("file.md", "").unwrap();
 
         assert!(mf.tests().next().is_none());
+    }
+
+    #[test]
+    fn source_map_to_absolute_line_number() {
+        let map = super::EmbeddedFileSourceMap {
+            start_line_and_line_count: vec![(10, 5), (25, 3)],
+        };
+
+        let absolute = map
+            .to_absolute_line_number(OneIndexed::new(6).unwrap())
+            .unwrap();
+        assert_eq!(absolute.get(), 26);
+    }
+
+    #[test]
+    fn source_map_reports_invalid_relative_line() {
+        let map = super::EmbeddedFileSourceMap {
+            start_line_and_line_count: vec![(9, 2)],
+        };
+
+        let last_line_number = map.last_absolute_line_number().unwrap();
+
+        let error = map
+            .to_absolute_line_number(OneIndexed::new(3).unwrap())
+            .unwrap_err();
+
+        assert_eq!(error, last_line_number);
+        assert_eq!(error.get(), 11);
     }
 
     #[test]

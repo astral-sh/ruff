@@ -14,7 +14,7 @@ use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
-use std::fmt::Write;
+use std::fmt::{Display, Write};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
 use ty_python_semantic::{
@@ -86,21 +86,28 @@ pub fn run(
                     EmbeddedFileSourceMap::new(&md_index, test_failures.backtick_offsets);
 
                 for (relative_line_number, failures) in test_failures.by_line.iter() {
-                    let absolute_line_number =
-                        source_map.to_absolute_line_number(relative_line_number);
-
-                    for failure in failures {
-                        match output_format {
-                            OutputFormat::Cli => {
-                                let line_info =
-                                    format!("{relative_fixture_path}:{absolute_line_number}")
-                                        .cyan();
-                                println!("  {line_info} {failure}");
-                            }
-                            OutputFormat::GitHub => println!(
-                                "::error file={absolute_fixture_path},line={absolute_line_number}::{failure}"
-                            ),
+                    let (absolute_line_number, line_number_error, emit_failures) = match source_map
+                        .to_absolute_line_number(relative_line_number)
+                    {
+                        Ok(line_number) => (Some(line_number), None, true),
+                        Err(last_line_number) => {
+                            let message = "Found a trailing assertion comment (e.g., `# revealed:` or `# error:`) \
+                                not followed by any statement.";
+                            (Some(last_line_number), Some(message), false)
                         }
+                    };
+
+                    let file = match output_format {
+                        OutputFormat::Cli => relative_fixture_path.as_str(),
+                        OutputFormat::GitHub => absolute_fixture_path.as_str(),
+                    };
+                    if emit_failures {
+                        for failure in failures {
+                            output_format.print_error(file, absolute_line_number, failure);
+                        }
+                    }
+                    if let Some(err) = line_number_error {
+                        output_format.print_error(file, absolute_line_number, err);
                     }
                 }
             }
@@ -152,6 +159,27 @@ pub enum OutputFormat {
 impl OutputFormat {
     const fn is_cli(self) -> bool {
         matches!(self, OutputFormat::Cli)
+    }
+
+    #[expect(clippy::print_stdout)]
+    fn print_error(self, file: &str, line: Option<OneIndexed>, failure: impl Display) {
+        let line_value = line.map(OneIndexed::get);
+        match self {
+            Self::Cli => {
+                let cli_line_info = match line_value {
+                    Some(line) => format!("{file}:{line}"),
+                    None => format!("{file}:?"),
+                };
+                println!("  {} {failure}", cli_line_info.as_str().cyan());
+            }
+            Self::GitHub => {
+                if let Some(line) = line_value {
+                    println!("::error file={file},line={line}::{failure}");
+                } else {
+                    println!("::error file={file}::{failure}");
+                }
+            }
+        }
     }
 }
 
