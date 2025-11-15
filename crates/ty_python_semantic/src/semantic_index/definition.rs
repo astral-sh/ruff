@@ -714,6 +714,13 @@ impl DefinitionKind<'_> {
         }
     }
 
+    pub(crate) const fn as_class(&self) -> Option<&AstNodeRef<ast::StmtClassDef>> {
+        match self {
+            DefinitionKind::Class(class) => Some(class),
+            _ => None,
+        }
+    }
+
     pub(crate) fn is_import(&self) -> bool {
         matches!(
             self,

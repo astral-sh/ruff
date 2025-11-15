@@ -2206,7 +2206,7 @@ impl<'db> ClassLiteral<'db> {
 
         let field_policy = CodeGeneratorKind::from_class(db, self, specialization)?;
 
-        let transformer_params =
+        let mut transformer_params =
             if let CodeGeneratorKind::DataclassLike(Some(transformer_params)) = field_policy {
                 Some(DataclassParams::from_transformer_params(
                     db,
@@ -2215,6 +2215,36 @@ impl<'db> ClassLiteral<'db> {
             } else {
                 None
             };
+
+        // Dataclass transformer flags can be overwritten using class arguments.
+        if let Some(transformer_params) = transformer_params.as_mut() {
+            if let Some(class_def) = self.definition(db).kind(db).as_class() {
+                let module = parsed_module(db, self.file(db)).load(db);
+
+                if let Some(arguments) = &class_def.node(&module).arguments {
+                    let mut flags = transformer_params.flags(db);
+
+                    for keyword in &arguments.keywords {
+                        if let Some(arg_name) = &keyword.arg {
+                            if let Some(is_set) =
+                                keyword.value.as_boolean_literal_expr().map(|b| b.value)
+                            {
+                                match arg_name.as_str() {
+                                    "eq" => flags.set(DataclassFlags::EQ, is_set),
+                                    "order" => flags.set(DataclassFlags::ORDER, is_set),
+                                    "kw_only" => flags.set(DataclassFlags::KW_ONLY, is_set),
+                                    "frozen" => flags.set(DataclassFlags::FROZEN, is_set),
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+
+                    *transformer_params =
+                        DataclassParams::new(db, flags, transformer_params.field_specifiers(db));
+                }
+            }
+        }
 
         let has_dataclass_param = |param| {
             dataclass_params.is_some_and(|params| params.flags(db).contains(param))
