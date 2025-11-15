@@ -1206,7 +1206,6 @@ type<CURSOR>
             @r"
         TypeError :: <class 'TypeError'>
         type :: <class 'type'>
-        _NotImplementedType :: <class '_NotImplementedType'>
         ",
         );
     }
@@ -2092,7 +2091,7 @@ C.<CURSOR>
         __call__ :: bound method <class 'C'>.__call__(...) -> Any
         __class__ :: <class 'Meta'>
         __delattr__ :: def __delattr__(self, name: str, /) -> None
-        __dict__ :: MappingProxyType[str, Any]
+        __dict__ :: dict[str, Any]
         __dictoffset__ :: int
         __dir__ :: def __dir__(self) -> Iterable[str]
         __doc__ :: str | None
@@ -2291,7 +2290,7 @@ Quux.<CURSOR>
         __call__ :: bound method <class 'Quux'>.__call__(...) -> Any
         __class__ :: <class 'type'>
         __delattr__ :: def __delattr__(self, name: str, /) -> None
-        __dict__ :: MappingProxyType[str, Any]
+        __dict__ :: dict[str, Any]
         __dictoffset__ :: int
         __dir__ :: def __dir__(self) -> Iterable[str]
         __doc__ :: str | None
@@ -2365,7 +2364,7 @@ Answer.<CURSOR>
                 __copy__ :: def __copy__(self) -> Self@__copy__
                 __deepcopy__ :: def __deepcopy__(self, memo: Any) -> Self@__deepcopy__
                 __delattr__ :: def __delattr__(self, name: str, /) -> None
-                __dict__ :: MappingProxyType[str, Any]
+                __dict__ :: dict[str, Any]
                 __dictoffset__ :: int
                 __dir__ :: def __dir__(self) -> list[str]
                 __doc__ :: str | None

@@ -197,3 +197,9 @@ isinstance("", t.ClassVar)  # error: [invalid-argument-type]
 isinstance("", t.Final)  # error: [invalid-argument-type]
 isinstance("", t.Any)  # error: [invalid-argument-type]
 ```
+
+## The builtin `NotImplemented` constant is not callable
+
+```py
+NotImplemented()  # error: [call-non-callable]
+```

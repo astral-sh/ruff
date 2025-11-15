@@ -218,6 +218,11 @@ jobs:
       - name: Update snapshots
         if: ${{ success() }}
         run: |
+          cargo r \
+          --profile=profiling \
+          -p ty_completion_eval \
+          -- all --tasks ./crates/ty_completion_eval/completion-evaluation-tasks.csv
+
           # The `cargo insta` docs indicate that `--unreferenced=delete` might be a good option,
           # but from local testing it appears to just revert all changes made by `cargo insta test --accept`.
           #
