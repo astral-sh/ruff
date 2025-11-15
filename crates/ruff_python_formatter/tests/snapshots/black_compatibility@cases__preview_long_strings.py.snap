@@ -854,7 +854,7 @@ x = {
  
  long_unmergable_string_with_pragma = (
      "This is a really long string that can't be merged because it has a likely pragma at the end"  # type: ignore
-@@ -468,49 +358,24 @@
+@@ -468,49 +358,26 @@
      " of it."
  )
  
@@ -910,11 +910,13 @@ x = {
 -    f"this is a very very very very long lambda value {x} that doesn't fit on a"
 -    " single line"
 +msg = (
-+    lambda x: f"this is a very very very very long lambda value {x} that doesn't fit on a single line"
++    lambda x: (
++        f"this is a very very very very long lambda value {x} that doesn't fit on a single line"
++    )
  )
  
  dict_with_lambda_values = {
-@@ -522,65 +387,58 @@
+@@ -522,65 +389,58 @@
  
  # Complex string concatenations with a method call in the middle.
  code = (
@@ -998,7 +1000,7 @@ x = {
  )
  
  log.info(
-@@ -588,7 +446,7 @@
+@@ -588,7 +448,7 @@
  )
  
  log.info(
@@ -1007,7 +1009,7 @@ x = {
  )
  
  x = {
-@@ -597,10 +455,10 @@
+@@ -597,10 +457,10 @@
      )
  }
  x = {
@@ -1404,7 +1406,9 @@ string_with_escaped_nameescape = "..............................................
 string_with_escaped_nameescape = "........................................................................... \\N{LAO KO LA}"
 
 msg = (
-    lambda x: f"this is a very very very very long lambda value {x} that doesn't fit on a single line"
+    lambda x: (
+        f"this is a very very very very long lambda value {x} that doesn't fit on a single line"
+    )
 )
 
 dict_with_lambda_values = {

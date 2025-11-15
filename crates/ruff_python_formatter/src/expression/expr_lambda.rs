@@ -1,12 +1,16 @@
+use ruff_formatter::RemoveSoftLinesBuffer;
 use ruff_formatter::write;
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprLambda;
 use ruff_text_size::Ranged;
 
 use crate::comments::dangling_comments;
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parenthesize};
+use crate::expression::{has_own_parentheses, maybe_parenthesize_expression};
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
+use crate::preview::is_force_single_line_lambda_parameters_enabled;
+use crate::preview::is_parenthesize_lambda_bodies_enabled;
 
 #[derive(Default)]
 pub struct FormatExprLambda;
@@ -26,7 +30,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
         write!(f, [token("lambda")])?;
 
         if let Some(parameters) = parameters {
-            // In this context, a dangling comment can either be a comment between the `lambda` the
+            // In this context, a dangling comment can either be a comment between the `lambda` and the
             // parameters, or a comment between the parameters and the body.
             let (dangling_before_parameters, dangling_after_parameters) = dangling
                 .split_at(dangling.partition_point(|comment| comment.end() < parameters.start()));
@@ -37,12 +41,25 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 write!(f, [dangling_comments(dangling_before_parameters)])?;
             }
 
-            write!(
-                f,
-                [parameters
-                    .format()
-                    .with_options(ParametersParentheses::Never)]
-            )?;
+            // Try to keep the parameters on a single line, unless there are intervening comments.
+            if is_force_single_line_lambda_parameters_enabled(f.context())
+                && !comments.contains_comments(parameters.as_ref().into())
+            {
+                let mut buffer = RemoveSoftLinesBuffer::new(f);
+                write!(
+                    buffer,
+                    [parameters
+                        .format()
+                        .with_options(ParametersParentheses::Never)]
+                )?;
+            } else {
+                write!(
+                    f,
+                    [parameters
+                        .format()
+                        .with_options(ParametersParentheses::Never)]
+                )?;
+            }
 
             write!(f, [token(":")])?;
 
@@ -62,7 +79,15 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             }
         }
 
-        write!(f, [body.format()])
+        // Avoid parenthesizing lists, dictionaries, etc.
+        if is_parenthesize_lambda_bodies_enabled(f.context())
+            && has_own_parentheses(body, f.context()).is_none()
+        {
+            maybe_parenthesize_expression(body, item, Parenthesize::IfBreaksParenthesizedNested)
+                .fmt(f)
+        } else {
+            body.format().fmt(f)
+        }
     }
 }
 
