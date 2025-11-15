@@ -455,6 +455,82 @@ m.name = "new"  # No error
 reveal_type(Mutable(name="A") < Mutable(name="B"))  # revealed: bool
 ```
 
+## Other `dataclass` parameters
+
+Other parameters from normal dataclasses can also be set on models created using
+`dataclass_transform`.
+
+### Using function-based transformers
+
+```py
+from typing_extensions import dataclass_transform, TypeVar, Callable
+
+T = TypeVar("T", bound=type)
+
+@dataclass_transform()
+def fancy_model(*, slots: bool = False) -> Callable[[T], T]:
+    raise NotImplementedError
+
+@fancy_model()
+class NoSlots:
+    name: str
+
+NoSlots.__slots__  # error: [unresolved-attribute]
+
+@fancy_model(slots=True)
+class WithSlots:
+    name: str
+
+reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["name"]]
+```
+
+### Using metaclass-based transformers
+
+```py
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+class FancyMeta(type):
+    def __new__(cls, name, bases, namespace, *, slots: bool = False):
+        ...
+        return super().__new__(cls, name, bases, namespace)
+
+class FancyBase(metaclass=FancyMeta): ...
+
+class NoSlots(FancyBase):
+    name: str
+
+# error: [unresolved-attribute]
+NoSlots.__slots__
+
+class WithSlots(FancyBase, slots=True):
+    name: str
+
+reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["name"]]
+```
+
+### Using base-class-based transformers
+
+```py
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+class FancyBase:
+    def __init_subclass__(cls, *, slots: bool = False):
+        ...
+        super().__init_subclass__()
+
+class NoSlots(FancyBase):
+    name: str
+
+NoSlots.__slots__  # error: [unresolved-attribute]
+
+class WithSlots(FancyBase, slots=True):
+    name: str
+
+reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["name"]]
+```
+
 ## `field_specifiers`
 
 The `field_specifiers` argument can be used to specify a list of functions that should be treated

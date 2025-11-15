@@ -35,11 +35,11 @@ use crate::types::generics::{
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::{
-    BoundMethodType, BoundTypeVarIdentity, ClassLiteral, DataclassFlags, DataclassParams,
-    FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    NominalInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
-    TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
-    enums, ide_support, infer_isolated_expression, todo_type,
+    BoundMethodType, BoundTypeVarIdentity, ClassLiteral, DATACLASS_FLAGS, DataclassFlags,
+    DataclassParams, FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType,
+    TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, ide_support, infer_isolated_expression, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
@@ -1134,28 +1134,12 @@ impl<'db> Bindings<'db> {
                                                 );
                                             let mut flags = dataclass_params.flags(db);
 
-                                            if let Ok(Some(Type::BooleanLiteral(order))) =
-                                                overload.parameter_type_by_name("order", false)
-                                            {
-                                                flags.set(DataclassFlags::ORDER, order);
-                                            }
-
-                                            if let Ok(Some(Type::BooleanLiteral(eq))) =
-                                                overload.parameter_type_by_name("eq", false)
-                                            {
-                                                flags.set(DataclassFlags::EQ, eq);
-                                            }
-
-                                            if let Ok(Some(Type::BooleanLiteral(kw_only))) =
-                                                overload.parameter_type_by_name("kw_only", false)
-                                            {
-                                                flags.set(DataclassFlags::KW_ONLY, kw_only);
-                                            }
-
-                                            if let Ok(Some(Type::BooleanLiteral(frozen))) =
-                                                overload.parameter_type_by_name("frozen", false)
-                                            {
-                                                flags.set(DataclassFlags::FROZEN, frozen);
+                                            for (param, flag) in DATACLASS_FLAGS {
+                                                if let Ok(Some(Type::BooleanLiteral(value))) =
+                                                    overload.parameter_type_by_name(param, false)
+                                                {
+                                                    flags.set(*flag, value);
+                                                }
                                             }
 
                                             Type::DataclassDecorator(DataclassParams::new(
