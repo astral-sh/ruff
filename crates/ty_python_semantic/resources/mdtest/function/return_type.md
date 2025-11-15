@@ -466,11 +466,18 @@ def f(cond: bool) -> int:
     return "hello" if cond else NotImplemented
 ```
 
+`NotImplemented` is only special-cased for return types (mirroring the way the interpreter applies
+special casing for the symbol at runtime). It is not generally considered assignable to every other
+type:
+
+```py
+x: int = NotImplemented  # error: [invalid-assignment]
+```
+
 ### Python 3.10+
 
-Unlike Ellipsis, `_NotImplementedType` remains in `builtins.pyi` regardless of the Python version.
-Even if `builtins._NotImplementedType` is fully replaced by `types.NotImplementedType` in the
-future, it should still work as expected.
+We correctly understand the semantics of `NotImplemented` on all Python versions, even though the
+class `types.NotImplementedType` is only exposed in the `types` module on Python 3.10+.
 
 ```toml
 [environment]
