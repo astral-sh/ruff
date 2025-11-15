@@ -1246,6 +1246,20 @@ nested: Node = {"name": "n1", "parent": {"name": "n2", "parent": {"name": "n3", 
 nested_invalid: Node = {"name": "n1", "parent": {"name": "n2", "parent": {"name": 3, "parent": None}}}
 ```
 
+Structural assignment works for recursive `TypedDict`s too:
+
+```py
+class Person(TypedDict):
+    name: str
+    parent: Person | None
+
+def _(node: Node, person: Person):
+    _: Person = node
+    _: Node = person
+
+_: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charlie", parent=None)))
+```
+
 ## Function/assignment syntax
 
 This is not yet supported. Make sure that we do not emit false positives for this syntax:
