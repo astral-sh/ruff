@@ -17,16 +17,19 @@ const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("numpy", "np"),
     ("numpy.typing", "npt"),
     ("pandas", "pd"),
+    ("plotly.express", "px"),
     ("seaborn", "sns"),
     ("tensorflow", "tf"),
     ("tkinter", "tk"),
     ("holoviews", "hv"),
     ("panel", "pn"),
-    ("plotly.express", "px"),
     ("polars", "pl"),
     ("pyarrow", "pa"),
     ("xml.etree.ElementTree", "ET"),
 ];
+
+const PREVIEW_ALIASES: &[(&str, &str)] =
+    &[("plotly.graph_objects", "go"), ("statsmodels.api", "sm")];
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -71,6 +74,32 @@ pub fn default_aliases() -> FxHashMap<String, String> {
         .iter()
         .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
         .collect::<FxHashMap<_, _>>()
+}
+
+pub fn preview_aliases() -> FxHashMap<String, String> {
+    PREVIEW_ALIASES
+        .iter()
+        .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+        .collect::<FxHashMap<_, _>>()
+}
+
+pub fn preview_banned_aliases() -> FxHashMap<String, BannedAliases> {
+    FxHashMap::from_iter([(
+        "geopandas".to_string(),
+        BannedAliases::from_iter(["gpd".to_string()]),
+    )])
+}
+
+impl Settings {
+    /// Merge preview aliases and banned aliases into the settings if preview mode is enabled.
+    #[must_use]
+    pub fn with_preview(mut self, preview_enabled: bool) -> Self {
+        if preview_enabled {
+            self.aliases.extend(preview_aliases());
+            self.banned_aliases.extend(preview_banned_aliases());
+        }
+        self
+    }
 }
 
 impl Default for Settings {

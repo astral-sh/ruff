@@ -6,7 +6,8 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_import_conventions::settings::BannedAliases;
+use crate::preview::is_import_conventions_preview_enabled;
+use crate::rules::flake8_import_conventions::settings::{BannedAliases, preview_banned_aliases};
 
 /// ## What it does
 /// Checks for imports that use non-standard naming conventions, like
@@ -56,7 +57,17 @@ pub(crate) fn banned_import_alias(
     asname: &str,
     banned_conventions: &FxHashMap<String, BannedAliases>,
 ) {
-    if let Some(banned_aliases) = banned_conventions.get(name) {
+    // Merge preview banned aliases if preview mode is enabled
+    let banned_aliases = if is_import_conventions_preview_enabled(checker.settings()) {
+        banned_conventions.get(name).cloned().or_else(|| {
+            let preview_banned = preview_banned_aliases();
+            preview_banned.get(name).cloned()
+        })
+    } else {
+        banned_conventions.get(name).cloned()
+    };
+
+    if let Some(banned_aliases) = banned_aliases.as_ref() {
         if banned_aliases
             .iter()
             .any(|banned_alias| banned_alias == asname)
