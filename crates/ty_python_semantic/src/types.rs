@@ -622,6 +622,19 @@ bitflags! {
     }
 }
 
+pub(crate) const DATACLASS_FLAGS: &[(&str, DataclassFlags)] = &[
+    ("init", DataclassFlags::INIT),
+    ("repr", DataclassFlags::REPR),
+    ("eq", DataclassFlags::EQ),
+    ("order", DataclassFlags::ORDER),
+    ("unsafe_hash", DataclassFlags::UNSAFE_HASH),
+    ("frozen", DataclassFlags::FROZEN),
+    ("match_args", DataclassFlags::MATCH_ARGS),
+    ("kw_only", DataclassFlags::KW_ONLY),
+    ("slots", DataclassFlags::SLOTS),
+    ("weakref_slot", DataclassFlags::WEAKREF_SLOT),
+];
+
 impl get_size2::GetSize for DataclassFlags {}
 
 impl Default for DataclassFlags {
