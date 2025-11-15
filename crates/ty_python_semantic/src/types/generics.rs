@@ -474,11 +474,6 @@ impl<'db> GenericContext<'db> {
         self.specialize(db, types.into())
     }
 
-    /// Returns a tuple type of the typevars introduced by this generic context.
-    pub(crate) fn as_tuple(self, db: &'db dyn Db) -> Type<'db> {
-        Type::heterogeneous_tuple(db, self.variables(db).map(Type::TypeVar))
-    }
-
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
         let other_variables = other.variables_inner(db);
         self.variables(db)
@@ -624,7 +619,12 @@ impl std::fmt::Display for LegacyGenericBase {
 ///
 /// TODO: Handle nested specializations better, with actual parent links to the specialization of
 /// the lexically containing context.
+///
+/// # Ordering
+/// Ordering is based on the context's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the context was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
 pub struct Specialization<'db> {
     pub(crate) generic_context: GenericContext<'db>,
     #[returns(deref)]

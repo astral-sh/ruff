@@ -21,14 +21,14 @@ class TypeVarAndParamSpec(Generic[P, T]): ...
 class SingleTypeVarTuple(Generic[Unpack[Ts]]): ...
 class TypeVarAndTypeVarTuple(Generic[T, Unpack[Ts]]): ...
 
-# revealed: tuple[T@SingleTypevar]
+# revealed: ty_extensions.GenericContext[T@SingleTypevar]
 reveal_type(generic_context(SingleTypevar))
-# revealed: tuple[T@MultipleTypevars, S@MultipleTypevars]
+# revealed: ty_extensions.GenericContext[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
 
-# revealed: tuple[P@SingleParamSpec]
+# revealed: ty_extensions.GenericContext[P@SingleParamSpec]
 reveal_type(generic_context(SingleParamSpec))
-# revealed: tuple[P@TypeVarAndParamSpec, T@TypeVarAndParamSpec]
+# revealed: ty_extensions.GenericContext[P@TypeVarAndParamSpec, T@TypeVarAndParamSpec]
 reveal_type(generic_context(TypeVarAndParamSpec))
 
 # TODO: support `TypeVarTuple` properly (these should not reveal `None`)
@@ -66,9 +66,9 @@ class InheritedGeneric(MultipleTypevars[T, S]): ...
 class InheritedGenericPartiallySpecialized(MultipleTypevars[T, int]): ...
 class InheritedGenericFullySpecialized(MultipleTypevars[str, int]): ...
 
-# revealed: tuple[T@InheritedGeneric, S@InheritedGeneric]
+# revealed: ty_extensions.GenericContext[T@InheritedGeneric, S@InheritedGeneric]
 reveal_type(generic_context(InheritedGeneric))
-# revealed: tuple[T@InheritedGenericPartiallySpecialized]
+# revealed: ty_extensions.GenericContext[T@InheritedGenericPartiallySpecialized]
 reveal_type(generic_context(InheritedGenericPartiallySpecialized))
 # revealed: None
 reveal_type(generic_context(InheritedGenericFullySpecialized))
@@ -90,7 +90,7 @@ class OuterClass(Generic[T]):
         # revealed: None
         reveal_type(generic_context(InnerClassInMethod))
 
-# revealed: tuple[T@OuterClass]
+# revealed: ty_extensions.GenericContext[T@OuterClass]
 reveal_type(generic_context(OuterClass))
 ```
 
@@ -118,11 +118,11 @@ class ExplicitInheritedGenericPartiallySpecializedExtraTypevar(MultipleTypevars[
 # error: [invalid-generic-class] "`Generic` base class must include all type variables used in other base classes"
 class ExplicitInheritedGenericPartiallySpecializedMissingTypevar(MultipleTypevars[T, int], Generic[S]): ...
 
-# revealed: tuple[T@ExplicitInheritedGeneric, S@ExplicitInheritedGeneric]
+# revealed: ty_extensions.GenericContext[T@ExplicitInheritedGeneric, S@ExplicitInheritedGeneric]
 reveal_type(generic_context(ExplicitInheritedGeneric))
-# revealed: tuple[T@ExplicitInheritedGenericPartiallySpecialized]
+# revealed: ty_extensions.GenericContext[T@ExplicitInheritedGenericPartiallySpecialized]
 reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))
-# revealed: tuple[T@ExplicitInheritedGenericPartiallySpecializedExtraTypevar, S@ExplicitInheritedGenericPartiallySpecializedExtraTypevar]
+# revealed: ty_extensions.GenericContext[T@ExplicitInheritedGenericPartiallySpecializedExtraTypevar, S@ExplicitInheritedGenericPartiallySpecializedExtraTypevar]
 reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))
 ```
 
@@ -594,18 +594,27 @@ class C(Generic[T]):
     def generic_method(self, t: T, u: U) -> U:
         return u
 
-reveal_type(generic_context(C))  # revealed: tuple[T@C]
-reveal_type(generic_context(C.method))  # revealed: tuple[Self@method]
-reveal_type(generic_context(C.generic_method))  # revealed: tuple[Self@generic_method, U@generic_method]
-reveal_type(generic_context(C[int]))  # revealed: None
-reveal_type(generic_context(C[int].method))  # revealed: tuple[Self@method]
-reveal_type(generic_context(C[int].generic_method))  # revealed: tuple[Self@generic_method, U@generic_method]
+# revealed: ty_extensions.GenericContext[T@C]
+reveal_type(generic_context(C))
+# revealed: ty_extensions.GenericContext[Self@method]
+reveal_type(generic_context(C.method))
+# revealed: ty_extensions.GenericContext[Self@generic_method, U@generic_method]
+reveal_type(generic_context(C.generic_method))
+# revealed: None
+reveal_type(generic_context(C[int]))
+# revealed: ty_extensions.GenericContext[Self@method]
+reveal_type(generic_context(C[int].method))
+# revealed: ty_extensions.GenericContext[Self@generic_method, U@generic_method]
+reveal_type(generic_context(C[int].generic_method))
 
 c: C[int] = C[int]()
 reveal_type(c.generic_method(1, "string"))  # revealed: Literal["string"]
-reveal_type(generic_context(c))  # revealed: None
-reveal_type(generic_context(c.method))  # revealed: tuple[Self@method]
-reveal_type(generic_context(c.generic_method))  # revealed: tuple[Self@generic_method, U@generic_method]
+# revealed: None
+reveal_type(generic_context(c))
+# revealed: ty_extensions.GenericContext[Self@method]
+reveal_type(generic_context(c.method))
+# revealed: ty_extensions.GenericContext[Self@generic_method, U@generic_method]
+reveal_type(generic_context(c.generic_method))
 ```
 
 ## Specializations propagate
