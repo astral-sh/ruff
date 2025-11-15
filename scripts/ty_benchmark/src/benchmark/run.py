@@ -5,12 +5,14 @@ import json
 import logging
 import tempfile
 import typing
+import subprocess
 from pathlib import Path
 
 from benchmark import Hyperfine
 from benchmark.cases import Benchmark, Mypy, Pyright, Tool, Ty, Venv
-from benchmark.projects import ALL as all_projects
+from benchmark.projects import ALL as all_projects, Project
 from benchmark.projects import DEFAULT as default_projects
+from benchmark.error_count import ErrorCountSummary
 
 if typing.TYPE_CHECKING:
     from benchmark.cases import Tool
@@ -115,6 +117,8 @@ def main() -> None:
         if project.name in (args.project or default_projects)
     ]
 
+    error_count_summary = ErrorCountSummary()
+
     for project in projects:
         with tempfile.TemporaryDirectory() as tempdir:
             cwd = Path(tempdir)
@@ -140,7 +144,17 @@ def main() -> None:
                 if not commands:
                     continue
 
-                print(f"{project.name} ({benchmark.value})")
+                name = f"{project.name} ({benchmark.value})"
+                print(name)
+
+                if args.ty:
+                    error_count = count_errors_produced_by_ty(
+                        benchmark=benchmark,
+                        project=project,
+                        venv=venv,
+                        cwd=cwd,
+                    )
+                    error_count_summary.error_counts[name] = error_count
 
                 hyperfine = Hyperfine(
                     name=f"{project.name}-{benchmark.value}",
@@ -151,3 +165,26 @@ def main() -> None:
                     json=False,
                 )
                 hyperfine.run(cwd=cwd)
+
+    root = Path(__file__).parent
+    old_error_count_summary = ErrorCountSummary.from_json(root / "error_count.json")
+    error_count_summary.print_comparison(old_error_count_summary)
+
+    path = root / "new_error_count.json"
+    error_count_summary.write_json(path)
+    print(f"Saved new error count summary to {path}")
+
+
+def count_errors_produced_by_ty(
+    benchmark: Benchmark, project: Project, venv: Venv, cwd: Path | None = None
+) -> int:
+    ty = Ty()
+    command = ty.command(benchmark, project, venv)
+    output = subprocess.run(
+        command.command + ["--output-format=concise"],
+        cwd=cwd,
+        capture_output=True,
+    )
+    decoded_output = output.stdout.decode("utf-8")
+    error_count = len(decoded_output.splitlines())
+    return error_count
