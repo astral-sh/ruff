@@ -121,8 +121,16 @@ reacquires it afterwards.
     def __getitem__(self, name_or_ordinal: str) -> _NamedFuncPointer: ...
 
 if sys.platform == "win32":
-    class OleDLL(CDLL): ...
-    class WinDLL(CDLL): ...
+    class OleDLL(CDLL):
+        """This class represents a dll exporting functions using the
+Windows stdcall calling convention, and returning HRESULT.
+HRESULT error values are automatically raised as OSError
+exceptions.
+"""
+    class WinDLL(CDLL):
+        """This class represents a dll exporting functions using the
+Windows stdcall calling convention.
+"""
 
 class PyDLL(CDLL):
     """This class represents the Python library itself.  It allows
