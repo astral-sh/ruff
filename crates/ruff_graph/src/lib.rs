@@ -30,6 +30,7 @@ impl ModuleImports {
         path: &SystemPath,
         package: Option<&SystemPath>,
         string_imports: StringImports,
+        exclude_type_checking_imports: bool,
     ) -> Result<Self> {
         // Parse the source code.
         let parsed = parse(source, ParseOptions::from(source_type))?;
@@ -44,6 +45,11 @@ impl ModuleImports {
         // Resolve the imports.
         let mut resolved_imports = ModuleImports::default();
         for import in imports {
+            // Skip type-checking imports if requested
+            if exclude_type_checking_imports && import.type_checking {
+                continue;
+            }
+
             for resolved in Resolver::new(db).resolve(import) {
                 if let Some(path) = resolved.as_system_path() {
                     resolved_imports.insert(path.to_path_buf());
