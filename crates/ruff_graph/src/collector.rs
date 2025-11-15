@@ -76,7 +76,11 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                     }
 
                     if let Some(module_name) = ModuleName::from_components(components) {
-                        self.imports.push(CollectedImport::ImportFrom(module_name));
+                        self.imports.push(CollectedImport {
+                            module_name,
+                            import_kind: ImportKind::ImportFrom,
+                            type_checking: false,
+                        });
                     }
                 }
             }
@@ -87,7 +91,11 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
             }) => {
                 for alias in names {
                     if let Some(module_name) = ModuleName::new(alias.name.as_str()) {
-                        self.imports.push(CollectedImport::Import(module_name));
+                        self.imports.push(CollectedImport {
+                            module_name,
+                            import_kind: ImportKind::Import,
+                            type_checking: false,
+                        });
                     }
                 }
             }
@@ -142,7 +150,11 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                         >= self.string_imports.min_dots
                 {
                     if let Some(module_name) = ModuleName::new(value) {
-                        self.imports.push(CollectedImport::Import(module_name));
+                        self.imports.push(CollectedImport {
+                            module_name,
+                            import_kind: ImportKind::Import,
+                            type_checking: false,
+                        });
                     }
                 }
             }
@@ -153,9 +165,17 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
 }
 
 #[derive(Debug)]
-pub(crate) enum CollectedImport {
+pub(crate) enum ImportKind {
     /// The import was part of an `import` statement.
-    Import(ModuleName),
+    Import,
     /// The import was part of an `import from` statement.
-    ImportFrom(ModuleName),
+    ImportFrom,
+}
+
+#[derive(Debug)]
+pub(crate) struct CollectedImport {
+    pub(crate) module_name: ModuleName,
+    pub(crate) import_kind: ImportKind,
+    /// The import was part of a `TYPE_CHECKING` conditional
+    pub(crate) type_checking: bool,
 }
