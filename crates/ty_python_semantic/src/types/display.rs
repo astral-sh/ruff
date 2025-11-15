@@ -603,6 +603,18 @@ impl Display for DisplayRepresentation<'_> {
                 }
                 f.write_str("]")
             }
+            Type::TypeGuard(type_guard) => {
+                f.write_str("TypeGuard[")?;
+                type_guard
+                    .return_type(self.db)
+                    .display_with(self.db, self.settings.singleline())
+                    .fmt(f)?;
+                if let Some(name) = type_guard.place_name(self.db) {
+                    f.write_str(" @ ")?;
+                    f.write_str(&name)?;
+                }
+                f.write_str("]")
+            }
             Type::TypedDict(typed_dict) => typed_dict
                 .defining_class()
                 .class_literal(self.db)
