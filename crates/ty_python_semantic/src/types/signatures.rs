@@ -1216,15 +1216,17 @@ impl<'db> ParamSpecOrigin<'db> {
     }
 }
 
+/// The kind of parameter list represented.
+// TODO: the spec also allows signatures like `Concatenate[int, ...]`, which have some number
+// of required positional parameters followed by a gradual form. Our representation will need
+// some adjustments to represent that.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum ParametersKind<'db> {
+    /// A standard parameter list.
     #[default]
     Standard,
 
-    /// Whether this parameter list represents a gradual form using `...` as the only parameter.
-    ///
-    /// If this is `true`, the `value` will still contain the variadic and keyword-variadic
-    /// parameters.
+    /// Represents a gradual parameter list using `...` as the only parameter.
     ///
     /// Per [the typing specification], any signature with a variadic and a keyword-variadic
     /// argument, both annotated (explicitly or implicitly) as `Any` or `Unknown`, is considered
@@ -1235,14 +1237,10 @@ pub(crate) enum ParametersKind<'db> {
     ///
     /// Note: This flag can also result from invalid forms of `Callable` annotations.
     ///
-    /// TODO: the spec also allows signatures like `Concatenate[int, ...]`, which have some number
-    /// of required positional parameters followed by a gradual form. Our representation will need
-    /// some adjustments to represent that.
-    ///
-    ///   [the typing specification]: https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable
+    /// [the typing specification]: https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable
     Gradual,
 
-    // TODO: Need to store the name of the paramspec variable for the display implementation.
+    /// Represents a `ParamSpec` parameter list.
     ParamSpec(ParamSpecOrigin<'db>),
 }
 
