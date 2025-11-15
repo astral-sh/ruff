@@ -99,10 +99,30 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
             Stmt::Import(stmt) => {
                 self.collect_import(stmt, false);
             }
+            Stmt::If(ast::StmtIf { test, body, .. }) => {
+                if is_type_checking_condition(test) {
+                    // Collect all imports from the body with type_checking: true
+                    for stmt in body {
+                        match stmt {
+                            Stmt::Import(stmt) => {
+                                self.collect_import(stmt, true);
+                            }
+                            Stmt::ImportFrom(stmt) => {
+                                self.collect_import_from(stmt, true);
+                            }
+                            _ => {
+                                // Ignore non-import statements in TYPE_CHECKING blocks
+                            }
+                        }
+                    }
+                } else {
+                    // Regular if statement, traverse normally
+                    walk_stmt(self, stmt);
+                }
+            }
             Stmt::FunctionDef(_)
             | Stmt::ClassDef(_)
             | Stmt::While(_)
-            | Stmt::If(_)
             | Stmt::With(_)
             | Stmt::Match(_)
             | Stmt::Try(_)
