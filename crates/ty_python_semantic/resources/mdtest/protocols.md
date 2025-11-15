@@ -2099,18 +2099,14 @@ static_assert(is_equivalent_to(LegacyFunctionScoped, NewStyleFunctionScoped))  #
 
 static_assert(is_assignable_to(NominalNewStyle, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalNewStyle, LegacyFunctionScoped))
-# TODO: should pass
-static_assert(is_subtype_of(NominalNewStyle, NewStyleFunctionScoped))  # error: [static-assert-error]
-# TODO: should pass
-static_assert(is_subtype_of(NominalNewStyle, LegacyFunctionScoped))  # error: [static-assert-error]
+static_assert(is_subtype_of(NominalNewStyle, NewStyleFunctionScoped))
+static_assert(is_subtype_of(NominalNewStyle, LegacyFunctionScoped))
 static_assert(not is_assignable_to(NominalNewStyle, UsesSelf))
 
 static_assert(is_assignable_to(NominalLegacy, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalLegacy, LegacyFunctionScoped))
-# TODO: should pass
-static_assert(is_subtype_of(NominalLegacy, NewStyleFunctionScoped))  # error: [static-assert-error]
-# TODO: should pass
-static_assert(is_subtype_of(NominalLegacy, LegacyFunctionScoped))  # error: [static-assert-error]
+static_assert(is_subtype_of(NominalLegacy, NewStyleFunctionScoped))
+static_assert(is_subtype_of(NominalLegacy, LegacyFunctionScoped))
 static_assert(not is_assignable_to(NominalLegacy, UsesSelf))
 
 static_assert(not is_assignable_to(NominalWithSelf, NewStyleFunctionScoped))
