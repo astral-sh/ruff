@@ -15,7 +15,7 @@ const PYODIDE_EXCLUDE = [
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss(), viteStaticCopyPyodide()],
-  optimizeDeps: { exclude: ["pyodide"] },
+  optimizeDeps: { exclude: ["pyodide", "ty_wasm"] },
 });
 
 export function viteStaticCopyPyodide() {
@@ -23,7 +23,7 @@ export function viteStaticCopyPyodide() {
   return viteStaticCopy({
     targets: [
       {
-        src: [join(pyodideDir, "*"), ...PYODIDE_EXCLUDE],
+        src: [join(pyodideDir, "*").replace(/\\/g, "/"), ...PYODIDE_EXCLUDE],
         dest: "assets",
       },
     ],
