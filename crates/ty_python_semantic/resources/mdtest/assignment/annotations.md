@@ -482,17 +482,14 @@ class TD2(TypedDict):
     x: str
 
 def f(self, dt: dict[str, Any], key: str):
-    # TODO: This should not error once typed dict assignability is implemented.
-    # error: [invalid-assignment]
     x1: TD = dt.get(key, {})
-    reveal_type(x1)  # revealed: TD
+    reveal_type(x1)  # revealed: Any
 
     x2: TD = dt.get(key, {"x": 0})
     reveal_type(x2)  # revealed: Any
 
     x3: TD | None = dt.get(key, {})
-    # TODO: This should reveal `Any` once typed dict assignability is implemented.
-    reveal_type(x3)  # revealed: Any | None
+    reveal_type(x3)  # revealed: Any
 
     x4: TD | None = dt.get(key, {"x": 0})
     reveal_type(x4)  # revealed: Any

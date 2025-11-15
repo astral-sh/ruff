@@ -2078,11 +2078,14 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(false)
             }
 
-            (Type::TypedDict(_), _) => {
-                // TODO: Implement assignability and subtyping for TypedDict
-                ConstraintSet::from(relation.is_assignability())
-            }
-
+            (Type::TypedDict(self_typeddict), _) => self_typeddict.has_relation_to_impl(
+                db,
+                target,
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            ),
             // A non-`TypedDict` cannot subtype a `TypedDict`
             (_, Type::TypedDict(_)) => ConstraintSet::from(false),
 

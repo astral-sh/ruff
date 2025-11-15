@@ -460,6 +460,7 @@ and their types, rather than the class hierarchy:
 
 ```py
 from typing import TypedDict
+from typing_extensions import ReadOnly
 
 class Person(TypedDict):
     name: str
@@ -468,10 +469,117 @@ class Employee(TypedDict):
     name: str
     employee_id: int
 
-p1: Person = Employee(name="Alice", employee_id=1)
+class Robot(TypedDict):
+    name: int
 
-# TODO: this should be an error
-e1: Employee = Person(name="Eve")
+_: Person = Employee(name="Alice", employee_id=1)
+
+# error: [invalid-assignment] "Object of type `Person` is not assignable to `Employee`"
+_: Employee = Person(name="Eve")
+
+# error: [invalid-assignment] "Object of type `Robot` is not assignable to `Person`"
+_: Person = Robot(name=0xDEADC0DE)
+# error: [invalid-assignment] "Object of type `Person` is not assignable to `Robot`"
+_: Robot = Person(name="Del Spooner")
+```
+
+Required keys in the target must also be required in the source. This includes explicitly
+`NotRequired` keys and also all the keys in a `TypedDict` with `total=False`. If a key is
+`NotRequired` and also mutable in the target, then it must be `NotRequired` in the source too
+(because `del` is allowed on that key the target):
+
+```py
+from typing_extensions import NotRequired
+
+class Spy(TypedDict):
+    name: NotRequired[str]
+
+# invalid because `Spy` might be missing `name`
+# error: [invalid-assignment] "Object of type `Spy` is not assignable to `Person`"
+_: Person = Spy(name="Powers, Austin Powers")
+
+# invalid because `Spy` is allowed to delete `name`, while `Person` is not
+# error: [invalid-assignment] "Object of type `Person` is not assignable to `Spy`"
+_: Spy = Person(name="Bond, James Bond")
+
+class Amnesiac(TypedDict, total=False):
+    name: ReadOnly[str]
+
+# invalid because `Amnesiac` might be missing `name`
+# error: [invalid-assignment] "Object of type `Amnesiac` is not assignable to `Person`"
+_: Person = Amnesiac()
+
+# Allowed. `Amnesiac` can't delete `name`, because it's read-only.
+_: Amnesiac = Person(name="Jason Bourne")
+```
+
+If the target item is read-only, then the source item can have any assignable type. But if the
+target is mutable, the source type must match exactly. The required and not-required cases are
+different codepaths, so we need test all the permutations:
+
+```py
+from typing import Any
+from typing_extensions import ReadOnly
+
+class RequiredMutableInt(TypedDict):
+    x: int
+
+class RequiredReadOnlyInt(TypedDict):
+    x: ReadOnly[int]
+
+class NotRequiredMutableInt(TypedDict):
+    x: NotRequired[int]
+
+class NotRequiredReadOnlyInt(TypedDict):
+    x: NotRequired[ReadOnly[int]]
+
+class RequiredMutableBool(TypedDict):
+    x: bool
+
+class RequiredReadOnlyBool(TypedDict):
+    x: ReadOnly[bool]
+
+class NotRequiredMutableBool(TypedDict):
+    x: NotRequired[bool]
+
+class NotRequiredReadOnlyBool(TypedDict):
+    x: NotRequired[ReadOnly[bool]]
+
+_: RequiredMutableInt = RequiredMutableInt(x=1)
+_: RequiredMutableInt = RequiredReadOnlyInt(x=1)  # error: [invalid-assignment]
+_: RequiredMutableInt = NotRequiredMutableInt(x=1)  # error: [invalid-assignment]
+_: RequiredMutableInt = NotRequiredReadOnlyInt(x=1)  # error: [invalid-assignment]
+_: RequiredMutableInt = RequiredMutableBool(x=True)  # error: [invalid-assignment]
+_: RequiredMutableInt = RequiredReadOnlyBool(x=True)  # error: [invalid-assignment]
+_: RequiredMutableInt = NotRequiredMutableBool(x=True)  # error: [invalid-assignment]
+_: RequiredMutableInt = NotRequiredReadOnlyBool(x=True)  # error: [invalid-assignment]
+
+_: RequiredReadOnlyInt = RequiredMutableInt(x=1)
+_: RequiredReadOnlyInt = RequiredReadOnlyInt(x=1)
+_: RequiredReadOnlyInt = NotRequiredMutableInt(x=1)  # error: [invalid-assignment]
+_: RequiredReadOnlyInt = NotRequiredReadOnlyInt(x=1)  # error: [invalid-assignment]
+_: RequiredReadOnlyInt = RequiredMutableBool(x=True)
+_: RequiredReadOnlyInt = RequiredReadOnlyBool(x=True)
+_: RequiredReadOnlyInt = NotRequiredMutableBool(x=True)  # error: [invalid-assignment]
+_: RequiredReadOnlyInt = NotRequiredReadOnlyBool(x=True)  # error: [invalid-assignment]
+
+_: NotRequiredMutableInt = RequiredMutableInt(x=1)  # error: [invalid-assignment]
+_: NotRequiredMutableInt = RequiredReadOnlyInt(x=1)  # error: [invalid-assignment]
+_: NotRequiredMutableInt = NotRequiredMutableInt(x=1)
+_: NotRequiredMutableInt = NotRequiredReadOnlyInt(x=1)  # error: [invalid-assignment]
+_: NotRequiredMutableInt = RequiredMutableBool(x=True)  # error: [invalid-assignment]
+_: NotRequiredMutableInt = RequiredReadOnlyBool(x=True)  # error: [invalid-assignment]
+_: NotRequiredMutableInt = NotRequiredMutableBool(x=True)  # error: [invalid-assignment]
+_: NotRequiredMutableInt = NotRequiredReadOnlyBool(x=True)  # error: [invalid-assignment]
+
+_: NotRequiredReadOnlyInt = RequiredMutableInt(x=1)
+_: NotRequiredReadOnlyInt = RequiredReadOnlyInt(x=1)
+_: NotRequiredReadOnlyInt = NotRequiredMutableInt(x=1)
+_: NotRequiredReadOnlyInt = NotRequiredReadOnlyInt(x=1)
+_: NotRequiredReadOnlyInt = RequiredMutableBool(x=True)
+_: NotRequiredReadOnlyInt = RequiredReadOnlyBool(x=True)
+_: NotRequiredReadOnlyInt = NotRequiredMutableBool(x=True)
+_: NotRequiredReadOnlyInt = NotRequiredReadOnlyBool(x=True)
 ```
 
 All typed dictionaries can be assigned to `Mapping[str, object]`:
@@ -483,10 +591,20 @@ class Person(TypedDict):
     name: str
     age: int | None
 
-m: Mapping[str, object] = Person(name="Alice", age=30)
+alice = Person(name="Alice", age=30)
+# Always assignable.
+_: Mapping[str, object] = alice
+# Follows from above.
+_: Mapping[str, Any] = alice
+# Not assignable.
+# error: [invalid-assignment] "Object of type `Person` is not assignable to `Mapping[str, int]`"
+_: Mapping[str, int] = alice
+# TODO: Could be assignable once we support `closed=True` and/or `extra_items`.
+# error: [invalid-assignment]
+_: Mapping[str, str | int | None] = alice
 ```
 
-They can *not* be assigned to `dict[str, object]`, as that would allow them to be mutated in unsafe
+They *cannot* be assigned to `dict[str, object]`, as that would allow them to be mutated in unsafe
 ways:
 
 ```py
@@ -500,7 +618,7 @@ class Person(TypedDict):
 
 alice: Person = {"name": "Alice"}
 
-# TODO: this should be an invalid-assignment error
+# error: [invalid-argument-type] "Argument to function `dangerous` is incorrect: Expected `dict[str, object]`, found `Person`"
 dangerous(alice)
 
 reveal_type(alice["name"])  # revealed: str
@@ -513,6 +631,138 @@ alice: dict[str, str] = {"name": "Alice"}
 
 # error: [invalid-assignment] "Object of type `dict[str, str]` is not assignable to `Person`"
 alice: Person = alice
+```
+
+## A subtle interaction between two structural assignability rules prevents unsoundness
+
+> For the purposes of these conditions, an open `TypedDict` is treated as if it had **read-only**
+> extra items of type `object`.
+
+That language is at the top of [subtyping section of the `TypedDict` spec][subtyping section]. It
+sounds like an obscure technicality, especially since `extra_items` is still TODO, but it has an
+important interaction with another rule:
+
+> For each item in [the destination type]...If it is non-required...If it is mutable...If \[the
+> source type does not have an item with the same key and also\] has extra items, the extra items
+> type **must not be read-only**...
+
+In other words, by default (`closed=False`) a `TypedDict` cannot be assigned to a different
+`TypedDict` that has an additional, optional, mutable item. That implicit rule turns out to be the
+only thing standing in the way of this unsound example:
+
+```py
+from typing_extensions import TypedDict, NotRequired
+
+class C(TypedDict):
+    x: int
+    y: str
+
+class B(TypedDict):
+    x: int
+
+class A(TypedDict):
+    x: int
+    y: NotRequired[object]  # incompatible with both C and (surprisingly!) B
+
+def b_from_c(c: C) -> B:
+    return c  # allowed
+
+def a_from_b(b: B) -> A:
+    # error: [invalid-return-type] "Return type does not match returned value: expected `A`, found `B`"
+    return b
+
+# The [invalid-return-type] error above is the only thing that keeps us from corrupting the type of c['y'].
+c: C = {"x": 1, "y": "hello"}
+a: A = a_from_b(b_from_c(c))
+a["y"] = 42
+```
+
+If the additional, optional item in the target is read-only, the requirements are *somewhat*
+relaxed. In this case, because the source might contain have undeclared extra items of any type, the
+target item must be assignable from `object`:
+
+```py
+from typing_extensions import ReadOnly
+
+class A2(TypedDict):
+    x: int
+    y: NotRequired[ReadOnly[object]]
+
+def a2_from_b(b: B) -> A2:
+    return b  # allowed
+
+class A3(TypedDict):
+    x: int
+    y: NotRequired[ReadOnly[int]]  # not assignable from `object`
+
+def a3_from_b(b: B) -> A3:
+    return b  # error: [invalid-return-type]
+```
+
+## Structural assignability supports `TypedDict`s that contain other `TypedDict`s
+
+```py
+from typing_extensions import TypedDict, ReadOnly, NotRequired
+
+class Inner1(TypedDict):
+    name: str
+
+class Inner2(TypedDict):
+    name: str
+
+class Outer1(TypedDict):
+    a: Inner1
+    b: ReadOnly[Inner1]
+    c: NotRequired[Inner1]
+    d: ReadOnly[NotRequired[Inner1]]
+
+class Outer2(TypedDict):
+    a: Inner2
+    b: ReadOnly[Inner2]
+    c: NotRequired[Inner2]
+    d: ReadOnly[NotRequired[Inner2]]
+
+def _(o1: Outer1, o2: Outer2):
+    _: Outer1 = o2
+    _: Outer2 = o1
+```
+
+This also extends to gradual types:
+
+```py
+from typing import Any
+
+class Inner3(TypedDict):
+    name: Any
+
+class Outer3(TypedDict):
+    a: Inner3
+    b: ReadOnly[Inner3]
+    c: NotRequired[Inner3]
+    d: ReadOnly[NotRequired[Inner3]]
+
+class Outer4(TypedDict):
+    a: Any
+    b: ReadOnly[Any]
+    c: NotRequired[Any]
+    d: ReadOnly[NotRequired[Any]]
+
+def _(o1: Outer1, o2: Outer2, o3: Outer3, o4: Outer4):
+    _: Outer1 = o3
+    _: Outer1 = o4
+
+    _: Outer2 = o3
+    _: Outer2 = o4
+
+    _: Outer3 = o1
+    _: Outer3 = o2
+    _: Outer3 = o3
+    _: Outer3 = o4
+
+    _: Outer4 = o1
+    _: Outer4 = o2
+    _: Outer4 = o3
+    _: Outer4 = o4
 ```
 
 ## Key-based access
@@ -561,10 +811,10 @@ def _(
 
     reveal_type(being["name"])  # revealed: str
 
-    # TODO: A type of `int | None | Unknown` might be better here. The `str` is mixed in
-    # because `Animal.__getitem__` can only return `str`.
+    # TODO: A type of `int | None | Unknown` might be better here. `str` is because
+    # `Person | Animal` reduces to `Animal`, and `Animal.__getitem__` can only return `str`.
     # error: [invalid-key] "Invalid key for TypedDict `Animal`"
-    reveal_type(being["age"])  # revealed: int | None | str
+    reveal_type(being["age"])  # revealed: str
 ```
 
 ### Writing
@@ -835,8 +1085,7 @@ def combine(p: Person, e: Employee):
     reveal_type(p | p)  # revealed: Person
     reveal_type(e | e)  # revealed: Employee
 
-    # TODO: Should be `Person` once we support subtyping for TypedDicts
-    reveal_type(p | e)  # revealed: Person | Employee
+    reveal_type(p | e)  # revealed: Person
 ```
 
 When inheriting from a `TypedDict` with a different `total` setting, inherited fields maintain their
@@ -995,6 +1244,20 @@ nested: Node = {"name": "n1", "parent": {"name": "n2", "parent": {"name": "n3", 
 
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Node`: value of type `Literal[3]`"
 nested_invalid: Node = {"name": "n1", "parent": {"name": "n2", "parent": {"name": 3, "parent": None}}}
+```
+
+Structural assignment works for recursive `TypedDict`s too:
+
+```py
+class Person(TypedDict):
+    name: str
+    parent: Person | None
+
+def _(node: Node, person: Person):
+    _: Person = node
+    _: Node = person
+
+_: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charlie", parent=None)))
 ```
 
 ## Function/assignment syntax
@@ -1165,4 +1428,5 @@ reveal_type(actual_td)  # revealed: ActualTypedDict
 reveal_type(actual_td["name"])  # revealed: str
 ```
 
+[subtyping section]: https://typing.python.org/en/latest/spec/typeddict.html#subtyping-between-typeddict-types
 [`typeddict`]: https://typing.python.org/en/latest/spec/typeddict.html
