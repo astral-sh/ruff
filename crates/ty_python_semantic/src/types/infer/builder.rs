@@ -72,9 +72,10 @@ use crate::types::diagnostic::{
     report_instance_layout_conflict, report_invalid_arguments_to_annotated,
     report_invalid_assignment, report_invalid_attribute_assignment,
     report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_invalid_generator_function_return_type,
-    report_invalid_key_on_typed_dict, report_invalid_or_unsupported_base,
-    report_invalid_return_type, report_invalid_type_checking_constant,
+    report_invalid_exception_raised, report_invalid_exception_tuple_caught,
+    report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
+    report_invalid_or_unsupported_base, report_invalid_return_type,
+    report_invalid_type_checking_constant,
     report_namedtuple_field_without_default_after_field_with_default, report_non_subscriptable,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
     report_rebound_typevar, report_slice_step_size_zero,
@@ -3025,7 +3026,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // it will actually be the type of the generic parameters to `BaseExceptionGroup` or `ExceptionGroup`.
         let symbol_ty = if let Some(tuple_spec) = node_ty.tuple_instance_spec(self.db()) {
             let mut builder = UnionBuilder::new(self.db());
-            for element in tuple_spec.all_elements().copied() {
+            let mut invalid_elements = vec![];
+
+            for (index, element) in tuple_spec.all_elements().enumerate() {
                 builder = builder.add(
                     if element.is_assignable_to(self.db(), type_base_exception) {
                         element.to_instance(self.db()).expect(
@@ -3033,13 +3036,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 if called on a type assignable to `type[BaseException]`",
                         )
                     } else {
-                        if let Some(node) = node {
-                            report_invalid_exception_caught(&self.context, node, element);
-                        }
+                        invalid_elements.push((index, element));
                         Type::unknown()
                     },
                 );
             }
+
+            if !invalid_elements.is_empty()
+                && let Some(node) = node
+            {
+                if let ast::Expr::Tuple(tuple) = node
+                    && !tuple.iter().any(ast::Expr::is_starred_expr)
+                    && Some(tuple.len()) == tuple_spec.len().into_fixed_length()
+                {
+                    let invalid_elements = invalid_elements
+                        .iter()
+                        .map(|(index, ty)| (&tuple.elts[*index], **ty));
+
+                    report_invalid_exception_tuple_caught(&self.context, tuple, invalid_elements);
+                } else {
+                    report_invalid_exception_caught(&self.context, node, node_ty);
+                }
+            }
+
             builder.build()
         } else if node_ty.is_assignable_to(self.db(), type_base_exception) {
             node_ty.to_instance(self.db()).expect(
