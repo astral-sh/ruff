@@ -566,4 +566,26 @@ def main():
 
         Ok(())
     }
+
+    #[test]
+    fn regression_ruf066_bindings_run_with_select_only() {
+        use crate::codes::Rule;
+        let settings = LinterSettings::for_rule(Rule::SingleAssignmentMissingFinal);
+        let code = r#"
+x = 1
+print(x)
+"#;
+
+        // Collect secondary codes (like "RUF066") from diagnostics and assert our rule fired.
+        let diagnostics = super::test_snippet(code, &settings);
+        let codes: Vec<String> = diagnostics
+            .iter()
+            .filter_map(|d| d.secondary_code().map(std::string::ToString::to_string))
+            .collect();
+
+        assert!(
+            codes.iter().any(|c| c.eq_ignore_ascii_case("RUF066")),
+            "Expected RUF066 to be present in diagnostics, got: {codes:?}"
+        );
+    }
 }

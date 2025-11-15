@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/immutability/mod.rs
+---
+RUF066 Variable `y` is assigned once and is missing `Final`
+  --> single_assignment_local.py:9:5
+   |
+ 7 | def f():
+ 8 |     """Function with a single assignment."""
+ 9 |     y = 2
+   |     ^
+10 |     print(y)
+   |

@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/immutability/mod.rs
+---
+RUF066 Variable `X` is assigned once and is missing `Final`
+ --> single_assignment_module.py:7:1
+  |
+5 | """
+6 |
+7 | X = 1
+  | ^
+8 | print(X)
+  |

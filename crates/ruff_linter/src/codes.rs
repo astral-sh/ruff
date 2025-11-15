@@ -1058,6 +1058,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "063") => rules::ruff::rules::AccessAnnotationsFromClassDict,
         (Ruff, "064") => rules::ruff::rules::NonOctalPermissions,
         (Ruff, "065") => rules::ruff::rules::LoggingEagerConversion,
+        (Ruff, "066") => rules::immutability::single_assignment_missing_final::SingleAssignmentMissingFinal,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,

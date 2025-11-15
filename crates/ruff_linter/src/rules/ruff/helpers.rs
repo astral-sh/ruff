@@ -68,7 +68,7 @@ pub(super) fn is_class_var_annotation(annotation: &Expr, semantic: &SemanticMode
 }
 
 /// Returns `true` if the given [`Expr`] is a `typing.Final` annotation.
-pub(super) fn is_final_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+pub(crate) fn is_final_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
     if !semantic.seen_typing() {
         return false;
     }
