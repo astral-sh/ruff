@@ -69,7 +69,7 @@ def name_or_age() -> Literal["name", "age"]:
 carol: Person = {NAME: "Carol", AGE: 20}
 
 reveal_type(carol[NAME])  # revealed: str
-# error: [invalid-key] "TypedDict `Person` can only be subscripted with string literal keys, got key of type `str`"
+# error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`"
 reveal_type(carol[non_literal()])  # revealed: Unknown
 reveal_type(carol[name_or_age()])  # revealed: str | int | None
 
@@ -553,7 +553,7 @@ def _(
     # error: [invalid-key] "Invalid key for TypedDict `Person`: Unknown key "non_existing""
     reveal_type(person["non_existing"])  # revealed: Unknown
 
-    # error: [invalid-key] "TypedDict `Person` can only be subscripted with string literal keys, got key of type `str`"
+    # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`"
     reveal_type(person[str_key])  # revealed: Unknown
 
     # No error here:

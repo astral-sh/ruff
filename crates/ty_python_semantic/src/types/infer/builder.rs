@@ -3672,7 +3672,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // or a dynamic type like `Any`. We can do this by checking assignability to `LiteralString`,
                     // but we need to exclude `LiteralString` itself. This check would technically allow weird key
                     // types like `LiteralString & Any` to pass, but it does not need to be perfect. We would just
-                    // fail to provide the "can only be subscripted with string literal keys" hint in that case.
+                    // fail to provide the "can only be subscripted with a string literal key" hint in that case.
 
                     if slice_ty.is_dynamic() {
                         return true;
@@ -3836,9 +3836,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                 attach_original_type_info(&mut diagnostic);
                                             } else {
                                                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                                                    "Method `__setitem__` of type `{}` cannot be called with \
-                                                    a key of type `{}` and a value of type `{assigned_d}` on object of type `{object_d}`",
-                                                    bindings.callable_type().display(db),
+                                                    "Invalid subscript assignment with key of type `{}` and value of \
+                                                     type `{assigned_d}` on object of type `{object_d}`",
                                                     slice_ty.display(db),
                                                 ));
                                                 attach_original_type_info(&mut diagnostic);
@@ -3873,19 +3872,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ));
                                 attach_original_type_info(&mut diagnostic);
 
-                                // Use `KnownClass` as a crude proxy for checking if this is not a user-defined class. Otherwise,
-                                // we end up suggesting things like "Consider adding a `__setitem__` method to `None`".
+                                // If it's a user-defined class, suggest adding a `__setitem__` method.
                                 if object_ty
                                     .as_nominal_instance()
-                                    .is_some_and(|instance| instance.class(db).known(db).is_some())
+                                    .and_then(|instance| {
+                                        file_to_module(
+                                            db,
+                                            instance.class(db).class_literal(db).0.file(db),
+                                        )
+                                    })
+                                    .and_then(|module| module.search_path(db))
+                                    .is_some_and(crate::SearchPath::is_first_party)
                                 {
-                                    diagnostic.info(format_args!(
-                                        "`{}` does not have a `__setitem__` method.",
+                                    diagnostic.help(format_args!(
+                                        "Consider adding a `__setitem__` method to `{}`.",
                                         object_ty.display(db),
                                     ));
                                 } else {
                                     diagnostic.help(format_args!(
-                                        "Consider adding a `__setitem__` method to `{}`.",
+                                        "`{}` does not have a `__setitem__` method.",
                                         object_ty.display(db),
                                     ));
                                 }

@@ -110,6 +110,6 @@ class Identity:
         pass
 
 a = Identity()
-# error: [invalid-assignment] "Method `__setitem__` of type `bound method Identity.__setitem__(index: int, value: int) -> None` cannot be called with a key of type `Literal["a"]` and a value of type `Literal[0]` on object of type `Identity`"
+# error: [invalid-assignment] "Invalid subscript assignment with key of type `Literal["a"]` and value of type `Literal[0]` on object of type `Identity`"
 a["a"] = 0
 ```
