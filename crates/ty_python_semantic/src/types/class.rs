@@ -4534,7 +4534,15 @@ impl KnownClass {
                     "ellipsis"
                 }
             }
-            Self::NotImplementedType => "_NotImplementedType",
+            Self::NotImplementedType => {
+                // Exposed as `types.NotImplementedType` on Python >=3.10;
+                // backported as `builtins._NotImplementedType` by typeshed on Python <=3.9
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                    "NotImplementedType"
+                } else {
+                    "_NotImplementedType"
+                }
+            }
             Self::Field => "Field",
             Self::KwOnly => "KW_ONLY",
             Self::InitVar => "InitVar",
@@ -4836,7 +4844,15 @@ impl KnownClass {
                     KnownModule::Builtins
                 }
             }
-            Self::NotImplementedType => KnownModule::Builtins,
+            Self::NotImplementedType => {
+                // Exposed as `types.NotImplementedType` on Python >=3.10;
+                // backported as `builtins._NotImplementedType` by typeshed on Python <=3.9
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                    KnownModule::Types
+                } else {
+                    KnownModule::Builtins
+                }
+            }
             Self::ChainMap
             | Self::Counter
             | Self::DefaultDict
@@ -5106,7 +5122,12 @@ impl KnownClass {
             "EllipsisType" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
                 &[Self::EllipsisType]
             }
-            "_NotImplementedType" => &[Self::NotImplementedType],
+            "_NotImplementedType" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
+                &[Self::NotImplementedType]
+            }
+            "NotImplementedType" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
+                &[Self::NotImplementedType]
+            }
             "Field" => &[Self::Field],
             "KW_ONLY" => &[Self::KwOnly],
             "InitVar" => &[Self::InitVar],
