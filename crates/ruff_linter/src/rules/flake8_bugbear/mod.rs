@@ -48,6 +48,7 @@ mod tests {
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_7.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_8.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_9.py"))]
+    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_10.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_B008.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.pyi"))]
     #[test_case(Rule::NoExplicitStacklevel, Path::new("B028.py"))]
@@ -93,6 +94,7 @@ mod tests {
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_7.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_8.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_9.py"))]
+    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_10.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_B008.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.pyi"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
