@@ -193,6 +193,9 @@ pub struct AnalyzeGraphCommand {
     /// Path to a virtual environment to use for resolving additional dependencies
     #[arg(long)]
     python: Option<PathBuf>,
+    /// Exclude imports that are only used for type checking (i.e., imports within `if TYPE_CHECKING:` blocks)
+    #[arg(long)]
+    exclude_type_checking_imports: bool,
 }
 
 // The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
@@ -828,6 +831,7 @@ impl AnalyzeGraphCommand {
             files: self.files,
             direction: self.direction,
             python: self.python,
+            exclude_type_checking_imports: self.exclude_type_checking_imports,
         };
 
         let cli_overrides = ExplicitConfigOverrides {
@@ -1301,6 +1305,7 @@ pub struct AnalyzeGraphArgs {
     pub files: Vec<PathBuf>,
     pub direction: Direction,
     pub python: Option<PathBuf>,
+    pub exclude_type_checking_imports: bool,
 }
 
 /// Configuration overrides provided via dedicated CLI flags:

@@ -167,6 +167,7 @@ pub(crate) fn analyze_graph(
                         &path,
                         package.as_deref(),
                         string_imports,
+                        args.exclude_type_checking_imports,
                     )
                     .unwrap_or_else(|err| {
                         warn!("Failed to generate import map for {path}: {err}");

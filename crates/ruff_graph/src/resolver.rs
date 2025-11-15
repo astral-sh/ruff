@@ -2,7 +2,7 @@ use ruff_db::files::FilePath;
 use ty_python_semantic::{ModuleName, resolve_module, resolve_real_module};
 
 use crate::ModuleDb;
-use crate::collector::CollectedImport;
+use crate::collector::{CollectedImport, ImportKind};
 
 /// Collect all imports for a given Python file.
 pub(crate) struct Resolver<'a> {
@@ -16,28 +16,29 @@ impl<'a> Resolver<'a> {
     }
 
     /// Resolve the [`CollectedImport`] into a [`FilePath`].
-    pub(crate) fn resolve(&self, import: CollectedImport) -> impl Iterator<Item = &'a FilePath> {
-        match import {
-            CollectedImport::Import(import) => {
+    pub(crate) fn resolve(&self, import: &CollectedImport) -> impl Iterator<Item = &'a FilePath> {
+        let module_name = &import.module_name;
+        match import.import_kind {
+            ImportKind::Import => {
                 // Attempt to resolve the module (e.g., given `import foo`, look for `foo`).
-                let file = self.resolve_module(&import);
+                let file = self.resolve_module(module_name);
 
                 // If the file is a stub, look for the corresponding source file.
                 let source_file = file
                     .is_some_and(|file| file.extension() == Some("pyi"))
-                    .then(|| self.resolve_real_module(&import))
+                    .then(|| self.resolve_real_module(module_name))
                     .flatten();
 
                 std::iter::once(file)
                     .chain(std::iter::once(source_file))
                     .flatten()
             }
-            CollectedImport::ImportFrom(import) => {
+            ImportKind::ImportFrom => {
                 // Attempt to resolve the member (e.g., given `from foo import bar`, look for `foo.bar`).
-                if let Some(file) = self.resolve_module(&import) {
+                if let Some(file) = self.resolve_module(module_name) {
                     // If the file is a stub, look for the corresponding source file.
                     let source_file = (file.extension() == Some("pyi"))
-                        .then(|| self.resolve_real_module(&import))
+                        .then(|| self.resolve_real_module(module_name))
                         .flatten();
 
                     return std::iter::once(Some(file))
@@ -46,7 +47,7 @@ impl<'a> Resolver<'a> {
                 }
 
                 // Attempt to resolve the module (e.g., given `from foo import bar`, look for `foo`).
-                let parent = import.parent();
+                let parent = module_name.parent();
                 let file = parent
                     .as_ref()
                     .and_then(|parent| self.resolve_module(parent));
