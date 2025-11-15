@@ -1831,7 +1831,7 @@ fn handle_lambda_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
-/// Move comment between a unary op and its operand before the unary op by marking them as trailing.
+/// Move comment between a unary op and its operand before the unary op by marking them as leading.
 ///
 /// For example, given:
 /// ```python
@@ -1841,8 +1841,13 @@ fn handle_lambda_comment<'a>(
 /// )
 /// ```
 ///
-/// The `# comment` will be attached as a dangling comment on the enclosing node, to ensure that
-/// it remains on the same line as the operator.
+/// The `# comment` will be attached as a leading comment on the unary op, to ensure that
+/// it doesn't fall between the operator and its operand:
+/// ```python
+/// (  # comment
+///     not True
+/// )
+/// ```
 fn handle_unary_op_comment<'a>(
     comment: DecoratedComment<'a>,
     unary_op: &'a ast::ExprUnaryOp,
