@@ -3892,6 +3892,18 @@ pub struct AnalyzeOptions {
         "#
     )]
     pub include_dependencies: Option<BTreeMap<PathBuf, Vec<String>>>,
+    /// Whether to include imports that are only used for type checking (i.e., imports within `if TYPE_CHECKING:` blocks).
+    /// When enabled (default), type-checking-only imports are included in the import graph.
+    /// When disabled, they are excluded.
+    #[option(
+        default = "true",
+        value_type = "bool",
+        example = r#"
+            # Exclude type-checking-only imports from the graph
+            type-checking-imports = false
+        "#
+    )]
+    pub type_checking_imports: Option<bool>,
 }
 
 /// Like [`LintCommonOptions`], but with any `#[serde(flatten)]` fields inlined. This leads to far,

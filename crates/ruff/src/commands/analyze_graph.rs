@@ -105,6 +105,7 @@ pub(crate) fn analyze_graph(
                 let settings = resolver.resolve(path);
                 let string_imports = settings.analyze.string_imports;
                 let include_dependencies = settings.analyze.include_dependencies.get(path).cloned();
+                let type_checking_imports = settings.analyze.type_checking_imports;
 
                 // Skip excluded files.
                 if (settings.file_resolver.force_exclude || !resolved_file.is_root())
@@ -167,6 +168,7 @@ pub(crate) fn analyze_graph(
                         &path,
                         package.as_deref(),
                         string_imports,
+                        type_checking_imports,
                     )
                     .unwrap_or_else(|err| {
                         warn!("Failed to generate import map for {path}: {err}");

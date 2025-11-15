@@ -30,6 +30,7 @@ impl ModuleImports {
         path: &SystemPath,
         package: Option<&SystemPath>,
         string_imports: StringImports,
+        type_checking_imports: bool,
     ) -> Result<Self> {
         // Parse the source code.
         let parsed = parse(source, ParseOptions::from(source_type))?;
