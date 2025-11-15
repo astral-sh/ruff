@@ -217,3 +217,84 @@ def f(x: object) -> int:
     else:
         y = 2
     return y
+
+
+# OK - both branches have matching annotations (SIM108 does not trigger)
+def f(x: object) -> int:
+    if x:
+        y: int = 1
+    else:
+        y: int = 2
+    return y
+
+
+# OK - both branches have non-matching annotations (SIM108 does not trigger)
+def f(x: object) -> int:
+    if x:
+        y: int = 1
+    else:
+        y: str = "2"
+    return y
+
+
+# SIM108 - annotated assignment with dict type
+def f(next_token: str | None):
+    if next_token is not None:
+        token_arg: dict[str, str] = {"nextToken": next_token}
+    else:
+        token_arg = {}
+    return token_arg
+
+
+# SIM108 - annotated assignment with Optional/Union type
+def f(first_records: list[str] | None):
+    if not first_records:
+        first_job_row: str | None = None
+    else:
+        first_job_row = first_records.pop(0)
+    return first_job_row
+
+
+# SIM108 - annotated assignment with list type
+def f(args):
+    if args.output is None:
+        outputs: list[str] = []
+    else:
+        outputs = list(args.output)
+    return outputs
+
+
+# SIM108 - annotated assignment with Optional type
+def f(self):
+    if self.has_tool_choice:
+        tool_choice: str | None = "any"
+    else:
+        tool_choice = None
+    return tool_choice
+
+
+# SIM108 - annotated assignment with Optional type and attribute access
+def f(stream):
+    if stream:
+        stream_name: str | None = stream.name
+    else:
+        stream_name = None
+    return stream_name
+
+
+# OK - both branches have matching Optional annotations (SIM108 does not trigger)
+def f(stream):
+    if stream:
+        stream_name: str | None = stream.name
+    else:
+        stream_name: str | None = None
+    return stream_name
+
+
+# OK - both branches have non-matching Optional annotations (SIM108 does not trigger)
+def f(stream):
+    if stream:
+        stream_name: str | None = stream.name
+    else:
+        stream_name: int | None = None
+    return stream_name

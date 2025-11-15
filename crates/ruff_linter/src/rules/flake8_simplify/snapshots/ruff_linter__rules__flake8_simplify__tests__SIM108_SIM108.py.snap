@@ -410,4 +410,110 @@ help: Replace `if`-`else`-block with `y: int = 1 if x else 2`
     -         y = 2
 215 +     y: int = 1 if x else 2
 216 |     return y
+217 | 
+218 | 
+note: This is an unsafe fix and may change runtime behavior
+
+SIM108 [*] Use ternary operator `first_job_row: str | None = None if not first_records else first_records.pop(0)` instead of `if`-`else`-block
+   --> SIM108.py:251:5
+    |
+249 |   # SIM108 - annotated assignment with Optional/Union type
+250 |   def f(first_records: list[str] | None):
+251 | /     if not first_records:
+252 | |         first_job_row: str | None = None
+253 | |     else:
+254 | |         first_job_row = first_records.pop(0)
+    | |____________________________________________^
+255 |       return first_job_row
+    |
+help: Replace `if`-`else`-block with `first_job_row: str | None = None if not first_records else first_records.pop(0)`
+248 | 
+249 | # SIM108 - annotated assignment with Optional/Union type
+250 | def f(first_records: list[str] | None):
+    -     if not first_records:
+    -         first_job_row: str | None = None
+    -     else:
+    -         first_job_row = first_records.pop(0)
+251 +     first_job_row: str | None = None if not first_records else first_records.pop(0)
+252 |     return first_job_row
+253 | 
+254 | 
+note: This is an unsafe fix and may change runtime behavior
+
+SIM108 [*] Use ternary operator `outputs: list[str] = [] if args.output is None else list(args.output)` instead of `if`-`else`-block
+   --> SIM108.py:260:5
+    |
+258 |   # SIM108 - annotated assignment with list type
+259 |   def f(args):
+260 | /     if args.output is None:
+261 | |         outputs: list[str] = []
+262 | |     else:
+263 | |         outputs = list(args.output)
+    | |___________________________________^
+264 |       return outputs
+    |
+help: Replace `if`-`else`-block with `outputs: list[str] = [] if args.output is None else list(args.output)`
+257 | 
+258 | # SIM108 - annotated assignment with list type
+259 | def f(args):
+    -     if args.output is None:
+    -         outputs: list[str] = []
+    -     else:
+    -         outputs = list(args.output)
+260 +     outputs: list[str] = [] if args.output is None else list(args.output)
+261 |     return outputs
+262 | 
+263 | 
+note: This is an unsafe fix and may change runtime behavior
+
+SIM108 [*] Use ternary operator `tool_choice: str | None = "any" if self.has_tool_choice else None` instead of `if`-`else`-block
+   --> SIM108.py:269:5
+    |
+267 |   # SIM108 - annotated assignment with Optional type
+268 |   def f(self):
+269 | /     if self.has_tool_choice:
+270 | |         tool_choice: str | None = "any"
+271 | |     else:
+272 | |         tool_choice = None
+    | |__________________________^
+273 |       return tool_choice
+    |
+help: Replace `if`-`else`-block with `tool_choice: str | None = "any" if self.has_tool_choice else None`
+266 | 
+267 | # SIM108 - annotated assignment with Optional type
+268 | def f(self):
+    -     if self.has_tool_choice:
+    -         tool_choice: str | None = "any"
+    -     else:
+    -         tool_choice = None
+269 +     tool_choice: str | None = "any" if self.has_tool_choice else None
+270 |     return tool_choice
+271 | 
+272 | 
+note: This is an unsafe fix and may change runtime behavior
+
+SIM108 [*] Use ternary operator `stream_name: str | None = stream.name if stream else None` instead of `if`-`else`-block
+   --> SIM108.py:278:5
+    |
+276 |   # SIM108 - annotated assignment with Optional type and attribute access
+277 |   def f(stream):
+278 | /     if stream:
+279 | |         stream_name: str | None = stream.name
+280 | |     else:
+281 | |         stream_name = None
+    | |__________________________^
+282 |       return stream_name
+    |
+help: Replace `if`-`else`-block with `stream_name: str | None = stream.name if stream else None`
+275 | 
+276 | # SIM108 - annotated assignment with Optional type and attribute access
+277 | def f(stream):
+    -     if stream:
+    -         stream_name: str | None = stream.name
+    -     else:
+    -         stream_name = None
+278 +     stream_name: str | None = stream.name if stream else None
+279 |     return stream_name
+280 | 
+281 | 
 note: This is an unsafe fix and may change runtime behavior
