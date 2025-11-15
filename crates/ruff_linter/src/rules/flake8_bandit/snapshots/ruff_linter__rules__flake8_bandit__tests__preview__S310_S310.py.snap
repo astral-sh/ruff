@@ -271,4 +271,6 @@ S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom sch
 46 | map(urllib.request.urlopen, [])
 47 | foo = urllib.request.urlopen
    |       ^^^^^^^^^^^^^^^^^^^^^^
+48 |
+49 | # https://github.com/astral-sh/ruff/issues/21462
    |
