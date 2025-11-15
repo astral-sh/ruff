@@ -471,6 +471,11 @@ special casing for the symbol at runtime). It is not generally considered assign
 type:
 
 ```py
+# Other type checkers do not emit an error here,
+# but this is likely not a deliberate feature they've implemented;
+# it's probably because `NotImplementedType` inherits from `Any`
+# according to typeshed. We override typeshed's incorrect MRO
+# for more precise type inference.
 x: int = NotImplemented  # error: [invalid-assignment]
 ```
 
