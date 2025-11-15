@@ -248,7 +248,10 @@ def f(x: IntOr, y: OrInt):
 # error: [cyclic-type-alias-definition] "Cyclic definition of `Itself`"
 type Itself = Itself
 
-def foo(Itself: Itself):
+def foo(
+    # this is a very strange thing to do, but this is a regression test to ensure it doesn't panic
+    Itself: Itself,
+):
     x: Itself
     reveal_type(Itself)  # revealed: Divergent
 
@@ -271,6 +274,9 @@ type G[T] = G[T]
 type H[T] = I[T]
 # error: [cyclic-type-alias-definition] "Cyclic definition of `I`"
 type I[T] = H[T]
+
+# It's not possible to create an element of this type, but it's not an error for now
+type DirectRecursiveList[T] = list[DirectRecursiveList[T]]
 ```
 
 ### With legacy generic

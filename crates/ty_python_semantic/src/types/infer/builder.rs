@@ -1903,7 +1903,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_annotation_expression(&type_alias.value, DeferredExpressionState::None);
 
         // A type alias where a value type points to itself, i.e. the expanded type is `Divergent` is meaningless
+        // (but a type alias that expands to something like `list[Divergent]` may be a valid recursive type alias)
         // and would lead to infinite recursion. Therefore, such type aliases should not be exposed.
+        // ```python
+        // type Itself = Itself  # error: "Cyclic definition of `Itself`"
+        // type A = B  # error: "Cyclic definition of `A`"
+        // type B = A  # error: "Cyclic definition of `B`"
+        // type G[T] = G[T]  # error: "Cyclic definition of `G`"
+        // type RecursiveList[T] = list[T | RecursiveList[T]]  # OK
+        // type RecursiveList2[T] = list[RecursiveList2[T]]  # It's not possible to create an element of this, but it's not an error for now
+        // type IntOr = int | IntOr  # It's redundant, but OK for now
+        // type IntOrStr = int | StrOrInt  # It's redundant, but OK
+        // type StrOrInt = str | IntOrStr  # It's redundant, but OK
+        // ```
         let expanded = value_ty.inner_type().expand_eagerly(self.db());
         if expanded.is_divergent() {
             if let Some(builder) = self
