@@ -46,6 +46,7 @@ pub mod rule_selector;
 pub mod rules;
 pub mod settings;
 pub mod source_kind;
+pub mod suppression;
 mod text_helpers;
 pub mod upstream_categories;
 mod violation;
