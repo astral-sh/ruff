@@ -1605,13 +1605,13 @@ a: float<CURSOR> = 3.14
 
         assert_snapshot!(test.goto_definition(), @r#"
         info[goto-definition]: Definition
-           --> stdlib/builtins.pyi:346:7
+           --> stdlib/builtins.pyi:348:7
             |
-        345 | @disjoint_base
-        346 | class int:
+        347 | @disjoint_base
+        348 | class int:
             |       ^^^
-        347 |     """int([x]) -> integer
-        348 |     int(x, base=10) -> integer
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
             |
         info: Source
          --> main.py:2:4
@@ -1621,12 +1621,12 @@ a: float<CURSOR> = 3.14
           |
 
         info[goto-definition]: Definition
-           --> stdlib/builtins.pyi:659:7
+           --> stdlib/builtins.pyi:661:7
             |
-        658 | @disjoint_base
-        659 | class float:
+        660 | @disjoint_base
+        661 | class float:
             |       ^^^^^
-        660 |     """Convert a string or number to a floating-point number, if possible."""
+        662 |     """Convert a string or number to a floating-point number, if possible."""
             |
         info: Source
          --> main.py:2:4
@@ -1650,13 +1650,13 @@ a: complex<CURSOR> = 3.14
 
         assert_snapshot!(test.goto_definition(), @r#"
         info[goto-definition]: Definition
-           --> stdlib/builtins.pyi:346:7
+           --> stdlib/builtins.pyi:348:7
             |
-        345 | @disjoint_base
-        346 | class int:
+        347 | @disjoint_base
+        348 | class int:
             |       ^^^
-        347 |     """int([x]) -> integer
-        348 |     int(x, base=10) -> integer
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
             |
         info: Source
          --> main.py:2:4
@@ -1666,12 +1666,12 @@ a: complex<CURSOR> = 3.14
           |
 
         info[goto-definition]: Definition
-           --> stdlib/builtins.pyi:659:7
+           --> stdlib/builtins.pyi:661:7
             |
-        658 | @disjoint_base
-        659 | class float:
+        660 | @disjoint_base
+        661 | class float:
             |       ^^^^^
-        660 |     """Convert a string or number to a floating-point number, if possible."""
+        662 |     """Convert a string or number to a floating-point number, if possible."""
             |
         info: Source
          --> main.py:2:4
@@ -1681,12 +1681,12 @@ a: complex<CURSOR> = 3.14
           |
 
         info[goto-definition]: Definition
-           --> stdlib/builtins.pyi:820:7
+           --> stdlib/builtins.pyi:822:7
             |
-        819 | @disjoint_base
-        820 | class complex:
+        821 | @disjoint_base
+        822 | class complex:
             |       ^^^^^^^
-        821 |     """Create a complex number from a string or numbers.
+        823 |     """Create a complex number from a string or numbers.
             |
         info: Source
          --> main.py:2:4
