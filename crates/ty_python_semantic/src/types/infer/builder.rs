@@ -7761,7 +7761,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_expression(target, TypeContext::default());
 
-        self.add_binding(named.into(), definition, |builder, tcx| {
+        self.add_binding(named.target.as_ref().into(), definition, |builder, tcx| {
             builder.infer_expression(value, tcx)
         })
     }

@@ -26,7 +26,9 @@ error[invalid-assignment]: Implicit shadowing of class `C`
 1 | class C: ...
 2 |
 3 | C = 1  # error: [invalid-assignment]
-  | ^
+  | -   ^ Incompatible value of type `Literal[1]`
+  | |
+  | Declared type `<class 'C'>`
   |
 info: Annotate to make it explicit if this is intentional
 info: rule `invalid-assignment` is enabled by default

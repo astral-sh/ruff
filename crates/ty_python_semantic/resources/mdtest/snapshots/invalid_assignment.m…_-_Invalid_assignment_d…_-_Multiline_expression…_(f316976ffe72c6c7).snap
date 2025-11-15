@@ -1,0 +1,44 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_assignment.md - Invalid assignment diagnostics - Multiline expressions
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assignment.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | # fmt: off
+2 | 
+3 | # error: [invalid-assignment]
+4 | x: str = (
+5 |     1 + 2 + (
+6 |         3 + 4 + 5
+7 |     )
+8 | )
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Object of type `Literal[15]` is not assignable to `str`
+ --> src/mdtest_snippet.py:4:4
+  |
+3 |   # error: [invalid-assignment]
+4 |   x: str = (
+  |  ____---___^
+  | |    |
+  | |    Declared type
+5 | |     1 + 2 + (
+6 | |         3 + 4 + 5
+7 | |     )
+8 | | )
+  | |_^ Incompatible value of type `Literal[15]`
+  |
+info: rule `invalid-assignment` is enabled by default
+
+```
