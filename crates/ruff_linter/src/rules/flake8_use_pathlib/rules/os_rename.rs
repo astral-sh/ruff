@@ -38,6 +38,8 @@ use ruff_python_ast::ExprCall;
 ///
 /// ## Fix Safety
 /// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+/// Additionally, the fix is marked as unsafe when the return value is used because the type changes
+/// from `None` to a `Path` object.
 ///
 /// ## References
 /// - [Python documentation: `Path.rename`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.rename)

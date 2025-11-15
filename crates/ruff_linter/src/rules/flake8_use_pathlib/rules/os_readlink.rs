@@ -38,6 +38,8 @@ use crate::{FixAvailability, Violation};
 ///
 /// ## Fix Safety
 /// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+/// Additionally, the fix is marked as unsafe when the return value is used because the type changes
+/// from `str` to a `Path` object.
 ///
 /// ## References
 /// - [Python documentation: `Path.readlink`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.readline)
