@@ -152,6 +152,30 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
     }
 }
 
+/// Check if an expression is a `TYPE_CHECKING` condition.
+///
+/// Returns `true` for:
+/// - `TYPE_CHECKING`
+/// - `typing.TYPE_CHECKING`
+///
+/// NOTE: Aliased `TYPE_CHECKING`, i.e. `import typing.TYPE_CHECKING as TC; if TC: ...`
+/// will not be detected!
+fn is_type_checking_condition(expr: &Expr) -> bool {
+    match expr {
+        // `if TYPE_CHECKING:`
+        Expr::Name(ast::ExprName { id, .. }) => id.as_str() == "TYPE_CHECKING",
+        // `if typing.TYPE_CHECKING:`
+        Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+            attr.as_str() == "TYPE_CHECKING"
+                && matches!(
+                    value.as_ref(),
+                    Expr::Name(ast::ExprName { id, .. }) if id.as_str() == "typing"
+                )
+        }
+        _ => false,
+    }
+}
+
 #[derive(Debug)]
 pub(crate) enum CollectedImport {
     /// The import was part of an `import` statement.
