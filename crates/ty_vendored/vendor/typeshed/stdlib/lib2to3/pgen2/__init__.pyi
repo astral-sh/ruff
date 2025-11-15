@@ -1,5 +1,5 @@
-"""The pgen2 package.
-"""
+"""The pgen2 package."""
+
 from collections.abc import Callable
 from typing import Any
 from typing_extensions import TypeAlias

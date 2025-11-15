@@ -1,5 +1,5 @@
-"""Fixer that turns <> into !=.
-"""
+"""Fixer that turns <> into !=."""
+
 from typing import ClassVar, Literal
 
 from .. import fixer_base

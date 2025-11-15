@@ -102,6 +102,7 @@ close() to patch up the sizes in the header.
 The close() method is called automatically when the class instance
 is destroyed.
 """
+
 from _typeshed import Unused
 from typing import IO, Any, Final, Literal, NamedTuple, NoReturn, overload
 from typing_extensions import Self, TypeAlias
@@ -126,8 +127,8 @@ AUDIO_FILE_ENCODING_ALAW_8: Final = 27
 AUDIO_UNKNOWN_SIZE: Final = 0xFFFFFFFF
 
 class _sunau_params(NamedTuple):
-    """_sunau_params(nchannels, sampwidth, framerate, nframes, comptype, compname)
-"""
+    """_sunau_params(nchannels, sampwidth, framerate, nframes, comptype, compname)"""
+
     nchannels: int
     sampwidth: int
     framerate: int

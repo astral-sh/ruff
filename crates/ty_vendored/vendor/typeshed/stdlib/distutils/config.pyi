@@ -3,6 +3,7 @@
 Provides the PyPIRCCommand class, the base class for the command classes
 that uses .pypirc in the distutils.command package.
 """
+
 from abc import abstractmethod
 from distutils.cmd import Command
 from typing import ClassVar
@@ -10,8 +11,8 @@ from typing import ClassVar
 DEFAULT_PYPIRC: str
 
 class PyPIRCCommand(Command):
-    """Base command that knows how to handle the .pypirc file
-    """
+    """Base command that knows how to handle the .pypirc file"""
+
     DEFAULT_REPOSITORY: ClassVar[str]
     DEFAULT_REALM: ClassVar[str]
     repository: None
@@ -19,11 +20,11 @@ class PyPIRCCommand(Command):
     user_options: ClassVar[list[tuple[str, str | None, str]]]
     boolean_options: ClassVar[list[str]]
     def initialize_options(self) -> None:
-        """Initialize options.
-"""
+        """Initialize options."""
+
     def finalize_options(self) -> None:
-        """Finalizes options.
-"""
+        """Finalizes options."""
+
     @abstractmethod
     def run(self) -> None:
         """A command's raison d'etre: carry out the action it exists to

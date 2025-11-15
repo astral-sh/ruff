@@ -1,6 +1,7 @@
 """
 Main program for 2to3.
 """
+
 from _typeshed import FileDescriptorOrPath
 from collections.abc import Container, Iterable, Iterator, Mapping, Sequence
 from logging import _ExcInfoType
@@ -9,8 +10,7 @@ from typing import AnyStr, Literal
 from . import refactor as refactor
 
 def diff_texts(a: str, b: str, filename: str) -> Iterator[str]:
-    """Return a unified diff of two strings.
-"""
+    """Return a unified diff of two strings."""
 
 class StdoutRefactoringTool(refactor.MultiprocessRefactoringTool):
     """
@@ -21,6 +21,7 @@ class StdoutRefactoringTool(refactor.MultiprocessRefactoringTool):
     have an extra file suffix appended to their name for use in situations
     where you do not want to replace the input files.
     """
+
     nobackups: bool
     show_diffs: bool
     def __init__(
