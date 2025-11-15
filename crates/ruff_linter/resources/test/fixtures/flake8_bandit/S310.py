@@ -45,3 +45,7 @@ urllib.request.urlopen(urllib.request.Request(url))
 # https://github.com/astral-sh/ruff/issues/15522
 map(urllib.request.urlopen, [])
 foo = urllib.request.urlopen
+
+# https://github.com/astral-sh/ruff/issues/21462
+path = "https://example.com/data.csv"
+urllib.request.urlretrieve(path, "data.csv")
