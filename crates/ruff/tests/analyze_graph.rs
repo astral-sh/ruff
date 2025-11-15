@@ -783,3 +783,168 @@ fn notebook_with_magic() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn type_checking_imports() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    root.child("ruff").child("__init__.py").write_str("")?;
+
+    // File with TYPE_CHECKING (without `typing` prefix)
+    root.child("ruff")
+        .child("a.py")
+        .write_str(indoc::indoc! {r#"
+        from typing import TYPE_CHECKING
+
+        import ruff.b
+
+        if TYPE_CHECKING:
+            import ruff.c
+    "#})?;
+
+    // File with typing.TYPE_CHECKING (with `typing` prefix)
+    root.child("ruff")
+        .child("b.py")
+        .write_str(indoc::indoc! {r#"
+        import typing
+
+        import ruff.d
+
+        if typing.TYPE_CHECKING:
+            from ruff import e
+    "#})?;
+
+    root.child("ruff").child("c.py").write_str("")?;
+    root.child("ruff").child("d.py").write_str("")?;
+    root.child("ruff").child("e.py").write_str("")?;
+
+    // By default (with --type-checking-imports): includes all imports (including TYPE_CHECKING)
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py",
+            "ruff/c.py"
+          ],
+          "ruff/b.py": [
+            "ruff/d.py",
+            "ruff/e.py"
+          ],
+          "ruff/c.py": [],
+          "ruff/d.py": [],
+          "ruff/e.py": []
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    // With --no-type-checking-imports: excludes TYPE_CHECKING imports
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("--no-type-checking-imports").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": [
+            "ruff/d.py"
+          ],
+          "ruff/c.py": [],
+          "ruff/d.py": [],
+          "ruff/e.py": []
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    Ok(())
+}
+
+#[test]
+fn type_checking_imports_from_config() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    root.child("ruff").child("__init__.py").write_str("")?;
+    root.child("ruff")
+        .child("a.py")
+        .write_str(indoc::indoc! {r#"
+        from typing import TYPE_CHECKING
+
+        import ruff.b
+
+        if TYPE_CHECKING:
+            import ruff.c
+    "#})?;
+    root.child("ruff").child("b.py").write_str("")?;
+    root.child("ruff").child("c.py").write_str("")?;
+
+    // With type-checking-imports = false: excludes TYPE_CHECKING imports
+    root.child("ruff.toml").write_str(indoc::indoc! {r#"
+        [analyze]
+        type-checking-imports = false
+    "#})?;
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": [],
+          "ruff/c.py": []
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    // With type-checking-imports = true: includes TYPE_CHECKING imports
+    root.child("ruff.toml").write_str(indoc::indoc! {r#"
+        [analyze]
+        type-checking-imports = true
+    "#})?;
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py",
+            "ruff/c.py"
+          ],
+          "ruff/b.py": [],
+          "ruff/c.py": []
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    Ok(())
+}
