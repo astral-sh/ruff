@@ -16,7 +16,7 @@ impl<'a> Resolver<'a> {
     }
 
     /// Resolve the [`CollectedImport`] into a [`FilePath`].
-    pub(crate) fn resolve(&self, import: CollectedImport) -> impl Iterator<Item = &'a FilePath> {
+    pub(crate) fn resolve(&self, import: &CollectedImport) -> impl Iterator<Item = &'a FilePath> {
         let module_name = &import.module_name;
         match import.import_kind {
             ImportKind::Import => {

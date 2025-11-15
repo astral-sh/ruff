@@ -50,7 +50,7 @@ impl ModuleImports {
                 continue;
             }
 
-            for resolved in Resolver::new(db).resolve(import) {
+            for resolved in Resolver::new(db).resolve(&import) {
                 if let Some(path) = resolved.as_system_path() {
                     resolved_imports.insert(path.to_path_buf());
                 }
