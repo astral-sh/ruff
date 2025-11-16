@@ -1,4 +1,5 @@
 use ruff_python_ast::{self as ast, Stmt};
+use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
@@ -96,7 +97,20 @@ impl Violation for MutableClassDefault {
 
 /// RUF012
 pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClassDef) {
+    let mut class_var_targets: FxHashSet<String> = FxHashSet::default();
+
     for statement in &class_def.body {
+        if let Stmt::AnnAssign(ast::StmtAnnAssign {
+            annotation, target, ..
+        }) = statement
+        {
+            if let ast::Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
+                if is_class_var_annotation(annotation, checker.semantic()) {
+                    class_var_targets.insert(id.to_string());
+                }
+            }
+        }
+
         match statement {
             Stmt::AnnAssign(ast::StmtAnnAssign {
                 annotation,
@@ -123,15 +137,27 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                 }
             }
             Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
-                if !targets.iter().all(is_special_attribute)
-                    && is_mutable_expr(value, checker.semantic())
-                {
-                    // Avoid, e.g., Pydantic and msgspec models, which end up copying defaults on instance creation.
-                    if has_default_copy_semantics(class_def, checker.semantic()) {
-                        return;
-                    }
+                if is_mutable_expr(value, checker.semantic()) {
+                    let has_mutable_non_class_var_target = targets.iter().any(|target| {
+                        if is_special_attribute(target) {
+                            return false;
+                        }
 
-                    checker.report_diagnostic(MutableClassDefault, value.range());
+                        match target {
+                            ast::Expr::Name(ast::ExprName { id, .. }) => {
+                                !class_var_targets.contains(id.as_str())
+                            }
+                            _ => true,
+                        }
+                    });
+                    // Avoid, e.g., Pydantic and msgspec models, which end up copying defaults on instance creation.
+                    if has_mutable_non_class_var_target {
+                        if has_default_copy_semantics(class_def, checker.semantic()) {
+                            return;
+                        }
+
+                        checker.report_diagnostic(MutableClassDefault, value.range());
+                    }
                 }
             }
             _ => (),
