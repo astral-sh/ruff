@@ -32,13 +32,13 @@ use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, DataclassFlags,
-    DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType,
-    MaterializationKind, NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType,
-    TypeContext, TypeMapping, TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable,
-    declaration_type, determine_upper_bound, exceeds_max_specialization_depth,
-    infer_definition_types,
+    ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, DATACLASS_FLAGS,
+    DataclassFlags, DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType,
+    ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
+    StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation, TypedDictParams,
+    UnionBuilder, VarianceInferable, declaration_type, determine_upper_bound,
+    exceeds_max_specialization_depth, infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -2229,12 +2229,10 @@ impl<'db> ClassLiteral<'db> {
                             if let Some(is_set) =
                                 keyword.value.as_boolean_literal_expr().map(|b| b.value)
                             {
-                                match arg_name.as_str() {
-                                    "eq" => flags.set(DataclassFlags::EQ, is_set),
-                                    "order" => flags.set(DataclassFlags::ORDER, is_set),
-                                    "kw_only" => flags.set(DataclassFlags::KW_ONLY, is_set),
-                                    "frozen" => flags.set(DataclassFlags::FROZEN, is_set),
-                                    _ => {}
+                                for (flag_name, flag) in DATACLASS_FLAGS {
+                                    if arg_name.as_str() == *flag_name {
+                                        flags.set(*flag, is_set);
+                                    }
                                 }
                             }
                         }
