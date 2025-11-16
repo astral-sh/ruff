@@ -27,43 +27,43 @@ fn type_checking_imports() -> anyhow::Result<()> {
         ("ruff/c.py", ""),
     ])?;
 
-    assert_cmd_snapshot!(test.analyze_graph_command(), @r###"
+    assert_cmd_snapshot!(test.analyze_graph_command(), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
     {
-      "ruff/__init__.py": [],
-      "ruff/a.py": [
-        "ruff/b.py",
-        "ruff/c.py"
+      "ruff\/__init__.py": [],
+      "ruff\\a.py": [
+        "ruff\\b.py",
+        "ruff\\c.py"
       ],
-      "ruff/b.py": [
-        "ruff/c.py"
+      "ruff\\b.py": [
+        "ruff\\c.py"
       ],
-      "ruff/c.py": []
+      "ruff\\c.py": []
     }
 
     ----- stderr -----
-    "###);
+    "#);
 
     assert_cmd_snapshot!(
         test.analyze_graph_command()
             .arg("--no-type-checking-imports"),
-        @r###"
+        @r#"
     success: true
     exit_code: 0
     ----- stdout -----
     {
-      "ruff/__init__.py": [],
-      "ruff/a.py": [
-        "ruff/b.py"
+      "ruff\/__init__.py": [],
+      "ruff\\a.py": [
+        "ruff\\b.py"
       ],
-      "ruff/b.py": [],
-      "ruff/c.py": []
+      "ruff\\b.py": [],
+      "ruff\\c.py": []
     }
 
     ----- stderr -----
-    "###
+    "#
     );
 
     Ok(())
@@ -101,21 +101,21 @@ fn type_checking_imports_from_config() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(test.analyze_graph_command(), @r###"
+    assert_cmd_snapshot!(test.analyze_graph_command(), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
     {
-      "ruff/__init__.py": [],
-      "ruff/a.py": [
-        "ruff/b.py"
+      "ruff\/__init__.py": [],
+      "ruff\\a.py": [
+        "ruff\\b.py"
       ],
-      "ruff/b.py": [],
-      "ruff/c.py": []
+      "ruff\\b.py": [],
+      "ruff\\c.py": []
     }
 
     ----- stderr -----
-    "###);
+    "#);
 
     test.write_file(
         "ruff.toml",
@@ -125,24 +125,24 @@ fn type_checking_imports_from_config() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(test.analyze_graph_command(), @r###"
+    assert_cmd_snapshot!(test.analyze_graph_command(), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
     {
-      "ruff/__init__.py": [],
-      "ruff/a.py": [
-        "ruff/b.py",
-        "ruff/c.py"
+      "ruff\/__init__.py": [],
+      "ruff\\a.py": [
+        "ruff\\b.py",
+        "ruff\\c.py"
       ],
-      "ruff/b.py": [
-        "ruff/c.py"
+      "ruff\\b.py": [
+        "ruff\\c.py"
       ],
-      "ruff/c.py": []
+      "ruff\\c.py": []
     }
 
     ----- stderr -----
-    "###
+    "#
     );
 
     Ok(())
