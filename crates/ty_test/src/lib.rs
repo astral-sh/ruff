@@ -86,28 +86,34 @@ pub fn run(
                     EmbeddedFileSourceMap::new(&md_index, test_failures.backtick_offsets);
 
                 for (relative_line_number, failures) in test_failures.by_line.iter() {
-                    let (absolute_line_number, line_number_error, emit_failures) = match source_map
-                        .to_absolute_line_number(relative_line_number)
-                    {
-                        Ok(line_number) => (Some(line_number), None, true),
-                        Err(last_line_number) => {
-                            let message = "Found a trailing assertion comment (e.g., `# revealed:` or `# error:`) \
-                                not followed by any statement.";
-                            (Some(last_line_number), Some(message), false)
-                        }
-                    };
-
                     let file = match output_format {
                         OutputFormat::Cli => relative_fixture_path.as_str(),
                         OutputFormat::GitHub => absolute_fixture_path.as_str(),
                     };
-                    if emit_failures {
-                        for failure in failures {
-                            output_format.print_error(file, absolute_line_number, failure);
+
+                    let absolute_line_number = match source_map
+                        .to_absolute_line_number(relative_line_number)
+                    {
+                        Ok(line_number) => line_number,
+                        Err(last_line_number) => {
+                            print!("{}",
+                                output_format.display_error(
+                                    file,
+                                    last_line_number,
+                                    "Found a trailing assertion comment (e.g., `# revealed:` or `# error:`) \
+                                    not followed by any statement."
+                                )
+                            );
+
+                            continue;
                         }
-                    }
-                    if let Some(err) = line_number_error {
-                        output_format.print_error(file, absolute_line_number, err);
+                    };
+
+                    for failure in failures {
+                        print!(
+                            "{}",
+                            output_format.display_error(file, absolute_line_number, failure)
+                        );
                     }
                 }
             }
@@ -161,24 +167,46 @@ impl OutputFormat {
         matches!(self, OutputFormat::Cli)
     }
 
-    #[expect(clippy::print_stdout)]
-    fn print_error(self, file: &str, line: Option<OneIndexed>, failure: impl Display) {
-        let line_value = line.map(OneIndexed::get);
-        match self {
-            Self::Cli => {
-                let cli_line_info = match line_value {
-                    Some(line) => format!("{file}:{line}"),
-                    None => format!("{file}:?"),
-                };
-                println!("  {} {failure}", cli_line_info.as_str().cyan());
-            }
-            Self::GitHub => {
-                if let Some(line) = line_value {
-                    println!("::error file={file},line={line}::{failure}");
-                } else {
-                    println!("::error file={file}::{failure}");
+    fn display_error(self, file: &str, line: OneIndexed, failure: impl Display) -> impl Display {
+        struct Display<'a, T> {
+            format: OutputFormat,
+            file: &'a str,
+            line: OneIndexed,
+            failure: T,
+        }
+
+        impl<T> std::fmt::Display for Display<'_, T>
+        where
+            T: std::fmt::Display,
+        {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let Display {
+                    format,
+                    file,
+                    line,
+                    failure,
+                } = self;
+
+                match format {
+                    OutputFormat::Cli => {
+                        writeln!(
+                            f,
+                            "  {file_line} {failure}",
+                            file_line = format!("{file}:{line}").cyan()
+                        )
+                    }
+                    OutputFormat::GitHub => {
+                        writeln!(f, "::error file={file},line={line}::{failure}")
+                    }
                 }
             }
+        }
+
+        Display {
+            format: self,
+            file,
+            line,
+            failure,
         }
     }
 }

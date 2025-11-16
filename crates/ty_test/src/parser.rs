@@ -273,7 +273,14 @@ impl EmbeddedFileSourceMap {
         }
     }
 
-    /// On error, returns the last valid absolute line number in the embedded source.
+    /// Returns the absolute line number in the markdown file for a given line number
+    /// relative to the concatenated code blocks.
+    ///
+    /// Returns an `Err` if the relative line number is out of bounds where
+    /// the returned value is the absolute line number of the last code block.
+    ///
+    /// # Panics
+    ///  If called when the markdown file has no code blocks.
     pub(crate) fn to_absolute_line_number(
         &self,
         relative_line_number: OneIndexed,
@@ -290,15 +297,12 @@ impl EmbeddedFileSourceMap {
             }
         }
 
-        Err(self
-            .last_absolute_line_number()
-            .expect("embedded file source map should contain at least one code block"))
-    }
-
-    pub(crate) fn last_absolute_line_number(&self) -> Option<OneIndexed> {
-        self.start_line_and_line_count
+        let last_line_number = self
+            .start_line_and_line_count
             .last()
-            .and_then(|(start_line, line_count)| OneIndexed::new(start_line + line_count))
+            .and_then(|(start_line, line_count)| OneIndexed::new(start_line + line_count));
+
+        Err(last_line_number.expect("markdown file to have at least one code block"))
     }
 }
 
@@ -962,13 +966,10 @@ mod tests {
             start_line_and_line_count: vec![(9, 2)],
         };
 
-        let last_line_number = map.last_absolute_line_number().unwrap();
-
         let error = map
             .to_absolute_line_number(OneIndexed::new(3).unwrap())
             .unwrap_err();
 
-        assert_eq!(error, last_line_number);
         assert_eq!(error.get(), 11);
     }
 
