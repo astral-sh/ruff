@@ -194,7 +194,8 @@ pub struct AnalyzeGraphCommand {
     /// Path to a virtual environment to use for resolving additional dependencies
     #[arg(long)]
     python: Option<PathBuf>,
-    /// Include imports that are only used for type checking (i.e., imports within `if TYPE_CHECKING:` blocks). Use `--no-type-checking-imports` to disable.
+    /// Include imports that are only used for type checking (i.e., imports within `if TYPE_CHECKING:` blocks).
+    /// Use `--no-type-checking-imports` to exclude imports that are only used for type checking.
     #[arg(long, overrides_with("no_type_checking_imports"))]
     type_checking_imports: bool,
     #[arg(long, overrides_with("type_checking_imports"), hide = true)]

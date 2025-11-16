@@ -98,14 +98,21 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                     }
                 }
             }
-            Stmt::If(ast::StmtIf { test, .. }) => {
+            Stmt::If(ast::StmtIf {
+                test,
+                body,
+                elif_else_clauses,
+                range: _,
+                node_index: _,
+            }) => {
                 // Skip TYPE_CHECKING blocks if not requested
-                if !self.type_checking_imports && is_type_checking_condition(test) {
-                    // Don't traverse the body - skip these imports entirely
-                    return;
+                if self.type_checking_imports || !is_type_checking_condition(test) {
+                    self.visit_body(body);
                 }
-                // Otherwise, traverse normally
-                walk_stmt(self, stmt);
+
+                for clause in elif_else_clauses {
+                    self.visit_elif_else_clause(clause);
+                }
             }
             Stmt::FunctionDef(_)
             | Stmt::ClassDef(_)
