@@ -818,6 +818,13 @@
           ],
           "format": "uint",
           "minimum": 0
+        },
+        "type-checking-imports": {
+          "description": "Whether to include imports that are only used for type checking (i.e., imports within `if TYPE_CHECKING:` blocks).\nWhen enabled (default), type-checking-only imports are included in the import graph.\nWhen disabled, they are excluded.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false

@@ -15,6 +15,7 @@ use std::{
 };
 use tempfile::TempDir;
 
+mod analyze_graph;
 mod format;
 mod lint;
 

@@ -14,7 +14,6 @@ info:
     - py310
     - test.py
     - "-"
-snapshot_kind: text
 ---
 success: true
 exit_code: 0
@@ -288,5 +287,6 @@ analyze.target_version = 3.10
 analyze.string_imports = disabled
 analyze.extension = ExtensionMapping({})
 analyze.include_dependencies = {}
+analyze.type_checking_imports = true
 
 ----- stderr -----
