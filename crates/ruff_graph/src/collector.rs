@@ -14,14 +14,21 @@ pub(crate) struct Collector<'a> {
     string_imports: StringImports,
     /// The collected imports from the Python AST.
     imports: Vec<CollectedImport>,
+    /// Whether to detect type checking imports
+    type_checking_imports: bool,
 }
 
 impl<'a> Collector<'a> {
-    pub(crate) fn new(module_path: Option<&'a [String]>, string_imports: StringImports) -> Self {
+    pub(crate) fn new(
+        module_path: Option<&'a [String]>,
+        string_imports: StringImports,
+        type_checking_imports: bool,
+    ) -> Self {
         Self {
             module_path,
             string_imports,
             imports: Vec::new(),
+            type_checking_imports,
         }
     }
 
@@ -91,10 +98,18 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                     }
                 }
             }
+            Stmt::If(ast::StmtIf { test, .. }) => {
+                // Skip TYPE_CHECKING blocks if not requested
+                if !self.type_checking_imports && is_type_checking_condition(test) {
+                    // Don't traverse the body - skip these imports entirely
+                    return;
+                }
+                // Otherwise, traverse normally
+                walk_stmt(self, stmt);
+            }
             Stmt::FunctionDef(_)
             | Stmt::ClassDef(_)
             | Stmt::While(_)
-            | Stmt::If(_)
             | Stmt::With(_)
             | Stmt::Match(_)
             | Stmt::Try(_)
