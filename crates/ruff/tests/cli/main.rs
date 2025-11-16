@@ -63,9 +63,7 @@ impl CliTest {
         files: impl IntoIterator<Item = (&'a str, &'a str)>,
     ) -> anyhow::Result<Self> {
         let case = Self::new()?;
-        for file in files {
-            case.write_file(file.0, file.1)?;
-        }
+        case.write_files(files)?;
         Ok(case)
     }
 
@@ -151,6 +149,16 @@ impl CliTest {
         fs::write(&file_path, content.as_ref())
             .with_context(|| format!("Failed to write file `{}`", file_path.display()))?;
 
+        Ok(())
+    }
+
+    pub(crate) fn write_files<'a>(
+        &self,
+        files: impl IntoIterator<Item = (&'a str, &'a str)>,
+    ) -> Result<()> {
+        for file in files {
+            self.write_file(file.0, file.1)?;
+        }
         Ok(())
     }
 

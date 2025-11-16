@@ -1,10 +1,12 @@
+use std::process::Command;
+
 use insta_cmd::assert_cmd_snapshot;
 
 use crate::CliTest;
 
 #[test]
 fn type_checking_imports() -> anyhow::Result<()> {
-    let test = CliTest::with_files([
+    let test = AnalyzeTest::with_files([
         ("ruff/__init__.py", ""),
         (
             "ruff/a.py",
@@ -27,7 +29,7 @@ fn type_checking_imports() -> anyhow::Result<()> {
         ("ruff/c.py", ""),
     ])?;
 
-    assert_cmd_snapshot!(test.analyze_graph_command(), @r###"
+    assert_cmd_snapshot!(test.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -47,7 +49,7 @@ fn type_checking_imports() -> anyhow::Result<()> {
     "###);
 
     assert_cmd_snapshot!(
-        test.analyze_graph_command()
+        test.command()
             .arg("--no-type-checking-imports"),
         @r###"
     success: true
@@ -71,7 +73,7 @@ fn type_checking_imports() -> anyhow::Result<()> {
 
 #[test]
 fn type_checking_imports_from_config() -> anyhow::Result<()> {
-    let test = CliTest::with_files([
+    let test = AnalyzeTest::with_files([
         ("ruff/__init__.py", ""),
         (
             "ruff/a.py",
@@ -101,7 +103,7 @@ fn type_checking_imports_from_config() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(test.analyze_graph_command(), @r###"
+    assert_cmd_snapshot!(test.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -125,7 +127,7 @@ fn type_checking_imports_from_config() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(test.analyze_graph_command(), @r###"
+    assert_cmd_snapshot!(test.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -148,10 +150,44 @@ fn type_checking_imports_from_config() -> anyhow::Result<()> {
     Ok(())
 }
 
-impl CliTest {
-    fn analyze_graph_command(&self) -> std::process::Command {
-        let mut command = self.command();
+struct AnalyzeTest {
+    cli_test: CliTest,
+}
+
+impl AnalyzeTest {
+    pub(crate) fn new() -> anyhow::Result<Self> {
+        Ok(Self {
+            cli_test: CliTest::with_settings(|_, mut settings| {
+                settings.add_filter(r#"\\\\"#, "/");
+                settings
+            })?,
+        })
+    }
+
+    fn with_files<'a>(files: impl IntoIterator<Item = (&'a str, &'a str)>) -> anyhow::Result<Self> {
+        let case = Self::new()?;
+        case.write_files(files)?;
+        Ok(case)
+    }
+
+    #[expect(unused)]
+    fn with_file(path: impl AsRef<std::path::Path>, content: &str) -> anyhow::Result<Self> {
+        let fixture = Self::new()?;
+        fixture.write_file(path, content)?;
+        Ok(fixture)
+    }
+
+    fn command(&self) -> Command {
+        let mut command = self.cli_test.command();
         command.arg("analyze").arg("graph").arg("--preview");
         command
+    }
+}
+
+impl std::ops::Deref for AnalyzeTest {
+    type Target = CliTest;
+
+    fn deref(&self) -> &Self::Target {
+        &self.cli_test
     }
 }
