@@ -1212,6 +1212,19 @@ pub enum Truthiness {
     Unknown,
 }
 
+/// Return `true` if the expression is definitely not iterable (e.g., numbers, booleans, None).
+/// This is used to avoid incorrectly assuming truthiness for `tuple(x)`, `list(x)`, etc.
+/// when `x` is not iterable.
+fn is_definitely_not_iterable(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::NumberLiteral(_)
+            | Expr::BooleanLiteral(_)
+            | Expr::NoneLiteral(_)
+            | Expr::EllipsisLiteral(_)
+    )
+}
+
 impl Truthiness {
     /// Return the truthiness of an expression.
     pub fn from_expr<F>(expr: &Expr, is_builtin: F) -> Self
@@ -1327,6 +1340,19 @@ impl Truthiness {
                             // tuple(empty_generator) is falsy. ListComp and SetComp are handled by
                             // recursing into Self::from_expr below, which returns Unknown for them.
                             if argument.is_generator_expr() {
+                                Self::Unknown
+                            } else if is_definitely_not_iterable(argument) {
+                                // For non-iterable arguments like numbers, booleans, None, etc.,
+                                // we can't assume truthiness. For example, tuple(0) raises TypeError.
+                                Self::Unknown
+                            } else if matches!(argument, Expr::StringLiteral(_)) {
+                                // For strings, tuple("") creates an empty tuple which is falsy,
+                                // but tuple("a") creates a non-empty tuple which is truthy.
+                                // However, we can't assume truthiness matches because:
+                                // - tuple("") is falsy (empty tuple), but "" is also falsy
+                                // - The issue is that we conflate truthiness with non-emptiness
+                                // - For SIM222/SIM223, we should be conservative and return Unknown
+                                //   to avoid false positives
                                 Self::Unknown
                             } else {
                                 Self::from_expr(argument, is_builtin)
