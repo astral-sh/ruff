@@ -2400,6 +2400,28 @@ impl<'db> ClassLiteral<'db> {
 
                 Some(CallableType::function_like(db, signature))
             }
+            (CodeGeneratorKind::DataclassLike(_), "__hash__") => {
+                let unsafe_hash = has_dataclass_param(DataclassFlags::UNSAFE_HASH);
+                let frozen = has_dataclass_param(DataclassFlags::FROZEN);
+                let eq = has_dataclass_param(DataclassFlags::EQ);
+
+                if unsafe_hash || (frozen && eq) {
+                    let signature = Signature::new(
+                        Parameters::new([Parameter::positional_or_keyword(Name::new_static(
+                            "self",
+                        ))
+                        .with_annotated_type(instance_ty)]),
+                        Some(KnownClass::Int.to_instance(db)),
+                    );
+
+                    Some(CallableType::function_like(db, signature))
+                } else if eq && !frozen {
+                    Some(Type::none(db))
+                } else {
+                    // No `__hash__` is generated, fall back to `object.__hash__`
+                    None
+                }
+            }
             (CodeGeneratorKind::DataclassLike(_), "__match_args__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
             {
