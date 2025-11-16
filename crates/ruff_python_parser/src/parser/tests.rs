@@ -157,3 +157,43 @@ t"i}'"#;
 
     insta::assert_debug_snapshot!(error);
 }
+
+#[test]
+fn test_ipython_escape_command_in_with_statement() {
+    // Regression test for https://github.com/astral-sh/ruff/issues/21465
+    // This should not panic when encountering a `?` escape command in a with statement
+    // The original issue was that parsing `with a,?b\n?` would panic when trying to
+    // parse `?b` as an expression. Now it should handle it gracefully with an error.
+    let source = "with a,?b\n?";
+
+    // This should not panic - it may return an error, but that's fine
+    let parsed = parse(source, ParseOptions::from(Mode::Ipython));
+
+    // Verify it doesn't panic - check if it parsed or has errors
+    match parsed {
+        Ok(result) => {
+            // If it parsed successfully, snapshot the result
+            insta::assert_debug_snapshot!(result.syntax());
+        }
+        Err(error) => {
+            // If it has errors, that's also fine - the important thing is it didn't panic
+            // Snapshot the error to verify it's the expected error type
+            insta::assert_debug_snapshot!(error);
+        }
+    }
+}
+
+#[test]
+fn test_ipython_help_escape_command_as_expression() {
+    // Regression test for https://github.com/astral-sh/ruff/issues/21465
+    // Test that parsing a `?` escape command as an expression doesn't panic.
+    // Only `%` and `!` escape commands are allowed as expressions.
+    let source = "?foo";
+
+    // Try to parse as an expression - this should not panic
+    let parsed = parse_expression(source);
+
+    // Should return an error, not panic
+    let error = parsed.unwrap_err();
+    insta::assert_debug_snapshot!(error);
+}
