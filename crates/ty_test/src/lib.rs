@@ -14,7 +14,7 @@ use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
-use std::fmt::Write;
+use std::fmt::{Display, Write};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
 use ty_python_semantic::{
@@ -86,21 +86,34 @@ pub fn run(
                     EmbeddedFileSourceMap::new(&md_index, test_failures.backtick_offsets);
 
                 for (relative_line_number, failures) in test_failures.by_line.iter() {
-                    let absolute_line_number =
-                        source_map.to_absolute_line_number(relative_line_number);
+                    let file = match output_format {
+                        OutputFormat::Cli => relative_fixture_path.as_str(),
+                        OutputFormat::GitHub => absolute_fixture_path.as_str(),
+                    };
+
+                    let absolute_line_number = match source_map
+                        .to_absolute_line_number(relative_line_number)
+                    {
+                        Ok(line_number) => line_number,
+                        Err(last_line_number) => {
+                            print!("{}",
+                                output_format.display_error(
+                                    file,
+                                    last_line_number,
+                                    "Found a trailing assertion comment (e.g., `# revealed:` or `# error:`) \
+                                    not followed by any statement."
+                                )
+                            );
+
+                            continue;
+                        }
+                    };
 
                     for failure in failures {
-                        match output_format {
-                            OutputFormat::Cli => {
-                                let line_info =
-                                    format!("{relative_fixture_path}:{absolute_line_number}")
-                                        .cyan();
-                                println!("  {line_info} {failure}");
-                            }
-                            OutputFormat::GitHub => println!(
-                                "::error file={absolute_fixture_path},line={absolute_line_number}::{failure}"
-                            ),
-                        }
+                        print!(
+                            "{}",
+                            output_format.display_error(file, absolute_line_number, failure)
+                        );
                     }
                 }
             }
@@ -152,6 +165,49 @@ pub enum OutputFormat {
 impl OutputFormat {
     const fn is_cli(self) -> bool {
         matches!(self, OutputFormat::Cli)
+    }
+
+    fn display_error(self, file: &str, line: OneIndexed, failure: impl Display) -> impl Display {
+        struct Display<'a, T> {
+            format: OutputFormat,
+            file: &'a str,
+            line: OneIndexed,
+            failure: T,
+        }
+
+        impl<T> std::fmt::Display for Display<'_, T>
+        where
+            T: std::fmt::Display,
+        {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let Display {
+                    format,
+                    file,
+                    line,
+                    failure,
+                } = self;
+
+                match format {
+                    OutputFormat::Cli => {
+                        writeln!(
+                            f,
+                            "  {file_line} {failure}",
+                            file_line = format!("{file}:{line}").cyan()
+                        )
+                    }
+                    OutputFormat::GitHub => {
+                        writeln!(f, "::error file={file},line={line}::{failure}")
+                    }
+                }
+            }
+        }
+
+        Display {
+            format: self,
+            file,
+            line,
+            failure,
+        }
     }
 }
 
