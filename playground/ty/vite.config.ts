@@ -3,6 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react-swc";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
+import { normalizePath } from "vite";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 
 const PYODIDE_EXCLUDE = [
@@ -23,7 +24,7 @@ export function viteStaticCopyPyodide() {
   return viteStaticCopy({
     targets: [
       {
-        src: [join(pyodideDir, "*").replace(/\\/g, "/"), ...PYODIDE_EXCLUDE],
+        src: [normalizePath(join(pyodideDir, "*")), ...PYODIDE_EXCLUDE],
         dest: "assets",
       },
     ],
