@@ -358,6 +358,9 @@ fn only_keyword_completion<'db>(tokens: &[Token], typed: Option<&str>) -> Option
     if is_import_from_incomplete(tokens, typed) {
         return Some(Completion::keyword("import"));
     }
+    if is_import_alias_incomplete(tokens, typed) {
+        return Some(Completion::keyword("as"));
+    }
     None
 }
 
@@ -908,6 +911,59 @@ fn is_import_from_incomplete(tokens: &[Token], typed: Option<&str>) -> bool {
                 TK::Name | TK::Dot | TK::Ellipsis | TK::Case | TK::Match | TK::Type | TK::Unknown,
             ) => S::ModulePossiblyDotted,
             (S::ModulePossiblyDotted | S::ModuleOnlyDotted, TK::From) => return true,
+            _ => return false,
+        };
+    }
+    false
+}
+
+/// Detects `import <name> <CURSOR>` statements with a potentially incomplete
+/// `as` clause.
+///
+/// Note that this works for `from <module> import <name> <CURSOR>` as well.
+///
+/// If found, `true` is returned.
+fn is_import_alias_incomplete(tokens: &[Token], typed: Option<&str>) -> bool {
+    use TokenKind as TK;
+
+    const LIMIT: usize = 1_000;
+
+    /// A state used to "parse" the tokens preceding the user's cursor,
+    /// in reverse, to detect a "import <name> as" statement.
+    enum S {
+        Start,
+        As,
+        Name,
+    }
+
+    if typed.is_none() {
+        return false;
+    }
+
+    let mut state = S::Start;
+    for token in tokens.iter().rev().take(LIMIT) {
+        state = match (state, token.kind()) {
+            (S::Start, TK::Name | TK::Unknown | TK::As) => S::As,
+            (S::As, TK::Name | TK::Case | TK::Match | TK::Type | TK::Unknown) => S::Name,
+            (
+                S::Name,
+                TK::Name
+                | TK::Dot
+                | TK::Ellipsis
+                | TK::Case
+                | TK::Match
+                | TK::Type
+                | TK::Unknown
+                | TK::Comma
+                | TK::As
+                | TK::Newline
+                | TK::NonLogicalNewline
+                | TK::Lpar
+                | TK::Rpar,
+            ) => S::Name,
+            // Once we reach the `import` token we know we're in
+            // `import name <CURSOR>`.
+            (S::Name, TK::Import) => return true,
             _ => return false,
         };
     }
@@ -4688,6 +4744,68 @@ from collections import defaultdict as f<CURSOR>
             builder.build().snapshot(),
             @"<No completions found>",
         );
+    }
+
+    #[test]
+    fn import_missing_alias_suggests_as() {
+        let builder = completion_test_builder(
+            "\
+import collections a<CURSOR>
+    ",
+        );
+        assert_snapshot!(builder.build().snapshot(), @"as");
+    }
+
+    #[test]
+    fn import_dotted_module_missing_alias_suggests_as() {
+        let builder = completion_test_builder(
+            "\
+import collections.abc a<CURSOR>
+    ",
+        );
+        assert_snapshot!(builder.build().snapshot(), @"as");
+    }
+
+    #[test]
+    fn import_multiple_modules_missing_alias_suggests_as() {
+        let builder = completion_test_builder(
+            "\
+import collections.abc as c, typing a<CURSOR>
+    ",
+        );
+        assert_snapshot!(builder.build().snapshot(), @"as");
+    }
+
+    #[test]
+    fn from_import_missing_alias_suggests_as() {
+        let builder = completion_test_builder(
+            "\
+from collections.abc import Mapping a<CURSOR>
+    ",
+        );
+        assert_snapshot!(builder.build().snapshot(), @"as");
+    }
+
+    #[test]
+    fn from_import_parenthesized_missing_alias_suggests_as() {
+        let builder = completion_test_builder(
+            "\
+from typing import (
+    NamedTuple a<CURSOR>
+)
+    ",
+        );
+        assert_snapshot!(builder.build().snapshot(), @"as");
+    }
+
+    #[test]
+    fn from_relative_import_missing_alias_suggests_as() {
+        let builder = completion_test_builder(
+            "\
+from ...foo import bar a<CURSOR>
+    ",
+        );
+        assert_snapshot!(builder.build().snapshot(), @"as");
     }
 
     #[test]
