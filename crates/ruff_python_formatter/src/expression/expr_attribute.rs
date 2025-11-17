@@ -179,6 +179,12 @@ impl NeedsParentheses for ExprAttribute {
             context.comments().ranges(),
             context.source(),
         ) {
+            // We have to avoid creating syntax errors like
+            // ```python
+            // variable = (something) # trailing
+            // .my_attribute
+            // ```
+            // See https://github.com/astral-sh/ruff/issues/19350
             if context
                 .comments()
                 .trailing(self.value.as_ref())
