@@ -265,31 +265,35 @@ if +(
     pass
 
 if (
+    not
     # comment
-    not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 
 if (
+    ~
     # comment
-    ~aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 if (
+    -
     # comment
-    -aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 
 if (
+    +
     # comment
-    +aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
@@ -298,8 +302,9 @@ if (
 
 if (
     # unary comment
+    not
     # operand comment
-    not (
+    (
         # comment
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
         + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
@@ -334,31 +339,35 @@ if (
 ## Trailing operator comments
 
 if (
+    not
     # comment
-    not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 
 if (
+    ~
     # comment
-    ~aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 if (
+    -
     # comment
-    -aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 
 if (
+    +
     # comment
-    +aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
@@ -378,14 +387,16 @@ if (
     pass
 
 if (
+    not
     # comment
-    not a
+    a
 ):
     pass
 
 if (
+    not
     # comment
-    not a
+    a
 ):
     pass
 
@@ -402,9 +413,10 @@ if True:
 # Regression test for: https://github.com/astral-sh/ruff/issues/7448
 x = (
     # a
+    not
     # b
     # c
-    not (  # d
+    (  # d
         # e
         True
     )
@@ -436,14 +448,16 @@ def foo():
 
 # Regression tests for https://github.com/astral-sh/ruff/issues/19226
 if "" and (
+    not
     #
-    not 0
+    0
 ):
     pass
 
 if "" and (
+    not
     #
-    not (0)
+    (0)
 ):
     pass
 

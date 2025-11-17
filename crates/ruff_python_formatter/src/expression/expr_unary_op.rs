@@ -1,6 +1,7 @@
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprUnaryOp;
 use ruff_python_ast::UnaryOp;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -16,30 +17,12 @@ pub struct FormatExprUnaryOp;
 
 impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
     fn fmt_fields(&self, item: &ExprUnaryOp, f: &mut PyFormatter) -> FormatResult<()> {
-        token("<cursor>").fmt(f)?;
-        dbg!("unary op");
         let ExprUnaryOp {
             range: _,
             node_index: _,
             op,
             operand,
         } = item;
-
-        let comments = f.context().comments().clone();
-        let dangling = comments.dangling(item);
-
-        let up_to = operand_start(item, f.context().source());
-
-        let pivot = dangling.partition_point(|comment| comment.end() < up_to);
-        let leading = &dangling[..pivot];
-
-        // Split off the comments that follow after the operator and format them as trailing comments.
-        // ```python
-        // (not # comment
-        //      a)
-        // ```
-        leading_comments(leading).fmt(f)?;
-        trailing_comments(&dangling[pivot..]).fmt(f)?;
 
         let operator = match op {
             UnaryOp::Invert => "~",
@@ -50,6 +33,24 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
 
         token(operator).fmt(f)?;
 
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling(item);
+
+        let idx = dangling.partition_point(|comment| comment.line_position().is_end_of_line());
+        let (leading, trailing) = dangling.split_at(idx);
+
+        // Split off the comments that follow after the operator and format them as trailing comments.
+        // ```python
+        // (not # comment
+        //      a)
+        // ```
+        trailing_comments(trailing).fmt(f)?;
+
+        if !leading.is_empty() {
+            hard_line_break().fmt(f)?;
+            leading_comments(leading).fmt(f)?;
+        }
+
         // Insert a line break if the operand has comments but itself is not parenthesized.
         // ```python
         // if (
@@ -57,15 +58,30 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
         //  # comment
         //  a)
         // ```
+        let range = parenthesized_range(
+            operand.into(),
+            item.into(),
+            comments.ranges(),
+            f.context().source(),
+        );
+        // look at leading comments (on the operand) and see if any of them come before the starting
+        // range of the parentheses; if so, insert hard line break, otherwise space
+        let has_leading_comments_before_parens = range.is_some_and(|range| {
+            comments
+                .leading(operand.as_ref())
+                .iter()
+                .any(|comment| comment.start() < range.start())
+        });
         if comments.has_leading(operand.as_ref())
             && !is_expression_parenthesized(
                 operand.as_ref().into(),
                 f.context().comments().ranges(),
                 f.context().source(),
             )
+            || has_leading_comments_before_parens
         {
             hard_line_break().fmt(f)?;
-        } else if op.is_not() {
+        } else if op.is_not() && leading.is_empty() {
             space().fmt(f)?;
         }
 

@@ -403,7 +403,6 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatClauseHeader<'_, 'ast> {
         if has_skip_comment(self.trailing_colon_comment, f.context().source()) {
             write_suppressed_clause_header(self.header, f)?;
         } else {
-            dbg!("last branch in clause header");
             // Write a source map entry for the colon for range formatting to support formatting the clause header without
             // the clause body. Avoid computing `self.header.range()` otherwise because it's somewhat involved.
             let clause_end = if f.options().source_map_generation().is_enabled() {

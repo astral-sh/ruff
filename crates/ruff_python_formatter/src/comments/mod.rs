@@ -390,10 +390,10 @@ impl<'a> Comments<'a> {
             writeln!(output, "{:#?}", comment.debug(source_code)).unwrap();
         }
 
-        // assert!(
-        //     output.is_empty(),
-        //     "The following comments have not been formatted.\n{output}"
-        // );
+        assert!(
+            output.is_empty(),
+            "The following comments have not been formatted.\n{output}"
+        );
     }
 
     #[inline(always)]

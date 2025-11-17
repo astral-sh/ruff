@@ -1909,7 +1909,7 @@ fn handle_unary_op_comment<'a>(
     source: &str,
 ) -> CommentPlacement<'a> {
     let up_to = operand_start(unary_op, source);
-    if comment.end() < up_to {
+    if comment.end() < up_to && comment.line_position().is_end_of_line() {
         CommentPlacement::dangling(unary_op, comment)
     } else {
         CommentPlacement::Default(comment)
