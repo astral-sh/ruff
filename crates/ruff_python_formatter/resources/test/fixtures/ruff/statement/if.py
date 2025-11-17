@@ -298,35 +298,35 @@ if parent_body:
 # Compare behavior with `while`/`else` comment placement
 
 if True: pass
-    # comment
+    # 1
 else:
     pass
 
 if True:
     pass
-        # comment
+        # 2
 else:
     pass
 
 if True: pass
-# comment
+# 3
 else:
     pass
 
 if True: pass
-    # comment
+    # 4
 else:
     pass
 
 def foo():
     if True:
         pass
-# comment
+# 5
     else:
         pass
 
 if True:
     first;second
-    # comment
+    # 6
 else:
     pass

@@ -30,35 +30,35 @@ while (
     print("Do something")
 
 while True: pass
-    # comment
+    # 1
 else:
     pass
 
 while True:
     pass
-        # comment
+        # 2
 else:
     pass
 
 while True: pass
-# comment
+# 3
 else:
     pass
 
 while True: pass
-    # comment
+    # 4
 else:
     pass
 
 def foo():
     while True:
         pass
-# comment
+# 5
     else:
         pass
 
 while True:
     first;second
-    # comment
+    # 6
 else:
     pass
