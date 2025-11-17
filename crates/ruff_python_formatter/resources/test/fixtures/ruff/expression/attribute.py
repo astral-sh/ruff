@@ -204,3 +204,18 @@ variable = ( # 1
     # 6
 ) # 7
 
+
+if (
+    (something
+    # trailing own line on value
+    )
+    .first_method("some string")
+): ...
+
+variable = (
+    (something
+    # 1
+    )  # 2
+    .first_method("some string")
+)
+
