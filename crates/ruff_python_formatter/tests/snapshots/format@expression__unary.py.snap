@@ -339,35 +339,27 @@ if (
 ## Trailing operator comments
 
 if (
-    not
-    # comment
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  # comment
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 
 if (
-    ~
-    # comment
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    ~aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  # comment
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 if (
-    -
-    # comment
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    -aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  # comment
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 
 if (
-    +
-    # comment
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    +aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  # comment
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
@@ -394,9 +386,7 @@ if (
     pass
 
 if (
-    not
-    # comment
-    a
+    not a  # comment
 ):
     pass
 
@@ -413,8 +403,7 @@ if True:
 # Regression test for: https://github.com/astral-sh/ruff/issues/7448
 x = (
     # a
-    not
-    # b
+    not  # b
     # c
     (  # d
         # e
@@ -448,16 +437,12 @@ def foo():
 
 # Regression tests for https://github.com/astral-sh/ruff/issues/19226
 if "" and (
-    not
-    #
-    0
+    not 0  #
 ):
     pass
 
 if "" and (
-    not
-    #
-    (0)
+    not (0)  #
 ):
     pass
 

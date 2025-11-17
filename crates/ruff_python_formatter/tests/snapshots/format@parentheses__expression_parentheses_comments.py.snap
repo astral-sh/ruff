@@ -184,9 +184,7 @@ x = (
         # leading inner
         "a"
     ),
-    not
-    # in-between comment
-    (
+    not (  # in-between comment
         # leading inner
         "b"
     ),
@@ -195,9 +193,7 @@ x = (
         "c"
     ),
     # 1
-    not
-    # 2
-    (  # 3
+    not (  # 2  # 3
         # 4
         "d"
     ),

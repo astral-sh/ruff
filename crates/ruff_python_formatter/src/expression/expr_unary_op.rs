@@ -5,7 +5,6 @@ use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::comments::leading_comments;
 use crate::comments::trailing_comments;
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
@@ -36,20 +35,12 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
 
-        let idx = dangling.partition_point(|comment| comment.line_position().is_end_of_line());
-        let (leading, trailing) = dangling.split_at(idx);
-
         // Split off the comments that follow after the operator and format them as trailing comments.
         // ```python
         // (not # comment
         //      a)
         // ```
-        trailing_comments(trailing).fmt(f)?;
-
-        if !leading.is_empty() {
-            hard_line_break().fmt(f)?;
-            leading_comments(leading).fmt(f)?;
-        }
+        trailing_comments(dangling).fmt(f)?;
 
         // Insert a line break if the operand has comments but itself is not parenthesized or if the
         // operand is parenthesized but has a leading comment before the parentheses.
@@ -90,7 +81,7 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
             || has_leading_comments_before_parens
         {
             hard_line_break().fmt(f)?;
-        } else if op.is_not() && leading.is_empty() {
+        } else if op.is_not() {
             space().fmt(f)?;
         }
 
