@@ -38,6 +38,7 @@ use crate::types::{
     ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
     StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation, TypedDictParams,
     UnionBuilder, VarianceInferable, binding_type, declaration_type, determine_upper_bound,
+    todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -1664,20 +1665,28 @@ impl<'db> ClassLiteral<'db> {
         let class_definition =
             semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
 
-        if self.is_known(db, KnownClass::VersionInfo) {
-            let tuple_type = TupleType::new(db, &TupleSpec::version_info_spec(db))
-                .expect("sys.version_info tuple spec should always be a valid tuple");
+        if class_stmt.bases().iter().any(ast::Expr::is_starred_expr) {
+            return Box::new([todo_type!("Starred expressions in class bases")]);
+        }
 
-            Box::new([
-                definition_expression_type(db, class_definition, &class_stmt.bases()[0]),
-                Type::from(tuple_type.to_class_type(db)),
-            ])
-        } else {
-            class_stmt
+        match self.known(db) {
+            Some(KnownClass::VersionInfo) => {
+                let tuple_type = TupleType::new(db, &TupleSpec::version_info_spec(db))
+                    .expect("sys.version_info tuple spec should always be a valid tuple");
+
+                Box::new([
+                    definition_expression_type(db, class_definition, &class_stmt.bases()[0]),
+                    Type::from(tuple_type.to_class_type(db)),
+                ])
+            }
+            // Special-case `NotImplementedType`: typeshed says that it inherits from `Any`,
+            // but this causes more problems than it fixes.
+            Some(KnownClass::NotImplementedType) => Box::new([]),
+            _ => class_stmt
                 .bases()
                 .iter()
                 .map(|base_node| definition_expression_type(db, class_definition, base_node))
-                .collect()
+                .collect(),
         }
     }
 

@@ -36,8 +36,8 @@
 //! of iterations, so if we fail to converge, Salsa will eventually panic. (This should of course
 //! be considered a bug.)
 
-use ruff_python_ast as ast;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
