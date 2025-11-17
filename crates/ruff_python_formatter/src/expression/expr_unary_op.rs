@@ -51,22 +51,31 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
             leading_comments(leading).fmt(f)?;
         }
 
-        // Insert a line break if the operand has comments but itself is not parenthesized.
+        // Insert a line break if the operand has comments but itself is not parenthesized or if the
+        // operand is parenthesized but has a leading comment before the parentheses.
         // ```python
         // if (
         //  not
         //  # comment
-        //  a)
+        //  a):
+        //      pass
+        //
+        // if 1 and (
+        //     not
+        //     # comment
+        //     (
+        //         a
+        //     )
+        // ):
+        //     pass
         // ```
-        let range = parenthesized_range(
+        let parenthesized_operand_range = parenthesized_range(
             operand.into(),
             item.into(),
             comments.ranges(),
             f.context().source(),
         );
-        // look at leading comments (on the operand) and see if any of them come before the starting
-        // range of the parentheses; if so, insert hard line break, otherwise space
-        let has_leading_comments_before_parens = range.is_some_and(|range| {
+        let has_leading_comments_before_parens = parenthesized_operand_range.is_some_and(|range| {
             comments
                 .leading(operand.as_ref())
                 .iter()
