@@ -3368,10 +3368,7 @@ pub(super) fn report_invalid_method_override<'db>(
     let overridden_method = if class.name(db) != supercls_name {
         format!("{}.{}", supercls_name, member.name)
     } else {
-        let mut buffer = supercls.class_literal(db).0.qualified_name(db);
-        buffer.push('.');
-        buffer.push_str(&member.name);
-        buffer
+        supercls.class_literal(db).0.qualified_name(db).to_string()
     };
 
     diagnostic.set_primary_message(format_args!(

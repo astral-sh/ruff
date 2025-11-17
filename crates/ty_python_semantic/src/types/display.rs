@@ -15,8 +15,6 @@ use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::Db;
-use crate::module_resolver::file_to_module;
-use crate::semantic_index::{scope::ScopeKind, semantic_index};
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
@@ -28,7 +26,6 @@ use crate::types::{
     MaterializationKind, Protocol, ProtocolInstanceType, StringLiteralType, SubclassOfInner, Type,
     UnionType, WrapperDescriptorKind, visitor,
 };
-use ruff_db::parsed::parsed_module;
 
 /// Settings for displaying types and signatures
 #[derive(Debug, Clone, Default)]
@@ -134,8 +131,11 @@ impl<'db> AmbiguousClassCollector<'db> {
                 match value {
                     AmbiguityState::Unambiguous(existing) => {
                         if *existing != class {
-                            let qualified_name_components = class.qualified_name_components(db);
-                            if existing.qualified_name_components(db) == qualified_name_components {
+                            let qualified_name_components =
+                                class.qualified_name(db).components_excluding_self();
+                            if existing.qualified_name(db).components_excluding_self()
+                                == qualified_name_components
+                            {
                                 *value = AmbiguityState::RequiresFileAndLineNumber;
                             } else {
                                 *value = AmbiguityState::RequiresFullyQualifiedName {
@@ -150,7 +150,8 @@ impl<'db> AmbiguousClassCollector<'db> {
                         qualified_name_components,
                     } => {
                         if *existing != class {
-                            let new_components = class.qualified_name_components(db);
+                            let new_components =
+                                class.qualified_name(db).components_excluding_self();
                             if *qualified_name_components == new_components {
                                 *value = AmbiguityState::RequiresFileAndLineNumber;
                             }
@@ -275,62 +276,6 @@ impl<'db> ClassLiteral<'db> {
             settings,
         }
     }
-
-    /// Returns the components of the qualified name of this class, excluding this class itself.
-    ///
-    /// For example, calling this method on a class `C` in the module `a.b` would return
-    /// `["a", "b"]`. Calling this method on a class `D` inside the namespace of a method
-    /// `m` inside the namespace of a class `C` in the module `a.b` would return
-    /// `["a", "b", "C", "<locals of function 'm'>"]`.
-    fn qualified_name_components(self, db: &'db dyn Db) -> Vec<String> {
-        let body_scope = self.body_scope(db);
-        let file = body_scope.file(db);
-        let module_ast = parsed_module(db, file).load(db);
-        let index = semantic_index(db, file);
-        let file_scope_id = body_scope.file_scope_id(db);
-
-        let mut name_parts = vec![];
-
-        // Skips itself
-        for (_, ancestor_scope) in index.ancestor_scopes(file_scope_id).skip(1) {
-            let node = ancestor_scope.node();
-
-            match ancestor_scope.kind() {
-                ScopeKind::Class => {
-                    if let Some(class_def) = node.as_class() {
-                        name_parts.push(class_def.node(&module_ast).name.as_str().to_string());
-                    }
-                }
-                ScopeKind::Function => {
-                    if let Some(function_def) = node.as_function() {
-                        name_parts.push(format!(
-                            "<locals of function '{}'>",
-                            function_def.node(&module_ast).name.as_str()
-                        ));
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        if let Some(module) = file_to_module(db, file) {
-            let module_name = module.name(db);
-            name_parts.push(module_name.as_str().to_string());
-        }
-
-        name_parts.reverse();
-        name_parts
-    }
-
-    pub(super) fn qualified_name(self, db: &'db dyn Db) -> String {
-        let mut qualified_name = String::new();
-        for parent in self.qualified_name_components(db) {
-            qualified_name.push_str(&parent);
-            qualified_name.push('.');
-        }
-        qualified_name.push_str(self.name(db));
-        qualified_name
-    }
 }
 
 struct ClassDisplay<'db> {
@@ -343,12 +288,10 @@ impl Display for ClassDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let qualification_level = self.settings.qualified.get(&**self.class.name(self.db));
         if qualification_level.is_some() {
-            for parent in self.class.qualified_name_components(self.db) {
-                f.write_str(&parent)?;
-                f.write_char('.')?;
-            }
+            self.class.qualified_name(self.db).fmt(f)?;
+        } else {
+            f.write_str(self.class.name(self.db))?;
         }
-        f.write_str(self.class.name(self.db))?;
         if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
             let file = self.class.file(self.db);
             let path = file.path(self.db);
