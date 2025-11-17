@@ -253,6 +253,8 @@ class Sub(Base): ...
 @final
 class Unrelated: ...
 
+# fmt: off
+
 def mutually_bound[T: Base, U]():
     # revealed: ty_extensions.Specialization[T@mutually_bound = Base, U@mutually_bound = object]
     reveal_type(generic_context(mutually_bound).specialize_constrained(ConstraintSet.always()))
