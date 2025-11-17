@@ -140,3 +140,10 @@ if (
 for x in it: foo()
     # comment
 else: bar() # fmt: skip
+
+
+if this(
+    'is a long',
+    # commented
+    'condition'
+): with_a_skip # fmt: skip
