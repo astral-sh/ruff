@@ -95,7 +95,9 @@ use crate::types::mro::MroErrorKind;
 use crate::types::newtype::NewType;
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::subclass_of::SubclassOfInner;
-use crate::types::tuple::{Tuple, TupleLength, TupleSpec, TupleType};
+use crate::types::tuple::{
+    Tuple, TupleLength, TupleSpec, TupleSpecBuilder, TupleType, VariableLengthTuple,
+};
 use crate::types::typed_dict::{
     TypedDictAssignmentKind, validate_typed_dict_constructor, validate_typed_dict_dict_literal,
     validate_typed_dict_key_assignment,
@@ -7048,7 +7050,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::If(if_expression) => self.infer_if_expression(if_expression, tcx),
             ast::Expr::Lambda(lambda_expression) => self.infer_lambda_expression(lambda_expression),
             ast::Expr::Call(call_expression) => self.infer_call_expression(call_expression, tcx),
-            ast::Expr::Starred(starred) => self.infer_starred_expression(starred),
+            ast::Expr::Starred(starred) => self.infer_starred_expression(starred, tcx),
             ast::Expr::Yield(yield_expression) => self.infer_yield_expression(yield_expression),
             ast::Expr::YieldFrom(yield_from) => self.infer_yield_from_expression(yield_from),
             ast::Expr::Await(await_expression) => self.infer_await_expression(await_expression),
@@ -7284,25 +7286,66 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
         });
 
+        let mut is_homogeneous_tuple_annotation = false;
+
         let annotated_tuple = tcx
             .known_specialization(self.db(), KnownClass::Tuple)
             .and_then(|specialization| {
-                specialization
+                let spec = specialization
                     .tuple(self.db())
-                    .expect("the specialization of `KnownClass::Tuple` must have a tuple spec")
-                    .resize(self.db(), TupleLength::Fixed(elts.len()))
-                    .ok()
+                    .expect("the specialization of `KnownClass::Tuple` must have a tuple spec");
+
+                if matches!(
+                    spec,
+                    Tuple::Variable(VariableLengthTuple { prefix, variable: _, suffix})
+                    if prefix.is_empty() && suffix.is_empty()
+                ) {
+                    is_homogeneous_tuple_annotation = true;
+                }
+
+                spec.resize(self.db(), TupleLength::Fixed(elts.len())).ok()
             });
 
         let mut annotated_elt_tys = annotated_tuple.as_ref().map(Tuple::all_elements);
 
         let db = self.db();
-        let element_types = elts.iter().map(|element| {
-            let annotated_elt_ty = annotated_elt_tys.as_mut().and_then(Iterator::next).copied();
-            self.infer_expression(element, TypeContext::new(annotated_elt_ty))
-        });
 
-        Type::heterogeneous_tuple(db, element_types)
+        let can_use_type_context =
+            is_homogeneous_tuple_annotation || elts.iter().all(|elt| !elt.is_starred_expr());
+
+        let mut infer_element = |elt: &ast::Expr| {
+            if can_use_type_context {
+                let annotated_elt_ty = annotated_elt_tys.as_mut().and_then(Iterator::next).copied();
+                let context = if let ast::Expr::Starred(starred) = elt {
+                    annotated_elt_ty
+                        .map(|expected_element_type| {
+                            TypeContext::for_starred_expression(db, expected_element_type, starred)
+                        })
+                        .unwrap_or_default()
+                } else {
+                    TypeContext::new(annotated_elt_ty)
+                };
+                self.infer_expression(elt, context)
+            } else {
+                self.infer_expression(elt, TypeContext::default())
+            }
+        };
+
+        let mut builder = TupleSpecBuilder::with_capacity(elts.len());
+
+        for element in elts {
+            if element.is_starred_expr() {
+                let element_type = infer_element(element);
+                // Fine to use `iterate` rather than `try_iterate` here:
+                // errors from iterating over something not iterable will have been
+                // emitted in the `infer_element` call above.
+                builder = builder.concat(db, &element_type.iterate(db));
+            } else {
+                builder.push(infer_element(element));
+            }
+        }
+
+        Type::tuple(TupleType::new(db, &builder.build()))
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList, tcx: TypeContext<'db>) -> Type<'db> {
@@ -7459,7 +7502,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let inferable = generic_context.inferable_typevars(self.db());
 
-        // Remove any union elements of that are unrelated to the collection type.
+        // Remove any union elements of the annotation that are unrelated to the collection type.
         //
         // For example, we only want the `list[int]` from `annotation: list[int] | None` if
         // `collection_ty` is `list`.
@@ -7499,8 +7542,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let elt_tcxs = match annotated_elt_tys {
-            None => Either::Left(iter::repeat(TypeContext::default())),
-            Some(tys) => Either::Right(tys.iter().map(|ty| TypeContext::new(Some(*ty)))),
+            None => Either::Left(iter::repeat(None)),
+            Some(tys) => Either::Right(tys.iter().copied().map(Some)),
         };
 
         for elts in elts {
@@ -7529,6 +7572,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let Some(elt) = elt else { continue };
 
+                let elt_tcx = if let ast::Expr::Starred(starred) = elt {
+                    elt_tcx
+                        .map(|ty| TypeContext::for_starred_expression(self.db(), ty, starred))
+                        .unwrap_or_default()
+                } else {
+                    TypeContext::new(elt_tcx)
+                };
+
                 let inferred_elt_ty = infer_elt_expression(self, elt, elt_tcx);
 
                 // Simplify the inference based on the declared type of the element.
@@ -7542,7 +7593,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // unions for large nested list literals, which the constraint solver struggles with.
                 let inferred_elt_ty = inferred_elt_ty.promote_literals(self.db(), elt_tcx);
 
-                builder.infer(Type::TypeVar(elt_ty), inferred_elt_ty).ok()?;
+                builder
+                    .infer(
+                        Type::TypeVar(elt_ty),
+                        if elt.is_starred_expr() {
+                            inferred_elt_ty
+                                .iterate(self.db())
+                                .homogeneous_element_type(self.db())
+                        } else {
+                            inferred_elt_ty
+                        },
+                    )
+                    .ok()?;
             }
         }
 
@@ -8359,7 +8421,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_starred_expression(&mut self, starred: &ast::ExprStarred) -> Type<'db> {
+    fn infer_starred_expression(
+        &mut self,
+        starred: &ast::ExprStarred,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         let ast::ExprStarred {
             range: _,
             node_index: _,
@@ -8367,17 +8433,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ctx: _,
         } = starred;
 
-        let iterable_type = self.infer_expression(value, TypeContext::default());
+        let db = self.db();
+        let iterable_type = self.infer_expression(value, tcx);
+
         iterable_type
-            .try_iterate(self.db())
-            .map(|tuple| tuple.homogeneous_element_type(self.db()))
+            .try_iterate(db)
+            .map(|spec| Type::tuple(TupleType::new(db, &spec)))
             .unwrap_or_else(|err| {
                 err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
-                err.fallback_element_type(self.db())
-            });
-
-        // TODO
-        todo_type!("starred expression")
+                Type::homogeneous_tuple(db, err.fallback_element_type(db))
+            })
     }
 
     fn infer_yield_expression(&mut self, yield_expression: &ast::ExprYield) -> Type<'db> {
