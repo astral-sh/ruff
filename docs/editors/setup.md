@@ -400,11 +400,13 @@ Ruff can be utilized as a language server via [`Eglot`](https://github.com/joaot
 To enable Ruff with automatic formatting on save, use the following configuration:
 
 ```elisp
-(add-hook 'python-mode-hook 'eglot-ensure)
 (with-eval-after-load 'eglot
   (add-to-list 'eglot-server-programs
-               '(python-mode . ("ruff" "server")))
-  (add-hook 'after-save-hook 'eglot-format))
+               '(python-base-mode . ("ruff" "server"))))
+(add-hook 'python-base-mode-hook
+          (lambda ()
+            (eglot-ensure)
+            (add-hook 'after-save-hook 'eglot-format nil t)))
 ```
 
 Ruff is available as [`flymake-ruff`](https://melpa.org/#/flymake-ruff) on MELPA:
