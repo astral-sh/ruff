@@ -382,7 +382,7 @@ mod tests {
             f = func_a
         else:
             f = func_b
-
+        
         f(<CURSOR>
         "#,
         );
@@ -427,10 +427,10 @@ mod tests {
 
         @overload
         def process(value: int) -> str: ...
-
+        
         @overload
         def process(value: str) -> int: ...
-
+        
         def process(value):
             if isinstance(value, int):
                 return str(value)
@@ -827,10 +827,10 @@ def ab(a: int, *, c: int):
             r#"
         class Point:
             """A simple point class representing a 2D coordinate."""
-
+            
             def __init__(self, x: int, y: int):
                 """Initialize a point with x and y coordinates.
-
+                
                 Args:
                     x: The x-coordinate
                     y: The y-coordinate
@@ -962,12 +962,12 @@ def ab(a: int, *, c: int):
             r#"
         from typing import overload
 
-        @overload
+        @overload  
         def process(value: int) -> str: ...
-
+        
         @overload
         def process(value: str, flag: bool) -> int: ...
-
+        
         def process(value, flag=None):
             if isinstance(value, int):
                 return str(value)
