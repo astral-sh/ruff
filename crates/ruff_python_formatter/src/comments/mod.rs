@@ -1042,4 +1042,33 @@ else: # trailing comment
 
         assert_debug_snapshot!(comments.debug(test_case.source_code));
     }
+
+    #[test]
+    fn while_else_indented_comment_between_branches() {
+        let source = r"while True: pass
+    # comment
+else:
+    pass
+";
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn while_else_very_indented_comment_between_branches() {
+        let source = r"while True:
+    pass
+        # comment
+else:
+    pass
+";
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
 }

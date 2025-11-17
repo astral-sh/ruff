@@ -8,7 +8,7 @@ use ruff_python_trivia::{
     find_only_token_in_range, first_non_trivia_token, indentation_at_offset,
 };
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextLen, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::cmp::Ordering;
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
@@ -602,9 +602,35 @@ fn handle_own_line_comment_between_branches<'a>(
     // following branch or if it a trailing comment of the previous body's last statement.
     let comment_indentation = comment_indentation_after(preceding, comment.range(), source);
 
-    let preceding_indentation = indentation(source, &preceding)
-        .unwrap_or_default()
-        .text_len();
+    let preceding_indentation = indentation(source, &preceding).map_or_else(
+        // If `indentation` returns `None`, then there is leading
+        // content before the preceding node. In this case, we
+        // always treat the comment as being less-indented than the
+        // preceding. For example:
+        //
+        // ```python
+        // if True: pass
+        // # leading on `else`
+        // else:
+        //     pass
+        // ```
+        // Note we even do this if the comment is very indented
+        // (which matches `black`'s behavior as of 2025.11.11)
+        //
+        // ```python
+        // if True: pass
+        //          # leading on `else`
+        // else:
+        //     pass
+        // ```
+        || {
+            comment_indentation
+            // This can be any positive number - we just
+            // want to hit the `Less` branch below
+            + TextSize::new(1)
+        },
+        ruff_text_size::TextLen::text_len,
+    );
 
     // Compare to the last statement in the body
     match comment_indentation.cmp(&preceding_indentation) {
@@ -678,8 +704,41 @@ fn handle_own_line_comment_after_branch<'a>(
     preceding: AnyNodeRef<'a>,
     source: &str,
 ) -> CommentPlacement<'a> {
-    let Some(last_child) = preceding.last_child_in_body() else {
-        return CommentPlacement::Default(comment);
+    // If the preceding node has a body, we want the last child - e.g.
+    //
+    // ```python
+    // if True:
+    //     def foo():
+    //         something
+    //         last_child
+    //             # comment
+    // else:
+    //     pass
+    // ```
+    //
+    // Otherwise, the preceding node may be the last statement in the body
+    // of the preceding branch, in which case we can take it as our
+    // `last_child` here - e.g.
+    //
+    // ```python
+    // if True:
+    //     something
+    //     last_child
+    //         # comment
+    // else:
+    //     pass
+    // ```
+    let last_child = match preceding.last_child_in_body() {
+        Some(last) => last,
+        None if comment.following_node().is_some_and(|following| {
+            following.is_first_statement_in_alternate_body(comment.enclosing_node())
+        }) =>
+        {
+            preceding
+        }
+        _ => {
+            return CommentPlacement::Default(comment);
+        }
     };
 
     // We only care about the length because indentations with mixed spaces and tabs are only valid if
