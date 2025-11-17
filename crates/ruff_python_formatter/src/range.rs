@@ -12,7 +12,7 @@ use ruff_python_trivia::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::comments::{Comments, SuppressedNodes};
+use crate::comments::{Comments, SuppressedNodeRanges};
 use crate::context::{IndentLevel, NodeLevel};
 use crate::prelude::*;
 use crate::statement::suite::DocstringStmt;
@@ -77,7 +77,7 @@ pub fn format_range(
     let source_code = SourceCode::new(source);
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let comments = Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
-    let suppressed_nodes = SuppressedNodes::from_comments(&comments, source);
+    let suppressed_nodes = SuppressedNodeRanges::from_comments(&comments, source);
 
     let mut context = PyFormatContext::new(
         options.with_source_map_generation(SourceMapGeneration::Enabled),

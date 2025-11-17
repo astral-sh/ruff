@@ -7,14 +7,14 @@ use ruff_python_ast::str::Quote;
 use ruff_python_parser::Tokens;
 
 use crate::PyFormatOptions;
-use crate::comments::{Comments, SuppressedNodes};
+use crate::comments::{Comments, SuppressedNodeRanges};
 use crate::other::interpolated_string::InterpolatedStringContext;
 
 pub struct PyFormatContext<'a> {
     options: PyFormatOptions,
     contents: &'a str,
     comments: Comments<'a>,
-    suppressed_nodes: SuppressedNodes<'a>,
+    suppressed_nodes: SuppressedNodeRanges,
     tokens: &'a Tokens,
     node_level: NodeLevel,
     indent_level: IndentLevel,
@@ -36,7 +36,7 @@ impl<'a> PyFormatContext<'a> {
         options: PyFormatOptions,
         contents: &'a str,
         comments: Comments<'a>,
-        suppressed_nodes: SuppressedNodes<'a>,
+        suppressed_nodes: SuppressedNodeRanges,
         tokens: &'a Tokens,
     ) -> Self {
         Self {
