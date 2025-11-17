@@ -730,17 +730,9 @@ fn handle_own_line_comment_after_branch<'a>(
     // ```
     let last_child = match preceding.last_child_in_body() {
         Some(last) => last,
-        None if matches!(
-            comment.enclosing_node(),
-            AnyNodeRef::StmtIf(_)
-                | AnyNodeRef::StmtWhile(_)
-                | AnyNodeRef::StmtFor(_)
-                | AnyNodeRef::StmtMatch(_)
-                | AnyNodeRef::ElifElseClause(_)
-                | AnyNodeRef::StmtTry(_)
-                | AnyNodeRef::MatchCase(_)
-                | AnyNodeRef::ExceptHandlerExceptHandler(_)
-        ) =>
+        None if comment.following_node().is_some_and(|following| {
+            following.is_first_statement_in_alternate_body(comment.enclosing_node())
+        }) =>
         {
             preceding
         }
