@@ -46,6 +46,13 @@ error[invalid-method-override]: Invalid override of method `__eq__`
 144 |     def __str__(self) -> str: ...  # noqa: Y029
     |
 info: This violates the Liskov Substitution Principle
+help: It is recommended for `__eq__` to work with arbitrary objects, for example:
+help
+help:     def __eq__(self, other: object) -> bool:
+help:         if not isinstance(other, A):
+help:             return False
+help:         return <logic to compare two `A` instances>
+help
 info: rule `invalid-method-override` is enabled by default
 
 ```

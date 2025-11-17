@@ -1938,7 +1938,14 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Detects method overrides that violate the [Liskov Substitution Principle].
+    /// Detects method overrides that violate the [Liskov Substitution Principle] ("LSP").
+    ///
+    /// The LSP states that any subtype should be substitutable for its supertype.
+    /// Applied to Python, this means:
+    /// 1. All argument combinations a superclass method accepts
+    ///    must also be accepted by an overriding subclass method.
+    /// 2. The return type of an overriding subclass method must be a subtype
+    ///    of the return type of the superclass method.
     ///
     /// ## Why is this bad?
     /// Violating the Liskov Substitution Principle will lead to many of ty's assumptions and
@@ -1948,25 +1955,60 @@ declare_lint! {
     /// ## Example
     /// ```python
     /// class Super:
-    ///     def method(self) -> int:
+    ///     def method(self, x) -> int:
     ///         return 42
     ///
     /// class Sub(Super):
     ///     # Liskov violation: `str` is not a subtype of `int`,
     ///     # but the supertype method promises to return an `int`.
-    ///     def method(self) -> str:  # error: [invalid-override]
+    ///     def method(self, x) -> str:  # error: [invalid-override]
     ///         return "foo"
     ///
     /// def accepts_super(s: Super) -> int:
-    ///     return s.method()
+    ///     return s.method(x=42)
     ///
     /// accepts_super(Sub())  # The result of this call is a string, but ty will infer
     ///                       # it to be an `int` due to the violation of the Liskov Substitution Principle.
+    ///
+    /// class Sub2(Super):
+    ///     # Liskov violation: the superclass method can be called with a `x=`
+    ///     # keyword argument, but the subclass method does not accept it.
+    ///     def method(self, y) -> int:  # error: [invalid-override]
+    ///        return 42
+    ///
+    /// accepts_super(Sub2())  # TypeError at runtime: method() got an unexpected keyword argument 'x'
+    ///                        # ty cannot catch this error due to the violation of the Liskov Substitution Principle.
     /// ```
+    ///
+    /// ## Common issues
+    ///
+    /// ### Why does ty complain about my `__eq__` method?
+    ///
+    /// `__eq__` and `__ne__` methods in Python are generally expected to accept arbitrary
+    /// objects as their second argument, for example:
+    ///
+    /// ```python
+    /// class A:
+    ///     x: int
+    ///
+    ///     def __eq__(self, other: object) -> bool:
+    ///         # gracefully handle an object of an unexpected type
+    ///         # without raising an exception
+    ///         if not isinstance(other, A):
+    ///             return False
+    ///         return self.x == other.x
+    /// ```
+    ///
+    /// If `A.__eq__` here were annotated as only accepting `A` instances for its second argument,
+    /// it would imply that you wouldn't be able to use `==` between instances of `A` and
+    /// instances of unrelated classes without an exception possibly being raised. While some
+    /// classes in Python do indeed behave this way, the strongly held convention is that it should
+    /// be avoided wherever possible. As part of this check, therefore, ty enforces that `__eq__`
+    /// and `__ne__` methods accept `object` as their second argument.
     ///
     /// [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
     pub(crate) static INVALID_METHOD_OVERRIDE = {
-        summary: "detects missing required keys in `TypedDict` constructors",
+        summary: "detects method definitions that violate the Liskov Substitution Principle",
         status: LintStatus::stable("0.0.1-alpha.20"),
         default_level: Level::Error,
     }
@@ -3360,23 +3402,25 @@ pub(super) fn report_invalid_method_override<'db>(
     };
 
     let db = context.db();
+    let member = &member.name;
+    let class_name = class.name(db);
 
     let mut diagnostic =
-        builder.into_diagnostic(format_args!("Invalid override of method `{}`", member.name));
+        builder.into_diagnostic(format_args!("Invalid override of method `{member}`"));
 
     let supercls_name = supercls.name(db);
 
-    let overridden_method = if class.name(db) == supercls_name {
+    let overridden_method = if class_name == supercls_name {
         format!(
             "{class}.{member}",
             class = supercls.class_literal(db).0.qualified_name(db),
-            member = &member.name
+            member = member
         )
     } else {
         format!(
             "{class}.{member}",
             class = supercls.name(db),
-            member = &member.name
+            member = member
         )
     };
 
@@ -3386,40 +3430,81 @@ pub(super) fn report_invalid_method_override<'db>(
 
     diagnostic.info("This violates the Liskov Substitution Principle");
 
-    let secondary_span = type_on_supercls
+    let supercls_scope = supercls.class_literal(db).0.body_scope(db);
+
+    let Some(symbol_on_supercls) = place_table(db, supercls_scope).symbol_id(member) else {
+        return;
+    };
+
+    let Some(binding) = use_def_map(db, supercls_scope)
+        .end_of_scope_bindings(ScopedPlaceId::Symbol(symbol_on_supercls))
+        .next()
+    else {
+        return;
+    };
+
+    let Some(definition) = binding.binding.definition() else {
+        return;
+    };
+
+    let definition_span =
+        Span::from(definition.full_range(db, &parsed_module(db, supercls_scope.file(db)).load(db)));
+
+    let original_function_span = type_on_supercls
         .as_bound_method()
-        .and_then(|method_on_supercls| {
-            let supercls_scope = supercls.class_literal(db).0.body_scope(db);
+        .and_then(|method| {
+            method
+                .function(db)
+                .literal(db)
+                .last_definition(db)
+                .spans(db)
+        })
+        .map(|spans| spans.signature);
 
-            if method_on_supercls.function(db).definition(db).scope(db) == supercls_scope {
-                method_on_supercls
-                    .function(db)
-                    .literal(db)
-                    .last_definition(db)
-                    .spans(db)
-                    .map(|spans| spans.signature)
-            } else {
-                place_table(db, supercls_scope)
-                    .symbol_id(&member.name)
-                    .and_then(|symbol| {
-                        use_def_map(db, supercls_scope)
-                            .end_of_scope_bindings(ScopedPlaceId::Symbol(symbol))
-                            .next()
-                    })
-                    .and_then(|binding| binding.binding.definition())
-                    .map(|definition| {
-                        definition
-                            .full_range(db, &parsed_module(db, supercls_scope.file(db)).load(db))
-                    })
-                    .map(Span::from)
-            }
-        });
+    let definition_kind = definition.kind(db);
 
-    if let Some(secondary_span) = secondary_span {
+    let secondary_span = if definition_kind.is_function_def()
+        && let Some(function_span) = original_function_span.clone()
+    {
+        function_span
+    } else {
+        definition_span
+    };
+
+    diagnostic.annotate(
+        Annotation::secondary(secondary_span.clone())
+            .message(format_args!("`{overridden_method}` defined here")),
+    );
+
+    if !definition_kind.is_function_def()
+        && let Some(function_span) = original_function_span
+        && function_span != secondary_span
+    {
         diagnostic.annotate(
-            Annotation::secondary(secondary_span)
-                .message(format_args!("`{overridden_method}` defined here")),
+            Annotation::secondary(function_span)
+                .message(format_args!("Signature of `{overridden_method}`")),
         );
+    }
+
+    if !(supercls.is_object(db) && matches!(&**member, "__eq__" | "__ne__")) {
+        return;
+    }
+
+    // Inspired by mypy's subdiagnostic at <https://github.com/python/mypy/blob/1b6ebb17b7fe64488a7b3c3b4b0187bb14fe331b/mypy/messages.py#L1307-L1318>
+    let eq_subdiagnostics = [
+        format_args!(
+            "It is recommended for `{member}` to work with arbitrary objects, for example:",
+        ),
+        format_args!(""),
+        format_args!("    def {member}(self, other: object) -> bool:",),
+        format_args!("        if not isinstance(other, {class_name}):",),
+        format_args!("            return False"),
+        format_args!("        return <logic to compare two `{class_name}` instances>"),
+        format_args!(""),
+    ];
+
+    for subdiag in eq_subdiagnostics {
+        diagnostic.help(subdiag);
     }
 }
 

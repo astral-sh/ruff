@@ -66,6 +66,11 @@ error[invalid-method-override]: Invalid override of method `x`
 13 |     def x(self, y: int): ...  # error: [invalid-method-override]
    |         ^^^^^^^^^^^^^^^ Definition is incompatible with `C.x`
    |
+  ::: src/foo.pyi:1:5
+   |
+ 1 | def x(self, y: str): ...
+   |     --------------- Signature of `C.x`
+   |
 info: This violates the Liskov Substitution Principle
 info: rule `invalid-method-override` is enabled by default
 

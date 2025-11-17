@@ -271,3 +271,14 @@ class C:
 class D(C):
     def x(self, y: int): ...  # error: [invalid-method-override]
 ```
+
+## Bad override of `__eq__`
+
+<!-- snapshot-diagnostics -->
+
+```py
+class Bad:
+    x: int
+    def __eq__(self, other: "Bad") -> bool:  # error: [invalid-method-override]
+        return self.x == other.x
+```

@@ -870,7 +870,14 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.20">0
 
 **What it does**
 
-Detects method overrides that violate the [Liskov Substitution Principle].
+Detects method overrides that violate the [Liskov Substitution Principle] ("LSP").
+
+The LSP states that any subtype should be substitutable for its supertype.
+Applied to Python, this means:
+1. All argument combinations a superclass method accepts
+   must also be accepted by an overriding subclass method.
+2. The return type of an overriding subclass method must be a subtype
+   of the return type of the superclass method.
 
 **Why is this bad?**
 
@@ -882,21 +889,58 @@ type errors in your code.
 
 ```python
 class Super:
-    def method(self) -> int:
+    def method(self, x) -> int:
         return 42
 
 class Sub(Super):
     # Liskov violation: `str` is not a subtype of `int`,
     # but the supertype method promises to return an `int`.
-    def method(self) -> str:  # error: [invalid-override]
+    def method(self, x) -> str:  # error: [invalid-override]
         return "foo"
 
 def accepts_super(s: Super) -> int:
-    return s.method()
+    return s.method(x=42)
 
 accepts_super(Sub())  # The result of this call is a string, but ty will infer
                       # it to be an `int` due to the violation of the Liskov Substitution Principle.
+
+class Sub2(Super):
+    # Liskov violation: the superclass method can be called with a `x=`
+    # keyword argument, but the subclass method does not accept it.
+    def method(self, y) -> int:  # error: [invalid-override]
+       return 42
+
+accepts_super(Sub2())  # TypeError at runtime: method() got an unexpected keyword argument 'x'
+                       # ty cannot catch this error due to the violation of the Liskov Substitution Principle.
 ```
+
+**Common issues**
+
+
+**Why does ty complain about my `__eq__` method?**
+
+
+`__eq__` and `__ne__` methods in Python are generally expected to accept arbitrary
+objects as their second argument, for example:
+
+```python
+class A:
+    x: int
+
+    def __eq__(self, other: object) -> bool:
+        # gracefully handle an object of an unexpected type
+        # without raising an exception
+        if not isinstance(other, A):
+            return False
+        return self.x == other.x
+```
+
+If `A.__eq__` here were annotated as only accepting `A` instances for its second argument,
+it would imply that you wouldn't be able to use `==` between instances of `A` and
+instances of unrelated classes without an exception possibly being raised. While some
+classes in Python do indeed behave this way, the strongly held convention is that it should
+be avoided wherever possible. As part of this check, therefore, ty enforces that `__eq__`
+and `__ne__` methods accept `object` as their second argument.
 
 [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 
