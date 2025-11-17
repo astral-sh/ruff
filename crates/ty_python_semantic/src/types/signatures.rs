@@ -648,6 +648,15 @@ impl<'db> Signature<'db> {
         // If either signature is generic, their typevars should also be considered inferable when
         // checking whether the signatures are equivalent, since we only need to find one
         // specialization that causes the check to succeed.
+        //
+        // TODO: We should alpha-rename these typevars, too, to correctly handle when a generic
+        // callable refers to typevars from within the context that defines them. This primarily
+        // comes up when referring to a generic function recursively from within its body:
+        //
+        //     def identity[T](t: T) -> T:
+        //         # Here, TypeOf[identity2] is a generic callable that should consider T to be
+        //         # inferable, even though other uses of T in the function body are non-inferable.
+        //         return t
         let self_inferable = self.inferable_typevars(db);
         let other_inferable = other.inferable_typevars(db);
         let inferable = inferable.merge(&self_inferable);
@@ -762,6 +771,15 @@ impl<'db> Signature<'db> {
         // If either signature is generic, their typevars should also be considered inferable when
         // checking whether one signature is a subtype/etc of the other, since we only need to find
         // one specialization that causes the check to succeed.
+        //
+        // TODO: We should alpha-rename these typevars, too, to correctly handle when a generic
+        // callable refers to typevars from within the context that defines them. This primarily
+        // comes up when referring to a generic function recursively from within its body:
+        //
+        //     def identity[T](t: T) -> T:
+        //         # Here, TypeOf[identity2] is a generic callable that should consider T to be
+        //         # inferable, even though other uses of T in the function body are non-inferable.
+        //         return t
         let self_inferable = self.inferable_typevars(db);
         let other_inferable = other.inferable_typevars(db);
         let inferable = inferable.merge(&self_inferable);
