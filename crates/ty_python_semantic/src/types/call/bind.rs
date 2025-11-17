@@ -1291,7 +1291,7 @@ impl<'db> Bindings<'db> {
                             Ok(specialization) => Type::KnownInstance(
                                 KnownInstanceType::Specialization(specialization),
                             ),
-                            Err(_) => Type::none(db),
+                            Err(()) => Type::none(db),
                         };
                         overload.set_return_type(result);
                     }
