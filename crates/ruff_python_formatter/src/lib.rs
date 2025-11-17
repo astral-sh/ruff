@@ -61,7 +61,7 @@ where
         let node_ref = AnyNodeRef::from(node);
         let node_comments = comments.leading_dangling_trailing(node_ref);
 
-        if self.is_suppressed(node_comments.trailing, f.context()) {
+        if self.is_suppressed(node, f.context()) {
             suppressed_node(node_ref).fmt(f)
         } else {
             leading_comments(node_comments.leading).fmt(f)?;
@@ -99,11 +99,7 @@ where
     /// Formats the node's fields.
     fn fmt_fields(&self, item: &N, f: &mut PyFormatter) -> FormatResult<()>;
 
-    fn is_suppressed(
-        &self,
-        _trailing_comments: &[SourceComment],
-        _context: &PyFormatContext,
-    ) -> bool {
+    fn is_suppressed(&self, _node: &N, _context: &PyFormatContext) -> bool {
         false
     }
 }
