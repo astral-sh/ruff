@@ -59,7 +59,20 @@ y = foo(1)
         },
         "label": [
           {
-            "value": "a"
+            "value": "a",
+            "location": {
+              "uri": "file://<temp_dir>/src/foo.py",
+              "range": {
+                "start": {
+                  "line": 2,
+                  "character": 8
+                },
+                "end": {
+                  "line": 2,
+                  "character": 9
+                }
+              }
+            }
           },
           {
             "value": "="
