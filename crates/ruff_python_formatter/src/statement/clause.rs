@@ -771,8 +771,23 @@ fn write_suppressed_clause(
         ]
     )?;
 
-    // Mark the comments for the body statements as formatted, but not the entire header node
-    // (which might include other clauses like except/else/finally for try statements).
+    // We mark comments in the header as formatted as in
+    // the implementation of [`write_suppressed_clause_header`].
+    //
+    // Note that the header may be multi-line and contain
+    // various comments since we only require that the range
+    // starting at the _colon_ and ending at the `# fmt: skip`
+    // fits on one line.
+    header.visit(&mut |child| {
+        for comment in comments.leading_trailing(child) {
+            comment.mark_formatted();
+        }
+        comments.mark_verbatim_node_comments_formatted(child);
+    });
+
+    // Similarly we mark the comments in the body as formatted.
+    // Note that the trailing comments for the last child in the
+    // body have already been handled above.
     for stmt in clause.format_body.body {
         comments.mark_verbatim_node_comments_formatted(stmt.into());
     }
