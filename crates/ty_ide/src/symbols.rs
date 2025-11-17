@@ -52,6 +52,13 @@ impl QueryPattern {
         }
     }
 
+    pub fn exact_match(symbol_name: &str) -> QueryPattern {
+        QueryPattern {
+            re: Some(Regex::new(&format!("^{}$", regex::escape(symbol_name))).unwrap()),
+            original: symbol_name.to_string(),
+        }
+    }
+
     fn is_match_symbol(&self, symbol: &SymbolInfo<'_>) -> bool {
         self.is_match_symbol_name(&symbol.name)
     }
