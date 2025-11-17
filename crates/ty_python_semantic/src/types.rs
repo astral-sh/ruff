@@ -8226,10 +8226,11 @@ impl<'db> KnownInstanceType<'db> {
                         )
                     }
                     KnownInstanceType::Specialization(specialization) => {
+                        // Normalize for consistent output across CI platforms
                         write!(
                             f,
                             "ty_extensions.Specialization{}",
-                            specialization.display_full(self.db)
+                            specialization.normalized(self.db).display_full(self.db)
                         )
                     }
                     KnownInstanceType::UnionType(_) => f.write_str("types.UnionType"),

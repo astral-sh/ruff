@@ -1003,6 +1003,11 @@ impl<'db> Specialization<'db> {
         Specialization::new(db, self.generic_context(db), types, None, None)
     }
 
+    #[must_use]
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        self.normalized_impl(db, &NormalizedVisitor::default())
+    }
+
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         let types: Box<[_]> = self
             .types(db)
