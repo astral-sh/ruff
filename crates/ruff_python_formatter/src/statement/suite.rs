@@ -8,7 +8,8 @@ use ruff_python_trivia::{lines_after, lines_after_ignoring_end_of_line_trivia, l
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{
-    Comments, LeadingDanglingTrailingComments, leading_comments, trailing_comments,
+    Comments, LeadingDanglingTrailingComments, has_skip_comment, leading_comments,
+    trailing_comments,
 };
 use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
 use crate::other::string_literal::StringLiteralKind;
@@ -16,7 +17,6 @@ use crate::prelude::*;
 use crate::preview::{
     is_allow_newline_after_block_open_enabled, is_blank_line_before_decorated_class_in_stub_enabled,
 };
-use crate::statement::stmt_expr::FormatStmtExpr;
 use crate::verbatim::{
     suppressed_node, write_suppressed_statements_starting_with_leading_comment,
     write_suppressed_statements_starting_with_trailing_comment,
@@ -840,7 +840,7 @@ impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
         let comments = f.context().comments().clone();
         let node_comments = comments.leading_dangling_trailing(self.docstring);
 
-        if FormatStmtExpr.is_suppressed(node_comments.trailing, f.context()) {
+        if has_skip_comment(node_comments.trailing, f.context().source()) {
             suppressed_node(self.docstring).fmt(f)
         } else {
             // SAFETY: Safe because `DocStringStmt` guarantees that it only ever wraps a `ExprStmt` containing a `ExprStringLiteral`.
