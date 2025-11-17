@@ -66,13 +66,13 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
             comments.ranges(),
             f.context().source(),
         );
+        let leading_operand_comments = comments.leading(operand.as_ref());
         let has_leading_comments_before_parens = parenthesized_operand_range.is_some_and(|range| {
-            comments
-                .leading(operand.as_ref())
+            leading_operand_comments
                 .iter()
                 .any(|comment| comment.start() < range.start())
         });
-        if comments.has_leading(operand.as_ref())
+        if !leading_operand_comments.is_empty()
             && !is_expression_parenthesized(
                 operand.as_ref().into(),
                 f.context().comments().ranges(),
