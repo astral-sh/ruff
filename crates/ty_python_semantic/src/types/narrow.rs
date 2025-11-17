@@ -171,6 +171,7 @@ impl ClassInfoConstraintFunction {
                 // e.g. `isinstance(x, list[int])` fails at runtime.
                 SubclassOfInner::Class(ClassType::Generic(_)) => None,
                 SubclassOfInner::Dynamic(dynamic) => Some(Type::Dynamic(dynamic)),
+                SubclassOfInner::TypeVar(_) => None,
             },
             Type::Dynamic(_) => Some(classinfo),
             Type::Intersection(intersection) => {

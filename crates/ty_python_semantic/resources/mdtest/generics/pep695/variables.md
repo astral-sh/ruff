@@ -754,21 +754,20 @@ def constrained[T: (Callable[[], int], Callable[[], str])](f: T):
 
 ## Meta-type
 
-The meta-type of a typevar is the same as the meta-type of the upper bound, or the union of the
-meta-types of the constraints:
+The meta-type of a typevar is `type[T]`.
 
 ```py
 def normal[T](x: T):
-    reveal_type(type(x))  # revealed: type
+    reveal_type(type(x))  # revealed: type[T@normal]
 
 def bound_object[T: object](x: T):
-    reveal_type(type(x))  # revealed: type
+    reveal_type(type(x))  # revealed: type[T@bound_object]
 
 def bound_int[T: int](x: T):
-    reveal_type(type(x))  # revealed: type[int]
+    reveal_type(type(x))  # revealed: type[T@bound_int]
 
 def constrained[T: (int, str)](x: T):
-    reveal_type(type(x))  # revealed: type[int] | type[str]
+    reveal_type(type(x))  # revealed: type[T@constrained]
 ```
 
 ## Cycles

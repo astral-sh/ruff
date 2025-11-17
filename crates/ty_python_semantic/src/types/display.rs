@@ -688,6 +688,11 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     write!(f.with_type(Type::Dynamic(dynamic)), "{dynamic}")?;
                     f.write_char(']')
                 }
+                SubclassOfInner::TypeVar(bound_typevar) => write!(
+                    f,
+                    "type[{}]",
+                    bound_typevar.identity(self.db).display(self.db)
+                ),
             },
             Type::SpecialForm(special_form) => {
                 write!(f.with_type(self.ty), "{special_form}")

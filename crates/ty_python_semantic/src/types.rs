@@ -1787,10 +1787,11 @@ impl<'db> Type<'db> {
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(class) => Some(class.into_callable(db)),
-                SubclassOfInner::Dynamic(dynamic) => {
+
+                SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => {
                     Some(CallableTypes::one(CallableType::single(
                         db,
-                        Signature::new(Parameters::unknown(), Some(Type::Dynamic(dynamic))),
+                        Signature::new(Parameters::unknown(), Some(Type::from(subclass_of_ty))),
                     )))
                 }
             },
@@ -2075,13 +2076,14 @@ impl<'db> Type<'db> {
             //
             // However, there is one exception to this general rule: for any given typevar `T`,
             // `T` will always be a subtype of any union containing `T`.
-            // A similar rule applies in reverse to intersection types.
             (Type::TypeVar(bound_typevar), Type::Union(union))
                 if !bound_typevar.is_inferable(db, inferable)
                     && union.elements(db).contains(&self) =>
             {
                 ConstraintSet::from(true)
             }
+
+            // A similar rule applies in reverse to intersection types.
             (Type::Intersection(intersection), Type::TypeVar(bound_typevar))
                 if !bound_typevar.is_inferable(db, inferable)
                     && intersection.positive(db).contains(&target) =>
@@ -2105,6 +2107,42 @@ impl<'db> Type<'db> {
                     && lhs_bound_typevar.is_same_typevar_as(db, rhs_bound_typevar) =>
             {
                 ConstraintSet::from(true)
+            }
+
+            // `type[T]` is a subtype of the class object `A` if every instance of `T` is a subtype of an instance
+            // of `A`, and vice versa.
+            (Type::SubclassOf(subclass_of), _) if subclass_of.is_type_var() => {
+                let this_instance = Type::TypeVar(subclass_of.into_type_var().unwrap());
+                let other_instance = match target {
+                    Type::Union(union) => Some(
+                        union.map(db, |element| element.to_instance(db).unwrap_or(Type::Never)),
+                    ),
+                    _ => target.to_instance(db),
+                };
+
+                other_instance.when_some_and(|other_instance| {
+                    this_instance.has_relation_to_impl(
+                        db,
+                        other_instance,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
+            }
+            (_, Type::SubclassOf(subclass_of)) if subclass_of.is_type_var() => {
+                let other_instance = Type::TypeVar(subclass_of.into_type_var().unwrap());
+                self.to_instance(db).when_some_and(|this_instance| {
+                    this_instance.has_relation_to_impl(
+                        db,
+                        other_instance,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
             }
 
             // A fully static typevar is a subtype of its upper bound, and to something similar to
@@ -2613,7 +2651,7 @@ impl<'db> Type<'db> {
             // since `type[B]` describes all possible runtime subclasses of the class object `B`.
             (Type::ClassLiteral(class), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
                 .subclass_of()
-                .into_class()
+                .into_class(db)
                 .map(|subclass_of_class| {
                     class.default_specialization(db).has_relation_to_impl(
                         db,
@@ -2627,7 +2665,7 @@ impl<'db> Type<'db> {
                 .unwrap_or_else(|| ConstraintSet::from(relation.is_assignability())),
             (Type::GenericAlias(alias), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
                 .subclass_of()
-                .into_class()
+                .into_class(db)
                 .map(|subclass_of_class| {
                     ClassType::Generic(alias).has_relation_to_impl(
                         db,
@@ -2725,7 +2763,7 @@ impl<'db> Type<'db> {
             // however, as they are not fully static types.
             (Type::SubclassOf(subclass_of_ty), _) => subclass_of_ty
                 .subclass_of()
-                .into_class()
+                .into_class(db)
                 .map(|class| class.metaclass_instance_type(db))
                 .unwrap_or_else(|| KnownClass::Type.to_instance(db))
                 .has_relation_to_impl(
@@ -3041,6 +3079,36 @@ impl<'db> Type<'db> {
             (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
                 // TODO: Implement disjointness for TypedDict
                 ConstraintSet::from(false)
+            }
+
+            // `type[T]` is disjoint from a class object `A` if every instance of `T` is disjoint from an instance of `A`.
+            (Type::SubclassOf(subclass_of), other) | (other, Type::SubclassOf(subclass_of))
+                if subclass_of.is_type_var() =>
+            {
+                let this_instance = Type::TypeVar(subclass_of.into_type_var().unwrap());
+                let other_instance = match other {
+                    Type::Union(union) => Some(
+                        union.map(db, |element| element.to_instance(db).unwrap_or(Type::Never)),
+                    ),
+                    // An unbounded typevar `U` may have instances of type `object` if specialized to
+                    // an instance of `type`.
+                    Type::TypeVar(typevar)
+                        if typevar.typevar(db).bound_or_constraints(db).is_none() =>
+                    {
+                        Some(Type::object())
+                    }
+                    _ => other.to_instance(db),
+                };
+
+                other_instance.when_none_or(|other_instance| {
+                    this_instance.is_disjoint_from_impl(
+                        db,
+                        other_instance,
+                        inferable,
+                        disjointness_visitor,
+                        relation_visitor,
+                    )
+                })
             }
 
             // A typevar is never disjoint from itself, since all occurrences of the typevar must
@@ -3382,6 +3450,7 @@ impl<'db> Type<'db> {
                     SubclassOfInner::Class(class_a) => {
                         class_b.when_subclass_of(db, None, class_a).negate(db)
                     }
+                    SubclassOfInner::TypeVar(_) => unreachable!(),
                 }
             }
 
@@ -3392,6 +3461,7 @@ impl<'db> Type<'db> {
                     SubclassOfInner::Class(class_a) => ClassType::from(alias_b)
                         .when_subclass_of(db, class_a, inferable)
                         .negate(db),
+                    SubclassOfInner::TypeVar(_) => unreachable!(),
                 }
             }
 
@@ -3421,6 +3491,7 @@ impl<'db> Type<'db> {
                         relation_visitor,
                     )
                 }
+                SubclassOfInner::TypeVar(_) => unreachable!(),
             },
 
             (Type::SpecialForm(special_form), Type::NominalInstance(instance))
@@ -4959,7 +5030,7 @@ impl<'db> Type<'db> {
                     Type::ClassLiteral(literal) => Some(literal),
                     Type::SubclassOf(subclass_of) => subclass_of
                         .subclass_of()
-                        .into_class()
+                        .into_class(db)
                         .map(|class| class.class_literal(db).0),
                     _ => None,
                 } {
@@ -4975,7 +5046,7 @@ impl<'db> Type<'db> {
                     }
                 }
 
-                let class_attr_plain = self.find_name_in_mro_with_policy(db, name_str,policy).expect(
+                let class_attr_plain = self.find_name_in_mro_with_policy(db, name_str, policy).expect(
                     "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
                 );
 
@@ -5245,12 +5316,16 @@ impl<'db> Type<'db> {
                 .metaclass_instance_type(db)
                 .try_bool_impl(db, allow_short_circuit, visitor)?,
 
-            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Dynamic(_) => Truthiness::Ambiguous,
-                SubclassOfInner::Class(class) => {
-                    Type::from(class).try_bool_impl(db, allow_short_circuit, visitor)?
+            Type::SubclassOf(subclass_of_ty) => {
+                match subclass_of_ty.subclass_of().with_transposed_type_var(db) {
+                    SubclassOfInner::Dynamic(_) => Truthiness::Ambiguous,
+                    SubclassOfInner::Class(class) => {
+                        Type::from(class).try_bool_impl(db, allow_short_circuit, visitor)?
+                    }
+                    SubclassOfInner::TypeVar(bound_typevar) => Type::TypeVar(bound_typevar)
+                        .try_bool_impl(db, allow_short_circuit, visitor)?,
                 }
-            },
+            }
 
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
@@ -5972,7 +6047,10 @@ impl<'db> Type<'db> {
                 .into()
             }
 
-            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
+            Type::SubclassOf(subclass_of_type) => match subclass_of_type
+                .subclass_of()
+                .with_transposed_type_var(db)
+            {
                 SubclassOfInner::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type).bindings(db),
 
                 // Most type[] constructor calls are handled by `try_call_constructor` and not via
@@ -5980,6 +6058,10 @@ impl<'db> Type<'db> {
                 // evaluating callable subtyping). TODO improve this definition (intersection of
                 // `__new__` and `__init__` signatures? and respect metaclass `__call__`).
                 SubclassOfInner::Class(class) => Type::from(class).bindings(db),
+
+                SubclassOfInner::TypeVar(bound_typevar) => {
+                    Type::TypeVar(bound_typevar).bindings(db)
+                }
             },
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) | Type::NewTypeInstance(_) => {
@@ -6853,6 +6935,17 @@ impl<'db> Type<'db> {
             Type::TypeVar(bound_typevar) => Some(Type::TypeVar(bound_typevar.to_instance(db)?)),
             Type::TypeAlias(alias) => alias.value_type(db).to_instance(db),
             Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance")),
+            // An instance of class `C` may itself have instances if `C` is a subclass of `type`.
+            Type::NominalInstance(instance)
+                if KnownClass::Type
+                    .to_class_literal(db)
+                    .to_class_type(db)
+                    .is_some_and(|type_class| {
+                        instance.class(db).is_subclass_of(db, type_class)
+                    }) =>
+            {
+                Some(Type::object())
+            }
             Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
             | Type::EnumLiteral(_)
@@ -7254,35 +7347,22 @@ impl<'db> Type<'db> {
             Type::Callable(_) | Type::DataclassTransformer(_) => KnownClass::Type.to_instance(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db) {
-                    None => KnownClass::Type.to_instance(db),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.to_meta_type(db),
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        // TODO: If we add a proper `OneOf` connector, we should use that here instead
-                        // of union. (Using a union here doesn't break anything, but it is imprecise.)
-                        constraints.map(db, |constraint| constraint.to_meta_type(db))
-                    }
-                }
+                SubclassOfType::from(db, SubclassOfInner::TypeVar(bound_typevar))
             }
-
             Type::ClassLiteral(class) => class.metaclass(db),
             Type::GenericAlias(alias) => ClassType::from(alias).metaclass(db),
-            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Dynamic(_) => self,
-                SubclassOfInner::Class(class) => SubclassOfType::from(
-                    db,
-                    SubclassOfInner::try_from_type(db, class.metaclass(db))
-                        .unwrap_or(SubclassOfInner::unknown()),
-                ),
+            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of().into_class(db) {
+                None => self,
+                Some(class) => SubclassOfType::try_from_type(db, class.metaclass(db))
+                    .unwrap_or(SubclassOfType::subclass_of_unknown()),
             },
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),
             // TODO intersections
-            Type::Intersection(_) => SubclassOfType::from(
-                db,
-                SubclassOfInner::try_from_type(db, todo_type!("Intersection meta-type"))
-                    .expect("Type::Todo should be a valid `SubclassOfInner`"),
-            ),
+            Type::Intersection(_) => {
+                SubclassOfType::try_from_type(db, todo_type!("Intersection meta-type"))
+                    .expect("Type::Todo should be a valid `SubclassOfInner`")
+            }
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
             Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db),
             Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
@@ -7378,41 +7458,7 @@ impl<'db> Type<'db> {
         }
 
         match self {
-            Type::TypeVar(bound_typevar) => match type_mapping {
-                TypeMapping::Specialization(specialization) => {
-                    specialization.get(db, bound_typevar).unwrap_or(self)
-                }
-                TypeMapping::PartialSpecialization(partial) => {
-                    partial.get(db, bound_typevar).unwrap_or(self)
-                }
-                TypeMapping::BindSelf(self_type) => {
-                    if bound_typevar.typevar(db).is_self(db) {
-                        *self_type
-                    } else {
-                        self
-                    }
-                }
-                TypeMapping::ReplaceSelf { new_upper_bound } => {
-                    if bound_typevar.typevar(db).is_self(db) {
-                        Type::TypeVar(
-                            BoundTypeVarInstance::synthetic_self(
-                                db,
-                                *new_upper_bound,
-                                bound_typevar.binding_context(db)
-                            )
-                        )
-                    } else {
-                        self
-                    }
-                }
-                TypeMapping::PromoteLiterals(_)
-                    | TypeMapping::ReplaceParameterDefaults
-                    | TypeMapping::BindLegacyTypevars(_)
-                    | TypeMapping::EagerExpansion => self,
-                TypeMapping::Materialize(materialization_kind)  => {
-                    Type::TypeVar(bound_typevar.materialize_impl(db, *materialization_kind, visitor))
-                }
-            }
+            Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
 
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => match type_mapping {
                 TypeMapping::BindLegacyTypevars(binding_context) => {
@@ -7869,6 +7915,7 @@ impl<'db> Type<'db> {
             Self::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 SubclassOfInner::Class(class) => Some(TypeDefinition::Class(class.definition(db))),
                 SubclassOfInner::Dynamic(_) => None,
+                SubclassOfInner::TypeVar(bound_typevar) => Some(TypeDefinition::TypeVar(bound_typevar.typevar(db).definition(db)?)),
             },
 
             Self::TypeAlias(alias) => alias.value_type(db).definition(db),
@@ -9556,6 +9603,25 @@ impl<'db> BoundTypeVarInstance<'db> {
         Self::new(db, typevar, binding_context)
     }
 
+    /// Returns an identical type variable with its `TypeVarBoundOrConstraints` mapped by the
+    /// provided closure.
+    pub(crate) fn map_bound_or_constraints(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(Option<TypeVarBoundOrConstraints<'db>>) -> Option<TypeVarBoundOrConstraints<'db>>,
+    ) -> Self {
+        let bound_or_constraints = f(self.typevar(db).bound_or_constraints(db));
+        let typevar = TypeVarInstance::new(
+            db,
+            self.typevar(db).identity(db),
+            bound_or_constraints.map(TypeVarBoundOrConstraintsEvaluation::Eager),
+            self.typevar(db).explicit_variance(db),
+            self.typevar(db)._default(db),
+        );
+
+        Self::new(db, typevar, self.binding_context(db))
+    }
+
     pub(crate) fn variance_with_polarity(
         self,
         db: &'db dyn Db,
@@ -9575,6 +9641,47 @@ impl<'db> BoundTypeVarInstance<'db> {
 
     pub fn variance(self, db: &'db dyn Db) -> TypeVarVariance {
         self.variance_with_polarity(db, TypeVarVariance::Covariant)
+    }
+
+    fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Type<'db> {
+        match type_mapping {
+            TypeMapping::Specialization(specialization) => {
+                specialization.get(db, self).unwrap_or(Type::TypeVar(self))
+            }
+            TypeMapping::PartialSpecialization(partial) => {
+                partial.get(db, self).unwrap_or(Type::TypeVar(self))
+            }
+            TypeMapping::BindSelf(self_type) => {
+                if self.typevar(db).is_self(db) {
+                    *self_type
+                } else {
+                    Type::TypeVar(self)
+                }
+            }
+            TypeMapping::ReplaceSelf { new_upper_bound } => {
+                if self.typevar(db).is_self(db) {
+                    Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+                        db,
+                        *new_upper_bound,
+                        self.binding_context(db),
+                    ))
+                } else {
+                    Type::TypeVar(self)
+                }
+            }
+            TypeMapping::PromoteLiterals(_)
+            | TypeMapping::ReplaceParameterDefaults
+            | TypeMapping::BindLegacyTypevars(_)
+            | TypeMapping::EagerExpansion => Type::TypeVar(self),
+            TypeMapping::Materialize(materialization_kind) => {
+                Type::TypeVar(self.materialize_impl(db, *materialization_kind, visitor))
+            }
+        }
     }
 }
 
@@ -9741,8 +9848,7 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
                         .elements(db)
                         .iter()
                         .map(|ty| ty.materialize(db, materialization_kind, visitor))
-                        .collect::<Vec<_>>()
-                        .into_boxed_slice(),
+                        .collect::<Box<_>>(),
                 ))
             }
         }

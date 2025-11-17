@@ -2650,7 +2650,7 @@ reveal_type(C().x)  # revealed: int
 ```py
 import enum
 
-reveal_type(enum.Enum.__members__)  # revealed: MappingProxyType[str, Unknown]
+reveal_type(enum.Enum.__members__)  # revealed: MappingProxyType[str, Enum]
 
 class Answer(enum.Enum):
     NO = 0
@@ -2658,7 +2658,7 @@ class Answer(enum.Enum):
 
 reveal_type(Answer.NO)  # revealed: Literal[Answer.NO]
 reveal_type(Answer.NO.value)  # revealed: Literal[0]
-reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Unknown]
+reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Answer]
 ```
 
 ## Divergent inferred implicit instance attribute types
