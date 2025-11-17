@@ -27,7 +27,7 @@ error[invalid-assignment]: Cannot assign to a subscript on an object of type `No
   |     ^^^^^^^^^^^^^^^^^
   |
 info: The full type of the subscripted object is `dict[str, int] | None`
-help: `None` does not have a `__setitem__` method.
+info: `None` does not have a `__setitem__` method.
 info: rule `invalid-assignment` is enabled by default
 
 ```

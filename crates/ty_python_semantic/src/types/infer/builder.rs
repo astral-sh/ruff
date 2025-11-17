@@ -3794,18 +3794,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             let assigned_d = rhs_value_ty.display(db);
                                             let object_d = object_ty.display(db);
 
+                                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                                    "Invalid subscript assignment with key of type `{}` and value of \
+                                                     type `{assigned_d}` on object of type `{object_d}`",
+                                                    slice_ty.display(db),
+                                                ));
+
                                             // Special diagnostic for dictionaries
                                             if let Some([expected_key_ty, expected_value_ty]) =
                                                 object_ty
                                                     .known_specialization(db, KnownClass::Dict)
                                                     .map(|s| s.types(db))
                                             {
-                                                let mut diagnostic = builder.into_diagnostic(format_args!(
-                                                    "Invalid subscript assignment with key of type `{}` and value of \
-                                                     type `{assigned_d}` on object of type `{object_d}`",
-                                                    slice_ty.display(db),
-                                                ));
-
                                                 if !slice_ty.is_assignable_to(db, *expected_key_ty)
                                                 {
                                                     diagnostic.annotate(
@@ -3832,16 +3832,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                             )),
                                                     );
                                                 }
-
-                                                attach_original_type_info(&mut diagnostic);
-                                            } else {
-                                                let mut diagnostic = builder.into_diagnostic(format_args!(
-                                                    "Invalid subscript assignment with key of type `{}` and value of \
-                                                     type `{assigned_d}` on object of type `{object_d}`",
-                                                    slice_ty.display(db),
-                                                ));
-                                                attach_original_type_info(&mut diagnostic);
                                             }
+
+                                            attach_original_type_info(&mut diagnostic);
                                         }
                                     }
                                 }
@@ -3889,7 +3882,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         object_ty.display(db),
                                     ));
                                 } else {
-                                    diagnostic.help(format_args!(
+                                    diagnostic.info(format_args!(
                                         "`{}` does not have a `__setitem__` method.",
                                         object_ty.display(db),
                                     ));
