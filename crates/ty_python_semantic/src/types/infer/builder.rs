@@ -108,14 +108,13 @@ use crate::types::{
     TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
     TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
     TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
-    binding_type, todo_type,
+    binding_type, liskov, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
 
 mod annotation_expression;
-mod liskov;
 mod type_expression;
 
 /// Whether the intersection type is on the left or right side of the comparison.
