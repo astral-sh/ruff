@@ -3,7 +3,10 @@ name = "ty_benchmark"
 version = "0.0.1"
 description = "Package for running end-to-end ty benchmarks"
 requires-python = ">=3.12"
-dependencies = ["mypy", "pyright"]
+dependencies = [
+    "pyrefly>=0.41.3",
+    "pyright",
+]
 
 [project.scripts]
 benchmark = "benchmark.run:main"
@@ -19,3 +22,5 @@ packages = ["src/benchmark"]
 ignore = [
     "E501", # We use ruff format
 ]
+
+[tool.ty]
