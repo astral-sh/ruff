@@ -1,19 +1,21 @@
 from __future__ import annotations
 
 import argparse
-import json
 import logging
+import os
 import tempfile
-import typing
 from pathlib import Path
+from typing import TYPE_CHECKING, Final
 
 from benchmark import Hyperfine
-from benchmark.cases import Benchmark, Mypy, Pyright, Tool, Ty, Venv
-from benchmark.projects import ALL as all_projects
-from benchmark.projects import DEFAULT as default_projects
+from benchmark.projects import ALL as ALL_PROJECTS
+from benchmark.tool import Mypy, Pyrefly, Pyright, Tool, Ty
+from benchmark.venv import Venv
 
-if typing.TYPE_CHECKING:
-    from benchmark.cases import Tool
+if TYPE_CHECKING:
+    from benchmark.tool import Tool
+
+TOOL_CHOICES: Final = ["ty", "pyrefly", "mypy", "pyright"]
 
 
 def main() -> None:
@@ -37,41 +39,36 @@ def main() -> None:
         default=10,
     )
     parser.add_argument(
-        "--benchmark",
-        "-b",
-        type=str,
-        help="The benchmark(s) to run.",
-        choices=[benchmark.value for benchmark in Benchmark],
-        action="append",
-    )
-    parser.add_argument(
         "--project",
         "-p",
         type=str,
         help="The project(s) to run.",
-        choices=[project.name for project in all_projects],
+        choices=[project.name for project in ALL_PROJECTS],
         action="append",
     )
     parser.add_argument(
-        "--mypy",
-        help="Whether to benchmark `mypy`.",
-        action="store_true",
+        "--tool",
+        help="Which tool to benchmark.",
+        choices=TOOL_CHOICES,
+        action="append",
     )
-    parser.add_argument(
-        "--pyright",
-        help="Whether to benchmark `pyright`.",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--ty",
-        help="Whether to benchmark ty (assumes a ty binary exists at `./target/release/ty`).",
-        action="store_true",
-    )
+
     parser.add_argument(
         "--ty-path",
         type=Path,
-        help="Path(s) to the ty binary to benchmark.",
-        action="append",
+        help="Path to the ty binary to benchmark.",
+    )
+
+    parser.add_argument(
+        "--single-threaded",
+        action="store_true",
+        help="Run the type checkers single threaded",
+    )
+
+    parser.add_argument(
+        "--warm",
+        action=argparse.BooleanOptionalAction,
+        help="Run warm benchmarks in addition to cold benchmarks (for tools supporting it)",
     )
 
     args = parser.parse_args()
@@ -87,67 +84,70 @@ def main() -> None:
 
     # Determine the tools to benchmark, based on the user-provided arguments.
     suites: list[Tool] = []
-    if args.pyright:
-        suites.append(Pyright())
 
-    if args.ty:
-        suites.append(Ty())
+    for tool_name in args.tool or TOOL_CHOICES:
+        match tool_name:
+            case "ty":
+                suites.append(Ty(path=args.ty_path))
+            case "pyrefly":
+                suites.append(Pyrefly())
+            case "pyright":
+                suites.append(Pyright())
+            case "mypy":
+                suites.append(Mypy(warm=False))
+                if args.warm:
+                    suites.append(Mypy(warm=True))
+            case _:
+                raise ValueError(f"Unknown tool: {tool_name}")
 
-    for path in args.ty_path or []:
-        suites.append(Ty(path=path))
-
-    if args.mypy:
-        suites.append(Mypy())
-
-    # If no tools were specified, default to benchmarking all tools.
-    suites = suites or [Ty(), Pyright(), Mypy()]
-
-    # Determine the benchmarks to run, based on user input.
-    benchmarks = (
-        [Benchmark(benchmark) for benchmark in args.benchmark]
-        if args.benchmark is not None
-        else list(Benchmark)
+    projects = (
+        [project for project in ALL_PROJECTS if project.name in args.project]
+        if args.project
+        else ALL_PROJECTS
     )
 
-    projects = [
-        project
-        for project in all_projects
-        if project.name in (args.project or default_projects)
-    ]
+    benchmark_env = os.environ.copy()
+
+    if args.single_threaded:
+        benchmark_env["TY_MAX_PARALLELISM"] = "1"
+
+    first = True
 
     for project in projects:
         with tempfile.TemporaryDirectory() as tempdir:
             cwd = Path(tempdir)
             project.clone(cwd)
 
-            venv = Venv.create(cwd)
-            venv.install(project.dependencies)
+            venv = Venv.create(cwd, project.python_version)
+            venv.install(project.install_arguments)
 
-            # Set the `venv` config for pyright. Pyright only respects the `--venvpath`
-            # CLI option when `venv` is set in the configuration... 🤷‍♂️
-            with open(cwd / "pyrightconfig.json", "w") as f:
-                f.write(json.dumps(dict(venv=venv.name)))
+            # Generate the benchmark command for each tool.
+            commands = [
+                suite.command(project, venv, args.single_threaded) for suite in suites
+            ]
 
-            for benchmark in benchmarks:
-                # Generate the benchmark command for each tool.
-                commands = [
-                    command
-                    for suite in suites
-                    if (command := suite.command(benchmark, project, venv))
-                ]
+            if not commands:
+                continue
 
-                # not all tools support all benchmarks.
-                if not commands:
-                    continue
-
-                print(f"{project.name} ({benchmark.value})")
-
-                hyperfine = Hyperfine(
-                    name=f"{project.name}-{benchmark.value}",
-                    commands=commands,
-                    warmup=warmup,
-                    min_runs=min_runs,
-                    verbose=verbose,
-                    json=False,
+            if not first:
+                print("")
+                print(
+                    "-------------------------------------------------------------------------------"
                 )
-                hyperfine.run(cwd=cwd)
+                print("")
+
+            print(f"{project.name}")
+            print("-" * len(project.name))
+            print("")
+
+            hyperfine = Hyperfine(
+                name=f"{project.name}",
+                commands=commands,
+                warmup=warmup,
+                min_runs=min_runs,
+                verbose=verbose,
+                json=False,
+            )
+            hyperfine.run(cwd=cwd, env=benchmark_env)
+
+            first = False
