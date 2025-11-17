@@ -420,7 +420,6 @@ def unrelated[T]():
     static_assert(not constraints.implies_subtype_of(Callable[[str], int], TypeOf[identity]))
     static_assert(not constraints.implies_subtype_of(GenericIdentity[int], TypeOf[identity]))
     static_assert(not constraints.implies_subtype_of(GenericIdentity[str], TypeOf[identity]))
-
 ```
 
 The generic callable's typevar _also_ does not affect whether the subtyping check succeeds or fails!
