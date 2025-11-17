@@ -458,12 +458,12 @@ b: TD | None = f([{"x": 0}, {"x": 1}])
 reveal_type(b)  # revealed: TD
 
 # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
-# error: [invalid-key] "Invalid key for TypedDict `TD`: Unknown key "y""
+# error: [invalid-key] "Unknown key "y" for TypedDict `TD`"
 # error: [invalid-assignment] "Object of type `Unknown | dict[Unknown | str, Unknown | int]` is not assignable to `TD`"
 c: TD = f([{"y": 0}, {"x": 1}])
 
 # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
-# error: [invalid-key] "Invalid key for TypedDict `TD`: Unknown key "y""
+# error: [invalid-key] "Unknown key "y" for TypedDict `TD`"
 # error: [invalid-assignment] "Object of type `Unknown | dict[Unknown | str, Unknown | int]` is not assignable to `TD | None`"
 c: TD | None = f([{"y": 0}, {"x": 1}])
 ```

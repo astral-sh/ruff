@@ -3147,7 +3147,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                 let typed_dict_name = typed_dict_ty.display(db);
 
                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Invalid key for TypedDict `{typed_dict_name}`",
+                    "Unknown key \"{key}\" for TypedDict `{typed_dict_name}`",
                 ));
 
                 diagnostic.annotate(if let Some(full_object_ty) = full_object_ty {
@@ -3167,14 +3167,15 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                 });
 
                 let existing_keys = items.iter().map(|(name, _)| name.as_str());
+                let hint = if let Some(suggestion) = did_you_mean(existing_keys, key) {
+                    format!(" - did you mean \"{suggestion}\"?")
+                } else {
+                    String::new()
+                };
 
-                diagnostic.set_primary_message(format!(
-                    "Unknown key \"{key}\"{hint}",
-                    hint = if let Some(suggestion) = did_you_mean(existing_keys, key) {
-                        format!(" - did you mean \"{suggestion}\"?")
-                    } else {
-                        String::new()
-                    }
+                diagnostic.set_primary_message(format!("Unknown key \"{key}\"{hint}"));
+                diagnostic.set_concise_message(format!(
+                    "Unknown key \"{key}\" for TypedDict `{typed_dict_name}`{hint}",
                 ));
             }
             _ => {

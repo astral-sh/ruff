@@ -30,7 +30,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
 # Diagnostics
 
 ```
-error[invalid-key]: Invalid key for TypedDict `Person`
+error[invalid-key]: Unknown key "surname" for TypedDict `Person`
   --> src/mdtest_snippet.py:13:5
    |
 11 |     # error: [invalid-key]
@@ -45,7 +45,7 @@ info: rule `invalid-key` is enabled by default
 ```
 
 ```
-error[invalid-key]: Invalid key for TypedDict `Animal`
+error[invalid-key]: Unknown key "surname" for TypedDict `Animal`
   --> src/mdtest_snippet.py:13:5
    |
 11 |     # error: [invalid-key]
