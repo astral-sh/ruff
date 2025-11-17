@@ -2,11 +2,12 @@ use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 
 use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::str::Quote;
 use ruff_python_parser::Tokens;
 
 use crate::PyFormatOptions;
-use crate::comments::Comments;
+use crate::comments::{Comments, has_skip_comment};
 use crate::other::interpolated_string::InterpolatedStringContext;
 
 pub struct PyFormatContext<'a> {
@@ -111,6 +112,14 @@ impl<'a> PyFormatContext<'a> {
     /// Returns `true` if preview mode is enabled.
     pub(crate) const fn is_preview(&self) -> bool {
         self.options.preview().is_enabled()
+    }
+
+    /// Returns `true` if node is a suppressed statement.
+    pub(crate) fn is_suppressed_statement_node(&self, node: AnyNodeRef<'_>) -> bool {
+        if !node.is_statement() {
+            return false;
+        }
+        has_skip_comment(self.comments().trailing(node), self.source())
     }
 }
 
