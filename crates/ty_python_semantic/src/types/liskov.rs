@@ -1,3 +1,7 @@
+//! Checks relating to the [Liskov Substitution Principle].
+//!
+//! [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
+
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
 
