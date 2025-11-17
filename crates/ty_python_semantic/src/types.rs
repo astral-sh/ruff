@@ -1,3 +1,4 @@
+use compact_str::{CompactString, ToCompactString};
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
@@ -7497,7 +7498,7 @@ impl<'db> Type<'db> {
             Type::SpecialForm(special_form) => Type::string_literal(db, special_form.repr()),
             Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
                 db,
-                known_instance.repr(db).to_string().into_boxed_str(),
+                known_instance.repr(db).to_compact_string(),
             )),
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
@@ -7519,7 +7520,7 @@ impl<'db> Type<'db> {
             Type::SpecialForm(special_form) => Type::string_literal(db, special_form.repr()),
             Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
                 db,
-                known_instance.repr(db).to_string().into_boxed_str(),
+                known_instance.repr(db).to_compact_string(),
             )),
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
@@ -12388,7 +12389,7 @@ impl<'db> IntersectionType<'db> {
 #[derive(PartialOrd, Ord)]
 pub struct StringLiteralType<'db> {
     #[returns(deref)]
-    value: Box<str>,
+    value: CompactString,
 }
 
 // The Salsa heap is tracked separately.

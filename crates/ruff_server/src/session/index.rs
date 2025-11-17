@@ -430,6 +430,11 @@ impl WorkspaceSettingsIndex {
             anyhow!("Failed to convert workspace URL to file path: {workspace_url}")
         })?;
 
+        tracing::debug!(
+            "options for workspace {workspace_url}: {workspace_options:#?}",
+            workspace_options = workspace.options()
+        );
+
         let client_settings = if let Some(workspace_options) = workspace.options() {
             let options = workspace_options.clone().combine(global.options().clone());
             let settings = match options.into_settings() {
@@ -446,6 +451,8 @@ impl WorkspaceSettingsIndex {
         } else {
             global.to_settings_arc()
         };
+
+        tracing::debug!("Resolved client settings: {client_settings:#?}");
 
         let workspace_settings_index = ruff_settings::RuffSettingsIndex::new(
             client,
