@@ -236,3 +236,36 @@ def constrained_by_two_gradual_lists[T: (list[Any], list[Any])]():
     # revealed: ty_extensions.Specialization[T@constrained_by_two_gradual_lists = list[Sub]]
     reveal_type(generic_context(constrained_by_two_gradual_lists).specialize_constrained(ConstraintSet.range(list[Sub], T, list[Sub])))
 ```
+
+## Mutually constrained typevars
+
+If one typevar is constrained by another, the specialization of one can affect the specialization of
+the other.
+
+```py
+from typing import final, Never
+from ty_extensions import ConstraintSet, generic_context
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+
+@final
+class Unrelated: ...
+
+def mutually_bound[T: Base, U]():
+    # revealed: ty_extensions.Specialization[T@mutually_bound = Base, U@mutually_bound = object]
+    reveal_type(generic_context(mutually_bound).specialize_constrained(ConstraintSet.always()))
+    # revealed: None
+    reveal_type(generic_context(mutually_bound).specialize_constrained(ConstraintSet.never()))
+
+    # revealed: ty_extensions.Specialization[T@mutually_bound = Base, U@mutually_bound = Base]
+    reveal_type(generic_context(mutually_bound).specialize_constrained(ConstraintSet.range(Never, U, T)))
+
+    # revealed: ty_extensions.Specialization[T@mutually_bound = Sub, U@mutually_bound = object]
+    reveal_type(generic_context(mutually_bound).specialize_constrained(ConstraintSet.range(Never, T, Sub)))
+    # revealed: ty_extensions.Specialization[T@mutually_bound = Sub, U@mutually_bound = Sub]
+    reveal_type(generic_context(mutually_bound).specialize_constrained(ConstraintSet.range(Never, T, Sub) & ConstraintSet.range(Never, U, T)))
+    # revealed: ty_extensions.Specialization[T@mutually_bound = Base, U@mutually_bound = Sub]
+    reveal_type(generic_context(mutually_bound).specialize_constrained(ConstraintSet.range(Never, U, Sub) & ConstraintSet.range(Never, U, T)))
+```

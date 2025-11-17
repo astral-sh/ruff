@@ -2892,17 +2892,22 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         constraints: ConstraintSet<'db>,
     ) -> Result<Specialization<'db>, ()> {
+        // First we intersect with the valid specializations of all of the typevars. We need all of
+        // valid specializations to hold simultaneously, so we do this once before abstracting over
+        // each typevar.
+        let abstracted = self
+            .variables(db)
+            .fold(constraints.node, |constraints, bound_typevar| {
+                constraints.and(db, bound_typevar.valid_specializations(db))
+            });
+
+        // Then we find all of the "representative types" for each typevar in the constraint set.
         let mut types = vec![Type::Never; self.len(db)];
         for (i, bound_typevar) in self.variables(db).enumerate() {
-            // First we intersect with the valid specializations of this typevar, in case the
-            // constraint set is more permissive.
-            let abstracted = (constraints.node).and(db, bound_typevar.valid_specializations(db));
-
-            // Then we find all of the "representative types" for this typevar in the constraint
-            // set. This is a union type, where each element represents one of the ways that the
-            // constraint set can be satisfied. Each of those is a conjunction of individual
-            // constraints. We choose the "highest" (i.e. least upper bound, "closest to `object`")
-            // type that satisfies all of those individual constraints.
+            // Each representative type is a union type, where each element represents one of the
+            // ways that the typevar can satisfy the constraint. Each of those is a conjunction of
+            // individual constraints. We choose the "highest" (i.e. least upper bound, "closest to
+            // `object`") type that satisfies all of those individual constraints.
             //
             // Note that we track whether there is any satisfiable representative type separately
             // from the union builder, since we specializing the typevar to `Never` is different
