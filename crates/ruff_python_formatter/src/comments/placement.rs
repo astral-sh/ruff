@@ -13,7 +13,6 @@ use std::cmp::Ordering;
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{ExprSliceCommentSection, assign_comment_in_slice};
-use crate::expression::expr_unary_op::operand_start;
 use crate::expression::parentheses::is_expression_parenthesized;
 use crate::other::parameters::{
     assign_argument_separator_comment_placement, find_parameter_separators,
@@ -1915,7 +1914,22 @@ fn handle_unary_op_comment<'a>(
     unary_op: &'a ast::ExprUnaryOp,
     source: &str,
 ) -> CommentPlacement<'a> {
-    let up_to = operand_start(unary_op, source);
+    let mut tokenizer = SimpleTokenizer::new(
+        source,
+        TextRange::new(unary_op.start(), unary_op.operand.start()),
+    )
+    .skip_trivia();
+    let op_token = tokenizer.next();
+    debug_assert!(op_token.is_some_and(|token| matches!(
+        token.kind,
+        SimpleTokenKind::Tilde
+            | SimpleTokenKind::Not
+            | SimpleTokenKind::Plus
+            | SimpleTokenKind::Minus
+    )));
+    let up_to = tokenizer
+        .find(|token| token.kind == SimpleTokenKind::LParen)
+        .map_or(unary_op.operand.start(), |lparen| lparen.start());
     if comment.end() < up_to && comment.line_position().is_end_of_line() {
         CommentPlacement::dangling(unary_op, comment)
     } else {

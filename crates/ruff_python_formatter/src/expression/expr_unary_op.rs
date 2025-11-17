@@ -2,8 +2,7 @@ use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprUnaryOp;
 use ruff_python_ast::UnaryOp;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::Ranged;
 
 use crate::comments::trailing_comments;
 use crate::expression::parentheses::{
@@ -103,45 +102,19 @@ impl NeedsParentheses for ExprUnaryOp {
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         if parent.is_expr_await() {
-            return OptionalParentheses::Always;
-        }
-
-        if context.comments().has_dangling(self) {
-            return OptionalParentheses::Multiline;
-        }
-
-        if is_expression_parenthesized(
+            OptionalParentheses::Always
+        } else if context.comments().has_dangling(self) {
+            OptionalParentheses::Multiline
+        } else if is_expression_parenthesized(
             self.operand.as_ref().into(),
             context.comments().ranges(),
             context.source(),
         ) {
-            return OptionalParentheses::Never;
-        }
-
-        if context.comments().has(self.operand.as_ref()) {
+            OptionalParentheses::Never
+        } else if context.comments().has(self.operand.as_ref()) {
             OptionalParentheses::Always
         } else {
             self.operand.needs_parentheses(self.into(), context)
         }
     }
-}
-
-/// Returns the start of `unary_op`'s operand, or its leading parenthesis, if it has one.
-pub(crate) fn operand_start(unary_op: &ExprUnaryOp, source: &str) -> TextSize {
-    let mut tokenizer = SimpleTokenizer::new(
-        source,
-        TextRange::new(unary_op.start(), unary_op.operand.start()),
-    )
-    .skip_trivia();
-    let op_token = tokenizer.next();
-    debug_assert!(op_token.is_some_and(|token| matches!(
-        token.kind,
-        SimpleTokenKind::Tilde
-            | SimpleTokenKind::Not
-            | SimpleTokenKind::Plus
-            | SimpleTokenKind::Minus
-    )));
-    tokenizer
-        .find(|token| token.kind == SimpleTokenKind::LParen)
-        .map_or(unary_op.operand.start(), |lparen| lparen.start())
 }
