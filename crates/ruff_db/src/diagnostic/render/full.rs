@@ -9,18 +9,27 @@ use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::diagnostic::render::{FileResolver, Resolved};
+use crate::diagnostic::render::{FileResolver, IdUrlResolver, Resolved};
 use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
 use crate::diagnostic::{Diagnostic, DiagnosticSource, DisplayDiagnosticConfig};
 
 pub(super) struct FullRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
+    url_resolver: Option<&'a IdUrlResolver>,
 }
 
 impl<'a> FullRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
-        Self { resolver, config }
+    pub(super) fn new(
+        resolver: &'a dyn FileResolver,
+        config: &'a DisplayDiagnosticConfig,
+        url_resolver: Option<&'a IdUrlResolver>,
+    ) -> Self {
+        Self {
+            resolver,
+            config,
+            url_resolver,
+        }
     }
 
     pub(super) fn render(
@@ -52,7 +61,7 @@ impl<'a> FullRenderer<'a> {
             .none(stylesheet.none);
 
         for diag in diagnostics {
-            let resolved = Resolved::new(self.resolver, diag, self.config);
+            let resolved = Resolved::new(self.resolver, diag, self.config, self.url_resolver);
             let renderable = resolved.to_renderable(self.config.context);
             for diag in renderable.diagnostics.iter() {
                 writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
@@ -729,7 +738,7 @@ print()
          ::: cell 2
         1 | # cell 2
           - import math
-        2 | 
+        2 |
         3 | print('hello world')
 
         error[unused-variable][*]: Local variable `x` is assigned to but never used
@@ -746,7 +755,7 @@ print()
         2 | def foo():
         3 |     print()
           -     x = 1
-        4 | 
+        4 |
         note: This is an unsafe fix and may change runtime behavior
         ");
     }
@@ -783,14 +792,14 @@ print()
          ::: cell 2
         1 | # cell 2
           - import math
-        2 | 
+        2 |
         3 | print('hello world')
          ::: cell 3
         1 | # cell 3
         2 | def foo():
         3 |     print()
           -     x = 1
-        4 | 
+        4 |
         note: This is an unsafe fix and may change runtime behavior
         ");
     }

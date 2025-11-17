@@ -13,6 +13,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::{
     Db,
+    diagnostic::DiagnosticId,
     files::File,
     source::{SourceText, line_index, source_text},
 };
@@ -80,6 +81,8 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
     }
 }
 
+type IdUrlResolver = dyn Fn(&DiagnosticId) -> Option<String>;
+
 /// A type that implements `std::fmt::Display` for rendering a collection of diagnostics.
 ///
 /// It is intended for collections of diagnostics that need to be serialized together, as is the
@@ -90,6 +93,7 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
 pub struct DisplayDiagnostics<'a> {
     config: &'a DisplayDiagnosticConfig,
     resolver: &'a dyn FileResolver,
+    url_resolver: Option<&'a IdUrlResolver>,
     diagnostics: &'a [Diagnostic],
 }
 
@@ -103,18 +107,32 @@ impl<'a> DisplayDiagnostics<'a> {
             config,
             resolver,
             diagnostics,
+            url_resolver: None,
         }
+    }
+
+    pub fn with_url_resolver(mut self, url_resolver: &'a IdUrlResolver) -> Self {
+        self.url_resolver = Some(url_resolver);
+        self
     }
 }
 
 impl std::fmt::Display for DisplayDiagnostics<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let url_resolver = if self.config.color {
+            self.url_resolver
+        } else {
+            None
+        };
+
         match self.config.format {
             DiagnosticFormat::Concise => {
-                ConciseRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
+                ConciseRenderer::new(self.resolver, url_resolver, self.config)
+                    .render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Full => {
-                FullRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
+                FullRenderer::new(self.resolver, self.config, url_resolver)
+                    .render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Azure => {
                 AzureRenderer::new(self.resolver).render(f, self.diagnostics)?;
@@ -175,9 +193,15 @@ impl<'a> Resolved<'a> {
         resolver: &'a dyn FileResolver,
         diag: &'a Diagnostic,
         config: &DisplayDiagnosticConfig,
+        url_resolver: Option<&IdUrlResolver>,
     ) -> Resolved<'a> {
         let mut diagnostics = vec![];
-        diagnostics.push(ResolvedDiagnostic::from_diagnostic(resolver, config, diag));
+        diagnostics.push(ResolvedDiagnostic::from_diagnostic(
+            resolver,
+            config,
+            url_resolver,
+            diag,
+        ));
         for sub in &diag.inner.subs {
             diagnostics.push(ResolvedDiagnostic::from_sub_diagnostic(resolver, sub));
         }
@@ -196,6 +220,12 @@ impl<'a> Resolved<'a> {
     }
 }
 
+#[derive(Debug)]
+struct ResolvedId {
+    id: String,
+    url: Option<String>,
+}
+
 /// A single resolved diagnostic.
 ///
 /// The lifetime `'a` refers to the shorter of the lifetimes between the file
@@ -204,7 +234,7 @@ impl<'a> Resolved<'a> {
 #[derive(Debug)]
 struct ResolvedDiagnostic<'a> {
     level: AnnotateLevel,
-    id: Option<String>,
+    id: Option<ResolvedId>,
     message: String,
     annotations: Vec<ResolvedAnnotation<'a>>,
     is_fixable: bool,
@@ -216,6 +246,7 @@ impl<'a> ResolvedDiagnostic<'a> {
     fn from_diagnostic(
         resolver: &'a dyn FileResolver,
         config: &DisplayDiagnosticConfig,
+        url_resolver: Option<&IdUrlResolver>,
         diag: &'a Diagnostic,
     ) -> ResolvedDiagnostic<'a> {
         let annotations: Vec<_> = diag
@@ -234,18 +265,23 @@ impl<'a> ResolvedDiagnostic<'a> {
             })
             .collect();
 
-        let id = if config.hide_severity {
+        let id_text = if config.hide_severity {
             // Either the rule code alone (e.g. `F401`), or the lint id with a colon (e.g.
             // `invalid-syntax:`). When Ruff gets real severities, we should put the colon back in
             // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve
             // the formatting of syntax errors for now. This should also be kept consistent with the
             // concise formatting.
-            Some(diag.secondary_code().map_or_else(
+            diag.secondary_code().map_or_else(
                 || format!("{id}:", id = diag.inner.id),
                 |code| code.to_string(),
-            ))
+            )
         } else {
-            Some(diag.inner.id.to_string())
+            diag.inner.id.to_string()
+        };
+
+        let id = ResolvedId {
+            id: id_text,
+            url: url_resolver.and_then(|resolver| resolver(&diag.inner.id)),
         };
 
         let level = if config.hide_severity {
@@ -256,7 +292,7 @@ impl<'a> ResolvedDiagnostic<'a> {
 
         ResolvedDiagnostic {
             level,
-            id,
+            id: Some(id),
             message: diag.inner.message.as_str().to_string(),
             annotations,
             is_fixable: config.show_fix_status && diag.has_applicable_fix(config),
@@ -384,7 +420,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             .sort_by(|snips1, snips2| snips1.has_primary.cmp(&snips2.has_primary).reverse());
         RenderableDiagnostic {
             level: self.level,
-            id: self.id.as_deref(),
+            id: self.id.as_ref(),
             message: &self.message,
             snippets_by_input,
             is_fixable: self.is_fixable,
@@ -484,7 +520,7 @@ struct RenderableDiagnostic<'r> {
     ///
     /// An ID is always present for top-level diagnostics and always absent for
     /// sub-diagnostics.
-    id: Option<&'r str>,
+    id: Option<&'r ResolvedId>,
     /// The message emitted with the diagnostic, before any snippets are
     /// rendered.
     message: &'r str,
@@ -519,7 +555,7 @@ impl RenderableDiagnostic<'_> {
             .is_fixable(self.is_fixable)
             .lineno_offset(self.header_offset);
         if let Some(id) = self.id {
-            message = message.id(id);
+            message = message.id_with_url(&id.id, id.url.as_deref());
         }
         message.snippets(snippets)
     }

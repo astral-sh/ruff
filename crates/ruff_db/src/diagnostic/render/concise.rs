@@ -1,5 +1,6 @@
 use crate::diagnostic::{
     Diagnostic, DisplayDiagnosticConfig, Severity,
+    render::IdUrlResolver,
     stylesheet::{DiagnosticStylesheet, fmt_styled},
 };
 
@@ -7,12 +8,21 @@ use super::FileResolver;
 
 pub(super) struct ConciseRenderer<'a> {
     resolver: &'a dyn FileResolver,
+    url_resolver: Option<&'a IdUrlResolver>,
     config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> ConciseRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
-        Self { resolver, config }
+    pub(super) fn new(
+        resolver: &'a dyn FileResolver,
+        url_resolver: Option<&'a IdUrlResolver>,
+        config: &'a DisplayDiagnosticConfig,
+    ) -> Self {
+        Self {
+            resolver,
+            url_resolver,
+            config,
+        }
     }
 
     pub(super) fn render(
@@ -62,18 +72,34 @@ impl<'a> ConciseRenderer<'a> {
                 }
                 write!(f, "{sep} ")?;
             }
+
+            let url = self
+                .url_resolver
+                .and_then(|resolver| resolver(&diag.inner.id));
             if self.config.hide_severity {
                 if let Some(code) = diag.secondary_code() {
                     write!(
                         f,
                         "{code} ",
-                        code = fmt_styled(code, stylesheet.secondary_code)
+                        code = fmt_styled(
+                            DisplayId {
+                                id: &code,
+                                url: url.as_deref()
+                            },
+                            stylesheet.secondary_code
+                        )
                     )?;
                 } else {
                     write!(
                         f,
                         "{id}: ",
-                        id = fmt_styled(diag.inner.id.as_str(), stylesheet.secondary_code)
+                        id = fmt_styled(
+                            DisplayId {
+                                id: diag.inner.id.as_str(),
+                                url: url.as_deref()
+                            },
+                            stylesheet.secondary_code
+                        )
                     )?;
                 }
                 if self.config.show_fix_status {
@@ -93,7 +119,13 @@ impl<'a> ConciseRenderer<'a> {
                     f,
                     "{severity}[{id}] ",
                     severity = fmt_styled(severity, severity_style),
-                    id = fmt_styled(diag.id(), stylesheet.emphasis)
+                    id = fmt_styled(
+                        DisplayId {
+                            id: diag.id().as_str(),
+                            url: url.as_deref()
+                        },
+                        stylesheet.emphasis
+                    )
                 )?;
             }
 
@@ -195,5 +227,26 @@ mod tests {
             env.render(&diag),
             @"error[test-diagnostic] main diagnostic message",
         );
+    }
+}
+
+struct DisplayId<'a> {
+    id: &'a str,
+    url: Option<&'a str>,
+}
+
+impl std::fmt::Display for DisplayId<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(url) = self.url {
+            write!(f, "\x1B]8;;{url}\x1B\\")?;
+        }
+
+        f.write_str(self.id)?;
+
+        if self.url.is_some() {
+            f.write_str("\x1B]8;;\x1B\\")?;
+        }
+
+        Ok(())
     }
 }
