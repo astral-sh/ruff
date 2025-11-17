@@ -2103,12 +2103,12 @@ impl<'db> SequentMap<'db> {
         let upper = constraint.upper(db);
         match (lower, upper) {
             // Case 1
-            (Type::TypeVar(lower_typevar), Type::TypeVar(upper_typevar))
-                if !lower_typevar.is_same_typevar_as(db, upper_typevar) =>
-            {
-                let post_constraint =
-                    ConstrainedTypeVar::new(db, lower_typevar, Type::Never, upper);
-                self.add_single_implication(constraint, post_constraint);
+            (Type::TypeVar(lower_typevar), Type::TypeVar(upper_typevar)) => {
+                if !lower_typevar.is_same_typevar_as(db, upper_typevar) {
+                    let post_constraint =
+                        ConstrainedTypeVar::new(db, lower_typevar, Type::Never, upper);
+                    self.add_single_implication(constraint, post_constraint);
+                }
             }
 
             // Case 2
