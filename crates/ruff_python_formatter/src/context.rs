@@ -114,11 +114,8 @@ impl<'a> PyFormatContext<'a> {
         self.options.preview().is_enabled()
     }
 
-    /// Returns `true` if node is a suppressed statement.
-    pub(crate) fn is_suppressed_statement_node(&self, node: AnyNodeRef<'_>) -> bool {
-        if !node.is_statement() {
-            return false;
-        }
+    /// Returns `true` if node is suppressed via skip comment.
+    pub(crate) fn is_suppressed(&self, node: AnyNodeRef<'_>) -> bool {
         has_skip_comment(self.comments().trailing(node), self.source())
     }
 }

@@ -1,8 +1,6 @@
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::StmtNonlocal;
 
-use crate::comments::SourceComment;
-use crate::has_skip_comment;
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -47,12 +45,7 @@ impl FormatNodeRule<StmtNonlocal> for FormatStmtNonlocal {
             )
         }
     }
-
-    fn is_suppressed(
-        &self,
-        trailing_comments: &[SourceComment],
-        context: &PyFormatContext,
-    ) -> bool {
-        has_skip_comment(trailing_comments, context.source())
+    fn is_suppressed(&self, node: &StmtNonlocal, context: &PyFormatContext) -> bool {
+        context.is_suppressed(node.into())
     }
 }
