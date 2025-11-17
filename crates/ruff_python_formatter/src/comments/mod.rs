@@ -99,6 +99,7 @@ use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_trivia::{CommentLinePosition, CommentRanges, SuppressionKind};
 use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashSet;
 pub(crate) use visitor::collect_comments;
 
 use crate::comments::debug::{DebugComment, DebugComments};
@@ -509,6 +510,24 @@ pub(crate) fn has_skip_comment(trailing_comments: &[SourceComment], source: &str
                 Some(SuppressionKind::Skip | SuppressionKind::Off)
             )
     })
+}
+
+pub(crate) struct SuppressedNodes<'a>(FxHashSet<NodeRefEqualityKey<'a>>);
+
+impl<'a> SuppressedNodes<'a> {
+    pub(crate) fn from_comments(comments: &Comments<'a>, source: &'a str) -> Self {
+        let map = &comments.clone().data.comments;
+        Self(
+            map.keys()
+                .copied()
+                .filter(|key| has_skip_comment(map.trailing(key), source))
+                .collect(),
+        )
+    }
+
+    pub(crate) fn contains(&self, node: AnyNodeRef<'_>) -> bool {
+        self.0.contains(&NodeRefEqualityKey::from_ref(node))
+    }
 }
 
 #[cfg(test)]

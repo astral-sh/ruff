@@ -20,6 +20,7 @@ use {
 };
 
 use super::NormalizedString;
+use crate::comments::SuppressedNodes;
 use crate::preview::is_no_chaperone_for_escaped_quote_in_triple_quoted_docstring_enabled;
 use crate::string::StringQuotes;
 use crate::{DocstringCodeLineWidth, FormatModuleError, prelude::*};
@@ -1585,8 +1586,9 @@ fn docstring_format_source(
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let source_code = ruff_formatter::SourceCode::new(source);
     let comments = crate::Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
+    let suppressed_nodes = SuppressedNodes::from_comments(&comments, source_code.as_str());
 
-    let ctx = PyFormatContext::new(options, source, comments, parsed.tokens())
+    let ctx = PyFormatContext::new(options, source, comments, suppressed_nodes, parsed.tokens())
         .in_docstring(docstring_quote_style);
     let formatted = crate::format!(ctx, [parsed.syntax().format()])?;
     formatted

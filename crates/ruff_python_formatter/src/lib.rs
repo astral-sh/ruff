@@ -14,7 +14,7 @@ use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{
-    Comments, SourceComment, has_skip_comment, leading_comments, trailing_comments,
+    Comments, SourceComment, SuppressedNodes, has_skip_comment, leading_comments, trailing_comments,
 };
 pub use crate::context::PyFormatContext;
 pub use crate::db::Db;
@@ -174,9 +174,10 @@ where
 {
     let source_code = SourceCode::new(source);
     let comments = Comments::from_ast(parsed.syntax(), source_code, comment_ranges);
+    let suppressed_nodes = SuppressedNodes::from_comments(&comments, source);
 
     let formatted = format!(
-        PyFormatContext::new(options, source, comments, parsed.tokens()),
+        PyFormatContext::new(options, source, comments, suppressed_nodes, parsed.tokens()),
         [parsed.syntax().format()]
     )?;
     formatted

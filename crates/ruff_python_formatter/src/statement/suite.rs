@@ -945,7 +945,7 @@ mod tests {
     use ruff_python_trivia::CommentRanges;
 
     use crate::PyFormatOptions;
-    use crate::comments::Comments;
+    use crate::comments::{Comments, SuppressedNodes};
     use crate::prelude::*;
     use crate::statement::suite::SuiteKind;
 
@@ -973,11 +973,14 @@ def trailing_func():
 
         let parsed = parse_module(source).unwrap();
         let comment_ranges = CommentRanges::from(parsed.tokens());
+        let comments = Comments::from_ranges(&comment_ranges);
+        let suppressed_nodes = SuppressedNodes::from_comments(&comments, source);
 
         let context = PyFormatContext::new(
             PyFormatOptions::default(),
             source,
-            Comments::from_ranges(&comment_ranges),
+            comments,
+            suppressed_nodes,
             parsed.tokens(),
         );
 
