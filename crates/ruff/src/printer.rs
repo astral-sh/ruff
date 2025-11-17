@@ -9,9 +9,7 @@ use itertools::{Itertools, iterate};
 use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
-use ruff_db::diagnostic::{
-    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, SecondaryCode,
-};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, SecondaryCode};
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{EmitterContext, render_diagnostics};
@@ -390,21 +388,18 @@ impl Printer {
 
             let context = EmitterContext::new(&diagnostics.notebook_indexes);
             let format = if preview {
-                DiagnosticFormat::Full
+                self.format
             } else {
-                DiagnosticFormat::Concise
+                OutputFormat::Concise
             };
             let config = DisplayDiagnosticConfig::default()
+                .preview(preview)
                 .hide_severity(true)
                 .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
                 .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                .format(format)
-                .with_fix_applicability(self.unsafe_fixes.required_applicability());
-            write!(
-                writer,
-                "{}",
-                DisplayDiagnostics::new(&context, &config, &diagnostics.inner)
-            )?;
+                .with_fix_applicability(self.unsafe_fixes.required_applicability())
+                .show_fix_diff(preview);
+            render_diagnostics(writer, format, config, &context, &diagnostics.inner)?;
         }
         writer.flush()?;
 

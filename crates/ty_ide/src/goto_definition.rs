@@ -1294,6 +1294,156 @@ class Test:
                 "main.py",
                 "
 class Test:
+    def __invert__(self) -> 'Test': ...
+
+a = Test()
+
+<CURSOR>~a
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:9
+          |
+        2 | class Test:
+        3 |     def __invert__(self) -> 'Test': ...
+          |         ^^^^^^^^^^
+        4 |
+        5 | a = Test()
+          |
+        info: Source
+         --> main.py:7:1
+          |
+        5 | a = Test()
+        6 |
+        7 | ~a
+          | ^
+          |
+        ");
+    }
+
+    /// We jump to the `__invert__` definition here even though its signature is incorrect.
+    #[test]
+    fn goto_definition_unary_operator_with_bad_dunder_definition() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __invert__(self, extra_arg) -> 'Test': ...
+
+a = Test()
+
+<CURSOR>~a
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:9
+          |
+        2 | class Test:
+        3 |     def __invert__(self, extra_arg) -> 'Test': ...
+          |         ^^^^^^^^^^
+        4 |
+        5 | a = Test()
+          |
+        info: Source
+         --> main.py:7:1
+          |
+        5 | a = Test()
+        6 |
+        7 | ~a
+          | ^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_unary_after_operator() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __invert__(self) -> 'Test': ...
+
+a = Test()
+
+~<CURSOR> a
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:9
+          |
+        2 | class Test:
+        3 |     def __invert__(self) -> 'Test': ...
+          |         ^^^^^^^^^^
+        4 |
+        5 | a = Test()
+          |
+        info: Source
+         --> main.py:7:1
+          |
+        5 | a = Test()
+        6 |
+        7 | ~ a
+          | ^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_unary_between_operator_and_operand() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __invert__(self) -> 'Test': ...
+
+a = Test()
+
+-<CURSOR>a
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:5:1
+          |
+        3 |     def __invert__(self) -> 'Test': ...
+        4 |
+        5 | a = Test()
+          | ^
+        6 |
+        7 | -a
+          |
+        info: Source
+         --> main.py:7:2
+          |
+        5 | a = Test()
+        6 |
+        7 | -a
+          |  ^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_unary_not_with_dunder_bool() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
     def __bool__(self) -> bool: ...
 
 a = Test()
@@ -1325,17 +1475,17 @@ a = Test()
     }
 
     #[test]
-    fn goto_definition_unary_after_operator() {
+    fn goto_definition_unary_not_with_dunder_len() {
         let test = CursorTest::builder()
             .source(
                 "main.py",
                 "
 class Test:
-    def __bool__(self) -> bool: ...
+    def __len__(self) -> 42: ...
 
 a = Test()
 
-not<CURSOR> a
+<CURSOR>not a
 ",
             )
             .build();
@@ -1345,8 +1495,89 @@ not<CURSOR> a
          --> main.py:3:9
           |
         2 | class Test:
-        3 |     def __bool__(self) -> bool: ...
+        3 |     def __len__(self) -> 42: ...
+          |         ^^^^^^^
+        4 |
+        5 | a = Test()
+          |
+        info: Source
+         --> main.py:7:1
+          |
+        5 | a = Test()
+        6 |
+        7 | not a
+          | ^^^
+          |
+        ");
+    }
+
+    /// If `__bool__` is defined incorrectly, `not` does not fallback to `__len__`.
+    /// Instead, we jump to the `__bool__` definition as usual.
+    /// The fallback only occurs if `__bool__` is not defined at all.
+    #[test]
+    fn goto_definition_unary_not_with_bad_dunder_bool_and_dunder_len() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __bool__(self, extra_arg) -> bool: ...
+    def __len__(self) -> 42: ...
+
+a = Test()
+
+<CURSOR>not a
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:9
+          |
+        2 | class Test:
+        3 |     def __bool__(self, extra_arg) -> bool: ...
           |         ^^^^^^^^
+        4 |     def __len__(self) -> 42: ...
+          |
+        info: Source
+         --> main.py:8:1
+          |
+        6 | a = Test()
+        7 |
+        8 | not a
+          | ^^^
+          |
+        ");
+    }
+
+    /// Same as for unary operators that only use a single dunder,
+    /// we still jump to `__len__` for `not` goto-definition even if
+    /// the `__len__` signature is incorrect (but only if there is no
+    /// `__bool__` definition).
+    #[test]
+    fn goto_definition_unary_not_with_no_dunder_bool_and_bad_dunder_len() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Test:
+    def __len__(self, extra_arg) -> 42: ...
+
+a = Test()
+
+<CURSOR>not a
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:9
+          |
+        2 | class Test:
+        3 |     def __len__(self, extra_arg) -> 42: ...
+          |         ^^^^^^^
         4 |
         5 | a = Test()
           |
@@ -1362,41 +1593,125 @@ not<CURSOR> a
     }
 
     #[test]
-    fn goto_definition_unary_between_operator_and_operand() {
+    fn float_annotation() {
         let test = CursorTest::builder()
             .source(
                 "main.py",
                 "
-class Test:
-    def __bool__(self) -> bool: ...
-
-a = Test()
-
--<CURSOR>a
+a: float<CURSOR> = 3.14
 ",
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @r#"
         info[goto-definition]: Definition
-         --> main.py:5:1
-          |
-        3 |     def __bool__(self) -> bool: ...
-        4 |
-        5 | a = Test()
-          | ^
-        6 |
-        7 | -a
-          |
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
         info: Source
-         --> main.py:7:2
+         --> main.py:2:4
           |
-        5 | a = Test()
-        6 |
-        7 | -a
-          |  ^
+        2 | a: float = 3.14
+          |    ^^^^^
           |
-        ");
+
+        info[goto-definition]: Definition
+           --> stdlib/builtins.pyi:661:7
+            |
+        660 | @disjoint_base
+        661 | class float:
+            |       ^^^^^
+        662 |     """Convert a string or number to a floating-point number, if possible."""
+            |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: float = 3.14
+          |    ^^^^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn complex_annotation() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+a: complex<CURSOR> = 3.14
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: complex = 3.14
+          |    ^^^^^^^
+          |
+
+        info[goto-definition]: Definition
+           --> stdlib/builtins.pyi:661:7
+            |
+        660 | @disjoint_base
+        661 | class float:
+            |       ^^^^^
+        662 |     """Convert a string or number to a floating-point number, if possible."""
+            |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: complex = 3.14
+          |    ^^^^^^^
+          |
+
+        info[goto-definition]: Definition
+           --> stdlib/builtins.pyi:822:7
+            |
+        821 | @disjoint_base
+        822 | class complex:
+            |       ^^^^^^^
+        823 |     """Create a complex number from a string or numbers.
+            |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: complex = 3.14
+          |    ^^^^^^^
+          |
+        "#);
+    }
+
+    /// Regression test for <https://github.com/astral-sh/ty/issues/1451>.
+    /// We must ensure we respect re-import convention for stub files for
+    /// imports in builtins.pyi.
+    #[test]
+    fn goto_definition_unimported_symbol_imported_in_builtins() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+Traceb<CURSOR>ackType
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
     }
 
     impl CursorTest {

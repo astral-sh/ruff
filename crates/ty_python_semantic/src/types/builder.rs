@@ -44,6 +44,7 @@ use crate::types::{
     TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderSet};
+use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -206,7 +207,7 @@ enum ReduceResult<'db> {
 //
 // For now (until we solve https://github.com/astral-sh/ty/issues/957), keep this number
 // below 200, which is the salsa fixpoint iteration limit.
-const MAX_UNION_LITERALS: usize = 199;
+const MAX_UNION_LITERALS: usize = 190;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
@@ -422,9 +423,9 @@ impl<'db> UnionBuilder<'db> {
                     .iter()
                     .filter_map(UnionElement::to_type_element)
                     .filter_map(Type::as_enum_literal)
-                    .map(|literal| literal.name(self.db).clone())
-                    .chain(std::iter::once(enum_member_to_add.name(self.db).clone()))
-                    .collect::<FxOrderSet<_>>();
+                    .map(|literal| literal.name(self.db))
+                    .chain(std::iter::once(enum_member_to_add.name(self.db)))
+                    .collect::<FxHashSet<_>>();
 
                 let all_members_are_in_union = metadata
                     .members
@@ -854,7 +855,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
             _ => {
                 let known_instance = new_positive
-                    .into_nominal_instance()
+                    .as_nominal_instance()
                     .and_then(|instance| instance.known_class(db));
 
                 if known_instance == Some(KnownClass::Object) {
@@ -966,7 +967,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         let contains_bool = || {
             self.positive
                 .iter()
-                .filter_map(|ty| ty.into_nominal_instance())
+                .filter_map(|ty| ty.as_nominal_instance())
                 .filter_map(|instance| instance.known_class(db))
                 .any(KnownClass::is_bool)
         };
@@ -1145,6 +1146,39 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     fn build(mut self, db: &'db dyn Db) -> Type<'db> {
         self.simplify_constrained_typevars(db);
+
+        // If any typevars are in `self.positive`, speculatively solve all bounded type variables
+        // to their upper bound and all constrained type variables to the union of their constraints.
+        // If that speculative intersection simplifies to `Never`, this intersection must also simplify
+        // to `Never`.
+        if self.positive.iter().any(|ty| ty.is_type_var()) {
+            let mut speculative = IntersectionBuilder::new(db);
+            for pos in &self.positive {
+                match pos {
+                    Type::TypeVar(type_var) => {
+                        match type_var.typevar(db).bound_or_constraints(db) {
+                            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                                speculative = speculative.add_positive(bound);
+                            }
+                            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                                speculative = speculative.add_positive(Type::Union(constraints));
+                            }
+                            // TypeVars without a bound or constraint implicitly have `object` as their
+                            // upper bound, and it is always a no-op to add `object` to an intersection.
+                            None => {}
+                        }
+                    }
+                    _ => speculative = speculative.add_positive(*pos),
+                }
+            }
+            for neg in &self.negative {
+                speculative = speculative.add_negative(*neg);
+            }
+            if speculative.build().is_never() {
+                return Type::Never;
+            }
+        }
+
         match (self.positive.len(), self.negative.len()) {
             (0, 0) => Type::object(),
             (1, 0) => self.positive[0],

@@ -34,6 +34,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// The fix is marked unsafe if it is not possible to guarantee that the first argument of
 /// `round()` is of type `int`, or if the fix deletes comments.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct UnnecessaryRound;
 
 impl AlwaysFixableViolation for UnnecessaryRound {
@@ -139,6 +140,15 @@ pub(super) fn rounded_and_ndigits<'a>(
     semantic: &'a SemanticModel,
 ) -> Option<(&'a Expr, RoundedValue, NdigitsValue)> {
     if arguments.len() > 2 {
+        return None;
+    }
+
+    // *args
+    if arguments.args.iter().any(Expr::is_starred_expr) {
+        return None;
+    }
+    // **kwargs
+    if arguments.keywords.iter().any(|kw| kw.arg.is_none()) {
         return None;
     }
 

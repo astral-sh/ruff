@@ -47,6 +47,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.138")]
 pub(crate) struct RaiseWithoutFromInsideExcept {
     is_star: bool,
 }

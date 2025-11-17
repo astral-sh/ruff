@@ -26,6 +26,7 @@ python-version = "3.12"
 
 ```py
 from __future__ import annotations
+from ty_extensions import reveal_mro
 
 class A:
     def a(self): ...
@@ -39,7 +40,7 @@ class C(B):
     def c(self): ...
     cc: int = 3
 
-reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'B'>, <class 'A'>, <class 'object'>]
+reveal_mro(C)  # revealed: (<class 'C'>, <class 'B'>, <class 'A'>, <class 'object'>)
 
 super(C, C()).a
 super(C, C()).b
@@ -65,7 +66,7 @@ synthesized `Protocol`s that cannot be upcast to, or interpreted as, a non-`obje
 
 ```py
 import types
-from typing_extensions import Callable, TypeIs, Literal, TypedDict
+from typing_extensions import Callable, TypeIs, Literal, NewType, TypedDict
 
 def f(): ...
 
@@ -79,6 +80,8 @@ type Alias = int
 class SomeTypedDict(TypedDict):
     x: int
     y: bytes
+
+N = NewType("N", int)
 
 # revealed: <super: <class 'object'>, FunctionType>
 reveal_type(super(object, f))
@@ -94,6 +97,8 @@ reveal_type(super(object, Alias))
 reveal_type(super(object, Foo().method))
 # revealed: <super: <class 'object'>, property>
 reveal_type(super(object, Foo.some_property))
+# revealed: <super: <class 'object'>, int>
+reveal_type(super(object, N(42)))
 
 def g(x: object) -> TypeIs[list[object]]:
     return isinstance(x, list)
@@ -163,14 +168,13 @@ class A:
 
 class B(A):
     def __init__(self, a: int):
-        # TODO: Once `Self` is supported, this should be `<super: <class 'B'>, B>`
-        reveal_type(super())  # revealed: <super: <class 'B'>, Unknown>
+        reveal_type(super())  # revealed: <super: <class 'B'>, B>
         reveal_type(super(object, super()))  # revealed: <super: <class 'object'>, super>
         super().__init__(a)
 
     @classmethod
     def f(cls):
-        # TODO: Once `Self` is supported, this should be `<super: <class 'B'>, <class 'B'>>`
+        # TODO: Once `cls` is supported, this should be `<super: <class 'B'>, <class 'B'>>`
         reveal_type(super())  # revealed: <super: <class 'B'>, Unknown>
         super().f()
 
@@ -358,15 +362,15 @@ from __future__ import annotations
 
 class A:
     def test(self):
-        reveal_type(super())  # revealed: <super: <class 'A'>, Unknown>
+        reveal_type(super())  # revealed: <super: <class 'A'>, A>
 
     class B:
         def test(self):
-            reveal_type(super())  # revealed: <super: <class 'B'>, Unknown>
+            reveal_type(super())  # revealed: <super: <class 'B'>, B>
 
             class C(A.B):
                 def test(self):
-                    reveal_type(super())  # revealed: <super: <class 'C'>, Unknown>
+                    reveal_type(super())  # revealed: <super: <class 'C'>, C>
 
             def inner(t: C):
                 reveal_type(super())  # revealed: <super: <class 'B'>, C>
@@ -421,6 +425,8 @@ When the owner is a union type, `super()` is built separately for each branch, a
 super objects are combined into a union.
 
 ```py
+from ty_extensions import reveal_mro
+
 class A: ...
 
 class B:
@@ -430,8 +436,8 @@ class C(A, B): ...
 class D(B, A): ...
 
 def f(x: C | D):
-    reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'A'>, <class 'B'>, <class 'object'>]
-    reveal_type(D.__mro__)  # revealed: tuple[<class 'D'>, <class 'B'>, <class 'A'>, <class 'object'>]
+    reveal_mro(C)  # revealed: (<class 'C'>, <class 'A'>, <class 'B'>, <class 'object'>)
+    reveal_mro(D)  # revealed: (<class 'D'>, <class 'B'>, <class 'A'>, <class 'object'>)
 
     s = super(A, x)
     reveal_type(s)  # revealed: <super: <class 'A'>, C> | <super: <class 'A'>, D>
@@ -616,7 +622,7 @@ class A:
 class B(A):
     def __init__(self, a: int):
         super().__init__(a)
-        # TODO: Once `Self` is supported, this should raise `unresolved-attribute` error
+        # error: [unresolved-attribute] "Object of type `<super: <class 'B'>, B>` has no attribute `a`"
         super().a
 
 # error: [unresolved-attribute] "Object of type `<super: <class 'B'>, B>` has no attribute `a`"

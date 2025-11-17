@@ -30,6 +30,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.5.1")]
 pub(crate) struct WhitespaceAfterDecorator;
 
 impl AlwaysFixableViolation for WhitespaceAfterDecorator {

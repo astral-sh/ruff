@@ -40,6 +40,7 @@ use crate::{Edit, Fix};
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.67")]
 pub(crate) struct DuplicateTryBlockException {
     name: String,
     is_star: bool,
@@ -87,6 +88,7 @@ impl Violation for DuplicateTryBlockException {
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 /// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.67")]
 pub(crate) struct DuplicateHandlerException {
     pub names: Vec<String>,
 }

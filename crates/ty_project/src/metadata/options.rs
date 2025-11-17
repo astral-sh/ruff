@@ -131,9 +131,7 @@ impl Options {
                         ValueSource::File(path) => PythonVersionSource::ConfigFile(
                             PythonVersionFileSource::new(path.clone(), ranged_version.range()),
                         ),
-                        ValueSource::PythonVSCodeExtension => {
-                            PythonVersionSource::PythonVSCodeExtension
-                        }
+                        ValueSource::Editor => PythonVersionSource::Editor,
                     },
                 });
 
@@ -153,7 +151,7 @@ impl Options {
                 ValueSource::File(path) => {
                     SysPrefixPathOrigin::ConfigFileSetting(path.clone(), python_path.range())
                 }
-                ValueSource::PythonVSCodeExtension => SysPrefixPathOrigin::PythonVSCodeExtension,
+                ValueSource::Editor => SysPrefixPathOrigin::Editor,
             };
 
             Some(PythonEnvironment::new(
@@ -166,14 +164,24 @@ impl Options {
                 .context("Failed to discover local Python environment")?
         };
 
-        let site_packages_paths = if let Some(python_environment) = python_environment.as_ref() {
+        let self_site_packages = self_environment_search_paths(
             python_environment
-                .site_packages_paths(system)
-                .context("Failed to discover the site-packages directory")?
+                .as_ref()
+                .map(ty_python_semantic::PythonEnvironment::origin)
+                .cloned(),
+            system,
+        )
+        .unwrap_or_default();
+
+        let site_packages_paths = if let Some(python_environment) = python_environment.as_ref() {
+            self_site_packages.concatenate(
+                python_environment
+                    .site_packages_paths(system)
+                    .context("Failed to discover the site-packages directory")?,
+            )
         } else {
             tracing::debug!("No virtual environment found");
-
-            SitePackagesPaths::default()
+            self_site_packages
         };
 
         let real_stdlib_path = python_environment.as_ref().and_then(|python_environment| {
@@ -461,6 +469,42 @@ impl Options {
 
         Ok(overrides)
     }
+}
+
+/// Return the site-packages from the environment ty is installed in, as derived from ty's
+/// executable.
+///
+/// If there's an existing environment with an origin that does not allow including site-packages
+/// from ty's environment, discovery of ty's environment is skipped and [`None`] is returned.
+///
+/// Since ty may be executed from an arbitrary non-Python location, errors during discovery of ty's
+/// environment are not raised, instead [`None`] is returned.
+fn self_environment_search_paths(
+    existing_origin: Option<SysPrefixPathOrigin>,
+    system: &dyn System,
+) -> Option<SitePackagesPaths> {
+    if existing_origin.is_some_and(|origin| !origin.allows_concatenation_with_self_environment()) {
+        return None;
+    }
+
+    let Ok(exe_path) = std::env::current_exe() else {
+        return None;
+    };
+    let ty_path = SystemPath::from_std_path(exe_path.as_path())?;
+
+    let environment = PythonEnvironment::new(ty_path, SysPrefixPathOrigin::SelfEnvironment, system)
+        .inspect_err(|err| tracing::debug!("Failed to discover ty's environment: {err}"))
+        .ok()?;
+
+    let search_paths = environment
+        .site_packages_paths(system)
+        .inspect_err(|err| {
+            tracing::debug!("Failed to discover site-packages in ty's environment: {err}");
+        })
+        .ok();
+
+    tracing::debug!("Using site-packages from ty's environment");
+    search_paths
 }
 
 #[derive(
@@ -819,8 +863,8 @@ impl Rules {
                         ValueSource::File(_) => LintSource::File,
                         ValueSource::Cli => LintSource::Cli,
 
-                        ValueSource::PythonVSCodeExtension => {
-                            unreachable!("Can't configure rules from the Python VSCode extension")
+                        ValueSource::Editor => {
+                            unreachable!("Can't configure rules from the user's editor")
                         }
                     };
                     if let Ok(severity) = Severity::try_from(**level) {
@@ -957,7 +1001,7 @@ fn build_include_filter(
                             SubDiagnosticSeverity::Info,
                             "The pattern was specified on the CLI",
                         )),
-                        ValueSource::PythonVSCodeExtension => unreachable!("Can't configure includes from the Python VSCode extension"),
+                        ValueSource::Editor => unreachable!("Can't configure includes from the user's editor"),
                     }
                 })?;
         }
@@ -1040,8 +1084,8 @@ fn build_exclude_filter(
                             SubDiagnosticSeverity::Info,
                             "The pattern was specified on the CLI",
                         )),
-                        ValueSource::PythonVSCodeExtension => unreachable!(
-                            "Can't configure excludes from the Python VSCode extension"
+                        ValueSource::Editor => unreachable!(
+                            "Can't configure excludes from the user's editor"
                         )
                     }
                 })?;
@@ -1139,6 +1183,16 @@ impl From<OutputFormat> for DiagnosticFormat {
             OutputFormat::Gitlab => Self::Gitlab,
             OutputFormat::Github => Self::Github,
         }
+    }
+}
+
+impl Combine for OutputFormat {
+    #[inline(always)]
+    fn combine_with(&mut self, _other: Self) {}
+
+    #[inline]
+    fn combine(self, _other: Self) -> Self {
+        self
     }
 }
 

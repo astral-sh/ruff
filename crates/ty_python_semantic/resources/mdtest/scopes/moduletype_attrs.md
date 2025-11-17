@@ -120,6 +120,21 @@ we're dealing with:
 reveal_type(typing.__getattr__)  # revealed: Unknown
 ```
 
+However, if we have a `ModuleType` instance, we make `__getattr__` available. This means that
+arbitrary attribute accesses are allowed (with a result type of `Any`):
+
+```py
+import types
+
+reveal_type(types.ModuleType.__getattr__)  # revealed: def __getattr__(self, name: str) -> Any
+
+def f(module: types.ModuleType):
+    reveal_type(module.__getattr__)  # revealed: bound method ModuleType.__getattr__(name: str) -> Any
+
+    reveal_type(module.__all__)  # revealed: Any
+    reveal_type(module.whatever)  # revealed: Any
+```
+
 ## `types.ModuleType.__dict__` takes precedence over global variable `__dict__`
 
 It's impossible to override the `__dict__` attribute of `types.ModuleType` instances from inside the

@@ -43,9 +43,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     pycodestyle::rules::ambiguous_variable_name(checker, name, name.range());
                 }
             }
-            if checker.is_rule_enabled(Rule::NonlocalWithoutBinding) {
-                pylint::rules::nonlocal_without_binding(checker, nonlocal);
-            }
             if checker.is_rule_enabled(Rule::NonlocalAndGlobal) {
                 pylint::rules::nonlocal_and_global(checker, nonlocal);
             }
@@ -720,7 +717,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::UnnecessaryBuiltinImport) {
                 if let Some(module) = module {
-                    pyupgrade::rules::unnecessary_builtin_import(checker, stmt, module, names);
+                    pyupgrade::rules::unnecessary_builtin_import(
+                        checker, stmt, module, names, level,
+                    );
                 }
             }
             if checker.any_rule_enabled(&[
@@ -950,6 +949,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::MisplacedBareRaise) {
                 pylint::rules::misplaced_bare_raise(checker, raise);
+            }
+            if checker.is_rule_enabled(Rule::StopIterationReturn) {
+                pylint::rules::stop_iteration_return(checker, raise);
             }
         }
         Stmt::AugAssign(aug_assign @ ast::StmtAugAssign { target, .. }) => {

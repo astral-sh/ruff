@@ -32,6 +32,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// Note that while the fix may flatten nested unions into a single top-level union,
 /// the semantics of the annotation will remain unchanged.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.283")]
 pub(crate) struct UnnecessaryTypeUnion {
     members: Vec<Name>,
     union_kind: UnionKind,

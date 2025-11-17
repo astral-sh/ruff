@@ -187,8 +187,8 @@ python-platform = "all"
 
 If `python-platform` is set to `all`, we treat the platform as unspecified. This means that we do
 not infer a literal type like `Literal["win32"]` for `sys.platform`, but instead fall back to
-`LiteralString` (the `typeshed` annotation for `sys.platform`). This means that we can not
-statically determine the truthiness of a branch like `sys.platform == "win32"`.
+`LiteralString` (the `typeshed` annotation for `sys.platform`). This means that we cannot statically
+determine the truthiness of a branch like `sys.platform == "win32"`.
 
 See <https://github.com/astral-sh/ruff/issues/16983#issuecomment-2777146188> for a plan on how this
 could be improved.

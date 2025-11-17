@@ -42,6 +42,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.pylint.max-positional-args`
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.7")]
 pub(crate) struct TooManyPositionalArguments {
     c_pos: usize,
     max_pos: usize,

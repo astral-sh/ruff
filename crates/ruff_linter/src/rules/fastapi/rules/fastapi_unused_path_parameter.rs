@@ -64,6 +64,7 @@ use crate::{FixAvailability, Violation};
 /// This rule's fix is marked as unsafe, as modifying a function signature can
 /// change the behavior of the code.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct FastApiUnusedPathParameter {
     arg_name: String,
     function_name: String,

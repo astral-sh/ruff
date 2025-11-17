@@ -29,13 +29,13 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchOr(
                                 PatternMatchOr {
-                                    range: 18..36,
                                     node_index: NodeIndex(None),
+                                    range: 18..36,
                                     patterns: [
                                         MatchClass(
                                             PatternMatchClass {
-                                                range: 18..26,
                                                 node_index: NodeIndex(None),
+                                                range: 18..26,
                                                 cls: Name(
                                                     ExprName {
                                                         node_index: NodeIndex(None),
@@ -50,8 +50,8 @@ Module(
                                                     patterns: [
                                                         MatchAs(
                                                             PatternMatchAs {
-                                                                range: 24..25,
                                                                 node_index: NodeIndex(None),
+                                                                range: 24..25,
                                                                 pattern: None,
                                                                 name: Some(
                                                                     Identifier {
@@ -69,13 +69,13 @@ Module(
                                         ),
                                         MatchSequence(
                                             PatternMatchSequence {
-                                                range: 29..32,
                                                 node_index: NodeIndex(None),
+                                                range: 29..32,
                                                 patterns: [
                                                     MatchAs(
                                                         PatternMatchAs {
-                                                            range: 30..31,
                                                             node_index: NodeIndex(None),
+                                                            range: 30..31,
                                                             pattern: None,
                                                             name: Some(
                                                                 Identifier {
@@ -91,8 +91,8 @@ Module(
                                         ),
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 35..36,
                                                 node_index: NodeIndex(None),
+                                                range: 35..36,
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {

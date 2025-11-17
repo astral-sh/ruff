@@ -32,6 +32,7 @@ use crate::package::PackageRoot;
 /// ## Options
 /// - `namespace-packages`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.225")]
 pub(crate) struct ImplicitNamespacePackage {
     filename: String,
     parent: Option<String>,

@@ -33,6 +33,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Options
 /// - `lint.external`
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.11.4")]
 pub(crate) struct InvalidRuleCode {
     pub(crate) rule_code: String,
 }

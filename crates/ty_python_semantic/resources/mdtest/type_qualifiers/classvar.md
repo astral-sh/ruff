@@ -123,6 +123,7 @@ python-version = "3.12"
 
 ```py
 from typing import ClassVar
+from ty_extensions import reveal_mro
 
 # error: [invalid-type-form] "`ClassVar` annotations are only allowed in class-body scopes"
 x: ClassVar[int] = 1
@@ -155,8 +156,8 @@ def f[T](x: T) -> ClassVar[T]:
 class Foo(ClassVar[tuple[int]]): ...
 
 # TODO: Show `Unknown` instead of `@Todo` type in the MRO; or ignore `ClassVar` and show the MRO as if `ClassVar` was not there
-# revealed: tuple[<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>]
-reveal_type(Foo.__mro__)
+# revealed: (<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>)
+reveal_mro(Foo)
 ```
 
 [`typing.classvar`]: https://docs.python.org/3/library/typing.html#typing.ClassVar

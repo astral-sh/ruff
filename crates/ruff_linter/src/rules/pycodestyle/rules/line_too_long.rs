@@ -70,6 +70,7 @@ use crate::settings::LinterSettings;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.18")]
 pub(crate) struct LineTooLong(usize, usize);
 
 impl Violation for LineTooLong {

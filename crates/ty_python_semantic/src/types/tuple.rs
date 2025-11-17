@@ -201,7 +201,7 @@ impl<'db> TupleType<'db> {
     // N.B. If this method is not Salsa-tracked, we take 10 minutes to check
     // `static-frame` as part of a mypy_primer run! This is because it's called
     // from `NominalInstanceType::class()`, which is a very hot method.
-    #[salsa::tracked(cycle_fn=to_class_type_cycle_recover, cycle_initial=to_class_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=to_class_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
         let tuple_class = KnownClass::Tuple
             .try_to_class_literal(db)
@@ -260,7 +260,7 @@ impl<'db> TupleType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -290,16 +290,11 @@ impl<'db> TupleType<'db> {
     }
 }
 
-fn to_class_type_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &ClassType<'db>,
-    _count: u32,
-    _self: TupleType<'db>,
-) -> salsa::CycleRecoveryAction<ClassType<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn to_class_type_cycle_initial<'db>(db: &'db dyn Db, self_: TupleType<'db>) -> ClassType<'db> {
+fn to_class_type_cycle_initial<'db>(
+    db: &'db dyn Db,
+    _id: salsa::Id,
+    self_: TupleType<'db>,
+) -> ClassType<'db> {
     let tuple_class = KnownClass::Tuple
         .try_to_class_literal(db)
         .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
@@ -447,7 +442,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -486,7 +481,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     );
                     if result
                         .intersect(db, element_constraints)
-                        .is_never_satisfied()
+                        .is_never_satisfied(db)
                     {
                         return result;
                     }
@@ -505,7 +500,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     );
                     if result
                         .intersect(db, element_constraints)
-                        .is_never_satisfied()
+                        .is_never_satisfied(db)
                     {
                         return result;
                     }
@@ -804,7 +799,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -843,7 +838,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     );
                     if result
                         .intersect(db, element_constraints)
-                        .is_never_satisfied()
+                        .is_never_satisfied(db)
                     {
                         return result;
                     }
@@ -863,7 +858,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     );
                     if result
                         .intersect(db, element_constraints)
-                        .is_never_satisfied()
+                        .is_never_satisfied(db)
                     {
                         return result;
                     }
@@ -916,7 +911,10 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                             return ConstraintSet::from(false);
                         }
                     };
-                    if result.intersect(db, pair_constraints).is_never_satisfied() {
+                    if result
+                        .intersect(db, pair_constraints)
+                        .is_never_satisfied(db)
+                    {
                         return result;
                     }
                 }
@@ -952,7 +950,10 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                             return ConstraintSet::from(false);
                         }
                     };
-                    if result.intersect(db, pair_constraints).is_never_satisfied() {
+                    if result
+                        .intersect(db, pair_constraints)
+                        .is_never_satisfied(db)
+                    {
                         return result;
                     }
                 }
@@ -1190,7 +1191,7 @@ impl<'db> Tuple<Type<'db>> {
         db: &'db dyn Db,
         other: &Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {

@@ -170,6 +170,7 @@ def f1(flag: bool):
             attr = DataDescriptor()
 
         def f(self):
+            # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `attr` on type `Self@f` with custom `__set__` method"
             self.attr = "normal"
 
     reveal_type(C1().attr)  # revealed: Unknown | Literal["data", "normal"]
@@ -695,8 +696,16 @@ reveal_type(C().instance_access)  # revealed: str
 reveal_type(C.metaclass_access)  # revealed: bytes
 
 # TODO: These should emit a diagnostic
-reveal_type(C().class_object_access)  # revealed: TailoredForClassObjectAccess
-reveal_type(C.instance_access)  # revealed: TailoredForInstanceAccess
+#
+# However, we use the return-type of `__get__` as the inferred type anyway:
+# the way to specify that the descriptor object itself is returned when the
+# attribute is accessed on the instance or the class is by overloading `__get__`.
+#
+# Using the return type of `__get__` even for `__get__` calls that have invalid
+# arguments passed to them avoids false positives in situations where there are
+# `__get__` calls that we don't sufficiently understand.
+reveal_type(C().class_object_access)  # revealed: int
+reveal_type(C.instance_access)  # revealed: str
 ```
 
 ### Descriptors with incorrect `__get__` signature
@@ -711,10 +720,28 @@ class C:
     descriptor: Descriptor = Descriptor()
 
 # TODO: This should be an error
-reveal_type(C.descriptor)  # revealed: Descriptor
+reveal_type(C.descriptor)  # revealed: int
 
 # TODO: This should be an error
-reveal_type(C().descriptor)  # revealed: Descriptor
+reveal_type(C().descriptor)  # revealed: int
+```
+
+### "Descriptors" with non-callable `__get__` attributes
+
+If `__get__` is not callable at all, the interpreter will still attempt to call the method at
+runtime, and this will raise an exception. As such, even for `__get__ = None`, we still "attempt to
+call `__get__`" on the descriptor object (leading us to infer `Unknown`):
+
+```py
+class BrokenDescriptor:
+    __get__: None = None
+
+class Foo:
+    desc: BrokenDescriptor = BrokenDescriptor()
+
+# TODO: this raises `TypeError` at runtime due to the implicit call to `__get__`;
+# we should emit a diagnostic
+reveal_type(Foo().desc)  # revealed: Unknown
 ```
 
 ### Undeclared descriptor arguments

@@ -132,8 +132,29 @@ def f(x: int | str):
 Inside an `if TYPE_CHECKING` block, we allow "stub" style function definitions with empty bodies,
 since these functions will never actually be called.
 
+`compat/__init__.py`:
+
+```py
+```
+
+`compat/sub/__init__.py`:
+
+```py
+```
+
+`compat/sub/sub.py`:
+
 ```py
 from typing import TYPE_CHECKING
+```
+
+`main.py`:
+
+```py
+from typing import TYPE_CHECKING
+import typing
+import typing as t
+import compat.sub.sub
 
 if TYPE_CHECKING:
     def f() -> int: ...
@@ -199,6 +220,24 @@ if get_bool():
 if TYPE_CHECKING:
     if not TYPE_CHECKING:
         def n() -> str: ...
+
+if typing.TYPE_CHECKING:
+    def o() -> str: ...
+
+if not typing.TYPE_CHECKING:
+    def p() -> str: ...  # error: [invalid-return-type]
+
+if compat.sub.sub.TYPE_CHECKING:
+    def q() -> str: ...
+
+if not compat.sub.sub.TYPE_CHECKING:
+    def r() -> str: ...  # error: [invalid-return-type]
+
+if t.TYPE_CHECKING:
+    def s() -> str: ...
+
+if not t.TYPE_CHECKING:
+    def t() -> str: ...  # error: [invalid-return-type]
 ```
 
 ## Conditional return type
@@ -427,11 +466,23 @@ def f(cond: bool) -> int:
     return "hello" if cond else NotImplemented
 ```
 
+`NotImplemented` is only special-cased for return types (mirroring the way the interpreter applies
+special casing for the symbol at runtime). It is not generally considered assignable to every other
+type:
+
+```py
+# Other type checkers do not emit an error here,
+# but this is likely not a deliberate feature they've implemented;
+# it's probably because `NotImplementedType` inherits from `Any`
+# according to typeshed. We override typeshed's incorrect MRO
+# for more precise type inference.
+x: int = NotImplemented  # error: [invalid-assignment]
+```
+
 ### Python 3.10+
 
-Unlike Ellipsis, `_NotImplementedType` remains in `builtins.pyi` regardless of the Python version.
-Even if `builtins._NotImplementedType` is fully replaced by `types.NotImplementedType` in the
-future, it should still work as expected.
+We correctly understand the semantics of `NotImplemented` on all Python versions, even though the
+class `types.NotImplementedType` is only exposed in the `types` module on Python 3.10+.
 
 ```toml
 [environment]

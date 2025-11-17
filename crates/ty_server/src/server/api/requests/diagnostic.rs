@@ -33,7 +33,7 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
         _client: &Client,
         params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
-        let diagnostics = compute_diagnostics(db, snapshot);
+        let diagnostics = compute_diagnostics(db, snapshot.document(), snapshot.encoding());
 
         let Some(diagnostics) = diagnostics else {
             return Ok(DocumentDiagnosticReportResult::Report(

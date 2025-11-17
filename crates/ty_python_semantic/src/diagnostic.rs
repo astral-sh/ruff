@@ -88,10 +88,10 @@ pub fn add_inferred_python_version_hint_to_diagnostic(
                 or in a configuration file",
             );
         }
-        crate::PythonVersionSource::PythonVSCodeExtension => {
+        crate::PythonVersionSource::Editor => {
             diagnostic.info(format_args!(
                 "Python {version} was assumed when {action} \
-                because it's the version of the selected Python interpreter in the VS Code Python extension",
+                because it's the version of the selected Python interpreter in your editor",
             ));
         }
         crate::PythonVersionSource::InstallationDirectoryLayout {

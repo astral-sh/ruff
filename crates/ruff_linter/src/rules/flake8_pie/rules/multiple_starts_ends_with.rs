@@ -49,6 +49,7 @@ use crate::{Edit, Fix};
 /// - [Python documentation: `str.startswith`](https://docs.python.org/3/library/stdtypes.html#str.startswith)
 /// - [Python documentation: `str.endswith`](https://docs.python.org/3/library/stdtypes.html#str.endswith)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.243")]
 pub(crate) struct MultipleStartsEndsWith {
     attr: String,
 }

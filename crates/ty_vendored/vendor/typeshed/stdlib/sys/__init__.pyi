@@ -578,6 +578,21 @@ def _getframe(depth: int = 0, /) -> FrameType:
     only.
     """
 
+# documented -- see https://docs.python.org/3/library/sys.html#sys._current_exceptions
+if sys.version_info >= (3, 12):
+    def _current_exceptions() -> dict[int, BaseException | None]:
+        """Return a dict mapping each thread's identifier to its current raised exception.
+
+        This function should be used for specialized purposes only.
+        """
+
+else:
+    def _current_exceptions() -> dict[int, OptExcInfo]:
+        """Return a dict mapping each thread's identifier to its current raised exception.
+
+        This function should be used for specialized purposes only.
+        """
+
 if sys.version_info >= (3, 12):
     def _getframemodulename(depth: int = 0) -> str | None:
         """Return the name of the module for a calling frame.
@@ -626,6 +641,9 @@ def exit(status: _ExitCode = None, /) -> NoReturn:
     If it is another kind of object, it will be printed and the system
     exit status will be one (i.e., failure).
     """
+
+if sys.platform == "android":  # noqa: Y008
+    def getandroidapilevel() -> int: ...
 
 def getallocatedblocks() -> int:
     """Return the number of memory blocks currently allocated."""
@@ -744,6 +762,8 @@ def intern(string: str, /) -> str:
     purpose is to speed up dictionary lookups. Return the string itself or
     the previously interned string object with the same value.
     """
+
+__interactivehook__: Callable[[], object]
 
 if sys.version_info >= (3, 13):
     def _is_gil_enabled() -> bool:
@@ -948,4 +968,10 @@ if sys.version_info >= (3, 14):
              pid (int): The process ID of the target Python process.
              script (str|bytes): The path to a file containing
                  the Python code to be executed.
+        """
+
+    def _is_immortal(op: object, /) -> bool:
+        """Return True if the given object is "immortal" per PEP 683.
+
+        This function should be used for specialized purposes only.
         """

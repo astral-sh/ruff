@@ -39,6 +39,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```
 ///
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.110")]
 pub(crate) struct UnsortedImports;
 
 impl Violation for UnsortedImports {

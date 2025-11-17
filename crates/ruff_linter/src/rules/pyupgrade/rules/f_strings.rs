@@ -40,6 +40,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.224")]
 pub(crate) struct FString;
 
 impl Violation for FString {
@@ -160,7 +161,11 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
                 value: ast::Number::Int(..),
                 ..
             }),
-        ) => text.chars().all(|c| c.is_ascii_digit()),
+        ) => text
+            .chars()
+            // Ignore digit separators so decimal literals like `1_2` still count as pure digits.
+            .filter(|c| *c != '_')
+            .all(|c| c.is_ascii_digit()),
         // E.g., `{x, y}` should be parenthesized in `f"{(x, y)}"`.
         (
             _,

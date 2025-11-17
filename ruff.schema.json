@@ -71,7 +71,7 @@
       "deprecated": true
     },
     "extend": {
-      "description": "A path to a local `pyproject.toml` file to merge into this\nconfiguration. User home directory and environment variables will be\nexpanded.\n\nTo resolve the current `pyproject.toml` file, Ruff will first resolve\nthis base configuration file, then merge in any properties defined\nin the current configuration file.",
+      "description": "A path to a local `pyproject.toml` or `ruff.toml` file to merge into this\nconfiguration. User home directory and environment variables will be\nexpanded.\n\nTo resolve the current configuration file, Ruff will first load\nthis base configuration file, then merge in properties defined\nin the current configuration file. Most settings follow simple override\nbehavior where the child value replaces the parent value. However,\nrule selection (`lint.select` and `lint.ignore`) has special merging\nbehavior: if the child configuration specifies `lint.select`, it\nestablishes a new baseline rule set and the parent's `lint.ignore`\nrules are discarded; if the child configuration omits `lint.select`,\nthe parent's rule selection is inherited and both parent and child\n`lint.ignore` rules are accumulated together.",
       "type": [
         "string",
         "null"
@@ -818,6 +818,13 @@
           ],
           "format": "uint",
           "minimum": 0
+        },
+        "type-checking-imports": {
+          "description": "Whether to include imports that are only used for type checking (i.e., imports within `if TYPE_CHECKING:` blocks).\nWhen enabled (default), type-checking-only imports are included in the import graph.\nWhen disabled, they are excluded.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
@@ -3715,6 +3722,7 @@
         "PLR170",
         "PLR1702",
         "PLR1704",
+        "PLR1708",
         "PLR171",
         "PLR1711",
         "PLR1714",

@@ -45,6 +45,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct CallDateFromtimestamp;
 
 impl Violation for CallDateFromtimestamp {

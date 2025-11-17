@@ -59,13 +59,20 @@ pub struct Options {
     )]
     pub cache_dir: Option<String>,
 
-    /// A path to a local `pyproject.toml` file to merge into this
+    /// A path to a local `pyproject.toml` or `ruff.toml` file to merge into this
     /// configuration. User home directory and environment variables will be
     /// expanded.
     ///
-    /// To resolve the current `pyproject.toml` file, Ruff will first resolve
-    /// this base configuration file, then merge in any properties defined
-    /// in the current configuration file.
+    /// To resolve the current configuration file, Ruff will first load
+    /// this base configuration file, then merge in properties defined
+    /// in the current configuration file. Most settings follow simple override
+    /// behavior where the child value replaces the parent value. However,
+    /// rule selection (`lint.select` and `lint.ignore`) has special merging
+    /// behavior: if the child configuration specifies `lint.select`, it
+    /// establishes a new baseline rule set and the parent's `lint.ignore`
+    /// rules are discarded; if the child configuration omits `lint.select`,
+    /// the parent's rule selection is inherited and both parent and child
+    /// `lint.ignore` rules are accumulated together.
     #[option(
         default = r#"null"#,
         value_type = "str",
@@ -3885,6 +3892,18 @@ pub struct AnalyzeOptions {
         "#
     )]
     pub include_dependencies: Option<BTreeMap<PathBuf, Vec<String>>>,
+    /// Whether to include imports that are only used for type checking (i.e., imports within `if TYPE_CHECKING:` blocks).
+    /// When enabled (default), type-checking-only imports are included in the import graph.
+    /// When disabled, they are excluded.
+    #[option(
+        default = "true",
+        value_type = "bool",
+        example = r#"
+            # Exclude type-checking-only imports from the graph
+            type-checking-imports = false
+        "#
+    )]
+    pub type_checking_imports: Option<bool>,
 }
 
 /// Like [`LintCommonOptions`], but with any `#[serde(flatten)]` fields inlined. This leads to far,

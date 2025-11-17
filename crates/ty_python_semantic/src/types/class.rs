@@ -30,14 +30,15 @@ use crate::types::member::{Member, class_member};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
-use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, DataclassFlags,
-    DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType,
-    MaterializationKind, NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType,
-    TypeContext, TypeMapping, TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable,
-    declaration_type, determine_upper_bound, infer_definition_types,
+    ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, DATACLASS_FLAGS,
+    DataclassFlags, DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType,
+    ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
+    StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation, TypedDictParams,
+    UnionBuilder, VarianceInferable, declaration_type, determine_upper_bound,
+    exceeds_max_specialization_depth, infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -68,52 +69,25 @@ use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
-fn explicit_bases_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &[Type<'db>],
-    _count: u32,
-    _self: ClassLiteral<'db>,
-) -> salsa::CycleRecoveryAction<Box<[Type<'db>]>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn explicit_bases_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: ClassLiteral<'db>,
 ) -> Box<[Type<'db>]> {
     Box::default()
 }
 
-#[expect(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
-fn inheritance_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Option<InheritanceCycle>,
-    _count: u32,
-    _self: ClassLiteral<'db>,
-) -> salsa::CycleRecoveryAction<Option<InheritanceCycle>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn inheritance_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: ClassLiteral<'db>,
 ) -> Option<InheritanceCycle> {
     None
 }
 
-fn implicit_attribute_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Member<'db>,
-    _count: u32,
-    _class_body_scope: ScopeId<'db>,
-    _name: String,
-    _target_method_decorator: MethodDecorator,
-) -> salsa::CycleRecoveryAction<Member<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn implicit_attribute_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _class_body_scope: ScopeId<'db>,
     _name: String,
     _target_method_decorator: MethodDecorator,
@@ -121,18 +95,9 @@ fn implicit_attribute_initial<'db>(
     Member::unbound()
 }
 
-fn try_mro_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Result<Mro<'db>, MroError<'db>>,
-    _count: u32,
-    _self: ClassLiteral<'db>,
-    _specialization: Option<Specialization<'db>>,
-) -> salsa::CycleRecoveryAction<Result<Mro<'db>, MroError<'db>>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn try_mro_cycle_initial<'db>(
     db: &'db dyn Db,
+    _id: salsa::Id,
     self_: ClassLiteral<'db>,
     specialization: Option<Specialization<'db>>,
 ) -> Result<Mro<'db>, MroError<'db>> {
@@ -142,35 +107,19 @@ fn try_mro_cycle_initial<'db>(
     ))
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn is_typed_dict_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &bool,
-    _count: u32,
-    _self: ClassLiteral<'db>,
-) -> salsa::CycleRecoveryAction<bool> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 #[allow(clippy::unnecessary_wraps)]
-fn is_typed_dict_cycle_initial<'db>(_db: &'db dyn Db, _self: ClassLiteral<'db>) -> bool {
-    false
-}
-
-fn try_metaclass_cycle_recover<'db>(
+fn is_typed_dict_cycle_initial<'db>(
     _db: &'db dyn Db,
-    _value: &Result<(Type<'db>, Option<DataclassTransformerParams>), MetaclassError<'db>>,
-    _count: u32,
+    _id: salsa::Id,
     _self: ClassLiteral<'db>,
-) -> salsa::CycleRecoveryAction<
-    Result<(Type<'db>, Option<DataclassTransformerParams<'db>>), MetaclassError<'db>>,
-> {
-    salsa::CycleRecoveryAction::Iterate
+) -> bool {
+    false
 }
 
 #[allow(clippy::unnecessary_wraps)]
 fn try_metaclass_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self_: ClassLiteral<'db>,
 ) -> Result<(Type<'db>, Option<DataclassTransformerParams<'db>>), MetaclassError<'db>> {
     Err(MetaclassError {
@@ -195,9 +144,7 @@ impl<'db> CodeGeneratorKind<'db> {
         class: ClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Option<Self> {
-        #[salsa::tracked(
-            cycle_fn=code_generator_of_class_recover,
-            cycle_initial=code_generator_of_class_initial,
+        #[salsa::tracked(cycle_initial=code_generator_of_class_initial,
             heap_size=ruff_memory_usage::heap_size
         )]
         fn code_generator_of_class<'db>(
@@ -231,21 +178,11 @@ impl<'db> CodeGeneratorKind<'db> {
 
         fn code_generator_of_class_initial<'db>(
             _db: &'db dyn Db,
+            _id: salsa::Id,
             _class: ClassLiteral<'db>,
             _specialization: Option<Specialization<'db>>,
         ) -> Option<CodeGeneratorKind<'db>> {
             None
-        }
-
-        #[expect(clippy::ref_option)]
-        fn code_generator_of_class_recover<'db>(
-            _db: &'db dyn Db,
-            _value: &Option<CodeGeneratorKind<'db>>,
-            _count: u32,
-            _class: ClassLiteral<'db>,
-            _specialization: Option<Specialization<'db>>,
-        ) -> salsa::CycleRecoveryAction<Option<CodeGeneratorKind<'db>>> {
-            salsa::CycleRecoveryAction::Iterate
         }
 
         code_generator_of_class(db, class, specialization)
@@ -321,7 +258,7 @@ impl<'db> GenericAlias<'db> {
     ) -> Self {
         let tcx = tcx
             .annotation
-            .and_then(|ty| ty.specialization_of(db, Some(self.origin(db))))
+            .and_then(|ty| ty.specialization_of(db, self.origin(db)))
             .map(|specialization| specialization.types(db))
             .unwrap_or(&[]);
 
@@ -357,7 +294,7 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
 
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
-    #[salsa::tracked]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         let origin = self.origin(db);
 
@@ -421,6 +358,14 @@ pub enum ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
+    /// Return a `ClassType` representing the class `builtins.object`
+    pub(super) fn object(db: &'db dyn Db) -> Self {
+        KnownClass::Object
+            .to_class_literal(db)
+            .to_class_type(db)
+            .unwrap()
+    }
+
     pub(super) const fn is_generic(self) -> bool {
         matches!(self, Self::Generic(_))
     }
@@ -572,7 +517,7 @@ impl<'db> ClassType<'db> {
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
         self.when_subclass_of(db, other, InferableTypeVars::None)
-            .is_always_satisfied()
+            .is_always_satisfied(db)
     }
 
     pub(super) fn when_subclass_of(
@@ -596,14 +541,16 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         self.iter_mro(db).when_any(db, |base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
-                    TypeRelation::Subtyping | TypeRelation::Redundancy => {
+                    TypeRelation::Subtyping
+                    | TypeRelation::Redundancy
+                    | TypeRelation::SubtypingAssuming(_) => {
                         ConstraintSet::from(other.is_object(db))
                     }
                     TypeRelation::Assignability => ConstraintSet::from(!other.is_final(db)),
@@ -700,12 +647,17 @@ impl<'db> ClassType<'db> {
             return true;
         }
 
-        // Optimisation: if either class is `@final`, we only need to do one `is_subclass_of` call.
         if self.is_final(db) {
-            return self.is_subclass_of(db, other);
+            return self
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .any(|class| class.class_literal(db).0 == other.class_literal(db).0);
         }
         if other.is_final(db) {
-            return other.is_subclass_of(db, self);
+            return other
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .any(|class| class.class_literal(db).0 == self.class_literal(db).0);
         }
 
         // Two disjoint bases can only coexist in an MRO if one is a subclass of the other.
@@ -818,17 +770,6 @@ impl<'db> ClassType<'db> {
                 })
         };
 
-        let synthesize_simple_tuple_method = |return_type| {
-            let parameters =
-                Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(Type::instance(db, self))]);
-
-            let synthesized_dunder_method =
-                CallableType::function_like(db, Signature::new(parameters, Some(return_type)));
-
-            Member::definitely_declared(synthesized_dunder_method)
-        };
-
         match name {
             "__len__" if class_literal.is_tuple(db) => {
                 let return_type = specialization
@@ -838,16 +779,14 @@ impl<'db> ClassType<'db> {
                     .map(Type::IntLiteral)
                     .unwrap_or_else(|| KnownClass::Int.to_instance(db));
 
-                synthesize_simple_tuple_method(return_type)
-            }
+                let parameters =
+                    Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(Type::instance(db, self))]);
 
-            "__bool__" if class_literal.is_tuple(db) => {
-                let return_type = specialization
-                    .and_then(|spec| spec.tuple(db))
-                    .map(|tuple| tuple.truthiness().into_type(db))
-                    .unwrap_or_else(|| KnownClass::Bool.to_instance(db));
+                let synthesized_dunder_method =
+                    CallableType::function_like(db, Signature::new(parameters, Some(return_type)));
 
-                synthesize_simple_tuple_method(return_type)
+                Member::definitely_declared(synthesized_dunder_method)
             }
 
             "__getitem__" if class_literal.is_tuple(db) => {
@@ -1105,7 +1044,7 @@ impl<'db> ClassType<'db> {
 
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
-    #[salsa::tracked(cycle_fn=into_callable_cycle_recover, cycle_initial=into_callable_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=into_callable_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn into_callable(self, db: &'db dyn Db) -> Type<'db> {
         let self_ty = Type::from(self);
         let metaclass_dunder_call_function_symbol = self_ty
@@ -1127,16 +1066,10 @@ impl<'db> ClassType<'db> {
             return Type::Callable(metaclass_dunder_call_function.into_callable_type(db));
         }
 
-        let dunder_new_function_symbol = self_ty
-            .member_lookup_with_policy(
-                db,
-                "__new__".into(),
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-            )
-            .place;
+        let dunder_new_function_symbol = self_ty.lookup_dunder_new(db);
 
         let dunder_new_signature = dunder_new_function_symbol
-            .ignore_possibly_undefined()
+            .and_then(|place_and_quals| place_and_quals.ignore_possibly_undefined())
             .and_then(|ty| match ty {
                 Type::FunctionLiteral(function) => Some(function.signature(db)),
                 Type::Callable(callable) => Some(callable.signatures(db)),
@@ -1267,17 +1200,11 @@ impl<'db> ClassType<'db> {
     }
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn into_callable_cycle_recover<'db>(
+fn into_callable_cycle_initial<'db>(
     _db: &'db dyn Db,
-    _value: &Type<'db>,
-    _count: u32,
+    _id: salsa::Id,
     _self: ClassType<'db>,
-) -> salsa::CycleRecoveryAction<Type<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn into_callable_cycle_initial<'db>(_db: &'db dyn Db, _self: ClassType<'db>) -> Type<'db> {
+) -> Type<'db> {
     Type::Never
 }
 
@@ -1390,9 +1317,7 @@ impl<'db> Field<'db> {
     /// Returns true if this field is a `dataclasses.KW_ONLY` sentinel.
     /// <https://docs.python.org/3/library/dataclasses.html#dataclasses.KW_ONLY>
     pub(crate) fn is_kw_only_sentinel(&self, db: &'db dyn Db) -> bool {
-        self.declared_ty
-            .into_nominal_instance()
-            .is_some_and(|instance| instance.has_known_class(db, KnownClass::KwOnly))
+        self.declared_ty.is_instance_of(db, KnownClass::KwOnly)
     }
 }
 
@@ -1419,6 +1344,8 @@ pub struct ClassLiteral<'db> {
     /// If this class is deprecated, this holds the deprecation message.
     pub(crate) deprecated: Option<DeprecatedInstance<'db>>,
 
+    pub(crate) type_check_only: bool,
+
     pub(crate) dataclass_params: Option<DataclassParams<'db>>,
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams<'db>>,
 }
@@ -1426,19 +1353,9 @@ pub struct ClassLiteral<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ClassLiteral<'_> {}
 
-#[expect(clippy::ref_option)]
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn generic_context_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Option<GenericContext<'db>>,
-    _count: u32,
-    _self: ClassLiteral<'db>,
-) -> salsa::CycleRecoveryAction<Option<GenericContext<'db>>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn generic_context_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _self: ClassLiteral<'db>,
 ) -> Option<GenericContext<'db>> {
     None
@@ -1477,9 +1394,7 @@ impl<'db> ClassLiteral<'db> {
         self.pep695_generic_context(db).is_some()
     }
 
-    #[salsa::tracked(
-        cycle_fn=generic_context_cycle_recover,
-        cycle_initial=generic_context_cycle_initial,
+    #[salsa::tracked(cycle_initial=generic_context_cycle_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
@@ -1504,9 +1419,7 @@ impl<'db> ClassLiteral<'db> {
         })
     }
 
-    #[salsa::tracked(
-        cycle_fn=generic_context_cycle_recover,
-        cycle_initial=generic_context_cycle_initial,
+    #[salsa::tracked(cycle_initial=generic_context_cycle_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn inherited_legacy_generic_context(
@@ -1534,7 +1447,7 @@ impl<'db> ClassLiteral<'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
             typevars: RefCell<FxIndexSet<BoundTypeVarInstance<'db>>>,
-            seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
+            recursion_guard: TypeCollector<'db>,
         }
 
         impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
@@ -1551,16 +1464,7 @@ impl<'db> ClassLiteral<'db> {
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                match TypeKind::from(ty) {
-                    TypeKind::Atomic => {}
-                    TypeKind::NonAtomic(non_atomic_type) => {
-                        if !self.seen_types.borrow_mut().insert(non_atomic_type) {
-                            // If we have already seen this type, we can skip it.
-                            return;
-                        }
-                        walk_non_atomic_type(db, non_atomic_type, self);
-                    }
-                }
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
             }
         }
 
@@ -1574,14 +1478,9 @@ impl<'db> ClassLiteral<'db> {
         visitor.typevars.into_inner()
     }
 
-    /// Returns the generic context that should be inherited by any constructor methods of this
-    /// class.
-    ///
-    /// When inferring a specialization of the class's generic context from a constructor call, we
-    /// promote any typevars that are inferred as a literal to the corresponding instance type.
+    /// Returns the generic context that should be inherited by any constructor methods of this class.
     fn inherited_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         self.generic_context(db)
-            .map(|generic_context| generic_context.promote_literals(db))
     }
 
     pub(super) fn file(self, db: &dyn Db) -> File {
@@ -1612,7 +1511,18 @@ impl<'db> ClassLiteral<'db> {
         match self.generic_context(db) {
             None => ClassType::NonGeneric(self),
             Some(generic_context) => {
-                let specialization = f(generic_context);
+                let mut specialization = f(generic_context);
+
+                for (idx, ty) in specialization.types(db).iter().enumerate() {
+                    if exceeds_max_specialization_depth(db, *ty) {
+                        specialization = specialization.with_replaced_type(
+                            db,
+                            idx,
+                            Type::divergent(Some(self.body_scope(db))),
+                        );
+                    }
+                }
+
                 ClassType::Generic(GenericAlias::new(db, self, specialization))
             }
         }
@@ -1679,7 +1589,7 @@ impl<'db> ClassLiteral<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the class's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(deref), cycle_fn=explicit_bases_cycle_recover, cycle_initial=explicit_bases_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(deref), cycle_initial=explicit_bases_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::explicit_bases_query: {}", self.name(db));
 
@@ -1815,7 +1725,7 @@ impl<'db> ClassLiteral<'db> {
     /// attribute on a class at runtime.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    #[salsa::tracked(returns(as_ref), cycle_fn=try_mro_cycle_recover, cycle_initial=try_mro_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(as_ref), cycle_initial=try_mro_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn try_mro(
         self,
         db: &'db dyn Db,
@@ -1865,9 +1775,7 @@ impl<'db> ClassLiteral<'db> {
 
     /// Return `true` if this class constitutes a typed dict specification (inherits from
     /// `typing.TypedDict`, either directly or indirectly).
-    #[salsa::tracked(
-        cycle_fn=is_typed_dict_cycle_recover,
-        cycle_initial=is_typed_dict_cycle_initial,
+    #[salsa::tracked(cycle_initial=is_typed_dict_cycle_initial,
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(super) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
@@ -1928,9 +1836,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
-    #[salsa::tracked(
-        cycle_fn=try_metaclass_cycle_recover,
-        cycle_initial=try_metaclass_cycle_initial,
+    #[salsa::tracked(cycle_initial=try_metaclass_cycle_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(super) fn try_metaclass(
@@ -2083,11 +1989,6 @@ impl<'db> ClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        if name == "__mro__" {
-            let tuple_elements = self.iter_mro(db, specialization);
-            return Place::bound(Type::heterogeneous_tuple(db, tuple_elements)).into();
-        }
-
         self.class_member_from_mro(db, name, policy, self.iter_mro(db, specialization))
     }
 
@@ -2218,18 +2119,25 @@ impl<'db> ClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> Member<'db> {
-        if name == "__dataclass_fields__" && self.dataclass_params(db).is_some() {
-            // Make this class look like a subclass of the `DataClassInstance` protocol
-            return Member {
-                inner: Place::declared(KnownClass::Dict.to_specialized_instance(
-                    db,
-                    [
-                        KnownClass::Str.to_instance(db),
-                        KnownClass::Field.to_specialized_instance(db, [Type::any()]),
-                    ],
-                ))
-                .with_qualifiers(TypeQualifiers::CLASS_VAR),
-            };
+        if self.dataclass_params(db).is_some() {
+            if name == "__dataclass_fields__" {
+                // Make this class look like a subclass of the `DataClassInstance` protocol
+                return Member {
+                    inner: Place::declared(KnownClass::Dict.to_specialized_instance(
+                        db,
+                        [
+                            KnownClass::Str.to_instance(db),
+                            KnownClass::Field.to_specialized_instance(db, [Type::any()]),
+                        ],
+                    ))
+                    .with_qualifiers(TypeQualifiers::CLASS_VAR),
+                };
+            } else if name == "__dataclass_params__" {
+                // There is no typeshed class for this. For now, we model it as `Any`.
+                return Member {
+                    inner: Place::declared(Type::any()).with_qualifiers(TypeQualifiers::CLASS_VAR),
+                };
+            }
         }
 
         if CodeGeneratorKind::NamedTuple.matches(db, self, specialization) {
@@ -2274,7 +2182,8 @@ impl<'db> ClassLiteral<'db> {
         });
 
         if member.is_undefined() {
-            if let Some(synthesized_member) = self.own_synthesized_member(db, specialization, name)
+            if let Some(synthesized_member) =
+                self.own_synthesized_member(db, specialization, inherited_generic_context, name)
             {
                 return Member::definitely_declared(synthesized_member);
             }
@@ -2290,13 +2199,14 @@ impl<'db> ClassLiteral<'db> {
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
+        inherited_generic_context: Option<GenericContext<'db>>,
         name: &str,
     ) -> Option<Type<'db>> {
         let dataclass_params = self.dataclass_params(db);
 
         let field_policy = CodeGeneratorKind::from_class(db, self, specialization)?;
 
-        let transformer_params =
+        let mut transformer_params =
             if let CodeGeneratorKind::DataclassLike(Some(transformer_params)) = field_policy {
                 Some(DataclassParams::from_transformer_params(
                     db,
@@ -2305,6 +2215,34 @@ impl<'db> ClassLiteral<'db> {
             } else {
                 None
             };
+
+        // Dataclass transformer flags can be overwritten using class arguments.
+        if let Some(transformer_params) = transformer_params.as_mut() {
+            if let Some(class_def) = self.definition(db).kind(db).as_class() {
+                let module = parsed_module(db, self.file(db)).load(db);
+
+                if let Some(arguments) = &class_def.node(&module).arguments {
+                    let mut flags = transformer_params.flags(db);
+
+                    for keyword in &arguments.keywords {
+                        if let Some(arg_name) = &keyword.arg {
+                            if let Some(is_set) =
+                                keyword.value.as_boolean_literal_expr().map(|b| b.value)
+                            {
+                                for (flag_name, flag) in DATACLASS_FLAGS {
+                                    if arg_name.as_str() == *flag_name {
+                                        flags.set(*flag, is_set);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    *transformer_params =
+                        DataclassParams::new(db, flags, transformer_params.field_specifiers(db));
+                }
+            }
+        }
 
         let has_dataclass_param = |param| {
             dataclass_params.is_some_and(|params| params.flags(db).contains(param))
@@ -2418,7 +2356,7 @@ impl<'db> ClassLiteral<'db> {
 
             let signature = match name {
                 "__new__" | "__init__" => Signature::new_generic(
-                    self.inherited_generic_context(db),
+                    inherited_generic_context.or_else(|| self.inherited_generic_context(db)),
                     Parameters::new(parameters),
                     return_ty,
                 ),
@@ -2461,6 +2399,63 @@ impl<'db> ClassLiteral<'db> {
                 );
 
                 Some(CallableType::function_like(db, signature))
+            }
+            (CodeGeneratorKind::DataclassLike(_), "__hash__") => {
+                let unsafe_hash = has_dataclass_param(DataclassFlags::UNSAFE_HASH);
+                let frozen = has_dataclass_param(DataclassFlags::FROZEN);
+                let eq = has_dataclass_param(DataclassFlags::EQ);
+
+                if unsafe_hash || (frozen && eq) {
+                    let signature = Signature::new(
+                        Parameters::new([Parameter::positional_or_keyword(Name::new_static(
+                            "self",
+                        ))
+                        .with_annotated_type(instance_ty)]),
+                        Some(KnownClass::Int.to_instance(db)),
+                    );
+
+                    Some(CallableType::function_like(db, signature))
+                } else if eq && !frozen {
+                    Some(Type::none(db))
+                } else {
+                    // No `__hash__` is generated, fall back to `object.__hash__`
+                    None
+                }
+            }
+            (CodeGeneratorKind::DataclassLike(_), "__match_args__")
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
+            {
+                if !has_dataclass_param(DataclassFlags::MATCH_ARGS) {
+                    return None;
+                }
+
+                let kw_only_default = has_dataclass_param(DataclassFlags::KW_ONLY);
+
+                let fields = self.fields(db, specialization, field_policy);
+                let match_args = fields
+                    .iter()
+                    .filter(|(_, field)| {
+                        if let FieldKind::Dataclass { init, kw_only, .. } = &field.kind {
+                            *init && !kw_only.unwrap_or(kw_only_default)
+                        } else {
+                            false
+                        }
+                    })
+                    .map(|(name, _)| Type::string_literal(db, name));
+                Some(Type::heterogeneous_tuple(db, match_args))
+            }
+            (CodeGeneratorKind::DataclassLike(_), "__weakref__")
+                if Program::get(db).python_version(db) >= PythonVersion::PY311 =>
+            {
+                if !has_dataclass_param(DataclassFlags::WEAKREF_SLOT)
+                    || !has_dataclass_param(DataclassFlags::SLOTS)
+                {
+                    return None;
+                }
+
+                // This could probably be `weakref | None`, but it does not seem important enough to
+                // model it precisely.
+                Some(UnionType::from_elements(db, [Type::any(), Type::none(db)]))
             }
             (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
                 KnownClass::NamedTupleFallback
@@ -2510,7 +2505,9 @@ impl<'db> ClassLiteral<'db> {
                 }
                 None
             }
-            (CodeGeneratorKind::DataclassLike(_), "__slots__") => {
+            (CodeGeneratorKind::DataclassLike(_), "__slots__")
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
+            {
                 has_dataclass_param(DataclassFlags::SLOTS).then(|| {
                     let fields = self.fields(db, specialization, field_policy);
                     let slots = fields.keys().map(|name| Type::string_literal(db, name));
@@ -2800,7 +2797,7 @@ impl<'db> ClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        if let Some(member) = self.own_synthesized_member(db, specialization, name) {
+        if let Some(member) = self.own_synthesized_member(db, specialization, None, name) {
             Place::bound(member).into()
         } else {
             KnownClass::TypedDictFallback
@@ -3112,9 +3109,7 @@ impl<'db> ClassLiteral<'db> {
         )
     }
 
-    #[salsa::tracked(
-        cycle_fn=implicit_attribute_recover,
-        cycle_initial=implicit_attribute_initial,
+    #[salsa::tracked(cycle_initial=implicit_attribute_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn implicit_attribute_inner(
@@ -3215,30 +3210,47 @@ impl<'db> ClassLiteral<'db> {
             union_of_inferred_types = union_of_inferred_types.add(Type::unknown());
         }
 
-        for (attribute_assignments, method_scope_id) in
+        for (attribute_assignments, attribute_binding_scope_id) in
             attribute_assignments(db, class_body_scope, &name)
         {
-            let method_scope = index.scope(method_scope_id);
-            if !is_valid_scope(method_scope) {
+            let binding_scope = index.scope(attribute_binding_scope_id);
+            if !is_valid_scope(binding_scope) {
                 continue;
             }
 
-            // The attribute assignment inherits the reachability of the method which contains it
-            let is_method_reachable = if let Some(method_def) = method_scope.node().as_function() {
-                let method = index.expect_single_definition(method_def);
-                let method_place = class_table
-                    .symbol_id(&method_def.node(&module).name)
-                    .unwrap();
-                class_map
-                    .all_reachable_symbol_bindings(method_place)
-                    .find_map(|bind| {
-                        (bind.binding.is_defined_and(|def| def == method))
-                            .then(|| class_map.binding_reachability(db, &bind))
-                    })
-                    .unwrap_or(Truthiness::AlwaysFalse)
-            } else {
-                Truthiness::AlwaysFalse
+            let scope_for_reachability_analysis = {
+                if binding_scope.node().as_function().is_some() {
+                    binding_scope
+                } else if binding_scope.is_eager() {
+                    let mut eager_scope_parent = binding_scope;
+                    while eager_scope_parent.is_eager()
+                        && let Some(parent) = eager_scope_parent.parent()
+                    {
+                        eager_scope_parent = index.scope(parent);
+                    }
+                    eager_scope_parent
+                } else {
+                    binding_scope
+                }
             };
+
+            // The attribute assignment inherits the reachability of the method which contains it
+            let is_method_reachable =
+                if let Some(method_def) = scope_for_reachability_analysis.node().as_function() {
+                    let method = index.expect_single_definition(method_def);
+                    let method_place = class_table
+                        .symbol_id(&method_def.node(&module).name)
+                        .unwrap();
+                    class_map
+                        .all_reachable_symbol_bindings(method_place)
+                        .find_map(|bind| {
+                            (bind.binding.is_defined_and(|def| def == method))
+                                .then(|| class_map.binding_reachability(db, &bind))
+                        })
+                        .unwrap_or(Truthiness::AlwaysFalse)
+                } else {
+                    Truthiness::AlwaysFalse
+                };
             if is_method_reachable.is_always_false() {
                 continue;
             }
@@ -3550,7 +3562,7 @@ impl<'db> ClassLiteral<'db> {
     ///
     /// A class definition like this will fail at runtime,
     /// but we must be resilient to it or we could panic.
-    #[salsa::tracked(cycle_fn=inheritance_cycle_recover, cycle_initial=inheritance_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_initial=inheritance_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn inheritance_cycle(self, db: &'db dyn Db) -> Option<InheritanceCycle> {
         /// Return `true` if the class is cyclically defined.
         ///
@@ -3642,7 +3654,7 @@ impl<'db> From<ClassLiteral<'db>> for ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
-    #[salsa::tracked(cycle_fn=crate::types::variance_cycle_recover, cycle_initial=crate::types::variance_cycle_initial)]
+    #[salsa::tracked(cycle_initial=crate::types::variance_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         let typevar_in_generic_context = self
             .generic_context(db)
@@ -4572,7 +4584,15 @@ impl KnownClass {
                     "ellipsis"
                 }
             }
-            Self::NotImplementedType => "_NotImplementedType",
+            Self::NotImplementedType => {
+                // Exposed as `types.NotImplementedType` on Python >=3.10;
+                // backported as `builtins._NotImplementedType` by typeshed on Python <=3.9
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                    "NotImplementedType"
+                } else {
+                    "_NotImplementedType"
+                }
+            }
             Self::Field => "Field",
             Self::KwOnly => "KW_ONLY",
             Self::InitVar => "InitVar",
@@ -4614,7 +4634,13 @@ impl KnownClass {
     /// the class. If this class is generic, this will use the default specialization.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
+    #[track_caller]
     pub(crate) fn to_instance(self, db: &dyn Db) -> Type<'_> {
+        debug_assert_ne!(
+            self,
+            KnownClass::Tuple,
+            "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
+        );
         self.to_class_literal(db)
             .to_class_type(db)
             .map(|class| Type::instance(db, class))
@@ -4623,7 +4649,13 @@ impl KnownClass {
 
     /// Similar to [`KnownClass::to_instance`], but returns the Unknown-specialization where each type
     /// parameter is specialized to `Unknown`.
+    #[track_caller]
     pub(crate) fn to_instance_unknown(self, db: &dyn Db) -> Type<'_> {
+        debug_assert_ne!(
+            self,
+            KnownClass::Tuple,
+            "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
+        );
         self.try_to_class_literal(db)
             .map(|literal| Type::instance(db, literal.unknown_specialization(db)))
             .unwrap_or_else(Type::unknown)
@@ -4667,11 +4699,17 @@ impl KnownClass {
     ///
     /// If the class cannot be found in typeshed, or if you provide a specialization with the wrong
     /// number of types, a debug-level log message will be emitted stating this.
+    #[track_caller]
     pub(crate) fn to_specialized_instance<'db>(
         self,
         db: &'db dyn Db,
         specialization: impl IntoIterator<Item = Type<'db>>,
     ) -> Type<'db> {
+        debug_assert_ne!(
+            self,
+            KnownClass::Tuple,
+            "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
+        );
         self.to_specialized_class_type(db, specialization)
             .and_then(|class_type| Type::from(class_type).to_instance(db))
             .unwrap_or_else(Type::unknown)
@@ -4856,7 +4894,15 @@ impl KnownClass {
                     KnownModule::Builtins
                 }
             }
-            Self::NotImplementedType => KnownModule::Builtins,
+            Self::NotImplementedType => {
+                // Exposed as `types.NotImplementedType` on Python >=3.10;
+                // backported as `builtins._NotImplementedType` by typeshed on Python <=3.9
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                    KnownModule::Types
+                } else {
+                    KnownModule::Builtins
+                }
+            }
             Self::ChainMap
             | Self::Counter
             | Self::DefaultDict
@@ -5126,7 +5172,12 @@ impl KnownClass {
             "EllipsisType" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
                 &[Self::EllipsisType]
             }
-            "_NotImplementedType" => &[Self::NotImplementedType],
+            "_NotImplementedType" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
+                &[Self::NotImplementedType]
+            }
+            "NotImplementedType" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
+                &[Self::NotImplementedType]
+            }
             "Field" => &[Self::Field],
             "KW_ONLY" => &[Self::KwOnly],
             "InitVar" => &[Self::InitVar],
@@ -5566,11 +5617,19 @@ mod tests {
             });
 
         for class in KnownClass::iter() {
-            assert_ne!(
-                class.to_instance(&db),
-                Type::unknown(),
-                "Unexpectedly fell back to `Unknown` for `{class:?}`"
-            );
+            // Check the class can be looked up successfully
+            class.try_to_class_literal_without_logging(&db).unwrap();
+
+            // We can't call `KnownClass::Tuple.to_instance()`;
+            // there are assertions to ensure that we always call `Type::homogeneous_tuple()`
+            // or `Type::heterogeneous_tuple()` instead.`
+            if class != KnownClass::Tuple {
+                assert_ne!(
+                    class.to_instance(&db),
+                    Type::unknown(),
+                    "Unexpectedly fell back to `Unknown` for `{class:?}`"
+                );
+            }
         }
     }
 
@@ -5617,11 +5676,19 @@ mod tests {
                 current_version = version_added;
             }
 
-            assert_ne!(
-                class.to_instance(&db),
-                Type::unknown(),
-                "Unexpectedly fell back to `Unknown` for `{class:?}` on Python {version_added}"
-            );
+            // Check the class can be looked up successfully
+            class.try_to_class_literal_without_logging(&db).unwrap();
+
+            // We can't call `KnownClass::Tuple.to_instance()`;
+            // there are assertions to ensure that we always call `Type::homogeneous_tuple()`
+            // or `Type::heterogeneous_tuple()` instead.`
+            if class != KnownClass::Tuple {
+                assert_ne!(
+                    class.to_instance(&db),
+                    Type::unknown(),
+                    "Unexpectedly fell back to `Unknown` for `{class:?}` on Python {version_added}"
+                );
+            }
         }
     }
 }

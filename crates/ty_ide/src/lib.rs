@@ -342,9 +342,6 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
     use ty_project::ProjectMetadata;
-    use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
-    };
 
     /// A way to create a simple single-file (named `main.py`) cursor test.
     ///
@@ -421,18 +418,7 @@ mod tests {
                 SystemPathBuf::from("/"),
             ));
 
-            let search_paths = SearchPathSettings::new(vec![SystemPathBuf::from("/")])
-                .to_search_paths(db.system(), db.vendored())
-                .expect("Valid search path settings");
-
-            Program::from_settings(
-                &db,
-                ProgramSettings {
-                    python_version: PythonVersionWithSource::default(),
-                    python_platform: PythonPlatform::default(),
-                    search_paths,
-                },
-            );
+            db.init_program().unwrap();
 
             let mut cursor: Option<Cursor> = None;
             for &Source {

@@ -953,7 +953,11 @@ fn rule_f401() {
 
 #[test]
 fn rule_f401_output_json() {
-    assert_cmd_snapshot!(ruff_cmd().args(["rule", "F401", "--output-format", "json"]));
+    insta::with_settings!({filters => vec![
+        (r#"("file": ")[^"]+(",)"#, "$1<FILE>$2"),
+    ]}, {
+        assert_cmd_snapshot!(ruff_cmd().args(["rule", "F401", "--output-format", "json"]));
+    });
 }
 
 #[test]

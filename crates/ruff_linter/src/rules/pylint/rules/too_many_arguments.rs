@@ -44,6 +44,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.pylint.max-args`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.238")]
 pub(crate) struct TooManyArguments {
     c_args: usize,
     max_args: usize,

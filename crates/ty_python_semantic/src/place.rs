@@ -10,9 +10,9 @@ use crate::semantic_index::{
 };
 use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
-    ApplyTypeMappingVisitor, DynamicType, KnownClass, MaterializationKind, Truthiness, Type,
-    TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type, declaration_type,
-    todo_type,
+    ApplyTypeMappingVisitor, DynamicType, KnownClass, MaterializationKind, MemberLookupPolicy,
+    Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type,
+    declaration_type, todo_type,
 };
 use crate::{Db, FxOrderSet, Program, resolve_module};
 
@@ -364,7 +364,9 @@ pub(crate) fn imported_symbol<'db>(
         } else if name == "__builtins__" {
             Place::bound(Type::any()).into()
         } else {
-            KnownClass::ModuleType.to_instance(db).member(db, name)
+            KnownClass::ModuleType
+                .to_instance(db)
+                .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NO_GETATTR_LOOKUP)
         }
     })
 }
@@ -695,20 +697,9 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
     }
 }
 
-fn place_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &PlaceAndQualifiers<'db>,
-    _count: u32,
-    _scope: ScopeId<'db>,
-    _place_id: ScopedPlaceId,
-    _requires_explicit_reexport: RequiresExplicitReExport,
-    _considered_definitions: ConsideredDefinitions,
-) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn place_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _scope: ScopeId<'db>,
     _place_id: ScopedPlaceId,
     _requires_explicit_reexport: RequiresExplicitReExport,
@@ -717,7 +708,7 @@ fn place_cycle_initial<'db>(
     Place::bound(Type::Never).into()
 }
 
-#[salsa::tracked(cycle_fn=place_cycle_recover, cycle_initial=place_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(cycle_initial=place_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn place_by_id<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -744,7 +735,7 @@ pub(crate) fn place_by_id<'db>(
     };
 
     // If a symbol is undeclared, but qualified with `typing.Final`, we use the right-hand side
-    // inferred type, without unioning with `Unknown`, because it can not be modified.
+    // inferred type, without unioning with `Unknown`, because it cannot be modified.
     if let Some(qualifiers) = declared.is_bare_final() {
         let bindings = all_considered_bindings();
         return place_from_bindings_impl(db, bindings, requires_explicit_reexport)
@@ -1385,7 +1376,9 @@ mod implicit_globals {
     use crate::place::{Definedness, PlaceAndQualifiers, TypeOrigin};
     use crate::semantic_index::symbol::Symbol;
     use crate::semantic_index::{place_table, use_def_map};
-    use crate::types::{CallableType, KnownClass, Parameter, Parameters, Signature, Type};
+    use crate::types::{
+        CallableType, KnownClass, MemberLookupPolicy, Parameter, Parameters, Signature, Type,
+    };
     use ruff_python_ast::PythonVersion;
 
     use super::{Place, place_from_declarations};
@@ -1484,7 +1477,13 @@ mod implicit_globals {
                 .iter()
                 .any(|module_type_member| &**module_type_member == name) =>
             {
-                KnownClass::ModuleType.to_instance(db).member(db, name)
+                KnownClass::ModuleType
+                    .to_instance(db)
+                    .member_lookup_with_policy(
+                        db,
+                        name.into(),
+                        MemberLookupPolicy::NO_GETATTR_LOOKUP,
+                    )
             }
 
             _ => Place::Undefined.into(),
@@ -1511,7 +1510,6 @@ mod implicit_globals {
     #[salsa::tracked(
         returns(deref),
         cycle_initial=module_type_symbols_initial,
-        cycle_fn=module_type_symbols_cycle_recover,
         heap_size=ruff_memory_usage::heap_size
     )]
     fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
@@ -1541,16 +1539,11 @@ mod implicit_globals {
             .collect()
     }
 
-    fn module_type_symbols_initial(_db: &dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
-        smallvec::SmallVec::default()
-    }
-
-    fn module_type_symbols_cycle_recover(
+    fn module_type_symbols_initial(
         _db: &dyn Db,
-        _value: &smallvec::SmallVec<[ast::name::Name; 8]>,
-        _count: u32,
-    ) -> salsa::CycleRecoveryAction<smallvec::SmallVec<[ast::name::Name; 8]>> {
-        salsa::CycleRecoveryAction::Iterate
+        _id: salsa::Id,
+    ) -> smallvec::SmallVec<[ast::name::Name; 8]> {
+        smallvec::SmallVec::default()
     }
 
     #[cfg(test)]

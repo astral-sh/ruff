@@ -12,6 +12,7 @@ use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::semantic_index::{global_scope, place_table};
 use crate::suppression::FileSuppressionId;
+use crate::types::KnownInstanceType;
 use crate::types::call::CallError;
 use crate::types::class::{DisjointBase, DisjointBaseKind, Field};
 use crate::types::function::KnownFunction;
@@ -63,7 +64,9 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
     registry.register_lint(&INVALID_GENERIC_CLASS);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
+    registry.register_lint(&INVALID_PARAMSPEC);
     registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
+    registry.register_lint(&INVALID_NEWTYPE);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
     registry.register_lint(&USELESS_OVERLOAD_BODY);
@@ -572,10 +575,14 @@ declare_lint! {
 // Added in #19763.
 declare_lint! {
     /// ## What it does
-    /// Checks for subscript accesses with invalid keys.
+    /// Checks for subscript accesses with invalid keys and `TypedDict` construction with an
+    /// unknown key.
     ///
     /// ## Why is this bad?
-    /// Using an invalid key will raise a `KeyError` at runtime.
+    /// Subscripting with an invalid key will raise a `KeyError` at runtime.
+    ///
+    /// Creating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is
+    /// `closed=true` it also violates the expectations of the type.
     ///
     /// ## Examples
     /// ```python
@@ -587,9 +594,13 @@ declare_lint! {
     ///
     /// alice = Person(name="Alice", age=30)
     /// alice["height"]  # KeyError: 'height'
+    ///
+    /// bob: Person = { "name": "Bob", "age": 30 }  # typo!
+    ///
+    /// carol = Person(name="Carol", age=25)  # typo!
     /// ```
     pub(crate) static INVALID_KEY = {
-        summary: "detects invalid subscript accesses",
+        summary: "detects invalid subscript accesses or TypedDict literal keys",
         status: LintStatus::stable("0.0.1-alpha.17"),
         default_level: Level::Error,
     }
@@ -874,6 +885,30 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for the creation of invalid `ParamSpec`s
+    ///
+    /// ## Why is this bad?
+    /// There are several requirements that you must follow when creating a `ParamSpec`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import ParamSpec
+    ///
+    /// P1 = ParamSpec("P1")  # okay
+    /// P2 = ParamSpec("S2")  # error: ParamSpec name must match the variable it's assigned to
+    /// ```
+    ///
+    /// ## References
+    /// - [Typing spec: ParamSpec](https://typing.python.org/en/latest/spec/generics.html#paramspec)
+    pub(crate) static INVALID_PARAMSPEC = {
+        summary: "detects invalid ParamSpec usage",
+        status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for the creation of invalid `TypeAliasType`s
     ///
     /// ## Why is this bad?
@@ -889,6 +924,30 @@ declare_lint! {
     pub(crate) static INVALID_TYPE_ALIAS_TYPE = {
         summary: "detects invalid TypeAliasType definitions",
         status: LintStatus::stable("0.0.1-alpha.6"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for the creation of invalid `NewType`s
+    ///
+    /// ## Why is this bad?
+    /// There are several requirements that you must follow when creating a `NewType`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import NewType
+    ///
+    /// def get_name() -> str: ...
+    ///
+    /// Foo = NewType("Foo", int)        # okay
+    /// Bar = NewType(get_name(), int)   # error: The first argument to `NewType` must be a string literal
+    /// Baz = NewType("Baz", int | str)  # error: invalid base for `typing.NewType`
+    /// ```
+    pub(crate) static INVALID_NEWTYPE = {
+        summary: "detects invalid NewType definitions",
+        status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
 }
@@ -1975,7 +2034,7 @@ pub(super) fn report_index_out_of_bounds(
 /// Emit a diagnostic declaring that a type does not support subscripting.
 pub(super) fn report_non_subscriptable(
     context: &InferContext,
-    node: AnyNodeRef,
+    node: &ast::ExprSubscript,
     non_subscriptable_ty: Type,
     method: &str,
 ) {
@@ -1992,7 +2051,21 @@ pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeR
     let Some(builder) = context.report_lint(&ZERO_STEPSIZE_IN_SLICE, node) else {
         return;
     };
-    builder.into_diagnostic("Slice step size can not be zero");
+    builder.into_diagnostic("Slice step size cannot be zero");
+}
+
+// We avoid emitting invalid assignment diagnostic for literal assignments to a `TypedDict`, as
+// they can only occur if we already failed to validate the dict (and emitted some diagnostic).
+pub(crate) fn is_invalid_typed_dict_literal(
+    db: &dyn Db,
+    target_ty: Type,
+    source: AnyNodeRef<'_>,
+) -> bool {
+    target_ty
+        .filter_union(db, Type::is_typed_dict)
+        .as_typed_dict()
+        .is_some()
+        && matches!(source, AnyNodeRef::ExprDict(_))
 }
 
 fn report_invalid_assignment_with_message(
@@ -2032,15 +2105,27 @@ pub(super) fn report_invalid_assignment<'db>(
     target_ty: Type,
     mut source_ty: Type<'db>,
 ) {
+    let value_expr = match definition.kind(context.db()) {
+        DefinitionKind::Assignment(def) => Some(def.value(context.module())),
+        DefinitionKind::AnnotatedAssignment(def) => def.value(context.module()),
+        DefinitionKind::NamedExpression(def) => Some(&*def.node(context.module()).value),
+        _ => None,
+    };
+
+    if let Some(value_expr) = value_expr
+        && is_invalid_typed_dict_literal(context.db(), target_ty, value_expr.into())
+    {
+        return;
+    }
+
     let settings =
         DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), target_ty, source_ty);
 
-    if let DefinitionKind::AnnotatedAssignment(annotated_assignment) = definition.kind(context.db())
-        && let Some(value) = annotated_assignment.value(context.module())
-    {
+    if let Some(value_expr) = value_expr {
         // Re-infer the RHS of the annotated assignment, ignoring the type context for more precise
         // error messages.
-        source_ty = infer_isolated_expression(context.db(), definition.scope(context.db()), value);
+        source_ty =
+            infer_isolated_expression(context.db(), definition.scope(context.db()), value_expr);
     }
 
     report_invalid_assignment_with_message(
@@ -2062,6 +2147,11 @@ pub(super) fn report_invalid_attribute_assignment(
     source_ty: Type,
     attribute_name: &'_ str,
 ) {
+    // TODO: Ideally we would not emit diagnostics for `TypedDict` literal arguments
+    // here (see `diagnostic::is_invalid_typed_dict_literal`). However, we may have
+    // silenced diagnostics during attribute resolution, and rely on the assignability
+    // diagnostic being emitted here.
+
     report_invalid_assignment_with_message(
         context,
         node,
@@ -2290,36 +2380,108 @@ pub(super) fn report_possibly_missing_attribute(
     };
 }
 
+pub(super) fn report_invalid_exception_tuple_caught<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    node: &'ast ast::ExprTuple,
+    invalid_tuple_nodes: impl IntoIterator<Item = (&'ast ast::Expr, Type<'db>)>,
+) {
+    let Some(builder) = context.report_lint(&INVALID_EXCEPTION_CAUGHT, node) else {
+        return;
+    };
+
+    let mut diagnostic = builder.into_diagnostic("Invalid tuple caught in an exception handler");
+
+    for (sub_node, ty) in invalid_tuple_nodes {
+        let span = context.span(sub_node);
+        diagnostic.annotate(Annotation::secondary(span.clone()).message(format_args!(
+            "Invalid element of type `{}`",
+            ty.display(context.db())
+        )));
+        if ty.is_notimplemented(context.db()) {
+            diagnostic.annotate(
+                Annotation::secondary(span).message("Did you mean `NotImplementedError`?"),
+            );
+        }
+    }
+
+    diagnostic.info(
+        "Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses",
+    );
+}
+
 pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast::Expr, ty: Type) {
     let Some(builder) = context.report_lint(&INVALID_EXCEPTION_CAUGHT, node) else {
         return;
     };
-    builder.into_diagnostic(format_args!(
-        "Cannot catch object of type `{}` in an exception handler \
-            (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)",
-        ty.display(context.db())
-    ));
+
+    let mut diagnostic = if ty.is_notimplemented(context.db()) {
+        let mut diag =
+            builder.into_diagnostic("Cannot catch `NotImplemented` in an exception handler");
+        diag.set_primary_message("Did you mean `NotImplementedError`?");
+        diag
+    } else {
+        let mut diag = builder.into_diagnostic(format_args!(
+            "Invalid {thing} caught in an exception handler",
+            thing = if ty.tuple_instance_spec(context.db()).is_some() {
+                "tuple"
+            } else {
+                "object"
+            },
+        ));
+        diag.set_primary_message(format_args!(
+            "Object has type `{}`",
+            ty.display(context.db())
+        ));
+        diag
+    };
+
+    diagnostic.info(
+        "Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses",
+    );
 }
 
-pub(crate) fn report_invalid_exception_raised(context: &InferContext, node: &ast::Expr, ty: Type) {
-    let Some(builder) = context.report_lint(&INVALID_RAISE, node) else {
+pub(crate) fn report_invalid_exception_raised(
+    context: &InferContext,
+    raised_node: &ast::Expr,
+    raise_type: Type,
+) {
+    let Some(builder) = context.report_lint(&INVALID_RAISE, raised_node) else {
         return;
     };
-    builder.into_diagnostic(format_args!(
-        "Cannot raise object of type `{}` (must be a `BaseException` subclass or instance)",
-        ty.display(context.db())
-    ));
+    if raise_type.is_notimplemented(context.db()) {
+        let mut diagnostic =
+            builder.into_diagnostic(format_args!("Cannot raise `NotImplemented`",));
+        diagnostic.set_primary_message("Did you mean `NotImplementedError`?");
+        diagnostic.info("Can only raise an instance or subclass of `BaseException`");
+    } else {
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Cannot raise object of type `{}`",
+            raise_type.display(context.db())
+        ));
+        diagnostic.set_primary_message("Not an instance or subclass of `BaseException`");
+    }
 }
 
 pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast::Expr, ty: Type) {
     let Some(builder) = context.report_lint(&INVALID_RAISE, node) else {
         return;
     };
-    builder.into_diagnostic(format_args!(
-        "Cannot use object of type `{}` as exception cause \
-         (must be a `BaseException` subclass or instance or `None`)",
-        ty.display(context.db())
-    ));
+    let mut diagnostic = if ty.is_notimplemented(context.db()) {
+        let mut diag = builder.into_diagnostic(format_args!(
+            "Cannot use `NotImplemented` as an exception cause",
+        ));
+        diag.set_primary_message("Did you mean `NotImplementedError`?");
+        diag
+    } else {
+        builder.into_diagnostic(format_args!(
+            "Cannot use object of type `{}` as an exception cause",
+            ty.display(context.db())
+        ))
+    };
+    diagnostic.info(
+        "An exception cause must be an instance of `BaseException`, \
+        subclass of `BaseException`, or `None`",
+    );
 }
 
 pub(crate) fn report_instance_layout_conflict(
@@ -2834,6 +2996,24 @@ pub(crate) fn report_invalid_or_unsupported_base(
         return;
     }
 
+    if let Type::KnownInstance(KnownInstanceType::NewType(newtype)) = base_type {
+        let Some(builder) = context.report_lint(&INVALID_BASE, base_node) else {
+            return;
+        };
+        let mut diagnostic = builder.into_diagnostic("Cannot subclass an instance of NewType");
+        diagnostic.info(format_args!(
+            "Perhaps you were looking for: `{} = NewType('{}', {})`",
+            class.name(context.db()),
+            class.name(context.db()),
+            newtype.name(context.db()),
+        ));
+        diagnostic.info(format_args!(
+            "Definition of class `{}` will raise `TypeError` at runtime",
+            class.name(context.db())
+        ));
+        return;
+    }
+
     let tuple_of_types = Type::homogeneous_tuple(db, instance_of_type);
 
     let explain_mro_entries = |diagnostic: &mut LintDiagnosticGuard| {
@@ -2955,6 +3135,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
     typed_dict_node: AnyNodeRef,
     key_node: AnyNodeRef,
     typed_dict_ty: Type<'db>,
+    full_object_ty: Option<Type<'db>>,
     key_ty: Type<'db>,
     items: &FxOrderMap<Name, Field<'db>>,
 ) {
@@ -2966,14 +3147,24 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                 let typed_dict_name = typed_dict_ty.display(db);
 
                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Invalid key access on TypedDict `{typed_dict_name}`",
+                    "Invalid key for TypedDict `{typed_dict_name}`",
                 ));
 
-                diagnostic.annotate(
+                diagnostic.annotate(if let Some(full_object_ty) = full_object_ty {
+                    context.secondary(typed_dict_node).message(format_args!(
+                        "TypedDict `{typed_dict_name}` in {kind} type `{full_object_ty}`",
+                        kind = if full_object_ty.is_union() {
+                            "union"
+                        } else {
+                            "intersection"
+                        },
+                        full_object_ty = full_object_ty.display(db)
+                    ))
+                } else {
                     context
                         .secondary(typed_dict_node)
-                        .message(format_args!("TypedDict `{typed_dict_name}`")),
-                );
+                        .message(format_args!("TypedDict `{typed_dict_name}`"))
+                });
 
                 let existing_keys = items.iter().map(|(name, _)| name.as_str());
 
@@ -2985,15 +3176,23 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         String::new()
                     }
                 ));
-
-                diagnostic
             }
-            _ => builder.into_diagnostic(format_args!(
-                "TypedDict `{}` cannot be indexed with a key of type `{}`",
-                typed_dict_ty.display(db),
-                key_ty.display(db),
-            )),
-        };
+            _ => {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "TypedDict `{}` can only be subscripted with string literal keys, \
+                     got key of type `{}`",
+                    typed_dict_ty.display(db),
+                    key_ty.display(db),
+                ));
+
+                if let Some(full_object_ty) = full_object_ty {
+                    diagnostic.info(format_args!(
+                        "The full type of the subscripted object is `{}`",
+                        full_object_ty.display(db)
+                    ));
+                }
+            }
+        }
     }
 }
 

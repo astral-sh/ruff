@@ -85,6 +85,7 @@ where
     ///
     /// This method may panic or produce unspecified results if the provided module is from a
     /// different file or Salsa revision than the module to which the node belongs.
+    #[track_caller]
     pub fn node<'ast>(&self, module_ref: &'ast ParsedModuleRef) -> &'ast T {
         #[cfg(debug_assertions)]
         assert_eq!(module_ref.module().addr(), self.module_addr);

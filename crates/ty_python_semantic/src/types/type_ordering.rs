@@ -1,5 +1,7 @@
 use std::cmp::Ordering;
 
+use salsa::plumbing::AsId;
+
 use crate::{db::Db, types::bound_super::SuperOwnerKind};
 
 use super::{
@@ -137,7 +139,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::ProtocolInstance(_), _) => Ordering::Less,
         (_, Type::ProtocolInstance(_)) => Ordering::Greater,
 
-        (Type::TypeVar(left), Type::TypeVar(right)) => left.cmp(right),
+        // This is one place where we want to compare the typevar identities directly, instead of
+        // falling back on `is_same_typevar_as` or `can_be_bound_for`.
+        (Type::TypeVar(left), Type::TypeVar(right)) => left.as_id().cmp(&right.as_id()),
         (Type::TypeVar(_), _) => Ordering::Less,
         (_, Type::TypeVar(_)) => Ordering::Greater,
 
@@ -209,6 +213,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::TypedDict(_), _) => Ordering::Less,
         (_, Type::TypedDict(_)) => Ordering::Greater,
 
+        (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => left.cmp(right),
+        (Type::NewTypeInstance(_), _) => Ordering::Less,
+        (_, Type::NewTypeInstance(_)) => Ordering::Greater,
+
         (Type::Union(_), _) | (_, Type::Union(_)) => {
             unreachable!("our type representation does not permit nested unions");
         }
@@ -257,9 +265,6 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
 
         #[cfg(not(debug_assertions))]
         (DynamicType::Todo(TodoType), DynamicType::Todo(TodoType)) => Ordering::Equal,
-
-        (DynamicType::TodoPEP695ParamSpec, _) => Ordering::Less,
-        (_, DynamicType::TodoPEP695ParamSpec) => Ordering::Greater,
 
         (DynamicType::TodoUnpack, _) => Ordering::Less,
         (_, DynamicType::TodoUnpack) => Ordering::Greater,

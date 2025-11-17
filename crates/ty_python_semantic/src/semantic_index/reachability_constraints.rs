@@ -13,7 +13,7 @@
 //! of `test`. When evaluating a constraint, there are three possible outcomes: always true, always
 //! false, or ambiguous. For a simple constraint like this, always-true and always-false correspond
 //! to the case in which we can infer that the type of `test` is `Literal[True]` or `Literal[False]`.
-//! In any other case, like if the type of `test` is `bool` or `Unknown`, we can not statically
+//! In any other case, like if the type of `test` is `bool` or `Unknown`, we cannot statically
 //! determine whether `test` is truthy or falsy, so the outcome would be "ambiguous".
 //!
 //!
@@ -29,7 +29,7 @@
 //! Here, we would accumulate a reachability constraint of `test1 AND test2`. We can statically
 //! determine that this position is *always* reachable only if both `test1` and `test2` are
 //! always true. On the other hand, we can statically determine that this position is *never*
-//! reachable if *either* `test1` or `test2` is always false. In any other case, we can not
+//! reachable if *either* `test1` or `test2` is always false. In any other case, we cannot
 //! determine whether this position is reachable or not, so the outcome is "ambiguous". This
 //! corresponds to a ternary *AND* operation in [Kleene] logic:
 //!
@@ -60,7 +60,7 @@
 //! The third branch ends in a terminal statement [^1]. When we merge control flow, we need to consider
 //! the reachability through either the first or the second branch. The current position is only
 //! *definitely* unreachable if both `test1` and `test2` are always false. It is definitely
-//! reachable if *either* `test1` or `test2` is always true. In any other case, we can not statically
+//! reachable if *either* `test1` or `test2` is always true. In any other case, we cannot statically
 //! determine whether it is reachable or not. This operation corresponds to a ternary *OR* operation:
 //!
 //! ```text
@@ -91,7 +91,7 @@
 //! ## Explicit ambiguity
 //!
 //! In some cases, we explicitly record an “ambiguous” constraint. We do this when branching on
-//! something that we can not (or intentionally do not want to) analyze statically. `for` loops are
+//! something that we cannot (or intentionally do not want to) analyze statically. `for` loops are
 //! one example:
 //! ```py
 //! def _():
@@ -771,8 +771,9 @@ impl ReachabilityConstraints {
                 truthiness
             }
             PatternPredicateKind::Class(class_expr, kind) => {
-                let class_ty =
-                    infer_expression_type(db, *class_expr, TypeContext::default()).to_instance(db);
+                let class_ty = infer_expression_type(db, *class_expr, TypeContext::default())
+                    .as_class_literal()
+                    .map(|class| Type::instance(db, class.top_materialization(db)));
 
                 class_ty.map_or(Truthiness::Ambiguous, |class_ty| {
                     if subject_ty.is_subtype_of(db, class_ty) {
@@ -802,10 +803,27 @@ impl ReachabilityConstraints {
     fn analyze_single_pattern_predicate(db: &dyn Db, predicate: PatternPredicate) -> Truthiness {
         let subject_ty = infer_expression_type(db, predicate.subject(db), TypeContext::default());
 
-        let narrowed_subject_ty = IntersectionBuilder::new(db)
+        let narrowed_subject = IntersectionBuilder::new(db)
             .add_positive(subject_ty)
-            .add_negative(type_excluded_by_previous_patterns(db, predicate))
+            .add_negative(type_excluded_by_previous_patterns(db, predicate));
+
+        let narrowed_subject_ty = narrowed_subject.clone().build();
+
+        // Consider a case where we match on a subject type of `Self` with an upper bound of `Answer`,
+        // where `Answer` is a {YES, NO} enum. After a previous pattern matching on `NO`, the narrowed
+        // subject type is `Self & ~Literal[NO]`. This type is *not* equivalent to `Literal[YES]`,
+        // because `Self` could also specialize to `Literal[NO]` or `Never`, making the intersection
+        // empty. However, if the current pattern matches on `YES`, the *next* narrowed subject type
+        // will be `Self & ~Literal[NO] & ~Literal[YES]`, which *is* always equivalent to `Never`. This
+        // means that subsequent patterns can never match. And we know that if we reach this point,
+        // the current pattern will have to match. We return `AlwaysTrue` here, since the call to
+        // `analyze_single_pattern_predicate_kind` below would return `Ambiguous` in this case.
+        let next_narrowed_subject_ty = narrowed_subject
+            .add_negative(pattern_kind_to_type(db, predicate.kind(db)))
             .build();
+        if !narrowed_subject_ty.is_never() && next_narrowed_subject_ty.is_never() {
+            return Truthiness::AlwaysTrue;
+        }
 
         let truthiness = Self::analyze_single_pattern_predicate_kind(
             db,

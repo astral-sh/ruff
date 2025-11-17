@@ -30,6 +30,7 @@ use crate::rules::pyupgrade::types::Primitive;
 /// - [Python documentation: `type()`](https://docs.python.org/3/library/functions.html#type)
 /// - [Python documentation: Built-in types](https://docs.python.org/3/library/stdtypes.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct TypeOfPrimitive {
     primitive: Primitive,
 }

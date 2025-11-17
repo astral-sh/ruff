@@ -2,7 +2,6 @@ use std::borrow::Cow;
 
 use lsp_types::request::References;
 use lsp_types::{Location, ReferenceParams, Url};
-use ruff_db::source::{line_index, source_text};
 use ty_ide::goto_references;
 use ty_project::ProjectDatabase;
 
@@ -37,17 +36,18 @@ impl BackgroundDocumentRequestHandler for ReferencesRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.file(db) else {
+        let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
 
-        let source = source_text(db, file);
-        let line_index = line_index(db, file);
-        let offset = params.text_document_position.position.to_text_size(
-            &source,
-            &line_index,
+        let Some(offset) = params.text_document_position.position.to_text_size(
+            db,
+            file,
+            snapshot.url(),
             snapshot.encoding(),
-        );
+        ) else {
+            return Ok(None);
+        };
 
         let include_declaration = params.context.include_declaration;
 

@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 # Please update rustfmt.toml when bumping the Rust edition
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.89"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -84,7 +84,7 @@ dashmap = { version = "6.0.1" }
 dir-test = { version = "0.4.0" }
 dunce = { version = "1.0.5" }
 drop_bomb = { version = "0.1.5" }
-etcetera = { version = "0.10.0" }
+etcetera = { version = "0.11.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
 getrandom = { version = "0.3.1" }
@@ -103,7 +103,7 @@ hashbrown = { version = "0.16.0", default-features = false, features = [
     "inline-more",
 ] }
 heck = "0.5.0"
-ignore = { version = "0.4.22" }
+ignore = { version = "0.4.24" }
 imara-diff = { version = "0.1.5" }
 imperative = { version = "1.0.4" }
 indexmap = { version = "2.6.0" }
@@ -124,7 +124,7 @@ lsp-server = { version = "0.7.6" }
 lsp-types = { git = "https://github.com/astral-sh/lsp-types.git", rev = "3512a9f", features = [
     "proposed",
 ] }
-matchit = { version = "0.8.1" }
+matchit = { version = "0.9.0" }
 memchr = { version = "2.7.1" }
 mimalloc = { version = "0.1.39" }
 natord = { version = "1.0.9" }
@@ -146,7 +146,7 @@ regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "ef9f9329be6923acd050c8dddd172e3bc93e8051", default-features = false, features = [
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "a885bb4c4c192741b8a17418fef81a71e33d111e", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",

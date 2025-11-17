@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::contains_effect;
+use ruff_python_ast::helpers::{contains_effect, is_empty_f_string};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
@@ -38,6 +38,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `print`](https://docs.python.org/3/library/functions.html#print)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct PrintEmptyString {
     reason: Reason,
 }
@@ -193,13 +194,11 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
 
 /// Check if an expression is a constant empty string.
 fn is_empty_string(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::StringLiteral(ast::ExprStringLiteral {
-            value,
-            ..
-        }) if value.is_empty()
-    )
+    match expr {
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
+        Expr::FString(f_string) => is_empty_f_string(f_string),
+        _ => false,
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

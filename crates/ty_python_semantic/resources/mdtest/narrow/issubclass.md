@@ -131,6 +131,75 @@ def _(flag1: bool, flag2: bool):
         reveal_type(t)  # revealed: <class 'str'>
 ```
 
+## `classinfo` is a PEP-604 union of types
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+def f(x: type[int | str | bytes | range]):
+    if issubclass(x, int | str):
+        reveal_type(x)  # revealed: type[int] | type[str]
+    elif issubclass(x, bytes | memoryview):
+        reveal_type(x)  # revealed: type[bytes]
+    else:
+        reveal_type(x)  # revealed: <class 'range'>
+```
+
+Although `issubclass()` usually only works if all elements in the `UnionType` are class objects, at
+runtime a special exception is made for `None` so that `issubclass(x, int | None)` can work:
+
+```py
+def _(x: type):
+    if issubclass(x, int | str | None):
+        reveal_type(x)  # revealed: type[int] | type[str] | <class 'NoneType'>
+    else:
+        reveal_type(x)  # revealed: type & ~type[int] & ~type[str] & ~<class 'NoneType'>
+```
+
+## `classinfo` is an invalid PEP-604 union of types
+
+Except for the `None` special case mentioned above, narrowing can only take place if all elements in
+the PEP-604 union are class literals. If any elements are generic aliases or other types, the
+`issubclass()` call may fail at runtime, so no narrowing can take place:
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+def _(x: type[int | list | bytes]):
+    # error: [invalid-argument-type]
+    if issubclass(x, int | list[int]):
+        reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+    else:
+        reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+```
+
+## PEP-604 unions on Python \<3.10
+
+PEP-604 unions were added in Python 3.10, so attempting to use them on Python 3.9 does not lead to
+any type narrowing.
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+def _(x: type[int | str | bytes]):
+    # error: [unsupported-operator]
+    if issubclass(x, int | str):
+        reveal_type(x)  # revealed: (type[int] & Unknown) | (type[str] & Unknown) | (type[bytes] & Unknown)
+    else:
+        reveal_type(x)  # revealed: (type[int] & Unknown) | (type[str] & Unknown) | (type[bytes] & Unknown)
+```
+
 ## Special cases
 
 ### Emit a diagnostic if the first argument is of wrong type
@@ -214,8 +283,7 @@ def flag() -> bool:
 
 t = int if flag() else str
 
-# TODO: this should cause us to emit a diagnostic during
-# type checking
+# error: [invalid-argument-type] "Argument to function `issubclass` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["str"]"
 if issubclass(t, "str"):
     reveal_type(t)  # revealed: <class 'int'> | <class 'str'>
 

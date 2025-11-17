@@ -370,3 +370,95 @@ class Foo:
             The flag converter instance with all flags parsed.
         """
         return
+
+# DOC102 - Test case from issue #20959: comma-separated parameters
+def leq(x: object, y: object) -> bool:
+    """Compare two objects for loose equality.
+
+    Parameters
+    ----------
+    x1, x2 : object
+        Objects.
+
+    Returns
+    -------
+    bool
+        Whether the objects are identical or equal.
+    """
+    return x is y or x == y
+
+
+# OK - comma-separated parameters that match function signature
+def compare_values(x1: int, x2: int) -> bool:
+    """Compare two integer values.
+
+    Parameters
+    ----------
+    x1, x2 : int
+        Values to compare.
+
+    Returns
+    -------
+    bool
+        True if values are equal.
+    """
+    return x1 == x2
+
+
+# DOC102 - mixed comma-separated and regular parameters
+def process_data(data, x1: str, x2: str) -> str:
+    """Process data with multiple string parameters.
+
+    Parameters
+    ----------
+    data : list
+        Input data to process.
+    x1, x2 : str
+        String parameters for processing.
+    extra_param : str
+        Extra parameter not in signature.
+
+    Returns
+    -------
+    str
+        Processed result.
+    """
+    return f"{x1}{x2}{len(data)}"
+
+
+# OK
+def baz(x: int) -> int:
+    """
+    Show a `Warnings` DOC102 false positive.
+
+    Parameters
+    ----------
+    x : int
+
+    Warnings
+    --------
+    This function demonstrates a DOC102 false positive
+
+    Returns
+    -------
+    int
+    """
+    return x
+
+
+# OK - comma-separated parameters without type annotations
+def add_numbers(a, b):
+    """
+    Adds two numbers and returns the result.
+
+    Parameters
+    ----------
+    a, b
+        The numbers to add.
+
+    Returns
+    -------
+    int
+        The sum of the two numbers.
+    """
+    return a + b

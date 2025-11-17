@@ -186,7 +186,7 @@ impl<'db> SuperOwnerKind<'db> {
             }
             SuperOwnerKind::Instance(instance) => instance
                 .normalized_impl(db, visitor)
-                .into_nominal_instance()
+                .as_nominal_instance()
                 .map(Self::Instance)
                 .unwrap_or(Self::Dynamic(DynamicType::Any)),
         }
@@ -403,6 +403,9 @@ impl<'db> BoundSuperType<'db> {
                     KnownClass::Dict
                         .to_specialized_instance(db, [key_builder.build(), value_builder.build()]),
                 );
+            }
+            Type::NewTypeInstance(newtype) => {
+                return delegate_to(Type::instance(db, newtype.base_class_type(db)));
             }
             Type::Callable(callable) if callable.is_function_like(db) => {
                 return delegate_to(KnownClass::FunctionType.to_instance(db));

@@ -36,6 +36,7 @@ use crate::checkers::ast::Checker;
 ///     return phrases.get(x, "Goodnight")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.250")]
 pub(crate) struct IfElseBlockInsteadOfDictLookup;
 
 impl Violation for IfElseBlockInsteadOfDictLookup {

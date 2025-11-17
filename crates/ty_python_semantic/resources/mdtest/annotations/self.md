@@ -56,7 +56,7 @@ In instance methods, the first parameter (regardless of its name) is assumed to 
 
 ```toml
 [environment]
-python-version = "3.11"
+python-version = "3.12"
 ```
 
 ```py
@@ -64,16 +64,30 @@ from typing import Self
 
 class A:
     def implicit_self(self) -> Self:
-        # TODO: This should be Self@implicit_self
-        reveal_type(self)  # revealed: Unknown
+        reveal_type(self)  # revealed: Self@implicit_self
 
         return self
 
-    def a_method(self) -> int:
-        def first_arg_is_not_self(a: int) -> int:
+    def implicit_self_generic[T](self, x: T) -> T:
+        reveal_type(self)  # revealed: Self@implicit_self_generic
+
+        return x
+
+    def method_a(self) -> None:
+        def first_param_is_not_self(a: int):
             reveal_type(a)  # revealed: int
-            return a
-        return first_arg_is_not_self(1)
+            reveal_type(self)  # revealed: Self@method_a
+
+        def first_param_is_not_self_unannotated(a):
+            reveal_type(a)  # revealed: Unknown
+            reveal_type(self)  # revealed: Self@method_a
+
+        def first_param_is_also_not_self(self) -> None:
+            reveal_type(self)  # revealed: Unknown
+
+        def first_param_is_explicit_self(this: Self) -> None:
+            reveal_type(this)  # revealed: Self@method_a
+            reveal_type(self)  # revealed: Self@method_a
 
     @classmethod
     def a_classmethod(cls) -> Self:
@@ -102,7 +116,7 @@ A.implicit_self(1)
 Passing `self` implicitly also verifies the type:
 
 ```py
-from typing import Never
+from typing import Never, Callable
 
 class Strange:
     def can_not_be_called(self: Never) -> None: ...
@@ -125,35 +139,62 @@ The first parameter of instance methods always has type `Self`, if it is not exp
 The name `self` is not special in any way.
 
 ```py
+def some_decorator[**P, R](f: Callable[P, R]) -> Callable[P, R]:
+    return f
+
 class B:
     def name_does_not_matter(this) -> Self:
-        # TODO: Should reveal Self@name_does_not_matter
-        reveal_type(this)  # revealed: Unknown
+        reveal_type(this)  # revealed: Self@name_does_not_matter
 
         return this
 
     def positional_only(self, /, x: int) -> Self:
-        # TODO: Should reveal Self@positional_only
-        reveal_type(self)  # revealed: Unknown
+        reveal_type(self)  # revealed: Self@positional_only
         return self
 
     def keyword_only(self, *, x: int) -> Self:
-        # TODO: Should reveal Self@keyword_only
-        reveal_type(self)  # revealed: Unknown
+        reveal_type(self)  # revealed: Self@keyword_only
+        return self
+
+    @some_decorator
+    def decorated_method(self) -> Self:
+        reveal_type(self)  # revealed: Self@decorated_method
         return self
 
     @property
     def a_property(self) -> Self:
-        # TODO: Should reveal Self@a_property
-        reveal_type(self)  # revealed: Unknown
+        reveal_type(self)  # revealed: Self@a_property
         return self
+
+    async def async_method(self) -> Self:
+        reveal_type(self)  # revealed: Self@async_method
+        return self
+
+    @staticmethod
+    def static_method(self):
+        # The parameter can be called `self`, but it is not treated as `Self`
+        reveal_type(self)  # revealed: Unknown
+
+    @staticmethod
+    @some_decorator
+    def decorated_static_method(self):
+        reveal_type(self)  # revealed: Unknown
+    # TODO: On Python <3.10, this should ideally be rejected, because `staticmethod` objects were not callable.
+    @some_decorator
+    @staticmethod
+    def decorated_static_method_2(self):
+        reveal_type(self)  # revealed: Unknown
 
 reveal_type(B().name_does_not_matter())  # revealed: B
 reveal_type(B().positional_only(1))  # revealed: B
 reveal_type(B().keyword_only(x=1))  # revealed: B
+# TODO: This should deally be `B`
+reveal_type(B().decorated_method())  # revealed: Unknown
 
-# TODO: this should be B
-reveal_type(B().a_property)  # revealed: Unknown
+reveal_type(B().a_property)  # revealed: B
+
+async def _():
+    reveal_type(await B().async_method())  # revealed: B
 ```
 
 This also works for generic classes:
@@ -165,8 +206,7 @@ T = TypeVar("T")
 
 class G(Generic[T]):
     def id(self) -> Self:
-        # TODO: Should reveal Self@id
-        reveal_type(self)  # revealed: Unknown
+        reveal_type(self)  # revealed: Self@id
 
         return self
 
@@ -250,6 +290,20 @@ class LinkedList:
         return self.next_node
 
 reveal_type(LinkedList().next())  # revealed: LinkedList
+```
+
+Attributes can also refer to a generic parameter:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class C(Generic[T]):
+    foo: T
+    def method(self) -> None:
+        reveal_type(self)  # revealed: Self@method
+        reveal_type(self.foo)  # revealed: T@C
 ```
 
 ## Generic Classes
@@ -342,31 +396,28 @@ b: Self
 
 # TODO: "Self" cannot be used in a function with a `self` or `cls` parameter that has a type annotation other than "Self"
 class Foo:
-    # TODO: rejected Self because self has a different type
+    # TODO: This `self: T` annotation should be rejected because `T` is not `Self`
     def has_existing_self_annotation(self: T) -> Self:
         return self  # error: [invalid-return-type]
 
     def return_concrete_type(self) -> Self:
-        # TODO: tell user to use "Foo" instead of "Self"
+        # TODO: We could emit a hint that suggests annotating with `Foo` instead of `Self`
         # error: [invalid-return-type]
         return Foo()
 
     @staticmethod
-    # TODO: reject because of staticmethod
+    # TODO: The usage of `Self` here should be rejected because this is a static method
     def make() -> Self:
         # error: [invalid-return-type]
         return Foo()
 
-class Bar(Generic[T]):
-    foo: T
-    def bar(self) -> T:
-        return self.foo
+class Bar(Generic[T]): ...
 
 # error: [invalid-type-form]
 class Baz(Bar[Self]): ...
 
 class MyMetaclass(type):
-    # TODO: rejected
+    # TODO: reject the Self usage. because self cannot be used within a metaclass.
     def __new__(cls) -> Self:
         return super().__new__(cls)
 ```

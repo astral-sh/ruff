@@ -61,6 +61,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// [code coverage]: https://github.com/nedbat/coveragepy/issues/509
 /// [pycodestyle.max-line-length]: https://docs.astral.sh/ruff/settings/#lint_pycodestyle_max-line-length
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.213")]
 pub(crate) struct IfElseBlockInsteadOfIfExp {
     /// The ternary or binary expression to replace the `if`-`else`-block.
     contents: String,

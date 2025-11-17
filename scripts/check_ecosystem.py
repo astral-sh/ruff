@@ -528,7 +528,8 @@ if __name__ == "__main__":
     else:
         logging.basicConfig(level=logging.INFO)
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     if args.checkouts:
         args.checkouts.mkdir(exist_ok=True, parents=True)
     main_task = asyncio.ensure_future(

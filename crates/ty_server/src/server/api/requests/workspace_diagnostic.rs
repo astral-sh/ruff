@@ -1,14 +1,7 @@
-use crate::PositionEncoding;
-use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
-use crate::server::api::traits::{
-    BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
-};
-use crate::server::lazy_work_done_progress::LazyWorkDoneProgress;
-use crate::server::{Action, Result};
-use crate::session::client::Client;
-use crate::session::index::Index;
-use crate::session::{SessionSnapshot, SuspendedWorkspaceDiagnosticRequest};
-use crate::system::{AnySystemPath, file_to_url};
+use std::collections::BTreeMap;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+
 use lsp_server::RequestId;
 use lsp_types::request::WorkspaceDiagnosticRequest;
 use lsp_types::{
@@ -20,12 +13,23 @@ use lsp_types::{
 };
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
+use ruff_db::source::source_text;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Instant;
-use ty_project::{Db, ProgressReporter};
+use ty_project::{ProgressReporter, ProjectDatabase};
+
+use crate::PositionEncoding;
+use crate::document::DocumentKey;
+use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
+use crate::server::api::traits::{
+    BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
+};
+use crate::server::lazy_work_done_progress::LazyWorkDoneProgress;
+use crate::server::{Action, Result};
+use crate::session::client::Client;
+use crate::session::index::Index;
+use crate::session::{SessionSnapshot, SuspendedWorkspaceDiagnosticRequest};
+use crate::system::file_to_url;
 
 /// Handler for [Workspace diagnostics](workspace-diagnostics)
 ///
@@ -199,80 +203,67 @@ impl RetriableRequestHandler for WorkspaceDiagnosticRequestHandler {
 ///
 /// Diagnostics are only streamed if the client sends a partial result token.
 struct WorkspaceDiagnosticsProgressReporter<'a> {
-    total_files: usize,
-    checked_files: AtomicUsize,
     work_done: LazyWorkDoneProgress,
-    response: std::sync::Mutex<ResponseWriter<'a>>,
+    state: Mutex<ProgressReporterState<'a>>,
 }
 
 impl<'a> WorkspaceDiagnosticsProgressReporter<'a> {
     fn new(work_done: LazyWorkDoneProgress, response: ResponseWriter<'a>) -> Self {
         Self {
-            total_files: 0,
-            checked_files: AtomicUsize::new(0),
+            state: Mutex::new(ProgressReporterState {
+                total_files: 0,
+                checked_files: 0,
+                last_response_sent: Instant::now(),
+                response,
+            }),
             work_done,
-            response: std::sync::Mutex::new(response),
         }
     }
 
     fn into_final_report(self) -> WorkspaceDiagnosticReportResult {
-        let writer = self.response.into_inner().unwrap();
-        writer.into_final_report()
-    }
-
-    fn report_progress(&self) {
-        let checked = self.checked_files.load(Ordering::Relaxed);
-        let total = self.total_files;
-
-        #[allow(clippy::cast_possible_truncation)]
-        let percentage = if total > 0 {
-            Some((checked * 100 / total) as u32)
-        } else {
-            None
-        };
-
-        self.work_done
-            .report_progress(format!("{checked}/{total} files"), percentage);
-
-        if checked == total {
-            self.work_done
-                .set_finish_message(format!("Checked {total} files"));
-        }
+        let state = self.state.into_inner().unwrap();
+        state.response.into_final_report()
     }
 }
 
 impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
     fn set_files(&mut self, files: usize) {
-        self.total_files += files;
-        self.report_progress();
+        let state = self.state.get_mut().unwrap();
+        state.total_files += files;
+        state.report_progress(&self.work_done);
     }
 
-    fn report_checked_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]) {
-        let checked = self.checked_files.fetch_add(1, Ordering::Relaxed) + 1;
-
-        if checked.is_multiple_of(100) || checked == self.total_files {
-            // Report progress every 100 files or when all files are checked
-            self.report_progress();
-        }
-
+    fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
         // Another thread might have panicked at this point because of a salsa cancellation which
         // poisoned the result. If the response is poisoned, just don't report and wait for our thread
         // to unwind with a salsa cancellation next.
-        let Ok(mut response) = self.response.lock() else {
+        let Ok(mut state) = self.state.lock() else {
             return;
         };
+
+        state.checked_files += 1;
+
+        if state.checked_files == state.total_files {
+            state.report_progress(&self.work_done);
+        } else if state.last_response_sent.elapsed() >= Duration::from_millis(50) {
+            state.last_response_sent = Instant::now();
+
+            state.report_progress(&self.work_done);
+        }
 
         // Don't report empty diagnostics. We clear previous diagnostics in `into_response`
         // which also handles the case where a file no longer has diagnostics because
         // it's no longer part of the project.
         if !diagnostics.is_empty() {
-            response.write_diagnostics_for_file(db, file, diagnostics);
+            state
+                .response
+                .write_diagnostics_for_file(db, file, diagnostics);
         }
 
-        response.maybe_flush();
+        state.response.maybe_flush();
     }
 
-    fn report_diagnostics(&mut self, db: &dyn Db, diagnostics: Vec<Diagnostic>) {
+    fn report_diagnostics(&mut self, db: &ProjectDatabase, diagnostics: Vec<Diagnostic>) {
         let mut by_file: BTreeMap<File, Vec<Diagnostic>> = BTreeMap::new();
 
         for diagnostic in diagnostics {
@@ -286,12 +277,39 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
             }
         }
 
-        let response = self.response.get_mut().unwrap();
+        let response = &mut self.state.get_mut().unwrap().response;
 
         for (file, diagnostics) in by_file {
             response.write_diagnostics_for_file(db, file, &diagnostics);
         }
         response.maybe_flush();
+    }
+}
+
+struct ProgressReporterState<'a> {
+    total_files: usize,
+    checked_files: usize,
+    last_response_sent: Instant,
+    response: ResponseWriter<'a>,
+}
+
+impl ProgressReporterState<'_> {
+    fn report_progress(&self, work_done: &LazyWorkDoneProgress) {
+        let checked = self.checked_files;
+        let total = self.total_files;
+
+        #[allow(clippy::cast_possible_truncation)]
+        let percentage = if total > 0 {
+            Some((checked * 100 / total) as u32)
+        } else {
+            None
+        };
+
+        work_done.report_progress(format!("{checked}/{total} files"), percentage);
+
+        if checked == total {
+            work_done.set_finish_message(format!("Checked {total} files"));
+        }
     }
 }
 
@@ -303,7 +321,7 @@ struct ResponseWriter<'a> {
     // It's important that we use `AnySystemPath` over `Url` here because
     // `file_to_url` isn't guaranteed to return the exact same URL as the one provided
     // by the client.
-    previous_result_ids: FxHashMap<AnySystemPath, (Url, String)>,
+    previous_result_ids: FxHashMap<DocumentKey, (Url, String)>,
 }
 
 impl<'a> ResponseWriter<'a> {
@@ -332,12 +350,7 @@ impl<'a> ResponseWriter<'a> {
 
         let previous_result_ids = previous_result_ids
             .into_iter()
-            .filter_map(|prev| {
-                Some((
-                    AnySystemPath::try_from_url(&prev.uri).ok()?,
-                    (prev.uri, prev.value),
-                ))
-            })
+            .map(|prev| (DocumentKey::from_url(&prev.uri), (prev.uri, prev.value)))
             .collect();
 
         Self {
@@ -348,25 +361,35 @@ impl<'a> ResponseWriter<'a> {
         }
     }
 
-    fn write_diagnostics_for_file(&mut self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]) {
+    fn write_diagnostics_for_file(
+        &mut self,
+        db: &ProjectDatabase,
+        file: File,
+        diagnostics: &[Diagnostic],
+    ) {
         let Some(url) = file_to_url(db, file) else {
             tracing::debug!("Failed to convert file path to URL at {}", file.path(db));
             return;
         };
 
+        if source_text(db, file).is_notebook() {
+            // Notebooks only support publish diagnostics.
+            // and we can't convert text ranges to notebook ranges unless
+            // the document is open in the editor, in which case
+            // we publish the diagnostics already.
+            return;
+        }
+
+        let key = DocumentKey::from_url(&url);
         let version = self
             .index
-            .key_from_url(url.clone())
-            .ok()
-            .and_then(|key| self.index.make_document_ref(key).ok())
-            .map(|doc| i64::from(doc.version()));
+            .document_handle(&url)
+            .map(|doc| i64::from(doc.version()))
+            .ok();
 
         let result_id = Diagnostics::result_id_from_hash(diagnostics);
 
-        let previous_result_id = AnySystemPath::try_from_url(&url)
-            .ok()
-            .and_then(|path| self.previous_result_ids.remove(&path))
-            .map(|(_url, id)| id);
+        let previous_result_id = self.previous_result_ids.remove(&key).map(|(_url, id)| id);
 
         let report = match result_id {
             Some(new_id) if Some(&new_id) == previous_result_id.as_ref() => {
@@ -383,7 +406,7 @@ impl<'a> ResponseWriter<'a> {
             new_id => {
                 let lsp_diagnostics = diagnostics
                     .iter()
-                    .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, self.position_encoding))
+                    .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, self.position_encoding).1)
                     .collect::<Vec<_>>();
 
                 WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {
@@ -430,13 +453,12 @@ impl<'a> ResponseWriter<'a> {
 
         // Handle files that had diagnostics in previous request but no longer have any
         // Any remaining entries in previous_results are files that were fixed
-        for (previous_url, previous_result_id) in self.previous_result_ids.into_values() {
+        for (key, (previous_url, previous_result_id)) in self.previous_result_ids {
             // This file had diagnostics before but doesn't now, so we need to report it as having no diagnostics
             let version = self
                 .index
-                .key_from_url(previous_url.clone())
+                .document(&key)
                 .ok()
-                .and_then(|key| self.index.make_document_ref(key).ok())
                 .map(|doc| i64::from(doc.version()));
 
             let new_result_id = Diagnostics::result_id_from_hash(&[]);

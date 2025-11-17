@@ -17,6 +17,990 @@ def f(x: MyInt):
 f(1)
 ```
 
+## None
+
+```py
+MyNone = None
+
+def g(x: MyNone):
+    reveal_type(x)  # revealed: None
+
+g(None)
+```
+
+## Unions
+
+We also support unions in type aliases:
+
+```py
+from typing_extensions import Any, Never, Literal, LiteralString, Tuple, Annotated, Optional, Union
+from ty_extensions import Unknown
+
+IntOrStr = int | str
+IntOrStrOrBytes1 = int | str | bytes
+IntOrStrOrBytes2 = (int | str) | bytes
+IntOrStrOrBytes3 = int | (str | bytes)
+IntOrStrOrBytes4 = IntOrStr | bytes
+IntOrStrOrBytes5 = int | Union[str, bytes]
+IntOrStrOrBytes6 = Union[int, str] | bytes
+BytesOrIntOrStr = bytes | IntOrStr
+IntOrNone = int | None
+NoneOrInt = None | int
+IntOrStrOrNone = IntOrStr | None
+NoneOrIntOrStr = None | IntOrStr
+IntOrAny = int | Any
+AnyOrInt = Any | int
+NoneOrAny = None | Any
+AnyOrNone = Any | None
+NeverOrAny = Never | Any
+AnyOrNever = Any | Never
+UnknownOrInt = Unknown | int
+IntOrUnknown = int | Unknown
+StrOrZero = str | Literal[0]
+ZeroOrStr = Literal[0] | str
+LiteralStringOrInt = LiteralString | int
+IntOrLiteralString = int | LiteralString
+NoneOrTuple = None | Tuple[int, str]
+TupleOrNone = Tuple[int, str] | None
+IntOrAnnotated = int | Annotated[str, "meta"]
+AnnotatedOrInt = Annotated[str, "meta"] | int
+IntOrOptional = int | Optional[str]
+OptionalOrInt = Optional[str] | int
+IntOrTypeOfStr = int | type[str]
+TypeOfStrOrInt = type[str] | int
+
+reveal_type(IntOrStr)  # revealed: types.UnionType
+reveal_type(IntOrStrOrBytes1)  # revealed: types.UnionType
+reveal_type(IntOrStrOrBytes2)  # revealed: types.UnionType
+reveal_type(IntOrStrOrBytes3)  # revealed: types.UnionType
+reveal_type(IntOrStrOrBytes4)  # revealed: types.UnionType
+reveal_type(IntOrStrOrBytes5)  # revealed: types.UnionType
+reveal_type(IntOrStrOrBytes6)  # revealed: types.UnionType
+reveal_type(BytesOrIntOrStr)  # revealed: types.UnionType
+reveal_type(IntOrNone)  # revealed: types.UnionType
+reveal_type(NoneOrInt)  # revealed: types.UnionType
+reveal_type(IntOrStrOrNone)  # revealed: types.UnionType
+reveal_type(NoneOrIntOrStr)  # revealed: types.UnionType
+reveal_type(IntOrAny)  # revealed: types.UnionType
+reveal_type(AnyOrInt)  # revealed: types.UnionType
+reveal_type(NoneOrAny)  # revealed: types.UnionType
+reveal_type(AnyOrNone)  # revealed: types.UnionType
+reveal_type(NeverOrAny)  # revealed: types.UnionType
+reveal_type(AnyOrNever)  # revealed: types.UnionType
+reveal_type(UnknownOrInt)  # revealed: types.UnionType
+reveal_type(IntOrUnknown)  # revealed: types.UnionType
+reveal_type(StrOrZero)  # revealed: types.UnionType
+reveal_type(ZeroOrStr)  # revealed: types.UnionType
+reveal_type(IntOrLiteralString)  # revealed: types.UnionType
+reveal_type(LiteralStringOrInt)  # revealed: types.UnionType
+reveal_type(NoneOrTuple)  # revealed: types.UnionType
+reveal_type(TupleOrNone)  # revealed: types.UnionType
+reveal_type(IntOrAnnotated)  # revealed: types.UnionType
+reveal_type(AnnotatedOrInt)  # revealed: types.UnionType
+reveal_type(IntOrOptional)  # revealed: types.UnionType
+reveal_type(OptionalOrInt)  # revealed: types.UnionType
+reveal_type(IntOrTypeOfStr)  # revealed: types.UnionType
+reveal_type(TypeOfStrOrInt)  # revealed: types.UnionType
+
+def _(
+    int_or_str: IntOrStr,
+    int_or_str_or_bytes1: IntOrStrOrBytes1,
+    int_or_str_or_bytes2: IntOrStrOrBytes2,
+    int_or_str_or_bytes3: IntOrStrOrBytes3,
+    int_or_str_or_bytes4: IntOrStrOrBytes4,
+    int_or_str_or_bytes5: IntOrStrOrBytes5,
+    int_or_str_or_bytes6: IntOrStrOrBytes6,
+    bytes_or_int_or_str: BytesOrIntOrStr,
+    int_or_none: IntOrNone,
+    none_or_int: NoneOrInt,
+    int_or_str_or_none: IntOrStrOrNone,
+    none_or_int_or_str: NoneOrIntOrStr,
+    int_or_any: IntOrAny,
+    any_or_int: AnyOrInt,
+    none_or_any: NoneOrAny,
+    any_or_none: AnyOrNone,
+    never_or_any: NeverOrAny,
+    any_or_never: AnyOrNever,
+    unknown_or_int: UnknownOrInt,
+    int_or_unknown: IntOrUnknown,
+    str_or_zero: StrOrZero,
+    zero_or_str: ZeroOrStr,
+    literal_string_or_int: LiteralStringOrInt,
+    int_or_literal_string: IntOrLiteralString,
+    none_or_tuple: NoneOrTuple,
+    tuple_or_none: TupleOrNone,
+    int_or_annotated: IntOrAnnotated,
+    annotated_or_int: AnnotatedOrInt,
+    int_or_optional: IntOrOptional,
+    optional_or_int: OptionalOrInt,
+    int_or_type_of_str: IntOrTypeOfStr,
+    type_of_str_or_int: TypeOfStrOrInt,
+):
+    reveal_type(int_or_str)  # revealed: int | str
+    reveal_type(int_or_str_or_bytes1)  # revealed: int | str | bytes
+    reveal_type(int_or_str_or_bytes2)  # revealed: int | str | bytes
+    reveal_type(int_or_str_or_bytes3)  # revealed: int | str | bytes
+    reveal_type(int_or_str_or_bytes4)  # revealed: int | str | bytes
+    reveal_type(int_or_str_or_bytes5)  # revealed: int | str | bytes
+    reveal_type(int_or_str_or_bytes6)  # revealed: int | str | bytes
+    reveal_type(bytes_or_int_or_str)  # revealed: bytes | int | str
+    reveal_type(int_or_none)  # revealed: int | None
+    reveal_type(none_or_int)  # revealed: None | int
+    reveal_type(int_or_str_or_none)  # revealed: int | str | None
+    reveal_type(none_or_int_or_str)  # revealed: None | int | str
+    reveal_type(int_or_any)  # revealed: int | Any
+    reveal_type(any_or_int)  # revealed: Any | int
+    reveal_type(none_or_any)  # revealed: None | Any
+    reveal_type(any_or_none)  # revealed: Any | None
+    reveal_type(never_or_any)  # revealed: Any
+    reveal_type(any_or_never)  # revealed: Any
+    reveal_type(unknown_or_int)  # revealed: Unknown | int
+    reveal_type(int_or_unknown)  # revealed: int | Unknown
+    reveal_type(str_or_zero)  # revealed: str | Literal[0]
+    reveal_type(zero_or_str)  # revealed: Literal[0] | str
+    reveal_type(literal_string_or_int)  # revealed: LiteralString | int
+    reveal_type(int_or_literal_string)  # revealed: int | LiteralString
+    reveal_type(none_or_tuple)  # revealed: None | tuple[int, str]
+    reveal_type(tuple_or_none)  # revealed: tuple[int, str] | None
+    reveal_type(int_or_annotated)  # revealed: int | str
+    reveal_type(annotated_or_int)  # revealed: str | int
+    reveal_type(int_or_optional)  # revealed: int | str | None
+    reveal_type(optional_or_int)  # revealed: str | None | int
+    reveal_type(int_or_type_of_str)  # revealed: int | type[str]
+    reveal_type(type_of_str_or_int)  # revealed: type[str] | int
+```
+
+If a type is unioned with itself in a value expression, the result is just that type. No
+`types.UnionType` instance is created:
+
+```py
+IntOrInt = int | int
+ListOfIntOrListOfInt = list[int] | list[int]
+
+reveal_type(IntOrInt)  # revealed: <class 'int'>
+reveal_type(ListOfIntOrListOfInt)  # revealed: <class 'list[int]'>
+
+def _(int_or_int: IntOrInt, list_of_int_or_list_of_int: ListOfIntOrListOfInt):
+    reveal_type(int_or_int)  # revealed: int
+    reveal_type(list_of_int_or_list_of_int)  # revealed: list[int]
+```
+
+`NoneType` has no special or-operator behavior, so this is an error:
+
+```py
+None | None  # error: [unsupported-operator] "Operator `|` is unsupported between objects of type `None` and `None`"
+```
+
+When constructing something nonsensical like `int | 1`, we emit a diagnostic for the expression
+itself, as it leads to a `TypeError` at runtime. The result of the expression is then inferred as
+`Unknown`, so we permit it to be used in a type expression.
+
+```py
+IntOrOne = int | 1  # error: [unsupported-operator]
+
+reveal_type(IntOrOne)  # revealed: Unknown
+
+def _(int_or_one: IntOrOne):
+    reveal_type(int_or_one)  # revealed: Unknown
+```
+
+If you were to somehow get hold of an opaque instance of `types.UnionType`, that could not be used
+as a type expression:
+
+```py
+from types import UnionType
+
+def f(SomeUnionType: UnionType):
+    # error: [invalid-type-form] "Variable of type `UnionType` is not allowed in a type expression"
+    some_union: SomeUnionType
+
+f(int | str)
+```
+
+## `|` operator between class objects and non-class objects
+
+Using the `|` operator between a class object and a non-class object does not create a `UnionType`
+instance; it calls the relevant dunder as normal:
+
+```py
+class Foo:
+    def __or__(self, other) -> str:
+        return "foo"
+
+reveal_type(Foo() | int)  # revealed: str
+reveal_type(Foo() | list[int])  # revealed: str
+
+class Bar:
+    def __ror__(self, other) -> str:
+        return "bar"
+
+reveal_type(int | Bar())  # revealed: str
+reveal_type(list[int] | Bar())  # revealed: str
+
+class Invalid:
+    def __or__(self, other: "Invalid") -> str:
+        return "Invalid"
+
+    def __ror__(self, other: "Invalid") -> str:
+        return "Invalid"
+
+# error: [unsupported-operator]
+reveal_type(int | Invalid())  # revealed: Unknown
+# error: [unsupported-operator]
+reveal_type(Invalid() | list[int])  # revealed: Unknown
+```
+
+## Custom `__(r)or__` methods on metaclasses are only partially respected
+
+A drawback of our extensive special casing of `|` operations between class objects is that
+`__(r)or__` methods on metaclasses are completely disregarded if two classes are `|`'d together. We
+respect the metaclass dunder if a class is `|`'d with a non-class, however:
+
+```py
+class Meta(type):
+    def __or__(self, other) -> str:
+        return "Meta"
+
+class Foo(metaclass=Meta): ...
+class Bar(metaclass=Meta): ...
+
+X = Foo | Bar
+
+# In an ideal world, perhaps we would respect `Meta.__or__` here and reveal `str`?
+# But we still need to record what the elements are, since (according to the typing spec)
+# `X` is still a valid type alias
+reveal_type(X)  # revealed: types.UnionType
+
+def f(obj: X):
+    reveal_type(obj)  # revealed: Foo | Bar
+
+# We do respect the metaclass `__or__` if it's used between a class and a non-class, however:
+
+Y = Foo | 42
+reveal_type(Y)  # revealed: str
+
+Z = Bar | 56
+reveal_type(Z)  # revealed: str
+
+def g(
+    arg1: Y,  # error: [invalid-type-form]
+    arg2: Z,  # error: [invalid-type-form]
+): ...
+```
+
+## `|` unions in stubs and `TYPE_CHECKING` blocks
+
+In runtime contexts, `|` unions are only permitted on Python 3.10+. But in suites of code that are
+never executed at runtime (stub files, `if TYPE_CHECKING` blocks, and stringified annotations), they
+are permitted even if the target version is set to Python 3.9 or earlier.
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+`bar.pyi`:
+
+```pyi
+Z = int | str
+GLOBAL_CONSTANT: Z
+```
+
+`foo.py`:
+
+```py
+from typing import TYPE_CHECKING
+from bar import GLOBAL_CONSTANT
+
+reveal_type(GLOBAL_CONSTANT)  # revealed: int | str
+
+if TYPE_CHECKING:
+    class ItsQuiteCloudyInManchester:
+        X = int | str
+
+        def f(obj: X):
+            reveal_type(obj)  # revealed: int | str
+
+    # TODO: we currently only understand code as being inside a `TYPE_CHECKING` block
+    # if a whole *scope* is inside the `if TYPE_CHECKING` block
+    # (like the `ItsQuiteCloudyInManchester` class above); this is a false-positive
+    Y = int | str  # error: [unsupported-operator]
+
+    def g(obj: Y):
+        # TODO: should be `int | str`
+        reveal_type(obj)  # revealed: Unknown
+
+Y = list["int | str"]
+
+def g(obj: Y):
+    reveal_type(obj)  # revealed: list[int | str]
+```
+
+## Generic types
+
+Implicit type aliases can also refer to generic types:
+
+```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+
+MyList = list[T]
+
+def _(my_list: MyList[int]):
+    # TODO: This should be `list[int]`
+    reveal_type(my_list)  # revealed: @Todo(unknown type subscript)
+
+ListOrTuple = list[T] | tuple[T, ...]
+
+reveal_type(ListOrTuple)  # revealed: types.UnionType
+
+def _(list_or_tuple: ListOrTuple[int]):
+    reveal_type(list_or_tuple)  # revealed: @Todo(Generic specialization of types.UnionType)
+```
+
+## `Literal`s
+
+We also support `typing.Literal` in implicit type aliases.
+
+```py
+from typing import Literal
+from enum import Enum
+
+IntLiteral1 = Literal[26]
+IntLiteral2 = Literal[0x1A]
+IntLiterals = Literal[-1, 0, 1]
+NestedLiteral = Literal[Literal[1]]
+StringLiteral = Literal["a"]
+BytesLiteral = Literal[b"b"]
+BoolLiteral = Literal[True]
+MixedLiterals = Literal[1, "a", True, None]
+
+class Color(Enum):
+    RED = 0
+    GREEN = 1
+    BLUE = 2
+
+EnumLiteral = Literal[Color.RED]
+
+def _(
+    int_literal1: IntLiteral1,
+    int_literal2: IntLiteral2,
+    int_literals: IntLiterals,
+    nested_literal: NestedLiteral,
+    string_literal: StringLiteral,
+    bytes_literal: BytesLiteral,
+    bool_literal: BoolLiteral,
+    mixed_literals: MixedLiterals,
+    enum_literal: EnumLiteral,
+):
+    reveal_type(int_literal1)  # revealed: Literal[26]
+    reveal_type(int_literal2)  # revealed: Literal[26]
+    reveal_type(int_literals)  # revealed: Literal[-1, 0, 1]
+    reveal_type(nested_literal)  # revealed: Literal[1]
+    reveal_type(string_literal)  # revealed: Literal["a"]
+    reveal_type(bytes_literal)  # revealed: Literal[b"b"]
+    reveal_type(bool_literal)  # revealed: Literal[True]
+    reveal_type(mixed_literals)  # revealed: Literal[1, "a", True] | None
+    reveal_type(enum_literal)  # revealed: Literal[Color.RED]
+```
+
+We reject invalid uses:
+
+```py
+# error: [invalid-type-form] "Type arguments for `Literal` must be `None`, a literal value (int, bool, str, or bytes), or an enum member"
+LiteralInt = Literal[int]
+
+reveal_type(LiteralInt)  # revealed: Unknown
+
+def _(weird: LiteralInt):
+    reveal_type(weird)  # revealed: Unknown
+
+# error: [invalid-type-form] "`Literal[26]` is not a generic class"
+def _(weird: IntLiteral1[int]):
+    reveal_type(weird)  # revealed: Unknown
+```
+
+## `Annotated`
+
+Basic usage:
+
+```py
+from typing import Annotated
+
+MyAnnotatedInt = Annotated[int, "some metadata", 1, 2, 3]
+
+def _(annotated_int: MyAnnotatedInt):
+    reveal_type(annotated_int)  # revealed: int
+```
+
+Usage with generics:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+Deprecated = Annotated[T, "deprecated attribute"]
+
+class C:
+    old: Deprecated[int]
+
+# TODO: Should be `int`
+reveal_type(C().old)  # revealed: @Todo(Generic specialization of typing.Annotated)
+```
+
+If the metadata argument is missing, we emit an error (because this code fails at runtime), but
+still use the first element as the type, when used in annotations:
+
+```py
+# error: [invalid-type-form] "Special form `typing.Annotated` expected at least 2 arguments (one type and at least one metadata element)"
+WronglyAnnotatedInt = Annotated[int]
+
+def _(wrongly_annotated_int: WronglyAnnotatedInt):
+    reveal_type(wrongly_annotated_int)  # revealed: int
+```
+
+## `Optional`
+
+Starting with Python 3.14, `Optional[int]` creates an instance of `typing.Union`, which is an alias
+for `types.UnionType`. We only support this new behavior and do not attempt to model the details of
+the pre-3.14 behavior:
+
+```py
+from typing import Optional
+
+MyOptionalInt = Optional[int]
+
+reveal_type(MyOptionalInt)  # revealed: types.UnionType
+
+def _(optional_int: MyOptionalInt):
+    reveal_type(optional_int)  # revealed: int | None
+```
+
+A special case is `Optional[None]`, which is equivalent to `None`:
+
+```py
+JustNone = Optional[None]
+
+reveal_type(JustNone)  # revealed: None
+
+def _(just_none: JustNone):
+    reveal_type(just_none)  # revealed: None
+```
+
+Invalid uses:
+
+```py
+# error: [invalid-type-form] "`typing.Optional` requires exactly one argument"
+Optional[int, str]
+```
+
+## `LiteralString`, `NoReturn`, `Never`
+
+```py
+from typing_extensions import LiteralString, NoReturn, Never
+
+MyLiteralString = LiteralString
+MyNoReturn = NoReturn
+MyNever = Never
+
+reveal_type(MyLiteralString)  # revealed: typing.LiteralString
+reveal_type(MyNoReturn)  # revealed: typing.NoReturn
+reveal_type(MyNever)  # revealed: typing.Never
+
+def _(
+    ls: MyLiteralString,
+    nr: MyNoReturn,
+    nv: MyNever,
+):
+    reveal_type(ls)  # revealed: LiteralString
+    reveal_type(nr)  # revealed: Never
+    reveal_type(nv)  # revealed: Never
+```
+
+## `Tuple`
+
+We support implicit type aliases using `typing.Tuple`:
+
+```py
+from typing import Tuple
+
+IntAndStr = Tuple[int, str]
+SingleInt = Tuple[int]
+Ints = Tuple[int, ...]
+EmptyTuple = Tuple[()]
+
+def _(int_and_str: IntAndStr, single_int: SingleInt, ints: Ints, empty_tuple: EmptyTuple):
+    reveal_type(int_and_str)  # revealed: tuple[int, str]
+    reveal_type(single_int)  # revealed: tuple[int]
+    reveal_type(ints)  # revealed: tuple[int, ...]
+    reveal_type(empty_tuple)  # revealed: tuple[()]
+```
+
+Invalid uses cause diagnostics:
+
+```py
+from typing import Tuple
+
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+Invalid = Tuple[int, 1]
+
+def _(invalid: Invalid):
+    reveal_type(invalid)  # revealed: tuple[int, Unknown]
+```
+
+## `Union`
+
+We support implicit type aliases using `typing.Union`:
+
+```py
+from typing import Union
+
+IntOrStr = Union[int, str]
+IntOrStrOrBytes = Union[int, Union[str, bytes]]
+
+reveal_type(IntOrStr)  # revealed: types.UnionType
+reveal_type(IntOrStrOrBytes)  # revealed: types.UnionType
+
+def _(
+    int_or_str: IntOrStr,
+    int_or_str_or_bytes: IntOrStrOrBytes,
+):
+    reveal_type(int_or_str)  # revealed: int | str
+    reveal_type(int_or_str_or_bytes)  # revealed: int | str | bytes
+```
+
+If a single type is given, no `types.UnionType` instance is created:
+
+```py
+JustInt = Union[int]
+
+reveal_type(JustInt)  # revealed: <class 'int'>
+
+def _(just_int: JustInt):
+    reveal_type(just_int)  # revealed: int
+```
+
+An empty `typing.Union` leads to a `TypeError` at runtime, so we emit an error. We still infer
+`Never` when used as a type expression, which seems reasonable for an empty union:
+
+```py
+# error: [invalid-type-form] "`typing.Union` requires at least one type argument"
+EmptyUnion = Union[()]
+
+reveal_type(EmptyUnion)  # revealed: types.UnionType
+
+def _(empty: EmptyUnion):
+    reveal_type(empty)  # revealed: Never
+```
+
+Other invalid uses are also caught:
+
+```py
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+Invalid = Union[str, 1]
+
+def _(
+    invalid: Invalid,
+):
+    reveal_type(invalid)  # revealed: str | Unknown
+```
+
+## `type[…]` and `Type[…]`
+
+### `type[…]`
+
+We support implicit type aliases using `type[…]`:
+
+```py
+from typing import Any, Union, Protocol, TypeVar, Generic
+
+T = TypeVar("T")
+
+class A: ...
+class B: ...
+class G(Generic[T]): ...
+
+class P(Protocol):
+    def method(self) -> None: ...
+
+SubclassOfA = type[A]
+SubclassOfAny = type[Any]
+SubclassOfAOrB1 = type[A | B]
+SubclassOfAOrB2 = type[A] | type[B]
+SubclassOfAOrB3 = Union[type[A], type[B]]
+SubclassOfG = type[G]
+SubclassOfGInt = type[G[int]]
+SubclassOfP = type[P]
+
+reveal_type(SubclassOfA)  # revealed: GenericAlias
+reveal_type(SubclassOfAny)  # revealed: GenericAlias
+reveal_type(SubclassOfAOrB1)  # revealed: GenericAlias
+reveal_type(SubclassOfAOrB2)  # revealed: types.UnionType
+reveal_type(SubclassOfAOrB3)  # revealed: types.UnionType
+reveal_type(SubclassOfG)  # revealed: GenericAlias
+reveal_type(SubclassOfGInt)  # revealed: GenericAlias
+reveal_type(SubclassOfP)  # revealed: GenericAlias
+
+def _(
+    subclass_of_a: SubclassOfA,
+    subclass_of_any: SubclassOfAny,
+    subclass_of_a_or_b1: SubclassOfAOrB1,
+    subclass_of_a_or_b2: SubclassOfAOrB2,
+    subclass_of_a_or_b3: SubclassOfAOrB3,
+    subclass_of_g: SubclassOfG,
+    subclass_of_g_int: SubclassOfGInt,
+    subclass_of_p: SubclassOfP,
+):
+    reveal_type(subclass_of_a)  # revealed: type[A]
+    reveal_type(subclass_of_a())  # revealed: A
+
+    reveal_type(subclass_of_any)  # revealed: type[Any]
+    reveal_type(subclass_of_any())  # revealed: Any
+
+    reveal_type(subclass_of_a_or_b1)  # revealed: type[A] | type[B]
+    reveal_type(subclass_of_a_or_b1())  # revealed: A | B
+
+    reveal_type(subclass_of_a_or_b2)  # revealed: type[A] | type[B]
+    reveal_type(subclass_of_a_or_b2())  # revealed: A | B
+
+    reveal_type(subclass_of_a_or_b3)  # revealed: type[A] | type[B]
+    reveal_type(subclass_of_a_or_b3())  # revealed: A | B
+
+    reveal_type(subclass_of_g)  # revealed: type[G[Unknown]]
+    reveal_type(subclass_of_g())  # revealed: G[Unknown]
+
+    reveal_type(subclass_of_g_int)  # revealed: type[G[int]]
+    reveal_type(subclass_of_g_int())  # revealed: G[int]
+
+    reveal_type(subclass_of_p)  # revealed: type[P]
+```
+
+Invalid uses result in diagnostics:
+
+```py
+from typing import Literal
+
+# error: [invalid-type-form]
+InvalidSubclassOf1 = type[1]
+
+# TODO: This should be an error
+InvalidSubclassOfLiteral = type[Literal[42]]
+
+def _(
+    invalid_subclass_of_1: InvalidSubclassOf1,
+    invalid_subclass_of_literal: InvalidSubclassOfLiteral,
+):
+    reveal_type(invalid_subclass_of_1)  # revealed: type[Unknown]
+    # TODO: this should be `type[Unknown]` or `Unknown`
+    reveal_type(invalid_subclass_of_literal)  # revealed: <class 'int'>
+```
+
+### `Type[…]`
+
+The same also works for `typing.Type[…]`:
+
+```py
+from typing import Any, Union, Protocol, TypeVar, Generic, Type
+
+T = TypeVar("T")
+
+class A: ...
+class B: ...
+class G(Generic[T]): ...
+
+class P(Protocol):
+    def method(self) -> None: ...
+
+SubclassOfA = Type[A]
+SubclassOfAny = Type[Any]
+SubclassOfAOrB1 = Type[A | B]
+SubclassOfAOrB2 = Type[A] | Type[B]
+SubclassOfAOrB3 = Union[Type[A], Type[B]]
+SubclassOfG = Type[G]
+SubclassOfGInt = Type[G[int]]
+SubclassOfP = Type[P]
+
+reveal_type(SubclassOfA)  # revealed: GenericAlias
+reveal_type(SubclassOfAny)  # revealed: GenericAlias
+reveal_type(SubclassOfAOrB1)  # revealed: GenericAlias
+reveal_type(SubclassOfAOrB2)  # revealed: types.UnionType
+reveal_type(SubclassOfAOrB3)  # revealed: types.UnionType
+reveal_type(SubclassOfG)  # revealed: GenericAlias
+reveal_type(SubclassOfGInt)  # revealed: GenericAlias
+reveal_type(SubclassOfP)  # revealed: GenericAlias
+
+def _(
+    subclass_of_a: SubclassOfA,
+    subclass_of_any: SubclassOfAny,
+    subclass_of_a_or_b1: SubclassOfAOrB1,
+    subclass_of_a_or_b2: SubclassOfAOrB2,
+    subclass_of_a_or_b3: SubclassOfAOrB3,
+    subclass_of_g: SubclassOfG,
+    subclass_of_g_int: SubclassOfGInt,
+    subclass_of_p: SubclassOfP,
+):
+    reveal_type(subclass_of_a)  # revealed: type[A]
+    reveal_type(subclass_of_a())  # revealed: A
+
+    reveal_type(subclass_of_any)  # revealed: type[Any]
+    reveal_type(subclass_of_any())  # revealed: Any
+
+    reveal_type(subclass_of_a_or_b1)  # revealed: type[A] | type[B]
+    reveal_type(subclass_of_a_or_b1())  # revealed: A | B
+
+    reveal_type(subclass_of_a_or_b2)  # revealed: type[A] | type[B]
+    reveal_type(subclass_of_a_or_b2())  # revealed: A | B
+
+    reveal_type(subclass_of_a_or_b3)  # revealed: type[A] | type[B]
+    reveal_type(subclass_of_a_or_b3())  # revealed: A | B
+
+    reveal_type(subclass_of_g)  # revealed: type[G[Unknown]]
+    reveal_type(subclass_of_g())  # revealed: G[Unknown]
+
+    reveal_type(subclass_of_g_int)  # revealed: type[G[int]]
+    reveal_type(subclass_of_g_int())  # revealed: G[int]
+
+    reveal_type(subclass_of_p)  # revealed: type[P]
+```
+
+Invalid uses result in diagnostics:
+
+```py
+# error: [invalid-type-form]
+InvalidSubclass = Type[1]
+```
+
+## Other `typing` special forms
+
+The following special forms from the `typing` module are also supported in implicit type aliases:
+
+```py
+from typing import List, Dict, Set, FrozenSet, ChainMap, Counter, DefaultDict, Deque, OrderedDict
+
+MyList = List[str]
+MySet = Set[str]
+MyDict = Dict[str, int]
+MyFrozenSet = FrozenSet[str]
+MyChainMap = ChainMap[str, int]
+MyCounter = Counter[str]
+MyDefaultDict = DefaultDict[str, int]
+MyDeque = Deque[str]
+MyOrderedDict = OrderedDict[str, int]
+
+reveal_type(MyList)  # revealed: <class 'list[str]'>
+reveal_type(MySet)  # revealed: <class 'set[str]'>
+reveal_type(MyDict)  # revealed: <class 'dict[str, int]'>
+reveal_type(MyFrozenSet)  # revealed: <class 'frozenset[str]'>
+reveal_type(MyChainMap)  # revealed: <class 'ChainMap[str, int]'>
+reveal_type(MyCounter)  # revealed: <class 'Counter[str]'>
+reveal_type(MyDefaultDict)  # revealed: <class 'defaultdict[str, int]'>
+reveal_type(MyDeque)  # revealed: <class 'deque[str]'>
+reveal_type(MyOrderedDict)  # revealed: <class 'OrderedDict[str, int]'>
+
+def _(
+    my_list: MyList,
+    my_set: MySet,
+    my_dict: MyDict,
+    my_frozen_set: MyFrozenSet,
+    my_chain_map: MyChainMap,
+    my_counter: MyCounter,
+    my_default_dict: MyDefaultDict,
+    my_deque: MyDeque,
+    my_ordered_dict: MyOrderedDict,
+):
+    reveal_type(my_list)  # revealed: list[str]
+    reveal_type(my_set)  # revealed: set[str]
+    reveal_type(my_dict)  # revealed: dict[str, int]
+    reveal_type(my_frozen_set)  # revealed: frozenset[str]
+    reveal_type(my_chain_map)  # revealed: ChainMap[str, int]
+    reveal_type(my_counter)  # revealed: Counter[str]
+    reveal_type(my_default_dict)  # revealed: defaultdict[str, int]
+    reveal_type(my_deque)  # revealed: deque[str]
+    reveal_type(my_ordered_dict)  # revealed: OrderedDict[str, int]
+```
+
+All of them are supported in unions:
+
+```py
+NoneOrList = None | List[str]
+NoneOrSet = None | Set[str]
+NoneOrDict = None | Dict[str, int]
+NoneOrFrozenSet = None | FrozenSet[str]
+NoneOrChainMap = None | ChainMap[str, int]
+NoneOrCounter = None | Counter[str]
+NoneOrDefaultDict = None | DefaultDict[str, int]
+NoneOrDeque = None | Deque[str]
+NoneOrOrderedDict = None | OrderedDict[str, int]
+
+ListOrNone = List[int] | None
+SetOrNone = Set[int] | None
+DictOrNone = Dict[str, int] | None
+FrozenSetOrNone = FrozenSet[int] | None
+ChainMapOrNone = ChainMap[str, int] | None
+CounterOrNone = Counter[str] | None
+DefaultDictOrNone = DefaultDict[str, int] | None
+DequeOrNone = Deque[str] | None
+OrderedDictOrNone = OrderedDict[str, int] | None
+
+reveal_type(NoneOrList)  # revealed: types.UnionType
+reveal_type(NoneOrSet)  # revealed: types.UnionType
+reveal_type(NoneOrDict)  # revealed: types.UnionType
+reveal_type(NoneOrFrozenSet)  # revealed: types.UnionType
+reveal_type(NoneOrChainMap)  # revealed: types.UnionType
+reveal_type(NoneOrCounter)  # revealed: types.UnionType
+reveal_type(NoneOrDefaultDict)  # revealed: types.UnionType
+reveal_type(NoneOrDeque)  # revealed: types.UnionType
+reveal_type(NoneOrOrderedDict)  # revealed: types.UnionType
+
+reveal_type(ListOrNone)  # revealed: types.UnionType
+reveal_type(SetOrNone)  # revealed: types.UnionType
+reveal_type(DictOrNone)  # revealed: types.UnionType
+reveal_type(FrozenSetOrNone)  # revealed: types.UnionType
+reveal_type(ChainMapOrNone)  # revealed: types.UnionType
+reveal_type(CounterOrNone)  # revealed: types.UnionType
+reveal_type(DefaultDictOrNone)  # revealed: types.UnionType
+reveal_type(DequeOrNone)  # revealed: types.UnionType
+reveal_type(OrderedDictOrNone)  # revealed: types.UnionType
+
+def _(
+    none_or_list: NoneOrList,
+    none_or_set: NoneOrSet,
+    none_or_dict: NoneOrDict,
+    none_or_frozen_set: NoneOrFrozenSet,
+    none_or_chain_map: NoneOrChainMap,
+    none_or_counter: NoneOrCounter,
+    none_or_default_dict: NoneOrDefaultDict,
+    none_or_deque: NoneOrDeque,
+    none_or_ordered_dict: NoneOrOrderedDict,
+    list_or_none: ListOrNone,
+    set_or_none: SetOrNone,
+    dict_or_none: DictOrNone,
+    frozen_set_or_none: FrozenSetOrNone,
+    chain_map_or_none: ChainMapOrNone,
+    counter_or_none: CounterOrNone,
+    default_dict_or_none: DefaultDictOrNone,
+    deque_or_none: DequeOrNone,
+    ordered_dict_or_none: OrderedDictOrNone,
+):
+    reveal_type(none_or_list)  # revealed: None | list[str]
+    reveal_type(none_or_set)  # revealed: None | set[str]
+    reveal_type(none_or_dict)  # revealed: None | dict[str, int]
+    reveal_type(none_or_frozen_set)  # revealed: None | frozenset[str]
+    reveal_type(none_or_chain_map)  # revealed: None | ChainMap[str, int]
+    reveal_type(none_or_counter)  # revealed: None | Counter[str]
+    reveal_type(none_or_default_dict)  # revealed: None | defaultdict[str, int]
+    reveal_type(none_or_deque)  # revealed: None | deque[str]
+    reveal_type(none_or_ordered_dict)  # revealed: None | OrderedDict[str, int]
+
+    reveal_type(list_or_none)  # revealed: list[int] | None
+    reveal_type(set_or_none)  # revealed: set[int] | None
+    reveal_type(dict_or_none)  # revealed: dict[str, int] | None
+    reveal_type(frozen_set_or_none)  # revealed: frozenset[int] | None
+    reveal_type(chain_map_or_none)  # revealed: ChainMap[str, int] | None
+    reveal_type(counter_or_none)  # revealed: Counter[str] | None
+    reveal_type(default_dict_or_none)  # revealed: defaultdict[str, int] | None
+    reveal_type(deque_or_none)  # revealed: deque[str] | None
+    reveal_type(ordered_dict_or_none)  # revealed: OrderedDict[str, int] | None
+```
+
+Invalid uses result in diagnostics:
+
+```py
+from typing import List, Dict
+
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+InvalidList = List[1]
+
+# error: [invalid-type-form] "`typing.typing.List` requires exactly one argument"
+ListTooManyArgs = List[int, str]
+
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+InvalidDict1 = Dict[1, str]
+
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+InvalidDict2 = Dict[str, 2]
+
+# error: [invalid-type-form] "`typing.typing.Dict` requires exactly two arguments, got 1"
+DictTooFewArgs = Dict[str]
+
+# error: [invalid-type-form] "`typing.typing.Dict` requires exactly two arguments, got 3"
+DictTooManyArgs = Dict[str, int, float]
+
+def _(
+    invalid_list: InvalidList,
+    list_too_many_args: ListTooManyArgs,
+    invalid_dict1: InvalidDict1,
+    invalid_dict2: InvalidDict2,
+    dict_too_few_args: DictTooFewArgs,
+    dict_too_many_args: DictTooManyArgs,
+):
+    reveal_type(invalid_list)  # revealed: list[Unknown]
+    reveal_type(list_too_many_args)  # revealed: list[Unknown]
+    reveal_type(invalid_dict1)  # revealed: dict[Unknown, str]
+    reveal_type(invalid_dict2)  # revealed: dict[str, Unknown]
+    reveal_type(dict_too_few_args)  # revealed: dict[str, Unknown]
+    reveal_type(dict_too_many_args)  # revealed: dict[Unknown, Unknown]
+```
+
+## Stringified annotations?
+
+From the [typing spec on type aliases](https://typing.python.org/en/latest/spec/aliases.html):
+
+> Type aliases may be as complex as type hints in annotations – anything that is acceptable as a
+> type hint is acceptable in a type alias
+
+However, no other type checker seems to support stringified annotations in implicit type aliases. We
+currently also do not support them, and we detect places where these attempted unions cause runtime
+errors:
+
+```py
+AliasForStr = "str"
+
+# error: [invalid-type-form] "Variable of type `Literal["str"]` is not allowed in a type expression"
+def _(s: AliasForStr):
+    reveal_type(s)  # revealed: Unknown
+
+IntOrStr = int | "str"  # error: [unsupported-operator]
+
+reveal_type(IntOrStr)  # revealed: Unknown
+
+def _(int_or_str: IntOrStr):
+    reveal_type(int_or_str)  # revealed: Unknown
+```
+
+We *do* support stringified annotations if they appear in a position where a type expression is
+syntactically expected:
+
+```py
+from typing import Union, List, Dict, Annotated
+
+ListOfInts1 = list["int"]
+ListOfInts2 = List["int"]
+StrOrStyle = Union[str, "Style"]
+SubclassOfStyle = type["Style"]
+DictStrToStyle = Dict[str, "Style"]
+AnnotatedStyle = Annotated["Style", "metadata"]
+
+class Style: ...
+
+def _(
+    list_of_ints1: ListOfInts1,
+    list_of_ints2: ListOfInts2,
+    str_or_style: StrOrStyle,
+    subclass_of_style: SubclassOfStyle,
+    dict_str_to_style: DictStrToStyle,
+    annotated_style: AnnotatedStyle,
+):
+    reveal_type(list_of_ints1)  # revealed: list[int]
+    reveal_type(list_of_ints2)  # revealed: list[int]
+    reveal_type(str_or_style)  # revealed: str | Style
+    reveal_type(subclass_of_style)  # revealed: type[Style]
+    reveal_type(dict_str_to_style)  # revealed: dict[str, Style]
+    reveal_type(annotated_style)  # revealed: Style
+```
+
 ## Recursive
 
 ### Old union syntax
@@ -38,8 +1022,27 @@ python-version = "3.12"
 ```
 
 ```py
-Recursive = list["Recursive" | None]
+from typing import List, Dict
 
-def _(r: Recursive):
-    reveal_type(r)  # revealed: list[Divergent]
+RecursiveList1 = list["RecursiveList1" | None]
+RecursiveList2 = List["RecursiveList2" | None]
+RecursiveDict1 = dict[str, "RecursiveDict1" | None]
+RecursiveDict2 = Dict[str, "RecursiveDict2" | None]
+RecursiveDict3 = dict["RecursiveDict3", int]
+RecursiveDict4 = Dict["RecursiveDict4", int]
+
+def _(
+    recursive_list1: RecursiveList1,
+    recursive_list2: RecursiveList2,
+    recursive_dict1: RecursiveDict1,
+    recursive_dict2: RecursiveDict2,
+    recursive_dict3: RecursiveDict3,
+    recursive_dict4: RecursiveDict4,
+):
+    reveal_type(recursive_list1)  # revealed: list[Divergent]
+    reveal_type(recursive_list2)  # revealed: list[Divergent]
+    reveal_type(recursive_dict1)  # revealed: dict[str, Divergent]
+    reveal_type(recursive_dict2)  # revealed: dict[str, Divergent]
+    reveal_type(recursive_dict3)  # revealed: dict[Divergent, int]
+    reveal_type(recursive_dict4)  # revealed: dict[Divergent, int]
 ```

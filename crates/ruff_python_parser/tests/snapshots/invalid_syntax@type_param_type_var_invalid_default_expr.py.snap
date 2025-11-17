@@ -29,8 +29,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 7..15,
                                         node_index: NodeIndex(None),
+                                        range: 7..15,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 7..8,
@@ -88,8 +88,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 30..41,
                                         node_index: NodeIndex(None),
+                                        range: 30..41,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 30..31,
@@ -148,8 +148,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 56..69,
                                         node_index: NodeIndex(None),
+                                        range: 56..69,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 56..57,
@@ -208,8 +208,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 84..100,
                                         node_index: NodeIndex(None),
+                                        range: 84..100,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 84..85,
@@ -266,8 +266,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 115..120,
                                         node_index: NodeIndex(None),
+                                        range: 115..120,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 115..116,
@@ -288,8 +288,8 @@ Module(
                                 ),
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 124..127,
                                         node_index: NodeIndex(None),
+                                        range: 124..127,
                                         name: Identifier {
                                             id: Name("int"),
                                             range: 124..127,
@@ -331,8 +331,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 142..155,
                                         node_index: NodeIndex(None),
+                                        range: 142..155,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 142..143,
@@ -417,7 +417,7 @@ Module(
 3 | type X[T = (yield x)] = int
 4 | type X[T = yield from x] = int
 5 | type X[T = x := int] = int
-  |              ^^ Syntax Error: Expected ',', found ':='
+  |              ^^ Syntax Error: Expected `,`, found `:=`
 6 | type X[T: int = *int] = int
   |
 

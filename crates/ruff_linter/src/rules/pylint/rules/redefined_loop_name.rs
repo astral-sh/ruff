@@ -49,6 +49,7 @@ use crate::checkers::ast::Checker;
 ///     print(f.readline())  # prints a line from path2
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.252")]
 pub(crate) struct RedefinedLoopName {
     name: String,
     outer_kind: OuterBindingKind,

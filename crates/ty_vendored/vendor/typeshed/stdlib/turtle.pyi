@@ -669,7 +669,7 @@ class TurtleScreen(TurtleScreenBase):
         ['arrow', 'blank', 'circle', ... , 'turtle']
         """
 
-    def onclick(self, fun: Callable[[float, float], object], btn: int = 1, add: Any | None = None) -> None:
+    def onclick(self, fun: Callable[[float, float], object], btn: int = 1, add: bool | None = None) -> None:
         """Bind fun to mouse-click event on canvas.
 
         Arguments:
@@ -2540,7 +2540,7 @@ def getshapes() -> list[str]:
     ['arrow', 'blank', 'circle', ... , 'turtle']
     """
 
-def onclick(fun: Callable[[float, float], object], btn: int = 1, add: Any | None = None) -> None:
+def onclick(fun: Callable[[float, float], object], btn: int = 1, add: bool | None = None) -> None:
     """Bind fun to mouse-click event on this turtle on canvas.
 
     Arguments:
@@ -3960,7 +3960,7 @@ def getturtle() -> Turtle:
 
 getpen = getturtle
 
-def onrelease(fun: Callable[[float, float], object], btn: int = 1, add: Any | None = None) -> None:
+def onrelease(fun: Callable[[float, float], object], btn: int = 1, add: bool | None = None) -> None:
     """Bind fun to mouse-button-release event on this turtle on canvas.
 
     Arguments:
@@ -3983,7 +3983,7 @@ def onrelease(fun: Callable[[float, float], object], btn: int = 1, add: Any | No
     transparent.
     """
 
-def ondrag(fun: Callable[[float, float], object], btn: int = 1, add: Any | None = None) -> None:
+def ondrag(fun: Callable[[float, float], object], btn: int = 1, add: bool | None = None) -> None:
     """Bind fun to mouse-move event on this turtle on canvas.
 
     Arguments:

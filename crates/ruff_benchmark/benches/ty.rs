@@ -667,7 +667,7 @@ fn attrs(criterion: &mut Criterion) {
             max_dep_date: "2025-06-17",
             python_version: PythonVersion::PY313,
         },
-        100,
+        110,
     );
 
     bench_project(&benchmark, criterion);
@@ -684,7 +684,7 @@ fn anyio(criterion: &mut Criterion) {
             max_dep_date: "2025-06-17",
             python_version: PythonVersion::PY313,
         },
-        100,
+        150,
     );
 
     bench_project(&benchmark, criterion);

@@ -64,9 +64,21 @@ from typing import (
     runtime_checkable,
     type_check_only,
 )
-from typing_extensions import Self, TypeAlias, Unpack, deprecated
+from typing_extensions import LiteralString, Self, TypeAlias, Unpack, deprecated
 
 from . import path as _path
+
+# Re-export common definitions from os.path to reduce duplication
+from .path import (
+    altsep as altsep,
+    curdir as curdir,
+    defpath as defpath,
+    devnull as devnull,
+    extsep as extsep,
+    pardir as pardir,
+    pathsep as pathsep,
+    sep as sep,
+)
 
 __all__ = [
     "F_OK",
@@ -697,19 +709,8 @@ if sys.platform != "win32":
     ST_NOSUID: Final[int]
     ST_RDONLY: Final[int]
 
-curdir: str
-pardir: str
-sep: str
-if sys.platform == "win32":
-    altsep: str
-else:
-    altsep: str | None
-extsep: str
-pathsep: str
-defpath: str
 linesep: Literal["\n", "\r\n"]
-devnull: str
-name: str
+name: LiteralString
 
 F_OK: Final = 0
 R_OK: Final = 4
@@ -751,6 +752,9 @@ class _Environ(MutableMapping[AnyStr, AnyStr], Generic[AnyStr]):
 environ: _Environ[str]
 if sys.platform != "win32":
     environb: _Environ[bytes]
+
+if sys.version_info >= (3, 14):
+    def reload_environ() -> None: ...
 
 if sys.version_info >= (3, 11) or sys.platform != "win32":
     EX_OK: Final[int]

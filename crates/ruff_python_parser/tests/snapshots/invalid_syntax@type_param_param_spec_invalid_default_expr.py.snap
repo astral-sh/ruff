@@ -29,8 +29,8 @@ Module(
                             type_params: [
                                 ParamSpec(
                                     TypeParamParamSpec {
-                                        range: 7..17,
                                         node_index: NodeIndex(None),
+                                        range: 7..17,
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 9..10,
@@ -87,8 +87,8 @@ Module(
                             type_params: [
                                 ParamSpec(
                                     TypeParamParamSpec {
-                                        range: 32..45,
                                         node_index: NodeIndex(None),
+                                        range: 32..45,
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 34..35,
@@ -146,8 +146,8 @@ Module(
                             type_params: [
                                 ParamSpec(
                                     TypeParamParamSpec {
-                                        range: 60..78,
                                         node_index: NodeIndex(None),
+                                        range: 60..78,
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 62..63,
@@ -203,8 +203,8 @@ Module(
                             type_params: [
                                 ParamSpec(
                                     TypeParamParamSpec {
-                                        range: 93..100,
                                         node_index: NodeIndex(None),
+                                        range: 93..100,
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 95..96,
@@ -224,8 +224,8 @@ Module(
                                 ),
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 104..107,
                                         node_index: NodeIndex(None),
+                                        range: 104..107,
                                         name: Identifier {
                                             id: Name("int"),
                                             range: 104..107,
@@ -267,8 +267,8 @@ Module(
                             type_params: [
                                 ParamSpec(
                                     TypeParamParamSpec {
-                                        range: 122..132,
                                         node_index: NodeIndex(None),
+                                        range: 122..132,
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 124..125,
@@ -343,7 +343,7 @@ Module(
 2 | type X[**P = yield x] = int
 3 | type X[**P = yield from x] = int
 4 | type X[**P = x := int] = int
-  |                ^^ Syntax Error: Expected ',', found ':='
+  |                ^^ Syntax Error: Expected `,`, found `:=`
 5 | type X[**P = *int] = int
   |
 

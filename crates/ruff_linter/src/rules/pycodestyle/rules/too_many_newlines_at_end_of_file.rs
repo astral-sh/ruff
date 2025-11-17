@@ -29,6 +29,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, checkers::ast::LintContext};
 /// spam(1)\n
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.3.3")]
 pub(crate) struct TooManyNewlinesAtEndOfFile {
     num_trailing_newlines: u32,
     in_notebook: bool,

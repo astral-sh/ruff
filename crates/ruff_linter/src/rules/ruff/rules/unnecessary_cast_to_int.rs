@@ -45,6 +45,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// overriding the `__round__`, `__ceil__`, `__floor__`, or `__trunc__` dunder methods
 /// such that they don't return an integer.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct UnnecessaryCastToInt;
 
 impl AlwaysFixableViolation for UnnecessaryCastToInt {

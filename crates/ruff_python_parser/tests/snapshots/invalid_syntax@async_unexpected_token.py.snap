@@ -148,8 +148,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 109..110,
                                     node_index: NodeIndex(None),
+                                    range: 109..110,
                                     pattern: None,
                                     name: None,
                                 },
@@ -181,7 +181,7 @@ Module(
 
   |
 1 | async class Foo: ...
-  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'class'
+  |       ^^^^^ Syntax Error: Expected `def`, `with` or `for` to follow `async`, found `class`
 2 | async while test: ...
 3 | async x = 1
   |
@@ -190,7 +190,7 @@ Module(
   |
 1 | async class Foo: ...
 2 | async while test: ...
-  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'while'
+  |       ^^^^^ Syntax Error: Expected `def`, `with` or `for` to follow `async`, found `while`
 3 | async x = 1
 4 | async async def foo(): ...
   |
@@ -200,7 +200,7 @@ Module(
 1 | async class Foo: ...
 2 | async while test: ...
 3 | async x = 1
-  |       ^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found name
+  |       ^ Syntax Error: Expected `def`, `with` or `for` to follow `async`, found name
 4 | async async def foo(): ...
 5 | async match test:
   |
@@ -210,7 +210,7 @@ Module(
 2 | async while test: ...
 3 | async x = 1
 4 | async async def foo(): ...
-  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'async'
+  |       ^^^^^ Syntax Error: Expected `def`, `with` or `for` to follow `async`, found `async`
 5 | async match test:
 6 |     case _: ...
   |
@@ -220,6 +220,6 @@ Module(
 3 | async x = 1
 4 | async async def foo(): ...
 5 | async match test:
-  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'match'
+  |       ^^^^^ Syntax Error: Expected `def`, `with` or `for` to follow `async`, found `match`
 6 |     case _: ...
   |

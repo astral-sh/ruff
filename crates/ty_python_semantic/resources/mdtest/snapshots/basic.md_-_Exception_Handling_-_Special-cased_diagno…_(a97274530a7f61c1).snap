@@ -1,0 +1,93 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: basic.md - Exception Handling - Special-cased diagnostics for `NotImplemented`
+mdtest path: crates/ty_python_semantic/resources/mdtest/exception/basic.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | try:
+ 2 |     # error: [invalid-raise]
+ 3 |     # error: [invalid-raise]
+ 4 |     raise NotImplemented from NotImplemented
+ 5 | # error: [invalid-exception-caught]
+ 6 | except NotImplemented:
+ 7 |     pass
+ 8 | # error: [invalid-exception-caught]
+ 9 | except (TypeError, NotImplemented):
+10 |     pass
+```
+
+# Diagnostics
+
+```
+error[invalid-raise]: Cannot raise `NotImplemented`
+ --> src/mdtest_snippet.py:4:11
+  |
+2 |     # error: [invalid-raise]
+3 |     # error: [invalid-raise]
+4 |     raise NotImplemented from NotImplemented
+  |           ^^^^^^^^^^^^^^ Did you mean `NotImplementedError`?
+5 | # error: [invalid-exception-caught]
+6 | except NotImplemented:
+  |
+info: Can only raise an instance or subclass of `BaseException`
+info: rule `invalid-raise` is enabled by default
+
+```
+
+```
+error[invalid-raise]: Cannot use `NotImplemented` as an exception cause
+ --> src/mdtest_snippet.py:4:31
+  |
+2 |     # error: [invalid-raise]
+3 |     # error: [invalid-raise]
+4 |     raise NotImplemented from NotImplemented
+  |                               ^^^^^^^^^^^^^^ Did you mean `NotImplementedError`?
+5 | # error: [invalid-exception-caught]
+6 | except NotImplemented:
+  |
+info: An exception cause must be an instance of `BaseException`, subclass of `BaseException`, or `None`
+info: rule `invalid-raise` is enabled by default
+
+```
+
+```
+error[invalid-exception-caught]: Cannot catch `NotImplemented` in an exception handler
+ --> src/mdtest_snippet.py:6:8
+  |
+4 |     raise NotImplemented from NotImplemented
+5 | # error: [invalid-exception-caught]
+6 | except NotImplemented:
+  |        ^^^^^^^^^^^^^^ Did you mean `NotImplementedError`?
+7 |     pass
+8 | # error: [invalid-exception-caught]
+  |
+info: Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses
+info: rule `invalid-exception-caught` is enabled by default
+
+```
+
+```
+error[invalid-exception-caught]: Invalid tuple caught in an exception handler
+  --> src/mdtest_snippet.py:9:8
+   |
+ 7 |     pass
+ 8 | # error: [invalid-exception-caught]
+ 9 | except (TypeError, NotImplemented):
+   |        ^^^^^^^^^^^^--------------^
+   |                    |
+   |                    Invalid element of type `NotImplementedType`
+   |                    Did you mean `NotImplementedError`?
+10 |     pass
+   |
+info: Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses
+info: rule `invalid-exception-caught` is enabled by default
+
+```

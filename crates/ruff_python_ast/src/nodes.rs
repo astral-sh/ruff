@@ -3,7 +3,7 @@
 use crate::AtomicNodeIndex;
 use crate::generated::{
     ExprBytesLiteral, ExprDict, ExprFString, ExprList, ExprName, ExprSet, ExprStringLiteral,
-    ExprTString, ExprTuple, StmtClassDef,
+    ExprTString, ExprTuple, PatternMatchAs, PatternMatchOr, StmtClassDef,
 };
 use std::borrow::Cow;
 use std::fmt;
@@ -2848,58 +2848,10 @@ pub enum IrrefutablePatternKind {
     Wildcard,
 }
 
-/// See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchValue {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub value: Box<Expr>,
-}
-
-/// See also [MatchSingleton](https://docs.python.org/3/library/ast.html#ast.MatchSingleton)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchSingleton {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub value: Singleton,
-}
-
-/// See also [MatchSequence](https://docs.python.org/3/library/ast.html#ast.MatchSequence)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchSequence {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub patterns: Vec<Pattern>,
-}
-
-/// See also [MatchMapping](https://docs.python.org/3/library/ast.html#ast.MatchMapping)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchMapping {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub keys: Vec<Expr>,
-    pub patterns: Vec<Pattern>,
-    pub rest: Option<Identifier>,
-}
-
-/// See also [MatchClass](https://docs.python.org/3/library/ast.html#ast.MatchClass)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchClass {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub cls: Box<Expr>,
-    pub arguments: PatternArguments,
-}
-
-/// An AST node to represent the arguments to a [`PatternMatchClass`], i.e., the
+/// An AST node to represent the arguments to a [`crate::PatternMatchClass`], i.e., the
 /// parenthesized contents in `case Point(1, x=0, y=0)`.
 ///
-/// Like [`Arguments`], but for [`PatternMatchClass`].
+/// Like [`Arguments`], but for [`crate::PatternMatchClass`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternArguments {
@@ -2909,10 +2861,10 @@ pub struct PatternArguments {
     pub keywords: Vec<PatternKeyword>,
 }
 
-/// An AST node to represent the keyword arguments to a [`PatternMatchClass`], i.e., the
+/// An AST node to represent the keyword arguments to a [`crate::PatternMatchClass`], i.e., the
 /// `x=0` and `y=0` in `case Point(x=0, y=0)`.
 ///
-/// Like [`Keyword`], but for [`PatternMatchClass`].
+/// Like [`Keyword`], but for [`crate::PatternMatchClass`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternKeyword {
@@ -2920,34 +2872,6 @@ pub struct PatternKeyword {
     pub node_index: AtomicNodeIndex,
     pub attr: Identifier,
     pub pattern: Pattern,
-}
-
-/// See also [MatchStar](https://docs.python.org/3/library/ast.html#ast.MatchStar)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchStar {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub name: Option<Identifier>,
-}
-
-/// See also [MatchAs](https://docs.python.org/3/library/ast.html#ast.MatchAs)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchAs {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub pattern: Option<Box<Pattern>>,
-    pub name: Option<Identifier>,
-}
-
-/// See also [MatchOr](https://docs.python.org/3/library/ast.html#ast.MatchOr)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchOr {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub patterns: Vec<Pattern>,
 }
 
 impl TypeParam {
@@ -2966,37 +2890,6 @@ impl TypeParam {
             Self::TypeVarTuple(x) => x.default.as_deref(),
         }
     }
-}
-
-/// See also [TypeVar](https://docs.python.org/3/library/ast.html#ast.TypeVar)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct TypeParamTypeVar {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub name: Identifier,
-    pub bound: Option<Box<Expr>>,
-    pub default: Option<Box<Expr>>,
-}
-
-/// See also [ParamSpec](https://docs.python.org/3/library/ast.html#ast.ParamSpec)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct TypeParamParamSpec {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub name: Identifier,
-    pub default: Option<Box<Expr>>,
-}
-
-/// See also [TypeVarTuple](https://docs.python.org/3/library/ast.html#ast.TypeVarTuple)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct TypeParamTypeVarTuple {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub name: Identifier,
-    pub default: Option<Box<Expr>>,
 }
 
 /// See also [decorator](https://docs.python.org/3/library/ast.html#ast.decorator)
@@ -3376,6 +3269,13 @@ impl<'a> ArgOrKeyword<'a> {
             ArgOrKeyword::Keyword(keyword) => &keyword.value,
         }
     }
+
+    pub const fn is_variadic(self) -> bool {
+        match self {
+            ArgOrKeyword::Arg(expr) => expr.is_starred_expr(),
+            ArgOrKeyword::Keyword(keyword) => keyword.arg.is_none(),
+        }
+    }
 }
 
 impl<'a> From<&'a Expr> for ArgOrKeyword<'a> {
@@ -3479,7 +3379,7 @@ impl Arguments {
     pub fn arguments_source_order(&self) -> impl Iterator<Item = ArgOrKeyword<'_>> {
         let args = self.args.iter().map(ArgOrKeyword::Arg);
         let keywords = self.keywords.iter().map(ArgOrKeyword::Keyword);
-        args.merge_by(keywords, |left, right| left.start() < right.start())
+        args.merge_by(keywords, |left, right| left.start() <= right.start())
     }
 
     pub fn inner_range(&self) -> TextRange {

@@ -37,6 +37,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.214")]
 pub(crate) struct IfExprWithTrueFalse {
     is_compare: bool,
 }
@@ -85,6 +86,7 @@ impl Violation for IfExprWithTrueFalse {
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.214")]
 pub(crate) struct IfExprWithFalseTrue;
 
 impl AlwaysFixableViolation for IfExprWithFalseTrue {
@@ -118,6 +120,7 @@ impl AlwaysFixableViolation for IfExprWithFalseTrue {
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.214")]
 pub(crate) struct IfExprWithTwistedArms {
     expr_body: String,
     expr_else: String,

@@ -130,7 +130,7 @@ static_assert(has_member(C, "base_attr"))
 static_assert(not has_member(C, "non_existent"))
 ```
 
-But instance attributes can not be accessed this way:
+But instance attributes cannot be accessed this way:
 
 ```py
 static_assert(not has_member(C, "instance_attr"))
@@ -548,13 +548,20 @@ static_assert(not has_member(c, "dynamic_attr"))
 
 ### Dataclasses
 
-So far, we do not include synthetic members of dataclasses.
+#### Basic
+
+For dataclasses, we make sure to include all synthesized members:
+
+```toml
+[environment]
+python-version = "3.9"
+```
 
 ```py
 from ty_extensions import has_member, static_assert
 from dataclasses import dataclass
 
-@dataclass(order=True)
+@dataclass
 class Person:
     age: int
     name: str
@@ -562,13 +569,208 @@ class Person:
 static_assert(has_member(Person, "name"))
 static_assert(has_member(Person, "age"))
 
+static_assert(has_member(Person, "__dataclass_fields__"))
+static_assert(has_member(Person, "__dataclass_params__"))
+
 # These are always available, since they are also defined on `object`:
 static_assert(has_member(Person, "__init__"))
 static_assert(has_member(Person, "__repr__"))
 static_assert(has_member(Person, "__eq__"))
+static_assert(has_member(Person, "__ne__"))
 
-# TODO: this should ideally be available:
-static_assert(has_member(Person, "__lt__"))  # error: [static-assert-error]
+# There are not available, unless `order=True` is set:
+static_assert(not has_member(Person, "__lt__"))
+static_assert(not has_member(Person, "__le__"))
+static_assert(not has_member(Person, "__gt__"))
+static_assert(not has_member(Person, "__ge__"))
+
+# These are not available, unless `slots=True`, `weakref_slot=True` are set:
+static_assert(not has_member(Person, "__slots__"))
+static_assert(not has_member(Person, "__weakref__"))
+
+# Not available before Python 3.13:
+static_assert(not has_member(Person, "__replace__"))
+```
+
+The same behavior applies to instances of dataclasses:
+
+```py
+def _(person: Person):
+    static_assert(has_member(person, "name"))
+    static_assert(has_member(person, "age"))
+
+    static_assert(has_member(person, "__dataclass_fields__"))
+    static_assert(has_member(person, "__dataclass_params__"))
+
+    static_assert(has_member(person, "__init__"))
+    static_assert(has_member(person, "__repr__"))
+    static_assert(has_member(person, "__eq__"))
+    static_assert(has_member(person, "__ne__"))
+
+    static_assert(not has_member(person, "__lt__"))
+    static_assert(not has_member(person, "__le__"))
+    static_assert(not has_member(person, "__gt__"))
+    static_assert(not has_member(person, "__ge__"))
+
+    static_assert(not has_member(person, "__slots__"))
+
+    static_assert(not has_member(person, "__replace__"))
+```
+
+#### `__init__`, `__repr__` and `__eq__`
+
+`__init__`, `__repr__` and `__eq__` are always available (via `object`), even when `init=False`,
+`repr=False` and `eq=False` are set:
+
+```py
+from ty_extensions import has_member, static_assert
+from dataclasses import dataclass
+
+@dataclass(init=False, repr=False, eq=False)
+class C:
+    x: int
+
+static_assert(has_member(C, "__init__"))
+static_assert(has_member(C, "__repr__"))
+static_assert(has_member(C, "__eq__"))
+static_assert(has_member(C, "__ne__"))
+static_assert(has_member(C(), "__init__"))
+static_assert(has_member(C(), "__repr__"))
+static_assert(has_member(C(), "__eq__"))
+static_assert(has_member(C(), "__ne__"))
+```
+
+#### `order=True`
+
+When `order=True` is set, comparison dunder methods become available:
+
+```py
+from ty_extensions import has_member, static_assert
+from dataclasses import dataclass
+
+@dataclass(order=True)
+class C:
+    x: int
+
+static_assert(has_member(C, "__lt__"))
+static_assert(has_member(C, "__le__"))
+static_assert(has_member(C, "__gt__"))
+static_assert(has_member(C, "__ge__"))
+
+def _(c: C):
+    static_assert(has_member(c, "__lt__"))
+    static_assert(has_member(c, "__le__"))
+    static_assert(has_member(c, "__gt__"))
+    static_assert(has_member(c, "__ge__"))
+```
+
+#### `slots=True`
+
+When `slots=True`, the corresponding dunder attribute becomes available:
+
+```py
+from ty_extensions import has_member, static_assert
+from dataclasses import dataclass
+
+@dataclass(slots=True)
+class C:
+    x: int
+
+static_assert(has_member(C, "__slots__"))
+static_assert(has_member(C(1), "__slots__"))
+```
+
+#### `weakref_slot=True`
+
+When `weakref_slot=True` on Python >=3.11, the corresponding dunder attribute becomes available:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from ty_extensions import has_member, static_assert
+from dataclasses import dataclass
+
+@dataclass(slots=True, weakref_slot=True)
+class C:
+    x: int
+
+static_assert(has_member(C, "__weakref__"))
+static_assert(has_member(C(1), "__weakref__"))
+```
+
+#### `__replace__` in Python 3.13+
+
+Since Python 3.13, dataclasses have a `__replace__` method:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from ty_extensions import has_member, static_assert
+from dataclasses import dataclass
+
+@dataclass
+class C:
+    x: int
+
+static_assert(has_member(C, "__replace__"))
+
+def _(c: C):
+    static_assert(has_member(c, "__replace__"))
+```
+
+#### `__match_args__`
+
+Since Python 3.10, dataclasses have a `__match_args__` attribute:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from ty_extensions import has_member, static_assert
+from dataclasses import dataclass
+
+@dataclass
+class C:
+    x: int
+
+static_assert(has_member(C, "__match_args__"))
+
+def _(c: C):
+    static_assert(has_member(c, "__match_args__"))
+```
+
+### Attributes added on new Python versions are not synthesized on older Python versions
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+from dataclasses import dataclass
+from ty_extensions import static_assert, has_member
+
+# TODO: these parameters don't exist on Python 3.9;
+# we should emit a diagnostic (or two)
+@dataclass(slots=True, weakref_slot=True)
+class F: ...
+
+static_assert(not has_member(F, "__slots__"))
+static_assert(not has_member(F, "__match_args__"))
+
+# In actual fact, all non-slotted instances have this attribute
+# (and even slotted instances can, if `__weakref__` is included in `__slots__`);
+# we could possibly model that more fully?
+# It's not added by the dataclasses machinery, though
+static_assert(not has_member(F(), "__weakref__"))
 ```
 
 ### Attributes not available at runtime

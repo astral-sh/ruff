@@ -26,6 +26,7 @@ use crate::checkers::ast::Checker;
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 /// - [Paramiko documentation: `SSHClient.exec_command()`](https://docs.paramiko.org/en/stable/api/client.html#paramiko.client.SSHClient.exec_command)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.270")]
 pub(crate) struct ParamikoCall;
 
 impl Violation for ParamikoCall {

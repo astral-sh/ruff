@@ -206,7 +206,7 @@ dd: defaultdict[int, int] = defaultdict(int)
 dd[0] = 0
 cm: ChainMap[int, int] = ChainMap({1: 1}, {0: 0})
 cm[0] = 0
-reveal_type(cm)  # revealed: ChainMap[Unknown | int, Unknown | int]
+reveal_type(cm)  # revealed: ChainMap[int, int]
 
 reveal_type(l[0])  # revealed: Literal[0]
 reveal_type(d[0])  # revealed: Literal[0]

@@ -95,7 +95,7 @@ Module(
 1 | x[::
 2 |
 3 | def foo():
-  | ^^^ Syntax Error: Expected an identifier, but found a keyword 'def' that cannot be used here
+  | ^^^ Syntax Error: Expected an identifier, but found a keyword `def` that cannot be used here
 4 |     pass
   |
 
@@ -104,7 +104,7 @@ Module(
 1 | x[::
 2 |
 3 | def foo():
-  |     ^^^ Syntax Error: Expected ']', found name
+  |     ^^^ Syntax Error: Expected `]`, found name
 4 |     pass
   |
 
@@ -112,7 +112,7 @@ Module(
   |
 3 | def foo():
 4 |     pass
-  |     ^^^^ Syntax Error: Expected an identifier, but found a keyword 'pass' that cannot be used here
+  |     ^^^^ Syntax Error: Expected an identifier, but found a keyword `pass` that cannot be used here
   |
 
 

@@ -51,6 +51,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: Value comparisons](https://docs.python.org/3/reference/expressions.html#value-comparisons)
 /// - [_Why does Python log a SyntaxWarning for ‘is’ with literals?_ by Adam Johnson](https://adamj.eu/tech/2020/01/21/why-does-python-3-8-syntaxwarning-for-is-literal/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.39")]
 pub(crate) struct IsLiteral {
     cmp_op: IsCmpOp,
 }

@@ -798,11 +798,11 @@ A class literal can be iterated over if it has `Any` or `Unknown` in its MRO, si
 ```py
 from unresolved_module import SomethingUnknown  # error: [unresolved-import]
 from typing import Any, Iterable
-from ty_extensions import static_assert, is_assignable_to, TypeOf, Unknown
+from ty_extensions import static_assert, is_assignable_to, TypeOf, Unknown, reveal_mro
 
 class Foo(SomethingUnknown): ...
 
-reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 
 # TODO: these should pass
 static_assert(is_assignable_to(TypeOf[Foo], Iterable[Unknown]))  # error: [static-assert-error]
@@ -815,7 +815,7 @@ for x in Foo:
 
 class Bar(Any): ...
 
-reveal_type(Bar.__mro__)  # revealed: tuple[<class 'Bar'>, Any, <class 'object'>]
+reveal_mro(Bar)  # revealed: (<class 'Bar'>, Any, <class 'object'>)
 
 # TODO: these should pass
 static_assert(is_assignable_to(TypeOf[Bar], Iterable[Any]))  # error: [static-assert-error]

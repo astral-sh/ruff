@@ -234,7 +234,7 @@ impl<'db> ProtocolInterface<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -634,7 +634,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         db: &'db dyn Db,
         other: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -766,7 +766,7 @@ impl BoundOnClass {
 }
 
 /// Inner Salsa query for [`ProtocolClassLiteral::interface`].
-#[salsa::tracked(cycle_fn=proto_interface_cycle_recover, cycle_initial=proto_interface_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(cycle_initial=proto_interface_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 fn cached_protocol_interface<'db>(
     db: &'db dyn Db,
     class: ClassType<'db>,
@@ -864,17 +864,9 @@ fn cached_protocol_interface<'db>(
 // If we use `expect(clippy::trivially_copy_pass_by_ref)` here,
 // the lint expectation is unfulfilled on WASM
 #[allow(clippy::trivially_copy_pass_by_ref)]
-fn proto_interface_cycle_recover<'db>(
-    _db: &dyn Db,
-    _value: &ProtocolInterface<'db>,
-    _count: u32,
-    _class: ClassType<'db>,
-) -> salsa::CycleRecoveryAction<ProtocolInterface<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn proto_interface_cycle_initial<'db>(
     db: &'db dyn Db,
+    _id: salsa::Id,
     _class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
     ProtocolInterface::empty(db)

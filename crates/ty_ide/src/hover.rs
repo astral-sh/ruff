@@ -1633,11 +1633,12 @@ def ab(a: int, *, c: int):
             "#,
         );
 
+        // TODO: This should be `P@Alias (<variance>)`
         assert_snapshot!(test.hover(), @r"
-        @Todo
+        typing.ParamSpec
         ---------------------------------------------
         ```python
-        @Todo
+        typing.ParamSpec
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -2630,6 +2631,40 @@ def ab(a: int, *, c: int):
            |       |
            |       source
            |
+        ");
+    }
+
+    #[test]
+    fn hover_float_annotation() {
+        let test = cursor_test(
+            r#"
+            a: float<CURSOR> = 3.14
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        int | float
+        ---------------------------------------------
+        Convert a string or number to a floating-point number, if possible.
+
+        ---------------------------------------------
+        ```python
+        int | float
+        ```
+        ---
+        ```text
+        Convert a string or number to a floating-point number, if possible.
+
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:4
+          |
+        2 | a: float = 3.14
+          |    ^^^^^- Cursor offset
+          |    |
+          |    source
+          |
         ");
     }
 

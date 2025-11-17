@@ -370,7 +370,7 @@ pub(crate) fn format_source(
                 let line_index = LineIndex::from_source_text(unformatted);
                 let byte_range = range.to_text_range(unformatted, &line_index);
                 format_range(unformatted, byte_range, options).map(|formatted_range| {
-                    let mut formatted = unformatted.to_string();
+                    let mut formatted = unformatted.clone();
                     formatted.replace_range(
                         std::ops::Range::<usize>::from(formatted_range.source_range()),
                         formatted_range.as_code(),

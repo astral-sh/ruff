@@ -32,6 +32,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct UnexpectedSpacesAroundKeywordParameterEquals;
 
 impl AlwaysFixableViolation for UnexpectedSpacesAroundKeywordParameterEquals {
@@ -71,6 +72,7 @@ impl AlwaysFixableViolation for UnexpectedSpacesAroundKeywordParameterEquals {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct MissingWhitespaceAroundParameterEquals;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundParameterEquals {

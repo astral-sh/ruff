@@ -7,7 +7,7 @@ use rustc_hash::FxBuildHasher;
 use crate::Db;
 use crate::types::class_base::ClassBase;
 use crate::types::generics::Specialization;
-use crate::types::{ClassLiteral, ClassType, KnownInstanceType, SpecialFormType, Type};
+use crate::types::{ClassLiteral, ClassType, KnownClass, KnownInstanceType, SpecialFormType, Type};
 
 /// The inferred method resolution order of a given class.
 ///
@@ -52,6 +52,11 @@ impl<'db> Mro<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> Result<Self, MroError<'db>> {
         let class = class_literal.apply_optional_specialization(db, specialization);
+        // Special-case `NotImplementedType`: typeshed says that it inherits from `Any`,
+        // but this causes more problems than it fixes.
+        if class_literal.is_known(db, KnownClass::NotImplementedType) {
+            return Ok(Self::from([ClassBase::Class(class), ClassBase::object(db)]));
+        }
         Self::of_class_impl(db, class, class_literal.explicit_bases(db), specialization)
             .map_err(|err| err.into_mro_error(db, class))
     }

@@ -46,6 +46,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ## References
 /// - [Python documentation: The Python Standard Library](https://docs.python.org/3/library/index.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.211")]
 pub(crate) struct UnnecessaryBuiltinImport {
     pub names: Vec<String>,
 }
@@ -74,7 +75,13 @@ pub(crate) fn unnecessary_builtin_import(
     stmt: &Stmt,
     module: &str,
     names: &[Alias],
+    level: u32,
 ) {
+    // Ignore relative imports (they're importing from local modules, not Python's builtins).
+    if level > 0 {
+        return;
+    }
+
     // Ignore irrelevant modules.
     if !matches!(
         module,

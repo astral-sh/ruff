@@ -6,7 +6,7 @@ use crate::{
     place::{Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
-        ClassLiteral, DynamicType, EnumLiteralType, KnownClass, MemberLookupPolicy,
+        ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, MemberLookupPolicy,
         StringLiteralType, Type, TypeQualifiers,
     },
 };
@@ -36,19 +36,10 @@ impl EnumMetadata<'_> {
     }
 }
 
-#[allow(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
-fn enum_metadata_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Option<EnumMetadata<'db>>,
-    _count: u32,
-    _class: ClassLiteral<'db>,
-) -> salsa::CycleRecoveryAction<Option<EnumMetadata<'db>>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 #[allow(clippy::unnecessary_wraps)]
 fn enum_metadata_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _class: ClassLiteral<'db>,
 ) -> Option<EnumMetadata<'db>> {
     Some(EnumMetadata::empty())
@@ -56,7 +47,7 @@ fn enum_metadata_cycle_initial<'db>(
 
 /// List all members of an enum.
 #[allow(clippy::ref_option, clippy::unnecessary_wraps)]
-#[salsa::tracked(returns(as_ref), cycle_fn=enum_metadata_cycle_recover, cycle_initial=enum_metadata_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(as_ref), cycle_initial=enum_metadata_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn enum_metadata<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
@@ -76,9 +67,6 @@ pub(crate) fn enum_metadata<'db>(
     {
         return None;
     }
-
-    let is_str_enum =
-        Type::ClassLiteral(class).is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db));
 
     let scope_id = class.body_scope(db);
     let use_def_map = use_def_map(db, scope_id);
@@ -150,14 +138,48 @@ pub(crate) fn enum_metadata<'db>(
                             // enum.auto
                             Some(KnownClass::Auto) => {
                                 auto_counter += 1;
-                                Some(if is_str_enum {
+
+                                // `StrEnum`s have different `auto()` behaviour to enums inheriting from `(str, Enum)`
+                                let auto_value_ty = if Type::ClassLiteral(class)
+                                    .is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db))
+                                {
                                     Type::StringLiteral(StringLiteralType::new(
                                         db,
                                         name.to_lowercase().as_str(),
                                     ))
                                 } else {
-                                    Type::IntLiteral(auto_counter)
-                                })
+                                    let custom_mixins: smallvec::SmallVec<[Option<KnownClass>; 1]> =
+                                        class
+                                            .iter_mro(db, None)
+                                            .skip(1)
+                                            .filter_map(ClassBase::into_class)
+                                            .filter(|class| {
+                                                !Type::from(*class).is_subtype_of(
+                                                    db,
+                                                    KnownClass::Enum.to_subclass_of(db),
+                                                )
+                                            })
+                                            .map(|class| class.known(db))
+                                            .filter(|class| {
+                                                !matches!(class, Some(KnownClass::Object))
+                                            })
+                                            .collect();
+
+                                    // `IntEnum`s have the same `auto()` behaviour to enums inheriting from `(int, Enum)`,
+                                    // and `IntEnum`s also have `int` in their MROs, so both cases are handled here.
+                                    //
+                                    // In general, the `auto()` behaviour for enums with non-`int` mixins is hard to predict,
+                                    // so we fall back to `Any` in those cases.
+                                    if matches!(
+                                        custom_mixins.as_slice(),
+                                        [] | [Some(KnownClass::Int)]
+                                    ) {
+                                        Type::IntLiteral(auto_counter)
+                                    } else {
+                                        Type::any()
+                                    }
+                                };
+                                Some(auto_value_ty)
                             }
 
                             _ => None,

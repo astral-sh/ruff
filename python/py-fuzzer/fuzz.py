@@ -139,7 +139,7 @@ class FuzzResult:
                 case Executable.TY:
                     panic_message = f"The following code triggers a {new}ty panic:"
                 case _ as unreachable:
-                    assert_never(unreachable)  # ty: ignore[type-assertion-failure]
+                    assert_never(unreachable)
 
             print(colored(panic_message, "red"))
             print()
@@ -395,13 +395,14 @@ def parse_args() -> ResolvedCliArgs:
 
     if not args.test_executable:
         print(
-            "Running `cargo build --release` since no test executable was specified...",
+            "Running `cargo build --profile=profiling` since no test executable was specified...",
             flush=True,
         )
         cmd: list[str] = [
             "cargo",
             "build",
-            "--release",
+            "--profile",
+            "profiling",
             "--locked",
             "--color",
             "always",
@@ -413,7 +414,7 @@ def parse_args() -> ResolvedCliArgs:
         except subprocess.CalledProcessError as e:
             print(e.stderr)
             raise
-        args.test_executable = Path("target", "release", executable)
+        args.test_executable = Path("target", "profiling", executable)
         assert args.test_executable.is_file()
 
     seed_arguments: list[range | int] = args.seeds

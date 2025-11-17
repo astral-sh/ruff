@@ -53,6 +53,7 @@ use crate::settings::LinterSettings;
 /// - `lint.flake8-builtins.allowed-modules`
 /// - `lint.flake8-builtins.strict-checking`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.9.0")]
 pub(crate) struct StdlibModuleShadowing {
     name: String,
 }

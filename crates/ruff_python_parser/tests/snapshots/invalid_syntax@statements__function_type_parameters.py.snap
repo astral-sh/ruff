@@ -28,8 +28,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 808..809,
                                         node_index: NodeIndex(None),
+                                        range: 808..809,
                                         name: Identifier {
                                             id: Name("A"),
                                             range: 808..809,
@@ -41,8 +41,8 @@ Module(
                                 ),
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 811..816,
                                         node_index: NodeIndex(None),
+                                        range: 811..816,
                                         name: Identifier {
                                             id: Name("await"),
                                             range: 811..816,
@@ -99,8 +99,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 847..848,
                                         node_index: NodeIndex(None),
+                                        range: 847..848,
                                         name: Identifier {
                                             id: Name("A"),
                                             range: 847..848,
@@ -112,8 +112,8 @@ Module(
                                 ),
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 853..854,
                                         node_index: NodeIndex(None),
+                                        range: 853..854,
                                         name: Identifier {
                                             id: Name("B"),
                                             range: 853..854,
@@ -170,8 +170,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 884..885,
                                         node_index: NodeIndex(None),
+                                        range: 884..885,
                                         name: Identifier {
                                             id: Name("A"),
                                             range: 884..885,
@@ -183,8 +183,8 @@ Module(
                                 ),
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 887..888,
                                         node_index: NodeIndex(None),
+                                        range: 887..888,
                                         name: Identifier {
                                             id: Name("B"),
                                             range: 887..888,
@@ -241,8 +241,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 927..928,
                                         node_index: NodeIndex(None),
+                                        range: 927..928,
                                         name: Identifier {
                                             id: Name("A"),
                                             range: 927..928,
@@ -299,8 +299,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 973..974,
                                         node_index: NodeIndex(None),
+                                        range: 973..974,
                                         name: Identifier {
                                             id: Name("A"),
                                             range: 973..974,
@@ -375,7 +375,7 @@ Module(
  9 | # on following lines.
 10 |
 11 | def keyword[A, await](): ...
-   |                ^^^^^ Syntax Error: Expected an identifier, but found a keyword 'await' that cannot be used here
+   |                ^^^^^ Syntax Error: Expected an identifier, but found a keyword `await` that cannot be used here
 12 |
 13 | def not_a_type_param[A, |, B](): ...
    |
@@ -385,7 +385,7 @@ Module(
 11 | def keyword[A, await](): ...
 12 |
 13 | def not_a_type_param[A, |, B](): ...
-   |                         ^ Syntax Error: Expected ',', found '|'
+   |                         ^ Syntax Error: Expected `,`, found `|`
 14 |
 15 | def multiple_commas[A,,B](): ...
    |
@@ -433,7 +433,7 @@ Module(
 17 | def multiple_trailing_commas[A,,](): ...
 18 |
 19 | def multiple_commas_and_recovery[A,,100](): ...
-   |                                     ^^^ Syntax Error: Expected ']', found int
+   |                                     ^^^ Syntax Error: Expected `]`, found int
    |
 
 
@@ -441,7 +441,7 @@ Module(
 17 | def multiple_trailing_commas[A,,](): ...
 18 |
 19 | def multiple_commas_and_recovery[A,,100](): ...
-   |                                        ^ Syntax Error: Expected newline, found ']'
+   |                                        ^ Syntax Error: Expected newline, found `]`
    |
 
 

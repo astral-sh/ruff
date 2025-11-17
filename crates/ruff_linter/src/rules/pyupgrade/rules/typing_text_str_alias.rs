@@ -34,6 +34,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `typing.Text`](https://docs.python.org/3/library/typing.html#typing.Text)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.195")]
 pub(crate) struct TypingTextStrAlias {
     module: TypingModule,
 }

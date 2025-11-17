@@ -1,5 +1,7 @@
 use crate::logging::Verbosity;
 use crate::python_version::PythonVersion;
+use clap::builder::Styles;
+use clap::builder::styling::{AnsiColor, Effects};
 use clap::error::ErrorKind;
 use clap::{ArgAction, ArgMatches, Error, Parser};
 use ruff_db::system::SystemPathBuf;
@@ -8,9 +10,17 @@ use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions, Ter
 use ty_project::metadata::value::{RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource};
 use ty_python_semantic::lint;
 
+// Configures Clap v3-style help menu colors
+const STYLES: Styles = Styles::styled()
+    .header(AnsiColor::Green.on_default().effects(Effects::BOLD))
+    .usage(AnsiColor::Green.on_default().effects(Effects::BOLD))
+    .literal(AnsiColor::Cyan.on_default().effects(Effects::BOLD))
+    .placeholder(AnsiColor::Cyan.on_default());
+
 #[derive(Debug, Parser)]
 #[command(author, name = "ty", about = "An extremely fast Python type checker.")]
 #[command(long_version = crate::version::version())]
+#[command(styles = STYLES)]
 pub struct Cli {
     #[command(subcommand)]
     pub(crate) command: Command,
@@ -34,6 +44,7 @@ pub(crate) enum Command {
 }
 
 #[derive(Debug, Parser)]
+#[expect(clippy::struct_excessive_bools)]
 pub(crate) struct CheckCommand {
     /// List of files or directories to check.
     #[clap(
@@ -117,10 +128,6 @@ pub(crate) struct CheckCommand {
     #[arg(long)]
     pub(crate) output_format: Option<OutputFormat>,
 
-    /// Control when colored output is used.
-    #[arg(long, value_name = "WHEN")]
-    pub(crate) color: Option<TerminalColor>,
-
     /// Use exit code 1 if there are any warning-level diagnostics.
     #[arg(long, conflicts_with = "exit_zero", default_missing_value = "true", num_args=0..1)]
     pub(crate) error_on_warning: Option<bool>,
@@ -152,6 +159,21 @@ pub(crate) struct CheckCommand {
     /// Supports patterns like `tests/`, `*.tmp`, `**/__pycache__/**`.
     #[arg(long, help_heading = "File selection")]
     exclude: Option<Vec<String>>,
+
+    /// Control when colored output is used.
+    #[arg(
+        long,
+        value_name = "WHEN",
+        help_heading = "Global options",
+        display_order = 1000
+    )]
+    pub(crate) color: Option<TerminalColor>,
+
+    /// Hide all progress outputs.
+    ///
+    /// For example, spinners or progress bars.
+    #[arg(global = true, long, value_parser = clap::builder::BoolishValueParser::new(), help_heading = "Global options")]
+    pub no_progress: bool,
 }
 
 impl CheckCommand {

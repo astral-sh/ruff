@@ -13,7 +13,6 @@ info:
     - UP007
     - test.py
     - "-"
-snapshot_kind: text
 ---
 success: true
 exit_code: 0
@@ -288,5 +287,6 @@ analyze.target_version = 3.11
 analyze.string_imports = disabled
 analyze.extension = ExtensionMapping({})
 analyze.include_dependencies = {}
+analyze.type_checking_imports = true
 
 ----- stderr -----

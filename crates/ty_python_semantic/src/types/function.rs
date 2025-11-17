@@ -82,8 +82,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
-    NormalizedVisitor, SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeContext,
-    TypeMapping, TypeRelation, UnionBuilder, binding_type, todo_type, walk_signature,
+    NormalizedVisitor, SpecialFormType, Truthiness, Type, TypeContext, TypeMapping, TypeRelation,
+    UnionBuilder, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -121,6 +121,8 @@ bitflags! {
         const STATICMETHOD = 1 << 5;
         /// `@typing.override`
         const OVERRIDE = 1 << 6;
+        /// `@typing.type_check_only`
+        const TYPE_CHECK_ONLY = 1 << 7;
     }
 }
 
@@ -135,6 +137,7 @@ impl FunctionDecorators {
                 Some(KnownFunction::AbstractMethod) => FunctionDecorators::ABSTRACT_METHOD,
                 Some(KnownFunction::Final) => FunctionDecorators::FINAL,
                 Some(KnownFunction::Override) => FunctionDecorators::OVERRIDE,
+                Some(KnownFunction::TypeCheckOnly) => FunctionDecorators::TYPE_CHECK_ONLY,
                 _ => FunctionDecorators::empty(),
             },
             Type::ClassLiteral(class) => match class.known(db) {
@@ -181,6 +184,16 @@ pub struct DataclassTransformerParams<'db> {
 }
 
 impl get_size2::GetSize for DataclassTransformerParams<'_> {}
+
+/// Whether a function should implicitly be treated as a staticmethod based on its name.
+pub(crate) fn is_implicit_staticmethod(function_name: &str) -> bool {
+    matches!(function_name, "__new__")
+}
+
+/// Whether a function should implicitly be treated as a classmethod based on its name.
+pub(crate) fn is_implicit_classmethod(function_name: &str) -> bool {
+    matches!(function_name, "__init_subclass__" | "__class_getitem__")
+}
 
 /// Representation of a function definition in the AST: either a non-generic function, or a generic
 /// function that has not been specialized.
@@ -254,17 +267,15 @@ impl<'db> OverloadLiteral<'db> {
     /// Returns true if this overload is decorated with `@staticmethod`, or if it is implicitly a
     /// staticmethod.
     pub(crate) fn is_staticmethod(self, db: &dyn Db) -> bool {
-        self.has_known_decorator(db, FunctionDecorators::STATICMETHOD) || self.name(db) == "__new__"
+        self.has_known_decorator(db, FunctionDecorators::STATICMETHOD)
+            || is_implicit_staticmethod(self.name(db))
     }
 
     /// Returns true if this overload is decorated with `@classmethod`, or if it is implicitly a
     /// classmethod.
     pub(crate) fn is_classmethod(self, db: &dyn Db) -> bool {
         self.has_known_decorator(db, FunctionDecorators::CLASSMETHOD)
-            || matches!(
-                self.name(db).as_str(),
-                "__init_subclass__" | "__class_getitem__"
-            )
+            || is_implicit_classmethod(self.name(db))
     }
 
     fn node<'ast>(
@@ -523,6 +534,14 @@ pub struct FunctionLiteral<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for FunctionLiteral<'_> {}
 
+fn overloads_and_implementation_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: FunctionLiteral<'db>,
+) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
+    (Box::new([]), None)
+}
+
 #[salsa::tracked]
 impl<'db> FunctionLiteral<'db> {
     fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
@@ -565,7 +584,7 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition(db).spans(db)
     }
 
-    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size, cycle_initial=overloads_and_implementation_cycle_initial)]
     fn overloads_and_implementation(
         self,
         db: &'db dyn Db,
@@ -898,7 +917,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(ref), cycle_initial=signature_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         self.updated_signature(db)
             .cloned()
@@ -915,9 +934,7 @@ impl<'db> FunctionType<'db> {
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(
-        returns(ref),
-        cycle_fn=last_definition_signature_cycle_recover,
-        cycle_initial=last_definition_signature_cycle_initial,
+        returns(ref), cycle_initial=last_definition_signature_cycle_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
@@ -928,9 +945,7 @@ impl<'db> FunctionType<'db> {
 
     /// Typed externally-visible "raw" signature of the last overload or implementation of this function.
     #[salsa::tracked(
-        returns(ref),
-        cycle_fn=last_definition_signature_cycle_recover,
-        cycle_initial=last_definition_signature_cycle_initial,
+        returns(ref), cycle_initial=last_definition_signature_cycle_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn last_definition_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
@@ -956,7 +971,7 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -964,8 +979,10 @@ impl<'db> FunctionType<'db> {
         // our representation of a function type includes any specialization that should be applied
         // to the signature. Different specializations of the same function type are only subtypes
         // of each other if they result in subtype signatures.
-        if matches!(relation, TypeRelation::Subtyping | TypeRelation::Redundancy)
-            && self.normalized(db) == other.normalized(db)
+        if matches!(
+            relation,
+            TypeRelation::Subtyping | TypeRelation::Redundancy | TypeRelation::SubtypingAssuming(_)
+        ) && self.normalized(db) == other.normalized(db)
         {
             return ConstraintSet::from(true);
         }
@@ -1086,6 +1103,11 @@ fn is_instance_truthiness<'db>(
 
         Type::NominalInstance(..) => always_true_if(is_instance(&ty)),
 
+        Type::NewTypeInstance(newtype) => always_true_if(is_instance(&Type::instance(
+            db,
+            newtype.base_class_type(db),
+        ))),
+
         Type::BooleanLiteral(..)
         | Type::BytesLiteral(..)
         | Type::IntLiteral(..)
@@ -1194,33 +1216,17 @@ fn is_mode_with_nontrivial_return_type<'db>(db: &'db dyn Db, mode: Type<'db>) ->
     })
 }
 
-fn signature_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &CallableSignature<'db>,
-    _count: u32,
-    _function: FunctionType<'db>,
-) -> salsa::CycleRecoveryAction<CallableSignature<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn signature_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _function: FunctionType<'db>,
 ) -> CallableSignature<'db> {
     CallableSignature::single(Signature::bottom())
 }
 
-fn last_definition_signature_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Signature<'db>,
-    _count: u32,
-    _function: FunctionType<'db>,
-) -> salsa::CycleRecoveryAction<Signature<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn last_definition_signature_cycle_initial<'db>(
     _db: &'db dyn Db,
+    _id: salsa::Id,
     _function: FunctionType<'db>,
 ) -> Signature<'db> {
     Signature::bottom()
@@ -1278,6 +1284,8 @@ pub enum KnownFunction {
     DisjointBase,
     /// [`typing(_extensions).no_type_check`](https://typing.python.org/en/latest/spec/directives.html#no-type-check)
     NoTypeCheck,
+    /// `typing(_extensions).type_check_only`
+    TypeCheckOnly,
 
     /// `typing(_extensions).assert_type`
     AssertType,
@@ -1336,10 +1344,8 @@ pub enum KnownFunction {
     HasMember,
     /// `ty_extensions.reveal_protocol_interface`
     RevealProtocolInterface,
-    /// `ty_extensions.range_constraint`
-    RangeConstraint,
-    /// `ty_extensions.negated_range_constraint`
-    NegatedRangeConstraint,
+    /// `ty_extensions.reveal_mro`
+    RevealMro,
 }
 
 impl KnownFunction {
@@ -1362,7 +1368,7 @@ impl KnownFunction {
             .then_some(candidate)
     }
 
-    /// Return `true` if `self` is defined in `module` at runtime.
+    /// Return `true` if `self` is defined in `module`
     const fn check_module(self, module: KnownModule) -> bool {
         match self {
             Self::IsInstance
@@ -1412,10 +1418,11 @@ impl KnownFunction {
             | Self::StaticAssert
             | Self::HasMember
             | Self::RevealProtocolInterface
-            | Self::RangeConstraint
-            | Self::NegatedRangeConstraint
+            | Self::RevealMro
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
+
+            Self::TypeCheckOnly => matches!(module, KnownModule::Typing),
         }
     }
 
@@ -1634,6 +1641,85 @@ impl KnownFunction {
                 }
             }
 
+            KnownFunction::RevealMro => {
+                let [Some(param_type)] = parameter_types else {
+                    return;
+                };
+                let mut good_argument = true;
+                let classes = match param_type {
+                    Type::ClassLiteral(class) => vec![ClassType::NonGeneric(*class)],
+                    Type::GenericAlias(generic_alias) => vec![ClassType::Generic(*generic_alias)],
+                    Type::Union(union) => {
+                        let elements = union.elements(db);
+                        let mut classes = Vec::with_capacity(elements.len());
+                        for element in elements {
+                            match element {
+                                Type::ClassLiteral(class) => {
+                                    classes.push(ClassType::NonGeneric(*class));
+                                }
+                                Type::GenericAlias(generic_alias) => {
+                                    classes.push(ClassType::Generic(*generic_alias));
+                                }
+                                _ => {
+                                    good_argument = false;
+                                    break;
+                                }
+                            }
+                        }
+                        classes
+                    }
+                    _ => {
+                        good_argument = false;
+                        vec![]
+                    }
+                };
+                if !good_argument {
+                    let Some(builder) =
+                        context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
+                    else {
+                        return;
+                    };
+                    let mut diagnostic =
+                        builder.into_diagnostic("Invalid argument to `reveal_mro`");
+                    diagnostic.set_primary_message(format_args!(
+                        "Can only pass a class object, generic alias or a union thereof"
+                    ));
+                    return;
+                }
+                if let Some(builder) =
+                    context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
+                {
+                    let mut diag = builder.into_diagnostic("Revealed MRO");
+                    let span = context.span(&call_expression.arguments.args[0]);
+                    let mut message = String::new();
+                    for (i, class) in classes.iter().enumerate() {
+                        message.push('(');
+                        for class in class.iter_mro(db) {
+                            message.push_str(&class.display(db).to_string());
+                            // Omit the comma for the last element (which is always `object`)
+                            if class
+                                .into_class()
+                                .is_none_or(|base| !base.is_object(context.db()))
+                            {
+                                message.push_str(", ");
+                            }
+                        }
+                        // If the last element was also the first element
+                        // (i.e., it's a length-1 tuple -- which can only happen if we're revealing
+                        // the MRO for `object` itself), add a trailing comma so that it's still a
+                        // valid tuple display.
+                        if class.is_object(db) {
+                            message.push(',');
+                        }
+                        message.push(')');
+                        if i < classes.len() - 1 {
+                            message.push_str(" | ");
+                        }
+                    }
+                    diag.annotate(Annotation::primary(span).message(message));
+                }
+            }
+
             KnownFunction::IsInstance | KnownFunction::IsSubclass => {
                 let [Some(first_arg), Some(second_argument)] = parameter_types else {
                     return;
@@ -1676,6 +1762,82 @@ impl KnownFunction {
                         diagnostic
                             .set_primary_message("This call will raise `TypeError` at runtime");
                     }
+
+                    Type::KnownInstance(KnownInstanceType::UnionType(_)) => {
+                        fn find_invalid_elements<'db>(
+                            db: &'db dyn Db,
+                            function: KnownFunction,
+                            ty: Type<'db>,
+                            invalid_elements: &mut Vec<Type<'db>>,
+                        ) {
+                            match ty {
+                                Type::ClassLiteral(_) => {}
+                                Type::NominalInstance(instance)
+                                    if instance.has_known_class(db, KnownClass::NoneType) => {}
+                                Type::SpecialForm(special_form)
+                                    if special_form.is_valid_isinstance_target() => {}
+                                // `Any` can be used in `issubclass()` calls but not `isinstance()` calls
+                                Type::SpecialForm(SpecialFormType::Any)
+                                    if function == KnownFunction::IsSubclass => {}
+                                Type::KnownInstance(KnownInstanceType::UnionType(union)) => {
+                                    for element in union.elements(db) {
+                                        find_invalid_elements(
+                                            db,
+                                            function,
+                                            *element,
+                                            invalid_elements,
+                                        );
+                                    }
+                                }
+                                _ => invalid_elements.push(ty),
+                            }
+                        }
+
+                        let mut invalid_elements = vec![];
+                        find_invalid_elements(db, self, *second_argument, &mut invalid_elements);
+
+                        let Some((first_invalid_element, other_invalid_elements)) =
+                            invalid_elements.split_first()
+                        else {
+                            return;
+                        };
+
+                        let Some(builder) =
+                            context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
+                        else {
+                            return;
+                        };
+
+                        let function_name: &str = self.into();
+
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Invalid second argument to `{function_name}`"
+                        ));
+                        diagnostic.info(format_args!(
+                            "A `UnionType` instance can only be used as the second argument to \
+                            `{function_name}` if all elements are class objects"
+                        ));
+                        diagnostic.annotate(
+                            Annotation::secondary(context.span(&call_expression.arguments.args[1]))
+                                .message("This `UnionType` instance contains non-class elements"),
+                        );
+                        match other_invalid_elements {
+                            [] => diagnostic.info(format_args!(
+                                "Element `{}` in the union is not a class object",
+                                first_invalid_element.display(db)
+                            )),
+                            [single] => diagnostic.info(format_args!(
+                                "Elements `{}` and `{}` in the union are not class objects",
+                                first_invalid_element.display(db),
+                                single.display(db),
+                            )),
+                            _ => diagnostic.info(format_args!(
+                                "Element `{}` in the union, and {} more elements, are not class objects",
+                                first_invalid_element.display(db),
+                                other_invalid_elements.len(),
+                            ))
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -1708,33 +1870,6 @@ impl KnownFunction {
                 };
 
                 overload.set_return_type(Type::module_literal(db, file, module));
-            }
-
-            KnownFunction::RangeConstraint => {
-                let [Some(lower), Some(Type::TypeVar(typevar)), Some(upper)] = parameter_types
-                else {
-                    return;
-                };
-
-                let constraints = ConstraintSet::range(db, *lower, typevar.identity(db), *upper);
-                let tracked = TrackedConstraintSet::new(db, constraints);
-                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    tracked,
-                )));
-            }
-
-            KnownFunction::NegatedRangeConstraint => {
-                let [Some(lower), Some(Type::TypeVar(typevar)), Some(upper)] = parameter_types
-                else {
-                    return;
-                };
-
-                let constraints =
-                    ConstraintSet::negated_range(db, *lower, typevar.identity(db), *upper);
-                let tracked = TrackedConstraintSet::new(db, constraints);
-                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    tracked,
-                )));
             }
 
             KnownFunction::Open => {
@@ -1821,6 +1956,8 @@ pub(crate) mod tests {
                 | KnownFunction::DisjointBase
                 | KnownFunction::NoTypeCheck => KnownModule::TypingExtensions,
 
+                KnownFunction::TypeCheckOnly => KnownModule::Typing,
+
                 KnownFunction::IsSingleton
                 | KnownFunction::IsSubtypeOf
                 | KnownFunction::GenericContext
@@ -1833,8 +1970,7 @@ pub(crate) mod tests {
                 | KnownFunction::IsEquivalentTo
                 | KnownFunction::HasMember
                 | KnownFunction::RevealProtocolInterface
-                | KnownFunction::RangeConstraint
-                | KnownFunction::NegatedRangeConstraint
+                | KnownFunction::RevealMro
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,

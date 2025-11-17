@@ -41,6 +41,7 @@ use crate::rules::flake8_django::helpers;
 ///     field = models.CharField(max_length=255, default="")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.246")]
 pub(crate) struct DjangoNullableModelStringField {
     field_name: String,
 }
@@ -60,9 +61,14 @@ pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) {
     }
 
     for statement in body {
-        let Stmt::Assign(ast::StmtAssign { value, .. }) = statement else {
-            continue;
+        let value = match statement {
+            Stmt::Assign(ast::StmtAssign { value, .. }) => value,
+            Stmt::AnnAssign(ast::StmtAnnAssign {
+                value: Some(value), ..
+            }) => value,
+            _ => continue,
         };
+
         if let Some(field_name) = is_nullable_field(value, checker.semantic()) {
             checker.report_diagnostic(
                 DjangoNullableModelStringField {

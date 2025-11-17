@@ -47,8 +47,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 22..23,
                                     node_index: NodeIndex(None),
+                                    range: 22..23,
                                     pattern: None,
                                     name: None,
                                 },
@@ -80,6 +80,6 @@ Module(
 
   |
 1 | match [1, 2]
-  |             ^ Syntax Error: Expected ':', found newline
+  |             ^ Syntax Error: Expected `:`, found newline
 2 |     case _: ...
   |
