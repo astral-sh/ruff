@@ -132,3 +132,11 @@ finally: cleanup()  # fmt: skip
 if (
 	long_condition
 ):  a     +     b # fmt: skip
+
+# over-indented comment example
+# See https://github.com/astral-sh/ruff/pull/20633#issuecomment-3453288910
+# and https://github.com/astral-sh/ruff/pull/21185
+
+for x in it: foo()
+    # comment
+else: bar() # fmt: skip
