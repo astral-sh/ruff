@@ -817,13 +817,24 @@ impl<'db> Node<'db> {
         // When checking subtyping involving a typevar, we can turn the subtyping check into a
         // constraint (i.e, "is `T` a subtype of `int` becomes the constraint `T ≤ int`), and then
         // check when the BDD implies that constraint.
+        //
+        // Note that we are NOT guaranteed that `lhs` and `rhs` will always be fully static, since
+        // these types are coming in from arbitrary subtyping checks that the caller might want to
+        // perform. So we have to take the appropriate materialization when translating the check
+        // into a constraint.
         let constraint = match (lhs, rhs) {
-            (Type::TypeVar(bound_typevar), _) => {
-                ConstrainedTypeVar::new_node(db, bound_typevar, Type::Never, rhs)
-            }
-            (_, Type::TypeVar(bound_typevar)) => {
-                ConstrainedTypeVar::new_node(db, bound_typevar, lhs, Type::object())
-            }
+            (Type::TypeVar(bound_typevar), _) => ConstrainedTypeVar::new_node(
+                db,
+                bound_typevar,
+                Type::Never,
+                rhs.bottom_materialization(db),
+            ),
+            (_, Type::TypeVar(bound_typevar)) => ConstrainedTypeVar::new_node(
+                db,
+                bound_typevar,
+                lhs.top_materialization(db),
+                Type::object(),
+            ),
             _ => panic!("at least one type should be a typevar"),
         };
 
