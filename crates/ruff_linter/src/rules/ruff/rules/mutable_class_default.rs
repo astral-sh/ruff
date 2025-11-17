@@ -1,7 +1,7 @@
-use ruff_python_ast::{self as ast, Stmt};
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_text_size::Ranged;
 
@@ -97,20 +97,10 @@ impl Violation for MutableClassDefault {
 
 /// RUF012
 pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClassDef) {
-    let mut class_var_targets: FxHashSet<String> = FxHashSet::default();
+    // Collect any `ClassVar`s we find in case they get reassigned later.
+    let mut class_var_targets = FxHashSet::default();
 
     for statement in &class_def.body {
-        if let Stmt::AnnAssign(ast::StmtAnnAssign {
-            annotation, target, ..
-        }) = statement
-        {
-            if let ast::Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
-                if is_class_var_annotation(annotation, checker.semantic()) {
-                    class_var_targets.insert(id.to_string());
-                }
-            }
-        }
-
         match statement {
             Stmt::AnnAssign(ast::StmtAnnAssign {
                 annotation,
@@ -118,6 +108,12 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                 value: Some(value),
                 ..
             }) => {
+                if let ast::Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
+                    if is_class_var_annotation(annotation, checker.semantic()) {
+                        class_var_targets.insert(id);
+                    }
+                }
+
                 if !is_special_attribute(target)
                     && is_mutable_expr(value, checker.semantic())
                     && !is_class_var_annotation(annotation, checker.semantic())
@@ -137,27 +133,19 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                 }
             }
             Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
-                if is_mutable_expr(value, checker.semantic()) {
-                    let has_mutable_non_class_var_target = targets.iter().any(|target| {
-                        if is_special_attribute(target) {
-                            return false;
-                        }
-
-                        match target {
-                            ast::Expr::Name(ast::ExprName { id, .. }) => {
-                                !class_var_targets.contains(id.as_str())
-                            }
-                            _ => true,
-                        }
-                    });
+                if !targets.iter().all(|target| {
+                    is_special_attribute(target)
+                        || target
+                            .as_name_expr()
+                            .is_some_and(|name| class_var_targets.contains(&name.id))
+                }) && is_mutable_expr(value, checker.semantic())
+                {
                     // Avoid, e.g., Pydantic and msgspec models, which end up copying defaults on instance creation.
-                    if has_mutable_non_class_var_target {
-                        if has_default_copy_semantics(class_def, checker.semantic()) {
-                            return;
-                        }
-
-                        checker.report_diagnostic(MutableClassDefault, value.range());
+                    if has_default_copy_semantics(class_def, checker.semantic()) {
+                        return;
                     }
+
+                    checker.report_diagnostic(MutableClassDefault, value.range());
                 }
             }
             _ => (),
