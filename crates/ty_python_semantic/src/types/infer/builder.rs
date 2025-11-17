@@ -9508,7 +9508,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     KnownInstanceType::UnionType(_)
                     | KnownInstanceType::Literal(_)
                     | KnownInstanceType::Annotated(_)
-                    | KnownInstanceType::TypeGenericAlias(_),
+                    | KnownInstanceType::TypeGenericAlias(_)
+                    | KnownInstanceType::Callable(_),
                 ),
                 Type::ClassLiteral(..)
                 | Type::SubclassOf(..)
@@ -9518,7 +9519,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     KnownInstanceType::UnionType(_)
                     | KnownInstanceType::Literal(_)
                     | KnownInstanceType::Annotated(_)
-                    | KnownInstanceType::TypeGenericAlias(_),
+                    | KnownInstanceType::TypeGenericAlias(_)
+                    | KnownInstanceType::Callable(_),
                 ),
                 ast::Operator::BitOr,
             ) if pep_604_unions_allowed() => {
@@ -10828,6 +10830,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
                     InternedType::new(self.db(), argument_ty),
                 ));
+            }
+            Type::SpecialForm(SpecialFormType::Callable) => {
+                let callable = self
+                    .infer_callable_type(subscript)
+                    .as_callable()
+                    .expect("always returns Type::Callable");
+
+                return Type::KnownInstance(KnownInstanceType::Callable(callable));
             }
             // `typing` special forms with a single generic argument
             Type::SpecialForm(
