@@ -138,6 +138,16 @@ impl NavigationTarget {
     }
 }
 
+impl From<FileRange> for NavigationTarget {
+    fn from(value: FileRange) -> Self {
+        Self {
+            file: value.file(),
+            focus_range: value.range(),
+            full_range: value.range(),
+        }
+    }
+}
+
 /// Specifies the kind of reference operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ReferenceKind {

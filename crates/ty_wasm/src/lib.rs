@@ -471,10 +471,9 @@ impl Workspace {
             .map(|hint| InlayHint {
                 label: hint
                     .label
-                    .parts()
-                    .iter()
+                    .into_parts()
+                    .into_iter()
                     .map(|part| InlayHintLabelPart {
-                        label: part.text().to_string(),
                         location: part.target().map(|target| {
                             location_link_from_navigation_target(
                                 target,
@@ -483,6 +482,7 @@ impl Workspace {
                                 None,
                             )
                         }),
+                        label: part.into_text(),
                     })
                     .collect(),
                 position: Position::from_text_size(

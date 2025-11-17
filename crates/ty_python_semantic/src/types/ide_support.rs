@@ -20,7 +20,7 @@ use crate::types::{
 };
 use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::{File, FileRange};
-use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
 use ruff_text_size::{Ranged, TextRange};
@@ -963,29 +963,14 @@ impl CallSignatureDetails<'_> {
         let definition = self.signature.definition()?;
         let file = definition.file(db);
         let module_ref = parsed_module(db, file).load(db);
-        let offsets = definition_parameter_offsets(definition.kind(db), &module_ref)?;
 
-        offsets
-            .into_iter()
-            .find(|(param_name, _)| param_name == name)
-            .map(|(_, text_range)| FileRange::new(file, text_range))
-    }
-}
+        let parameters = match definition.kind(db) {
+            DefinitionKind::Function(node) => &node.node(&module_ref).parameters,
+            // TODO: lambda functions
+            _ => return None,
+        };
 
-fn definition_parameter_offsets(
-    definition_kind: &DefinitionKind,
-    module_ref: &ParsedModuleRef,
-) -> Option<HashMap<String, TextRange>> {
-    match definition_kind {
-        DefinitionKind::Function(node) => Some(
-            node.node(module_ref)
-                .parameters
-                .iter()
-                .map(|param| (param.name().to_string(), param.name().range()))
-                .collect(),
-        ),
-        // TODO: lambda functions
-        _ => None,
+        Some(FileRange::new(file, parameters.find(name)?.name().range))
     }
 }
 
@@ -1229,7 +1214,7 @@ pub fn inlay_hint_call_argument_details<'db>(
         };
 
         let parameter_label_offset =
-            call_signature_details.get_definition_parameter_range(db, param.name()?.as_ref());
+            call_signature_details.get_definition_parameter_range(db, param.name()?);
 
         // Only add hints for parameters that can be specified by name
         if !param.is_positional_only() && !param.is_variadic() && !param.is_keyword_variadic() {

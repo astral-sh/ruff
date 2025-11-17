@@ -68,6 +68,10 @@ impl InlayHintLabel {
     pub fn parts(&self) -> &[InlayHintLabelPart] {
         &self.parts
     }
+
+    pub fn into_parts(self) -> Vec<InlayHintLabelPart> {
+        self.parts
+    }
 }
 
 pub struct InlayHintDisplay<'a> {
@@ -100,6 +104,10 @@ impl InlayHintLabelPart {
 
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    pub fn into_text(self) -> String {
+        self.text
     }
 
     pub fn target(&self) -> Option<&NavigationTarget> {
@@ -303,14 +311,10 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
                     if let Some((name, parameter_label_offset)) = details.argument_names.get(&index)
                         && !arg_matches_name(&arg_or_keyword, name)
                     {
-                        let navigation_target = parameter_label_offset.map(|file_range| {
-                            NavigationTarget::new(file_range.file(), file_range.range())
-                        });
-
                         self.add_call_argument_name(
                             arg_or_keyword.range().start(),
                             name,
-                            navigation_target,
+                            parameter_label_offset.map(NavigationTarget::from),
                         );
                     }
                     self.visit_expr(arg_or_keyword.value());
