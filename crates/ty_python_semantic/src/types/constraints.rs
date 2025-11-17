@@ -1195,7 +1195,7 @@ impl<'db> Node<'db> {
     /// this method, other than to stop tracking the domain (which was never used for display
     /// purposes). That means we have some tech debt here, since there is a lot of duplicate logic
     /// between `simplify_for_display` and `SequentMap`. It would be nice to update our display
-    /// logic to use the sequenet map as much as possible. But that can happen later.
+    /// logic to use the sequent map as much as possible. But that can happen later.
     fn simplify_for_display(self, db: &'db dyn Db) -> Self {
         match self {
             Node::AlwaysTrue | Node::AlwaysFalse => self,
@@ -2012,7 +2012,7 @@ struct SequentMap<'db> {
     /// Sequents of the form `C₁ ∧ C₂ → D`
     pair_implications:
         FxHashMap<(ConstrainedTypeVar<'db>, ConstrainedTypeVar<'db>), Vec<ConstrainedTypeVar<'db>>>,
-    /// Sequents of the form `C₁ ∧ C₂ → D`
+    /// Sequents of the form `C → D`
     single_implications: FxHashMap<ConstrainedTypeVar<'db>, Vec<ConstrainedTypeVar<'db>>>,
     /// Constraints that we have already processed
     processed: FxHashSet<ConstrainedTypeVar<'db>>,
