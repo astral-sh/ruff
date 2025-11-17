@@ -3179,7 +3179,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
             }
             _ => {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "TypedDict `{}` can only be subscripted with string literal keys, \
+                    "TypedDict `{}` can only be subscripted with a string literal key, \
                      got key of type `{}`",
                     typed_dict_ty.display(db),
                     key_ty.display(db),
