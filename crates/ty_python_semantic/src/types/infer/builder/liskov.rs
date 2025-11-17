@@ -109,7 +109,7 @@ fn check_class_declaration<'db>(
                 .and_then(|spans| spans.signature.range())
                 .unwrap_or_else(|| function.node(db, context.file(), context.module()).range)
         } else {
-            definition.focus_range(db, context.module()).range()
+            definition.full_range(db, context.module()).range()
         };
 
         report_invalid_method_override(context, range, member, class, supercls, type_on_supercls);

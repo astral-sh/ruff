@@ -10,7 +10,7 @@ use crate::diagnostic::format_enumeration;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
-use crate::semantic_index::{global_scope, place_table};
+use crate::semantic_index::{global_scope, place_table, use_def_map};
 use crate::suppression::FileSuppressionId;
 use crate::types::KnownInstanceType;
 use crate::types::call::CallError;
@@ -32,6 +32,7 @@ use crate::{
 };
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef, Identifier};
 use ruff_text_size::{Ranged, TextRange};
@@ -3365,10 +3366,18 @@ pub(super) fn report_invalid_method_override<'db>(
 
     let supercls_name = supercls.name(db);
 
-    let overridden_method = if class.name(db) != supercls_name {
-        format!("{}.{}", supercls_name, member.name)
+    let overridden_method = if class.name(db) == supercls_name {
+        format!(
+            "{class}.{member}",
+            class = supercls.class_literal(db).0.qualified_name(db),
+            member = &member.name
+        )
     } else {
-        supercls.class_literal(db).0.qualified_name(db).to_string()
+        format!(
+            "{class}.{member}",
+            class = supercls.name(db),
+            member = &member.name
+        )
     };
 
     diagnostic.set_primary_message(format_args!(
@@ -3377,15 +3386,38 @@ pub(super) fn report_invalid_method_override<'db>(
 
     diagnostic.info("This violates the Liskov Substitution Principle");
 
-    if let Type::BoundMethod(method_on_supercls) = type_on_supercls
-        && let Some(spans) = method_on_supercls
-            .function(db)
-            .literal(db)
-            .last_definition(db)
-            .spans(db)
-    {
+    let secondary_span = type_on_supercls
+        .as_bound_method()
+        .and_then(|method_on_supercls| {
+            let supercls_scope = supercls.class_literal(db).0.body_scope(db);
+
+            if method_on_supercls.function(db).definition(db).scope(db) == supercls_scope {
+                method_on_supercls
+                    .function(db)
+                    .literal(db)
+                    .last_definition(db)
+                    .spans(db)
+                    .map(|spans| spans.signature)
+            } else {
+                place_table(db, supercls_scope)
+                    .symbol_id(&member.name)
+                    .and_then(|symbol| {
+                        use_def_map(db, supercls_scope)
+                            .end_of_scope_bindings(ScopedPlaceId::Symbol(symbol))
+                            .next()
+                    })
+                    .and_then(|binding| binding.binding.definition())
+                    .map(|definition| {
+                        definition
+                            .full_range(db, &parsed_module(db, supercls_scope.file(db)).load(db))
+                    })
+                    .map(Span::from)
+            }
+        });
+
+    if let Some(secondary_span) = secondary_span {
         diagnostic.annotate(
-            Annotation::secondary(spans.signature)
+            Annotation::secondary(secondary_span)
                 .message(format_args!("`{overridden_method}` defined here")),
         );
     }

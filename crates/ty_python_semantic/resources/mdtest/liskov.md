@@ -264,4 +264,10 @@ class A:
 
 class B(A):
     x = foo.x  # error: [invalid-method-override]
+
+class C:
+    x = foo.x
+
+class D(C):
+    def x(self, y: int): ...  # error: [invalid-method-override]
 ```
