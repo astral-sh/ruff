@@ -349,4 +349,101 @@ def mutually_constrained[T, U]():
     static_assert(not given_int.implies_subtype_of(Invariant[str], Invariant[T]))
 ```
 
+## Generic callables
+
+A generic callable can be considered equivalent to an intersection of all of its possible
+specializations. That means that a generic callable is a subtype of any particular specialization.
+(If someone expects a function that works with a particular specialization, it's fine to hand them
+the generic callable.)
+
+```py
+from typing import Callable
+from ty_extensions import CallableTypeOf, ConstraintSet, TypeOf, is_subtype_of, static_assert
+
+def identity[T](t: T) -> T:
+    return t
+
+type GenericIdentity[T] = Callable[[T], T]
+
+constraints = ConstraintSet.always()
+
+static_assert(constraints.implies_subtype_of(TypeOf[identity], Callable[[int], int]))
+static_assert(constraints.implies_subtype_of(TypeOf[identity], Callable[[str], str]))
+static_assert(not constraints.implies_subtype_of(TypeOf[identity], Callable[[str], int]))
+
+static_assert(constraints.implies_subtype_of(CallableTypeOf[identity], Callable[[int], int]))
+static_assert(constraints.implies_subtype_of(CallableTypeOf[identity], Callable[[str], str]))
+static_assert(not constraints.implies_subtype_of(CallableTypeOf[identity], Callable[[str], int]))
+
+static_assert(constraints.implies_subtype_of(TypeOf[identity], GenericIdentity[int]))
+static_assert(constraints.implies_subtype_of(TypeOf[identity], GenericIdentity[str]))
+# This gives us the default specialization, GenericIdentity[Unknown], which does
+# not participate in subtyping.
+static_assert(not constraints.implies_subtype_of(TypeOf[identity], GenericIdentity))
+```
+
+The reverse is not true — if someone expects a generic function that can be called with any
+specialization, we cannot hand them a function that only works with one specialization.
+
+```py
+static_assert(not constraints.implies_subtype_of(Callable[[int], int], TypeOf[identity]))
+static_assert(not constraints.implies_subtype_of(Callable[[str], str], TypeOf[identity]))
+static_assert(not constraints.implies_subtype_of(Callable[[str], int], TypeOf[identity]))
+
+static_assert(not constraints.implies_subtype_of(Callable[[int], int], CallableTypeOf[identity]))
+static_assert(not constraints.implies_subtype_of(Callable[[str], str], CallableTypeOf[identity]))
+static_assert(not constraints.implies_subtype_of(Callable[[str], int], CallableTypeOf[identity]))
+
+static_assert(not constraints.implies_subtype_of(GenericIdentity[int], TypeOf[identity]))
+static_assert(not constraints.implies_subtype_of(GenericIdentity[str], TypeOf[identity]))
+# This gives us the default specialization, GenericIdentity[Unknown], which does
+# not participate in subtyping.
+static_assert(not constraints.implies_subtype_of(GenericIdentity, TypeOf[identity]))
+```
+
+Unrelated typevars in the constraint set do not affect whether the subtyping check succeeds or
+fails.
+
+```py
+def unrelated[T]():
+    # Note that even though this typevar is also named T, it is not the same typevar as T@identity!
+    constraints = ConstraintSet.range(bool, T, int)
+
+    static_assert(constraints.implies_subtype_of(TypeOf[identity], Callable[[int], int]))
+    static_assert(constraints.implies_subtype_of(TypeOf[identity], Callable[[str], str]))
+    static_assert(not constraints.implies_subtype_of(TypeOf[identity], Callable[[str], int]))
+    static_assert(constraints.implies_subtype_of(TypeOf[identity], GenericIdentity[int]))
+    static_assert(constraints.implies_subtype_of(TypeOf[identity], GenericIdentity[str]))
+
+    static_assert(not constraints.implies_subtype_of(Callable[[int], int], TypeOf[identity]))
+    static_assert(not constraints.implies_subtype_of(Callable[[str], str], TypeOf[identity]))
+    static_assert(not constraints.implies_subtype_of(Callable[[str], int], TypeOf[identity]))
+    static_assert(not constraints.implies_subtype_of(GenericIdentity[int], TypeOf[identity]))
+    static_assert(not constraints.implies_subtype_of(GenericIdentity[str], TypeOf[identity]))
+```
+
+The generic callable's typevar _also_ does not affect whether the subtyping check succeeds or fails!
+
+```py
+def identity2[T](t: T) -> T:
+    # This constraint set refers to the same typevar as the generic function types below!
+    constraints = ConstraintSet.range(bool, T, int)
+
+    static_assert(constraints.implies_subtype_of(TypeOf[identity2], Callable[[int], int]))
+    static_assert(constraints.implies_subtype_of(TypeOf[identity2], Callable[[str], str]))
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(not constraints.implies_subtype_of(TypeOf[identity2], Callable[[str], int]))
+    static_assert(constraints.implies_subtype_of(TypeOf[identity2], GenericIdentity[int]))
+    static_assert(constraints.implies_subtype_of(TypeOf[identity2], GenericIdentity[str]))
+
+    static_assert(not constraints.implies_subtype_of(Callable[[int], int], TypeOf[identity2]))
+    static_assert(not constraints.implies_subtype_of(Callable[[str], str], TypeOf[identity2]))
+    static_assert(not constraints.implies_subtype_of(Callable[[str], int], TypeOf[identity2]))
+    static_assert(not constraints.implies_subtype_of(GenericIdentity[int], TypeOf[identity2]))
+    static_assert(not constraints.implies_subtype_of(GenericIdentity[str], TypeOf[identity2]))
+
+    return t
+```
+
 [subtyping]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
