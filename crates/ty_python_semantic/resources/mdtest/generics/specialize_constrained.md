@@ -19,6 +19,8 @@ bound of all of the types that satisfy the constraint set.
 from typing import Never
 from ty_extensions import ConstraintSet, generic_context
 
+# fmt: off
+
 def unbounded[T]():
     # revealed: ty_extensions.Specialization[T@unbounded = object]
     reveal_type(generic_context(unbounded).specialize_constrained(ConstraintSet.always()))
@@ -153,6 +155,8 @@ constraint that makes the test succeed.
 
 ```py
 from typing import Any
+
+# fmt: off
 
 def constrained_by_gradual[T: (Base, Any)]():
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual = object]
