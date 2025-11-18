@@ -99,7 +99,7 @@ async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
         o: bar(),  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
         p: int | f"foo",  # error: [invalid-type-form] "F-strings are not allowed in type expressions"
         # error: [invalid-type-form] "Slices are not allowed in type expressions"
-        # error: [invalid-type-form] "Cannot subscript object of type"
+        # error: [invalid-type-form] "Invalid subscript"
         q: [1, 2, 3][1:2],
     ):
         reveal_type(a)  # revealed: Unknown

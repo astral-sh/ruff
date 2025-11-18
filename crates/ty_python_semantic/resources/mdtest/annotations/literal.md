@@ -330,7 +330,7 @@ from other import Literal
 # ?
 #
 # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
-# error: [invalid-type-form] "Cannot subscript object of type `_SpecialForm` in type expression"
+# error: [invalid-type-form] "Invalid subscript of object of type `_SpecialForm` in type expression"
 a1: Literal[26]
 
 def f():

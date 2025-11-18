@@ -903,7 +903,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_type_expression(slice);
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(
-                        "Cannot subscript object of type `{}` in type expression",
+                        "Invalid subscript of object of type `{}` in type expression",
                         value_ty.display(self.db())
                     ));
                 }
