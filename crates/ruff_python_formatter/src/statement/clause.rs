@@ -735,8 +735,6 @@ fn should_suppress_clause(
         return Ok(false);
     }
 
-    // Recall that we already checked whether there was
-    // a skip comment
     Ok(true)
 }
 
