@@ -37,6 +37,16 @@ struct ExpandedStatistics<'a> {
     fixable_count: usize,
 }
 
+impl ExpandedStatistics<'_> {
+    fn all_fixable(&self) -> bool {
+        self.fixable_count == self.count
+    }
+
+    fn any_fixable(&self) -> bool {
+        self.fixable_count > 0
+    }
+}
+
 pub(crate) struct Printer {
     format: OutputFormat,
     log_level: LogLevel,
@@ -317,9 +327,7 @@ impl Printer {
                     .map(|statistic| statistic.code.map_or(0, |s| s.len()))
                     .max()
                     .unwrap();
-                let any_fixable = statistics
-                    .iter()
-                    .any(|statistic| statistic.fixable_count > 0);
+                let any_fixable = statistics.iter().any(|statistic| statistic.any_fixable());
 
                 let all_fixable = format!("[{}] ", "*".cyan());
                 let partially_fixable = format!("[{}] ", "~".cyan());
@@ -338,9 +346,9 @@ impl Printer {
                             .red()
                             .bold(),
                         if any_fixable {
-                            if statistic.fixable_count == statistic.count {
+                            if statistic.all_fixable() {
                                 &all_fixable
-                            } else if statistic.fixable_count > 0 {
+                            } else if statistic.any_fixable() {
                                 &partially_fixable
                             } else {
                                 unfixable
