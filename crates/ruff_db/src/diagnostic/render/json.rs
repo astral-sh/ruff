@@ -100,7 +100,7 @@ pub(super) fn diagnostic_to_json<'a>(
     if config.preview {
         JsonDiagnostic {
             code: diagnostic.secondary_code_or_id(),
-            url: diagnostic.to_ruff_url(),
+            url: diagnostic.documentation_url(),
             message: diagnostic.body(),
             fix,
             cell: notebook_cell_index,
@@ -112,7 +112,7 @@ pub(super) fn diagnostic_to_json<'a>(
     } else {
         JsonDiagnostic {
             code: diagnostic.secondary_code_or_id(),
-            url: diagnostic.to_ruff_url(),
+            url: diagnostic.documentation_url(),
             message: diagnostic.body(),
             fix,
             cell: notebook_cell_index,
@@ -228,7 +228,7 @@ pub(crate) struct JsonDiagnostic<'a> {
     location: Option<JsonLocation>,
     message: &'a str,
     noqa_row: Option<OneIndexed>,
-    url: Option<String>,
+    url: Option<&'a str>,
 }
 
 #[derive(Serialize)]

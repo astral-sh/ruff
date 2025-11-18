@@ -82,7 +82,7 @@ fn diagnostic_to_rdjson<'a>(
             value: diagnostic
                 .secondary_code()
                 .map_or_else(|| diagnostic.name(), |code| code.as_str()),
-            url: diagnostic.to_ruff_url(),
+            url: diagnostic.documentation_url(),
         },
         suggestions: rdjson_suggestions(
             edits,
@@ -182,7 +182,7 @@ impl RdjsonRange {
 #[derive(Serialize)]
 struct RdjsonCode<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
-    url: Option<String>,
+    url: Option<&'a str>,
     value: &'a str,
 }
 
