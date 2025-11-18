@@ -1890,9 +1890,11 @@ fn handle_lambda_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
-/// Move comment between a unary op and its operand before the unary op by marking them as trailing.
+/// Move an end-of-line comment between a unary op and its operand after the operand by marking
+/// it as dangling.
 ///
 /// For example, given:
+///
 /// ```python
 /// (
 ///     not  # comment
@@ -1900,8 +1902,13 @@ fn handle_lambda_comment<'a>(
 /// )
 /// ```
 ///
-/// The `# comment` will be attached as a dangling comment on the enclosing node, to ensure that
-/// it remains on the same line as the operator.
+/// the `# comment` will be attached as a dangling comment on the unary op and formatted as:
+///
+/// ```python
+/// (
+///      not True  # comment
+/// )
+/// ```
 fn handle_unary_op_comment<'a>(
     comment: DecoratedComment<'a>,
     unary_op: &'a ast::ExprUnaryOp,
@@ -1923,8 +1930,8 @@ fn handle_unary_op_comment<'a>(
     let up_to = tokenizer
         .find(|token| token.kind == SimpleTokenKind::LParen)
         .map_or(unary_op.operand.start(), |lparen| lparen.start());
-    if comment.end() < up_to {
-        CommentPlacement::leading(unary_op, comment)
+    if comment.end() < up_to && comment.line_position().is_end_of_line() {
+        CommentPlacement::dangling(unary_op, comment)
     } else {
         CommentPlacement::Default(comment)
     }
