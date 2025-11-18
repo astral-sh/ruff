@@ -2022,27 +2022,41 @@ struct SequentMap<'db> {
     single_implications: FxHashMap<ConstrainedTypeVar<'db>, FxHashSet<ConstrainedTypeVar<'db>>>,
     /// Constraints that we have already processed
     processed: FxHashSet<ConstrainedTypeVar<'db>>,
+    /// Constraints that enqueued to be processed
+    enqueued: Vec<ConstrainedTypeVar<'db>>,
 }
 
 impl<'db> SequentMap<'db> {
     fn add(&mut self, db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) {
-        // If we've already seen this constraint, we can skip it.
-        if !self.processed.insert(constraint) {
+        self.enqueue_constraint(constraint);
+
+        while let Some(constraint) = self.enqueued.pop() {
+            // If we've already processed this constraint, we can skip it.
+            if !self.processed.insert(constraint) {
+                continue;
+            }
+
+            // Otherwise, check this constraint against all of the other ones we've seen so far, seeing
+            // if they're related to each other.
+            let processed = std::mem::take(&mut self.processed);
+            for other in &processed {
+                if constraint != *other {
+                    self.add_sequents_for_pair(db, constraint, *other);
+                }
+            }
+            self.processed = processed;
+
+            // And see if we can create any sequents from the constraint on its own.
+            self.add_sequents_for_single(db, constraint);
+        }
+    }
+
+    fn enqueue_constraint(&mut self, constraint: ConstrainedTypeVar<'db>) {
+        // If we've already processed this constraint, we can skip it.
+        if self.processed.contains(&constraint) {
             return;
         }
-
-        // Otherwise, check this constraint against all of the other ones we've seen so far, seeing
-        // if they're related to each other.
-        let processed = std::mem::take(&mut self.processed);
-        for other in &processed {
-            if constraint != *other {
-                self.add_sequents_for_pair(db, constraint, *other);
-            }
-        }
-        self.processed = processed;
-
-        // And see if we can create any sequents from the constraint on its own.
-        self.add_sequents_for_single(db, constraint);
+        self.enqueued.push(constraint);
     }
 
     fn pair_key(
@@ -2110,32 +2124,31 @@ impl<'db> SequentMap<'db> {
 
         let lower = constraint.lower(db);
         let upper = constraint.upper(db);
-        match (lower, upper) {
+        let post_constraint = match (lower, upper) {
             // Case 1
             (Type::TypeVar(lower_typevar), Type::TypeVar(upper_typevar)) => {
                 if !lower_typevar.is_same_typevar_as(db, upper_typevar) {
-                    let post_constraint =
-                        ConstrainedTypeVar::new(db, lower_typevar, Type::Never, upper);
-                    self.add_single_implication(constraint, post_constraint);
+                    ConstrainedTypeVar::new(db, lower_typevar, Type::Never, upper)
+                } else {
+                    return;
                 }
             }
 
             // Case 2
             (Type::TypeVar(lower_typevar), _) => {
-                let post_constraint =
-                    ConstrainedTypeVar::new(db, lower_typevar, Type::Never, upper);
-                self.add_single_implication(constraint, post_constraint);
+                ConstrainedTypeVar::new(db, lower_typevar, Type::Never, upper)
             }
 
             // Case 3
             (_, Type::TypeVar(upper_typevar)) => {
-                let post_constraint =
-                    ConstrainedTypeVar::new(db, upper_typevar, lower, Type::object());
-                self.add_single_implication(constraint, post_constraint);
+                ConstrainedTypeVar::new(db, upper_typevar, lower, Type::object())
             }
 
-            _ => {}
-        }
+            _ => return,
+        };
+
+        self.add_single_implication(constraint, post_constraint);
+        self.enqueue_constraint(post_constraint);
     }
 
     fn add_sequents_for_pair(
@@ -2246,6 +2259,7 @@ impl<'db> SequentMap<'db> {
         let post_constraint =
             ConstrainedTypeVar::new(db, constrained_typevar, new_lower, new_upper);
         self.add_pair_implication(db, left_constraint, right_constraint, post_constraint);
+        self.enqueue_constraint(post_constraint);
     }
 
     fn add_mutual_sequents_for_same_typevars(
@@ -2276,6 +2290,7 @@ impl<'db> SequentMap<'db> {
                     _ => return,
                 };
                 self.add_pair_implication(db, left_constraint, right_constraint, post_constraint);
+                self.enqueue_constraint(post_constraint);
             };
 
         try_one_direction(left_constraint, right_constraint);
@@ -2298,6 +2313,7 @@ impl<'db> SequentMap<'db> {
                 );
                 self.add_single_implication(intersection_constraint, left_constraint);
                 self.add_single_implication(intersection_constraint, right_constraint);
+                self.enqueue_constraint(intersection_constraint);
             }
             None => {
                 self.add_impossibility(db, left_constraint, right_constraint);
