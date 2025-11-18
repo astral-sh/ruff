@@ -2891,9 +2891,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 // should prefer the tighter specialization.
 
                 // XXX: Determine typevar variance per argument
+                eprintln!(
+                    "--> arg {} {} {}",
+                    argument_index,
+                    argument_constraints.display(self.db),
+                    valid_argument_constraints.display(self.db),
+                );
                 constraints.intersect(self.db, valid_argument_constraints);
             }
         }
+        eprintln!("--> constraints {}", constraints.display(self.db));
 
         // Attempt to promote any literal types assigned to the specialization.
         let maybe_promote = |identity, typevar, ty: Type<'db>| {
@@ -2949,15 +2956,23 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             generic_context.specialize_constrained_mapped(self.db, constraints, maybe_promote)
         else {
             // XXX: better error
+            eprintln!("--> X1");
             return;
         };
         // XXX: maybe_promote
         let isolated_return_ty = self
             .return_ty
             .apply_specialization(self.db, isolated_specialization);
+        eprintln!("--> spec {}", isolated_specialization.display_full(self.db));
+        eprintln!("--> rty {}", isolated_return_ty.display(self.db));
 
         let mut try_infer_tcx = || {
             let (return_ty, call_expression_tcx) = return_with_tcx?;
+            eprintln!(
+                "--> infer tcx {} {}",
+                return_ty.display(self.db),
+                call_expression_tcx.display(self.db)
+            );
 
             // A type variable is not a useful type-context for expression inference, and applying it
             // to the return type can lead to confusing unions in nested generic calls.
@@ -2968,6 +2983,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             // If the return type is already assignable to the annotated type, we ignore the rest of
             // the type context and prefer the narrower inferred type.
             if isolated_return_ty.is_assignable_to(self.db, call_expression_tcx) {
+                eprintln!("--> X2");
                 return None;
             }
 
@@ -2977,6 +2993,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 .when_assignable_to(self.db, call_expression_tcx, self.inferable_typevars)
                 .and(self.db, || valid_specializations);
             if return_constraints.is_never_satisfied(self.db) {
+                eprintln!("--> X3");
                 return None;
             }
 
@@ -2987,6 +3004,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 maybe_promote,
             ) else {
                 // XXX: better return
+                eprintln!("--> X4");
                 return None;
             };
             // XXX: maybe_promote
@@ -3009,13 +3027,37 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let parameters = self.signature.parameters();
         let parameter = &parameters[parameter_index];
         if let Some(mut expected_ty) = parameter.annotated_type() {
+            eprintln!(
+                "--> before {:?} {} {}",
+                adjusted_argument_index,
+                argument_type.display(self.db),
+                expected_ty.display(self.db),
+            );
             if let Some(specialization) = self.specialization {
                 argument_type = argument_type.apply_specialization(self.db, specialization);
                 expected_ty = expected_ty.apply_specialization(self.db, specialization);
+                eprintln!(
+                    "--> after {:?} {} {}",
+                    adjusted_argument_index,
+                    argument_type.display(self.db),
+                    expected_ty.display(self.db),
+                );
+                eprintln!("    {:?}", argument_type);
+                eprintln!("    {:?}", expected_ty);
             }
             // TODO: Soon we will go further, and build the actual specializations from the
             // constraint set that we get from this assignability check, instead of inferring and
             // building them in an earlier separate step.
+            let when =
+                argument_type.when_assignable_to(self.db, expected_ty, self.inferable_typevars);
+            eprintln!("===> check argument");
+            eprintln!(" --> arg   {}", argument_type.display(self.db));
+            eprintln!(" --> param {}", expected_ty.display(self.db));
+            eprintln!(" --> when  {}", when.display(self.db));
+            eprintln!(
+                " --> sat   {}",
+                when.satisfied_by_all_typevars(self.db, self.inferable_typevars)
+            );
             if !argument_type
                 .when_assignable_to(self.db, expected_ty, self.inferable_typevars)
                 .satisfied_by_all_typevars(self.db, self.inferable_typevars)

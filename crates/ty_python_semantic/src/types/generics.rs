@@ -1432,6 +1432,7 @@ impl<'db> SpecializationBuilder<'db> {
         mut f: &mut dyn FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) -> Result<(), SpecializationError<'db>> {
         if formal == actual {
+            eprintln!(" --> AAA");
             return Ok(());
         }
 
@@ -1510,6 +1511,7 @@ impl<'db> SpecializationBuilder<'db> {
                             .satisfied_by_all_typevars(self.db, InferableTypeVars::None)
                     });
                     if assignable_elements.exactly_one().is_ok() {
+                        eprintln!(" --> BBB");
                         return Ok(());
                     }
                 }
