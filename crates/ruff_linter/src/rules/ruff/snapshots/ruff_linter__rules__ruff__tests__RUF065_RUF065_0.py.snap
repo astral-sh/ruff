@@ -216,6 +216,4 @@ RUF065 Unnecessary `hex()` conversion when formatting with `%s`. Use `%#x` inste
 69 | info("Hex: %s", hex(42))
 70 | log(logging.INFO, "Hex: %s", hex(255))
    |                              ^^^^^^^^
-71 |
-72 | # Complex conversion specifiers that make oct() and hex() necessary
    |
