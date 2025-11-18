@@ -294,7 +294,10 @@ mod tests {
         env.format(DiagnosticFormat::Json);
         env.preview(false);
 
-        let diag = env.err().build();
+        let diag = env
+            .err()
+            .documentation_url("https://docs.astral.sh/ruff/rules/test-diagnostic")
+            .build();
 
         insta::assert_snapshot!(
             env.render(&diag),
@@ -328,7 +331,10 @@ mod tests {
         env.format(DiagnosticFormat::Json);
         env.preview(true);
 
-        let diag = env.err().build();
+        let diag = env
+            .err()
+            .documentation_url("https://docs.astral.sh/ruff/rules/test-diagnostic")
+            .build();
 
         insta::assert_snapshot!(
             env.render(&diag),
