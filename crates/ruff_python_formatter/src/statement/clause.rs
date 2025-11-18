@@ -445,22 +445,6 @@ where
     }
 }
 
-impl<'a> FormatClauseHeader<'a, '_> {
-    /// Sets the leading comments that precede an alternate branch.
-    #[must_use]
-    pub(crate) fn with_leading_comments<N>(
-        mut self,
-        comments: &'a [SourceComment],
-        last_node: Option<N>,
-    ) -> Self
-    where
-        N: Into<AnyNodeRef<'a>>,
-    {
-        self.leading_comments = Some((comments, last_node.map(Into::into)));
-        self
-    }
-}
-
 impl<'ast> Format<PyFormatContext<'ast>> for FormatClauseHeader<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
         if let Some((leading_comments, last_node)) = self.leading_comments {
@@ -533,11 +517,19 @@ impl Format<PyFormatContext<'_>> for FormatClauseBody<'_> {
 }
 
 pub(crate) struct FormatClause<'a, 'ast> {
-    format_header: FormatClauseHeader<'a, 'ast>,
-    format_body: FormatClauseBody<'a>,
+    header: ClauseHeader<'a>,
+    /// How to format the clause header
+    header_formatter: Argument<'a, PyFormatContext<'ast>>,
+    /// Leading comments coming before the branch, together with the previous node, if any. Only relevant
+    /// for alternate branches.
+    leading_comments: Option<(&'a [SourceComment], Option<AnyNodeRef<'a>>)>,
+    /// The trailing comments coming after the colon.
+    trailing_colon_comment: &'a [SourceComment],
+    body: &'a Suite,
+    kind: SuiteKind,
 }
 
-impl<'a> FormatClause<'a, '_> {
+impl<'a, 'ast> FormatClause<'a, 'ast> {
     /// Sets the leading comments that precede an alternate branch.
     #[must_use]
     pub(crate) fn with_leading_comments<N>(
@@ -548,10 +540,21 @@ impl<'a> FormatClause<'a, '_> {
     where
         N: Into<AnyNodeRef<'a>>,
     {
-        self.format_header = self
-            .format_header
-            .with_leading_comments(comments, last_node);
+        self.leading_comments = Some((comments, last_node.map(Into::into)));
         self
+    }
+
+    fn clause_header(&self) -> FormatClauseHeader<'a, 'ast> {
+        FormatClauseHeader {
+            header: self.header,
+            formatter: self.header_formatter,
+            leading_comments: self.leading_comments,
+            trailing_colon_comment: self.trailing_colon_comment,
+        }
+    }
+
+    fn clause_body(&self) -> FormatClauseBody<'a> {
+        clause_body(self.body, self.kind, self.trailing_colon_comment)
     }
 }
 
@@ -569,8 +572,12 @@ where
     Content: Format<PyFormatContext<'ast>>,
 {
     FormatClause {
-        format_header: clause_header(header, trailing_colon_comment, header_formatter),
-        format_body: clause_body(body, kind, trailing_colon_comment),
+        header,
+        header_formatter: Argument::new(header_formatter),
+        leading_comments: None,
+        trailing_colon_comment,
+        body,
+        kind,
     }
 }
 
@@ -579,7 +586,7 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatClause<'_, 'ast> {
         if should_suppress_clause(self, f)? {
             write_suppressed_clause(self, f)
         } else {
-            write!(f, [self.format_header, self.format_body])
+            write!(f, [self.clause_header(), self.clause_body()])
         }
     }
 }
@@ -713,7 +720,7 @@ fn should_suppress_clause(
 ) -> FormatResult<bool> {
     let source = f.context().source();
 
-    let Some(last_child_in_clause) = clause.format_header.header.last_child_in_clause() else {
+    let Some(last_child_in_clause) = clause.header.last_child_in_clause() else {
         return Ok(false);
     };
 
@@ -726,7 +733,7 @@ fn should_suppress_clause(
         return Ok(false);
     }
 
-    let clause_start = clause.format_header.header.range(source)?.end();
+    let clause_start = clause.header.range(source)?.end();
 
     let clause_range = TextRange::new(clause_start, last_child_in_clause.end());
 
@@ -743,11 +750,11 @@ fn write_suppressed_clause(
     clause: &FormatClause,
     f: &mut Formatter<PyFormatContext<'_>>,
 ) -> FormatResult<()> {
-    if let Some((leading_comments, last_node)) = clause.format_header.leading_comments {
+    if let Some((leading_comments, last_node)) = clause.leading_comments {
         leading_alternate_branch_comments(leading_comments, last_node).fmt(f)?;
     }
 
-    let header = clause.format_header.header;
+    let header = clause.header;
     let clause_start = header.first_keyword_range(f.context().source())?.start();
 
     let comments = f.context().comments().clone();
@@ -786,7 +793,7 @@ fn write_suppressed_clause(
     // Similarly we mark the comments in the body as formatted.
     // Note that the trailing comments for the last child in the
     // body have already been handled above.
-    for stmt in clause.format_body.body {
+    for stmt in clause.body {
         comments.mark_verbatim_node_comments_formatted(stmt.into());
     }
 
