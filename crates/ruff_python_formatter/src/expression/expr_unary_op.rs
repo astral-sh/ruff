@@ -87,7 +87,7 @@ impl NeedsParentheses for ExprUnaryOp {
         }
 
         if needs_line_break(self, context) {
-            return OptionalParentheses::Multiline;
+            return OptionalParentheses::Always;
         }
 
         if is_expression_parenthesized(
