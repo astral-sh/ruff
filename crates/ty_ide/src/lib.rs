@@ -132,6 +132,20 @@ impl NavigationTarget {
     pub fn full_range(&self) -> TextRange {
         self.full_range
     }
+
+    pub fn full_file_range(&self) -> FileRange {
+        FileRange::new(self.file, self.full_range)
+    }
+}
+
+impl From<FileRange> for NavigationTarget {
+    fn from(value: FileRange) -> Self {
+        Self {
+            file: value.file(),
+            focus_range: value.range(),
+            full_range: value.range(),
+        }
+    }
 }
 
 /// Specifies the kind of reference operation.

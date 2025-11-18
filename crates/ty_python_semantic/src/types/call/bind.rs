@@ -9,7 +9,7 @@ use std::fmt;
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
@@ -35,11 +35,11 @@ use crate::types::generics::{
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::{
-    BoundMethodType, BoundTypeVarIdentity, ClassLiteral, DataclassFlags, DataclassParams,
-    FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    NominalInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
-    TypeAliasType, TypeContext, UnionBuilder, UnionType, WrapperDescriptorKind, enums, ide_support,
-    infer_isolated_expression, todo_type,
+    BoundMethodType, BoundTypeVarIdentity, ClassLiteral, DATACLASS_FLAGS, DataclassFlags,
+    DataclassParams, FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType,
+    TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, ide_support, infer_isolated_expression, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
@@ -52,6 +52,9 @@ use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
 pub(crate) struct Bindings<'db> {
     /// The type that is (hopefully) callable.
     callable_type: Type<'db>,
+
+    /// The type of the instance being constructed, if this signature is for a constructor.
+    constructor_instance_type: Option<Type<'db>>,
 
     /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a non-union
     /// type.
@@ -77,6 +80,7 @@ impl<'db> Bindings<'db> {
             callable_type,
             elements,
             argument_forms: ArgumentForms::new(0),
+            constructor_instance_type: None,
         }
     }
 
@@ -87,6 +91,22 @@ impl<'db> Bindings<'db> {
         for binding in &mut self.elements {
             binding.replace_callable_type(before, after);
         }
+    }
+
+    pub(crate) fn with_constructor_instance_type(
+        mut self,
+        constructor_instance_type: Type<'db>,
+    ) -> Self {
+        self.constructor_instance_type = Some(constructor_instance_type);
+
+        for binding in &mut self.elements {
+            binding.constructor_instance_type = Some(constructor_instance_type);
+            for binding in &mut binding.overloads {
+                binding.constructor_instance_type = Some(constructor_instance_type);
+            }
+        }
+
+        self
     }
 
     pub(crate) fn set_dunder_call_is_possibly_unbound(&mut self) {
@@ -107,6 +127,7 @@ impl<'db> Bindings<'db> {
         Self {
             callable_type: self.callable_type,
             argument_forms: self.argument_forms,
+            constructor_instance_type: self.constructor_instance_type,
             elements: self.elements.into_iter().map(f).collect(),
         }
     }
@@ -238,6 +259,10 @@ impl<'db> Bindings<'db> {
 
     pub(crate) fn callable_type(&self) -> Type<'db> {
         self.callable_type
+    }
+
+    pub(crate) fn constructor_instance_type(&self) -> Option<Type<'db>> {
+        self.constructor_instance_type
     }
 
     /// Returns the return type of the call. For successful calls, this is the actual return type.
@@ -993,7 +1018,11 @@ impl<'db> Bindings<'db> {
                                     flags |= DataclassFlags::FROZEN;
                                 }
                                 if to_bool(match_args, true) {
-                                    flags |= DataclassFlags::MATCH_ARGS;
+                                    if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                                        flags |= DataclassFlags::MATCH_ARGS;
+                                    } else {
+                                        // TODO: emit diagnostic
+                                    }
                                 }
                                 if to_bool(kw_only, false) {
                                     if Program::get(db).python_version(db) >= PythonVersion::PY310 {
@@ -1003,10 +1032,18 @@ impl<'db> Bindings<'db> {
                                     }
                                 }
                                 if to_bool(slots, false) {
-                                    flags |= DataclassFlags::SLOTS;
+                                    if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                                        flags |= DataclassFlags::SLOTS;
+                                    } else {
+                                        // TODO: emit diagnostic
+                                    }
                                 }
                                 if to_bool(weakref_slot, false) {
-                                    flags |= DataclassFlags::WEAKREF_SLOT;
+                                    if Program::get(db).python_version(db) >= PythonVersion::PY311 {
+                                        flags |= DataclassFlags::WEAKREF_SLOT;
+                                    } else {
+                                        // TODO: emit diagnostic
+                                    }
                                 }
 
                                 let params = DataclassParams::from_flags(db, flags);
@@ -1097,28 +1134,12 @@ impl<'db> Bindings<'db> {
                                                 );
                                             let mut flags = dataclass_params.flags(db);
 
-                                            if let Ok(Some(Type::BooleanLiteral(order))) =
-                                                overload.parameter_type_by_name("order", false)
-                                            {
-                                                flags.set(DataclassFlags::ORDER, order);
-                                            }
-
-                                            if let Ok(Some(Type::BooleanLiteral(eq))) =
-                                                overload.parameter_type_by_name("eq", false)
-                                            {
-                                                flags.set(DataclassFlags::EQ, eq);
-                                            }
-
-                                            if let Ok(Some(Type::BooleanLiteral(kw_only))) =
-                                                overload.parameter_type_by_name("kw_only", false)
-                                            {
-                                                flags.set(DataclassFlags::KW_ONLY, kw_only);
-                                            }
-
-                                            if let Ok(Some(Type::BooleanLiteral(frozen))) =
-                                                overload.parameter_type_by_name("frozen", false)
-                                            {
-                                                flags.set(DataclassFlags::FROZEN, frozen);
+                                            for (param, flag) in DATACLASS_FLAGS {
+                                                if let Ok(Some(Type::BooleanLiteral(value))) =
+                                                    overload.parameter_type_by_name(param, false)
+                                                {
+                                                    flags.set(*flag, value);
+                                                }
                                             }
 
                                             Type::DataclassDecorator(DataclassParams::new(
@@ -1179,10 +1200,10 @@ impl<'db> Bindings<'db> {
                             continue;
                         };
 
-                        let result = tracked.constraints(db).when_subtype_of_given(
+                        let result = ty_a.when_subtype_of_assuming(
                             db,
-                            *ty_a,
                             *ty_b,
+                            tracked.constraints(db),
                             InferableTypeVars::None,
                         );
                         let tracked = TrackedConstraintSet::new(db, result);
@@ -1345,6 +1366,7 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
             callable_type: from.callable_type,
             elements: smallvec_inline![from],
             argument_forms: ArgumentForms::new(0),
+            constructor_instance_type: None,
         }
     }
 }
@@ -1358,6 +1380,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
+            constructor_instance_type: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads: smallvec_inline![from],
@@ -1366,6 +1389,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             callable_type,
             elements: smallvec_inline![callable_binding],
             argument_forms: ArgumentForms::new(0),
+            constructor_instance_type: None,
         }
     }
 }
@@ -1396,6 +1420,9 @@ pub(crate) struct CallableBinding<'db> {
 
     /// The type of the bound `self` or `cls` parameter if this signature is for a bound method.
     pub(crate) bound_type: Option<Type<'db>>,
+
+    /// The type of the instance being constructed, if this signature is for a constructor.
+    pub(crate) constructor_instance_type: Option<Type<'db>>,
 
     /// The return type of this overloaded callable.
     ///
@@ -1445,6 +1472,7 @@ impl<'db> CallableBinding<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
+            constructor_instance_type: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads,
@@ -1457,6 +1485,7 @@ impl<'db> CallableBinding<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
+            constructor_instance_type: None,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads: smallvec![],
@@ -2677,7 +2706,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     arguments: &'a CallArguments<'a, 'db>,
     argument_matches: &'a [MatchedArgument<'db>],
     parameter_tys: &'a mut [Option<Type<'db>>],
-    callable_type: Type<'db>,
+    constructor_instance_type: Option<Type<'db>>,
     call_expression_tcx: TypeContext<'db>,
     return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
@@ -2694,7 +2723,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         arguments: &'a CallArguments<'a, 'db>,
         argument_matches: &'a [MatchedArgument<'db>],
         parameter_tys: &'a mut [Option<Type<'db>>],
-        callable_type: Type<'db>,
+        constructor_instance_type: Option<Type<'db>>,
         call_expression_tcx: TypeContext<'db>,
         return_ty: Type<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
@@ -2705,7 +2734,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             arguments,
             argument_matches,
             parameter_tys,
-            callable_type,
+            constructor_instance_type,
             call_expression_tcx,
             return_ty,
             errors,
@@ -2747,8 +2776,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         };
 
         let return_with_tcx = self
-            .callable_type
-            .synthesized_constructor_return_ty(self.db)
+            .constructor_instance_type
             .or(self.signature.return_ty)
             .zip(self.call_expression_tcx.annotation);
 
@@ -2764,6 +2792,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             Some(builder.type_mappings().clone())
         });
 
+        // For a given type variable, we track the variance of any assignments to that type variable
+        // in the argument types.
+        let mut variance_in_arguments: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
+            FxHashMap::default();
+
         let parameters = self.signature.parameters();
         for (argument_index, adjusted_argument_index, _, argument_type) in
             self.enumerate_argument_types()
@@ -2776,22 +2809,32 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     continue;
                 };
 
-                let filter = |declared_ty: BoundTypeVarIdentity<'_>, inferred_ty: Type<'_>| {
-                    // Avoid widening the inferred type if it is already assignable to the
-                    // preferred declared type.
-                    preferred_type_mappings
-                        .as_ref()
-                        .and_then(|types| types.get(&declared_ty))
-                        .is_none_or(|preferred_ty| {
-                            !inferred_ty.is_assignable_to(self.db, *preferred_ty)
-                        })
-                };
-
-                if let Err(error) = builder.infer_filter(
+                let specialization_result = builder.infer_map(
                     expected_type,
                     variadic_argument_type.unwrap_or(argument_type),
-                    filter,
-                ) {
+                    |(identity, variance, inferred_ty)| {
+                        // Avoid widening the inferred type if it is already assignable to the
+                        // preferred declared type.
+                        if preferred_type_mappings
+                            .as_ref()
+                            .and_then(|types| types.get(&identity))
+                            .is_some_and(|preferred_ty| {
+                                inferred_ty.is_assignable_to(self.db, *preferred_ty)
+                            })
+                        {
+                            return None;
+                        }
+
+                        variance_in_arguments
+                            .entry(identity)
+                            .and_modify(|current| *current = current.join(variance))
+                            .or_insert(variance);
+
+                        Some(inferred_ty)
+                    },
+                );
+
+                if let Err(error) = specialization_result {
                     self.errors.push(BindingError::SpecializationError {
                         error,
                         argument_index: adjusted_argument_index,
@@ -2800,8 +2843,59 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
+        // Attempt to promote any literal types assigned to the specialization.
+        let maybe_promote = |identity, typevar, ty: Type<'db>| {
+            let Some(return_ty) = self.constructor_instance_type.or(self.signature.return_ty)
+            else {
+                return ty;
+            };
+
+            let mut combined_tcx = TypeContext::default();
+            let mut variance_in_return = TypeVarVariance::Bivariant;
+
+            // Find all occurrences of the type variable in the return type.
+            let visit_return_ty = |_, ty, variance, tcx: TypeContext<'db>| {
+                if ty != Type::TypeVar(typevar) {
+                    return;
+                }
+
+                // We always prefer the declared type when attempting literal promotion,
+                // so we take the union of every applicable type context.
+                match (tcx.annotation, &mut combined_tcx.annotation) {
+                    (Some(_), None) => combined_tcx = tcx,
+                    (Some(ty), Some(combined_ty)) => {
+                        *combined_ty = UnionType::from_elements(self.db, [*combined_ty, ty]);
+                    }
+                    _ => {}
+                }
+
+                variance_in_return = variance_in_return.join(variance);
+            };
+
+            return_ty.visit_specialization(self.db, self.call_expression_tcx, visit_return_ty);
+
+            // Promotion is only useful if the type variable is in invariant or contravariant
+            // position in the return type.
+            if variance_in_return.is_covariant() {
+                return ty;
+            }
+
+            // If the type variable is a non-covariant position in the argument, then we avoid
+            // promotion, respecting any literals in the parameter type.
+            if variance_in_arguments
+                .get(&identity)
+                .is_some_and(|variance| !variance.is_covariant())
+            {
+                return ty;
+            }
+
+            ty.promote_literals(self.db, combined_tcx)
+        };
+
         // Build the specialization first without inferring the complete type context.
-        let isolated_specialization = builder.build(generic_context, self.call_expression_tcx);
+        let isolated_specialization = builder
+            .mapped(generic_context, maybe_promote)
+            .build(generic_context);
         let isolated_return_ty = self
             .return_ty
             .apply_specialization(self.db, isolated_specialization);
@@ -2826,7 +2920,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             builder.infer(return_ty, call_expression_tcx).ok()?;
 
             // Otherwise, build the specialization again after inferring the complete type context.
-            let specialization = builder.build(generic_context, self.call_expression_tcx);
+            let specialization = builder
+                .mapped(generic_context, maybe_promote)
+                .build(generic_context);
             let return_ty = return_ty.apply_specialization(self.db, specialization);
 
             Some((Some(specialization), return_ty))
@@ -3097,6 +3193,9 @@ pub(crate) struct Binding<'db> {
     /// it may be a `__call__` method.
     pub(crate) signature_type: Type<'db>,
 
+    /// The type of the instance being constructed, if this signature is for a constructor.
+    pub(crate) constructor_instance_type: Option<Type<'db>>,
+
     /// Return type of the call.
     return_ty: Type<'db>,
 
@@ -3128,6 +3227,7 @@ impl<'db> Binding<'db> {
             signature,
             callable_type: signature_type,
             signature_type,
+            constructor_instance_type: None,
             return_ty: Type::unknown(),
             inferable_typevars: InferableTypeVars::None,
             specialization: None,
@@ -3192,7 +3292,7 @@ impl<'db> Binding<'db> {
             arguments,
             &self.argument_matches,
             &mut self.parameter_tys,
-            self.callable_type,
+            self.constructor_instance_type,
             call_expression_tcx,
             self.return_ty,
             &mut self.errors,

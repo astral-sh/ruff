@@ -66,8 +66,8 @@ use salsa::plumbing::AsId;
 use crate::Db;
 use crate::types::generics::InferableTypeVars;
 use crate::types::{
-    BoundTypeVarInstance, IntersectionType, Type, TypeRelation, TypeVarBoundOrConstraints,
-    UnionType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation,
+    TypeVarBoundOrConstraints, UnionType,
 };
 
 /// An extension trait for building constraint sets from [`Option`] values.
@@ -185,11 +185,12 @@ impl<'db> ConstraintSet<'db> {
         typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
         upper: Type<'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
     ) -> Self {
         let (lower, upper) = match relation {
-            // TODO: Is this the correct constraint for redundancy?
-            TypeRelation::Subtyping | TypeRelation::Redundancy => (
+            TypeRelation::Subtyping
+            | TypeRelation::Redundancy
+            | TypeRelation::SubtypingAssuming(_) => (
                 lower.top_materialization(db),
                 upper.bottom_materialization(db),
             ),
@@ -215,47 +216,16 @@ impl<'db> ConstraintSet<'db> {
     }
 
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
-    /// constraints in this constraint set hold.
-    ///
-    /// For concrete types (types that are not typevars), this returns the same result as
-    /// [`when_subtype_of`][Type::when_subtype_of]. (Constraint sets place restrictions on
-    /// typevars, so if you are not comparing typevars, the constraint set can have no effect on
-    /// whether subtyping holds.)
-    ///
-    /// If you're comparing a typevar, we have to consider what restrictions the constraint set
-    /// places on that typevar to determine if subtyping holds. For instance, if you want to check
-    /// whether `T ≤ int`, then answer will depend on what constraint set you are considering:
-    ///
-    /// ```text
-    /// when_subtype_of_given(T ≤ bool, T, int) ⇒ true
-    /// when_subtype_of_given(T ≤ int, T, int)  ⇒ true
-    /// when_subtype_of_given(T ≤ str, T, int)  ⇒ false
-    /// ```
-    ///
-    /// In the first two cases, the constraint set ensures that `T` will always specialize to a
-    /// type that is a subtype of `int`. In the final case, the constraint set requires `T` to
-    /// specialize to a subtype of `str`, and there is no such type that is also a subtype of
-    /// `int`.
-    ///
-    /// There are two constraint sets that deserve special consideration.
-    ///
-    /// - The "always true" constraint set does not place any restrictions on any typevar. In this
-    ///   case, `when_subtype_of_given` will return the same result as `when_subtype_of`, even if
-    ///   you're comparing against a typevar.
-    ///
-    /// - The "always false" constraint set represents an impossible situation. In this case, every
-    ///   subtype check will be vacuously true, even if you're comparing two concrete types that
-    ///   are not actually subtypes of each other. (That is,
-    ///   `when_subtype_of_given(false, int, str)` will return true!)
-    pub(crate) fn when_subtype_of_given(
+    /// constraints in this constraint set hold. Panics if neither of the types being compared are
+    /// a typevar. (That case is handled by `Type::has_relation_to`.)
+    pub(crate) fn implies_subtype_of(
         self,
         db: &'db dyn Db,
         lhs: Type<'db>,
         rhs: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
     ) -> Self {
         Self {
-            node: self.node.when_subtype_of_given(db, lhs, rhs, inferable),
+            node: self.node.implies_subtype_of(db, lhs, rhs),
         }
     }
 
@@ -329,6 +299,20 @@ impl<'db> ConstraintSet<'db> {
         ConstraintSet {
             node: self.node.iff(db, other.node),
         }
+    }
+
+    /// Reduces the set of inferable typevars for this constraint set. You provide an iterator of
+    /// the typevars that were inferable when this constraint set was created, and which should be
+    /// abstracted away. Those typevars will be removed from the constraint set, and the constraint
+    /// set will return true whenever there was _any_ specialization of those typevars that
+    /// returned true before.
+    pub(crate) fn reduce_inferable(
+        self,
+        db: &'db dyn Db,
+        to_remove: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
+    ) -> Self {
+        let node = self.node.exists(db, to_remove);
+        Self { node }
     }
 
     pub(crate) fn range(
@@ -829,25 +813,29 @@ impl<'db> Node<'db> {
         simplified.and(db, domain)
     }
 
-    fn when_subtype_of_given(
-        self,
-        db: &'db dyn Db,
-        lhs: Type<'db>,
-        rhs: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-    ) -> Self {
+    fn implies_subtype_of(self, db: &'db dyn Db, lhs: Type<'db>, rhs: Type<'db>) -> Self {
         // When checking subtyping involving a typevar, we can turn the subtyping check into a
         // constraint (i.e, "is `T` a subtype of `int` becomes the constraint `T ≤ int`), and then
         // check when the BDD implies that constraint.
+        //
+        // Note that we are NOT guaranteed that `lhs` and `rhs` will always be fully static, since
+        // these types are coming in from arbitrary subtyping checks that the caller might want to
+        // perform. So we have to take the appropriate materialization when translating the check
+        // into a constraint.
         let constraint = match (lhs, rhs) {
-            (Type::TypeVar(bound_typevar), _) => {
-                ConstrainedTypeVar::new_node(db, bound_typevar, Type::Never, rhs)
-            }
-            (_, Type::TypeVar(bound_typevar)) => {
-                ConstrainedTypeVar::new_node(db, bound_typevar, lhs, Type::object())
-            }
-            // If neither type is a typevar, then we fall back on a normal subtyping check.
-            _ => return lhs.when_subtype_of(db, rhs, inferable).node,
+            (Type::TypeVar(bound_typevar), _) => ConstrainedTypeVar::new_node(
+                db,
+                bound_typevar,
+                Type::Never,
+                rhs.bottom_materialization(db),
+            ),
+            (_, Type::TypeVar(bound_typevar)) => ConstrainedTypeVar::new_node(
+                db,
+                bound_typevar,
+                lhs.top_materialization(db),
+                Type::object(),
+            ),
+            _ => panic!("at least one type should be a typevar"),
         };
 
         self.satisfies(db, constraint)
@@ -923,6 +911,29 @@ impl<'db> Node<'db> {
         }
 
         true
+    }
+
+    /// Returns a new BDD that is the _existential abstraction_ of `self` for a set of typevars.
+    /// The result will return true whenever `self` returns true for _any_ assignment of those
+    /// typevars. The result will not contain any constraints that mention those typevars.
+    fn exists(
+        self,
+        db: &'db dyn Db,
+        bound_typevars: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
+    ) -> Self {
+        bound_typevars
+            .into_iter()
+            .fold(self.simplify(db), |abstracted, bound_typevar| {
+                abstracted.exists_one(db, bound_typevar)
+            })
+    }
+
+    fn exists_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Self {
+        match self {
+            Node::AlwaysTrue => Node::AlwaysTrue,
+            Node::AlwaysFalse => Node::AlwaysFalse,
+            Node::Interior(interior) => interior.exists_one(db, bound_typevar),
+        }
     }
 
     /// Returns a new BDD that returns the same results as `self`, but with some inputs fixed to
@@ -1339,6 +1350,32 @@ impl<'db> InteriorNode<'db> {
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn exists_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
+        let self_constraint = self.constraint(db);
+        let self_typevar = self_constraint.typevar(db).identity(db);
+        match bound_typevar.cmp(&self_typevar) {
+            // If the typevar that this node checks is "later" than the typevar we're abstracting
+            // over, then we have reached a point in the BDD where the abstraction can no longer
+            // affect the result, and we can return early.
+            Ordering::Less => Node::Interior(self),
+            // If the typevar that this node checks _is_ the typevar we're abstracting over, then
+            // we replace this node with the OR of its if_false/if_true edges. That is, the result
+            // is true if there's any assignment of this node's constraint that is true.
+            Ordering::Equal => {
+                let if_true = self.if_true(db).exists_one(db, bound_typevar);
+                let if_false = self.if_false(db).exists_one(db, bound_typevar);
+                if_true.or(db, if_false)
+            }
+            // Otherwise, we abstract the if_false/if_true edges recursively.
+            Ordering::Greater => {
+                let if_true = self.if_true(db).exists_one(db, bound_typevar);
+                let if_false = self.if_false(db).exists_one(db, bound_typevar);
+                Node::new(db, self_constraint, if_true, if_false)
+            }
+        }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn restrict_one(
         self,
         db: &'db dyn Db,
@@ -1464,10 +1501,12 @@ impl<'db> InteriorNode<'db> {
                     _ => continue,
                 };
 
-                let new_node = Node::new_constraint(
-                    db,
-                    ConstrainedTypeVar::new(db, constrained_typevar, new_lower, new_upper),
-                );
+                let new_constraint =
+                    ConstrainedTypeVar::new(db, constrained_typevar, new_lower, new_upper);
+                if seen_constraints.contains(&new_constraint) {
+                    continue;
+                }
+                let new_node = Node::new_constraint(db, new_constraint);
                 let positive_left_node =
                     Node::new_satisfied_constraint(db, left_constraint.when_true());
                 let positive_right_node =
@@ -1481,7 +1520,18 @@ impl<'db> InteriorNode<'db> {
                 continue;
             }
 
-            // From here on out we know that both constraints constrain the same typevar.
+            // From here on out we know that both constraints constrain the same typevar. The
+            // clause above will propagate all that we know about the current typevar relative to
+            // other typevars, producing constraints on this typevar that have concrete lower/upper
+            // bounds. That means we can skip the simplifications below if any bound is another
+            // typevar.
+            if left_constraint.lower(db).is_type_var()
+                || left_constraint.upper(db).is_type_var()
+                || right_constraint.lower(db).is_type_var()
+                || right_constraint.upper(db).is_type_var()
+            {
+                continue;
+            }
 
             // Containment: The range of one constraint might completely contain the range of the
             // other. If so, there are several potential simplifications.

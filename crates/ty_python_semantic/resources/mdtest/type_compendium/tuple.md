@@ -514,10 +514,8 @@ For covariant types, such as `frozenset`, the ideal behaviour would be to not pr
 types to their instance supertypes: doing so causes more false positives than it fixes:
 
 ```py
-# TODO: better here would be `frozenset[Literal[1, 2, 3]]`
-reveal_type(frozenset((1, 2, 3)))  # revealed: frozenset[int]
-# TODO: better here would be `frozenset[tuple[Literal[1], Literal[2], Literal[3]]]`
-reveal_type(frozenset(((1, 2, 3),)))  # revealed: frozenset[tuple[int, int, int]]
+reveal_type(frozenset((1, 2, 3)))  # revealed: frozenset[Literal[1, 2, 3]]
+reveal_type(frozenset(((1, 2, 3),)))  # revealed: frozenset[tuple[Literal[1], Literal[2], Literal[3]]]
 ```
 
 Literals are always promoted for invariant containers such as `list`, however, even though this can

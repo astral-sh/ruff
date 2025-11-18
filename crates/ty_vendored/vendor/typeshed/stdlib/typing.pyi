@@ -328,10 +328,6 @@ class TypeVar:
         @property
         def evaluate_default(self) -> EvaluateFunc | None: ...
 
-# Used for an undocumented mypy feature. Does not exist at runtime.
-# Obsolete, use _typeshed._type_checker_internals.promote instead.
-_promote = object()
-
 # N.B. Keep this definition in sync with typing_extensions._SpecialForm
 @final
 class _SpecialForm(_Final):

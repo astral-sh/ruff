@@ -88,6 +88,10 @@ impl<'db> Type<'db> {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
     }
 
+    pub(crate) const fn is_nominal_instance(self) -> bool {
+        matches!(self, Type::NominalInstance(_))
+    }
+
     pub(crate) const fn as_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
         match self {
             Type::NominalInstance(instance_type) => Some(instance_type),
@@ -123,7 +127,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         protocol: ProtocolInstanceType<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -366,7 +370,7 @@ impl<'db> NominalInstanceType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {

@@ -1,0 +1,146 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: basic.md - Exception Handling - Invalid exception handlers
+mdtest path: crates/ty_python_semantic/resources/mdtest/exception/basic.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | try:
+ 2 |     pass
+ 3 | # error: [invalid-exception-caught]
+ 4 | except 3 as e:
+ 5 |     reveal_type(e)  # revealed: Unknown
+ 6 | 
+ 7 | try:
+ 8 |     pass
+ 9 | # error: [invalid-exception-caught]
+10 | except (ValueError, OSError, "foo", b"bar") as e:
+11 |     reveal_type(e)  # revealed: ValueError | OSError | Unknown
+12 | 
+13 | def foo(
+14 |     x: type[str],
+15 |     y: tuple[type[OSError], type[RuntimeError], int],
+16 |     z: tuple[type[str], ...],
+17 | ):
+18 |     try:
+19 |         help()
+20 |     # error: [invalid-exception-caught]
+21 |     except x as e:
+22 |         reveal_type(e)  # revealed: Unknown
+23 |     # error: [invalid-exception-caught]
+24 |     except y as f:
+25 |         reveal_type(f)  # revealed: OSError | RuntimeError | Unknown
+26 |     # error: [invalid-exception-caught]
+27 |     except z as g:
+28 |         reveal_type(g)  # revealed: Unknown
+29 | 
+30 | try:
+31 |     {}.get("foo")
+32 | # error: [invalid-exception-caught]
+33 | except int:
+34 |     pass
+```
+
+# Diagnostics
+
+```
+error[invalid-exception-caught]: Invalid object caught in an exception handler
+ --> src/mdtest_snippet.py:4:8
+  |
+2 |     pass
+3 | # error: [invalid-exception-caught]
+4 | except 3 as e:
+  |        ^ Object has type `Literal[3]`
+5 |     reveal_type(e)  # revealed: Unknown
+  |
+info: Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses
+info: rule `invalid-exception-caught` is enabled by default
+
+```
+
+```
+error[invalid-exception-caught]: Invalid tuple caught in an exception handler
+  --> src/mdtest_snippet.py:10:8
+   |
+ 8 |     pass
+ 9 | # error: [invalid-exception-caught]
+10 | except (ValueError, OSError, "foo", b"bar") as e:
+   |        ^^^^^^^^^^^^^^^^^^^^^^-----^^------^
+   |                              |      |
+   |                              |      Invalid element of type `Literal[b"bar"]`
+   |                              Invalid element of type `Literal["foo"]`
+11 |     reveal_type(e)  # revealed: ValueError | OSError | Unknown
+   |
+info: Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses
+info: rule `invalid-exception-caught` is enabled by default
+
+```
+
+```
+error[invalid-exception-caught]: Invalid object caught in an exception handler
+  --> src/mdtest_snippet.py:21:12
+   |
+19 |         help()
+20 |     # error: [invalid-exception-caught]
+21 |     except x as e:
+   |            ^ Object has type `type[str]`
+22 |         reveal_type(e)  # revealed: Unknown
+23 |     # error: [invalid-exception-caught]
+   |
+info: Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses
+info: rule `invalid-exception-caught` is enabled by default
+
+```
+
+```
+error[invalid-exception-caught]: Invalid tuple caught in an exception handler
+  --> src/mdtest_snippet.py:24:12
+   |
+22 |         reveal_type(e)  # revealed: Unknown
+23 |     # error: [invalid-exception-caught]
+24 |     except y as f:
+   |            ^ Object has type `tuple[type[OSError], type[RuntimeError], int]`
+25 |         reveal_type(f)  # revealed: OSError | RuntimeError | Unknown
+26 |     # error: [invalid-exception-caught]
+   |
+info: Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses
+info: rule `invalid-exception-caught` is enabled by default
+
+```
+
+```
+error[invalid-exception-caught]: Invalid tuple caught in an exception handler
+  --> src/mdtest_snippet.py:27:12
+   |
+25 |         reveal_type(f)  # revealed: OSError | RuntimeError | Unknown
+26 |     # error: [invalid-exception-caught]
+27 |     except z as g:
+   |            ^ Object has type `tuple[type[str], ...]`
+28 |         reveal_type(g)  # revealed: Unknown
+   |
+info: Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses
+info: rule `invalid-exception-caught` is enabled by default
+
+```
+
+```
+error[invalid-exception-caught]: Invalid object caught in an exception handler
+  --> src/mdtest_snippet.py:33:8
+   |
+31 |     {}.get("foo")
+32 | # error: [invalid-exception-caught]
+33 | except int:
+   |        ^^^ Object has type `<class 'int'>`
+34 |     pass
+   |
+info: Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses
+info: rule `invalid-exception-caught` is enabled by default
+
+```

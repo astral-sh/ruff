@@ -26,13 +26,13 @@ error[invalid-await]: `Literal[1]` is not awaitable
   2 |     await 1  # error: [invalid-await]
     |           ^
     |
-   ::: stdlib/builtins.pyi:346:7
+   ::: stdlib/builtins.pyi:348:7
     |
-345 | @disjoint_base
-346 | class int:
+347 | @disjoint_base
+348 | class int:
     |       --- type defined here
-347 |     """int([x]) -> integer
-348 |     int(x, base=10) -> integer
+349 |     """int([x]) -> integer
+350 |     int(x, base=10) -> integer
     |
 info: `__await__` is missing
 info: rule `invalid-await` is enabled by default

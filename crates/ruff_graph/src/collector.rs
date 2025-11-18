@@ -14,14 +14,21 @@ pub(crate) struct Collector<'a> {
     string_imports: StringImports,
     /// The collected imports from the Python AST.
     imports: Vec<CollectedImport>,
+    /// Whether to detect type checking imports
+    type_checking_imports: bool,
 }
 
 impl<'a> Collector<'a> {
-    pub(crate) fn new(module_path: Option<&'a [String]>, string_imports: StringImports) -> Self {
+    pub(crate) fn new(
+        module_path: Option<&'a [String]>,
+        string_imports: StringImports,
+        type_checking_imports: bool,
+    ) -> Self {
         Self {
             module_path,
             string_imports,
             imports: Vec::new(),
+            type_checking_imports,
         }
     }
 
@@ -91,10 +98,25 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                     }
                 }
             }
+            Stmt::If(ast::StmtIf {
+                test,
+                body,
+                elif_else_clauses,
+                range: _,
+                node_index: _,
+            }) => {
+                // Skip TYPE_CHECKING blocks if not requested
+                if self.type_checking_imports || !is_type_checking_condition(test) {
+                    self.visit_body(body);
+                }
+
+                for clause in elif_else_clauses {
+                    self.visit_elif_else_clause(clause);
+                }
+            }
             Stmt::FunctionDef(_)
             | Stmt::ClassDef(_)
             | Stmt::While(_)
-            | Stmt::If(_)
             | Stmt::With(_)
             | Stmt::Match(_)
             | Stmt::Try(_)
@@ -149,6 +171,30 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
 
             walk_expr(self, expr);
         }
+    }
+}
+
+/// Check if an expression is a `TYPE_CHECKING` condition.
+///
+/// Returns `true` for:
+/// - `TYPE_CHECKING`
+/// - `typing.TYPE_CHECKING`
+///
+/// NOTE: Aliased `TYPE_CHECKING`, i.e. `import typing.TYPE_CHECKING as TC; if TC: ...`
+/// will not be detected!
+fn is_type_checking_condition(expr: &Expr) -> bool {
+    match expr {
+        // `if TYPE_CHECKING:`
+        Expr::Name(ast::ExprName { id, .. }) => id.as_str() == "TYPE_CHECKING",
+        // `if typing.TYPE_CHECKING:`
+        Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+            attr.as_str() == "TYPE_CHECKING"
+                && matches!(
+                    value.as_ref(),
+                    Expr::Name(ast::ExprName { id, .. }) if id.as_str() == "typing"
+                )
+        }
+        _ => false,
     }
 }
 

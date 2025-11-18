@@ -19,7 +19,7 @@ use ty_ide::{
     InlayHintSettings, MarkupKind, RangedValue, document_highlights, goto_declaration,
     goto_definition, goto_references, goto_type_definition, hover, inlay_hints,
 };
-use ty_ide::{NavigationTargets, signature_help};
+use ty_ide::{NavigationTarget, NavigationTargets, signature_help};
 use ty_project::metadata::options::Options;
 use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
@@ -469,7 +469,22 @@ impl Workspace {
         Ok(result
             .into_iter()
             .map(|hint| InlayHint {
-                markdown: hint.display().to_string(),
+                label: hint
+                    .label
+                    .into_parts()
+                    .into_iter()
+                    .map(|part| InlayHintLabelPart {
+                        location: part.target().map(|target| {
+                            location_link_from_navigation_target(
+                                target,
+                                &self.db,
+                                self.position_encoding,
+                                None,
+                            )
+                        }),
+                        label: part.into_text(),
+                    })
+                    .collect(),
                 position: Position::from_text_size(
                     hint.position,
                     &index,
@@ -639,19 +654,8 @@ fn map_targets_to_links(
 
     targets
         .into_iter()
-        .map(|target| LocationLink {
-            path: target.file().path(db).to_string(),
-            full_range: Range::from_file_range(
-                db,
-                FileRange::new(target.file(), target.full_range()),
-                position_encoding,
-            ),
-            selection_range: Some(Range::from_file_range(
-                db,
-                FileRange::new(target.file(), target.focus_range()),
-                position_encoding,
-            )),
-            origin_selection_range: Some(source_range),
+        .map(|target| {
+            location_link_from_navigation_target(&target, db, position_encoding, Some(source_range))
         })
         .collect()
 }
@@ -905,6 +909,7 @@ impl From<PositionEncoding> for ruff_source_file::PositionEncoding {
 }
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct LocationLink {
     /// The target file path
     #[wasm_bindgen(getter_with_clone)]
@@ -916,6 +921,24 @@ pub struct LocationLink {
     pub selection_range: Option<Range>,
     /// The range of the origin.
     pub origin_selection_range: Option<Range>,
+}
+
+fn location_link_from_navigation_target(
+    target: &NavigationTarget,
+    db: &dyn Db,
+    position_encoding: PositionEncoding,
+    source_range: Option<Range>,
+) -> LocationLink {
+    LocationLink {
+        path: target.file().path(db).to_string(),
+        full_range: Range::from_file_range(db, target.full_file_range(), position_encoding),
+        selection_range: Some(Range::from_file_range(
+            db,
+            FileRange::new(target.file(), target.focus_range()),
+            position_encoding,
+        )),
+        origin_selection_range: source_range,
+    }
 }
 
 #[wasm_bindgen]
@@ -1032,14 +1055,23 @@ impl From<ty_ide::InlayHintKind> for InlayHintKind {
 }
 
 #[wasm_bindgen]
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InlayHint {
     #[wasm_bindgen(getter_with_clone)]
-    pub markdown: String,
+    pub label: Vec<InlayHintLabelPart>,
 
     pub position: Position,
 
     pub kind: InlayHintKind,
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct InlayHintLabelPart {
+    #[wasm_bindgen(getter_with_clone)]
+    pub label: String,
+
+    #[wasm_bindgen(getter_with_clone)]
+    pub location: Option<LocationLink>,
 }
 
 #[wasm_bindgen]

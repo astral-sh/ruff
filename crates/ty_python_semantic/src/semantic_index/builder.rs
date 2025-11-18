@@ -1165,6 +1165,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
         if let Some(vararg) = parameters.vararg.as_ref() {
             let symbol = self.add_symbol(vararg.name.id().clone());
+            self.current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_parameter();
             self.add_definition(
                 symbol.into(),
                 DefinitionNodeRef::VariadicPositionalParameter(vararg),
@@ -1172,6 +1175,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
         if let Some(kwarg) = parameters.kwarg.as_ref() {
             let symbol = self.add_symbol(kwarg.name.id().clone());
+            self.current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_parameter();
             self.add_definition(
                 symbol.into(),
                 DefinitionNodeRef::VariadicKeywordParameter(kwarg),
@@ -1183,6 +1189,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let symbol = self.add_symbol(parameter.name().id().clone());
 
         let definition = self.add_definition(symbol.into(), parameter);
+
+        self.current_place_table_mut()
+            .symbol_mut(symbol)
+            .mark_parameter();
 
         // Insert a mapping from the inner Parameter node to the same definition. This
         // ensures that calling `HasType::inferred_type` on the inner parameter returns
@@ -2248,7 +2258,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     let symbol_id = self.add_symbol(name.id.clone());
                     let symbol = self.current_place_table().symbol(symbol_id);
                     // Check whether the variable has already been accessed in this scope.
-                    if symbol.is_bound() || symbol.is_declared() || symbol.is_used() {
+                    if (symbol.is_bound() || symbol.is_declared() || symbol.is_used())
+                        && !symbol.is_parameter()
+                    {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
                                 name: name.to_string(),
@@ -2892,8 +2904,12 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     fn in_loop_context(&self) -> bool {
         self.current_scope_info().current_loop.is_some()
     }
-    fn is_bound_parameter(&self, _name: &str) -> bool {
-        false
+
+    fn is_bound_parameter(&self, name: &str) -> bool {
+        self.scopes[self.current_scope()]
+            .node()
+            .as_function()
+            .is_some_and(|func| func.node(self.module).parameters.includes(name))
     }
 }
 
@@ -3131,15 +3147,31 @@ impl ExpressionsScopeMapBuilder {
 
 /// Returns if the expression is a `TYPE_CHECKING` expression.
 fn is_if_type_checking(expr: &ast::Expr) -> bool {
-    matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING")
+    fn is_dotted_name(expr: &ast::Expr) -> bool {
+        match expr {
+            ast::Expr::Name(_) => true,
+            ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => is_dotted_name(value),
+            _ => false,
+        }
+    }
+
+    match expr {
+        ast::Expr::Name(ast::ExprName { id, .. }) => id == "TYPE_CHECKING",
+        ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+            attr == "TYPE_CHECKING" && is_dotted_name(value)
+        }
+        _ => false,
+    }
 }
 
 /// Returns if the expression is a `not TYPE_CHECKING` expression.
 fn is_if_not_type_checking(expr: &ast::Expr) -> bool {
-    matches!(expr, ast::Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) if *op == ruff_python_ast::UnaryOp::Not
-        && matches!(
-            &**operand,
-            ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING"
-        )
+    matches!(
+        expr,
+        ast::Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::Not,
+            operand,
+            ..
+        }) if is_if_type_checking(operand)
     )
 }

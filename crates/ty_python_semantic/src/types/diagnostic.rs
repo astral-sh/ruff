@@ -2034,7 +2034,7 @@ pub(super) fn report_index_out_of_bounds(
 /// Emit a diagnostic declaring that a type does not support subscripting.
 pub(super) fn report_non_subscriptable(
     context: &InferContext,
-    node: AnyNodeRef,
+    node: &ast::ExprSubscript,
     non_subscriptable_ty: Type,
     method: &str,
 ) {
@@ -2380,36 +2380,108 @@ pub(super) fn report_possibly_missing_attribute(
     };
 }
 
+pub(super) fn report_invalid_exception_tuple_caught<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    node: &'ast ast::ExprTuple,
+    invalid_tuple_nodes: impl IntoIterator<Item = (&'ast ast::Expr, Type<'db>)>,
+) {
+    let Some(builder) = context.report_lint(&INVALID_EXCEPTION_CAUGHT, node) else {
+        return;
+    };
+
+    let mut diagnostic = builder.into_diagnostic("Invalid tuple caught in an exception handler");
+
+    for (sub_node, ty) in invalid_tuple_nodes {
+        let span = context.span(sub_node);
+        diagnostic.annotate(Annotation::secondary(span.clone()).message(format_args!(
+            "Invalid element of type `{}`",
+            ty.display(context.db())
+        )));
+        if ty.is_notimplemented(context.db()) {
+            diagnostic.annotate(
+                Annotation::secondary(span).message("Did you mean `NotImplementedError`?"),
+            );
+        }
+    }
+
+    diagnostic.info(
+        "Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses",
+    );
+}
+
 pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast::Expr, ty: Type) {
     let Some(builder) = context.report_lint(&INVALID_EXCEPTION_CAUGHT, node) else {
         return;
     };
-    builder.into_diagnostic(format_args!(
-        "Cannot catch object of type `{}` in an exception handler \
-            (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)",
-        ty.display(context.db())
-    ));
+
+    let mut diagnostic = if ty.is_notimplemented(context.db()) {
+        let mut diag =
+            builder.into_diagnostic("Cannot catch `NotImplemented` in an exception handler");
+        diag.set_primary_message("Did you mean `NotImplementedError`?");
+        diag
+    } else {
+        let mut diag = builder.into_diagnostic(format_args!(
+            "Invalid {thing} caught in an exception handler",
+            thing = if ty.tuple_instance_spec(context.db()).is_some() {
+                "tuple"
+            } else {
+                "object"
+            },
+        ));
+        diag.set_primary_message(format_args!(
+            "Object has type `{}`",
+            ty.display(context.db())
+        ));
+        diag
+    };
+
+    diagnostic.info(
+        "Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses",
+    );
 }
 
-pub(crate) fn report_invalid_exception_raised(context: &InferContext, node: &ast::Expr, ty: Type) {
-    let Some(builder) = context.report_lint(&INVALID_RAISE, node) else {
+pub(crate) fn report_invalid_exception_raised(
+    context: &InferContext,
+    raised_node: &ast::Expr,
+    raise_type: Type,
+) {
+    let Some(builder) = context.report_lint(&INVALID_RAISE, raised_node) else {
         return;
     };
-    builder.into_diagnostic(format_args!(
-        "Cannot raise object of type `{}` (must be a `BaseException` subclass or instance)",
-        ty.display(context.db())
-    ));
+    if raise_type.is_notimplemented(context.db()) {
+        let mut diagnostic =
+            builder.into_diagnostic(format_args!("Cannot raise `NotImplemented`",));
+        diagnostic.set_primary_message("Did you mean `NotImplementedError`?");
+        diagnostic.info("Can only raise an instance or subclass of `BaseException`");
+    } else {
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Cannot raise object of type `{}`",
+            raise_type.display(context.db())
+        ));
+        diagnostic.set_primary_message("Not an instance or subclass of `BaseException`");
+    }
 }
 
 pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast::Expr, ty: Type) {
     let Some(builder) = context.report_lint(&INVALID_RAISE, node) else {
         return;
     };
-    builder.into_diagnostic(format_args!(
-        "Cannot use object of type `{}` as exception cause \
-         (must be a `BaseException` subclass or instance or `None`)",
-        ty.display(context.db())
-    ));
+    let mut diagnostic = if ty.is_notimplemented(context.db()) {
+        let mut diag = builder.into_diagnostic(format_args!(
+            "Cannot use `NotImplemented` as an exception cause",
+        ));
+        diag.set_primary_message("Did you mean `NotImplementedError`?");
+        diag
+    } else {
+        builder.into_diagnostic(format_args!(
+            "Cannot use object of type `{}` as an exception cause",
+            ty.display(context.db())
+        ))
+    };
+    diagnostic.info(
+        "An exception cause must be an instance of `BaseException`, \
+        subclass of `BaseException`, or `None`",
+    );
 }
 
 pub(crate) fn report_instance_layout_conflict(
@@ -3075,7 +3147,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                 let typed_dict_name = typed_dict_ty.display(db);
 
                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Invalid key for TypedDict `{typed_dict_name}`",
+                    "Unknown key \"{key}\" for TypedDict `{typed_dict_name}`",
                 ));
 
                 diagnostic.annotate(if let Some(full_object_ty) = full_object_ty {
@@ -3095,19 +3167,25 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                 });
 
                 let existing_keys = items.iter().map(|(name, _)| name.as_str());
-
-                diagnostic.set_primary_message(format!(
-                    "Unknown key \"{key}\"{hint}",
-                    hint = if let Some(suggestion) = did_you_mean(existing_keys, key) {
-                        format!(" - did you mean \"{suggestion}\"?")
+                if let Some(suggestion) = did_you_mean(existing_keys, key) {
+                    if key_node.is_expr_string_literal() {
+                        diagnostic
+                            .set_primary_message(format_args!("Did you mean \"{suggestion}\"?"));
                     } else {
-                        String::new()
+                        diagnostic.set_primary_message(format_args!(
+                            "Unknown key \"{key}\" - did you mean \"{suggestion}\"?",
+                        ));
                     }
-                ));
+                    diagnostic.set_concise_message(format_args!(
+                        "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` - did you mean \"{suggestion}\"?",
+                    ));
+                } else {
+                    diagnostic.set_primary_message(format_args!("Unknown key \"{key}\""));
+                }
             }
             _ => {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "TypedDict `{}` can only be subscripted with string literal keys, \
+                    "TypedDict `{}` can only be subscripted with a string literal key, \
                      got key of type `{}`",
                     typed_dict_ty.display(db),
                     key_ty.display(db),

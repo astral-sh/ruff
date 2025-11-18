@@ -232,6 +232,9 @@ impl Configuration {
             include_dependencies: analyze
                 .include_dependencies
                 .unwrap_or(analyze_defaults.include_dependencies),
+            type_checking_imports: analyze
+                .type_checking_imports
+                .unwrap_or(analyze_defaults.type_checking_imports),
         };
 
         let lint = self.lint;
@@ -1277,6 +1280,7 @@ pub struct AnalyzeConfiguration {
     pub detect_string_imports: Option<bool>,
     pub string_imports_min_dots: Option<usize>,
     pub include_dependencies: Option<BTreeMap<PathBuf, (PathBuf, Vec<String>)>>,
+    pub type_checking_imports: Option<bool>,
 }
 
 impl AnalyzeConfiguration {
@@ -1303,6 +1307,7 @@ impl AnalyzeConfiguration {
                     })
                     .collect::<BTreeMap<_, _>>()
             }),
+            type_checking_imports: options.type_checking_imports,
         })
     }
 
@@ -1317,6 +1322,7 @@ impl AnalyzeConfiguration {
                 .string_imports_min_dots
                 .or(config.string_imports_min_dots),
             include_dependencies: self.include_dependencies.or(config.include_dependencies),
+            type_checking_imports: self.type_checking_imports.or(config.type_checking_imports),
         }
     }
 }

@@ -322,7 +322,7 @@ class C[T, U]:
 class D[V](C[V, int]):
     def __init__(self, x: V) -> None: ...
 
-reveal_type(D(1))  # revealed: D[int]
+reveal_type(D(1))  # revealed: D[Literal[1]]
 ```
 
 ### Generic class inherits `__init__` from generic base class
@@ -334,8 +334,8 @@ class C[T, U]:
 class D[T, U](C[T, U]):
     pass
 
-reveal_type(C(1, "str"))  # revealed: C[int, str]
-reveal_type(D(1, "str"))  # revealed: D[int, str]
+reveal_type(C(1, "str"))  # revealed: C[Literal[1], Literal["str"]]
+reveal_type(D(1, "str"))  # revealed: D[Literal[1], Literal["str"]]
 ```
 
 ### Generic class inherits `__init__` from `dict`
@@ -358,7 +358,7 @@ context. But from the user's point of view, this is another example of the above
 ```py
 class C[T, U](tuple[T, U]): ...
 
-reveal_type(C((1, 2)))  # revealed: C[int, int]
+reveal_type(C((1, 2)))  # revealed: C[Literal[1], Literal[2]]
 ```
 
 ### Upcasting a `tuple` to its `Sequence` supertype
@@ -442,9 +442,9 @@ class D[T, U]:
     def __init__(self, t: T, u: U) -> None: ...
     def __init__(self, *args) -> None: ...
 
-reveal_type(D("string"))  # revealed: D[str, str]
-reveal_type(D(1))  # revealed: D[str, int]
-reveal_type(D(1, "string"))  # revealed: D[int, str]
+reveal_type(D("string"))  # revealed: D[str, Literal["string"]]
+reveal_type(D(1))  # revealed: D[str, Literal[1]]
+reveal_type(D(1, "string"))  # revealed: D[Literal[1], Literal["string"]]
 ```
 
 ### Synthesized methods with dataclasses

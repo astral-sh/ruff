@@ -4,12 +4,30 @@
 
 ## Invalid value type
 
+### For a `list`
+
+```py
+numbers: list[int] = []
+numbers[0] = "three"  # error: [invalid-assignment]
+```
+
+### For a `dict`
+
 ```py
 config: dict[str, int] = {}
 config["retries"] = "three"  # error: [invalid-assignment]
 ```
 
 ## Invalid key type
+
+### For a `list`
+
+```py
+numbers: list[int] = []
+numbers["zero"] = 3  # error: [invalid-assignment]
+```
+
+### For a `dict`
 
 ```py
 config: dict[str, int] = {}

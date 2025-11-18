@@ -33,7 +33,7 @@ g(None)
 We also support unions in type aliases:
 
 ```py
-from typing_extensions import Any, Never, Literal, LiteralString, Tuple, Annotated, Optional, Union
+from typing_extensions import Any, Never, Literal, LiteralString, Tuple, Annotated, Optional, Union, Callable
 from ty_extensions import Unknown
 
 IntOrStr = int | str
@@ -68,6 +68,8 @@ IntOrOptional = int | Optional[str]
 OptionalOrInt = Optional[str] | int
 IntOrTypeOfStr = int | type[str]
 TypeOfStrOrInt = type[str] | int
+IntOrCallable = int | Callable[[str], bytes]
+CallableOrInt = Callable[[str], bytes] | int
 
 reveal_type(IntOrStr)  # revealed: types.UnionType
 reveal_type(IntOrStrOrBytes1)  # revealed: types.UnionType
@@ -101,6 +103,8 @@ reveal_type(IntOrOptional)  # revealed: types.UnionType
 reveal_type(OptionalOrInt)  # revealed: types.UnionType
 reveal_type(IntOrTypeOfStr)  # revealed: types.UnionType
 reveal_type(TypeOfStrOrInt)  # revealed: types.UnionType
+reveal_type(IntOrCallable)  # revealed: types.UnionType
+reveal_type(CallableOrInt)  # revealed: types.UnionType
 
 def _(
     int_or_str: IntOrStr,
@@ -135,6 +139,8 @@ def _(
     optional_or_int: OptionalOrInt,
     int_or_type_of_str: IntOrTypeOfStr,
     type_of_str_or_int: TypeOfStrOrInt,
+    int_or_callable: IntOrCallable,
+    callable_or_int: CallableOrInt,
 ):
     reveal_type(int_or_str)  # revealed: int | str
     reveal_type(int_or_str_or_bytes1)  # revealed: int | str | bytes
@@ -168,6 +174,8 @@ def _(
     reveal_type(optional_or_int)  # revealed: str | None | int
     reveal_type(int_or_type_of_str)  # revealed: int | type[str]
     reveal_type(type_of_str_or_int)  # revealed: type[str] | int
+    reveal_type(int_or_callable)  # revealed: int | ((str, /) -> bytes)
+    reveal_type(callable_or_int)  # revealed: ((str, /) -> bytes) | int
 ```
 
 If a type is unioned with itself in a value expression, the result is just that type. No
@@ -944,7 +952,60 @@ def _(
     reveal_type(dict_too_many_args)  # revealed: dict[Unknown, Unknown]
 ```
 
-## Stringified annotations?
+## `Callable[...]`
+
+We support implicit type aliases using `Callable[...]`:
+
+```py
+from typing import Callable, Union
+
+CallableNoArgs = Callable[[], None]
+BasicCallable = Callable[[int, str], bytes]
+GradualCallable = Callable[..., str]
+
+reveal_type(CallableNoArgs)  # revealed: GenericAlias
+reveal_type(BasicCallable)  # revealed: GenericAlias
+reveal_type(GradualCallable)  # revealed: GenericAlias
+
+def _(
+    callable_no_args: CallableNoArgs,
+    basic_callable: BasicCallable,
+    gradual_callable: GradualCallable,
+):
+    reveal_type(callable_no_args)  # revealed: () -> None
+    reveal_type(basic_callable)  # revealed: (int, str, /) -> bytes
+    reveal_type(gradual_callable)  # revealed: (...) -> str
+```
+
+Nested callables work as expected:
+
+```py
+TakesCallable = Callable[[Callable[[int], str]], bytes]
+ReturnsCallable = Callable[[int], Callable[[str], bytes]]
+
+def _(takes_callable: TakesCallable, returns_callable: ReturnsCallable):
+    reveal_type(takes_callable)  # revealed: ((int, /) -> str, /) -> bytes
+    reveal_type(returns_callable)  # revealed: (int, /) -> (str, /) -> bytes
+```
+
+Invalid uses result in diagnostics:
+
+```py
+# error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+InvalidCallable1 = Callable[[int]]
+
+# error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
+InvalidCallable2 = Callable[int, str]
+
+reveal_type(InvalidCallable1)  # revealed: GenericAlias
+reveal_type(InvalidCallable2)  # revealed: GenericAlias
+
+def _(invalid_callable1: InvalidCallable1, invalid_callable2: InvalidCallable2):
+    reveal_type(invalid_callable1)  # revealed: (...) -> Unknown
+    reveal_type(invalid_callable2)  # revealed: (...) -> Unknown
+```
+
+## Stringified annotations
 
 From the [typing spec on type aliases](https://typing.python.org/en/latest/spec/aliases.html):
 
@@ -974,13 +1035,15 @@ We *do* support stringified annotations if they appear in a position where a typ
 syntactically expected:
 
 ```py
-from typing import Union, List, Dict
+from typing import Union, List, Dict, Annotated, Callable
 
 ListOfInts1 = list["int"]
 ListOfInts2 = List["int"]
 StrOrStyle = Union[str, "Style"]
 SubclassOfStyle = type["Style"]
 DictStrToStyle = Dict[str, "Style"]
+AnnotatedStyle = Annotated["Style", "metadata"]
+CallableStyleToStyle = Callable[["Style"], "Style"]
 
 class Style: ...
 
@@ -990,12 +1053,16 @@ def _(
     str_or_style: StrOrStyle,
     subclass_of_style: SubclassOfStyle,
     dict_str_to_style: DictStrToStyle,
+    annotated_style: AnnotatedStyle,
+    callable_style_to_style: CallableStyleToStyle,
 ):
     reveal_type(list_of_ints1)  # revealed: list[int]
     reveal_type(list_of_ints2)  # revealed: list[int]
     reveal_type(str_or_style)  # revealed: str | Style
     reveal_type(subclass_of_style)  # revealed: type[Style]
     reveal_type(dict_str_to_style)  # revealed: dict[str, Style]
+    reveal_type(annotated_style)  # revealed: Style
+    reveal_type(callable_style_to_style)  # revealed: (Style, /) -> Style
 ```
 
 ## Recursive

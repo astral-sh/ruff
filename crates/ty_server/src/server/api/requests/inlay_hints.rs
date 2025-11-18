@@ -5,7 +5,8 @@ use lsp_types::{InlayHintParams, Url};
 use ty_ide::{InlayHintKind, InlayHintLabel, inlay_hints};
 use ty_project::ProjectDatabase;
 
-use crate::document::{RangeExt, TextSizeExt};
+use crate::PositionEncoding;
+use crate::document::{RangeExt, TextSizeExt, ToLink};
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
@@ -57,7 +58,7 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
                         .position
                         .to_lsp_position(db, file, snapshot.encoding())?
                         .local_position(),
-                    label: inlay_hint_label(&hint.label),
+                    label: inlay_hint_label(&hint.label, db, snapshot.encoding()),
                     kind: Some(inlay_hint_kind(&hint.kind)),
                     tooltip: None,
                     padding_left: None,
@@ -81,12 +82,18 @@ fn inlay_hint_kind(inlay_hint_kind: &InlayHintKind) -> lsp_types::InlayHintKind 
     }
 }
 
-fn inlay_hint_label(inlay_hint_label: &InlayHintLabel) -> lsp_types::InlayHintLabel {
+fn inlay_hint_label(
+    inlay_hint_label: &InlayHintLabel,
+    db: &ProjectDatabase,
+    encoding: PositionEncoding,
+) -> lsp_types::InlayHintLabel {
     let mut label_parts = Vec::new();
     for part in inlay_hint_label.parts() {
         label_parts.push(lsp_types::InlayHintLabelPart {
             value: part.text().into(),
-            location: None,
+            location: part
+                .target()
+                .and_then(|target| target.to_location(db, encoding)),
             tooltip: None,
             command: None,
         });

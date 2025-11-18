@@ -76,7 +76,18 @@ from ty_extensions import reveal_mro
 
 class C(Annotated[int, "foo"]): ...
 
-reveal_mro(C)  # revealed: (<class 'C'>, <class 'int'>, <class 'object'>)
+# revealed: (<class 'C'>, <class 'int'>, <class 'object'>)
+reveal_mro(C)
+
+class D(Annotated[list[str], "foo"]): ...
+
+# revealed: (<class 'D'>, <class 'list[str]'>, <class 'MutableSequence[str]'>, <class 'Sequence[str]'>, <class 'Reversible[str]'>, <class 'Collection[str]'>, <class 'Iterable[str]'>, <class 'Container[str]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(D)
+
+class E(Annotated[list["E"], "metadata"]): ...
+
+# error: [revealed-type] "Revealed MRO: (<class 'E'>, <class 'list[E]'>, <class 'MutableSequence[E]'>, <class 'Sequence[E]'>, <class 'Reversible[E]'>, <class 'Collection[E]'>, <class 'Iterable[E]'>, <class 'Container[E]'>, typing.Protocol, typing.Generic, <class 'object'>)"
+reveal_mro(E)
 ```
 
 ### Not parameterized

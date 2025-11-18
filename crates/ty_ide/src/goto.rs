@@ -855,7 +855,7 @@ fn convert_resolved_definitions_to_targets(
             }
             ty_python_semantic::ResolvedDefinition::FileWithRange(file_range) => {
                 // For file ranges, navigate to the specific range within the file
-                crate::NavigationTarget::new(file_range.file(), file_range.range())
+                crate::NavigationTarget::from(file_range)
             }
         })
         .collect()

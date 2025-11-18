@@ -901,7 +901,7 @@ def color_name_misses_one_variant(color: Color) -> str:
     elif color is Color.GREEN:
         return "Green"
     else:
-        assert_never(color)  # error: [type-assertion-failure] "Argument does not have asserted type `Never`"
+        assert_never(color)  # error: [type-assertion-failure] "Type `Literal[Color.BLUE]` is not equivalent to `Never`"
 
 class Singleton(Enum):
     VALUE = 1
@@ -956,7 +956,7 @@ def color_name_misses_one_variant(color: Color) -> str:
         case Color.GREEN:
             return "Green"
         case _:
-            assert_never(color)  # error: [type-assertion-failure] "Argument does not have asserted type `Never`"
+            assert_never(color)  # error: [type-assertion-failure] "Type `Literal[Color.BLUE]` is not equivalent to `Never`"
 
 class Singleton(Enum):
     VALUE = 1
