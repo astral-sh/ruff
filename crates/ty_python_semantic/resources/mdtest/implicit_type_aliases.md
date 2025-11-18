@@ -33,8 +33,10 @@ g(None)
 We also support unions in type aliases:
 
 ```py
-from typing_extensions import Any, Never, Literal, LiteralString, Tuple, Annotated, Optional, Union, Callable
+from typing_extensions import Any, Never, Literal, LiteralString, Tuple, Annotated, Optional, Union, Callable, TypeVar
 from ty_extensions import Unknown
+
+T = TypeVar("T")
 
 IntOrStr = int | str
 IntOrStrOrBytes1 = int | str | bytes
@@ -70,6 +72,10 @@ IntOrTypeOfStr = int | type[str]
 TypeOfStrOrInt = type[str] | int
 IntOrCallable = int | Callable[[str], bytes]
 CallableOrInt = Callable[[str], bytes] | int
+TypeVarOrInt = T | int
+IntOrTypeVar = int | T
+TypeVarOrNone = T | None
+NoneOrTypeVar = None | T
 
 reveal_type(IntOrStr)  # revealed: types.UnionType
 reveal_type(IntOrStrOrBytes1)  # revealed: types.UnionType
@@ -105,6 +111,10 @@ reveal_type(IntOrTypeOfStr)  # revealed: types.UnionType
 reveal_type(TypeOfStrOrInt)  # revealed: types.UnionType
 reveal_type(IntOrCallable)  # revealed: types.UnionType
 reveal_type(CallableOrInt)  # revealed: types.UnionType
+reveal_type(TypeVarOrInt)  # revealed: types.UnionType
+reveal_type(IntOrTypeVar)  # revealed: types.UnionType
+reveal_type(TypeVarOrNone)  # revealed: types.UnionType
+reveal_type(NoneOrTypeVar)  # revealed: types.UnionType
 
 def _(
     int_or_str: IntOrStr,
@@ -141,6 +151,10 @@ def _(
     type_of_str_or_int: TypeOfStrOrInt,
     int_or_callable: IntOrCallable,
     callable_or_int: CallableOrInt,
+    type_var_or_int: TypeVarOrInt,
+    int_or_type_var: IntOrTypeVar,
+    type_var_or_none: TypeVarOrNone,
+    none_or_type_var: NoneOrTypeVar,
 ):
     reveal_type(int_or_str)  # revealed: int | str
     reveal_type(int_or_str_or_bytes1)  # revealed: int | str | bytes
@@ -176,6 +190,14 @@ def _(
     reveal_type(type_of_str_or_int)  # revealed: type[str] | int
     reveal_type(int_or_callable)  # revealed: int | ((str, /) -> bytes)
     reveal_type(callable_or_int)  # revealed: ((str, /) -> bytes) | int
+    # TODO should be Unknown | int
+    reveal_type(type_var_or_int)  # revealed: T@_ | int
+    # TODO should be int | Unknown
+    reveal_type(int_or_type_var)  # revealed: int | T@_
+    # TODO should be Unknown | None
+    reveal_type(type_var_or_none)  # revealed: T@_ | None
+    # TODO should be None | Unknown
+    reveal_type(none_or_type_var)  # revealed: None | T@_
 ```
 
 If a type is unioned with itself in a value expression, the result is just that type. No
@@ -357,7 +379,7 @@ MyList = list[T]
 
 def _(my_list: MyList[int]):
     # TODO: This should be `list[int]`
-    reveal_type(my_list)  # revealed: @Todo(unknown type subscript)
+    reveal_type(my_list)  # revealed: @Todo(specialized generic alias in type expression)
 
 ListOrTuple = list[T] | tuple[T, ...]
 

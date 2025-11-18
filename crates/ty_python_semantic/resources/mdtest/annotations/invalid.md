@@ -98,7 +98,9 @@ async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
         n: 1 < 2,  # error: [invalid-type-form] "Comparison expressions are not allowed in type expressions"
         o: bar(),  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
         p: int | f"foo",  # error: [invalid-type-form] "F-strings are not allowed in type expressions"
-        q: [1, 2, 3][1:2],  # error: [invalid-type-form] "Slices are not allowed in type expressions"
+        # error: [invalid-type-form] "Slices are not allowed in type expressions"
+        # error: [invalid-type-form] "Invalid subscript"
+        q: [1, 2, 3][1:2],
     ):
         reveal_type(a)  # revealed: Unknown
         reveal_type(b)  # revealed: Unknown
@@ -116,7 +118,7 @@ async def outer_async():  # avoid unrelated syntax errors on `yield` and `await`
         reveal_type(n)  # revealed: Unknown
         reveal_type(o)  # revealed: Unknown
         reveal_type(p)  # revealed: int | Unknown
-        reveal_type(q)  # revealed: @Todo(unknown type subscript)
+        reveal_type(q)  # revealed: Unknown
 
 class Mat:
     def __init__(self, value: int):

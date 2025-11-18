@@ -858,7 +858,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
             },
-            Type::Dynamic(DynamicType::Todo(_)) => {
+            Type::Dynamic(_) => {
                 self.infer_type_expression(slice);
                 value_ty
             }
@@ -887,11 +887,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
             }
-            _ => {
-                // TODO: Emit a diagnostic once we've implemented all valid subscript type
-                // expressions.
+            Type::GenericAlias(_) => {
                 self.infer_type_expression(slice);
-                todo_type!("unknown type subscript")
+                // If the generic alias is already fully specialized, this is an error. But it
+                // could have been specialized with another typevar (e.g. a type alias like `MyList
+                // = list[T]`), in which case it's later valid to do `MyList[int]`.
+                todo_type!("specialized generic alias in type expression")
+            }
+            Type::StringLiteral(_) => {
+                self.infer_type_expression(slice);
+                // For stringified TypeAlias; remove once properly supported
+                todo_type!("string literal subscripted in type expression")
+            }
+            _ => {
+                self.infer_type_expression(slice);
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                    builder.into_diagnostic(format_args!(
+                        "Invalid subscript of object of type `{}` in type expression",
+                        value_ty.display(self.db())
+                    ));
+                }
+                Type::unknown()
             }
         }
     }
