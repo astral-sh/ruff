@@ -2484,7 +2484,7 @@ impl<'db> Type<'db> {
                 disjointness_visitor,
             ),
 
-            (Type::KnownInstance(left), right) => left.instance_fallback(db).has_relation_to_impl(
+            (Type::KnownInstance(left), right) => left.has_relation_to_impl(
                 db,
                 right,
                 inferable,
@@ -2626,6 +2626,10 @@ impl<'db> Type<'db> {
 
             (Type::NominalInstance(first), Type::NominalInstance(second)) => {
                 first.is_equivalent_to_impl(db, second, inferable, visitor)
+            }
+
+            (Type::KnownInstance(first), Type::KnownInstance(second)) => {
+                ConstraintSet::from(first.is_equivalent_to(db, second))
             }
 
             (Type::Union(first), Type::Union(second)) => {
@@ -8121,6 +8125,78 @@ impl<'db> KnownInstanceType<'db> {
         self.class(db).is_subclass_of(db, class)
     }
 
+    fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self, other) {
+            (Self::TypeVar(self_typevar), Self::TypeVar(other_typevar)) => {
+                self_typevar.is_same_typevar_as(db, other_typevar)
+            }
+            (
+                Self::SubscriptedProtocol(_)
+                | Self::SubscriptedGeneric(_)
+                | Self::TypeVar(_)
+                | Self::TypeAliasType(_)
+                | Self::Deprecated(_)
+                | Self::Field(_)
+                | Self::ConstraintSet(_)
+                | Self::UnionType(_)
+                | Self::Literal(_)
+                | Self::Annotated(_)
+                | Self::TypeGenericAlias(_)
+                | Self::NewType(_),
+                Self::SubscriptedProtocol(_)
+                | Self::SubscriptedGeneric(_)
+                | Self::TypeVar(_)
+                | Self::TypeAliasType(_)
+                | Self::Deprecated(_)
+                | Self::Field(_)
+                | Self::ConstraintSet(_)
+                | Self::UnionType(_)
+                | Self::Literal(_)
+                | Self::Annotated(_)
+                | Self::TypeGenericAlias(_)
+                | Self::NewType(_),
+            ) => self == other,
+        }
+    }
+
+    fn has_relation_to_impl(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        relation: TypeRelation<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        match (self, target) {
+            (Self::TypeVar(self_typevar), Type::KnownInstance(Self::TypeVar(other_typevar))) => {
+                ConstraintSet::from(self_typevar.is_same_typevar_as(db, other_typevar))
+            }
+            (
+                Self::SubscriptedProtocol(_)
+                | Self::SubscriptedGeneric(_)
+                | Self::TypeVar(_)
+                | Self::TypeAliasType(_)
+                | Self::Deprecated(_)
+                | Self::Field(_)
+                | Self::ConstraintSet(_)
+                | Self::UnionType(_)
+                | Self::Literal(_)
+                | Self::Annotated(_)
+                | Self::TypeGenericAlias(_)
+                | Self::NewType(_),
+                _,
+            ) => self.instance_fallback(db).has_relation_to_impl(
+                db,
+                target,
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            ),
+        }
+    }
+
     /// Return the repr of the symbol at runtime
     fn repr(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
         struct KnownInstanceRepr<'db> {
@@ -8728,6 +8804,12 @@ impl<'db> TypeVarInstance<'db> {
         binding_context: Definition<'db>,
     ) -> BoundTypeVarInstance<'db> {
         BoundTypeVarInstance::new(db, self, BindingContext::Definition(binding_context))
+    }
+
+    /// Returns whether two typevars represent the same logical typevar, regardless of e.g.
+    /// differences in their bounds or constraints due to materialization.
+    pub(crate) fn is_same_typevar_as(self, db: &'db dyn Db, other: Self) -> bool {
+        self.identity(db) == other.identity(db)
     }
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
@@ -12541,13 +12623,38 @@ static_assertions::assert_eq_size!(Type, [u8; 16]);
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::db::tests::{TestDbBuilder, setup_db};
-    use crate::place::{typing_extensions_symbol, typing_symbol};
+    use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
+    use crate::place::{ConsideredDefinitions, symbol, typing_extensions_symbol, typing_symbol};
     use crate::semantic_index::FileScopeId;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_ast::PythonVersion;
     use test_case::test_case;
+
+    #[track_caller]
+    pub(crate) fn get_symbol<'db>(
+        db: &'db TestDb,
+        file_name: &str,
+        scopes: &[&str],
+        symbol_name: &str,
+    ) -> Place<'db> {
+        let file = system_path_to_file(db, file_name).expect("file to exist");
+        let module = parsed_module(db, file).load(db);
+        let index = semantic_index(db, file);
+        let mut file_scope_id = FileScopeId::global();
+        let mut scope = file_scope_id.to_scope_id(db, file);
+        for expected_scope_name in scopes {
+            file_scope_id = index
+                .child_scopes(file_scope_id)
+                .next()
+                .unwrap_or_else(|| panic!("scope of {expected_scope_name}"))
+                .0;
+            scope = file_scope_id.to_scope_id(db, file);
+            assert_eq!(scope.name(db, &module), *expected_scope_name);
+        }
+
+        symbol(db, scope, symbol_name, ConsideredDefinitions::EndOfScope).place
+    }
 
     /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
     /// the fallback to `typing_extensions` is working correctly.
@@ -12697,6 +12804,40 @@ pub(crate) mod tests {
             .add_positive(Type::Never)
             .build();
         assert_eq!(intersection.display(&db).to_string(), "Never");
+    }
+
+    #[test]
+    fn lazy_eager_typevar_equivalence() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            def f[T = int](): ...
+            "#,
+        )
+        .unwrap();
+
+        let lazy_ty = get_symbol(&db, "/src/a.py", &["f"], "T").expect_type();
+        let Type::KnownInstance(KnownInstanceType::TypeVar(lazy_typevar)) = lazy_ty else {
+            panic!("unexpected type {}", lazy_ty.display(&db));
+        };
+        assert_eq!(
+            lazy_typevar._default(&db),
+            Some(TypeVarDefaultEvaluation::Lazy)
+        );
+
+        let eager_ty = lazy_ty.normalized(&db);
+        let Type::KnownInstance(KnownInstanceType::TypeVar(eager_typevar)) = eager_ty else {
+            panic!("unexpected type {}", eager_ty.display(&db));
+        };
+        assert!(matches!(
+            eager_typevar._default(&db),
+            Some(TypeVarDefaultEvaluation::Eager(_))
+        ));
+
+        assert!(lazy_ty.is_equivalent_to(&db, eager_ty));
+        assert!(lazy_ty.is_assignable_to(&db, eager_ty));
+        assert!(eager_ty.is_assignable_to(&db, lazy_ty));
     }
 
     #[test]
