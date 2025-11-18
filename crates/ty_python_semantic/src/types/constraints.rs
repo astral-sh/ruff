@@ -2088,7 +2088,8 @@ impl<'db> SequentMap<'db> {
         ante2: ConstrainedTypeVar<'db>,
         post: ConstrainedTypeVar<'db>,
     ) {
-        if ante1 == post || ante2 == post {
+        // If either antecedent implies the consequent on its own, this new sequent is redundant.
+        if ante1.implies(db, post) || ante2.implies(db, post) {
             return;
         }
         self.pair_implications
@@ -2303,6 +2304,18 @@ impl<'db> SequentMap<'db> {
         left_constraint: ConstrainedTypeVar<'db>,
         right_constraint: ConstrainedTypeVar<'db>,
     ) {
+        // These might seem redundant with the intersection check below, since `a → b` means that
+        // `a ∧ b = a`. But we are not normalizing constraint bounds, and these clauses help us
+        // identity constraints that are identical besides e.g. ordering of union/intersection
+        // elements. (For instance, these clauses would find `T ≤ τ₁ ∩ τ₂` and `T ≤ τ₂ ∩ τ₁`, and
+        // add sequents for `(T ≤ τ₁ ∩ τ₂) → (T ≤ τ₂ ∩ τ₁)` and vice versa.)
+        if left_constraint.implies(db, right_constraint) {
+            self.add_single_implication(left_constraint, right_constraint);
+        }
+        if right_constraint.implies(db, left_constraint) {
+            self.add_single_implication(right_constraint, left_constraint);
+        }
+
         match left_constraint.intersect(db, right_constraint) {
             Some(intersection_constraint) => {
                 self.add_pair_implication(
