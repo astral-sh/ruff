@@ -2014,10 +2014,12 @@ struct SequentMap<'db> {
     /// Sequents of the form `C₁ ∧ C₂ → false`
     impossibilities: FxHashSet<(ConstrainedTypeVar<'db>, ConstrainedTypeVar<'db>)>,
     /// Sequents of the form `C₁ ∧ C₂ → D`
-    pair_implications:
-        FxHashMap<(ConstrainedTypeVar<'db>, ConstrainedTypeVar<'db>), Vec<ConstrainedTypeVar<'db>>>,
+    pair_implications: FxHashMap<
+        (ConstrainedTypeVar<'db>, ConstrainedTypeVar<'db>),
+        FxHashSet<ConstrainedTypeVar<'db>>,
+    >,
     /// Sequents of the form `C → D`
-    single_implications: FxHashMap<ConstrainedTypeVar<'db>, Vec<ConstrainedTypeVar<'db>>>,
+    single_implications: FxHashMap<ConstrainedTypeVar<'db>, FxHashSet<ConstrainedTypeVar<'db>>>,
     /// Constraints that we have already processed
     processed: FxHashSet<ConstrainedTypeVar<'db>>,
 }
@@ -2078,7 +2080,7 @@ impl<'db> SequentMap<'db> {
         self.pair_implications
             .entry(Self::pair_key(db, ante1, ante2))
             .or_default()
-            .push(post);
+            .insert(post);
     }
 
     fn add_single_implication(
@@ -2089,7 +2091,10 @@ impl<'db> SequentMap<'db> {
         if ante == post {
             return;
         }
-        self.single_implications.entry(ante).or_default().push(post);
+        self.single_implications
+            .entry(ante)
+            .or_default()
+            .insert(post);
     }
 
     fn add_sequents_for_single(&mut self, db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) {
