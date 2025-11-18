@@ -215,3 +215,36 @@ if (
   # comment
   (a)):
     pass
+
+if not ( # comment
+      a):
+    pass
+
+if not (
+  # comment
+  (a)):
+    pass
+
+if not (
+  # comment
+  a):
+    pass
+
+not (# comment
+  (a))
+
+(-#comment
+ (a))
+
+if ( # a
+        # b
+  not # c
+  # d
+  ( # e
+      # f
+      a # g
+      # h
+  ) # i
+  # j
+):
+    pass
