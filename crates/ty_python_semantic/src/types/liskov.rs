@@ -2,7 +2,6 @@
 //!
 //! [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 
-use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
 
 use crate::{
@@ -55,6 +54,7 @@ fn check_class_declaration<'db>(
         return;
     }
 
+    // Constructor methods are not checked for Liskov compliance
     if matches!(
         &*member.name,
         "__init__" | "__new__" | "__post_init__" | "__init_subclass__"
@@ -62,6 +62,7 @@ fn check_class_declaration<'db>(
         return;
     }
 
+    // Synthesized `__replace__` methods on dataclasses are not checked
     if &member.name == "__replace__"
         && matches!(
             CodeGeneratorKind::from_class(db, class.class_literal(db).0, None),
@@ -77,46 +78,43 @@ fn check_class_declaration<'db>(
         return;
     };
 
-    for supercls in class.iter_mro(db).skip(1).filter_map(ClassBase::into_class) {
-        let Place::Defined(type_on_supercls, _, _) =
-            Type::instance(db, supercls).member(db, &member.name).place
+    for superclass in class.iter_mro(db).skip(1).filter_map(ClassBase::into_class) {
+        let Place::Defined(superclass_type, _, _) = Type::instance(db, superclass)
+            .member(db, &member.name)
+            .place
         else {
             // If not defined on any superclass, nothing to check
             break;
         };
 
-        let class_symbol_table = place_table(db, supercls.class_literal(db).0.body_scope(db));
+        let superclass_symbol_table =
+            place_table(db, superclass.class_literal(db).0.body_scope(db));
 
         // If the member is not defined on the class itself, skip it
-        let Some(symbol) = class_symbol_table.symbol_by_name(&member.name) else {
+        let Some(superclass_symbol) = superclass_symbol_table.symbol_by_name(&member.name) else {
             continue;
         };
-        if !(symbol.is_bound() || symbol.is_declared()) {
+        if !(superclass_symbol.is_bound() || superclass_symbol.is_declared()) {
             continue;
         }
 
-        let Some(supercls_as_callable) = type_on_supercls.try_upcast_to_callable(db) else {
+        let Some(superclass_type_as_callable) = superclass_type.try_upcast_to_callable(db) else {
             continue;
         };
 
-        if type_on_instance.is_assignable_to(db, supercls_as_callable) {
+        if type_on_instance.is_assignable_to(db, superclass_type_as_callable) {
             continue;
         }
 
-        // If the function was originally defined elsewhere and simply assigned
-        // in the body of the class here, we cannot use the range associated with the `FunctionType`
-        let range = if definition.kind(db).is_function_def() {
-            function
-                .literal(db)
-                .last_definition(db)
-                .spans(db)
-                .and_then(|spans| spans.signature.range())
-                .unwrap_or_else(|| function.node(db, context.file(), context.module()).range)
-        } else {
-            definition.full_range(db, context.module()).range()
-        };
-
-        report_invalid_method_override(context, range, member, class, supercls, type_on_supercls);
+        report_invalid_method_override(
+            context,
+            &member.name,
+            class,
+            *definition,
+            function,
+            superclass,
+            superclass_type,
+        );
 
         // Only one diagnostic should be emitted per each invalid override,
         // even if it overrides multiple superclasses incorrectly!

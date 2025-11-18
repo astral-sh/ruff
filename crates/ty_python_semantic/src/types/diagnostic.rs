@@ -15,8 +15,7 @@ use crate::suppression::FileSuppressionId;
 use crate::types::KnownInstanceType;
 use crate::types::call::CallError;
 use crate::types::class::{DisjointBase, DisjointBaseKind, Field};
-use crate::types::function::KnownFunction;
-use crate::types::ide_support::Member;
+use crate::types::function::{FunctionType, KnownFunction};
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
@@ -3454,38 +3453,59 @@ pub(crate) fn report_rebound_typevar<'db>(
 
 pub(super) fn report_invalid_method_override<'db>(
     context: &InferContext<'db, '_>,
-    range: impl Ranged,
-    member: &Member<'db>,
-    class: ClassType<'db>,
-    supercls: ClassType<'db>,
-    type_on_supercls: Type<'db>,
+    member: &str,
+    subclass: ClassType<'db>,
+    subclass_definition: Definition<'db>,
+    subclass_function: FunctionType<'db>,
+    superclass: ClassType<'db>,
+    superclass_type: Type<'db>,
 ) {
-    let Some(builder) = context.report_lint(&INVALID_METHOD_OVERRIDE, range) else {
+    let db = context.db();
+
+    let signature_span = |function: FunctionType<'db>| {
+        function
+            .literal(db)
+            .last_definition(db)
+            .spans(db)
+            .map(|spans| spans.signature)
+    };
+
+    let subclass_definition_kind = subclass_definition.kind(db);
+    let subclass_definition_signature_span = signature_span(subclass_function);
+
+    // If the function was originally defined elsewhere and simply assigned
+    // in the body of the class here, we cannot use the range associated with the `FunctionType`
+    let diagnostic_range = if subclass_definition_kind.is_function_def() {
+        subclass_definition_signature_span
+            .as_ref()
+            .and_then(Span::range)
+            .unwrap_or_else(|| {
+                subclass_function
+                    .node(db, context.file(), context.module())
+                    .range
+            })
+    } else {
+        subclass_definition.full_range(db, context.module()).range()
+    };
+
+    let class_name = subclass.name(db);
+    let superclass_name = superclass.name(db);
+
+    let overridden_method = if class_name == superclass_name {
+        format!(
+            "{superclass}.{member}",
+            superclass = superclass.class_literal(db).0.qualified_name(db),
+        )
+    } else {
+        format!("{superclass_name}.{member}")
+    };
+
+    let Some(builder) = context.report_lint(&INVALID_METHOD_OVERRIDE, diagnostic_range) else {
         return;
     };
 
-    let db = context.db();
-    let member = &member.name;
-    let class_name = class.name(db);
-
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Invalid override of method `{member}`"));
-
-    let supercls_name = supercls.name(db);
-
-    let overridden_method = if class_name == supercls_name {
-        format!(
-            "{class}.{member}",
-            class = supercls.class_literal(db).0.qualified_name(db),
-            member = member
-        )
-    } else {
-        format!(
-            "{class}.{member}",
-            class = supercls.name(db),
-            member = member
-        )
-    };
 
     diagnostic.set_primary_message(format_args!(
         "Definition is incompatible with `{overridden_method}`"
@@ -3493,81 +3513,74 @@ pub(super) fn report_invalid_method_override<'db>(
 
     diagnostic.info("This violates the Liskov Substitution Principle");
 
-    let supercls_scope = supercls.class_literal(db).0.body_scope(db);
-
-    let Some(symbol_on_supercls) = place_table(db, supercls_scope).symbol_id(member) else {
-        return;
-    };
-
-    let Some(binding) = use_def_map(db, supercls_scope)
-        .end_of_scope_bindings(ScopedPlaceId::Symbol(symbol_on_supercls))
-        .next()
-    else {
-        return;
-    };
-
-    let Some(definition) = binding.binding.definition() else {
-        return;
-    };
-
-    let definition_span =
-        Span::from(definition.full_range(db, &parsed_module(db, supercls_scope.file(db)).load(db)));
-
-    let original_function_span = type_on_supercls
-        .as_bound_method()
-        .and_then(|method| {
-            method
-                .function(db)
-                .literal(db)
-                .last_definition(db)
-                .spans(db)
-        })
-        .map(|spans| spans.signature);
-
-    let definition_kind = definition.kind(db);
-
-    let secondary_span = if definition_kind.is_function_def()
-        && let Some(function_span) = original_function_span.clone()
-    {
-        function_span
-    } else {
-        definition_span
-    };
-
-    diagnostic.annotate(
-        Annotation::secondary(secondary_span.clone())
-            .message(format_args!("`{overridden_method}` defined here")),
-    );
-
-    if !definition_kind.is_function_def()
-        && let Some(function_span) = original_function_span
-        && function_span != secondary_span
+    if !subclass_definition_kind.is_function_def()
+        && let Some(span) = subclass_definition_signature_span
     {
         diagnostic.annotate(
-            Annotation::secondary(function_span)
-                .message(format_args!("Signature of `{overridden_method}`")),
+            Annotation::secondary(span)
+                .message(format_args!("Signature of `{class_name}.{member}`")),
         );
     }
 
-    if !(supercls.is_object(db) && matches!(&**member, "__eq__" | "__ne__")) {
-        return;
+    let superclass_scope = superclass.class_literal(db).0.body_scope(db);
+
+    if let Some(superclass_symbol) = place_table(db, superclass_scope).symbol_id(member)
+        && let Some(binding) = use_def_map(db, superclass_scope)
+            .end_of_scope_bindings(ScopedPlaceId::Symbol(superclass_symbol))
+            .next()
+        && let Some(definition) = binding.binding.definition()
+    {
+        let definition_span = Span::from(
+            definition.full_range(db, &parsed_module(db, superclass_scope.file(db)).load(db)),
+        );
+
+        let superclass_function_span = superclass_type
+            .as_bound_method()
+            .and_then(|method| signature_span(method.function(db)));
+
+        let superclass_definition_kind = definition.kind(db);
+
+        let secondary_span = if superclass_definition_kind.is_function_def()
+            && let Some(function_span) = superclass_function_span.clone()
+        {
+            function_span
+        } else {
+            definition_span
+        };
+
+        diagnostic.annotate(
+            Annotation::secondary(secondary_span.clone())
+                .message(format_args!("`{overridden_method}` defined here")),
+        );
+
+        if !superclass_definition_kind.is_function_def()
+            && let Some(function_span) = superclass_function_span
+            && function_span != secondary_span
+        {
+            diagnostic.annotate(
+                Annotation::secondary(function_span)
+                    .message(format_args!("Signature of `{overridden_method}`")),
+            );
+        }
     }
 
-    // Inspired by mypy's subdiagnostic at <https://github.com/python/mypy/blob/1b6ebb17b7fe64488a7b3c3b4b0187bb14fe331b/mypy/messages.py#L1307-L1318>
-    let eq_subdiagnostics = [
-        format_args!(
-            "It is recommended for `{member}` to work with arbitrary objects, for example:",
-        ),
-        format_args!(""),
-        format_args!("    def {member}(self, other: object) -> bool:",),
-        format_args!("        if not isinstance(other, {class_name}):",),
-        format_args!("            return False"),
-        format_args!("        return <logic to compare two `{class_name}` instances>"),
-        format_args!(""),
-    ];
+    if superclass.is_object(db) && matches!(member, "__eq__" | "__ne__") {
+        // Inspired by mypy's subdiagnostic at <https://github.com/python/mypy/blob/1b6ebb17b7fe64488a7b3c3b4b0187bb14fe331b/mypy/messages.py#L1307-L1318>
+        let eq_subdiagnostics = [
+            format_args!(
+                "It is recommended for `{member}` to work with arbitrary objects, for example:",
+            ),
+            format_args!(""),
+            format_args!("    def {member}(self, other: object) -> bool:",),
+            format_args!("        if not isinstance(other, {class_name}):",),
+            format_args!("            return False"),
+            format_args!("        return <logic to compare two `{class_name}` instances>"),
+            format_args!(""),
+        ];
 
-    for subdiag in eq_subdiagnostics {
-        diagnostic.help(subdiag);
+        for subdiag in eq_subdiagnostics {
+            diagnostic.help(subdiag);
+        }
     }
 }
 
