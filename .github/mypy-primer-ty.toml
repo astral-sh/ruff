@@ -6,3 +6,8 @@
 possibly-unresolved-reference = "warn"
 unused-ignore-comment = "warn"
 division-by-zero = "warn"
+
+[src]
+exclude = [
+    "Pythonwin/pywin/test/_dbgscript.py"  # not valid UTF-8
+]
