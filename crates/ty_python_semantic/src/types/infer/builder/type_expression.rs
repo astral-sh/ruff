@@ -839,6 +839,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
+                KnownInstanceType::Callable(_) => {
+                    self.infer_type_expression(slice);
+                    todo_type!("Generic specialization of typing.Callable")
+                }
                 KnownInstanceType::Annotated(_) => {
                     self.infer_type_expression(slice);
                     todo_type!("Generic specialization of typing.Annotated")
@@ -929,6 +933,58 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         ty
     }
 
+    /// Infer the type of a `Callable[...]` type expression.
+    pub(crate) fn infer_callable_type(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
+        let db = self.db();
+
+        let arguments_slice = &*subscript.slice;
+
+        let mut arguments = match arguments_slice {
+            ast::Expr::Tuple(tuple) => Either::Left(tuple.iter()),
+            _ => {
+                self.infer_callable_parameter_types(arguments_slice);
+                Either::Right(std::iter::empty::<&ast::Expr>())
+            }
+        };
+
+        let first_argument = arguments.next();
+
+        let parameters = first_argument.and_then(|arg| self.infer_callable_parameter_types(arg));
+
+        let return_type = arguments.next().map(|arg| self.infer_type_expression(arg));
+
+        let correct_argument_number = if let Some(third_argument) = arguments.next() {
+            self.infer_type_expression(third_argument);
+            for argument in arguments {
+                self.infer_type_expression(argument);
+            }
+            false
+        } else {
+            return_type.is_some()
+        };
+
+        if !correct_argument_number {
+            report_invalid_arguments_to_callable(&self.context, subscript);
+        }
+
+        let callable_type = if let (Some(parameters), Some(return_type), true) =
+            (parameters, return_type, correct_argument_number)
+        {
+            CallableType::single(db, Signature::new(parameters, Some(return_type)))
+        } else {
+            CallableType::unknown(db)
+        };
+
+        // `Signature` / `Parameters` are not a `Type` variant, so we're storing
+        // the outer callable type on these expressions instead.
+        self.store_expression_type(arguments_slice, callable_type);
+        if let Some(first_argument) = first_argument {
+            self.store_expression_type(first_argument, callable_type);
+        }
+
+        callable_type
+    }
+
     pub(crate) fn infer_parameterized_special_form_type_expression(
         &mut self,
         subscript: &ast::ExprSubscript,
@@ -979,53 +1035,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 _ => self.infer_type_expression(arguments_slice),
             },
-            SpecialFormType::Callable => {
-                let mut arguments = match arguments_slice {
-                    ast::Expr::Tuple(tuple) => Either::Left(tuple.iter()),
-                    _ => {
-                        self.infer_callable_parameter_types(arguments_slice);
-                        Either::Right(std::iter::empty::<&ast::Expr>())
-                    }
-                };
-
-                let first_argument = arguments.next();
-
-                let parameters =
-                    first_argument.and_then(|arg| self.infer_callable_parameter_types(arg));
-
-                let return_type = arguments.next().map(|arg| self.infer_type_expression(arg));
-
-                let correct_argument_number = if let Some(third_argument) = arguments.next() {
-                    self.infer_type_expression(third_argument);
-                    for argument in arguments {
-                        self.infer_type_expression(argument);
-                    }
-                    false
-                } else {
-                    return_type.is_some()
-                };
-
-                if !correct_argument_number {
-                    report_invalid_arguments_to_callable(&self.context, subscript);
-                }
-
-                let callable_type = if let (Some(parameters), Some(return_type), true) =
-                    (parameters, return_type, correct_argument_number)
-                {
-                    CallableType::single(db, Signature::new(parameters, Some(return_type)))
-                } else {
-                    CallableType::unknown(db)
-                };
-
-                // `Signature` / `Parameters` are not a `Type` variant, so we're storing
-                // the outer callable type on these expressions instead.
-                self.store_expression_type(arguments_slice, callable_type);
-                if let Some(first_argument) = first_argument {
-                    self.store_expression_type(first_argument, callable_type);
-                }
-
-                callable_type
-            }
+            SpecialFormType::Callable => self.infer_callable_type(subscript),
 
             // `ty_extensions` special forms
             SpecialFormType::Not => {
@@ -1491,7 +1501,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///
     /// It returns `None` if the argument is invalid i.e., not a list of types, parameter
     /// specification, `typing.Concatenate`, or `...`.
-    fn infer_callable_parameter_types(
+    pub(super) fn infer_callable_parameter_types(
         &mut self,
         parameters: &ast::Expr,
     ) -> Option<Parameters<'db>> {

@@ -1952,9 +1952,7 @@ impl<'db> Type<'db> {
                     })
             }
 
-            (Type::TypeVar(bound_typevar), _)
-                if bound_typevar.is_inferable(db, inferable) && relation.is_assignability() =>
-            {
+            (Type::TypeVar(bound_typevar), _) if bound_typevar.is_inferable(db, inferable) => {
                 // The implicit lower bound of a typevar is `Never`, which means
                 // that it is always assignable to any other type.
 
@@ -2094,9 +2092,12 @@ impl<'db> Type<'db> {
             }
 
             // TODO: Infer specializations here
-            (Type::TypeVar(bound_typevar), _) | (_, Type::TypeVar(bound_typevar))
-                if bound_typevar.is_inferable(db, inferable) =>
-            {
+            (_, Type::TypeVar(bound_typevar)) if bound_typevar.is_inferable(db, inferable) => {
+                ConstraintSet::from(false)
+            }
+            (Type::TypeVar(bound_typevar), _) => {
+                // All inferable cases should have been handled above
+                assert!(!bound_typevar.is_inferable(db, inferable));
                 ConstraintSet::from(false)
             }
 
@@ -2550,13 +2551,8 @@ impl<'db> Type<'db> {
                 disjointness_visitor,
             ),
 
-            // Other than the special cases enumerated above, nominal-instance types,
-            // newtype-instance types, and typevars are never subtypes of any other variants
-            (Type::TypeVar(bound_typevar), _) => {
-                // All inferable cases should have been handled above
-                assert!(!bound_typevar.is_inferable(db, inferable));
-                ConstraintSet::from(false)
-            }
+            // Other than the special cases enumerated above, nominal-instance types, and
+            // newtype-instance types are never subtypes of any other variants
             (Type::NominalInstance(_), _) => ConstraintSet::from(false),
             (Type::NewTypeInstance(_), _) => ConstraintSet::from(false),
         }
@@ -6759,6 +6755,7 @@ impl<'db> Type<'db> {
 
                     Ok(ty.inner(db).to_meta_type(db))
                 }
+                KnownInstanceType::Callable(callable) => Ok(Type::Callable(*callable)),
             },
 
             Type::SpecialForm(special_form) => match special_form {
@@ -8002,6 +7999,9 @@ pub enum KnownInstanceType<'db> {
     /// An instance of `typing.GenericAlias` representing a `type[...]` expression.
     TypeGenericAlias(InternedType<'db>),
 
+    /// An instance of `typing.GenericAlias` representing a `Callable[...]` expression.
+    Callable(CallableType<'db>),
+
     /// An identity callable created with `typing.NewType(name, base)`, which behaves like a
     /// subtype of `base` in type expressions. See the `struct NewType` payload for an example.
     NewType(NewType<'db>),
@@ -8040,6 +8040,9 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         | KnownInstanceType::Annotated(ty)
         | KnownInstanceType::TypeGenericAlias(ty) => {
             visitor.visit_type(db, ty.inner(db));
+        }
+        KnownInstanceType::Callable(callable) => {
+            visitor.visit_callable_type(db, callable);
         }
         KnownInstanceType::NewType(newtype) => {
             if let ClassType::Generic(generic_alias) = newtype.base_class_type(db) {
@@ -8086,6 +8089,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Literal(ty) => Self::Literal(ty.normalized_impl(db, visitor)),
             Self::Annotated(ty) => Self::Annotated(ty.normalized_impl(db, visitor)),
             Self::TypeGenericAlias(ty) => Self::TypeGenericAlias(ty.normalized_impl(db, visitor)),
+            Self::Callable(callable) => Self::Callable(callable.normalized_impl(db, visitor)),
             Self::NewType(newtype) => Self::NewType(
                 newtype
                     .map_base_class_type(db, |class_type| class_type.normalized_impl(db, visitor)),
@@ -8108,9 +8112,10 @@ impl<'db> KnownInstanceType<'db> {
             Self::Field(_) => KnownClass::Field,
             Self::ConstraintSet(_) => KnownClass::ConstraintSet,
             Self::UnionType(_) => KnownClass::UnionType,
-            Self::Literal(_) | Self::Annotated(_) | Self::TypeGenericAlias(_) => {
-                KnownClass::GenericAlias
-            }
+            Self::Literal(_)
+            | Self::Annotated(_)
+            | Self::TypeGenericAlias(_)
+            | Self::Callable(_) => KnownClass::GenericAlias,
             Self::NewType(_) => KnownClass::NewType,
         }
     }
@@ -8196,7 +8201,9 @@ impl<'db> KnownInstanceType<'db> {
                     KnownInstanceType::Annotated(_) => {
                         f.write_str("<typing.Annotated special form>")
                     }
-                    KnownInstanceType::TypeGenericAlias(_) => f.write_str("GenericAlias"),
+                    KnownInstanceType::TypeGenericAlias(_) | KnownInstanceType::Callable(_) => {
+                        f.write_str("GenericAlias")
+                    }
                     KnownInstanceType::NewType(declaration) => {
                         write!(f, "<NewType pseudo-class '{}'>", declaration.name(self.db))
                     }

@@ -1,0 +1,33 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_assignment.md - Invalid assignment diagnostics - Unannotated assignment
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assignment.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | x: int
+2 | x = "three"  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Object of type `Literal["three"]` is not assignable to `int`
+ --> src/mdtest_snippet.py:2:1
+  |
+1 | x: int
+2 | x = "three"  # error: [invalid-assignment]
+  | -   ^^^^^^^ Incompatible value of type `Literal["three"]`
+  | |
+  | Declared type `int`
+  |
+info: rule `invalid-assignment` is enabled by default
+
+```

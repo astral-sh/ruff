@@ -132,3 +132,9 @@ class AWithQuotes:
     final_variable: 'Final[list[int]]' = []
     class_variable_without_subscript: 'ClassVar' = []
     final_variable_without_subscript: 'Final' = []
+
+
+# Reassignment of a ClassVar should not trigger RUF012
+class P:
+    class_variable: ClassVar[list] = [10, 20, 30, 40, 50]
+    class_variable = [*class_variable[0::1], *class_variable[2::3]]

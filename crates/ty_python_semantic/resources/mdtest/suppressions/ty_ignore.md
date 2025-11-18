@@ -189,3 +189,40 @@ a = 10 + 4  # ty: ignore[division-by-zer]
 # error: [division-by-zero]
 a = 10 / 0  # ty: ignore[lint:division-by-zero]
 ```
+
+## Suppression of specific diagnostics
+
+In this section, we make sure that specific diagnostics can be suppressed in various forms that
+users might expect to work.
+
+### Invalid assignment
+
+An invalid assignment can be suppressed in the following ways:
+
+```py
+# fmt: off
+
+x1: str = 1 + 2 + 3  # ty: ignore
+
+x2: str = (  # ty: ignore
+    1 + 2 + 3
+)
+
+x4: str = (
+    1 + 2 + 3
+)  # ty: ignore
+```
+
+It can *not* be suppressed by putting the `# ty: ignore` on the inner expression. The range targeted
+by the suppression comment needs to overlap with one of the boundaries of the value range (the outer
+parentheses in this case):
+
+```py
+# fmt: off
+
+# error: [invalid-assignment]
+x4: str = (
+    # error: [unused-ignore-comment]
+    1 + 2 + 3  # ty: ignore
+)
+```

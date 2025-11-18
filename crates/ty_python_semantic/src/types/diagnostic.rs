@@ -31,10 +31,15 @@ use crate::{
     Db, DisplaySettings, FxIndexMap, FxOrderMap, Module, ModuleName, Program, declare_lint,
 };
 use itertools::Itertools;
-use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
-use ruff_db::parsed::parsed_module;
+use ruff_db::{
+    diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
+    parsed::parsed_module,
+    source::source_text,
+};
 use ruff_python_ast::name::Name;
+use ruff_python_ast::parenthesize::parentheses_iterator;
 use ruff_python_ast::{self as ast, AnyNodeRef, Identifier};
+use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::Formatter;
@@ -2149,15 +2154,13 @@ pub(crate) fn is_invalid_typed_dict_literal(
         && matches!(source, AnyNodeRef::ExprDict(_))
 }
 
-fn report_invalid_assignment_with_message(
-    context: &InferContext,
-    node: AnyNodeRef,
-    target_ty: Type,
+fn report_invalid_assignment_with_message<'db, 'ctx: 'db, T: Ranged>(
+    context: &'ctx InferContext,
+    node: T,
+    target_ty: Type<'db>,
     message: std::fmt::Arguments,
-) {
-    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, node) else {
-        return;
-    };
+) -> Option<LintDiagnosticGuard<'db, 'ctx>> {
+    let builder = context.report_lint(&INVALID_ASSIGNMENT, node)?;
     match target_ty {
         Type::ClassLiteral(class) => {
             let mut diag = builder.into_diagnostic(format_args!(
@@ -2165,6 +2168,7 @@ fn report_invalid_assignment_with_message(
                 class.name(context.db()),
             ));
             diag.info("Annotate to make it explicit if this is intentional");
+            Some(diag)
         }
         Type::FunctionLiteral(function) => {
             let mut diag = builder.into_diagnostic(format_args!(
@@ -2172,53 +2176,106 @@ fn report_invalid_assignment_with_message(
                 function.name(context.db()),
             ));
             diag.info("Annotate to make it explicit if this is intentional");
+            Some(diag)
         }
+
         _ => {
-            builder.into_diagnostic(message);
+            let diag = builder.into_diagnostic(message);
+            Some(diag)
         }
     }
 }
 
 pub(super) fn report_invalid_assignment<'db>(
     context: &InferContext<'db, '_>,
-    node: AnyNodeRef,
+    target_node: AnyNodeRef,
     definition: Definition<'db>,
     target_ty: Type,
-    mut source_ty: Type<'db>,
+    mut value_ty: Type<'db>,
 ) {
-    let value_expr = match definition.kind(context.db()) {
+    let definition_kind = definition.kind(context.db());
+    let value_node = match definition_kind {
         DefinitionKind::Assignment(def) => Some(def.value(context.module())),
         DefinitionKind::AnnotatedAssignment(def) => def.value(context.module()),
         DefinitionKind::NamedExpression(def) => Some(&*def.node(context.module()).value),
         _ => None,
     };
 
-    if let Some(value_expr) = value_expr
-        && is_invalid_typed_dict_literal(context.db(), target_ty, value_expr.into())
+    if let Some(value_node) = value_node
+        && is_invalid_typed_dict_literal(context.db(), target_ty, value_node.into())
     {
         return;
     }
 
     let settings =
-        DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), target_ty, source_ty);
+        DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), target_ty, value_ty);
 
-    if let Some(value_expr) = value_expr {
+    if let Some(value_node) = value_node {
         // Re-infer the RHS of the annotated assignment, ignoring the type context for more precise
         // error messages.
-        source_ty =
-            infer_isolated_expression(context.db(), definition.scope(context.db()), value_expr);
+        value_ty =
+            infer_isolated_expression(context.db(), definition.scope(context.db()), value_node);
     }
 
-    report_invalid_assignment_with_message(
+    let diagnostic_range = if let Some(value_node) = value_node {
+        // Expand the range to include parentheses around the value, if any. This allows
+        // invalid-assignment diagnostics to be suppressed on the opening or closing parenthesis:
+        // ```py
+        // x: str = ( # ty: ignore <- here
+        //     1 + 2 + 3
+        // )  # ty: ignore <- or here
+        // ```
+
+        let comment_ranges = CommentRanges::from(context.module().tokens());
+        let source = source_text(context.db(), context.file());
+        parentheses_iterator(value_node.into(), None, &comment_ranges, &source)
+            .last()
+            .unwrap_or(value_node.range())
+    } else {
+        target_node.range()
+    };
+
+    let Some(mut diag) = report_invalid_assignment_with_message(
         context,
-        node,
+        diagnostic_range,
         target_ty,
         format_args!(
             "Object of type `{}` is not assignable to `{}`",
-            source_ty.display_with(context.db(), settings.clone()),
+            value_ty.display_with(context.db(), settings.clone()),
             target_ty.display_with(context.db(), settings)
         ),
-    );
+    ) else {
+        return;
+    };
+
+    if value_node.is_some() {
+        match definition_kind {
+            DefinitionKind::AnnotatedAssignment(assignment) => {
+                // For annotated assignments, just point to the annotation in the source code.
+                diag.annotate(
+                    context
+                        .secondary(assignment.annotation(context.module()))
+                        .message("Declared type"),
+                );
+            }
+            _ => {
+                // Otherwise, annotate the target with its declared type.
+                diag.annotate(context.secondary(target_node).message(format_args!(
+                    "Declared type `{}`",
+                    target_ty.display(context.db()),
+                )));
+            }
+        }
+
+        diag.set_primary_message(format_args!(
+            "Incompatible value of type `{}`",
+            value_ty.display(context.db()),
+        ));
+
+        // Overwrite the concise message to avoid showing the value type twice
+        let message = diag.primary_message().to_string();
+        diag.set_concise_message(message);
+    }
 }
 
 pub(super) fn report_invalid_attribute_assignment(
@@ -3228,7 +3285,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                 let typed_dict_name = typed_dict_ty.display(db);
 
                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Invalid key for TypedDict `{typed_dict_name}`",
+                    "Unknown key \"{key}\" for TypedDict `{typed_dict_name}`",
                 ));
 
                 diagnostic.annotate(if let Some(full_object_ty) = full_object_ty {
@@ -3248,15 +3305,21 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                 });
 
                 let existing_keys = items.iter().map(|(name, _)| name.as_str());
-
-                diagnostic.set_primary_message(format!(
-                    "Unknown key \"{key}\"{hint}",
-                    hint = if let Some(suggestion) = did_you_mean(existing_keys, key) {
-                        format!(" - did you mean \"{suggestion}\"?")
+                if let Some(suggestion) = did_you_mean(existing_keys, key) {
+                    if key_node.is_expr_string_literal() {
+                        diagnostic
+                            .set_primary_message(format_args!("Did you mean \"{suggestion}\"?"));
                     } else {
-                        String::new()
+                        diagnostic.set_primary_message(format_args!(
+                            "Unknown key \"{key}\" - did you mean \"{suggestion}\"?",
+                        ));
                     }
-                ));
+                    diagnostic.set_concise_message(format_args!(
+                        "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` - did you mean \"{suggestion}\"?",
+                    ));
+                } else {
+                    diagnostic.set_primary_message(format_args!("Unknown key \"{key}\""));
+                }
             }
             _ => {
                 let mut diagnostic = builder.into_diagnostic(format_args!(

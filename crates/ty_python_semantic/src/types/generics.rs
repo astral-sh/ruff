@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::fmt::Display;
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -145,10 +145,24 @@ impl<'db> BoundTypeVarInstance<'db> {
 }
 
 impl<'a, 'db> InferableTypeVars<'a, 'db> {
-    pub(crate) fn merge(&'a self, other: Option<&'a InferableTypeVars<'a, 'db>>) -> Self {
-        match other {
-            Some(other) => InferableTypeVars::Two(self, other),
-            None => *self,
+    pub(crate) fn merge(&'a self, other: &'a InferableTypeVars<'a, 'db>) -> Self {
+        match (self, other) {
+            (InferableTypeVars::None, other) | (other, InferableTypeVars::None) => *other,
+            _ => InferableTypeVars::Two(self, other),
+        }
+    }
+
+    // This is not an IntoIterator implementation because I have no desire to try to name the
+    // iterator type.
+    pub(crate) fn iter(self) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> {
+        match self {
+            InferableTypeVars::None => Either::Left(Either::Left(std::iter::empty())),
+            InferableTypeVars::One(typevars) => Either::Right(typevars.iter().copied()),
+            InferableTypeVars::Two(left, right) => {
+                let chained: Box<dyn Iterator<Item = BoundTypeVarIdentity<'db>>> =
+                    Box::new(left.iter().chain(right.iter()));
+                Either::Left(Either::Right(chained))
+            }
         }
     }
 
