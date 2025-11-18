@@ -100,14 +100,15 @@ use crate::types::typed_dict::{
 };
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    CallDunderError, CallableBinding, CallableType, ClassLiteral, ClassType, DataclassParams,
-    DynamicType, InferredAs, InternedType, InternedTypes, IntersectionBuilder, IntersectionType,
-    KnownClass, KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
-    PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, SpecialFormType,
-    SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
-    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
-    UnionType, binding_type, todo_type,
+    CallDunderError, CallableBinding, CallableType, CallableTypeKind, ClassLiteral, ClassType,
+    DataclassParams, DynamicType, InferredAs, InternedType, InternedTypes, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy,
+    MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm,
+    Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
+    binding_type, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -2274,7 +2275,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Type::Callable(callable) => Some(Type::Callable(CallableType::new(
                                 db,
                                 callable.signatures(db),
-                                true,
+                                CallableTypeKind::FunctionLike,
                             ))),
                             Type::Union(union) => union
                                 .try_map(db, |element| into_function_like_callable(db, *element)),
@@ -3324,9 +3325,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // for the subscript branch which is required for `Concatenate` but that cannot be
         // specified in this context.
         match default {
-            ast::Expr::EllipsisLiteral(_) => {
-                CallableType::single(self.db(), Signature::new(Parameters::gradual_form(), None))
-            }
+            ast::Expr::EllipsisLiteral(_) => CallableType::paramspec_value(
+                self.db(),
+                Signature::new(Parameters::gradual_form(), None),
+            ),
             ast::Expr::List(ast::ExprList { elts, .. }) => {
                 let mut parameter_types = Vec::with_capacity(elts.len());
 
@@ -3353,7 +3355,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }))
                 };
 
-                CallableType::single(self.db(), Signature::new(parameters, None))
+                CallableType::paramspec_value(self.db(), Signature::new(parameters, None))
             }
             ast::Expr::Name(name) => {
                 let name_ty = self.infer_name_load(name);

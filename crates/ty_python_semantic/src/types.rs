@@ -1568,13 +1568,13 @@ impl<'db> Type<'db> {
             Type::KnownBoundMethod(method) => Some(Type::Callable(CallableType::new(
                 db,
                 CallableSignature::from_overloads(method.signatures(db)),
-                false,
+                CallableTypeKind::Regular,
             ))),
 
             Type::WrapperDescriptor(wrapper_descriptor) => Some(Type::Callable(CallableType::new(
                 db,
                 CallableSignature::from_overloads(wrapper_descriptor.signatures(db)),
-                false,
+                CallableTypeKind::Regular,
             ))),
 
             Type::KnownInstance(KnownInstanceType::NewType(newtype)) => Some(CallableType::single(
@@ -10565,7 +10565,7 @@ impl<'db> BoundMethodType<'db> {
                     .iter()
                     .map(|signature| signature.bind_self(db, Some(self_instance))),
             ),
-            true,
+            CallableTypeKind::FunctionLike,
         )
     }
 
@@ -10631,6 +10631,20 @@ impl<'db> BoundMethodType<'db> {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, get_size2::GetSize)]
+pub enum CallableTypeKind {
+    /// Represents regular callable objects.
+    Regular,
+
+    /// Represents function-like objects, like the synthesized methods of dataclasses or
+    /// `NamedTuples`. These callables act like real functions when accessed as attributes on
+    /// instances, i.e. they bind `self`.
+    FunctionLike,
+
+    /// Represents the value bound to a `typing.ParamSpec` type variable.
+    ParamSpecValue,
+}
+
 /// This type represents the set of all callable objects with a certain, possibly overloaded,
 /// signature.
 ///
@@ -10647,10 +10661,7 @@ pub struct CallableType<'db> {
     #[returns(ref)]
     pub(crate) signatures: CallableSignature<'db>,
 
-    /// We use `CallableType` to represent function-like objects, like the synthesized methods
-    /// of dataclasses or NamedTuples. These callables act like real functions when accessed
-    /// as attributes on instances, i.e. they bind `self`.
-    is_function_like: bool,
+    kind: CallableTypeKind,
 }
 
 pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -10672,7 +10683,7 @@ impl<'db> CallableType<'db> {
         Type::Callable(CallableType::new(
             db,
             CallableSignature::single(signature),
-            false,
+            CallableTypeKind::Regular,
         ))
     }
 
@@ -10683,7 +10694,16 @@ impl<'db> CallableType<'db> {
         Type::Callable(CallableType::new(
             db,
             CallableSignature::single(signature),
-            true,
+            CallableTypeKind::FunctionLike,
+        ))
+    }
+
+    /// Create a callable type which represents the value bound to a `ParamSpec` type variable.
+    pub(crate) fn paramspec_value(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
+        Type::Callable(CallableType::new(
+            db,
+            CallableSignature::single(signature),
+            CallableTypeKind::ParamSpecValue,
         ))
     }
 
@@ -10693,7 +10713,15 @@ impl<'db> CallableType<'db> {
     }
 
     pub(crate) fn bind_self(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(db, self.signatures(db).bind_self(db, None), false)
+        CallableType::new(
+            db,
+            self.signatures(db).bind_self(db, None),
+            CallableTypeKind::Regular,
+        )
+    }
+
+    pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
+        matches!(self.kind(db), CallableTypeKind::FunctionLike)
     }
 
     /// Create a callable type which represents a fully-static "bottom" callable.
@@ -10701,7 +10729,7 @@ impl<'db> CallableType<'db> {
     /// Specifically, this represents a callable type with a single signature:
     /// `(*args: object, **kwargs: object) -> Never`.
     pub(crate) fn bottom(db: &'db dyn Db) -> CallableType<'db> {
-        Self::new(db, CallableSignature::bottom(), false)
+        Self::new(db, CallableSignature::bottom(), CallableTypeKind::Regular)
     }
 
     /// Return a "normalized" version of this `Callable` type.
@@ -10711,7 +10739,7 @@ impl<'db> CallableType<'db> {
         CallableType::new(
             db,
             self.signatures(db).normalized_impl(db, visitor),
-            self.is_function_like(db),
+            self.kind(db),
         )
     }
 
@@ -10726,7 +10754,7 @@ impl<'db> CallableType<'db> {
             db,
             self.signatures(db)
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            self.is_function_like(db),
+            self.kind(db),
         )
     }
 
