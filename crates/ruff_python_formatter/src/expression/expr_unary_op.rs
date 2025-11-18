@@ -102,19 +102,25 @@ impl NeedsParentheses for ExprUnaryOp {
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         if parent.is_expr_await() {
-            OptionalParentheses::Always
-        } else if context.comments().has_dangling(self) {
-            OptionalParentheses::Multiline
-        } else if is_expression_parenthesized(
+            return OptionalParentheses::Always;
+        }
+
+        if context.comments().has_dangling(self) {
+            return OptionalParentheses::Multiline;
+        }
+
+        if is_expression_parenthesized(
             self.operand.as_ref().into(),
             context.comments().ranges(),
             context.source(),
         ) {
-            OptionalParentheses::Never
-        } else if context.comments().has(self.operand.as_ref()) {
-            OptionalParentheses::Always
-        } else {
-            self.operand.needs_parentheses(self.into(), context)
+            return OptionalParentheses::Never;
         }
+
+        if context.comments().has(self.operand.as_ref()) {
+            return OptionalParentheses::Always;
+        }
+
+        self.operand.needs_parentheses(self.into(), context)
     }
 }
