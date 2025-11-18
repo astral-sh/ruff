@@ -36,7 +36,7 @@ error[invalid-key]: Unknown key "surname" for TypedDict `Person`
 11 |     # error: [invalid-key]
 12 |     # error: [invalid-key]
 13 |     being["surname"] = "unknown"
-   |     ----- ^^^^^^^^^ Unknown key "surname" - did you mean "name"?
+   |     ----- ^^^^^^^^^ Did you mean "name"?
    |     |
    |     TypedDict `Person` in union type `Person | Animal`
    |
@@ -51,7 +51,7 @@ error[invalid-key]: Unknown key "surname" for TypedDict `Animal`
 11 |     # error: [invalid-key]
 12 |     # error: [invalid-key]
 13 |     being["surname"] = "unknown"
-   |     ----- ^^^^^^^^^ Unknown key "surname" - did you mean "name"?
+   |     ----- ^^^^^^^^^ Did you mean "name"?
    |     |
    |     TypedDict `Animal` in union type `Person | Animal`
    |

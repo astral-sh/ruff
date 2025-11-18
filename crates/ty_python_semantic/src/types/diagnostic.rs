@@ -3167,16 +3167,21 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                 });
 
                 let existing_keys = items.iter().map(|(name, _)| name.as_str());
-                let hint = if let Some(suggestion) = did_you_mean(existing_keys, key) {
-                    format!(" - did you mean \"{suggestion}\"?")
+                if let Some(suggestion) = did_you_mean(existing_keys, key) {
+                    if key_node.is_expr_string_literal() {
+                        diagnostic
+                            .set_primary_message(format_args!("Did you mean \"{suggestion}\"?"));
+                    } else {
+                        diagnostic.set_primary_message(format_args!(
+                            "Unknown key \"{key}\" - did you mean \"{suggestion}\"?",
+                        ));
+                    }
+                    diagnostic.set_concise_message(format_args!(
+                        "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` - did you mean \"{suggestion}\"?",
+                    ));
                 } else {
-                    String::new()
-                };
-
-                diagnostic.set_primary_message(format!("Unknown key \"{key}\"{hint}"));
-                diagnostic.set_concise_message(format!(
-                    "Unknown key \"{key}\" for TypedDict `{typed_dict_name}`{hint}",
-                ));
+                    diagnostic.set_primary_message(format_args!("Unknown key \"{key}\""));
+                }
             }
             _ => {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
