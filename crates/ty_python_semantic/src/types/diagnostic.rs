@@ -26,9 +26,7 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
     infer_isolated_expression, protocol_class::ProtocolClass,
 };
-use crate::{
-    Db, DisplaySettings, FxIndexMap, FxOrderMap, Module, ModuleName, Program, declare_lint,
-};
+use crate::{Db, DisplaySettings, FxIndexMap, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::source::source_text;
@@ -3192,7 +3190,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
     typed_dict_ty: Type<'db>,
     full_object_ty: Option<Type<'db>>,
     key_ty: Type<'db>,
-    items: &FxOrderMap<Name, Field<'db>>,
+    items: &FxIndexMap<Name, Field<'db>>,
 ) {
     let db = context.db();
     if let Some(builder) = context.report_lint(&INVALID_KEY, key_node) {
@@ -3221,7 +3219,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         .message(format_args!("TypedDict `{typed_dict_name}`"))
                 });
 
-                let existing_keys = items.iter().map(|(name, _)| name.as_str());
+                let existing_keys = items.keys();
                 if let Some(suggestion) = did_you_mean(existing_keys, key) {
                     if key_node.is_expr_string_literal() {
                         diagnostic
