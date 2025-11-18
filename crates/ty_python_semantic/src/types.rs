@@ -14887,7 +14887,8 @@ impl<'db> TypeGuardType<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for TypeGuardType<'db> {
-    // TODO: comment
+    // `TypeGuard` is covariant in its type parameter. See the `TypeGuard`
+    // section of mdtest/generics/pep695/variance.md for details.
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         self.return_type(db).variance_of(db, typevar)
     }

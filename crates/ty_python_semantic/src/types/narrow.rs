@@ -292,10 +292,9 @@ impl ClassInfoConstraintFunction {
 /// in the second clobbers the first.
 #[derive(Hash, PartialEq, Debug, Eq, Clone, Copy)]
 struct Conjunction<'db> {
-    /// The intersected constraints (represented as an intersection type)
+    /// The intersected constraints (represented as a type to intersect the guard with)
     constraint: Type<'db>,
-    /// If any constraint in this conjunction is a `TypeGuard`, this is Some and
-    /// contains the union of all `TypeGuard` types in this conjunction
+    /// If any constraint in this conjunction is a `TypeGuard[T]`, this is `Some(T)`
     typeguard: Option<Type<'db>>,
 }
 
@@ -347,10 +346,10 @@ impl<'db> Conjunction<'db> {
 ///
 /// - `f(x) or g(x)` where f returns `TypeIs[A]` and g returns `TypeGuard[B]`
 ///   => `[Conjunction { constraint: A, typeguard: None }, Conjunction { constraint: object, typeguard: Some(B) }]`
-///   => evaluates to `A | B`
+///   => evaluates to `(P & A) | B`, where `P` is our previously-known type
 #[derive(Hash, PartialEq, Debug, Eq, Clone)]
 struct NarrowingConstraint<'db> {
-    /// Disjunctions of conjunctions (DNF)
+    /// Disjunction of conjunctions (DNF)
     disjuncts: SmallVec<[Conjunction<'db>; 4]>,
 }
 

@@ -12,17 +12,14 @@ from typing_extensions import TypeGuard, TypeIs
 def _(
     a: TypeGuard[str],
     b: TypeIs[str | int],
-    c: TypeGuard[Intersection[complex, Not[int], Not[float]]],
+    c: TypeGuard[bool],
     d: TypeIs[tuple[TypeOf[bytes]]],
     e: TypeGuard,  # error: [invalid-type-form]
     f: TypeIs,  # error: [invalid-type-form]
 ):
     reveal_type(a)  # revealed: TypeGuard[str]
     reveal_type(b)  # revealed: TypeIs[str | int]
-    # not `TypeGuard[complex & ~int & ~float]`: `complex` in argument position
-    # means `complex & int & float` semantically so `Intersection[complex,
-    # Not[int], Not[float]]` means `complex` semantically
-    reveal_type(c)  # revealed: TypeGuard[complex]
+    reveal_type(c)  # revealed: TypeGuard[bool]
     reveal_type(d)  # revealed: TypeIs[tuple[<class 'bytes'>]]
     reveal_type(e)  # revealed: Unknown
     reveal_type(f)  # revealed: Unknown
