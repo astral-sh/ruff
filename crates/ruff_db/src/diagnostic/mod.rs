@@ -65,6 +65,7 @@ impl Diagnostic {
             severity,
             message: message.into_diagnostic_message(),
             custom_concise_message: None,
+            documentation_url: None,
             annotations: vec![],
             subs: vec![],
             fix: None,
@@ -370,6 +371,14 @@ impl Diagnostic {
             .is_some_and(|fix| fix.applies(config.fix_applicability))
     }
 
+    pub fn documentation_url(&self) -> Option<&str> {
+        self.inner.documentation_url.as_deref()
+    }
+
+    pub fn set_documentation_url(&mut self, url: Option<String>) {
+        Arc::make_mut(&mut self.inner).documentation_url = url;
+    }
+
     /// Returns the offset of the parent statement for this diagnostic if it exists.
     ///
     /// This is primarily used for checking noqa/secondary code suppressions.
@@ -544,6 +553,7 @@ impl Diagnostic {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 struct DiagnosticInner {
     id: DiagnosticId,
+    documentation_url: Option<String>,
     severity: Severity,
     message: DiagnosticMessage,
     custom_concise_message: Option<DiagnosticMessage>,

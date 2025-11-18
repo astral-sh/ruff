@@ -923,7 +923,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let kw_only_sentinel_fields: Vec<_> = class
                     .fields(self.db(), specialization, field_policy)
-                    .into_iter()
+                    .iter()
                     .filter_map(|(name, field)| {
                         field.is_kw_only_sentinel(self.db()).then_some(name)
                     })
@@ -7958,7 +7958,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     Type::TypedDict(typed_dict_ty),
                                     None,
                                     key_ty,
-                                    &items,
+                                    items,
                                 );
                                 // Return `Unknown` to prevent the overload system from generating its own error
                                 return Type::unknown();
@@ -11299,7 +11299,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 value_ty,
                                 None,
                                 slice_ty,
-                                &typed_dict.items(db),
+                                typed_dict.items(db),
                             );
                         } else {
                             if let Some(builder) =

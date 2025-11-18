@@ -11,7 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use super::{Type, TypeCheckDiagnostics, binding_type};
 
-use crate::lint::LintSource;
+use crate::lint::{LintSource, lint_documentation_url};
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::function::FunctionDecorators;
@@ -103,7 +103,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     }
 
     pub(super) fn is_lint_enabled(&self, lint: &'static LintMetadata) -> bool {
-        LintDiagnosticGuardBuilder::severity_and_source(self, lint).is_some()
+        LintDiagnosticGuardBuilder::severity_and_source(self, LintId::of(lint)).is_some()
     }
 
     /// Optionally return a builder for a lint diagnostic guard.
@@ -395,7 +395,7 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
 /// when the diagnostic is disabled or suppressed (among other reasons).
 pub(super) struct LintDiagnosticGuardBuilder<'db, 'ctx> {
     ctx: &'ctx InferContext<'db, 'ctx>,
-    id: DiagnosticId,
+    id: LintId,
     severity: Severity,
     source: LintSource,
     primary_span: Span,
@@ -404,7 +404,7 @@ pub(super) struct LintDiagnosticGuardBuilder<'db, 'ctx> {
 impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
     fn severity_and_source(
         ctx: &'ctx InferContext<'db, 'ctx>,
-        lint: &'static LintMetadata,
+        lint: LintId,
     ) -> Option<(Severity, LintSource)> {
         // The comment below was copied from the original
         // implementation of diagnostic reporting. The code
@@ -420,10 +420,9 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         if !ctx.db.should_check_file(ctx.file) {
             return None;
         }
-        let lint_id = LintId::of(lint);
         // Skip over diagnostics if the rule
         // is disabled.
-        let (severity, source) = ctx.db.rule_selection(ctx.file).get(lint_id)?;
+        let (severity, source) = ctx.db.rule_selection(ctx.file).get(lint)?;
         // If we're not in type checking mode,
         // we can bail now.
         if ctx.is_in_no_type_check() {
@@ -443,20 +442,20 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         lint: &'static LintMetadata,
         range: TextRange,
     ) -> Option<LintDiagnosticGuardBuilder<'db, 'ctx>> {
-        let (severity, source) = Self::severity_and_source(ctx, lint)?;
+        let lint_id = LintId::of(lint);
+
+        let (severity, source) = Self::severity_and_source(ctx, lint_id)?;
 
         let suppressions = suppressions(ctx.db(), ctx.file());
-        let lint_id = LintId::of(lint);
         if let Some(suppression) = suppressions.find_suppression(range, lint_id) {
             ctx.diagnostics.borrow_mut().mark_used(suppression.id());
             return None;
         }
 
-        let id = DiagnosticId::Lint(lint.name());
         let primary_span = Span::from(ctx.file()).with_range(range);
         Some(LintDiagnosticGuardBuilder {
             ctx,
-            id,
+            id: lint_id,
             severity,
             source,
             primary_span,
@@ -477,7 +476,8 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         self,
         message: impl std::fmt::Display,
     ) -> LintDiagnosticGuard<'db, 'ctx> {
-        let mut diag = Diagnostic::new(self.id, self.severity, message);
+        let mut diag = Diagnostic::new(DiagnosticId::Lint(self.id.name()), self.severity, message);
+        diag.set_documentation_url(Some(self.id.documentation_url()));
         // This is why `LintDiagnosticGuard::set_primary_message` exists.
         // We add the primary annotation here (because it's required), but
         // the optional message can be added later. We could accept it here
@@ -629,10 +629,15 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
         self,
         message: impl std::fmt::Display,
     ) -> DiagnosticGuard<'db, 'ctx> {
-        let diag = Some(Diagnostic::new(self.id, self.severity, message));
+        let mut diag = Diagnostic::new(self.id, self.severity, message);
+
+        if let DiagnosticId::Lint(lint_name) = diag.id() {
+            diag.set_documentation_url(Some(lint_documentation_url(lint_name)));
+        }
+
         DiagnosticGuard {
             ctx: self.ctx,
-            diag,
+            diag: Some(diag),
         }
     }
 }

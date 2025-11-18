@@ -13,7 +13,7 @@ use super::diagnostic::{
 };
 use super::{ApplyTypeMappingVisitor, Type, TypeMapping, visitor};
 use crate::types::TypeContext;
-use crate::{Db, FxOrderMap};
+use crate::{Db, FxIndexMap};
 
 use ordermap::OrderSet;
 
@@ -54,7 +54,7 @@ impl<'db> TypedDictType<'db> {
         self.defining_class
     }
 
-    pub(crate) fn items(self, db: &'db dyn Db) -> FxOrderMap<Name, Field<'db>> {
+    pub(crate) fn items(self, db: &'db dyn Db) -> &'db FxIndexMap<Name, Field<'db>> {
         let (class_literal, specialization) = self.defining_class.class_literal(db);
         class_literal.fields(db, specialization, CodeGeneratorKind::TypedDict)
     }
@@ -165,7 +165,7 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
                 Type::TypedDict(typed_dict),
                 full_object_ty,
                 Type::string_literal(db, key),
-                &items,
+                items,
             );
         }
 

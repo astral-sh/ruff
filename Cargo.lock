@@ -1256,6 +1256,7 @@ dependencies = [
  "compact_str",
  "get-size-derive2",
  "hashbrown 0.16.0",
+ "indexmap",
  "smallvec",
 ]
 

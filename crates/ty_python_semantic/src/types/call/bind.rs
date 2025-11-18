@@ -3036,8 +3036,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         if let Type::TypedDict(typed_dict) = argument_type {
             for (argument_type, parameter_index) in typed_dict
                 .items(self.db)
-                .iter()
-                .map(|(_, field)| field.declared_ty)
+                .values()
+                .map(|field| field.declared_ty)
                 .zip(&self.argument_matches[argument_index].parameters)
             {
                 self.check_argument_type(
