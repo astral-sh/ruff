@@ -67,7 +67,7 @@ use salsa::plumbing::AsId;
 use crate::types::generics::{GenericContext, InferableTypeVars, Specialization};
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation,
-    TypeVarBoundOrConstraints, UnionBuilder, UnionType,
+    TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderSet};
 
@@ -1031,13 +1031,13 @@ impl<'db> Node<'db> {
     ///
     /// There is a representative type for each distinct path from the BDD root to the `AlwaysTrue`
     /// terminal. Each of those paths can be viewed as the conjunction of the individual
-    /// constraints of each internal node that we traverse as we walk that path. We choose the
-    /// "highest" (i.e. least upper bound) type that satisfies all of those constraints.
+    /// constraints of each internal node that we traverse as we walk that path. We provide the
+    /// entire range to your callback, allowing you to choose any suitble type in the range.
     fn find_representative_types(
         self,
         db: &'db dyn Db,
         bound_typevar: BoundTypeVarIdentity<'db>,
-        mut f: impl FnMut(Type<'db>),
+        mut f: impl FnMut(Type<'db>, Type<'db>),
     ) {
         self.retain_one(db, bound_typevar)
             .find_representative_types_inner(db, Type::Never, Type::object(), &mut f);
@@ -1048,7 +1048,7 @@ impl<'db> Node<'db> {
         db: &'db dyn Db,
         greatest_lower_bound: Type<'db>,
         least_upper_bound: Type<'db>,
-        f: &mut dyn FnMut(Type<'db>),
+        f: &mut dyn FnMut(Type<'db>, Type<'db>),
     ) {
         match self {
             Node::AlwaysTrue => {
@@ -1062,7 +1062,7 @@ impl<'db> Node<'db> {
 
                 // We've been tracking the least upper bound that the types for this path must
                 // satisfy. We choose that lub as the representative type.
-                f(least_upper_bound);
+                f(greatest_lower_bound, least_upper_bound);
             }
 
             Node::AlwaysFalse => {
@@ -1079,10 +1079,8 @@ impl<'db> Node<'db> {
                 // current glb/lub with the constraint's bounds to get the new glb/lub for the
                 // recursive call.
                 let constraint = interior.constraint(db);
-                let new_greatest_lower_bound = IntersectionType::from_elements(
-                    db,
-                    [greatest_lower_bound, constraint.lower(db)],
-                );
+                let new_greatest_lower_bound =
+                    UnionType::from_elements(db, [greatest_lower_bound, constraint.lower(db)]);
                 let new_least_upper_bound =
                     IntersectionType::from_elements(db, [least_upper_bound, constraint.upper(db)]);
                 interior.if_true(db).find_representative_types_inner(
@@ -2907,26 +2905,50 @@ impl<'db> GenericContext<'db> {
         // Then we find all of the "representative types" for each typevar in the constraint set.
         let mut types = vec![Type::Never; self.len(db)];
         for (i, bound_typevar) in self.variables(db).enumerate() {
-            // Each representative type is a union type, where each element represents one of the
-            // ways that the typevar can satisfy the constraint. Each of those is a conjunction of
-            // individual constraints. We choose the "highest" (i.e. least upper bound, "closest to
-            // `object`") type that satisfies all of those individual constraints.
+            // Each representative type, represents one of the ways that the typevar can satisfy
+            // the constraint, and which gives a lower/upper bound on the specialization of this
+            // typevar.
             //
-            // Note that we track whether there is any satisfiable representative type separately
-            // from the union builder, since we specializing the typevar to `Never` is different
-            // from not being able to specialize it to anything.
+            // If there are multiple paths in the BDD, they technically represent independent
+            // possible specializations. If there's a type that satisfies all of them, we will
+            // return that as the specialization. If not, then the constraint set is ambiguous.
+            // (This happens most often with constrained typevars.) We could in the future turn
+            // _each_ of the paths into separate specializations, but it's not clear what we would
+            // do with that, so instead we just report the ambiguity as a specialization failure.
             let mut satisfied = false;
-            let mut builder = UnionBuilder::new(db);
-            abstracted.find_representative_types(db, bound_typevar.identity(db), |ty| {
-                satisfied = true;
-                builder.add_in_place(ty);
-            });
+            let mut greatest_lower_bound = Type::Never;
+            let mut least_upper_bound = Type::object();
+            abstracted.find_representative_types(
+                db,
+                bound_typevar.identity(db),
+                |lower_bound, upper_bound| {
+                    satisfied = true;
+                    greatest_lower_bound =
+                        UnionType::from_elements(db, [greatest_lower_bound, lower_bound]);
+                    least_upper_bound =
+                        IntersectionType::from_elements(db, [least_upper_bound, upper_bound]);
+                },
+            );
+
+            // If there are no satisfiable paths in the BDD, then there is no valid specialization
+            // for this constraint set.
             if !satisfied {
                 // TODO: Construct a useful error here
                 return Err(());
             }
-            types[i] = builder.build();
+
+            // If `lower ≰ upper`, then there is no type that satisfies all of the paths in the
+            // BDD. That's an ambiguous specialization, as described above.
+            if !greatest_lower_bound.is_subtype_of(db, least_upper_bound) {
+                // TODO: Construct a useful error here
+                return Err(());
+            }
+
+            // Of all of the types that satisfy all of the paths in the BDD, we choose the
+            // "largest" one (i.e., "closest to `object`") as the specialization.
+            types[i] = least_upper_bound;
         }
+
         Ok(self.specialize(db, types.into_boxed_slice()))
     }
 }

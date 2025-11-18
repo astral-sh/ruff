@@ -41,9 +41,9 @@ def unbounded[T]():
 
     # revealed: ty_extensions.Specialization[T@unbounded = int]
     reveal_type(generic_context(unbounded).specialize_constrained(ConstraintSet.range(Never, T, int) | ConstraintSet.range(Never, T, bool)))
-    # revealed: ty_extensions.Specialization[T@unbounded = int | str]
+    # revealed: ty_extensions.Specialization[T@unbounded = Never]
     reveal_type(generic_context(unbounded).specialize_constrained(ConstraintSet.range(Never, T, int) | ConstraintSet.range(Never, T, str)))
-    # revealed: ty_extensions.Specialization[T@unbounded = bool | str]
+    # revealed: None
     reveal_type(generic_context(unbounded).specialize_constrained(ConstraintSet.range(bool, T, bool) | ConstraintSet.range(Never, T, str)))
 ```
 
@@ -117,6 +117,12 @@ def bounded_by_gradual_list[T: list[Any]]():
 If a typevar has constraints, then it must specialize to one of those specific types. (Not to a
 subtype of one of those types!)
 
+In particular, note that if a constraint set is satisfied by more than one of the typevar's
+constraints (i.e., we have no reason to prefer one over the others), then we return `None` to
+indicate an ambiguous result. We could, in theory, return _more than one_ specialization, since we
+have all of the information necessary to produce this. But it's not clear what we would do with that
+information at the moment.
+
 ```py
 from typing import final, Never
 from ty_extensions import ConstraintSet, generic_context
@@ -129,7 +135,7 @@ class Sub(Base): ...
 class Unrelated: ...
 
 def constrained[T: (Base, Unrelated)]():
-    # revealed: ty_extensions.Specialization[T@constrained = Base | Unrelated]
+    # revealed: None
     reveal_type(generic_context(constrained).specialize_constrained(ConstraintSet.always()))
     # revealed: None
     reveal_type(generic_context(constrained).specialize_constrained(ConstraintSet.never()))
@@ -201,7 +207,7 @@ def constrained_by_two_gradual[T: (Any, Any)]():
     reveal_type(generic_context(constrained_by_two_gradual).specialize_constrained(ConstraintSet.range(Sub, T, Sub)))
 
 def constrained_by_gradual_list[T: (list[Base], list[Any])]():
-    # revealed: ty_extensions.Specialization[T@constrained_by_gradual_list = Top[list[Any]]]
+    # revealed: ty_extensions.Specialization[T@constrained_by_gradual_list = list[Base]]
     reveal_type(generic_context(constrained_by_gradual_list).specialize_constrained(ConstraintSet.always()))
     # revealed: None
     reveal_type(generic_context(constrained_by_gradual_list).specialize_constrained(ConstraintSet.never()))
