@@ -209,3 +209,9 @@ if '' and (not
 	0
 )):
     pass
+
+if (
+  not
+  # comment
+  (a)):
+    pass

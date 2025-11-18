@@ -215,6 +215,12 @@ if '' and (not
 	0
 )):
     pass
+
+if (
+  not
+  # comment
+  (a)):
+    pass
 ```
 
 ## Output
@@ -385,9 +391,7 @@ if (
 ):
     pass
 
-if (
-    not a  # comment
-):
+if not a:  # comment
     pass
 
 # Regression test for: https://github.com/astral-sh/ruff/issues/7423
@@ -450,6 +454,13 @@ if "" and (
     not (  #
         0
     )
+):
+    pass
+
+if (
+    not
+    # comment
+    (a)
 ):
     pass
 ```

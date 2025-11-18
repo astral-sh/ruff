@@ -59,26 +59,7 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
         // ):
         //     pass
         // ```
-        let parenthesized_operand_range = parenthesized_range(
-            operand.into(),
-            item.into(),
-            comments.ranges(),
-            f.context().source(),
-        );
-        let leading_operand_comments = comments.leading(operand.as_ref());
-        let has_leading_comments_before_parens = parenthesized_operand_range.is_some_and(|range| {
-            leading_operand_comments
-                .iter()
-                .any(|comment| comment.start() < range.start())
-        });
-        if !leading_operand_comments.is_empty()
-            && !is_expression_parenthesized(
-                operand.as_ref().into(),
-                f.context().comments().ranges(),
-                f.context().source(),
-            )
-            || has_leading_comments_before_parens
-        {
+        if needs_line_break(item, f.context()) {
             hard_line_break().fmt(f)?;
         } else if op.is_not() {
             space().fmt(f)?;
@@ -105,7 +86,7 @@ impl NeedsParentheses for ExprUnaryOp {
             return OptionalParentheses::Always;
         }
 
-        if context.comments().has_dangling(self) {
+        if needs_line_break(self, context) {
             return OptionalParentheses::Multiline;
         }
 
@@ -123,4 +104,30 @@ impl NeedsParentheses for ExprUnaryOp {
 
         self.operand.needs_parentheses(self.into(), context)
     }
+}
+
+/// Returns `true` if the unary operator will have a hard line break between the operator and its
+/// operand and thus requires parentheses.
+fn needs_line_break(item: &ExprUnaryOp, context: &PyFormatContext) -> bool {
+    let comments = context.comments();
+    let parenthesized_operand_range = parenthesized_range(
+        item.operand.as_ref().into(),
+        item.into(),
+        comments.ranges(),
+        context.source(),
+    );
+    let leading_operand_comments = comments.leading(item.operand.as_ref());
+    let has_leading_comments_before_parens = parenthesized_operand_range.is_some_and(|range| {
+        leading_operand_comments
+            .iter()
+            .any(|comment| comment.start() < range.start())
+    });
+
+    !leading_operand_comments.is_empty()
+        && !is_expression_parenthesized(
+            item.operand.as_ref().into(),
+            context.comments().ranges(),
+            context.source(),
+        )
+        || has_leading_comments_before_parens
 }
