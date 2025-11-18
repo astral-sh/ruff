@@ -1,3 +1,7 @@
+use crate::{Db, Program, PythonVersionWithSource};
+use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
+use std::fmt::Write;
+
 /// Suggest a name from `existing_names` that is similar to `wrong_name`.
 pub(crate) fn did_you_mean<S: AsRef<str>, T: AsRef<str>>(
     existing_names: impl Iterator<Item = S>,
@@ -23,10 +27,6 @@ pub(crate) fn did_you_mean<S: AsRef<str>, T: AsRef<str>>(
         .filter(|(_, dist)| *dist <= 3)
         .map(|(id, _)| id)
 }
-
-use crate::{Db, Program, PythonVersionWithSource};
-use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
-use std::fmt::Write;
 
 /// Add a subdiagnostic to `diagnostic` that explains why a certain Python version was inferred.
 ///

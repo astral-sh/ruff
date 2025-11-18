@@ -21,9 +21,7 @@ use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
-use ruff_db::diagnostic::{
-    Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
-};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, DisplayDiagnostics, Severity};
 use ruff_db::files::File;
 use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
@@ -345,19 +343,10 @@ impl MainLoop {
                             // Only render diagnostics if they're going to be displayed, since doing
                             // so is expensive.
                             if stdout.is_enabled() {
-                                let url_resolver = |id: &DiagnosticId| {
-                                    let DiagnosticId::Lint(lint) = id else {
-                                        return None;
-                                    };
-
-                                    Some(format!("https://ty.dev/rules#{}", lint))
-                                };
-
                                 write!(
                                     stdout,
                                     "{}",
                                     DisplayDiagnostics::new(db, &display_config, &result)
-                                        .with_url_resolver(&url_resolver)
                                 )?;
                             }
 

@@ -261,13 +261,16 @@ impl DisplaySet<'_> {
                 if hide_severity {
                     buffer.append(
                         line_offset,
-                        &format!("{id} ", id = DisplayId(&id)),
+                        &format!("{id} ", id = fmt_with_hyperlink(id.id, id.url, stylesheet)),
                         *stylesheet.error(),
                     );
                 } else {
                     buffer.append(
                         line_offset,
-                        &format!("{annotation_type}[{id}]", id = DisplayId(&id)),
+                        &format!(
+                            "{annotation_type}[{id}]",
+                            id = fmt_with_hyperlink(id.id, id.url, stylesheet)
+                        ),
                         *color,
                     );
                 }
@@ -735,7 +738,10 @@ impl DisplaySet<'_> {
                             } else if formatted_len != 0 {
                                 formatted_len += 2;
                                 let id = match &annotation.annotation.id {
-                                    Some(id) => format!("[{id}]", id = DisplayId(&id)),
+                                    Some(id) => format!(
+                                        "[{id}]",
+                                        id = fmt_with_hyperlink(&id.id, id.url, stylesheet)
+                                    ),
                                     None => String::new(),
                                 };
                                 buffer.puts(
@@ -1900,21 +1906,39 @@ fn char_width(c: char) -> Option<usize> {
     }
 }
 
-struct DisplayId<'a>(&'a Id<'a>);
-
-impl std::fmt::Display for DisplayId<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Id { url, id } = self.0;
-        if let Some(url) = url {
-            write!(f, "\x1B]8;;{url}\x1B\\")?;
-        }
-
-        f.write_str(id)?;
-
-        if url.is_some() {
-            f.write_str("\x1B]8;;\x1B\\")?;
-        }
-
-        Ok(())
+pub(super) fn fmt_with_hyperlink<'a, T>(
+    content: T,
+    url: Option<&'a str>,
+    stylesheet: &Stylesheet,
+) -> impl std::fmt::Display + 'a
+where
+    T: std::fmt::Display + 'a,
+{
+    struct FmtHyperlink<'a, T> {
+        content: T,
+        url: Option<&'a str>,
     }
+
+    impl<T> std::fmt::Display for FmtHyperlink<'_, T>
+    where
+        T: std::fmt::Display,
+    {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            if let Some(url) = self.url {
+                write!(f, "\x1B]8;;{url}\x1B\\")?;
+            }
+
+            self.content.fmt(f)?;
+
+            if self.url.is_some() {
+                f.write_str("\x1B]8;;\x1B\\")?;
+            }
+
+            Ok(())
+        }
+    }
+
+    let url = if stylesheet.hyperlink { url } else { None };
+
+    FmtHyperlink { content, url }
 }
