@@ -6,11 +6,3 @@
 possibly-unresolved-reference = "warn"
 unused-ignore-comment = "warn"
 division-by-zero = "warn"
-
-[src]
-exclude = [
-    # not valid UTF-8
-    "Pythonwin/pywin/test/_dbgscript.py",
-    "tests/appsec/iast/fixtures/aspects/str/non_utf8_content.py",
-    "tests/appsec/iast/fixtures/ast/str/non_utf8_content.py",
-]
