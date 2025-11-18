@@ -3060,10 +3060,25 @@ impl<'db> BoundTypeVarInstance<'db> {
 }
 
 impl<'db> GenericContext<'db> {
+    /// Returns the valid specializations of all of the typevars in this generic context.
+    pub(crate) fn valid_specializations(self, db: &'db dyn Db) -> ConstraintSet<'db> {
+        self.variables(db)
+            .when_all(db, |bound_typevar| bound_typevar.valid_specializations(db))
+    }
+
     pub(crate) fn specialize_constrained(
         self,
         db: &'db dyn Db,
         constraints: ConstraintSet<'db>,
+    ) -> Result<Specialization<'db>, ()> {
+        self.specialize_constrained_mapped(db, constraints, |_, _, ty| ty)
+    }
+
+    pub(crate) fn specialize_constrained_mapped(
+        self,
+        db: &'db dyn Db,
+        constraints: ConstraintSet<'db>,
+        f: impl Fn(BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>, Type<'db>) -> Type<'db>,
     ) -> Result<Specialization<'db>, ()> {
         // If the constraint set is cyclic, don't even try to construct a specialization.
         if constraints.is_cyclic(db) {
@@ -3096,17 +3111,14 @@ impl<'db> GenericContext<'db> {
             let mut satisfied = false;
             let mut greatest_lower_bound = Type::Never;
             let mut least_upper_bound = Type::object();
-            abstracted.find_representative_types(
-                db,
-                bound_typevar.identity(db),
-                |lower_bound, upper_bound| {
-                    satisfied = true;
-                    greatest_lower_bound =
-                        UnionType::from_elements(db, [greatest_lower_bound, lower_bound]);
-                    least_upper_bound =
-                        IntersectionType::from_elements(db, [least_upper_bound, upper_bound]);
-                },
-            );
+            let identity = bound_typevar.identity(db);
+            abstracted.find_representative_types(db, identity, |lower_bound, upper_bound| {
+                satisfied = true;
+                greatest_lower_bound =
+                    UnionType::from_elements(db, [greatest_lower_bound, lower_bound]);
+                least_upper_bound =
+                    IntersectionType::from_elements(db, [least_upper_bound, upper_bound]);
+            });
 
             // If there are no satisfiable paths in the BDD, then there is no valid specialization
             // for this constraint set.
@@ -3124,7 +3136,7 @@ impl<'db> GenericContext<'db> {
 
             // Of all of the types that satisfy all of the paths in the BDD, we choose the
             // "largest" one (i.e., "closest to `object`") as the specialization.
-            types[i] = least_upper_bound;
+            types[i] = f(identity, bound_typevar, least_upper_bound);
         }
 
         Ok(self.specialize_recursive(db, types.into_boxed_slice()))
