@@ -21,6 +21,91 @@ use crate::importer::{ImportRequest, Importer};
 use crate::symbols::QueryPattern;
 use crate::{Db, all_symbols};
 
+/// A collection of completions built up from various sources.
+#[derive(Clone)]
+struct Completions<'db> {
+    db: &'db dyn Db,
+    items: Vec<Completion<'db>>,
+    query: QueryPattern,
+}
+
+impl<'db> Completions<'db> {
+    /// Create a new empty collection of completions.
+    ///
+    /// The given typed text should correspond to what we believe
+    /// the user has typed as part of the next symbol they are writing.
+    /// This collection will treat it as a query when present, and only
+    /// add completions that match it.
+    fn new(db: &'db dyn Db, typed: Option<&str>) -> Completions<'db> {
+        let query = typed
+            .map(QueryPattern::new)
+            .unwrap_or_else(QueryPattern::matches_all_symbols);
+        Completions {
+            db,
+            items: vec![],
+            query,
+        }
+    }
+
+    /// Convert this collection into a simple
+    /// sequence of completions.
+    fn into_completions(mut self) -> Vec<Completion<'db>> {
+        self.items.sort_by(compare_suggestions);
+        self.items
+            .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
+        self.items
+    }
+
+    /// Attempts to adds the given completion to this collection.
+    ///
+    /// When added, `true` is returned.
+    ///
+    /// This might not add the completion for a variety of reasons.
+    /// For example, if the symbol name does not match this collection's
+    /// query.
+    fn try_add(&mut self, completion: Completion<'db>) -> bool {
+        if !self.query.is_match_symbol_name(completion.name.as_str()) {
+            return false;
+        }
+        self.force_add(completion);
+        true
+    }
+
+    /// Attempts to adds the given semantic completion to this collection.
+    ///
+    /// When added, `true` is returned.
+    fn try_add_semantic(&mut self, completion: SemanticCompletion<'db>) -> bool {
+        self.try_add(Completion::from_semantic_completion(self.db, completion))
+    }
+
+    /// Always adds the given completion to this collection.
+    fn force_add(&mut self, completion: Completion<'db>) {
+        self.items.push(completion);
+    }
+}
+
+impl<'db> Extend<SemanticCompletion<'db>> for Completions<'db> {
+    fn extend<T>(&mut self, it: T)
+    where
+        T: IntoIterator<Item = SemanticCompletion<'db>>,
+    {
+        for c in it {
+            self.try_add_semantic(c);
+        }
+    }
+}
+
+impl<'db> Extend<Completion<'db>> for Completions<'db> {
+    fn extend<T>(&mut self, it: T)
+    where
+        T: IntoIterator<Item = Completion<'db>>,
+    {
+        for c in it {
+            self.try_add(c);
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Completion<'db> {
     /// The label shown to the user for this suggestion.
@@ -251,11 +336,6 @@ pub fn completion<'db>(
         return vec![completions];
     }
 
-    let typed_query = typed
-        .as_deref()
-        .map(QueryPattern::new)
-        .unwrap_or_else(QueryPattern::matches_all_symbols);
-
     let Some(target_token) = CompletionTargetTokens::find(&parsed, offset) else {
         return vec![];
     };
@@ -282,14 +362,12 @@ pub fn completion<'db>(
             (model.scoped_completions(scoped.node), Some(scoped))
         }
     };
-    let mut completions: Vec<Completion<'_>> = semantic_completions
-        .into_iter()
-        .filter(|c| typed_query.is_match_symbol_name(c.name.as_str()))
-        .map(|c| Completion::from_semantic_completion(db, c))
-        .collect();
+
+    let mut completions = Completions::new(db, typed.as_deref());
+    completions.extend(semantic_completions);
 
     if scoped.is_some() {
-        add_keyword_completions(db, &typed_query, &mut completions);
+        add_keyword_completions(db, &mut completions);
     }
     if settings.auto_import {
         if let Some(scoped) = scoped {
@@ -303,9 +381,7 @@ pub fn completion<'db>(
             );
         }
     }
-    completions.sort_by(compare_suggestions);
-    completions.dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
-    completions
+    completions.into_completions()
 }
 
 /// Adds completions derived from keywords.
@@ -313,21 +389,14 @@ pub fn completion<'db>(
 /// This should generally only be used when offering "scoped" completions.
 /// This will include keywords corresponding to Python values (like `None`)
 /// and general language keywords (like `raise`).
-fn add_keyword_completions<'db>(
-    db: &'db dyn Db,
-    query: &QueryPattern,
-    completions: &mut Vec<Completion<'db>>,
-) {
+fn add_keyword_completions<'db>(db: &'db dyn Db, completions: &mut Completions<'db>) {
     let keyword_values = [
         ("None", Type::none(db)),
         ("True", Type::BooleanLiteral(true)),
         ("False", Type::BooleanLiteral(false)),
     ];
     for (name, ty) in keyword_values {
-        if !query.is_match_symbol_name(name) {
-            continue;
-        }
-        completions.push(Completion::value_keyword(name, ty));
+        completions.try_add(Completion::value_keyword(name, ty));
     }
 
     // Note that we specifically omit the `type` keyword here, since
@@ -343,10 +412,7 @@ fn add_keyword_completions<'db>(
         "yield", "case", "match",
     ];
     for name in keywords {
-        if !query.is_match_symbol_name(name) {
-            continue;
-        }
-        completions.push(Completion::keyword(name));
+        completions.try_add(Completion::keyword(name));
     }
 }
 
@@ -377,17 +443,22 @@ fn add_unimported_completions<'db>(
     parsed: &ParsedModuleRef,
     scoped: ScopedTarget<'_>,
     typed: Option<&str>,
-    completions: &mut Vec<Completion<'db>>,
+    completions: &mut Completions<'db>,
 ) {
-    let Some(typed) = typed else {
+    // This is redundant since `all_symbols` will also bail
+    // when the query can match everything. But we bail here
+    // to avoid building an `Importer` and other plausibly
+    // costly work when we know we won't use it.
+    if completions.query.will_match_everything() {
         return;
-    };
+    }
+
     let source = source_text(db, file);
     let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
     let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
 
-    for symbol in all_symbols(db, typed) {
+    for symbol in all_symbols(db, &completions.query) {
         if symbol.module.file(db) == Some(file) {
             continue;
         }
@@ -399,7 +470,7 @@ fn add_unimported_completions<'db>(
         // "fine," but it might mean that we import a symbol from the
         // "wrong" module.
         let import_action = importer.import(request, &members);
-        completions.push(Completion {
+        completions.add(Completion {
             name: ast::name::Name::new(&symbol.symbol.name),
             insert: Some(import_action.symbol_text().into()),
             ty: None,
@@ -975,6 +1046,8 @@ fn is_import_alias_incomplete(tokens: &[Token], typed: Option<&str>) -> bool {
 ///
 /// If there isn't any typed text or it could not otherwise be found,
 /// then `None` is returned.
+///
+/// When `Some` is returned, the string is guaranteed to be non-empty.
 fn find_typed_text(
     db: &dyn Db,
     file: File,
@@ -997,7 +1070,7 @@ fn find_typed_text(
     // been typed. This likely means there is whitespace
     // or something that isn't represented in the token
     // stream. So just give up.
-    if last.end() < offset {
+    if last.end() < offset || last.range().is_empty() {
         return None;
     }
     Some(source[last.range()].to_string())
