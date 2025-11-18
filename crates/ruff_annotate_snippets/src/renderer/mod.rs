@@ -76,6 +76,7 @@ impl Renderer {
                 }
                 .effects(Effects::BOLD),
                 none: Style::new(),
+                hyperlink: true,
             },
             ..Self::plain()
         }
