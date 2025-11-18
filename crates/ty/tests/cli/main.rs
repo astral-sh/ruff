@@ -41,22 +41,24 @@ fn test_quiet_output() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", "x: int = 'foo'")?;
 
     // By default, we emit a diagnostic
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
     error[invalid-assignment]: Object of type `Literal["foo"]` is not assignable to `int`
-     --> test.py:1:1
+     --> test.py:1:4
       |
     1 | x: int = 'foo'
-      | ^
+      |    ---   ^^^^^ Incompatible value of type `Literal["foo"]`
+      |    |
+      |    Declared type
       |
     info: rule `invalid-assignment` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
     // With `quiet`, the diagnostic is not displayed, just the summary message
     assert_cmd_snapshot!(case.command().arg("--quiet"), @r"
