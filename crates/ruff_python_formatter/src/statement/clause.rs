@@ -583,10 +583,13 @@ where
 
 impl<'ast> Format<PyFormatContext<'ast>> for FormatClause<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
-        if should_suppress_clause(self, f)? {
-            write_suppressed_clause(self, f)
-        } else {
-            write!(f, [self.clause_header(), self.clause_body()])
+        match should_suppress_clause(self, f)? {
+            SuppressClauseHeader::Yes {
+                last_child_in_clause,
+            } => write_suppressed_clause(self, f, last_child_in_clause),
+            SuppressClauseHeader::No => {
+                write!(f, [self.clause_header(), self.clause_body()])
+            }
         }
     }
 }
@@ -714,14 +717,14 @@ fn colon_range(after_keyword_or_condition: TextSize, source: &str) -> FormatResu
     }
 }
 
-fn should_suppress_clause(
-    clause: &FormatClause<'_, '_>,
+fn should_suppress_clause<'a>(
+    clause: &FormatClause<'a, '_>,
     f: &mut Formatter<PyFormatContext<'_>>,
-) -> FormatResult<bool> {
+) -> FormatResult<SuppressClauseHeader<'a>> {
     let source = f.context().source();
 
     let Some(last_child_in_clause) = clause.header.last_child_in_clause() else {
-        return Ok(false);
+        return Ok(SuppressClauseHeader::No);
     };
 
     // Early return if we don't have a skip comment
@@ -730,7 +733,7 @@ fn should_suppress_clause(
         f.context().comments().trailing(last_child_in_clause),
         source,
     ) {
-        return Ok(false);
+        return Ok(SuppressClauseHeader::No);
     }
 
     let clause_start = clause.header.range(source)?.end();
@@ -739,16 +742,19 @@ fn should_suppress_clause(
 
     // Only applies to clauses on a single line
     if source.contains_line_break(clause_range) {
-        return Ok(false);
+        return Ok(SuppressClauseHeader::No);
     }
 
-    Ok(true)
+    Ok(SuppressClauseHeader::Yes {
+        last_child_in_clause,
+    })
 }
 
 #[cold]
 fn write_suppressed_clause(
     clause: &FormatClause,
     f: &mut Formatter<PyFormatContext<'_>>,
+    last_child_in_clause: AnyNodeRef,
 ) -> FormatResult<()> {
     if let Some((leading_comments, last_node)) = clause.leading_comments {
         leading_alternate_branch_comments(leading_comments, last_node).fmt(f)?;
@@ -759,10 +765,7 @@ fn write_suppressed_clause(
 
     let comments = f.context().comments().clone();
 
-    let last_child = header
-        .last_child_in_clause()
-        .expect("last child to exist if `should_suppress_clause` is `Ok(true)`");
-    let clause_end = last_child.end();
+    let clause_end = last_child_in_clause.end();
 
     // Write the outer comments and format the node as verbatim
     write!(
@@ -771,7 +774,7 @@ fn write_suppressed_clause(
             source_position(clause_start),
             verbatim_text(TextRange::new(clause_start, clause_end)),
             source_position(clause_end),
-            trailing_comments(comments.trailing(last_child)),
+            trailing_comments(comments.trailing(last_child_in_clause)),
             hard_line_break()
         ]
     )?;
@@ -798,4 +801,11 @@ fn write_suppressed_clause(
     }
 
     Ok(())
+}
+
+enum SuppressClauseHeader<'a> {
+    No,
+    Yes {
+        last_child_in_clause: AnyNodeRef<'a>,
+    },
 }
