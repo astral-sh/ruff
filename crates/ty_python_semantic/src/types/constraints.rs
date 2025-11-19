@@ -254,7 +254,6 @@ impl<'db> ConstraintSet<'db> {
         }
 
         fn visit_dfs<'db>(
-            db: &'db dyn Db,
             reachable_typevars: &FxHashMap<
                 BoundTypeVarIdentity<'db>,
                 FxHashSet<BoundTypeVarIdentity<'db>>,
@@ -269,7 +268,7 @@ impl<'db> ConstraintSet<'db> {
                     return true;
                 }
                 if !finished.contains(outgoing) {
-                    if visit_dfs(db, reachable_typevars, discovered, finished, *outgoing) {
+                    if visit_dfs(reachable_typevars, discovered, finished, *outgoing) {
                         return true;
                     }
                 }
@@ -300,7 +299,6 @@ impl<'db> ConstraintSet<'db> {
         for bound_typevar in reachable_typevars.keys() {
             if !discovered.contains(bound_typevar) && !finished.contains(bound_typevar) {
                 let cycle_found = visit_dfs(
-                    db,
                     &reachable_typevars,
                     &mut discovered,
                     &mut finished,
