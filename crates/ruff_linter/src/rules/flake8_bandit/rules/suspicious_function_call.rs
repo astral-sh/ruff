@@ -3,16 +3,16 @@
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html>
 use itertools::Either;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{
-    self as ast, Arguments, Decorator, Expr, ExprCall, ExprStringLiteral, Operator,
-};
+use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprCall, Operator};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing::find_binding_value;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::preview::is_suspicious_function_reference_enabled;
+use crate::preview::{
+    is_s310_resolve_string_literal_bindings_enabled, is_suspicious_function_reference_enabled,
+};
 
 /// ## What it does
 /// Checks for calls to `pickle` functions or modules that wrap them.
@@ -1020,27 +1020,17 @@ fn suspicious_function(
             || has_prefix(chars.skip_while(|c| c.is_whitespace()), "https://")
     }
 
-    /// Try to resolve an expression to a string literal, including resolving variable bindings.
-    fn resolve_to_string_literal<'a>(
-        expr: &'a Expr,
-        semantic: &'a SemanticModel,
-    ) -> Option<&'a ExprStringLiteral> {
-        // If it's already a string literal, return it directly.
-        if let Some(str_lit) = expr.as_string_literal_expr() {
-            return Some(str_lit);
-        }
-
-        // If it's a name expression, try to resolve the binding to a string literal.
+    /// Resolve a name expression to its binding value, or return the original expression.
+    fn resolve_name<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> &'a Expr {
         if let Some(name_expr) = expr.as_name_expr() {
-            let binding_id = semantic.only_binding(name_expr)?;
-            let binding = semantic.binding(binding_id);
-            let value = find_binding_value(binding, semantic)?;
-            if let Some(str_lit) = value.as_string_literal_expr() {
-                return Some(str_lit);
+            if let Some(binding_id) = semantic.only_binding(name_expr) {
+                let binding = semantic.binding(binding_id);
+                if let Some(value) = find_binding_value(binding, semantic) {
+                    return value;
+                }
             }
         }
-
-        None
+        expr
     }
 
     /// Return the leading characters for an expression, if it's a string literal, f-string, or
@@ -1213,27 +1203,31 @@ fn suspicious_function(
                                     name.segments() == ["urllib", "request", "Request"]
                                 })
                             {
-                                if arguments
-                                    .find_argument_value("url", 0)
-                                    .and_then(leading_chars)
-                                    .is_some_and(has_http_prefix)
-                                {
-                                    return;
+                                if let Some(url_expr) = arguments.find_argument_value("url", 0) {
+                                    let url_expr =
+                                        if is_s310_resolve_string_literal_bindings_enabled(
+                                            checker.settings(),
+                                        ) {
+                                            resolve_name(url_expr, checker.semantic())
+                                        } else {
+                                            url_expr
+                                        };
+                                    if leading_chars(url_expr).is_some_and(has_http_prefix) {
+                                        return;
+                                    }
                                 }
                             }
                         }
 
                         // If the `url` argument is a string literal (including resolved bindings), allow `http` and `https` schemes.
                         Some(expr) => {
-                            // First try to resolve bindings to string literals
-                            if let Some(str_lit) =
-                                resolve_to_string_literal(expr, checker.semantic())
-                            {
-                                if has_http_prefix(str_lit.value.chars()) {
-                                    return;
-                                }
-                            }
-                            // Fall back to checking direct string literals, f-strings, and concatenation
+                            let expr = if is_s310_resolve_string_literal_bindings_enabled(
+                                checker.settings(),
+                            ) {
+                                resolve_name(expr, checker.semantic())
+                            } else {
+                                expr
+                            };
                             if leading_chars(expr).is_some_and(has_http_prefix) {
                                 return;
                             }

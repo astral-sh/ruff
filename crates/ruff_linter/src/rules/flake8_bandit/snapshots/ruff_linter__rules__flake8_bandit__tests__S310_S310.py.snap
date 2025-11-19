@@ -254,3 +254,12 @@ S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom sch
 42 | urllib.request.urlopen(urllib.request.Request(url))
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
+
+S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+  --> S310.py:51:1
+   |
+49 | # https://github.com/astral-sh/ruff/issues/21462
+50 | path = "https://example.com/data.csv"
+51 | urllib.request.urlretrieve(path, "data.csv")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
