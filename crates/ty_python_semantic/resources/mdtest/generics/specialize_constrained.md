@@ -320,3 +320,16 @@ def mentions[T, U]():
     # revealed: ty_extensions.Specialization[T@mentions = int, U@mentions = list[int]]
     reveal_type(generic_context(mentions).specialize_constrained(constraints))
 ```
+
+If the constraint set contains mutually recursive bounds, specialization inference will not
+converge. This test ensures that our cycle detection prevents an endless loop or stack overflow in
+this case.
+
+```py
+def divergent[T, U]():
+    constraints = ConstraintSet.range(list[U], T, list[U]) & ConstraintSet.range(list[T], U, list[T])
+    # revealed: ty_extensions.ConstraintSet[((T@divergent = list[U@divergent]) ∧ (U@divergent = list[T@divergent]))]
+    reveal_type(constraints)
+    # revealed: None
+    reveal_type(generic_context(divergent).specialize_constrained(constraints))
+```
