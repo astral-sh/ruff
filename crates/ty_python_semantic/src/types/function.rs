@@ -83,7 +83,7 @@ use crate::types::{
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
     NormalizedVisitor, SpecialFormType, Truthiness, Type, TypeContext, TypeMapping, TypeRelation,
-    UnionBuilder, binding_type, todo_type, walk_signature,
+    UnionBuilder, UnionTypeInstance, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -1790,14 +1790,19 @@ impl KnownFunction {
                                 // `Any` can be used in `issubclass()` calls but not `isinstance()` calls
                                 Type::SpecialForm(SpecialFormType::Any)
                                     if function == KnownFunction::IsSubclass => {}
-                                Type::KnownInstance(KnownInstanceType::UnionType(union)) => {
-                                    for element in union.elements(db) {
-                                        find_invalid_elements(
-                                            db,
-                                            function,
-                                            *element,
-                                            invalid_elements,
-                                        );
+                                Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
+                                    match instance {
+                                        UnionTypeInstance::Legacy(..) => {}
+                                        UnionTypeInstance::PEP604(instance) => {
+                                            for element in instance.value_expr_types(db) {
+                                                find_invalid_elements(
+                                                    db,
+                                                    function,
+                                                    *element,
+                                                    invalid_elements,
+                                                );
+                                            }
+                                        }
                                     }
                                 }
                                 _ => invalid_elements.push(ty),
