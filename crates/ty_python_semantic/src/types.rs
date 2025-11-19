@@ -8287,7 +8287,9 @@ impl<'db> KnownInstanceType<'db> {
                         Ok(())
                     }
                     KnownInstanceType::ConstraintSet(tracked_set) => {
-                        let constraints = tracked_set.constraints(self.db);
+                        let constraints = tracked_set
+                            .constraints(self.db)
+                            .limit_to_valid_specializations(self.db);
                         write!(
                             f,
                             "ty_extensions.ConstraintSet[{}]",

@@ -345,6 +345,17 @@ impl<'db> ConstraintSet<'db> {
         self.node.satisfied_by_all_typevars(db, inferable)
     }
 
+    /// Returns a new constraint set that ensures that all typevars mentioned in the current
+    /// constraint set have valid specializations, according to any upper bound or constraints they
+    /// might have.
+    pub(crate) fn limit_to_valid_specializations(self, db: &'db dyn Db) -> Self {
+        let mut result = self.node;
+        self.node.for_each_constraint(db, &mut |constraint| {
+            result = result.and(db, constraint.typevar(db).valid_specializations(db));
+        });
+        Self { node: result }
+    }
+
     /// Updates this constraint set to hold the union of itself and another constraint set.
     pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
         self.node = self.node.or(db, other.node);
