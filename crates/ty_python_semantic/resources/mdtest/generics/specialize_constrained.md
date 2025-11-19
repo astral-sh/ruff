@@ -159,12 +159,16 @@ def constrained[T: (Base, Unrelated)]():
 If any of the constraints is a gradual type, we are free to choose any materialization of that
 constraint that makes the test succeed.
 
+TODO: At the moment, we are producing a specialization that shows which particular materialization
+that we chose, but really, we should be returning the gradual constraint as the specialization.
+
 ```py
 from typing import Any
 
 # fmt: off
 
 def constrained_by_gradual[T: (Base, Any)]():
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual = object]
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.always()))
     # revealed: None
@@ -172,37 +176,49 @@ def constrained_by_gradual[T: (Base, Any)]():
 
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual = Base]
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.range(Never, T, Base)))
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual = Unrelated]
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.range(Never, T, Unrelated)))
 
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual = Super]
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.range(Never, T, Super)))
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual = Super]
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.range(Super, T, Super)))
 
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual = object]
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.range(Sub, T, object)))
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual = Sub]
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.range(Sub, T, Sub)))
 
 def constrained_by_two_gradual[T: (Any, Any)]():
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_two_gradual = object]
     reveal_type(generic_context(constrained_by_two_gradual).specialize_constrained(ConstraintSet.always()))
     # revealed: None
     reveal_type(generic_context(constrained_by_two_gradual).specialize_constrained(ConstraintSet.never()))
 
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_two_gradual = Base]
     reveal_type(generic_context(constrained_by_two_gradual).specialize_constrained(ConstraintSet.range(Never, T, Base)))
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_two_gradual = Unrelated]
     reveal_type(generic_context(constrained_by_two_gradual).specialize_constrained(ConstraintSet.range(Never, T, Unrelated)))
 
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_two_gradual = Super]
     reveal_type(generic_context(constrained_by_two_gradual).specialize_constrained(ConstraintSet.range(Never, T, Super)))
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_two_gradual = Super]
     reveal_type(generic_context(constrained_by_two_gradual).specialize_constrained(ConstraintSet.range(Super, T, Super)))
 
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_two_gradual = object]
     reveal_type(generic_context(constrained_by_two_gradual).specialize_constrained(ConstraintSet.range(Sub, T, object)))
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_two_gradual = Sub]
     reveal_type(generic_context(constrained_by_two_gradual).specialize_constrained(ConstraintSet.range(Sub, T, Sub)))
 
@@ -214,31 +230,41 @@ def constrained_by_gradual_list[T: (list[Base], list[Any])]():
 
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual_list = list[Base]]
     reveal_type(generic_context(constrained_by_gradual_list).specialize_constrained(ConstraintSet.range(Never, T, list[Base])))
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = list[Any]]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual_list = list[Unrelated]]
     reveal_type(generic_context(constrained_by_gradual_list).specialize_constrained(ConstraintSet.range(Never, T, list[Unrelated])))
 
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = list[Any]]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual_list = list[Super]]
     reveal_type(generic_context(constrained_by_gradual_list).specialize_constrained(ConstraintSet.range(Never, T, list[Super])))
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = list[Any]]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual_list = list[Super]]
     reveal_type(generic_context(constrained_by_gradual_list).specialize_constrained(ConstraintSet.range(list[Super], T, list[Super])))
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = list[Any]]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual_list = list[Sub]]
     reveal_type(generic_context(constrained_by_gradual_list).specialize_constrained(ConstraintSet.range(list[Sub], T, list[Sub])))
 
 def constrained_by_two_gradual_lists[T: (list[Any], list[Any])]():
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = list[Any]]
     # revealed: ty_extensions.Specialization[T@constrained_by_two_gradual_lists = Top[list[Any]]]
     reveal_type(generic_context(constrained_by_two_gradual_lists).specialize_constrained(ConstraintSet.always()))
     # revealed: None
     reveal_type(generic_context(constrained_by_two_gradual_lists).specialize_constrained(ConstraintSet.never()))
 
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = list[Any]]
     # revealed: ty_extensions.Specialization[T@constrained_by_two_gradual_lists = list[Base]]
     reveal_type(generic_context(constrained_by_two_gradual_lists).specialize_constrained(ConstraintSet.range(Never, T, list[Base])))
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = list[Any]]
     # revealed: ty_extensions.Specialization[T@constrained_by_two_gradual_lists = list[Unrelated]]
     reveal_type(generic_context(constrained_by_two_gradual_lists).specialize_constrained(ConstraintSet.range(Never, T, list[Unrelated])))
 
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = list[Any]]
     # revealed: ty_extensions.Specialization[T@constrained_by_two_gradual_lists = list[Super]]
     reveal_type(generic_context(constrained_by_two_gradual_lists).specialize_constrained(ConstraintSet.range(Never, T, list[Super])))
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = list[Any]]
     # revealed: ty_extensions.Specialization[T@constrained_by_two_gradual_lists = list[Super]]
     reveal_type(generic_context(constrained_by_two_gradual_lists).specialize_constrained(ConstraintSet.range(list[Super], T, list[Super])))
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = list[Any]]
     # revealed: ty_extensions.Specialization[T@constrained_by_two_gradual_lists = list[Sub]]
     reveal_type(generic_context(constrained_by_two_gradual_lists).specialize_constrained(ConstraintSet.range(list[Sub], T, list[Sub])))
 ```
