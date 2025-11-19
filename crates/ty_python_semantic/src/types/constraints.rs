@@ -1622,7 +1622,10 @@ impl<'db> InteriorNode<'db> {
                         .abstract_one_inner(db, should_remove, map, path)
                 })
                 .unwrap_or(Node::AlwaysFalse);
-            Node::new(db, self_constraint, if_true, if_false)
+            // NB: We cannot use `Node::new` here, because the recursive calls might introduce new
+            // derived constraints into the result, and those constraints might appear before this
+            // one in the BDD ordering.
+            Node::new_constraint(db, self_constraint).ite(db, if_true, if_false)
         }
     }
 
