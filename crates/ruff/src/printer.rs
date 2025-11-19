@@ -79,7 +79,12 @@ impl Printer {
         }
     }
 
-    fn write_summary_text(&self, writer: &mut dyn Write, diagnostics: &Diagnostics) -> Result<()> {
+    fn write_summary_text(
+        &self,
+        writer: &mut dyn Write,
+        diagnostics: &Diagnostics,
+        show_legend: bool,
+    ) -> Result<()> {
         if self.log_level >= LogLevel::Default {
             let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
@@ -106,7 +111,18 @@ impl Printer {
                 }
 
                 if let Some(fixables) = fixables {
-                    let fix_prefix = format!("[{}]", "*".cyan());
+                    let (prefix, suffix) = if show_legend {
+                        (
+                            String::new(),
+                            format!(
+                                " ([{}] = all fixable, [{}] = some fixable)",
+                                "*".cyan(),
+                                "~".cyan()
+                            ),
+                        )
+                    } else {
+                        (format!("[{}] ", "*".cyan()), String::new())
+                    };
 
                     if self.unsafe_fixes.is_hint() {
                         if fixables.applicable > 0 && fixables.inapplicable_unsafe > 0 {
@@ -117,14 +133,14 @@ impl Printer {
                             };
                             writeln!(
                                 writer,
-                                "{fix_prefix} {} fixable with the `--fix` option ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
+                                "{prefix}{} fixable with the `--fix` option{suffix} ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
                                 fixables.applicable, fixables.inapplicable_unsafe
                             )?;
                         } else if fixables.applicable > 0 {
                             // Only applicable fixes
                             writeln!(
                                 writer,
-                                "{fix_prefix} {} fixable with the `--fix` option.",
+                                "{prefix}{} fixable with the `--fix` option{suffix}.",
                                 fixables.applicable,
                             )?;
                         } else {
@@ -144,7 +160,7 @@ impl Printer {
                         if fixables.applicable > 0 {
                             writeln!(
                                 writer,
-                                "{fix_prefix} {} fixable with the --fix option.",
+                                "{prefix}{} fixable with the --fix option{suffix}.",
                                 fixables.applicable
                             )?;
                         }
@@ -225,7 +241,7 @@ impl Printer {
                         writeln!(writer)?;
                     }
                 }
-                self.write_summary_text(writer, diagnostics)?;
+                self.write_summary_text(writer, diagnostics, false)?;
             }
             return Ok(());
         }
@@ -254,7 +270,7 @@ impl Printer {
                     writeln!(writer)?;
                 }
             }
-            self.write_summary_text(writer, diagnostics)?;
+            self.write_summary_text(writer, diagnostics, false)?;
         }
 
         writer.flush()?;
@@ -364,7 +380,7 @@ impl Printer {
                     )?;
                 }
 
-                self.write_summary_text(writer, diagnostics)?;
+                self.write_summary_text(writer, diagnostics, true)?;
                 return Ok(());
             }
             OutputFormat::Json => {
