@@ -53,6 +53,7 @@
 //!
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::Display;
 use std::ops::Range;
@@ -62,9 +63,10 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 
 use crate::types::generics::{GenericContext, InferableTypeVars, Specialization};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation,
-    TypeVarBoundOrConstraints, UnionType,
+    TypeVarBoundOrConstraints, UnionType, walk_bound_type_var_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -211,6 +213,100 @@ impl<'db> ConstraintSet<'db> {
     /// Returns whether this constraint set always holds
     pub(crate) fn is_always_satisfied(self, db: &'db dyn Db) -> bool {
         self.node.is_always_satisfied(db)
+    }
+
+    /// Returns whether this constraint set contains any cycles between typevars. If it does, then
+    /// we cannot create a specialization from this constraint set.
+    ///
+    /// We have restrictions in place that ensure that there are no cycles in the _lower and upper
+    /// bounds_ of each constraint, but it's still possible for a constraint to _mention_ another
+    /// typevar without _constraining_ it. For instance, `(T ≤ int) ∧ (U ≤ list[T])` is a valid
+    /// constraint set, which we can create a specialization from (`T = int, U = list[int]`). But
+    /// `(T ≤ list[U]) ∧ (U ≤ list[T])` does not violate our lower/upper bounds restrictions, since
+    /// neither bound _is_ a typevar. And it's not something we can create a specialization from,
+    /// since we would endlessly substitute until we stack overflow.
+    pub(crate) fn is_cyclic(self, db: &'db dyn Db) -> bool {
+        #[derive(Default)]
+        struct CollectReachability<'db> {
+            reachable_typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
+            recursion_guard: TypeCollector<'db>,
+        }
+
+        impl<'db> TypeVisitor<'db> for CollectReachability<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                true
+            }
+
+            fn visit_bound_type_var_type(
+                &self,
+                db: &'db dyn Db,
+                bound_typevar: BoundTypeVarInstance<'db>,
+            ) {
+                self.reachable_typevars
+                    .borrow_mut()
+                    .insert(bound_typevar.identity(db));
+                walk_bound_type_var_type(db, bound_typevar, self);
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+        }
+
+        fn visit_dfs<'db>(
+            reachable_typevars: &mut FxHashMap<
+                BoundTypeVarIdentity<'db>,
+                FxHashSet<BoundTypeVarIdentity<'db>>,
+            >,
+            discovered: &mut FxHashSet<BoundTypeVarIdentity<'db>>,
+            bound_typevar: BoundTypeVarIdentity<'db>,
+        ) -> bool {
+            discovered.insert(bound_typevar);
+            let outgoing = reachable_typevars
+                .remove(&bound_typevar)
+                .expect("should not visit typevar twice in DFS");
+            for outgoing in outgoing {
+                if discovered.contains(&outgoing) {
+                    return true;
+                }
+                if reachable_typevars.contains_key(&outgoing) {
+                    if visit_dfs(reachable_typevars, discovered, outgoing) {
+                        return true;
+                    }
+                }
+            }
+            discovered.remove(&bound_typevar);
+            false
+        }
+
+        // First find all of the typevars that each constraint directly mentions.
+        let mut reachable_typevars: FxHashMap<
+            BoundTypeVarIdentity<'db>,
+            FxHashSet<BoundTypeVarIdentity<'db>>,
+        > = FxHashMap::default();
+        self.node.for_each_constraint(db, &mut |constraint| {
+            let visitor = CollectReachability::default();
+            visitor.visit_type(db, constraint.lower(db));
+            visitor.visit_type(db, constraint.upper(db));
+            reachable_typevars
+                .entry(constraint.typevar(db).identity(db))
+                .or_default()
+                .extend(visitor.reachable_typevars.into_inner());
+        });
+
+        // Then perform a depth-first search to see if there are any cycles.
+        let mut discovered: FxHashSet<BoundTypeVarIdentity<'db>> = FxHashSet::default();
+        while let Some(bound_typevar) = reachable_typevars.keys().copied().next() {
+            if !discovered.contains(&bound_typevar) {
+                let cycle_found =
+                    visit_dfs(&mut reachable_typevars, &mut discovered, bound_typevar);
+                if cycle_found {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
@@ -2964,6 +3060,12 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         constraints: ConstraintSet<'db>,
     ) -> Result<Specialization<'db>, ()> {
+        // If the constraint set is cyclic, don't even try to construct a specialization.
+        if constraints.is_cyclic(db) {
+            // TODO: Better error
+            return Err(());
+        }
+
         // First we intersect with the valid specializations of all of the typevars. We need all of
         // valid specializations to hold simultaneously, so we do this once before abstracting over
         // each typevar.
@@ -3020,7 +3122,7 @@ impl<'db> GenericContext<'db> {
             types[i] = least_upper_bound;
         }
 
-        Ok(self.specialize(db, types.into_boxed_slice()))
+        Ok(self.specialize_recursive(db, types.into_boxed_slice()))
     }
 }
 
