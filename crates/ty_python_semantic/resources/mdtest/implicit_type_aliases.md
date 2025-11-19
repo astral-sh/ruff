@@ -439,6 +439,24 @@ def _(
     reveal_type(annotated_int)  # revealed: @Todo(Generic specialization of typing.Annotated)
 ```
 
+Generic implicit type aliases can be partially specialized:
+
+```py
+U = TypeVar("U")
+
+DictStrTo = MyDict[str, U]
+
+reveal_type(DictStrTo)  # revealed: GenericAlias
+
+def _(
+    # TODO: No error here
+    # error: [invalid-type-form] "Invalid subscript of object of type `GenericAlias` in type expression"
+    dict_str_to_int: DictStrTo[int],
+):
+    # TODO: This should be `dict[str, int]`
+    reveal_type(dict_str_to_int)  # revealed: Unknown
+```
+
 Using specializations of generic implicit type aliases in other implicit type aliases works as
 expected:
 
