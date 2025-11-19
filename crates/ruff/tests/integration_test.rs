@@ -1073,6 +1073,7 @@ def mvce(keys, values):
         "code": "C416",
         "name": "unnecessary-comprehension",
         "count": 1,
+        "fixable": false,
         "fixable_count": 0
       }
     ]
@@ -1106,6 +1107,7 @@ def mvce(keys, values):
         "code": "C416",
         "name": "unnecessary-comprehension",
         "count": 1,
+        "fixable": true,
         "fixable_count": 1
       }
     ]

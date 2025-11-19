@@ -34,6 +34,7 @@ struct ExpandedStatistics<'a> {
     code: Option<&'a SecondaryCode>,
     name: &'static str,
     count: usize,
+    fixable: bool,
     fixable_count: usize,
 }
 
@@ -301,6 +302,9 @@ impl Printer {
                     code,
                     name: message.name(),
                     count,
+                    // Backward compatibility: `fixable` is true only when all violations are fixable.
+                    // See: https://github.com/astral-sh/ruff/pull/21513
+                    fixable: fixable_count == count,
                     fixable_count,
                 },
             )
