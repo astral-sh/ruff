@@ -2921,9 +2921,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         };
 
         // Build the specialization first without inferring the complete type context.
-        let isolated_specialization = builder
-            .mapped(generic_context, maybe_promote)
-            .build(generic_context);
+        let isolated_specialization = builder.build_mapped(generic_context, maybe_promote);
         let isolated_return_ty = self
             .return_ty
             .apply_specialization(self.db, isolated_specialization);
@@ -2948,9 +2946,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             builder.infer(return_ty, call_expression_tcx).ok()?;
 
             // Otherwise, build the specialization again after inferring the complete type context.
-            let specialization = builder
-                .mapped(generic_context, maybe_promote)
-                .build(generic_context);
+            let specialization = builder.build_mapped(generic_context, maybe_promote);
             let return_ty = return_ty.apply_specialization(self.db, specialization);
 
             Some((Some(specialization), return_ty))

@@ -1350,31 +1350,24 @@ impl<'db> SpecializationBuilder<'db> {
         &self.types
     }
 
-    /// Map the types that have been assigned in this specialization.
-    pub(crate) fn mapped(
-        &self,
-        generic_context: GenericContext<'db>,
-        f: impl Fn(BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>, Type<'db>) -> Type<'db>,
-    ) -> Self {
-        let mut types = self.types.clone();
-        for (identity, variable) in generic_context.variables_inner(self.db) {
-            if let Some(ty) = types.get_mut(identity) {
-                *ty = f(*identity, *variable, *ty);
-            }
-        }
-
-        Self {
-            db: self.db,
-            inferable: self.inferable,
-            types,
-        }
+    pub(crate) fn build(&mut self, generic_context: GenericContext<'db>) -> Specialization<'db> {
+        self.build_mapped(generic_context, |_, _, ty| ty)
     }
 
-    pub(crate) fn build(&mut self, generic_context: GenericContext<'db>) -> Specialization<'db> {
-        let types = generic_context
-            .variables_inner(self.db)
-            .iter()
-            .map(|(identity, _)| self.types.get(identity).copied());
+    pub(crate) fn build_mapped(
+        &mut self,
+        generic_context: GenericContext<'db>,
+        f: impl Fn(BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>, Type<'db>) -> Type<'db>,
+    ) -> Specialization<'db> {
+        let types =
+            generic_context
+                .variables_inner(self.db)
+                .iter()
+                .map(|(identity, bound_typevar)| {
+                    self.types
+                        .get(identity)
+                        .map(|ty| f(*identity, *bound_typevar, *ty))
+                });
 
         // TODO Infer the tuple spec for a tuple type
         generic_context.specialize_partial(self.db, types)
