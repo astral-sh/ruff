@@ -562,9 +562,9 @@ fn check_non_existing_path() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(
         case.command().arg("project/main.py").arg("project/tests"),
-        @r###"
+        @r"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
     error[io]: `<temp_dir>/project/main.py`: No such file or directory (os error 2)
 
@@ -574,7 +574,7 @@ fn check_non_existing_path() -> anyhow::Result<()> {
 
     ----- stderr -----
     WARN No python files found under the given path(s)
-    "###
+    "
     );
 
     Ok(())
