@@ -704,52 +704,7 @@ print()
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
 
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
-        error[unused-import][*]: `os` imported but unused
-         --> notebook.ipynb:cell 1:2:8
-          |
-        1 | # cell 1
-        2 | import os
-          |        ^^
-          |
-        help: Remove unused import: `os`
-         ::: cell 1
-        1 | # cell 1
-          - import os
-
-        error[unused-import][*]: `math` imported but unused
-         --> notebook.ipynb:cell 2:2:8
-          |
-        1 | # cell 2
-        2 | import math
-          |        ^^^^
-        3 |
-        4 | print('hello world')
-          |
-        help: Remove unused import: `math`
-         ::: cell 2
-        1 | # cell 2
-          - import math
-        2 |
-        3 | print('hello world')
-
-        error[unused-variable][*]: Local variable `x` is assigned to but never used
-         --> notebook.ipynb:cell 3:4:5
-          |
-        2 | def foo():
-        3 |     print()
-        4 |     x = 1
-          |     ^
-          |
-        help: Remove assignment to unused variable `x`
-         ::: cell 3
-        1 | # cell 3
-        2 | def foo():
-        3 |     print()
-          -     x = 1
-        4 |
-        note: This is an unsafe fix and may change runtime behavior
-        ");
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
     }
 
     #[test]
@@ -769,31 +724,7 @@ print()
         }
         *fix = Fix::unsafe_edits(edits.remove(0), edits);
 
-        insta::assert_snapshot!(env.render(&diagnostic), @r"
-        error[unused-import][*]: `os` imported but unused
-         --> notebook.ipynb:cell 1:2:8
-          |
-        1 | # cell 1
-        2 | import os
-          |        ^^
-          |
-        help: Remove unused import: `os`
-         ::: cell 1
-        1 | # cell 1
-          - import os
-         ::: cell 2
-        1 | # cell 2
-          - import math
-        2 |
-        3 | print('hello world')
-         ::: cell 3
-        1 | # cell 3
-        2 | def foo():
-        3 |     print()
-          -     x = 1
-        4 |
-        note: This is an unsafe fix and may change runtime behavior
-        ");
+        insta::assert_snapshot!(env.render(&diagnostic));
     }
 
     /// Carriage return (`\r`) is a valid line-ending in Python, so we should normalize this to a
