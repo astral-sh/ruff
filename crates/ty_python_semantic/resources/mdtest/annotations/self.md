@@ -503,9 +503,11 @@ class C[T]():
     def f(self: Self):
         def b(x: Self):
             reveal_type(x)  # revealed: Self@f
-        reveal_type(generic_context(b))  # revealed: None
+        # revealed: None
+        reveal_type(generic_context(b))
 
-reveal_type(generic_context(C.f))  # revealed: tuple[Self@f]
+# revealed: ty_extensions.GenericContext[Self@f]
+reveal_type(generic_context(C.f))
 ```
 
 Even if the `Self` annotation appears first in the nested function, it is the method that binds
@@ -519,9 +521,11 @@ class C:
     def f(self: "C"):
         def b(x: Self):
             reveal_type(x)  # revealed: Self@f
-        reveal_type(generic_context(b))  # revealed: None
+        # revealed: None
+        reveal_type(generic_context(b))
 
-reveal_type(generic_context(C.f))  # revealed: None
+# revealed: None
+reveal_type(generic_context(C.f))
 ```
 
 ## Non-positional first parameters

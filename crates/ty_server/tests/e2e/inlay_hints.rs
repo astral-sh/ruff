@@ -17,7 +17,7 @@ x = 1
 def foo(a: int) -> int:
     return a + 1
 
-foo(1)
+y = foo(1)
 ";
 
     let mut server = TestServerBuilder::new()?
@@ -25,21 +25,21 @@ foo(1)
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .enable_inlay_hints(true)
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, &foo_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>()?;
+    let _ = server.await_notification::<PublishDiagnostics>();
 
     let hints = server
-        .inlay_hints_request(foo, Range::new(Position::new(0, 0), Position::new(6, 0)))?
+        .inlay_hints_request(foo, Range::new(Position::new(0, 0), Position::new(6, 0)))
         .unwrap();
 
     insta::assert_json_snapshot!(hints, @r#"
     [
       {
         "position": {
-          "line": 0,
+          "line": 5,
           "character": 1
         },
         "label": [
@@ -47,7 +47,7 @@ foo(1)
             "value": ": "
           },
           {
-            "value": "Literal[1]"
+            "value": "int"
           }
         ],
         "kind": 1
@@ -55,11 +55,24 @@ foo(1)
       {
         "position": {
           "line": 5,
-          "character": 4
+          "character": 8
         },
         "label": [
           {
-            "value": "a"
+            "value": "a",
+            "location": {
+              "uri": "file://<temp_dir>/src/foo.py",
+              "range": {
+                "start": {
+                  "line": 2,
+                  "character": 8
+                },
+                "end": {
+                  "line": 2,
+                  "character": 9
+                }
+              }
+            }
           },
           {
             "value": "="
@@ -87,14 +100,14 @@ fn variable_inlay_hints_disabled() -> Result<()> {
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .enable_inlay_hints(true)
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
     server.open_text_document(foo, &foo_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>()?;
+    let _ = server.await_notification::<PublishDiagnostics>();
 
     let hints = server
-        .inlay_hints_request(foo, Range::new(Position::new(0, 0), Position::new(0, 5)))?
+        .inlay_hints_request(foo, Range::new(Position::new(0, 0), Position::new(0, 5)))
         .unwrap();
 
     assert!(

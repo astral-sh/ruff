@@ -279,3 +279,34 @@ help: Replace with `Path("test.json")....`
     - with open("test.json", "wb") as f:
     -     f.write(json.dumps(data, indent=4).encode("utf-8"))
 155 + pathlib.Path("test.json").write_bytes(json.dumps(data, indent=4).encode("utf-8"))
+156 | 
+157 | # See: https://github.com/astral-sh/ruff/issues/21381
+158 | with open("tmp_path/pyproject.toml", "w") as f:
+
+FURB103 [*] `open` and `write` should be replaced by `Path("tmp_path/pyproject.toml")....`
+   --> FURB103_0.py:158:6
+    |
+157 | # See: https://github.com/astral-sh/ruff/issues/21381
+158 | with open("tmp_path/pyproject.toml", "w") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+159 |     f.write(dedent(
+160 |         """
+    |
+help: Replace with `Path("tmp_path/pyproject.toml")....`
+148 | 
+149 | # See: https://github.com/astral-sh/ruff/issues/20785
+150 | import json
+151 + import pathlib
+152 | 
+153 | data = {"price": 100}
+154 | 
+--------------------------------------------------------------------------------
+156 |     f.write(json.dumps(data, indent=4).encode("utf-8"))
+157 | 
+158 | # See: https://github.com/astral-sh/ruff/issues/21381
+    - with open("tmp_path/pyproject.toml", "w") as f:
+    -     f.write(dedent(
+159 + pathlib.Path("tmp_path/pyproject.toml").write_text(dedent(
+160 |         """
+161 |         [project]
+162 |         other = 1.234

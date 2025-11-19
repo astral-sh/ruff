@@ -309,6 +309,7 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
     def begin(self) -> None: ...
 
 class HTTPConnection:
+    blocksize: int
     auto_open: int  # undocumented
     debuglevel: int
     default_port: int  # undocumented

@@ -123,6 +123,9 @@ from typing_extensions import Never, Self, TypeAlias, deprecated
 if sys.version_info >= (3, 13):
     from _ssl import HAS_PSK as HAS_PSK
 
+if sys.version_info >= (3, 14):
+    from _ssl import HAS_PHA as HAS_PHA
+
 if sys.version_info < (3, 12):
     from _ssl import RAND_pseudo_bytes as RAND_pseudo_bytes
 

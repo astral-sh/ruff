@@ -11,6 +11,7 @@ use crate::{
         class::walk_generic_alias,
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
+        newtype::{NewType, walk_newtype_instance_type},
         subclass_of::walk_subclass_of_type,
         walk_bound_method_type, walk_bound_type_var_type, walk_callable_type,
         walk_intersection_type, walk_known_instance_type, walk_method_wrapper_type,
@@ -109,6 +110,10 @@ pub(crate) trait TypeVisitor<'db> {
     fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
         walk_typed_dict_type(db, typed_dict, self);
     }
+
+    fn visit_newtype_instance_type(&self, db: &'db dyn Db, newtype: NewType<'db>) {
+        walk_newtype_instance_type(db, newtype, self);
+    }
 }
 
 /// Enumeration of types that may contain other types, such as unions, intersections, and generics.
@@ -131,6 +136,7 @@ pub(super) enum NonAtomicType<'db> {
     ProtocolInstance(ProtocolInstanceType<'db>),
     TypedDict(TypedDictType<'db>),
     TypeAlias(TypeAliasType<'db>),
+    NewTypeInstance(NewType<'db>),
 }
 
 pub(super) enum TypeKind<'db> {
@@ -198,6 +204,9 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
                 TypeKind::NonAtomic(NonAtomicType::TypedDict(typed_dict))
             }
             Type::TypeAlias(alias) => TypeKind::NonAtomic(NonAtomicType::TypeAlias(alias)),
+            Type::NewTypeInstance(newtype) => {
+                TypeKind::NonAtomic(NonAtomicType::NewTypeInstance(newtype))
+            }
         }
     }
 }
@@ -238,6 +247,9 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         NonAtomicType::TypedDict(typed_dict) => visitor.visit_typed_dict_type(db, typed_dict),
         NonAtomicType::TypeAlias(alias) => {
             visitor.visit_type_alias_type(db, alias);
+        }
+        NonAtomicType::NewTypeInstance(newtype) => {
+            visitor.visit_newtype_instance_type(db, newtype);
         }
     }
 }

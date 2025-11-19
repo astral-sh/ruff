@@ -971,7 +971,7 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -979,8 +979,10 @@ impl<'db> FunctionType<'db> {
         // our representation of a function type includes any specialization that should be applied
         // to the signature. Different specializations of the same function type are only subtypes
         // of each other if they result in subtype signatures.
-        if matches!(relation, TypeRelation::Subtyping | TypeRelation::Redundancy)
-            && self.normalized(db) == other.normalized(db)
+        if matches!(
+            relation,
+            TypeRelation::Subtyping | TypeRelation::Redundancy | TypeRelation::SubtypingAssuming(_)
+        ) && self.normalized(db) == other.normalized(db)
         {
             return ConstraintSet::from(true);
         }
@@ -1100,6 +1102,11 @@ fn is_instance_truthiness<'db>(
         ),
 
         Type::NominalInstance(..) => always_true_if(is_instance(&ty)),
+
+        Type::NewTypeInstance(newtype) => always_true_if(is_instance(&Type::instance(
+            db,
+            newtype.base_class_type(db),
+        ))),
 
         Type::BooleanLiteral(..)
         | Type::BytesLiteral(..)
@@ -1488,6 +1495,12 @@ impl KnownFunction {
                         asserted_type = asserted_ty.display(db),
                         inferred_type = actual_ty.display(db),
                     ));
+
+                    diagnostic.set_concise_message(format_args!(
+                        "Type `{}` does not match asserted type `{}`",
+                        asserted_ty.display(db),
+                        actual_ty.display(db),
+                    ));
                 }
             }
 
@@ -1512,6 +1525,11 @@ impl KnownFunction {
                     diagnostic.info(format_args!(
                         "`Never` and `{inferred_type}` are not equivalent types",
                         inferred_type = actual_ty.display(db),
+                    ));
+
+                    diagnostic.set_concise_message(format_args!(
+                        "Type `{}` is not equivalent to `Never`",
+                        actual_ty.display(db),
                     ));
                 }
             }
@@ -1759,6 +1777,7 @@ impl KnownFunction {
                     Type::KnownInstance(KnownInstanceType::UnionType(_)) => {
                         fn find_invalid_elements<'db>(
                             db: &'db dyn Db,
+                            function: KnownFunction,
                             ty: Type<'db>,
                             invalid_elements: &mut Vec<Type<'db>>,
                         ) {
@@ -1766,9 +1785,19 @@ impl KnownFunction {
                                 Type::ClassLiteral(_) => {}
                                 Type::NominalInstance(instance)
                                     if instance.has_known_class(db, KnownClass::NoneType) => {}
+                                Type::SpecialForm(special_form)
+                                    if special_form.is_valid_isinstance_target() => {}
+                                // `Any` can be used in `issubclass()` calls but not `isinstance()` calls
+                                Type::SpecialForm(SpecialFormType::Any)
+                                    if function == KnownFunction::IsSubclass => {}
                                 Type::KnownInstance(KnownInstanceType::UnionType(union)) => {
                                     for element in union.elements(db) {
-                                        find_invalid_elements(db, *element, invalid_elements);
+                                        find_invalid_elements(
+                                            db,
+                                            function,
+                                            *element,
+                                            invalid_elements,
+                                        );
                                     }
                                 }
                                 _ => invalid_elements.push(ty),
@@ -1776,7 +1805,7 @@ impl KnownFunction {
                         }
 
                         let mut invalid_elements = vec![];
-                        find_invalid_elements(db, *second_argument, &mut invalid_elements);
+                        find_invalid_elements(db, self, *second_argument, &mut invalid_elements);
 
                         let Some((first_invalid_element, other_invalid_elements)) =
                             invalid_elements.split_first()

@@ -298,6 +298,7 @@ impl<'a> CheckSuppressionsContext<'a> {
 
         let id = DiagnosticId::Lint(lint.name());
         let mut diag = Diagnostic::new(id, severity, "");
+        diag.set_documentation_url(Some(lint.documentation_url()));
         let span = Span::from(self.file).with_range(range);
         diag.annotate(Annotation::primary(span).message(message));
         self.diagnostics.push(diag);

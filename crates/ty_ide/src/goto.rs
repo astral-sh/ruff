@@ -209,16 +209,11 @@ impl<'db> DefinitionsOrTargets<'db> {
             ty_python_semantic::types::TypeDefinition::Module(module) => {
                 ResolvedDefinition::Module(module.file(db)?)
             }
-            ty_python_semantic::types::TypeDefinition::Class(definition) => {
-                ResolvedDefinition::Definition(definition)
-            }
-            ty_python_semantic::types::TypeDefinition::Function(definition) => {
-                ResolvedDefinition::Definition(definition)
-            }
-            ty_python_semantic::types::TypeDefinition::TypeVar(definition) => {
-                ResolvedDefinition::Definition(definition)
-            }
-            ty_python_semantic::types::TypeDefinition::TypeAlias(definition) => {
+            ty_python_semantic::types::TypeDefinition::Class(definition)
+            | ty_python_semantic::types::TypeDefinition::Function(definition)
+            | ty_python_semantic::types::TypeDefinition::TypeVar(definition)
+            | ty_python_semantic::types::TypeDefinition::TypeAlias(definition)
+            | ty_python_semantic::types::TypeDefinition::NewType(definition) => {
                 ResolvedDefinition::Definition(definition)
             }
         };
@@ -860,7 +855,7 @@ fn convert_resolved_definitions_to_targets(
             }
             ty_python_semantic::ResolvedDefinition::FileWithRange(file_range) => {
                 // For file ranges, navigate to the specific range within the file
-                crate::NavigationTarget::new(file_range.file(), file_range.range())
+                crate::NavigationTarget::from(file_range)
             }
         })
         .collect()

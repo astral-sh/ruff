@@ -89,7 +89,7 @@ class Protocol(BaseProtocol):
     """
 
     # Need annotation or mypy will complain about 'Cannot determine type of "__slots__" in base class'
-    __slots__: tuple[()] = ()
+    __slots__: tuple[str, ...] = ()
     def data_received(self, data: bytes) -> None:
         """Called when some data is received.
 
@@ -182,7 +182,7 @@ class DatagramProtocol(BaseProtocol):
 class SubprocessProtocol(BaseProtocol):
     """Interface for protocol for subprocess calls."""
 
-    __slots__: tuple[()] = ()
+    __slots__: tuple[str, ...] = ()
     def pipe_data_received(self, fd: int, data: bytes) -> None:
         """Called when the subprocess writes data into stdout/stderr pipe.
 

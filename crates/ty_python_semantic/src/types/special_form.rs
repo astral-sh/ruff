@@ -328,6 +328,113 @@ impl SpecialFormType {
         }
     }
 
+    /// Return `Some(KnownClass)` if this special form is an alias
+    /// to a standard library class.
+    pub(super) const fn aliased_stdlib_class(self) -> Option<KnownClass> {
+        match self {
+            Self::List => Some(KnownClass::List),
+            Self::Dict => Some(KnownClass::Dict),
+            Self::Set => Some(KnownClass::Set),
+            Self::FrozenSet => Some(KnownClass::FrozenSet),
+            Self::ChainMap => Some(KnownClass::ChainMap),
+            Self::Counter => Some(KnownClass::Counter),
+            Self::DefaultDict => Some(KnownClass::DefaultDict),
+            Self::Deque => Some(KnownClass::Deque),
+            Self::OrderedDict => Some(KnownClass::OrderedDict),
+            Self::Tuple => Some(KnownClass::Tuple),
+            Self::Type => Some(KnownClass::Type),
+
+            Self::AlwaysFalsy
+            | Self::AlwaysTruthy
+            | Self::Annotated
+            | Self::Bottom
+            | Self::CallableTypeOf
+            | Self::ClassVar
+            | Self::Concatenate
+            | Self::Final
+            | Self::Intersection
+            | Self::Literal
+            | Self::LiteralString
+            | Self::Never
+            | Self::NoReturn
+            | Self::Not
+            | Self::ReadOnly
+            | Self::Required
+            | Self::TypeAlias
+            | Self::TypeGuard
+            | Self::NamedTuple
+            | Self::NotRequired
+            | Self::Optional
+            | Self::Top
+            | Self::TypeIs
+            | Self::TypedDict
+            | Self::TypingSelf
+            | Self::Union
+            | Self::Unknown
+            | Self::TypeOf
+            | Self::Any
+            // `typing.Callable` is an alias to `collections.abc.Callable`,
+            // but they're both the same `SpecialFormType` in our model,
+            // and neither is a class in typeshed (even though the `collections.abc` one is at runtime)
+            | Self::Callable
+            | Self::Protocol
+            | Self::Generic
+            | Self::Unpack => None,
+        }
+    }
+
+    /// Return `true` if this special form is valid as the second argument
+    /// to `issubclass()` and `isinstance()` calls.
+    pub(super) const fn is_valid_isinstance_target(self) -> bool {
+        match self {
+            Self::Callable
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::FrozenSet
+            | Self::Dict
+            | Self::List
+            | Self::OrderedDict
+            | Self::Set
+            | Self::Tuple
+            | Self::Type
+            | Self::Protocol
+            | Self::Generic => true,
+
+            Self::AlwaysFalsy
+            | Self::AlwaysTruthy
+            | Self::Annotated
+            | Self::Bottom
+            | Self::CallableTypeOf
+            | Self::ClassVar
+            | Self::Concatenate
+            | Self::Final
+            | Self::Intersection
+            | Self::Literal
+            | Self::LiteralString
+            | Self::Never
+            | Self::NoReturn
+            | Self::Not
+            | Self::ReadOnly
+            | Self::Required
+            | Self::TypeAlias
+            | Self::TypeGuard
+            | Self::NamedTuple
+            | Self::NotRequired
+            | Self::Optional
+            | Self::Top
+            | Self::TypeIs
+            | Self::TypedDict
+            | Self::TypingSelf
+            | Self::Union
+            | Self::Unknown
+            | Self::TypeOf
+            | Self::Any  // can be used in `issubclass()` but not `isinstance()`.
+            | Self::Unpack => false,
+        }
+    }
+
     /// Return the repr of the symbol at runtime
     pub(super) const fn repr(self) -> &'static str {
         match self {

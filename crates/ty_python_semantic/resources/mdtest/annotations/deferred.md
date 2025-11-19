@@ -87,9 +87,23 @@ class Foo:
         class Baz[T: Foo]:
             pass
 
+        # error: [unresolved-reference] "Name `Foo` used when not defined"
+        # error: [unresolved-reference] "Name `Bar` used when not defined"
+        class Qux(Foo, Bar, Baz):
+            pass
+
+        # error: [unresolved-reference] "Name `Foo` used when not defined"
+        # error: [unresolved-reference] "Name `Bar` used when not defined"
+        class Quux[_T](Foo, Bar, Baz):
+            pass
+
         # error: [unresolved-reference]
         type S = a
         type T = b
+        type U = Foo
+        # error: [unresolved-reference]
+        type V = Bar
+        type W = Baz
 
     def h[T: Bar]():
         # error: [unresolved-reference]
@@ -141,9 +155,23 @@ class Foo:
         class Baz[T: Foo]:
             pass
 
+        # error: [unresolved-reference] "Name `Foo` used when not defined"
+        # error: [unresolved-reference] "Name `Bar` used when not defined"
+        class Qux(Foo, Bar, Baz):
+            pass
+
+        # error: [unresolved-reference] "Name `Foo` used when not defined"
+        # error: [unresolved-reference] "Name `Bar` used when not defined"
+        class Quux[_T](Foo, Bar, Baz):
+            pass
+
         # error: [unresolved-reference]
         type S = a
         type T = b
+        type U = Foo
+        # error: [unresolved-reference]
+        type V = Bar
+        type W = Baz
 
     def h[T: Bar]():
         # error: [unresolved-reference]

@@ -1,0 +1,34 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: assignment_diagnostics.md - Subscript assignment diagnostics - Wrong value type for one element of a union
+mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_diagnostics.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | def _(config: dict[str, int] | dict[str, str]) -> None:
+2 |     config["retries"] = 3  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Invalid subscript assignment with key of type `Literal["retries"]` and value of type `Literal[3]` on object of type `dict[str, str]`
+ --> src/mdtest_snippet.py:2:5
+  |
+1 | def _(config: dict[str, int] | dict[str, str]) -> None:
+2 |     config["retries"] = 3  # error: [invalid-assignment]
+  |     ^^^^^^^^^^^^^^^^^^^^-
+  |                         |
+  |                         Expected value of type `str`, got `Literal[3]`
+  |
+info: The full type of the subscripted object is `dict[str, int] | dict[str, str]`
+info: rule `invalid-assignment` is enabled by default
+
+```

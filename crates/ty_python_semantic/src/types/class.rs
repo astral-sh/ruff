@@ -7,7 +7,6 @@ use super::{
     SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
     function::FunctionType, infer_expression_type, infer_unpack_types,
 };
-use crate::FxOrderMap;
 use crate::module_resolver::KnownModule;
 use crate::place::TypeOrigin;
 use crate::semantic_index::definition::{Definition, DefinitionState};
@@ -32,13 +31,13 @@ use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, DataclassFlags,
-    DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType,
-    MaterializationKind, NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType,
-    TypeContext, TypeMapping, TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable,
-    declaration_type, determine_upper_bound, exceeds_max_specialization_depth,
-    infer_definition_types,
+    ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, DATACLASS_FLAGS,
+    DataclassFlags, DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType,
+    ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
+    StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation, TypedDictParams,
+    UnionBuilder, VarianceInferable, declaration_type, determine_upper_bound,
+    exceeds_max_specialization_depth, infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -128,7 +127,7 @@ fn try_metaclass_cycle_initial<'db>(
 }
 
 /// A category of classes with code generation capabilities (with synthesized methods).
-#[derive(Clone, Copy, Debug, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum CodeGeneratorKind<'db> {
     /// Classes decorated with `@dataclass` or similar dataclass-like decorators
     DataclassLike(Option<DataclassTransformerParams<'db>>),
@@ -258,7 +257,7 @@ impl<'db> GenericAlias<'db> {
     ) -> Self {
         let tcx = tcx
             .annotation
-            .and_then(|ty| ty.specialization_of(db, Some(self.origin(db))))
+            .and_then(|ty| ty.specialization_of(db, self.origin(db)))
             .map(|specialization| specialization.types(db))
             .unwrap_or(&[]);
 
@@ -358,6 +357,14 @@ pub enum ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
+    /// Return a `ClassType` representing the class `builtins.object`
+    pub(super) fn object(db: &'db dyn Db) -> Self {
+        KnownClass::Object
+            .to_class_literal(db)
+            .to_class_type(db)
+            .unwrap()
+    }
+
     pub(super) const fn is_generic(self) -> bool {
         matches!(self, Self::Generic(_))
     }
@@ -533,14 +540,16 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         self.iter_mro(db).when_any(db, |base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
-                    TypeRelation::Subtyping | TypeRelation::Redundancy => {
+                    TypeRelation::Subtyping
+                    | TypeRelation::Redundancy
+                    | TypeRelation::SubtypingAssuming(_) => {
                         ConstraintSet::from(other.is_object(db))
                     }
                     TypeRelation::Assignability => ConstraintSet::from(!other.is_final(db)),
@@ -1243,7 +1252,7 @@ impl MethodDecorator {
 }
 
 /// Kind-specific metadata for different types of fields
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum FieldKind<'db> {
     /// `NamedTuple` field metadata
     NamedTuple { default_ty: Option<Type<'db>> },
@@ -1271,7 +1280,7 @@ pub(crate) enum FieldKind<'db> {
 }
 
 /// Metadata regarding a dataclass field/attribute or a `TypedDict` "item" / key-value pair.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct Field<'db> {
     /// The declared type of the field
     pub(crate) declared_ty: Type<'db>,
@@ -1468,14 +1477,9 @@ impl<'db> ClassLiteral<'db> {
         visitor.typevars.into_inner()
     }
 
-    /// Returns the generic context that should be inherited by any constructor methods of this
-    /// class.
-    ///
-    /// When inferring a specialization of the class's generic context from a constructor call, we
-    /// promote any typevars that are inferred as a literal to the corresponding instance type.
+    /// Returns the generic context that should be inherited by any constructor methods of this class.
     fn inherited_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         self.generic_context(db)
-            .map(|generic_context| generic_context.promote_literals(db))
     }
 
     pub(super) fn file(self, db: &dyn Db) -> File {
@@ -2114,18 +2118,25 @@ impl<'db> ClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> Member<'db> {
-        if name == "__dataclass_fields__" && self.dataclass_params(db).is_some() {
-            // Make this class look like a subclass of the `DataClassInstance` protocol
-            return Member {
-                inner: Place::declared(KnownClass::Dict.to_specialized_instance(
-                    db,
-                    [
-                        KnownClass::Str.to_instance(db),
-                        KnownClass::Field.to_specialized_instance(db, [Type::any()]),
-                    ],
-                ))
-                .with_qualifiers(TypeQualifiers::CLASS_VAR),
-            };
+        if self.dataclass_params(db).is_some() {
+            if name == "__dataclass_fields__" {
+                // Make this class look like a subclass of the `DataClassInstance` protocol
+                return Member {
+                    inner: Place::declared(KnownClass::Dict.to_specialized_instance(
+                        db,
+                        [
+                            KnownClass::Str.to_instance(db),
+                            KnownClass::Field.to_specialized_instance(db, [Type::any()]),
+                        ],
+                    ))
+                    .with_qualifiers(TypeQualifiers::CLASS_VAR),
+                };
+            } else if name == "__dataclass_params__" {
+                // There is no typeshed class for this. For now, we model it as `Any`.
+                return Member {
+                    inner: Place::declared(Type::any()).with_qualifiers(TypeQualifiers::CLASS_VAR),
+                };
+            }
         }
 
         if CodeGeneratorKind::NamedTuple.matches(db, self, specialization) {
@@ -2194,7 +2205,7 @@ impl<'db> ClassLiteral<'db> {
 
         let field_policy = CodeGeneratorKind::from_class(db, self, specialization)?;
 
-        let transformer_params =
+        let mut transformer_params =
             if let CodeGeneratorKind::DataclassLike(Some(transformer_params)) = field_policy {
                 Some(DataclassParams::from_transformer_params(
                     db,
@@ -2203,6 +2214,34 @@ impl<'db> ClassLiteral<'db> {
             } else {
                 None
             };
+
+        // Dataclass transformer flags can be overwritten using class arguments.
+        if let Some(transformer_params) = transformer_params.as_mut() {
+            if let Some(class_def) = self.definition(db).kind(db).as_class() {
+                let module = parsed_module(db, self.file(db)).load(db);
+
+                if let Some(arguments) = &class_def.node(&module).arguments {
+                    let mut flags = transformer_params.flags(db);
+
+                    for keyword in &arguments.keywords {
+                        if let Some(arg_name) = &keyword.arg {
+                            if let Some(is_set) =
+                                keyword.value.as_boolean_literal_expr().map(|b| b.value)
+                            {
+                                for (flag_name, flag) in DATACLASS_FLAGS {
+                                    if arg_name.as_str() == *flag_name {
+                                        flags.set(*flag, is_set);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    *transformer_params =
+                        DataclassParams::new(db, flags, transformer_params.field_specifiers(db));
+                }
+            }
+        }
 
         let has_dataclass_param = |param| {
             dataclass_params.is_some_and(|params| params.flags(db).contains(param))
@@ -2289,7 +2328,8 @@ impl<'db> ClassLiteral<'db> {
                     || kw_only.unwrap_or(has_dataclass_param(DataclassFlags::KW_ONLY));
 
                 // Use the alias name if provided, otherwise use the field name
-                let parameter_name = alias.map(Name::new).unwrap_or(field_name);
+                let parameter_name =
+                    Name::new(alias.map(|alias| &**alias).unwrap_or(&**field_name));
 
                 let mut parameter = if is_kw_only {
                     Parameter::keyword_only(parameter_name)
@@ -2360,6 +2400,63 @@ impl<'db> ClassLiteral<'db> {
 
                 Some(CallableType::function_like(db, signature))
             }
+            (CodeGeneratorKind::DataclassLike(_), "__hash__") => {
+                let unsafe_hash = has_dataclass_param(DataclassFlags::UNSAFE_HASH);
+                let frozen = has_dataclass_param(DataclassFlags::FROZEN);
+                let eq = has_dataclass_param(DataclassFlags::EQ);
+
+                if unsafe_hash || (frozen && eq) {
+                    let signature = Signature::new(
+                        Parameters::new([Parameter::positional_or_keyword(Name::new_static(
+                            "self",
+                        ))
+                        .with_annotated_type(instance_ty)]),
+                        Some(KnownClass::Int.to_instance(db)),
+                    );
+
+                    Some(CallableType::function_like(db, signature))
+                } else if eq && !frozen {
+                    Some(Type::none(db))
+                } else {
+                    // No `__hash__` is generated, fall back to `object.__hash__`
+                    None
+                }
+            }
+            (CodeGeneratorKind::DataclassLike(_), "__match_args__")
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
+            {
+                if !has_dataclass_param(DataclassFlags::MATCH_ARGS) {
+                    return None;
+                }
+
+                let kw_only_default = has_dataclass_param(DataclassFlags::KW_ONLY);
+
+                let fields = self.fields(db, specialization, field_policy);
+                let match_args = fields
+                    .iter()
+                    .filter(|(_, field)| {
+                        if let FieldKind::Dataclass { init, kw_only, .. } = &field.kind {
+                            *init && !kw_only.unwrap_or(kw_only_default)
+                        } else {
+                            false
+                        }
+                    })
+                    .map(|(name, _)| Type::string_literal(db, name));
+                Some(Type::heterogeneous_tuple(db, match_args))
+            }
+            (CodeGeneratorKind::DataclassLike(_), "__weakref__")
+                if Program::get(db).python_version(db) >= PythonVersion::PY311 =>
+            {
+                if !has_dataclass_param(DataclassFlags::WEAKREF_SLOT)
+                    || !has_dataclass_param(DataclassFlags::SLOTS)
+                {
+                    return None;
+                }
+
+                // This could probably be `weakref | None`, but it does not seem important enough to
+                // model it precisely.
+                Some(UnionType::from_elements(db, [Type::any(), Type::none(db)]))
+            }
             (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
                 KnownClass::NamedTupleFallback
                     .to_class_literal(db)
@@ -2408,7 +2505,9 @@ impl<'db> ClassLiteral<'db> {
                 }
                 None
             }
-            (CodeGeneratorKind::DataclassLike(_), "__slots__") => {
+            (CodeGeneratorKind::DataclassLike(_), "__slots__")
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
+            {
                 has_dataclass_param(DataclassFlags::SLOTS).then(|| {
                     let fields = self.fields(db, specialization, field_policy);
                     let slots = fields.keys().map(|name| Type::string_literal(db, name));
@@ -2496,7 +2595,7 @@ impl<'db> ClassLiteral<'db> {
             (CodeGeneratorKind::TypedDict, "get") => {
                 let overloads = self
                     .fields(db, specialization, field_policy)
-                    .into_iter()
+                    .iter()
                     .flat_map(|(name, field)| {
                         let key_type =
                             Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
@@ -2725,12 +2824,13 @@ impl<'db> ClassLiteral<'db> {
     /// Returns a list of all annotated attributes defined in this class, or any of its superclasses.
     ///
     /// See [`ClassLiteral::own_fields`] for more details.
+    #[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
     pub(crate) fn fields(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
-        field_policy: CodeGeneratorKind,
-    ) -> FxOrderMap<Name, Field<'db>> {
+        field_policy: CodeGeneratorKind<'db>,
+    ) -> FxIndexMap<Name, Field<'db>> {
         if field_policy == CodeGeneratorKind::NamedTuple {
             // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
             // fields of this class only.
@@ -2778,8 +2878,8 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind,
-    ) -> FxOrderMap<Name, Field<'db>> {
-        let mut attributes = FxOrderMap::default();
+    ) -> FxIndexMap<Name, Field<'db>> {
+        let mut attributes = FxIndexMap::default();
 
         let class_body_scope = self.body_scope(db);
         let table = place_table(db, class_body_scope);
@@ -3111,30 +3211,47 @@ impl<'db> ClassLiteral<'db> {
             union_of_inferred_types = union_of_inferred_types.add(Type::unknown());
         }
 
-        for (attribute_assignments, method_scope_id) in
+        for (attribute_assignments, attribute_binding_scope_id) in
             attribute_assignments(db, class_body_scope, &name)
         {
-            let method_scope = index.scope(method_scope_id);
-            if !is_valid_scope(method_scope) {
+            let binding_scope = index.scope(attribute_binding_scope_id);
+            if !is_valid_scope(binding_scope) {
                 continue;
             }
 
-            // The attribute assignment inherits the reachability of the method which contains it
-            let is_method_reachable = if let Some(method_def) = method_scope.node().as_function() {
-                let method = index.expect_single_definition(method_def);
-                let method_place = class_table
-                    .symbol_id(&method_def.node(&module).name)
-                    .unwrap();
-                class_map
-                    .all_reachable_symbol_bindings(method_place)
-                    .find_map(|bind| {
-                        (bind.binding.is_defined_and(|def| def == method))
-                            .then(|| class_map.binding_reachability(db, &bind))
-                    })
-                    .unwrap_or(Truthiness::AlwaysFalse)
-            } else {
-                Truthiness::AlwaysFalse
+            let scope_for_reachability_analysis = {
+                if binding_scope.node().as_function().is_some() {
+                    binding_scope
+                } else if binding_scope.is_eager() {
+                    let mut eager_scope_parent = binding_scope;
+                    while eager_scope_parent.is_eager()
+                        && let Some(parent) = eager_scope_parent.parent()
+                    {
+                        eager_scope_parent = index.scope(parent);
+                    }
+                    eager_scope_parent
+                } else {
+                    binding_scope
+                }
             };
+
+            // The attribute assignment inherits the reachability of the method which contains it
+            let is_method_reachable =
+                if let Some(method_def) = scope_for_reachability_analysis.node().as_function() {
+                    let method = index.expect_single_definition(method_def);
+                    let method_place = class_table
+                        .symbol_id(&method_def.node(&module).name)
+                        .unwrap();
+                    class_map
+                        .all_reachable_symbol_bindings(method_place)
+                        .find_map(|bind| {
+                            (bind.binding.is_defined_and(|def| def == method))
+                                .then(|| class_map.binding_reachability(db, &bind))
+                        })
+                        .unwrap_or(Truthiness::AlwaysFalse)
+                } else {
+                    Truthiness::AlwaysFalse
+                };
             if is_method_reachable.is_always_false() {
                 continue;
             }
@@ -3840,6 +3957,8 @@ pub enum KnownClass {
     Path,
     // ty_extensions
     ConstraintSet,
+    GenericContext,
+    Specialization,
 }
 
 impl KnownClass {
@@ -3943,6 +4062,8 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::GenericContext
+            | Self::Specialization
             | Self::ProtocolMeta
             | Self::TypedDictFallback => Some(Truthiness::Ambiguous),
 
@@ -4026,6 +4147,8 @@ impl KnownClass {
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
             | KnownClass::ConstraintSet
+            | KnownClass::GenericContext
+            | KnownClass::Specialization
             | KnownClass::TypedDictFallback
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
@@ -4109,6 +4232,8 @@ impl KnownClass {
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
             | KnownClass::ConstraintSet
+            | KnownClass::GenericContext
+            | KnownClass::Specialization
             | KnownClass::TypedDictFallback
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
@@ -4192,6 +4317,8 @@ impl KnownClass {
             | KnownClass::NamedTupleLike
             | KnownClass::NamedTupleFallback
             | KnownClass::ConstraintSet
+            | KnownClass::GenericContext
+            | KnownClass::Specialization
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
             | KnownClass::Template
@@ -4286,6 +4413,8 @@ impl KnownClass {
             | Self::InitVar
             | Self::NamedTupleFallback
             | Self::ConstraintSet
+            | Self::GenericContext
+            | Self::Specialization
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
@@ -4375,6 +4504,8 @@ impl KnownClass {
             | KnownClass::Template
             | KnownClass::Path
             | KnownClass::ConstraintSet
+            | KnownClass::GenericContext
+            | KnownClass::Specialization
             | KnownClass::InitVar => false,
             KnownClass::NamedTupleFallback | KnownClass::TypedDictFallback => true,
         }
@@ -4468,13 +4599,23 @@ impl KnownClass {
                     "ellipsis"
                 }
             }
-            Self::NotImplementedType => "_NotImplementedType",
+            Self::NotImplementedType => {
+                // Exposed as `types.NotImplementedType` on Python >=3.10;
+                // backported as `builtins._NotImplementedType` by typeshed on Python <=3.9
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                    "NotImplementedType"
+                } else {
+                    "_NotImplementedType"
+                }
+            }
             Self::Field => "Field",
             Self::KwOnly => "KW_ONLY",
             Self::InitVar => "InitVar",
             Self::NamedTupleFallback => "NamedTupleFallback",
             Self::NamedTupleLike => "NamedTupleLike",
             Self::ConstraintSet => "ConstraintSet",
+            Self::GenericContext => "GenericContext",
+            Self::Specialization => "Specialization",
             Self::TypedDictFallback => "TypedDictFallback",
             Self::Template => "Template",
             Self::Path => "Path",
@@ -4770,7 +4911,15 @@ impl KnownClass {
                     KnownModule::Builtins
                 }
             }
-            Self::NotImplementedType => KnownModule::Builtins,
+            Self::NotImplementedType => {
+                // Exposed as `types.NotImplementedType` on Python >=3.10;
+                // backported as `builtins._NotImplementedType` by typeshed on Python <=3.9
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                    KnownModule::Types
+                } else {
+                    KnownModule::Builtins
+                }
+            }
             Self::ChainMap
             | Self::Counter
             | Self::DefaultDict
@@ -4778,7 +4927,10 @@ impl KnownClass {
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field | Self::KwOnly | Self::InitVar => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
-            Self::NamedTupleLike | Self::ConstraintSet => KnownModule::TyExtensions,
+            Self::NamedTupleLike
+            | Self::ConstraintSet
+            | Self::GenericContext
+            | Self::Specialization => KnownModule::TyExtensions,
             Self::Template => KnownModule::Templatelib,
             Self::Path => KnownModule::Pathlib,
         }
@@ -4861,6 +5013,8 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::GenericContext
+            | Self::Specialization
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
@@ -4949,6 +5103,8 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::GenericContext
+            | Self::Specialization
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
@@ -5040,13 +5196,20 @@ impl KnownClass {
             "EllipsisType" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
                 &[Self::EllipsisType]
             }
-            "_NotImplementedType" => &[Self::NotImplementedType],
+            "_NotImplementedType" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
+                &[Self::NotImplementedType]
+            }
+            "NotImplementedType" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
+                &[Self::NotImplementedType]
+            }
             "Field" => &[Self::Field],
             "KW_ONLY" => &[Self::KwOnly],
             "InitVar" => &[Self::InitVar],
             "NamedTupleFallback" => &[Self::NamedTupleFallback],
             "NamedTupleLike" => &[Self::NamedTupleLike],
             "ConstraintSet" => &[Self::ConstraintSet],
+            "GenericContext" => &[Self::GenericContext],
+            "Specialization" => &[Self::Specialization],
             "TypedDictFallback" => &[Self::TypedDictFallback],
             "Template" => &[Self::Template],
             "Path" => &[Self::Path],
@@ -5124,6 +5287,8 @@ impl KnownClass {
             | Self::ExtensionsTypeVar
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::GenericContext
+            | Self::Specialization
             | Self::Awaitable
             | Self::Generator
             | Self::Template

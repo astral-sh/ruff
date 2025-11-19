@@ -33,7 +33,7 @@ jobs:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@85856786d1ce8acfbcc2f13a5f3fbd6b938f9f41 # v7.1.2
+        uses: astral-sh/setup-uv@5a7eac68fb9809dea845d802897dc5c723910fa3 # v7.1.3
         with:
           enable-cache: true # zizmor: ignore[cache-poisoning] acceptable risk for CloudFlare pages artifact
 
@@ -67,7 +67,7 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@908758da02a73ef3f3308e1dbb2248510029bbe4"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@e5c5f5b2d762af91b28490537fe0077334165693"
 
           ecosystem-analyzer \
             --repository ruff \

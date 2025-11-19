@@ -2,6 +2,7 @@ use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::ConstraintSet;
 use crate::types::generics::InferableTypeVars;
+use crate::types::protocol_class::ProtocolClass;
 use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
@@ -137,7 +138,7 @@ impl<'db> SubclassOfType<'db> {
         db: &'db dyn Db,
         other: SubclassOfType<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -286,6 +287,12 @@ impl<'db> From<ClassType<'db>> for SubclassOfInner<'db> {
 impl<'db> From<DynamicType<'db>> for SubclassOfInner<'db> {
     fn from(value: DynamicType<'db>) -> Self {
         SubclassOfInner::Dynamic(value)
+    }
+}
+
+impl<'db> From<ProtocolClass<'db>> for SubclassOfInner<'db> {
+    fn from(value: ProtocolClass<'db>) -> Self {
+        SubclassOfInner::Class(*value)
     }
 }
 

@@ -396,5 +396,6 @@ analyze.target_version = 3.7
 analyze.string_imports = disabled
 analyze.extension = ExtensionMapping({})
 analyze.include_dependencies = {}
+analyze.type_checking_imports = true
 
 ----- stderr -----

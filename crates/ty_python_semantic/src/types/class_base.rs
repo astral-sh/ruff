@@ -137,6 +137,12 @@ impl<'db> ClassBase<'db> {
 
             Type::TypeAlias(alias) => Self::try_from_type(db, alias.value_type(db), subclass),
 
+            Type::NewTypeInstance(newtype) => ClassBase::try_from_type(
+                db,
+                Type::instance(db, newtype.base_class_type(db)),
+                subclass,
+            ),
+
             Type::PropertyInstance(_)
             | Type::BooleanLiteral(_)
             | Type::FunctionLiteral(_)
@@ -168,9 +174,28 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Deprecated(_)
                 | KnownInstanceType::Field(_)
                 | KnownInstanceType::ConstraintSet(_)
+                | KnownInstanceType::Callable(_)
+                | KnownInstanceType::GenericContext(_)
+                | KnownInstanceType::Specialization(_)
                 | KnownInstanceType::UnionType(_)
-                | KnownInstanceType::Literal(_) => None,
-                KnownInstanceType::Annotated(ty) => Self::try_from_type(db, ty.inner(db), subclass),
+                | KnownInstanceType::Literal(_)
+                // A class inheriting from a newtype would make intuitive sense, but newtype
+                // wrappers are just identity callables at runtime, so this sort of inheritance
+                // doesn't work and isn't allowed.
+                | KnownInstanceType::NewType(_) => None,
+                KnownInstanceType::TypeGenericAlias(_) => {
+                    Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
+                }
+                KnownInstanceType::Annotated(ty) => {
+                    // Unions are not supported in this position, so we only need to support
+                    // something like `class C(Annotated[Base, "metadata"]): ...`, which we
+                    // can do by turning the instance type (`Base` in this example) back into
+                    // a class.
+                    let annotated_ty = ty.inner(db);
+                    let instance_ty = annotated_ty.as_nominal_instance()?;
+
+                    Some(Self::Class(instance_ty.class(db)))
+                }
             },
 
             Type::SpecialForm(special_form) => match special_form {

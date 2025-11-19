@@ -356,13 +356,17 @@ model < model  # No error
 
 ### Overwriting of default parameters on the dataclass-like class
 
+In the following examples, we show how a model can overwrite the default parameters set by the
+`dataclass_transform` decorator. In particular, we change from `frozen=True` to `frozen=False`, and
+from `order=False` (default) to `order=True`:
+
 #### Using function-based transformers
 
 ```py
 from typing import dataclass_transform
 
 @dataclass_transform(frozen_default=True)
-def default_frozen_model(*, frozen: bool = True): ...
+def default_frozen_model(*, frozen: bool = True, order: bool = False): ...
 @default_frozen_model()
 class Frozen:
     name: str
@@ -370,12 +374,16 @@ class Frozen:
 f = Frozen(name="test")
 f.name = "new"  # error: [invalid-assignment]
 
-@default_frozen_model(frozen=False)
+Frozen(name="A") < Frozen(name="B")  # error: [unsupported-operator]
+
+@default_frozen_model(frozen=False, order=True)
 class Mutable:
     name: str
 
 m = Mutable(name="test")
 m.name = "new"  # No error
+
+reveal_type(Mutable(name="A") < Mutable(name="B"))  # revealed: bool
 ```
 
 #### Using metaclass-based transformers
@@ -392,6 +400,7 @@ class DefaultFrozenMeta(type):
         namespace,
         *,
         frozen: bool = True,
+        order: bool = False,
     ): ...
 
 class DefaultFrozenModel(metaclass=DefaultFrozenMeta): ...
@@ -402,12 +411,17 @@ class Frozen(DefaultFrozenModel):
 f = Frozen(name="test")
 f.name = "new"  # error: [invalid-assignment]
 
-class Mutable(DefaultFrozenModel, frozen=False):
+Frozen(name="A") < Frozen(name="B")  # error: [unsupported-operator]
+
+class Mutable(DefaultFrozenModel, frozen=False, order=True):
     name: str
 
 m = Mutable(name="test")
-# TODO: no error here
+# TODO: This should not be an error. In order to support this, we need to implement the precise `frozen` semantics of
+# `dataclass_transform` described here: https://typing.python.org/en/latest/spec/dataclasses.html#dataclass-semantics
 m.name = "new"  # error: [invalid-assignment]
+
+reveal_type(Mutable(name="A") < Mutable(name="B"))  # revealed: bool
 ```
 
 #### Using base-class-based transformers
@@ -421,6 +435,7 @@ class DefaultFrozenModel:
         cls,
         *,
         frozen: bool = True,
+        order: bool = False,
     ): ...
 
 class Frozen(DefaultFrozenModel):
@@ -429,12 +444,91 @@ class Frozen(DefaultFrozenModel):
 f = Frozen(name="test")
 f.name = "new"  # error: [invalid-assignment]
 
-class Mutable(DefaultFrozenModel, frozen=False):
+Frozen(name="A") < Frozen(name="B")  # error: [unsupported-operator]
+
+class Mutable(DefaultFrozenModel, frozen=False, order=True):
     name: str
 
 m = Mutable(name="test")
-# TODO: This should not be an error
-m.name = "new"  # error: [invalid-assignment]
+m.name = "new"  # No error
+
+reveal_type(Mutable(name="A") < Mutable(name="B"))  # revealed: bool
+```
+
+## Other `dataclass` parameters
+
+Other parameters from normal dataclasses can also be set on models created using
+`dataclass_transform`.
+
+### Using function-based transformers
+
+```py
+from typing_extensions import dataclass_transform, TypeVar, Callable
+
+T = TypeVar("T", bound=type)
+
+@dataclass_transform()
+def fancy_model(*, slots: bool = False) -> Callable[[T], T]:
+    raise NotImplementedError
+
+@fancy_model()
+class NoSlots:
+    name: str
+
+NoSlots.__slots__  # error: [unresolved-attribute]
+
+@fancy_model(slots=True)
+class WithSlots:
+    name: str
+
+reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["name"]]
+```
+
+### Using metaclass-based transformers
+
+```py
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+class FancyMeta(type):
+    def __new__(cls, name, bases, namespace, *, slots: bool = False):
+        ...
+        return super().__new__(cls, name, bases, namespace)
+
+class FancyBase(metaclass=FancyMeta): ...
+
+class NoSlots(FancyBase):
+    name: str
+
+# error: [unresolved-attribute]
+NoSlots.__slots__
+
+class WithSlots(FancyBase, slots=True):
+    name: str
+
+reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["name"]]
+```
+
+### Using base-class-based transformers
+
+```py
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+class FancyBase:
+    def __init_subclass__(cls, *, slots: bool = False):
+        ...
+        super().__init_subclass__()
+
+class NoSlots(FancyBase):
+    name: str
+
+NoSlots.__slots__  # error: [unresolved-attribute]
+
+class WithSlots(FancyBase, slots=True):
+    name: str
+
+reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["name"]]
 ```
 
 ## `field_specifiers`

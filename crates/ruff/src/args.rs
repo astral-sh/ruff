@@ -167,6 +167,7 @@ pub enum AnalyzeCommand {
 }
 
 #[derive(Clone, Debug, clap::Parser)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct AnalyzeGraphCommand {
     /// List of files or directories to include.
     #[clap(help = "List of files or directories to include [default: .]")]
@@ -193,6 +194,12 @@ pub struct AnalyzeGraphCommand {
     /// Path to a virtual environment to use for resolving additional dependencies
     #[arg(long)]
     python: Option<PathBuf>,
+    /// Include imports that are only used for type checking (i.e., imports within `if TYPE_CHECKING:` blocks).
+    /// Use `--no-type-checking-imports` to exclude imports that are only used for type checking.
+    #[arg(long, overrides_with("no_type_checking_imports"))]
+    type_checking_imports: bool,
+    #[arg(long, overrides_with("type_checking_imports"), hide = true)]
+    no_type_checking_imports: bool,
 }
 
 // The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
@@ -415,8 +422,13 @@ pub struct CheckCommand {
     )]
     pub statistics: bool,
     /// Enable automatic additions of `noqa` directives to failing lines.
+    /// Optionally provide a reason to append after the codes.
     #[arg(
         long,
+        value_name = "REASON",
+        default_missing_value = "",
+        num_args = 0..=1,
+        require_equals = true,
         // conflicts_with = "add_noqa",
         conflicts_with = "show_files",
         conflicts_with = "show_settings",
@@ -428,7 +440,7 @@ pub struct CheckCommand {
         conflicts_with = "fix",
         conflicts_with = "diff",
     )]
-    pub add_noqa: bool,
+    pub add_noqa: Option<String>,
     /// See the files Ruff will be run against with the current settings.
     #[arg(
         long,
@@ -834,6 +846,10 @@ impl AnalyzeGraphCommand {
             string_imports_min_dots: self.min_dots,
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
             target_version: self.target_version.map(ast::PythonVersion::from),
+            type_checking_imports: resolve_bool_arg(
+                self.type_checking_imports,
+                self.no_type_checking_imports,
+            ),
             ..ExplicitConfigOverrides::default()
         };
 
@@ -1057,7 +1073,7 @@ Possible choices:
 /// etc.).
 #[expect(clippy::struct_excessive_bools)]
 pub struct CheckArguments {
-    pub add_noqa: bool,
+    pub add_noqa: Option<String>,
     pub diff: bool,
     pub exit_non_zero_on_fix: bool,
     pub exit_zero: bool,
@@ -1330,6 +1346,7 @@ struct ExplicitConfigOverrides {
     extension: Option<Vec<ExtensionPair>>,
     detect_string_imports: Option<bool>,
     string_imports_min_dots: Option<usize>,
+    type_checking_imports: Option<bool>,
 }
 
 impl ConfigurationTransformer for ExplicitConfigOverrides {
@@ -1419,6 +1436,9 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
         }
         if let Some(string_imports_min_dots) = &self.string_imports_min_dots {
             config.analyze.string_imports_min_dots = Some(*string_imports_min_dots);
+        }
+        if let Some(type_checking_imports) = &self.type_checking_imports {
+            config.analyze.type_checking_imports = Some(*type_checking_imports);
         }
 
         config

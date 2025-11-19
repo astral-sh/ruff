@@ -1,0 +1,31 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: assignment_diagnostics.md - Subscript assignment diagnostics - Invalid key type - For a `list`
+mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_diagnostics.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | numbers: list[int] = []
+2 | numbers["zero"] = 3  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Invalid subscript assignment with key of type `Literal["zero"]` and value of type `Literal[3]` on object of type `list[int]`
+ --> src/mdtest_snippet.py:2:1
+  |
+1 | numbers: list[int] = []
+2 | numbers["zero"] = 3  # error: [invalid-assignment]
+  | ^^^^^^^^^^^^^^^^^^^
+  |
+info: rule `invalid-assignment` is enabled by default
+
+```
