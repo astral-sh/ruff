@@ -1117,6 +1117,36 @@ def mvce(keys, values):
 }
 
 #[test]
+fn show_statistics_json_partial_fix() {
+    let mut cmd = RuffCheck::default()
+        .args([
+            "--select",
+            "UP035",
+            "--statistics",
+            "--output-format",
+            "json",
+        ])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("from typing import List, AsyncGenerator"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    [
+      {
+        "code": "UP035",
+        "name": "deprecated-import",
+        "count": 2,
+        "fixable": false,
+        "fixable_count": 1
+      }
+    ]
+
+    ----- stderr -----
+    "#);
+}
+
+#[test]
 fn show_statistics_syntax_errors() {
     let mut cmd = RuffCheck::default()
         .args(["--statistics", "--target-version=py39", "--preview"])
