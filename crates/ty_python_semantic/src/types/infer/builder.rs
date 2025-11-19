@@ -9507,7 +9507,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     | KnownInstanceType::Literal(_)
                     | KnownInstanceType::Annotated(_)
                     | KnownInstanceType::TypeGenericAlias(_)
-                    | KnownInstanceType::Callable(_),
+                    | KnownInstanceType::Callable(_)
+                    | KnownInstanceType::TypeVar(_),
                 ),
                 Type::ClassLiteral(..)
                 | Type::SubclassOf(..)
@@ -9518,7 +9519,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     | KnownInstanceType::Literal(_)
                     | KnownInstanceType::Annotated(_)
                     | KnownInstanceType::TypeGenericAlias(_)
-                    | KnownInstanceType::Callable(_),
+                    | KnownInstanceType::Callable(_)
+                    | KnownInstanceType::TypeVar(_),
                 ),
                 ast::Operator::BitOr,
             ) if pep_604_unions_allowed() => {
@@ -10925,6 +10927,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .to_specialized_class_type(self.db(), [first_ty, second_ty])
                     .map(Type::from)
                     .unwrap_or_else(Type::unknown);
+            }
+            Type::KnownInstance(KnownInstanceType::UnionType(_)) => {
+                return todo_type!("Specialization of union type alias");
             }
             _ => {}
         }
