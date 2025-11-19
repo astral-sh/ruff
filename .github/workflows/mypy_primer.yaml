@@ -55,6 +55,7 @@ jobs:
       - name: Run mypy_primer
         env:
           PRIMER_SELECTOR: crates/ty_python_semantic/resources/primer/good.txt
+          CLICOLOR_FORCE: "1"
           DIFF_FILE: mypy_primer.diff
         run: |
           cd ruff
