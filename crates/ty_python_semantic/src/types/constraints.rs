@@ -2307,8 +2307,8 @@ impl<'db> SequentMap<'db> {
         // These might seem redundant with the intersection check below, since `a → b` means that
         // `a ∧ b = a`. But we are not normalizing constraint bounds, and these clauses help us
         // identify constraints that are identical besides e.g. ordering of union/intersection
-        // elements. (For instance, these clauses would find `T ≤ τ₁ ∩ τ₂` and `T ≤ τ₂ ∩ τ₁`, and
-        // add sequents for `(T ≤ τ₁ ∩ τ₂) → (T ≤ τ₂ ∩ τ₁)` and vice versa.)
+        // elements. (For instance, when processing `T ≤ τ₁ & τ₂` and `T ≤ τ₂ & τ₁`, these clauses
+        // would add sequents for `(T ≤ τ₁ & τ₂) → (T ≤ τ₂ & τ₁)` and vice versa.)
         if left_constraint.implies(db, right_constraint) {
             self.add_single_implication(left_constraint, right_constraint);
         }
