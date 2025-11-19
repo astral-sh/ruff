@@ -220,6 +220,7 @@ def get_items_set():
 
 # https://github.com/astral-sh/ruff/issues/21473
 tuple("") or True  # OK
+tuple(t"") or True  # OK
 tuple(0) or True  # OK
 tuple(1) or True  # OK
 tuple(False) or True  # OK
