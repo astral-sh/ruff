@@ -1015,7 +1015,7 @@ impl<'db> Node<'db> {
     fn abstract_one_inner(
         self,
         db: &'db dyn Db,
-        should_remove: &mut dyn FnMut(BoundTypeVarInstance) -> bool,
+        should_remove: &mut dyn FnMut(ConstrainedTypeVar<'db>) -> bool,
         map: &SequentMap<'db>,
         path: &mut PathAssignments<'db>,
     ) -> Self {
@@ -1536,7 +1536,24 @@ impl<'db> InteriorNode<'db> {
         let mut path = PathAssignments::default();
         self.abstract_one_inner(
             db,
-            &mut |node_typevar| node_typevar.identity(db) == bound_typevar,
+            // Remove any node that constrains `bound_typevar`, or that has a lower/upper bound of
+            // `bound_typevar`.
+            &mut |constraint| {
+                if constraint.typevar(db).identity(db) == bound_typevar {
+                    return true;
+                }
+                if let Type::TypeVar(lower_bound_typevar) = constraint.lower(db)
+                    && lower_bound_typevar.identity(db) == bound_typevar
+                {
+                    return true;
+                }
+                if let Type::TypeVar(upper_bound_typevar) = constraint.upper(db)
+                    && upper_bound_typevar.identity(db) == bound_typevar
+                {
+                    return true;
+                }
+                false
+            },
             map,
             &mut path,
         )
@@ -1548,7 +1565,21 @@ impl<'db> InteriorNode<'db> {
         let mut path = PathAssignments::default();
         self.abstract_one_inner(
             db,
-            &mut |node_typevar| node_typevar.identity(db) != bound_typevar,
+            // Remove any node that constrains some other typevar than `bound_typevar`, and any
+            // node that constrains `bound_typevar` with a lower/upper bound of some other typevar.
+            // (For the latter, if there are any derived facts that we can infer from the typevar
+            // bound, those will be automatically added to the result.)
+            &mut |constraint| {
+                if constraint.typevar(db).identity(db) != bound_typevar {
+                    return true;
+                }
+                if matches!(constraint.lower(db), Type::TypeVar(_))
+                    || matches!(constraint.upper(db), Type::TypeVar(_))
+                {
+                    return true;
+                }
+                false
+            },
             map,
             &mut path,
         )
@@ -1557,13 +1588,12 @@ impl<'db> InteriorNode<'db> {
     fn abstract_one_inner(
         self,
         db: &'db dyn Db,
-        should_remove: &mut dyn FnMut(BoundTypeVarInstance) -> bool,
+        should_remove: &mut dyn FnMut(ConstrainedTypeVar<'db>) -> bool,
         map: &SequentMap<'db>,
         path: &mut PathAssignments<'db>,
     ) -> Node<'db> {
         let self_constraint = self.constraint(db);
-        let self_typevar = self_constraint.typevar(db);
-        if should_remove(self_typevar) {
+        if should_remove(self_constraint) {
             // If we should remove constraints involving this typevar, then we replace this node
             // with the OR of its if_false/if_true edges. That is, the result is true if there's
             // any assignment of this node's constraint that is true.
@@ -1579,9 +1609,9 @@ impl<'db> InteriorNode<'db> {
                     path.assignments[new_range]
                         .iter()
                         .filter(|assignment| {
-                            // Don't add back any derived facts if they reference the typevar
-                            // that we're trying to remove!
-                            !should_remove(assignment.constraint().typevar(db))
+                            // Don't add back any derived facts if they are ones that we would have
+                            // removed!
+                            !should_remove(assignment.constraint())
                         })
                         .fold(branch, |branch, assignment| {
                             branch.and(db, Node::new_satisfied_constraint(db, *assignment))
@@ -1596,9 +1626,9 @@ impl<'db> InteriorNode<'db> {
                     path.assignments[new_range]
                         .iter()
                         .filter(|assignment| {
-                            // Don't add back any derived facts if they reference the typevar
-                            // that we're trying to remove!
-                            !should_remove(assignment.constraint().typevar(db))
+                            // Don't add back any derived facts if they are ones that we would have
+                            // removed!
+                            !should_remove(assignment.constraint())
                         })
                         .fold(branch, |branch, assignment| {
                             branch.and(db, Node::new_satisfied_constraint(db, *assignment))
