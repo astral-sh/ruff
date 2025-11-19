@@ -392,12 +392,14 @@ impl Display for DisplayRepresentation<'_> {
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner {
-                Protocol::FromClass(ClassType::NonGeneric(class)) => {
-                    class.display_with(self.db, self.settings.clone()).fmt(f)
-                }
-                Protocol::FromClass(ClassType::Generic(alias)) => {
-                    alias.display_with(self.db, self.settings.clone()).fmt(f)
-                }
+                Protocol::FromClass(class) => match *class {
+                    ClassType::NonGeneric(class) => {
+                        class.display_with(self.db, self.settings.clone()).fmt(f)
+                    }
+                    ClassType::Generic(alias) => {
+                        alias.display_with(self.db, self.settings.clone()).fmt(f)
+                    }
+                },
                 Protocol::Synthesized(synthetic) => {
                     f.write_str("<Protocol with members ")?;
                     let interface = synthetic.interface();

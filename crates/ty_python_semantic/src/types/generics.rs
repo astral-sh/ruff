@@ -1570,9 +1570,9 @@ impl<'db> SpecializationBuilder<'db> {
                     // generic protocol, we will need to check the types of the protocol members to be
                     // able to infer the specialization of the protocol that the class implements.
                     Type::ProtocolInstance(ProtocolInstanceType {
-                        inner: Protocol::FromClass(ClassType::Generic(alias)),
+                        inner: Protocol::FromClass(class),
                         ..
-                    }) => Some(alias),
+                    }) => class.into_generic_alias(),
                     _ => None,
                 };
 
