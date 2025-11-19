@@ -1330,6 +1330,7 @@ pub(crate) struct SpecializationBuilder<'db> {
     db: &'db dyn Db,
     inferable: InferableTypeVars<'db, 'db>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+    constraints: ConstraintSet<'db>,
 }
 
 /// An assignment from a bound type variable to a given type, along with the variance of the outermost
@@ -1342,6 +1343,7 @@ impl<'db> SpecializationBuilder<'db> {
             db,
             inferable,
             types: FxHashMap::default(),
+            constraints: ConstraintSet::from(true),
         }
     }
 
@@ -1384,6 +1386,32 @@ impl<'db> SpecializationBuilder<'db> {
         let Some(ty) = f((identity, variance, ty)) else {
             return;
         };
+
+        let constraint = match variance {
+            TypeVarVariance::Covariant => ConstraintSet::constrain_typevar(
+                self.db,
+                bound_typevar,
+                Type::Never,
+                ty,
+                TypeRelation::Assignability,
+            ),
+            TypeVarVariance::Contravariant => ConstraintSet::constrain_typevar(
+                self.db,
+                bound_typevar,
+                ty,
+                Type::object(),
+                TypeRelation::Assignability,
+            ),
+            TypeVarVariance::Invariant => ConstraintSet::constrain_typevar(
+                self.db,
+                bound_typevar,
+                ty,
+                ty,
+                TypeRelation::Assignability,
+            ),
+            TypeVarVariance::Bivariant => ConstraintSet::from(true),
+        };
+        self.constraints.intersect(self.db, constraint);
 
         match self.types.entry(identity) {
             Entry::Occupied(mut entry) => {
