@@ -1032,7 +1032,8 @@ impl<'db> Node<'db> {
     /// There is a representative type for each distinct path from the BDD root to the `AlwaysTrue`
     /// terminal. Each of those paths can be viewed as the conjunction of the individual
     /// constraints of each internal node that we traverse as we walk that path. We provide the
-    /// entire range to your callback, allowing you to choose any suitble type in the range.
+    /// lower/upper bound of this conjunction to your callback, allowing you to choose any suitable
+    /// type in the range.
     fn find_representative_types(
         self,
         db: &'db dyn Db,
@@ -1060,8 +1061,9 @@ impl<'db> Node<'db> {
                 // process.
                 debug_assert!(greatest_lower_bound.is_subtype_of(db, least_upper_bound));
 
-                // We've been tracking the least upper bound that the types for this path must
-                // satisfy. We choose that lub as the representative type.
+                // We've been tracking the lower and upper bound that the types for this path must
+                // satisfy. Pass those bounds along and let the caller choose a representative type
+                // from within that range.
                 f(greatest_lower_bound, least_upper_bound);
             }
 
@@ -1093,12 +1095,13 @@ impl<'db> Node<'db> {
                 // For the `if_false` branch, then the types that satisfy the current path through
                 // the BDD do _not_ satisfy the node's constraint. Because we used `retain_one` to
                 // abstract the BDD to a single typevar, we don't need to worry about how that
-                // negative constraint affects the least upper bound. The abstraction process will
-                // have compared the negative constraint with all of the other constraints in the
-                // BDD, and added new interior nodes to handle the combination of those
-                // constraints. So we can recurse down the `if_false` branch without updating the
-                // lower/upper bounds, relying on the other constraints along the path to
-                // incorporate that negative "hole" in the set of valid types for this path.
+                // negative constraint affects the lower/upper bound that we're tracking. The
+                // abstraction process will have compared the negative constraint with all of the
+                // other constraints in the BDD, and added new interior nodes to handle the
+                // combination of those constraints. So we can recurse down the `if_false` branch
+                // without updating the lower/upper bounds, relying on the other constraints along
+                // the path to incorporate that negative "hole" in the set of valid types for this
+                // path.
                 interior.if_false(db).find_representative_types_inner(
                     db,
                     greatest_lower_bound,
@@ -2935,9 +2938,9 @@ impl<'db> GenericContext<'db> {
         // Then we find all of the "representative types" for each typevar in the constraint set.
         let mut types = vec![Type::Never; self.len(db)];
         for (i, bound_typevar) in self.variables(db).enumerate() {
-            // Each representative type, represents one of the ways that the typevar can satisfy
-            // the constraint, and which gives a lower/upper bound on the specialization of this
-            // typevar.
+            // Each representative type represents one of the ways that the typevar can satisfy the
+            // constraint, expressed as a lower/upper bound on the types that the typevar can
+            // specialize to.
             //
             // If there are multiple paths in the BDD, they technically represent independent
             // possible specializations. If there's a type that satisfies all of them, we will
