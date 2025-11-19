@@ -9,7 +9,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::importer::ImportRequest;
-use crate::rules::refurb::helpers::{FileOpen, find_file_opens};
+use crate::rules::refurb::helpers::{FileOpen, OpenArgument, find_file_opens};
 use crate::{FixAvailability, Locator, Violation};
 
 /// ## What it does
@@ -46,7 +46,6 @@ pub(crate) struct WriteWholeFile {
     filename: SourceCodeSnippet,
     suggestion: SourceCodeSnippet,
     is_path_open: bool,
-    has_filename: bool,
 }
 
 impl Violation for WriteWholeFile {
@@ -57,29 +56,23 @@ impl Violation for WriteWholeFile {
         let filename = self.filename.truncated_display();
         let suggestion = self.suggestion.truncated_display();
         if self.is_path_open {
-            if self.has_filename {
-                format!(
-                    "`Path().open()` followed by `write()` can be replaced by `Path({filename}).{suggestion}`"
-                )
-            } else {
-                format!(
-                    "`Path.open()` followed by `write()` can be replaced by `{filename}.{suggestion}`"
-                )
-            }
+            format!(
+                "`Path.open()` followed by `write()` can be replaced by `{filename}.{suggestion}`"
+            )
         } else {
             format!("`open` and `write` should be replaced by `Path({filename}).{suggestion}`")
         }
     }
     fn fix_title(&self) -> Option<String> {
-        let formatted = if self.has_filename {
+        let formatted = if self.is_path_open {
             format!(
-                "Replace with `Path({}).{}`",
+                "Replace with `{}.{}`",
                 self.filename.truncated_display(),
                 self.suggestion.truncated_display(),
             )
         } else {
             format!(
-                "Replace with `{}.{}`",
+                "Replace with `Path({}).{}`",
                 self.filename.truncated_display(),
                 self.suggestion.truncated_display(),
             )
@@ -149,27 +142,15 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
                 .position(|open| open.is_ref(write_to))
             {
                 let open = self.candidates.remove(open);
-                let has_filename: bool;
-                let filename_display: String;
                 if self.loop_counter == 0 {
-                    if let Some(filename) = open.filename {
-                        filename_display = self.checker.generator().expr(filename);
-                        has_filename = true;
-                    } else if let Some(path_obj) = open.path_obj {
-                        filename_display =
-                            self.checker.locator().slice(path_obj.range()).to_string();
-                        has_filename = false;
-                    } else {
-                        return;
-                    }
+                    let filename_display = open.argument.display(self.checker.source());
                     let suggestion = make_suggestion(&open, content, self.checker.locator());
 
                     let mut diagnostic = self.checker.report_diagnostic(
                         WriteWholeFile {
-                            filename: SourceCodeSnippet::from_str(&filename_display),
+                            filename: SourceCodeSnippet::from_str(filename_display),
                             suggestion: SourceCodeSnippet::from_str(&suggestion),
-                            is_path_open: open.path_obj.is_some(),
-                            has_filename,
+                            is_path_open: matches!(open.argument, OpenArgument::Pathlib { .. }),
                         },
                         open.item.range(),
                     );
@@ -243,12 +224,12 @@ fn generate_fix(
         )
         .ok()?;
 
-    let target = if let Some(path_obj) = open.path_obj {
-        locator.slice(path_obj.range()).to_string()
-    } else {
-        let filename = open.filename?;
-        let filename_code = locator.slice(filename.range());
-        format!("{binding}({filename_code})")
+    let target = match open.argument {
+        OpenArgument::Builtin { filename } => {
+            let filename_code = locator.slice(filename.range());
+            format!("{binding}({filename_code})")
+        }
+        OpenArgument::Pathlib { path } => locator.slice(path.range()).to_string(),
     };
 
     let replacement = format!("{target}.{suggestion}");

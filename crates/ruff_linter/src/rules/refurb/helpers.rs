@@ -120,16 +120,13 @@ impl OpenMode {
 pub(super) struct FileOpen<'a> {
     /// With item where the open happens, we use it for the reporting range.
     pub(super) item: &'a ast::WithItem,
-    /// Filename expression used as the first argument in `open`, we use it in the diagnostic message.
-    pub(super) filename: Option<&'a Expr>,
     /// The file open mode.
     pub(super) mode: OpenMode,
     /// The file open keywords.
     pub(super) keywords: Vec<&'a ast::Keyword>,
     /// We only check `open` operations whose file handles are used exactly once.
     pub(super) reference: &'a ResolvedReference,
-    /// Pathlib Path object used to open the file, if any.
-    pub(super) path_obj: Option<&'a Expr>,
+    pub(super) argument: OpenArgument<'a>,
 }
 
 impl FileOpen<'_> {
@@ -137,6 +134,45 @@ impl FileOpen<'_> {
     /// their ranges. If two expressions have the same range, they must be the same expression.
     pub(super) fn is_ref(&self, expr: &Expr) -> bool {
         expr.range() == self.reference.range()
+    }
+}
+
+#[derive(Debug)]
+pub(super) enum OpenArgument<'a> {
+    /// The filename argument to `open`, e.g. "foo.txt" in:
+    ///
+    /// ```py
+    /// f = open("foo.txt")
+    /// ```
+    Builtin { filename: &'a Expr },
+    /// The `Path` receiver of a `pathlib.Path.open` call, e.g. the `p` in the
+    /// context manager in:
+    ///
+    /// ```py
+    /// p = Path("foo.txt")
+    /// with p.open() as f: ...
+    /// ```
+    ///
+    /// or `Path("foo.txt")` in
+    ///
+    /// ```py
+    /// with Path("foo.txt").open() as f: ...
+    /// ```
+    Pathlib { path: &'a Expr },
+}
+
+impl OpenArgument<'_> {
+    pub(super) fn display<'src>(&self, source: &'src str) -> &'src str {
+        &source[self.range()]
+    }
+}
+
+impl Ranged for OpenArgument<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            OpenArgument::Builtin { filename } => filename.range(),
+            OpenArgument::Pathlib { path } => path.range(),
+        }
     }
 }
 
@@ -156,16 +192,14 @@ pub(super) fn find_file_opens<'a>(
         .collect()
 }
 
-#[expect(clippy::too_many_arguments)]
 fn resolve_file_open<'a>(
     item: &'a ast::WithItem,
     with: &'a ast::StmtWith,
     semantic: &'a SemanticModel<'a>,
     read_mode: bool,
-    filename: Option<&'a Expr>,
     mode: OpenMode,
     keywords: Vec<&'a ast::Keyword>,
-    path_obj: Option<&'a Expr>,
+    argument: OpenArgument<'a>,
 ) -> Option<FileOpen<'a>> {
     match mode {
         OpenMode::ReadText | OpenMode::ReadBytes => {
@@ -203,11 +237,10 @@ fn resolve_file_open<'a>(
 
     Some(FileOpen {
         item,
-        filename,
         mode,
         keywords,
         reference,
-        path_obj,
+        argument,
     })
 }
 
@@ -251,10 +284,9 @@ fn find_file_open<'a>(
         with,
         semantic,
         read_mode,
-        Some(filename),
         mode,
         keywords,
-        None,
+        OpenArgument::Builtin { filename },
     )
 }
 
@@ -279,15 +311,6 @@ fn find_path_open<'a>(
         return None;
     }
     let attr = func.as_attribute_expr()?;
-    let filename = if let Expr::Call(path_call) = attr.value.as_ref() {
-        if path_call.arguments.args.len() == 1 {
-            path_call.arguments.args.first()
-        } else {
-            None
-        }
-    } else {
-        None
-    };
     let mode = if args.is_empty() {
         OpenMode::ReadText
     } else {
@@ -301,10 +324,11 @@ fn find_path_open<'a>(
         with,
         semantic,
         read_mode,
-        filename,
         mode,
         keywords,
-        Some(attr.value.as_ref()),
+        OpenArgument::Pathlib {
+            path: attr.value.as_ref(),
+        },
     )
 }
 
