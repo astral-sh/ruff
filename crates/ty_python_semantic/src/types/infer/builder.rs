@@ -2671,7 +2671,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) {
         if let Some(annotation) = parameter.annotation() {
             let annotated_type = self.file_expression_type(annotation);
-            tracing::debug!("annotated_type: {}", annotated_type.display(self.db()));
             let ty = if let Type::TypeVar(typevar) = annotated_type
                 && typevar.kind(self.db()).is_paramspec()
             {
@@ -8998,10 +8997,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let mut constraint_keys = vec![];
 
-        tracing::debug!(
-            "value_type for attribute access: {}",
-            value_type.display(db)
-        );
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_type
             && typevar.kind(db).is_paramspec()
             && let Some(bound_typevar) = bind_typevar(
@@ -9013,7 +9008,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
         {
             value_type = Type::TypeVar(bound_typevar);
-            tracing::debug!("updated value_type: {}", value_type.display(db));
         }
 
         let mut assigned_type = None;
@@ -9027,7 +9021,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assigned_type = Some(ty);
             }
         }
-        tracing::debug!("assigned_type for attribute access: {:?}", assigned_type);
         let fallback_place = value_type.member(db, &attr.id);
         // Exclude non-definitely-bound places for purposes of reachability
         // analysis. We currently do not perform boundness analysis for implicit
@@ -9125,11 +9118,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             })
             .inner_type();
-
-        tracing::debug!(
-            "resolved_type for attribute access: {}",
-            resolved_type.display(db)
-        );
 
         self.check_deprecated(attr, resolved_type);
 
