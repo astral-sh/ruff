@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use ruff_macros::CacheKey;
 
 use crate::display_settings;
+use crate::settings::types::PreviewMode;
 
 const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("altair", "alt"),
@@ -91,14 +92,20 @@ pub fn preview_banned_aliases() -> FxHashMap<String, BannedAliases> {
 }
 
 impl Settings {
-    /// Merge preview aliases and banned aliases into the settings if preview mode is enabled.
-    #[must_use]
-    pub fn with_preview(mut self, preview_enabled: bool) -> Self {
-        if preview_enabled {
-            self.aliases.extend(preview_aliases());
-            self.banned_aliases.extend(preview_banned_aliases());
+    pub fn new(preview: PreviewMode) -> Self {
+        let mut aliases = default_aliases();
+        let mut banned_aliases = FxHashMap::default();
+
+        if preview.is_enabled() {
+            aliases.extend(preview_aliases());
+            banned_aliases.extend(preview_banned_aliases());
         }
-        self
+
+        Self {
+            aliases,
+            banned_aliases,
+            banned_from: FxHashSet::default(),
+        }
     }
 }
 

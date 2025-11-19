@@ -247,15 +247,13 @@ impl Configuration {
             .map(IsortOptions::try_into_settings)
             .transpose()?
             .unwrap_or_default();
-        let mut flake8_import_conventions = lint
+        let flake8_import_conventions = lint
             .flake8_import_conventions
-            .map(Flake8ImportConventionsOptions::try_into_settings)
+            .map(|options| options.try_into_settings(lint_preview))
             .transpose()?
-            .unwrap_or_default();
-
-        // Merge preview aliases and banned aliases when preview mode is enabled
-        flake8_import_conventions =
-            flake8_import_conventions.with_preview(matches!(lint_preview, PreviewMode::Enabled));
+            .unwrap_or_else(|| {
+                ruff_linter::rules::flake8_import_conventions::settings::Settings::new(lint_preview)
+            });
 
         conflicting_import_settings(&isort, &flake8_import_conventions)?;
 

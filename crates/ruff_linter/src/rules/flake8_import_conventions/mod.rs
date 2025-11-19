@@ -17,12 +17,11 @@ mod tests {
 
     #[test]
     fn defaults() -> Result<()> {
-        let mut settings = LinterSettings {
-            flake8_import_conventions: super::settings::Settings::default(),
+        let settings = LinterSettings {
+            flake8_import_conventions: super::settings::Settings::new(PreviewMode::Enabled),
+            preview: PreviewMode::Enabled,
             ..LinterSettings::for_rules([Rule::UnconventionalImportAlias, Rule::BannedImportAlias])
         };
-        // Enable preview mode to test preview-only conventions
-        settings.preview = PreviewMode::Enabled;
         let diagnostics = test_path(
             Path::new("flake8_import_conventions/defaults.py"),
             &settings,

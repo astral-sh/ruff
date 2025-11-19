@@ -28,7 +28,7 @@ use ruff_linter::rules::{
     pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, OutputFormat, PythonVersion, RequiredVersion,
+    IdentifierPattern, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
 };
 use ruff_linter::{RuleSelector, warn_user_once};
 use ruff_macros::{CombineOptions, OptionsMetadata};
@@ -1656,6 +1656,7 @@ impl<'de> Deserialize<'de> for Alias {
 impl Flake8ImportConventionsOptions {
     pub fn try_into_settings(
         self,
+        preview: PreviewMode,
     ) -> anyhow::Result<flake8_import_conventions::settings::Settings> {
         let mut aliases: FxHashMap<String, String> = match self.aliases {
             Some(options_aliases) => options_aliases
@@ -1672,6 +1673,11 @@ impl Flake8ImportConventionsOptions {
             );
         }
 
+        // Merge preview aliases if preview mode is enabled
+        if preview.is_enabled() {
+            aliases.extend(flake8_import_conventions::settings::preview_aliases());
+        }
+
         let mut normalized_aliases: FxHashMap<String, String> = FxHashMap::default();
         for (module, alias) in aliases {
             let normalized_alias = alias.nfkc().collect::<String>();
@@ -1683,9 +1689,16 @@ impl Flake8ImportConventionsOptions {
             normalized_aliases.insert(module, normalized_alias);
         }
 
+        let mut banned_aliases = self.banned_aliases.unwrap_or_default();
+
+        // Merge preview banned aliases if preview mode is enabled
+        if preview.is_enabled() {
+            banned_aliases.extend(flake8_import_conventions::settings::preview_banned_aliases());
+        }
+
         Ok(flake8_import_conventions::settings::Settings {
             aliases: normalized_aliases,
-            banned_aliases: self.banned_aliases.unwrap_or_default(),
+            banned_aliases,
             banned_from: self.banned_from.unwrap_or_default(),
         })
     }

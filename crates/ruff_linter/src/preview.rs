@@ -254,11 +254,6 @@ pub(crate) const fn is_b006_check_guaranteed_mutable_expr_enabled(
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/21373
-pub(crate) const fn is_import_conventions_preview_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // github.com/astral-sh/ruff/issues/20004
 pub(crate) const fn is_b006_unsafe_fix_preserve_assignment_expr_enabled(
     settings: &LinterSettings,

@@ -5,8 +5,6 @@ use ruff_python_semantic::{Binding, Imported};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::preview::is_import_conventions_preview_enabled;
-use crate::rules::flake8_import_conventions::settings::preview_aliases;
 use crate::{Fix, FixAvailability, Violation};
 
 use crate::renamer::Renamer;
@@ -68,26 +66,12 @@ pub(crate) fn unconventional_import_alias(
         return;
     };
     let qualified_name = import.qualified_name().to_string();
-
-    // Merge preview conventions if preview mode is enabled
-    let expected_alias = if is_import_conventions_preview_enabled(checker.settings()) {
-        conventions
-            .get(qualified_name.as_str())
-            .cloned()
-            .or_else(|| {
-                let preview_aliases_map = preview_aliases();
-                preview_aliases_map.get(qualified_name.as_str()).cloned()
-            })
-    } else {
-        conventions.get(qualified_name.as_str()).cloned()
-    };
-
-    let Some(expected_alias) = expected_alias else {
+    let Some(expected_alias) = conventions.get(qualified_name.as_str()) else {
         return;
     };
 
     let name = binding.name(checker.source());
-    if name == expected_alias.as_str() {
+    if name == expected_alias {
         return;
     }
 
@@ -99,12 +83,12 @@ pub(crate) fn unconventional_import_alias(
         binding.range(),
     );
     if !import.is_submodule_import() {
-        if checker.semantic().is_available(&expected_alias) {
+        if checker.semantic().is_available(expected_alias) {
             diagnostic.try_set_fix(|| {
                 let scope = &checker.semantic().scopes[binding.scope];
                 let (edit, rest) = Renamer::rename(
                     name,
-                    &expected_alias,
+                    expected_alias,
                     scope,
                     checker.semantic(),
                     checker.stylist(),
