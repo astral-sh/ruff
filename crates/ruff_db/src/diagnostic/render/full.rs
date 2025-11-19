@@ -49,7 +49,8 @@ impl<'a> FullRenderer<'a> {
             .help(stylesheet.help)
             .line_no(stylesheet.line_no)
             .emphasis(stylesheet.emphasis)
-            .none(stylesheet.none);
+            .none(stylesheet.none)
+            .hyperlink(stylesheet.hyperlink);
 
         for diag in diagnostics {
             let resolved = Resolved::new(self.resolver, diag, self.config);
@@ -729,7 +730,7 @@ print()
          ::: cell 2
         1 | # cell 2
           - import math
-        2 | 
+        2 |
         3 | print('hello world')
 
         error[unused-variable][*]: Local variable `x` is assigned to but never used
@@ -746,7 +747,7 @@ print()
         2 | def foo():
         3 |     print()
           -     x = 1
-        4 | 
+        4 |
         note: This is an unsafe fix and may change runtime behavior
         ");
     }
@@ -783,14 +784,14 @@ print()
          ::: cell 2
         1 | # cell 2
           - import math
-        2 | 
+        2 |
         3 | print('hello world')
          ::: cell 3
         1 | # cell 3
         2 | def foo():
         3 |     print()
           -     x = 1
-        4 | 
+        4 |
         note: This is an unsafe fix and may change runtime behavior
         ");
     }

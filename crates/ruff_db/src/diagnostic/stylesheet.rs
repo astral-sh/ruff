@@ -97,6 +97,8 @@ impl DiagnosticStylesheet {
     /// Default terminal styling
     pub fn styled() -> Self {
         let bright_blue = AnsiColor::BrightBlue.on_default();
+
+        let hyperlink = supports_hyperlinks::supports_hyperlinks();
         Self {
             error: AnsiColor::BrightRed.on_default().effects(Effects::BOLD),
             warning: AnsiColor::Yellow.on_default().effects(Effects::BOLD),
@@ -112,7 +114,7 @@ impl DiagnosticStylesheet {
             deletion: AnsiColor::Red.on_default(),
             insertion_line_no: AnsiColor::Green.on_default().effects(Effects::BOLD),
             deletion_line_no: AnsiColor::Red.on_default().effects(Effects::BOLD),
-            hyperlink: true,
+            hyperlink,
         }
     }
 
