@@ -254,27 +254,28 @@ impl<'db> ConstraintSet<'db> {
         }
 
         fn visit_dfs<'db>(
-            reachable_typevars: &FxHashMap<
+            reachable_typevars: &mut FxHashMap<
                 BoundTypeVarIdentity<'db>,
                 FxHashSet<BoundTypeVarIdentity<'db>>,
             >,
             discovered: &mut FxHashSet<BoundTypeVarIdentity<'db>>,
-            finished: &mut FxHashSet<BoundTypeVarIdentity<'db>>,
             bound_typevar: BoundTypeVarIdentity<'db>,
         ) -> bool {
             discovered.insert(bound_typevar);
-            for outgoing in reachable_typevars.get(&bound_typevar).into_iter().flatten() {
-                if discovered.contains(outgoing) {
+            let outgoing = reachable_typevars
+                .remove(&bound_typevar)
+                .expect("should not visit typevar twice in DFS");
+            for outgoing in outgoing {
+                if discovered.contains(&outgoing) {
                     return true;
                 }
-                if !finished.contains(outgoing) {
-                    if visit_dfs(reachable_typevars, discovered, finished, *outgoing) {
+                if reachable_typevars.contains_key(&outgoing) {
+                    if visit_dfs(reachable_typevars, discovered, outgoing) {
                         return true;
                     }
                 }
             }
             discovered.remove(&bound_typevar);
-            finished.insert(bound_typevar);
             false
         }
 
@@ -295,15 +296,10 @@ impl<'db> ConstraintSet<'db> {
 
         // Then perform a depth-first search to see if there are any cycles.
         let mut discovered: FxHashSet<BoundTypeVarIdentity<'db>> = FxHashSet::default();
-        let mut finished: FxHashSet<BoundTypeVarIdentity<'db>> = FxHashSet::default();
-        for bound_typevar in reachable_typevars.keys() {
-            if !discovered.contains(bound_typevar) && !finished.contains(bound_typevar) {
-                let cycle_found = visit_dfs(
-                    &reachable_typevars,
-                    &mut discovered,
-                    &mut finished,
-                    *bound_typevar,
-                );
+        while let Some(bound_typevar) = reachable_typevars.keys().copied().next() {
+            if !discovered.contains(&bound_typevar) {
+                let cycle_found =
+                    visit_dfs(&mut reachable_typevars, &mut discovered, bound_typevar);
                 if cycle_found {
                     return true;
                 }
