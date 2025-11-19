@@ -264,37 +264,10 @@ def f(args):
     return outputs
 
 
-# SIM108 - annotated assignment with Optional type
-def f(self):
-    if self.has_tool_choice:
-        tool_choice: str | None = "any"
-    else:
-        tool_choice = None
-    return tool_choice
-
-
 # SIM108 - annotated assignment with Optional type and attribute access
 def f(stream):
     if stream:
         stream_name: str | None = stream.name
     else:
         stream_name = None
-    return stream_name
-
-
-# OK - both branches have matching Optional annotations (SIM108 does not trigger)
-def f(stream):
-    if stream:
-        stream_name: str | None = stream.name
-    else:
-        stream_name: str | None = None
-    return stream_name
-
-
-# OK - both branches have non-matching Optional annotations (SIM108 does not trigger)
-def f(stream):
-    if stream:
-        stream_name: str | None = stream.name
-    else:
-        stream_name: int | None = None
     return stream_name

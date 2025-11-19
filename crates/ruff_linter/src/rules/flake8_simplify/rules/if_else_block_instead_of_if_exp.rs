@@ -7,6 +7,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
+use crate::preview::is_sim108_annotated_assignment_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -112,7 +113,6 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
     else {
         return;
     };
-    // Handle both Stmt::Assign and Stmt::AnnAssign in the if block
     let (body_target, body_value, body_annotation) = match body.as_slice() {
         [
             Stmt::Assign(ast::StmtAssign {
@@ -133,7 +133,7 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
                 annotation: body_annotation,
                 ..
             }),
-        ] => (
+        ] if is_sim108_annotated_assignment_enabled(checker.settings()) => (
             body_target.as_ref(),
             body_value.as_ref(),
             Some(body_annotation.as_ref()),
@@ -214,8 +214,7 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
                 && !contains_effect(test_node, |id| checker.semantic().has_builtin_binding(id)) =>
         {
             let target_var = &body_target;
-            let binary =
-                assignment_binary_or(target_var, body_value, else_value.as_ref(), body_annotation);
+            let binary = assignment_binary_or(target_var, body_value, else_value, body_annotation);
             (checker.generator().stmt(&binary), AssignmentKind::Binary)
         }
         (test_node, body_node)
@@ -230,19 +229,13 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
             }) =>
         {
             let target_var = &body_target;
-            let binary =
-                assignment_binary_and(target_var, body_value, else_value.as_ref(), body_annotation);
+            let binary = assignment_binary_and(target_var, body_value, else_value, body_annotation);
             (checker.generator().stmt(&binary), AssignmentKind::Binary)
         }
         _ => {
             let target_var = &body_target;
-            let ternary = assignment_ternary(
-                target_var,
-                body_value,
-                test,
-                else_value.as_ref(),
-                body_annotation,
-            );
+            let ternary =
+                assignment_ternary(target_var, body_value, test, else_value, body_annotation);
             (checker.generator().stmt(&ternary), AssignmentKind::Ternary)
         }
     };
@@ -318,14 +311,15 @@ fn assignment_ternary(
     }
 }
 
-fn assignment_binary_and(
+fn assignment_binary(
     target_var: &Expr,
     left_value: &Expr,
     right_value: &Expr,
+    op: BoolOp,
     annotation: Option<&Expr>,
 ) -> Stmt {
     let bool_op = ast::ExprBoolOp {
-        op: BoolOp::And,
+        op,
         values: vec![left_value.clone(), right_value.clone()],
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -342,14 +336,23 @@ fn assignment_binary_and(
         }
         .into()
     } else {
-        let node1 = ast::StmtAssign {
+        ast::StmtAssign {
             targets: vec![target_var.clone()],
             value: Box::new(bool_op.into()),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        };
-        node1.into()
+        }
+        .into()
     }
+}
+
+fn assignment_binary_and(
+    target_var: &Expr,
+    left_value: &Expr,
+    right_value: &Expr,
+    annotation: Option<&Expr>,
+) -> Stmt {
+    assignment_binary(target_var, left_value, right_value, BoolOp::And, annotation)
 }
 
 fn assignment_binary_or(
@@ -358,30 +361,5 @@ fn assignment_binary_or(
     right_value: &Expr,
     annotation: Option<&Expr>,
 ) -> Stmt {
-    let bool_op = ast::ExprBoolOp {
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        op: BoolOp::Or,
-        values: vec![left_value.clone(), right_value.clone()],
-    };
-    if let Some(annotation) = annotation {
-        let simple = matches!(target_var, Expr::Name(_));
-        ast::StmtAnnAssign {
-            target: Box::new(target_var.clone()),
-            annotation: Box::new(annotation.clone()),
-            value: Some(Box::new(bool_op.into())),
-            simple,
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        }
-        .into()
-    } else {
-        (ast::StmtAssign {
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            targets: vec![target_var.clone()],
-            value: Box::new(bool_op.into()),
-        })
-        .into()
-    }
+    assignment_binary(target_var, left_value, right_value, BoolOp::Or, annotation)
 }
