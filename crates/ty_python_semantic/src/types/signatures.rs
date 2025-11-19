@@ -29,7 +29,7 @@ use crate::types::generics::{
 };
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassLiteral,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ClassLiteral,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
     KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, ParamSpecAttrKind,
     TypeContext, TypeMapping, TypeRelation, TypeVarInstance, VarianceInferable, todo_type,
@@ -151,6 +151,10 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
+    pub(crate) fn as_slice(&self) -> &[Signature<'db>] {
+        &self.overloads
+    }
+
     pub(crate) fn with_inherited_generic_context(
         &self,
         db: &'db dyn Db,
@@ -182,6 +186,11 @@ impl<'db> CallableSignature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        // Check if `TypeMapping` is `ReplaceParamSpecVars` and take a special route which does the
+        // replacement in one pass for all overloads. I think in the case of overloads, the `self`
+        // is going to be `Callable[P, ...]` i.e., the one that actually contains the `ParamSpec`
+        // and not the actual overloaded function. That means that this needs to be converted into
+        // an overloaded callable.
         Self::from_overloads(
             self.overloads
                 .iter()
@@ -918,6 +927,52 @@ impl<'db> Signature<'db> {
             return ConstraintSet::from(relation.is_assignability());
         }
 
+        if let Some((paramspec_args_typevar, paramspec_kwargs_typevar)) =
+            other.parameters.paramspec_typevars()
+        {
+            let args_type = CallableType::paramspec_value(
+                db,
+                Signature::new(
+                    Parameters::new(
+                        self.parameters
+                            .iter()
+                            .filter(|param| param.is_positional() || param.is_variadic())
+                            .cloned(),
+                    ),
+                    None,
+                ),
+            );
+            let kwargs_type = CallableType::paramspec_value(
+                db,
+                Signature::new(
+                    Parameters::new(
+                        self.parameters
+                            .iter()
+                            .filter(|param| param.is_keyword_only() || param.is_keyword_variadic())
+                            .cloned(),
+                    ),
+                    None,
+                ),
+            );
+            return ConstraintSet::constrain_typevar(
+                db,
+                paramspec_args_typevar,
+                args_type,
+                args_type,
+                relation,
+            )
+            .union(
+                db,
+                ConstraintSet::constrain_typevar(
+                    db,
+                    paramspec_kwargs_typevar,
+                    kwargs_type,
+                    kwargs_type,
+                    relation,
+                ),
+            );
+        }
+
         let mut parameters = ParametersZip {
             current_self: None,
             current_other: None,
@@ -1352,6 +1407,18 @@ impl<'db> Parameters<'db> {
 
     pub(crate) const fn is_gradual(&self) -> bool {
         matches!(self.kind, ParametersKind::Gradual)
+    }
+
+    pub(crate) const fn is_paramspec(&self) -> bool {
+        matches!(self.kind, ParametersKind::ParamSpec(_))
+    }
+
+    pub(super) fn paramspec_typevars(
+        &self,
+    ) -> Option<(BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>)> {
+        let paramspec_args_typevar = self.variadic()?.1.annotated_type()?.as_typevar()?;
+        let paramspec_kwargs_typevar = self.keyword_variadic()?.1.annotated_type()?.as_typevar()?;
+        Some((paramspec_args_typevar, paramspec_kwargs_typevar))
     }
 
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)

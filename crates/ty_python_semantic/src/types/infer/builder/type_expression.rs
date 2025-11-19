@@ -1551,7 +1551,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 let name_ty = self.infer_name_load(name);
                 if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = name_ty
-                    && typevar.kind(self.db()).is_paramspec()
+                    && typevar.is_paramspec(self.db())
                 {
                     let index = semantic_index(self.db(), self.scope().file(self.db()));
                     let origin = bind_typevar(

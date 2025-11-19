@@ -13,15 +13,16 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSet;
 use crate::types::instance::{Protocol, ProtocolInstanceType};
-use crate::types::signatures::{Parameter, Parameters, Signature};
+use crate::types::signatures::{Parameter, ParameterKind, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral,
-    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeContext,
-    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance,
-    TypeVarKind, TypeVarVariance, UnionType, declaration_type, walk_bound_type_var_type,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
+    ClassLiteral, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
+    IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
+    Type, TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, declaration_type,
+    walk_bound_type_var_type,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -889,7 +890,13 @@ impl<'db> Specialization<'db> {
             .generic_context(db)
             .variables_inner(db)
             .get_index_of(&bound_typevar.identity(db))?;
-        self.types(db).get(index).copied()
+        let ty = self.types(db).get(index).copied();
+        tracing::debug!(
+            "Specialization for typevar {} is {:?}",
+            Type::TypeVar(bound_typevar).display(db),
+            ty,
+        );
+        ty
     }
 
     /// Applies a specialization to this specialization. This is used, for instance, when a generic
@@ -1597,6 +1604,64 @@ impl<'db> SpecializationBuilder<'db> {
                         }
                         return Ok(());
                     }
+                }
+            }
+
+            (Type::Callable(formal_callable), Type::Callable(actual_callable)) => {
+                // We're only interested in callable of the form `Callable[P, ...]` for now where
+                // `P` is a `ParamSpec`.
+                let [signature] = formal_callable.signatures(self.db).as_slice() else {
+                    return Ok(());
+                };
+                let formal_parameters = signature.parameters();
+                let Some((paramspec_args_typevar, paramspec_kwargs_typevar)) =
+                    formal_parameters.paramspec_typevars()
+                else {
+                    return Ok(());
+                };
+                let mut args_signatures = vec![];
+                let mut kwargs_signatures = vec![];
+                for signature in actual_callable.signatures(self.db) {
+                    args_signatures.push(Signature::new(
+                        Parameters::new(
+                            signature
+                                .parameters()
+                                .iter()
+                                .filter(|param| param.is_positional() || param.is_variadic())
+                                .cloned(),
+                        ),
+                        None,
+                    ));
+                    kwargs_signatures.push(Signature::new(
+                        Parameters::new(
+                            signature
+                                .parameters()
+                                .iter()
+                                .filter(|param| {
+                                    param.is_keyword_only() || param.is_keyword_variadic()
+                                })
+                                .cloned(),
+                        ),
+                        None,
+                    ));
+                }
+                self.add_type_mapping(
+                    paramspec_args_typevar,
+                    CallableType::overloaded_paramspec_value(self.db, args_signatures),
+                    polarity,
+                    &mut f,
+                );
+                self.add_type_mapping(
+                    paramspec_kwargs_typevar,
+                    CallableType::overloaded_paramspec_value(self.db, kwargs_signatures),
+                    polarity,
+                    &mut f,
+                );
+            }
+
+            (Type::Callable(_), _) => {
+                if let Some(actual_callable) = actual.try_upcast_to_callable(self.db) {
+                    self.infer_map_impl(formal, actual_callable, polarity, &mut f)?;
                 }
             }
 

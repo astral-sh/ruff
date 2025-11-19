@@ -4579,8 +4579,7 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeVar(typevar)
-                if typevar.kind(db).is_paramspec()
-                    && matches!(name.as_str(), "args" | "kwargs") =>
+                if typevar.is_paramspec(db) && matches!(name.as_str(), "args" | "kwargs") =>
             {
                 Place::bound(Type::TypeVar(match name.as_str() {
                     "args" => typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
@@ -7881,6 +7880,7 @@ pub enum TypeMapping<'a, 'db> {
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
     /// recursion when the type of the default value of a parameter depends on the callable itself.
     ReplaceParameterDefaults,
+    // ReplaceParamSpecVars(Specialization<'db>),
 }
 
 impl<'db> TypeMapping<'_, 'db> {
@@ -8113,7 +8113,7 @@ impl<'db> KnownInstanceType<'db> {
     fn class(self, db: &'db dyn Db) -> KnownClass {
         match self {
             Self::SubscriptedProtocol(_) | Self::SubscriptedGeneric(_) => KnownClass::SpecialForm,
-            Self::TypeVar(typevar_instance) if typevar_instance.kind(db).is_paramspec() => {
+            Self::TypeVar(typevar_instance) if typevar_instance.is_paramspec(db) => {
                 KnownClass::ParamSpec
             }
             Self::TypeVar(_) => KnownClass::TypeVar,
@@ -8187,7 +8187,7 @@ impl<'db> KnownInstanceType<'db> {
                     // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
                     // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
                     KnownInstanceType::TypeVar(typevar_instance) => {
-                        if typevar_instance.kind(self.db).is_paramspec() {
+                        if typevar_instance.is_paramspec(self.db) {
                             f.write_str("typing.ParamSpec")
                         } else {
                             f.write_str("typing.TypeVar")
@@ -8778,6 +8778,10 @@ impl<'db> TypeVarInstance<'db> {
         matches!(self.kind(db), TypeVarKind::TypingSelf)
     }
 
+    pub(crate) fn is_paramspec(self, db: &'db dyn Db) -> bool {
+        self.kind(db).is_paramspec()
+    }
+
     pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
         if let Some(TypeVarBoundOrConstraints::UpperBound(ty)) = self.bound_or_constraints(db) {
             Some(ty)
@@ -9127,6 +9131,10 @@ impl<'db> BoundTypeVarInstance<'db> {
 
     pub(crate) fn kind(self, db: &'db dyn Db) -> TypeVarKind {
         self.typevar(db).kind(db)
+    }
+
+    pub(crate) fn is_paramspec(self, db: &'db dyn Db) -> bool {
+        self.kind(db).is_paramspec()
     }
 
     pub(crate) fn with_paramspec_attr(self, db: &'db dyn Db, kind: ParamSpecAttrKind) -> Self {
@@ -10880,6 +10888,18 @@ impl<'db> CallableType<'db> {
         Type::Callable(CallableType::new(
             db,
             CallableSignature::single(signature),
+            CallableTypeKind::ParamSpecValue,
+        ))
+    }
+
+    /// Create a callable type which represents the value bound to a `ParamSpec` type variable.
+    pub(crate) fn overloaded_paramspec_value<I>(db: &'db dyn Db, signatures: I) -> Type<'db>
+    where
+        I: IntoIterator<Item = Signature<'db>>,
+    {
+        Type::Callable(CallableType::new(
+            db,
+            CallableSignature::from_overloads(signatures),
             CallableTypeKind::ParamSpecValue,
         ))
     }

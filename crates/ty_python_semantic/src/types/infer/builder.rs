@@ -2542,7 +2542,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 let annotated_type = self.file_expression_type(annotation);
                 if let Type::TypeVar(typevar) = annotated_type
-                    && typevar.kind(self.db()).is_paramspec()
+                    && typevar.is_paramspec(self.db())
                 {
                     match typevar.paramspec_attr(self.db()) {
                         // `*args: P.args`
@@ -2550,6 +2550,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                         // `*args: P.kwargs`
                         Some(ParamSpecAttrKind::Kwargs) => {
+                            // TODO: Should this diagnostic be raised as part of
+                            // `ArgumentTypeChecker`?
                             if let Some(builder) =
                                 self.context.report_lint(&INVALID_TYPE_FORM, annotation)
                             {
@@ -2568,6 +2570,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                         // `*args: P`
                         None => {
+                            // The diagnostic for this case is handled in `in_type_expression`.
                             // TODO: Should this be `Unknown` instead?
                             Type::homogeneous_tuple(self.db(), Type::unknown())
                         }
@@ -2672,11 +2675,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(annotation) = parameter.annotation() {
             let annotated_type = self.file_expression_type(annotation);
             let ty = if let Type::TypeVar(typevar) = annotated_type
-                && typevar.kind(self.db()).is_paramspec()
+                && typevar.is_paramspec(self.db())
             {
                 match typevar.paramspec_attr(self.db()) {
                     // `**kwargs: P.args`
                     Some(ParamSpecAttrKind::Args) => {
+                        // TODO: Should this diagnostic be raised as part of `ArgumentTypeChecker`?
                         if let Some(builder) =
                             self.context.report_lint(&INVALID_TYPE_FORM, annotation)
                         {
@@ -2698,11 +2702,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Some(ParamSpecAttrKind::Kwargs) => annotated_type,
 
                     // `**kwargs: P`
-                    // TODO: Should this be `Unknown` instead?
-                    None => KnownClass::Dict.to_specialized_instance(
-                        self.db(),
-                        [KnownClass::Str.to_instance(self.db()), Type::unknown()],
-                    ),
+                    None => {
+                        // The diagnostic for this case is handled in `in_type_expression`.
+                        // TODO: Should this be `Unknown` instead?
+                        KnownClass::Dict.to_specialized_instance(
+                            self.db(),
+                            [KnownClass::Str.to_instance(self.db()), Type::unknown()],
+                        )
+                    }
                 }
             } else {
                 KnownClass::Dict.to_specialized_instance(
@@ -8998,7 +9005,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut constraint_keys = vec![];
 
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_type
-            && typevar.kind(db).is_paramspec()
+            && typevar.is_paramspec(db)
             && let Some(bound_typevar) = bind_typevar(
                 db,
                 self.index,
