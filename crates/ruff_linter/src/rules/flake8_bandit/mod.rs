@@ -35,6 +35,8 @@ mod tests {
     #[test_case(Rule::RequestWithNoCertValidation, Path::new("S501.py"))]
     #[test_case(Rule::RequestWithoutTimeout, Path::new("S113.py"))]
     #[test_case(Rule::SSHNoHostKeyVerification, Path::new("S507.py"))]
+    #[test_case(Rule::SnmpInsecureVersion, Path::new("S508.py"))]
+    #[test_case(Rule::SnmpWeakCryptography, Path::new("S509.py"))]
     #[test_case(Rule::SslInsecureVersion, Path::new("S502.py"))]
     #[test_case(Rule::SslWithBadDefaults, Path::new("S503.py"))]
     #[test_case(Rule::SslWithNoVersion, Path::new("S504.py"))]
