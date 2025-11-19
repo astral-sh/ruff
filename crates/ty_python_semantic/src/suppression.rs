@@ -225,7 +225,7 @@ fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
             SuppressionTarget::All => context.report_unchecked(
                 &UNUSED_IGNORE_COMMENT,
                 suppression.range,
-                format_args!("Unused blanket `{}` directive", suppression.kind),
+                format_args!("Unused `{}` directive", suppression.kind),
             ),
             SuppressionTarget::Lint(lint) => context.report_unchecked(
                 &UNUSED_IGNORE_COMMENT,
