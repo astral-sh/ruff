@@ -500,9 +500,16 @@ impl<'db> GenericContext<'db> {
     }
 
     /// Creates a specialization of this generic context. Panics if the length of `types` does not
-    /// match the number of typevars in the generic context. You must provide a specific type for
-    /// each typevar; no defaults are used. (Use [`specialize_partial`](Self::specialize_partial)
-    /// if you might not have types for every typevar.)
+    /// match the number of typevars in the generic context.
+    ///
+    /// You must provide a specific type for each typevar; no defaults are used. (Use
+    /// [`specialize_partial`](Self::specialize_partial) if you might not have types for every
+    /// typevar.)
+    ///
+    /// The types you provide should not mention any of the typevars in this generic context;
+    /// otherwise, you will be left with a partial specialization. (Use
+    /// [`specialize_recursive`](Self::specialize_recursive) if your types might mention typevars
+    /// in this generic context.)
     pub(crate) fn specialize(
         self,
         db: &'db dyn Db,
@@ -510,6 +517,41 @@ impl<'db> GenericContext<'db> {
     ) -> Specialization<'db> {
         assert!(self.len(db) == types.len());
         Specialization::new(db, self, types, None, None)
+    }
+
+    /// Creates a specialization of this generic context. Panics if the length of `types` does not
+    /// match the number of typevars in the generic context.
+    ///
+    /// You are allowed to provide types that mention the typevars in this generic context.
+    pub(crate) fn specialize_recursive(
+        self,
+        db: &'db dyn Db,
+        mut types: Box<[Type<'db>]>,
+    ) -> Specialization<'db> {
+        let len = types.len();
+        assert!(self.len(db) == len);
+        loop {
+            let mut any_changed = false;
+            for i in 0..len {
+                let partial = PartialSpecialization {
+                    generic_context: self,
+                    types: &types,
+                };
+                let updated = types[i].apply_type_mapping(
+                    db,
+                    &TypeMapping::PartialSpecialization(partial),
+                    TypeContext::default(),
+                );
+                if updated != types[i] {
+                    types[i] = updated;
+                    any_changed = true;
+                }
+            }
+
+            if !any_changed {
+                return Specialization::new(db, self, types, None, None);
+            }
+        }
     }
 
     /// Creates a specialization of this generic context for the `tuple` class.

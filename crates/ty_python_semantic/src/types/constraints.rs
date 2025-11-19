@@ -3020,7 +3020,7 @@ impl<'db> GenericContext<'db> {
             types[i] = least_upper_bound;
         }
 
-        Ok(self.specialize(db, types.into_boxed_slice()))
+        Ok(self.specialize_recursive(db, types.into_boxed_slice()))
     }
 }
 
