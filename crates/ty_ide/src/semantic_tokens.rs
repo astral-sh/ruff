@@ -673,6 +673,23 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 self.visit_body(&class.body);
                 self.in_class_scope = prev_in_class;
             }
+            ast::Stmt::TypeAlias(type_alias) => {
+                // Type alias name
+                self.add_token(
+                    type_alias.name.range(),
+                    SemanticTokenType::Class,
+                    SemanticTokenModifier::DEFINITION,
+                );
+
+                // Type parameters (Python 3.12+ syntax)
+                if let Some(type_params) = &type_alias.type_params {
+                    for type_param in &type_params.type_params {
+                        self.visit_type_param(type_param);
+                    }
+                }
+
+                self.visit_expr(&type_alias.value);
+            }
             ast::Stmt::Import(import) => {
                 for alias in &import.names {
                     if let Some(asname) = &alias.asname {
@@ -746,6 +763,49 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 if let Some(value) = &assignment.value {
                     self.visit_expr(value);
                 }
+            }
+            ast::Stmt::For(for_stmt) => {
+                self.in_target_creating_definition = true;
+                self.visit_expr(&for_stmt.target);
+                self.in_target_creating_definition = false;
+
+                self.visit_expr(&for_stmt.iter);
+                self.visit_body(&for_stmt.body);
+                self.visit_body(&for_stmt.orelse);
+            }
+            ast::Stmt::With(with_stmt) => {
+                for item in &with_stmt.items {
+                    self.visit_expr(&item.context_expr);
+                    if let Some(expr) = &item.optional_vars {
+                        self.in_target_creating_definition = true;
+                        self.visit_expr(expr);
+                        self.in_target_creating_definition = false;
+                    }
+                }
+
+                self.visit_body(&with_stmt.body);
+            }
+            ast::Stmt::Try(try_stmt) => {
+                self.visit_body(&try_stmt.body);
+                for handler in &try_stmt.handlers {
+                    match handler {
+                        ast::ExceptHandler::ExceptHandler(except_handler) => {
+                            if let Some(expr) = &except_handler.type_ {
+                                self.visit_expr(expr);
+                            }
+                            if let Some(name) = &except_handler.name {
+                                self.add_token(
+                                    name.range(),
+                                    SemanticTokenType::Variable,
+                                    SemanticTokenModifier::DEFINITION,
+                                );
+                            }
+                            self.visit_body(&except_handler.body);
+                        }
+                    }
+                }
+                self.visit_body(&try_stmt.orelse);
+                self.visit_body(&try_stmt.finalbody);
             }
 
             _ => {
@@ -1304,7 +1364,7 @@ result = check(None)
         );
 
         assert_snapshot!(test.to_snapshot(&test.highlight_file()), @r#"
-        "U" @ 6..7: TypeParameter
+        "U" @ 6..7: Class [definition]
         "str" @ 10..13: Class
         "int" @ 16..19: Class
         "Test" @ 27..31: Class [definition]
@@ -2405,16 +2465,16 @@ finally:
         "1" @ 14..15: Number
         "0" @ 18..19: Number
         "ValueError" @ 27..37: Class
-        "ve" @ 41..43: Variable
+        "ve" @ 41..43: Variable [definition]
         "print" @ 49..54: Function
         "ve" @ 55..57: Variable
         "TypeError" @ 67..76: Class
         "RuntimeError" @ 78..90: Class
-        "re" @ 95..97: Variable
+        "re" @ 95..97: Variable [definition]
         "print" @ 103..108: Function
         "re" @ 109..111: Variable
         "Exception" @ 120..129: Class
-        "e" @ 133..134: Variable
+        "e" @ 133..134: Variable [definition]
         "print" @ 140..145: Function
         "e" @ 146..147: Variable
         "#);
@@ -2457,6 +2517,81 @@ class C:
         "test" @ 144..148: Variable
         "self" @ 159..163: SelfParameter
         "x" @ 164..165: Variable
+        "#);
+    }
+
+    #[test]
+    fn test_augmented_assignment() {
+        let test = SemanticTokenTest::new(
+            r#"
+x = 0
+x += 1
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "x" @ 1..2: Variable [definition]
+        "0" @ 5..6: Number
+        "x" @ 7..8: Variable
+        "1" @ 12..13: Number
+        "#);
+    }
+
+    #[test]
+    fn test_type_alias() {
+        let test = SemanticTokenTest::new("type MyList[T] = list[T]");
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "MyList" @ 5..11: Class [definition]
+        "T" @ 12..13: TypeParameter [definition]
+        "list" @ 17..21: Class
+        "T" @ 22..23: TypeParameter
+        "#);
+    }
+
+    #[test]
+    fn test_for_stmt() {
+        let test = SemanticTokenTest::new(
+            r#"
+for item in []:
+    print(item)
+else:
+    print(0)
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "item" @ 5..9: Variable [definition]
+        "print" @ 21..26: Function
+        "item" @ 27..31: Variable
+        "print" @ 43..48: Function
+        "0" @ 49..50: Number
+        "#);
+    }
+
+    #[test]
+    fn test_with_stmt() {
+        let test = SemanticTokenTest::new(
+            r#"
+with open("file.txt") as f:
+    f.read()
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "open" @ 6..10: Function
+        "\"file.txt\"" @ 11..21: String
+        "f" @ 26..27: Variable [definition]
+        "f" @ 33..34: Variable
+        "read" @ 35..39: Method
         "#);
     }
 
