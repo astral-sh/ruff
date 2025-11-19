@@ -29,10 +29,10 @@ use crate::types::generics::{
 };
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ClassLiteral,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassLiteral,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, ParamSpecAttrKind,
-    TypeContext, TypeMapping, TypeRelation, TypeVarInstance, VarianceInferable, todo_type,
+    KnownClass, MaterializationKind, NormalizedVisitor, ParamSpecAttrKind, TypeContext,
+    TypeMapping, TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -927,50 +927,21 @@ impl<'db> Signature<'db> {
             return ConstraintSet::from(relation.is_assignability());
         }
 
-        if let Some((paramspec_args_typevar, paramspec_kwargs_typevar)) =
-            other.parameters.paramspec_typevars()
-        {
-            let args_type = CallableType::paramspec_value(
+        if let ParametersKind::ParamSpec(typevar) = other.parameters.kind() {
+            let paramspec_value =
+                CallableType::paramspec_value(db, Signature::new(self.parameters().clone(), None));
+            let constrained_typevar = ConstraintSet::constrain_typevar(
                 db,
-                Signature::new(
-                    Parameters::new(
-                        self.parameters
-                            .iter()
-                            .filter(|param| param.is_positional() || param.is_variadic())
-                            .cloned(),
-                    ),
-                    None,
-                ),
-            );
-            let kwargs_type = CallableType::paramspec_value(
-                db,
-                Signature::new(
-                    Parameters::new(
-                        self.parameters
-                            .iter()
-                            .filter(|param| param.is_keyword_only() || param.is_keyword_variadic())
-                            .cloned(),
-                    ),
-                    None,
-                ),
-            );
-            return ConstraintSet::constrain_typevar(
-                db,
-                paramspec_args_typevar,
-                args_type,
-                args_type,
+                typevar,
+                paramspec_value,
+                paramspec_value,
                 relation,
-            )
-            .union(
-                db,
-                ConstraintSet::constrain_typevar(
-                    db,
-                    paramspec_kwargs_typevar,
-                    kwargs_type,
-                    kwargs_type,
-                    relation,
-                ),
             );
+            tracing::debug!(
+                "constrained paramspec typevar: {}",
+                constrained_typevar.display(db)
+            );
+            return constrained_typevar;
         }
 
         let mut parameters = ParametersZip {
@@ -1291,52 +1262,6 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
     }
 }
 
-#[derive(
-    Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, Ord, PartialOrd, get_size2::GetSize,
-)]
-pub(crate) enum ParamSpecOrigin<'db> {
-    Bounded(BoundTypeVarInstance<'db>),
-    Unbounded(TypeVarInstance<'db>),
-}
-
-impl<'db> ParamSpecOrigin<'db> {
-    pub(crate) fn with_paramspec_attr(
-        self,
-        db: &'db dyn Db,
-        paramspec_attr: ParamSpecAttrKind,
-    ) -> Self {
-        match self {
-            ParamSpecOrigin::Bounded(typevar) => {
-                ParamSpecOrigin::Bounded(typevar.with_paramspec_attr(db, paramspec_attr))
-            }
-            ParamSpecOrigin::Unbounded(_) => self,
-        }
-    }
-
-    pub(crate) fn name(&self, db: &'db dyn Db) -> &ast::name::Name {
-        match self {
-            ParamSpecOrigin::Bounded(bound) => bound.typevar(db).name(db),
-            ParamSpecOrigin::Unbounded(unbound) => unbound.name(db),
-        }
-    }
-
-    pub(crate) fn binding_context(&self, db: &'db dyn Db) -> Option<BindingContext<'db>> {
-        match self {
-            ParamSpecOrigin::Bounded(bound) => Some(bound.binding_context(db)),
-            ParamSpecOrigin::Unbounded(_) => None,
-        }
-    }
-
-    pub(crate) fn into_type(self) -> Type<'db> {
-        match self {
-            ParamSpecOrigin::Bounded(bound) => Type::TypeVar(bound),
-            ParamSpecOrigin::Unbounded(unbound) => {
-                Type::KnownInstance(KnownInstanceType::TypeVar(unbound))
-            }
-        }
-    }
-}
-
 /// The kind of parameter list represented.
 // TODO: the spec also allows signatures like `Concatenate[int, ...]`, which have some number
 // of required positional parameters followed by a gradual form. Our representation will need
@@ -1361,8 +1286,11 @@ pub(crate) enum ParametersKind<'db> {
     /// [the typing specification]: https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable
     Gradual,
 
-    /// Represents a `ParamSpec` parameter list.
-    ParamSpec(ParamSpecOrigin<'db>),
+    /// Represents a parameter list containing a `ParamSpec` as the only parameter.
+    ///
+    /// Note that this is distinct from a parameter list _containing_ a `ParamSpec` which is
+    /// considered a standard parameter list that just contains a `ParamSpec`.
+    ParamSpec(BoundTypeVarInstance<'db>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -1409,18 +1337,6 @@ impl<'db> Parameters<'db> {
         matches!(self.kind, ParametersKind::Gradual)
     }
 
-    pub(crate) const fn is_paramspec(&self) -> bool {
-        matches!(self.kind, ParametersKind::ParamSpec(_))
-    }
-
-    pub(super) fn paramspec_typevars(
-        &self,
-    ) -> Option<(BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>)> {
-        let paramspec_args_typevar = self.variadic()?.1.annotated_type()?.as_typevar()?;
-        let paramspec_kwargs_typevar = self.keyword_variadic()?.1.annotated_type()?.as_typevar()?;
-        Some((paramspec_args_typevar, paramspec_kwargs_typevar))
-    }
-
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
     pub(crate) fn todo() -> Self {
         Self {
@@ -1451,21 +1367,17 @@ impl<'db> Parameters<'db> {
         }
     }
 
-    pub(crate) fn paramspec(db: &'db dyn Db, origin: ParamSpecOrigin<'db>) -> Self {
+    pub(crate) fn paramspec(db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Self {
         Self {
             value: vec![
-                Parameter::variadic(Name::new_static("args")).with_annotated_type(
-                    origin
-                        .with_paramspec_attr(db, ParamSpecAttrKind::Args)
-                        .into_type(),
-                ),
+                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::TypeVar(
+                    typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
+                )),
                 Parameter::keyword_variadic(Name::new_static("kwargs")).with_annotated_type(
-                    origin
-                        .with_paramspec_attr(db, ParamSpecAttrKind::Kwargs)
-                        .into_type(),
+                    Type::TypeVar(typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs)),
                 ),
             ],
-            kind: ParametersKind::ParamSpec(origin),
+            kind: ParametersKind::ParamSpec(typevar),
         }
     }
 

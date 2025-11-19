@@ -7343,16 +7343,22 @@ impl<'db> Type<'db> {
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self {
-            Type::TypeVar(bound_typevar) => {
-                if matches!(
-                    bound_typevar.typevar(db).kind(db),
-                    TypeVarKind::Legacy | TypeVarKind::TypingSelf | TypeVarKind::ParamSpec
-                ) && binding_context.is_none_or(|binding_context| {
-                    bound_typevar.binding_context(db) == BindingContext::Definition(binding_context)
-                }) {
+            Type::TypeVar(bound_typevar) => match bound_typevar.typevar(db).kind(db) {
+                TypeVarKind::Legacy | TypeVarKind::TypingSelf
+                    if binding_context.is_none_or(|binding_context| {
+                        bound_typevar.binding_context(db)
+                            == BindingContext::Definition(binding_context)
+                    }) =>
+                {
                     typevars.insert(bound_typevar);
                 }
-            }
+                TypeVarKind::ParamSpec => {
+                    // For `ParamSpec`, we're only interested in `P` itself, not `P.args` or
+                    // `P.kwargs`.
+                    typevars.insert(bound_typevar.without_paramspec_attr(db));
+                }
+                _ => {}
+            },
 
             Type::FunctionLiteral(function) => {
                 function.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
@@ -9139,6 +9145,10 @@ impl<'db> BoundTypeVarInstance<'db> {
 
     pub(crate) fn with_paramspec_attr(self, db: &'db dyn Db, kind: ParamSpecAttrKind) -> Self {
         Self::new(db, self.typevar(db), self.binding_context(db), Some(kind))
+    }
+
+    pub(crate) fn without_paramspec_attr(self, db: &'db dyn Db) -> Self {
+        Self::new(db, self.typevar(db), self.binding_context(db), None)
     }
 
     /// Returns whether two bound typevars represent the same logical typevar, regardless of e.g.

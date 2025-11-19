@@ -8,13 +8,14 @@ use crate::types::diagnostic::{
     report_invalid_arguments_to_callable,
 };
 use crate::types::generics::bind_typevar;
-use crate::types::signatures::{ParamSpecOrigin, Signature};
+use crate::types::signatures::Signature;
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::{
-    CallableType, DynamicType, IntersectionBuilder, KnownClass, KnownInstanceType,
-    LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType, Type,
-    TypeAliasType, TypeContext, TypeIsType, UnionBuilder, UnionType, todo_type,
+    BindingContext, BoundTypeVarInstance, CallableType, DynamicType, IntersectionBuilder,
+    KnownClass, KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType,
+    SubclassOfType, Type, TypeAliasType, TypeContext, TypeIsType, UnionBuilder, UnionType,
+    todo_type,
 };
 
 /// Type expressions
@@ -1554,18 +1555,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     && typevar.is_paramspec(self.db())
                 {
                     let index = semantic_index(self.db(), self.scope().file(self.db()));
-                    let origin = bind_typevar(
+                    let bound_typevar = bind_typevar(
                         self.db(),
                         index,
                         self.scope().file_scope_id(self.db()),
                         self.typevar_binding_context,
                         typevar,
                     )
-                    .map_or(
-                        ParamSpecOrigin::Unbounded(typevar),
-                        ParamSpecOrigin::Bounded,
-                    );
-                    return Some(Parameters::paramspec(self.db(), origin));
+                    .unwrap_or_else(|| {
+                        BoundTypeVarInstance::new(
+                            self.db(),
+                            typevar,
+                            BindingContext::Synthetic,
+                            None,
+                        )
+                    });
+                    return Some(Parameters::paramspec(self.db(), bound_typevar));
                 }
             }
             _ => {}

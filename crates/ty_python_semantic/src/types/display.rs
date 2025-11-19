@@ -27,8 +27,8 @@ use crate::types::tuple::TupleSpec;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
     BoundTypeVarIdentity, CallableType, CallableTypeKind, IntersectionType, KnownBoundMethodType,
-    KnownClass, MaterializationKind, ParamSpecAttrKind, Protocol, ProtocolInstanceType,
-    StringLiteralType, SubclassOfInner, Type, UnionType, WrapperDescriptorKind, visitor,
+    KnownClass, MaterializationKind, Protocol, ProtocolInstanceType, StringLiteralType,
+    SubclassOfInner, Type, UnionType, WrapperDescriptorKind, visitor,
 };
 use ruff_db::parsed::parsed_module;
 
@@ -942,29 +942,8 @@ impl Display for DisplayGenericContext<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let variables = self.generic_context.variables(self.db);
 
-        let mut paramspec_args_identity = None;
         let non_implicit_variables: Vec<_> = variables
-            .filter(|bound_typevar| {
-                let typevar = bound_typevar.typevar(self.db);
-                // TODO: Should we instead display all the type variables?
-                // e.g., [P@foo.args, P@foo.kwargs]
-                if typevar.is_paramspec(self.db) {
-                    match bound_typevar.paramspec_attr(self.db) {
-                        Some(ParamSpecAttrKind::Args) => {
-                            paramspec_args_identity = Some(typevar.identity(self.db));
-                        }
-                        Some(ParamSpecAttrKind::Kwargs) => {
-                            // If we have already seen `*args`, we can skip `**kwargs` to avoid
-                            // displaying the same `ParamSpec` twice.
-                            if paramspec_args_identity == Some(typevar.identity(self.db)) {
-                                return false;
-                            }
-                        }
-                        None => {}
-                    }
-                }
-                !typevar.is_self(self.db)
-            })
+            .filter(|bound_typevar| !bound_typevar.typevar(self.db).is_self(self.db))
             .collect();
 
         if non_implicit_variables.is_empty() {
@@ -1352,12 +1331,9 @@ impl DisplayParameters<'_> {
                 // contain `(*args, **kwargs)` parameters.
                 writer.write_str("...")?;
             }
-            ParametersKind::ParamSpec(origin) => {
-                writer.write_str(&format!("**{}", origin.name(self.db)))?;
-                if let Some(name) = origin
-                    .binding_context(self.db)
-                    .and_then(|binding_context| binding_context.name(self.db))
-                {
+            ParametersKind::ParamSpec(typevar) => {
+                writer.write_str(&format!("**{}", typevar.name(self.db)))?;
+                if let Some(name) = typevar.binding_context(self.db).name(self.db) {
                     writer.write_str(&format!("@{name}"))?;
                 }
             }
