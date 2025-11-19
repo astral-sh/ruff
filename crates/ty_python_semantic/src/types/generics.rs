@@ -1361,18 +1361,16 @@ impl<'db> SpecializationBuilder<'db> {
         generic_context: GenericContext<'db>,
         f: impl Fn(BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>, Type<'db>) -> Type<'db>,
     ) -> Specialization<'db> {
-        let types =
-            generic_context
-                .variables_inner(self.db)
-                .iter()
-                .map(|(identity, bound_typevar)| {
-                    self.types
-                        .get(identity)
-                        .map(|ty| f(*identity, *bound_typevar, *ty))
-                });
-
         // TODO Infer the tuple spec for a tuple type
-        generic_context.specialize_partial(self.db, types)
+        let Ok(specialization) =
+            generic_context.specialize_constrained_mapped(self.db, self.constraints, f)
+        else {
+            panic!(
+                "should not be able to create unrealizable specialization from {}",
+                self.constraints.display(self.db),
+            );
+        };
+        specialization
     }
 
     fn add_type_mapping(
