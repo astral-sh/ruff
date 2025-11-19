@@ -303,3 +303,20 @@ def mutually_bound[T: Base, U]():
     # revealed: ty_extensions.Specialization[T@mutually_bound = Base, U@mutually_bound = Sub]
     reveal_type(generic_context(mutually_bound).specialize_constrained(ConstraintSet.range(Never, U, Sub) & ConstraintSet.range(Never, U, T)))
 ```
+
+## Nested typevars
+
+A typevar's constraint can _mention_ another typevar without _constraining_ it. In this example, `U`
+must be specialized to `list[T]`, but it cannot affect what `T` is specialized to.
+
+```py
+from typing import Never
+from ty_extensions import ConstraintSet, generic_context
+
+def mentions[T, U]():
+    constraints = ConstraintSet.range(Never, T, int) & ConstraintSet.range(list[T], U, list[T])
+    # revealed: ty_extensions.ConstraintSet[((T@mentions ≤ int) ∧ (U@mentions = list[T@mentions]))]
+    reveal_type(constraints)
+    # revealed: ty_extensions.Specialization[T@mentions = int, U@mentions = list[int]]
+    reveal_type(generic_context(mentions).specialize_constrained(constraints))
+```
