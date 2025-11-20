@@ -9,6 +9,7 @@ use crate::comments::{
     Comments, LeadingDanglingTrailingComments, SourceComment, trailing_comments,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
+use crate::expression::expr_lambda::ExprLambdaLayout;
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize, is_expression_parenthesized,
     optional_parentheses,
@@ -308,6 +309,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         *statement,
                         Parenthesize::IfBreaks,
                     )
+                    .with_lambda_layout(ExprLambdaLayout::Assignment)
                     .fmt(f);
                 }
 

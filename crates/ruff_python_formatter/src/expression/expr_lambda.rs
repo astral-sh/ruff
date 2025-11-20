@@ -1,12 +1,14 @@
-use ruff_formatter::{RemoveSoftLinesBuffer, write};
+use ruff_formatter::{FormatRuleWithOptions, RemoveSoftLinesBuffer, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprLambda;
 use ruff_text_size::Ranged;
 
 use crate::comments::dangling_comments;
 use crate::expression::has_own_parentheses;
+use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{
-    NeedsParentheses, OptionalParentheses, is_expression_parenthesized, optional_parentheses,
+    NeedsParentheses, OptionalParentheses, Parenthesize, is_expression_parenthesized,
+    optional_parentheses,
 };
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
@@ -14,7 +16,9 @@ use crate::preview::is_force_single_line_lambda_parameters_enabled;
 use crate::preview::is_parenthesize_lambda_bodies_enabled;
 
 #[derive(Default)]
-pub struct FormatExprLambda;
+pub struct FormatExprLambda {
+    layout: ExprLambdaLayout,
+}
 
 impl FormatNodeRule<ExprLambda> for FormatExprLambda {
     fn fmt_fields(&self, item: &ExprLambda, f: &mut PyFormatter) -> FormatResult<()> {
@@ -85,10 +89,60 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             && has_own_parentheses(body, f.context()).is_none()
             && !is_expression_parenthesized(body.into(), comments.ranges(), f.context().source())
         {
-            fits_expanded(&optional_parentheses(&body.format())).fmt(f)
+            match self.layout {
+                ExprLambdaLayout::Default => maybe_parenthesize_expression(
+                    body,
+                    item,
+                    Parenthesize::IfBreaksParenthesizedNested,
+                )
+                .fmt(f),
+                ExprLambdaLayout::Assignment => {
+                    fits_expanded(&optional_parentheses(&body.format())).fmt(f)
+                }
+            }
         } else {
             body.format().fmt(f)
         }
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub enum ExprLambdaLayout {
+    #[default]
+    Default,
+
+    /// The [`ExprLambda`] is the direct child of an assignment expression, so it needs to use
+    /// `fits_expanded` to prefer parenthesizing its own body before the assignment tries to
+    /// parenthesize the whole lambda. For example, we want this formatting:
+    ///
+    /// ```py
+    /// long_assignment_target = lambda x, y, z: (
+    ///     x + y + z
+    /// )
+    /// ```
+    ///
+    /// instead of either of these:
+    ///
+    /// ```py
+    /// long_assignment_target = (
+    ///     lambda x, y, z: (
+    ///         x + y + z
+    ///     )
+    /// )
+    ///
+    /// long_assignment_target = (
+    ///     lambda x, y, z: x + y + z
+    /// )
+    /// ```
+    Assignment,
+}
+
+impl FormatRuleWithOptions<ExprLambda, PyFormatContext<'_>> for FormatExprLambda {
+    type Options = ExprLambdaLayout;
+
+    fn with_options(mut self, options: Self::Options) -> Self {
+        self.layout = options;
+        self
     }
 }
 
