@@ -1142,27 +1142,30 @@ impl<'db> Node<'db> {
     /// Invokes a callback for each of the representative types of a particular typevar for this
     /// constraint set.
     ///
-    /// There is a representative type for each distinct path from the BDD root to the `AlwaysTrue`
+    /// We first abstract the BDD so that it only mentions constraints on the requested typevar. We
+    /// then invoke your callback for each distinct path from the BDD root to the `AlwaysTrue`
     /// terminal. Each of those paths can be viewed as the conjunction of the individual
     /// constraints of each internal node that we traverse as we walk that path. We provide the
     /// lower/upper bound of this conjunction to your callback, allowing you to choose any suitable
     /// type in the range.
+    ///
+    /// If the abstracted BDD does not mention the typevar at all (i.e., it leaves the typevar
+    /// completely unconstrained), we will invoke your callback once with `None`.
     fn find_representative_types(
         self,
         db: &'db dyn Db,
         bound_typevar: BoundTypeVarIdentity<'db>,
-        mut f: impl FnMut(Type<'db>, Type<'db>),
+        mut f: impl FnMut(Option<(Type<'db>, Type<'db>)>),
     ) {
         self.retain_one(db, bound_typevar)
-            .find_representative_types_inner(db, Type::Never, Type::object(), &mut f);
+            .find_representative_types_inner(db, None, &mut f);
     }
 
     fn find_representative_types_inner(
         self,
         db: &'db dyn Db,
-        greatest_lower_bound: Type<'db>,
-        least_upper_bound: Type<'db>,
-        f: &mut dyn FnMut(Type<'db>, Type<'db>),
+        current_bounds: Option<(Type<'db>, Type<'db>)>,
+        f: &mut dyn FnMut(Option<(Type<'db>, Type<'db>)>),
     ) {
         match self {
             Node::AlwaysTrue => {
@@ -1172,12 +1175,16 @@ impl<'db> Node<'db> {
                 // If `lower ≰ upper`, then this path somehow represents in invalid specialization.
                 // That should have been removed from the BDD domain as part of the simplification
                 // process.
-                debug_assert!(greatest_lower_bound.is_subtype_of(db, least_upper_bound));
+                debug_assert!(current_bounds.is_none_or(
+                    |(greatest_lower_bound, least_upper_bound)| {
+                        greatest_lower_bound.is_subtype_of(db, least_upper_bound)
+                    }
+                ));
 
                 // We've been tracking the lower and upper bound that the types for this path must
                 // satisfy. Pass those bounds along and let the caller choose a representative type
                 // from within that range.
-                f(greatest_lower_bound, least_upper_bound);
+                f(current_bounds);
             }
 
             Node::AlwaysFalse => {
@@ -1186,6 +1193,9 @@ impl<'db> Node<'db> {
             }
 
             Node::Interior(interior) => {
+                let (greatest_lower_bound, least_upper_bound) =
+                    current_bounds.unwrap_or((Type::Never, Type::object()));
+
                 // For an interior node, there are two outgoing paths: one for the `if_true`
                 // branch, and one for the `if_false` branch.
                 //
@@ -1200,8 +1210,7 @@ impl<'db> Node<'db> {
                     IntersectionType::from_elements(db, [least_upper_bound, constraint.upper(db)]);
                 interior.if_true(db).find_representative_types_inner(
                     db,
-                    new_greatest_lower_bound,
-                    new_least_upper_bound,
+                    Some((new_greatest_lower_bound, new_least_upper_bound)),
                     f,
                 );
 
@@ -1217,8 +1226,7 @@ impl<'db> Node<'db> {
                 // path.
                 interior.if_false(db).find_representative_types_inner(
                     db,
-                    greatest_lower_bound,
-                    least_upper_bound,
+                    Some((greatest_lower_bound, least_upper_bound)),
                     f,
                 );
             }
@@ -3128,25 +3136,35 @@ impl<'db> GenericContext<'db> {
             // _each_ of the paths into separate specializations, but it's not clear what we would
             // do with that, so instead we just report the ambiguity as a specialization failure.
             let mut satisfied = false;
+            let mut unconstrained = false;
             let mut greatest_lower_bound = Type::Never;
             let mut least_upper_bound = Type::object();
-            abstracted.find_representative_types(
-                db,
-                bound_typevar.identity(db),
-                |lower_bound, upper_bound| {
-                    satisfied = true;
-                    greatest_lower_bound =
-                        UnionType::from_elements(db, [greatest_lower_bound, lower_bound]);
-                    least_upper_bound =
-                        IntersectionType::from_elements(db, [least_upper_bound, upper_bound]);
-                },
-            );
+            abstracted.find_representative_types(db, bound_typevar.identity(db), |bounds| {
+                satisfied = true;
+                match bounds {
+                    Some((lower_bound, upper_bound)) => {
+                        greatest_lower_bound =
+                            UnionType::from_elements(db, [greatest_lower_bound, lower_bound]);
+                        least_upper_bound =
+                            IntersectionType::from_elements(db, [least_upper_bound, upper_bound]);
+                    }
+                    None => {
+                        unconstrained = true;
+                    }
+                }
+            });
 
             // If there are no satisfiable paths in the BDD, then there is no valid specialization
             // for this constraint set.
             if !satisfied {
                 // TODO: Construct a useful error here
                 error_occurred = true;
+                return None;
+            }
+
+            // The BDD is satisfiable, but the typevar is unconstrained, then we use `None` to tell
+            // specialize_recursive to fall back on the typevar's default.
+            if unconstrained {
                 return None;
             }
 
