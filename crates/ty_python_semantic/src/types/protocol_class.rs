@@ -199,7 +199,10 @@ impl<'db> ProtocolInterface<'db> {
                 // Synthesize a read-only property (one that has a getter but no setter)
                 // which returns the specified type from its getter.
                 let property_getter_signature = Signature::new(
-                    Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))]),
+                    Parameters::new(
+                        db,
+                        [Parameter::positional_only(Some(Name::new_static("self")))],
+                    ),
                     Some(ty.normalized(db)),
                 );
                 let property_getter = CallableType::single(db, property_getter_signature);

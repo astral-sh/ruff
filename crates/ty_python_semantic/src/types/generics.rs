@@ -422,6 +422,7 @@ impl<'db> GenericContext<'db> {
 
     pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
         let parameters = Parameters::new(
+            db,
             self.variables(db)
                 .map(|typevar| Self::parameter_from_typevar(db, typevar)),
         );

@@ -544,11 +544,12 @@ impl<'db> Signature<'db> {
             // Discard the definition when normalizing, so that two equivalent signatures
             // with different `Definition`s share the same Salsa ID when normalized
             definition: None,
-            parameters: self
-                .parameters
-                .iter()
-                .map(|param| param.normalized_impl(db, visitor))
-                .collect(),
+            parameters: Parameters::new(
+                db,
+                self.parameters
+                    .iter()
+                    .map(|param| param.normalized_impl(db, visitor)),
+            ),
             return_ty: self
                 .return_ty
                 .map(|return_ty| return_ty.normalized_impl(db, visitor)),
@@ -618,7 +619,7 @@ impl<'db> Signature<'db> {
             parameters.next();
         }
 
-        let mut parameters = Parameters::new(parameters);
+        let mut parameters = Parameters::new(db, parameters);
         let mut return_ty = self.return_ty;
         if let Some(self_type) = self_type {
             parameters = parameters.apply_type_mapping_impl(
@@ -932,16 +933,37 @@ impl<'db> Signature<'db> {
             return ConstraintSet::from(relation.is_assignability());
         }
 
-        if let ParametersKind::ParamSpec(typevar) = other.parameters.kind() {
-            let paramspec_value =
-                CallableType::paramspec_value(db, Signature::new(self.parameters().clone(), None));
-            return ConstraintSet::constrain_typevar(
-                db,
-                typevar,
-                paramspec_value,
-                paramspec_value,
-                relation,
-            );
+        match (self.parameters.kind(), other.parameters.kind()) {
+            (ParametersKind::ParamSpec(self_typevar), ParametersKind::ParamSpec(other_typevar)) => {
+                return ConstraintSet::from(self_typevar.is_same_typevar_as(db, other_typevar));
+            }
+            (ParametersKind::ParamSpec(typevar), _) => {
+                let paramspec_value = CallableType::paramspec_value(
+                    db,
+                    Signature::new(other.parameters.clone(), None),
+                );
+                return ConstraintSet::constrain_typevar(
+                    db,
+                    typevar,
+                    paramspec_value,
+                    paramspec_value,
+                    relation,
+                );
+            }
+            (_, ParametersKind::ParamSpec(typevar)) => {
+                let paramspec_value = CallableType::paramspec_value(
+                    db,
+                    Signature::new(self.parameters.clone(), None),
+                );
+                return ConstraintSet::constrain_typevar(
+                    db,
+                    typevar,
+                    paramspec_value,
+                    paramspec_value,
+                    relation,
+                );
+            }
+            _ => {}
         }
 
         let mut parameters = ParametersZip {
@@ -1301,19 +1323,40 @@ pub(crate) struct Parameters<'db> {
 }
 
 impl<'db> Parameters<'db> {
-    pub(crate) fn new(parameters: impl IntoIterator<Item = Parameter<'db>>) -> Self {
+    /// Create a new parameter list from an iterator of parameters.
+    ///
+    /// The kind of the parameter list is determined based on the provided parameters.
+    /// Specifically, if the parameters is made up of `*args` and `**kwargs` only, it checks
+    /// their annotated types to determine if they represent a gradual form or a `ParamSpec`.
+    pub(crate) fn new(
+        db: &'db dyn Db,
+        parameters: impl IntoIterator<Item = Parameter<'db>>,
+    ) -> Self {
         let value: Vec<Parameter<'db>> = parameters.into_iter().collect();
-        let kind = if value.len() == 2
-            && value
-                .iter()
-                .any(|p| p.is_variadic() && p.annotated_type().is_none_or(|ty| ty.is_dynamic()))
-            && value.iter().any(|p| {
-                p.is_keyword_variadic() && p.annotated_type().is_none_or(|ty| ty.is_dynamic())
-            }) {
-            ParametersKind::Gradual
-        } else {
-            ParametersKind::Standard
-        };
+        let mut kind = ParametersKind::Standard;
+        if let [p1, p2] = value.as_slice()
+            && p1.is_variadic()
+            && p2.is_keyword_variadic()
+        {
+            match (p1.annotated_type(), p2.annotated_type()) {
+                (None | Some(Type::Dynamic(_)), None | Some(Type::Dynamic(_))) => {
+                    kind = ParametersKind::Gradual;
+                }
+                (Some(Type::TypeVar(args_typevar)), Some(Type::TypeVar(kwargs_typevar))) => {
+                    if let (Some(ParamSpecAttrKind::Args), Some(ParamSpecAttrKind::Kwargs)) = (
+                        args_typevar.paramspec_attr(db),
+                        kwargs_typevar.paramspec_attr(db),
+                    ) {
+                        let typevar = args_typevar.without_paramspec_attr(db);
+                        if typevar.is_same_typevar_as(db, kwargs_typevar.without_paramspec_attr(db))
+                        {
+                            kind = ParametersKind::ParamSpec(typevar);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
         Self { value, kind }
     }
 
@@ -1577,6 +1620,7 @@ impl<'db> Parameters<'db> {
         });
 
         Self::new(
+            db,
             positional_only
                 .into_iter()
                 .chain(positional_or_keyword)
@@ -1691,12 +1735,6 @@ impl<'db, 'a> IntoIterator for &'a Parameters<'db> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.value.iter()
-    }
-}
-
-impl<'db> FromIterator<Parameter<'db>> for Parameters<'db> {
-    fn from_iter<T: IntoIterator<Item = Parameter<'db>>>(iter: T) -> Self {
-        Self::new(iter)
     }
 }
 

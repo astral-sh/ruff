@@ -1941,7 +1941,7 @@ mod tests {
         parameters: impl IntoIterator<Item = Parameter<'db>>,
         return_ty: Option<Type<'db>>,
     ) -> String {
-        Signature::new(Parameters::new(parameters), return_ty)
+        Signature::new(Parameters::new(db, parameters), return_ty)
             .display(db)
             .to_string()
     }
@@ -1951,7 +1951,7 @@ mod tests {
         parameters: impl IntoIterator<Item = Parameter<'db>>,
         return_ty: Option<Type<'db>>,
     ) -> String {
-        Signature::new(Parameters::new(parameters), return_ty)
+        Signature::new(Parameters::new(db, parameters), return_ty)
             .display_with(db, super::DisplaySettings::default().multiline())
             .to_string()
     }
