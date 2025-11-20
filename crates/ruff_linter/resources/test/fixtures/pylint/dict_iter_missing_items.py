@@ -41,9 +41,9 @@ empty_dict_annotated_tuple_keys: dict[tuple[int, str], bool] = {}
 for k, v in empty_dict_annotated_tuple_keys:
     pass
 
-empty_dict_annotated_tuple_keys = {}
-empty_dict_annotated_tuple_keys[("x", "y")] = True
-for k, v in empty_dict_annotated_tuple_keys:
+empty_dict_unannotated = {}
+empty_dict_unannotated[("x", "y")] = True
+for k, v in empty_dict_unannotated:
     pass
 
 empty_dict_annotated_str_keys: dict[str, int] = {}
