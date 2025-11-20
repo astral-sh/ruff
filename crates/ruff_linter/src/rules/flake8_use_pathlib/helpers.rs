@@ -73,18 +73,6 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
         return;
     }
 
-    // If there are keyword arguments other than `dir_fd` or the main argument, skip
-    // We need to allow the main argument to be passed as a keyword, and `dir_fd=None`
-    // Note: `dir_fd` non-default value checking is done by the caller before invoking this helper
-    let allowed_keywords = if has_keyword_arg {
-        &[fn_argument, "dir_fd"][..]
-    } else {
-        &["dir_fd"][..]
-    };
-    if has_unknown_keywords_or_starred_expr(&call.arguments, allowed_keywords) {
-        return;
-    }
-
     let Some(arg) = call.arguments.find_argument_value(fn_argument, 0) else {
         return;
     };
