@@ -329,3 +329,10 @@ class C:
             if name == source_bucket_name
             else storage.Bucket(mock_service, destination_bucket_name)
         )
+
+class C:
+	function_dict: Dict[Text, Callable[[CRFToken], Any]] = {
+        CRFEntityExtractorOptions.POS2: lambda crf_token: crf_token.pos_tag[:2]
+        if crf_token.pos_tag is not None
+        else None,
+	}
