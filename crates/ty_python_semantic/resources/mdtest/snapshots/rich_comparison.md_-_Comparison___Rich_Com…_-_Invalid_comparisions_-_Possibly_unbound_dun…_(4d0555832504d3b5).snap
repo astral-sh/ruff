@@ -1,0 +1,143 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: rich_comparison.md - Comparison: Rich Comparison - Invalid comparisions - Possibly unbound dunder comparison methods
+mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/instances/rich_comparison.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def _(flag: bool):
+ 2 |     class A:
+ 3 |         if flag:
+ 4 |             def __eq__(self, other) -> bool:
+ 5 |                 return NotImplemented
+ 6 | 
+ 7 |             def __ne__(self, other) -> bool:
+ 8 |                 return NotImplemented
+ 9 | 
+10 |             def __lt__(self, other) -> bool:
+11 |                 return NotImplemented
+12 | 
+13 |             def __gt__(self, other) -> bool:
+14 |                 return NotImplemented
+15 | 
+16 |             def __le__(self, other) -> bool:
+17 |                 return NotImplemented
+18 | 
+19 |             def __ge__(self, other) -> bool:
+20 |                 return NotImplemented
+21 | 
+22 |     # error: [unsupported-operator]
+23 |     reveal_type(A() == A())  # revealed: Unknown
+24 |     # error: [unsupported-operator]
+25 |     reveal_type(A() != A())  # revealed: Unknown
+26 |     # error: [unsupported-operator]
+27 |     reveal_type(A() < A())  # revealed: Unknown
+28 |     # error: [unsupported-operator]
+29 |     reveal_type(A() > A())  # revealed: Unknown
+30 |     # error: [unsupported-operator]
+31 |     reveal_type(A() <= A())  # revealed: Unknown
+32 |     # error: [unsupported-operator]
+33 |     reveal_type(A() >= A())  # revealed: Unknown
+```
+
+# Diagnostics
+
+```
+error[unsupported-operator]: Operator `==` is not supported for types `A` and `A`
+  --> src/mdtest_snippet.py:23:17
+   |
+22 |     # error: [unsupported-operator]
+23 |     reveal_type(A() == A())  # revealed: Unknown
+   |                 ^^^^^^^^^^
+24 |     # error: [unsupported-operator]
+25 |     reveal_type(A() != A())  # revealed: Unknown
+   |
+info: Operator '==' from dunder method `__eq__` is possibly unbound on object of type 'A'
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Operator `!=` is not supported for types `A` and `A`
+  --> src/mdtest_snippet.py:25:17
+   |
+23 |     reveal_type(A() == A())  # revealed: Unknown
+24 |     # error: [unsupported-operator]
+25 |     reveal_type(A() != A())  # revealed: Unknown
+   |                 ^^^^^^^^^^
+26 |     # error: [unsupported-operator]
+27 |     reveal_type(A() < A())  # revealed: Unknown
+   |
+info: Operator '!=' from dunder method `__ne__` is possibly unbound on object of type 'A'
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Operator `<` is not supported for types `A` and `A`
+  --> src/mdtest_snippet.py:27:17
+   |
+25 |     reveal_type(A() != A())  # revealed: Unknown
+26 |     # error: [unsupported-operator]
+27 |     reveal_type(A() < A())  # revealed: Unknown
+   |                 ^^^^^^^^^
+28 |     # error: [unsupported-operator]
+29 |     reveal_type(A() > A())  # revealed: Unknown
+   |
+info: Operator '<' from dunder method `__lt__` is possibly unbound on object of type 'A'
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Operator `>` is not supported for types `A` and `A`
+  --> src/mdtest_snippet.py:29:17
+   |
+27 |     reveal_type(A() < A())  # revealed: Unknown
+28 |     # error: [unsupported-operator]
+29 |     reveal_type(A() > A())  # revealed: Unknown
+   |                 ^^^^^^^^^
+30 |     # error: [unsupported-operator]
+31 |     reveal_type(A() <= A())  # revealed: Unknown
+   |
+info: Operator '>' from dunder method `__gt__` is possibly unbound on object of type 'A'
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Operator `<=` is not supported for types `A` and `A`
+  --> src/mdtest_snippet.py:31:17
+   |
+29 |     reveal_type(A() > A())  # revealed: Unknown
+30 |     # error: [unsupported-operator]
+31 |     reveal_type(A() <= A())  # revealed: Unknown
+   |                 ^^^^^^^^^^
+32 |     # error: [unsupported-operator]
+33 |     reveal_type(A() >= A())  # revealed: Unknown
+   |
+info: Operator '<=' from dunder method `__le__` is possibly unbound on object of type 'A'
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Operator `>=` is not supported for types `A` and `A`
+  --> src/mdtest_snippet.py:33:17
+   |
+31 |     reveal_type(A() <= A())  # revealed: Unknown
+32 |     # error: [unsupported-operator]
+33 |     reveal_type(A() >= A())  # revealed: Unknown
+   |                 ^^^^^^^^^^
+   |
+info: Operator '>=' from dunder method `__ge__` is possibly unbound on object of type 'A'
+info: rule `unsupported-operator` is enabled by default
+
+```
