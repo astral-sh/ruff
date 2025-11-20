@@ -147,6 +147,33 @@ def _(x: int | str | bytes):
         reveal_type(x)  # revealed: (int & Unknown) | (str & Unknown) | (bytes & Unknown)
 ```
 
+## `classinfo` is a `types.UnionType`
+
+Python 3.10 added the ability to use `Union[int, str]` as the second argument to `isinstance()`:
+
+```py
+from typing import Union
+
+IntOrStr = Union[int, str]
+
+reveal_type(IntOrStr)  # revealed: types.UnionType
+
+def _(x: int | str | bytes | memoryview | range):
+    # TODO: no error
+    # error: [invalid-argument-type]
+    if isinstance(x, IntOrStr):
+        # TODO: Should be `int | str`
+        reveal_type(x)  # revealed: int | str | bytes | memoryview[int] | range
+    # TODO: no error
+    # error: [invalid-argument-type]
+    elif isinstance(x, Union[bytes, memoryview]):
+        # TODO: Should be `bytes | memoryview[int]`
+        reveal_type(x)  # revealed: int | str | bytes | memoryview[int] | range
+    else:
+        # TODO: Should be `range`
+        reveal_type(x)  # revealed: int | str | bytes | memoryview[int] | range
+```
+
 ## `classinfo` is a `typing.py` special form
 
 Certain special forms in `typing.py` are aliases to classes elsewhere in the standard library; these

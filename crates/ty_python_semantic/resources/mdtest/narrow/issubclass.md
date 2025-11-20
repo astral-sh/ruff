@@ -200,6 +200,33 @@ def _(x: type[int | str | bytes]):
         reveal_type(x)  # revealed: (type[int] & Unknown) | (type[str] & Unknown) | (type[bytes] & Unknown)
 ```
 
+## `classinfo` is a `types.UnionType`
+
+Python 3.10 added the ability to use `Union[int, str]` as the second argument to `issubclass()`:
+
+```py
+from typing import Union
+
+IntOrStr = Union[int, str]
+
+reveal_type(IntOrStr)  # revealed: types.UnionType
+
+def f(x: type[int | str | bytes | range]):
+    # TODO: No error
+    # error: [invalid-argument-type]
+    if issubclass(x, IntOrStr):
+        # TODO: Should be `type[int] | type[str]`
+        reveal_type(x)  # revealed: type[int] | type[str] | type[bytes] | <class 'range'>
+    # TODO: No error
+    # error: [invalid-argument-type]
+    elif issubclass(x, Union[bytes, memoryview]):
+        # TODO: Should be `type[bytes]`
+        reveal_type(x)  # revealed: type[int] | type[str] | type[bytes] | <class 'range'>
+    else:
+        # TODO: Should be `<class 'range'>`
+        reveal_type(x)  # revealed: type[int] | type[str] | type[bytes] | <class 'range'>
+```
+
 ## Special cases
 
 ### Emit a diagnostic if the first argument is of wrong type
