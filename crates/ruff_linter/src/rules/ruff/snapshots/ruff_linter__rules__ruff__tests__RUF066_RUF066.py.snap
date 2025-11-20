@@ -2,40 +2,40 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
 RUF066 name is a property with no return statement
-  --> RUF066.py:10:5
+  --> RUF066.py:11:5
    |
- 9 |   class User:
-10 | /     @property
-11 | |     def name(self):  # No return
-12 | |         f"{self.first_name} {self.last_name}"
+10 |   class User:
+11 | /     @property
+12 | |     def name(self):  # No return
+13 | |         f"{self.first_name} {self.last_name}"
    | |_____________________________________________^
-13 |
-14 |       @property
+14 |
+15 |       @property
    |
 
 RUF066 nested is a property with no return statement
-  --> RUF066.py:21:5
+  --> RUF066.py:22:5
    |
-19 |           x = 1
-20 |
-21 | /     @property
-22 | |     def nested(self):  # No return
-23 | |         def inner():
-24 | |             return 0
+20 |           x = 1
+21 |
+22 | /     @property
+23 | |     def nested(self):  # No return
+24 | |         def inner():
+25 | |             return 0
    | |____________________^
-25 |
-26 |       @property
+26 |
+27 |       @property
    |
 
 RUF066 prop2 is a property with no return statement
-  --> RUF066.py:46:5
+  --> RUF066.py:47:5
    |
-44 |           return 1
-45 |
-46 | /     @property
-47 | |     def prop2(self):  # No return
-48 | |         50
+45 |           return 1
+46 |
+47 | /     @property
+48 | |     def prop2(self):  # No return
+49 | |         50
    | |__________^
-49 |
-50 |       def method(self):
+50 |
+51 |       def method(self):
    |

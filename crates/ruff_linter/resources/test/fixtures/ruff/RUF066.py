@@ -1,9 +1,10 @@
 """
 Should emit:
-RUF066 - on lines 11, 22, 47
+RUF066 - on lines 12, 23, 48
 """
 
 import abc
+import typing
 
 
 class User:
@@ -53,3 +54,8 @@ class UserMeta(metaclass=abc.ABCMeta):
 
 def func():
     x = 1
+
+
+class Prot(typing.Protocol):
+    @property
+    def prop1(self) -> int: ...

@@ -1,10 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor::{self, StatementVisitor};
 use ruff_python_ast::{Stmt, StmtFunctionDef};
-use ruff_python_semantic::analyze::{
-    function_type,
-    visibility::{is_abstract, is_property},
-};
+use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -49,6 +46,12 @@ impl Violation for PropertyNoReturn {
 
 /// RUF066
 pub(crate) fn property_no_return(checker: &Checker, function_def: &StmtFunctionDef) {
+    let semantic = checker.semantic();
+
+    if checker.source_type.is_stub() || semantic.in_protocol_or_abstract_method() {
+        return;
+    }
+
     let StmtFunctionDef {
         decorator_list,
         body,
@@ -56,10 +59,8 @@ pub(crate) fn property_no_return(checker: &Checker, function_def: &StmtFunctionD
         ..
     } = function_def;
 
-    let semantic = checker.semantic();
-    if checker.source_type.is_stub()
-        || !is_property(decorator_list, [], semantic)
-        || is_abstract(decorator_list, semantic)
+    if !visibility::is_property(decorator_list, [], semantic)
+        || visibility::is_overload(decorator_list, semantic)
         || function_type::is_stub(function_def, semantic)
     {
         return;
@@ -67,7 +68,6 @@ pub(crate) fn property_no_return(checker: &Checker, function_def: &StmtFunctionD
 
     let mut visitor = ReturnFinder::default();
     visitor.visit_body(body);
-
     if visitor.found {
         return;
     }
