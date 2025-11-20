@@ -8230,7 +8230,7 @@ impl<'db> KnownInstanceType<'db> {
                         write!(
                             f,
                             "ty_extensions.Specialization{}",
-                            specialization.normalized(self.db).display_full(self.db)
+                            specialization.display_full(self.db)
                         )
                     }
                     KnownInstanceType::UnionType(_) => f.write_str("types.UnionType"),
