@@ -245,14 +245,11 @@ mod tests {
         ) -> Unknown
         ```
         ---
-        ```text
-        This is such a great func!!
-
-        Args:
-            a: first for a reason
-            b: coming for `a`'s title
-
-        ```
+        This is such a great func!!  
+          
+        Args:  
+        &nbsp;&nbsp;&nbsp;&nbsp;a: first for a reason  
+        &nbsp;&nbsp;&nbsp;&nbsp;b: coming for `a`'s title
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:11:1
@@ -303,14 +300,11 @@ mod tests {
         ) -> Unknown
         ```
         ---
-        ```text
-        This is such a great func!!
-
-        Args:
-            a: first for a reason
-            b: coming for `a`'s title
-
-        ```
+        This is such a great func!!  
+          
+        Args:  
+        &nbsp;&nbsp;&nbsp;&nbsp;a: first for a reason  
+        &nbsp;&nbsp;&nbsp;&nbsp;b: coming for `a`'s title
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:2:5
@@ -369,14 +363,11 @@ mod tests {
         <class 'MyClass'>
         ```
         ---
-        ```text
-        This is such a great class!!
-
-            Don't you know?
-
+        This is such a great class!!  
+          
+        &nbsp;&nbsp;&nbsp;&nbsp;Don't you know?  
+          
         Everyone loves my class!!
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:24:1
@@ -434,14 +425,11 @@ mod tests {
         <class 'MyClass'>
         ```
         ---
-        ```text
-        This is such a great class!!
-
-            Don't you know?
-
+        This is such a great class!!  
+          
+        &nbsp;&nbsp;&nbsp;&nbsp;Don't you know?  
+          
         Everyone loves my class!!
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:2:7
@@ -497,10 +485,7 @@ mod tests {
         <class 'MyClass'>
         ```
         ---
-        ```text
         initializes MyClass (perfectly)
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:24:5
@@ -556,10 +541,7 @@ mod tests {
         <class 'MyClass'>
         ```
         ---
-        ```text
         initializes MyClass (perfectly)
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:11
@@ -618,14 +600,11 @@ mod tests {
         <class 'MyClass'>
         ```
         ---
-        ```text
-        This is such a great class!!
-
-            Don't you know?
-
+        This is such a great class!!  
+          
+        &nbsp;&nbsp;&nbsp;&nbsp;Don't you know?  
+          
         Everyone loves my class!!
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:23:5
@@ -692,14 +671,11 @@ mod tests {
         ) -> Unknown
         ```
         ---
-        ```text
-        This is such a great func!!
-
-        Args:
-            a: first for a reason
-            b: coming for `a`'s title
-
-        ```
+        This is such a great func!!  
+          
+        Args:  
+        &nbsp;&nbsp;&nbsp;&nbsp;a: first for a reason  
+        &nbsp;&nbsp;&nbsp;&nbsp;b: coming for `a`'s title
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:25:3
@@ -973,10 +949,7 @@ def ab(a: str): ...
         (a: int) -> Unknown
         ```
         ---
-        ```text
         the int overload
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -1036,10 +1009,7 @@ def ab(a: str):
         (a: str) -> Unknown
         ```
         ---
-        ```text
         the int overload
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -1105,10 +1075,7 @@ def ab(a: int):
         ) -> Unknown
         ```
         ---
-        ```text
         the two arg overload
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -1168,10 +1135,7 @@ def ab(a: int):
         (a: int) -> Unknown
         ```
         ---
-        ```text
         the two arg overload
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -1243,10 +1207,7 @@ def ab(a: int, *, c: int):
         ) -> Unknown
         ```
         ---
-        ```text
         keywordless overload
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -1318,10 +1279,7 @@ def ab(a: int, *, c: int):
         ) -> Unknown
         ```
         ---
-        ```text
         keywordless overload
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -1386,10 +1344,7 @@ def ab(a: int, *, c: int):
         ) -> Unknown
         ```
         ---
-        ```text
         The first overload
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:19:1
@@ -1441,10 +1396,7 @@ def ab(a: int, *, c: int):
         (a: str) -> Unknown
         ```
         ---
-        ```text
         The first overload
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:19:1
@@ -1494,12 +1446,9 @@ def ab(a: int, *, c: int):
         <module 'lib'>
         ```
         ---
-        ```text
-        The cool lib_py module!
-
+        The cool lib/_py module!  
+          
         Wow this module rocks.
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -1544,12 +1493,9 @@ def ab(a: int, *, c: int):
         Wow this module rocks.
 
         ---------------------------------------------
-        ```text
-        The cool lib_py module!
-
+        The cool lib/_py module!  
+          
         Wow this module rocks.
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:2:8
@@ -2499,10 +2445,7 @@ def ab(a: int, *, c: int):
         bound method int.__add__(value: int, /) -> int
         ```
         ---
-        ```text
         Return self+value.
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:2:12
@@ -2618,10 +2561,7 @@ def ab(a: int, *, c: int):
         int | float
         ```
         ---
-        ```text
         Convert a string or number to a floating-point number, if possible.
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:2:4

@@ -65,10 +65,7 @@ impl Docstring {
     /// Render the docstring for markdown display
     pub fn render_markdown(&self) -> String {
         let trimmed = documentation_trim(&self.0);
-
-        // Try to parse and render the contents as markdown,
-        // and if we fail, wrap it in a codeblock and display it raw.
-        try_render_markdown(&trimmed).unwrap_or_else(|| format!("```text\n{trimmed}\n```"))
+        render_markdown(&trimmed)
     }
 
     /// Extract parameter documentation from popular docstring formats.
@@ -152,24 +149,126 @@ fn documentation_trim(docs: &str) -> String {
     output
 }
 
-fn try_render_markdown(docstring: &str) -> Option<String> {
+/// Given a cleaned up docstring, render it to markdown.
+///
+/// This is by no means perfect but it handles a lot of common formats well.
+///
+/// This code currently assumes docstrings are reStructuredText with significant
+/// line-breaks and indentation. Some constructs like *italic*, **bold**, and `inline code`
+/// are shared between the two formats. Other things like _italic_ are only markdown
+/// and should be escaped.
+fn render_markdown(docstring: &str) -> String {
+    // TODO: there is a convention that `singletick` is for items that can
+    // be looked up in-scope while ``multitick`` is for opaque inline code.
+    // While rendering this we should make note of all the `singletick` locations
+    // and (possibly in a higher up piece of logic) try to resolve the names for
+    // cross-linking. (Similar to `TypeDetails` in the type formatting code.)
     let mut output = String::new();
     let mut first_line = true;
-    for line in docstring.lines() {
+    let mut block_indent = 0;
+    let mut in_doctest = false;
+    let mut starting_literal = false;
+    let mut in_literal = false;
+    let mut in_any_code = false;
+    for untrimmed_line in docstring.lines() {
         // We can assume leading whitespace has been normalized
-        let trimmed_line = line.trim_start_matches(' ');
-        let num_leading_spaces = line.len() - trimmed_line.len();
+        let mut line = untrimmed_line.trim_start_matches(' ');
+        let line_indent = untrimmed_line.len() - line.len();
 
+        // First thing's first, add a newline to start the new line
         if !first_line {
-            output.push_str("  \n");
+            // If we're not in a codeblock, add trailing space to the line to authentically wrap it
+            if !in_any_code {
+                output.push_str("  ");
+            }
+            // Only push newlines if we're not scanning for a real line
+            if !starting_literal {
+                output.push('\n');
+            }
         }
-        for _ in 0..num_leading_spaces {
-            output.push_str("&nbsp;");
+
+        // If we're in a literal block and we find a non-empty dedented line, end the block
+        if in_literal && line_indent < block_indent && !line.is_empty() {
+            in_literal = false;
+            in_any_code = false;
+            block_indent = 0;
+            output.push_str("```\n");
         }
-        output.push_str(trimmed_line);
+
+        // We previously entered a literal block and we just found our first non-blank line
+        // So now we're actually in the litreal
+        if starting_literal && !line.is_empty() {
+            starting_literal = false;
+            in_literal = true;
+            in_any_code = true;
+            block_indent = line_indent;
+            // TODO: should we not be this aggressive? Let it autodetect?
+            output.push_str("\n```python\n");
+        }
+
+        // If we're not in a codeblock and we see something that signals a doctest, start one
+        if !in_any_code && line.starts_with(">>>") {
+            block_indent = line_indent;
+            in_doctest = true;
+            in_any_code = true;
+            // TODO: is there something more specific? `pycon`?
+            output.push_str("```python\n");
+        }
+
+        // If we're not in a codeblock and we see something that signals a literal block, start one
+        if !in_any_code && let Some(without_lit) = line.strip_suffix("::") {
+            let trimmed_without_lit = without_lit.trim();
+            if let Some(character) = trimmed_without_lit.chars().next_back() {
+                if character.is_whitespace() {
+                    // Remove the marker completely
+                    line = trimmed_without_lit;
+                } else {
+                    // Only remove the first `:`
+                    line = line.strip_suffix(":").unwrap();
+                }
+            } else {
+                // Delete whole line
+                line = trimmed_without_lit;
+            }
+            starting_literal = true;
+        }
+
+        // Add this line's indentation.
+        // We could subtract the block_indent here but in practice it's uglier
+        for _ in 0..line_indent {
+            // If we're not in a codeblock use non-breaking spaces to preserve the indent
+            if !in_any_code {
+                output.push_str("&nbsp;");
+            } else {
+                output.push(' ');
+            }
+        }
+
+        if !in_any_code {
+            // This is plain text, apply some escapes for reST that don't map to markdown:
+            // * underscores aren't used for italics/bold in reST (don't mess up __dunders__)
+            output.push_str(&line.replace('_', "\\_"));
+        } else if line.is_empty() {
+            if in_doctest {
+                // This is the end of a doctest
+                block_indent = 0;
+                in_any_code = false;
+                in_literal = false;
+                output.push_str("```");
+            }
+        } else {
+            // Print the line verbatim, it's in code
+            output.push_str(line);
+        }
+
         first_line = false;
     }
-    Some(output)
+    // Flush codeblock
+    if in_any_code {
+        output.push_str("\n```");
+    }
+
+    output
 }
 
 /// Extract parameter documentation from Google-style docstrings.
@@ -509,6 +608,463 @@ mod tests {
 
     use super::*;
 
+    // A nice doctest that is surrounded by prose
+    #[test]
+    fn dunder_escape() {
+        let docstring = r#"
+        Here _this_ and ___that__ and should be escaped.
+        But *this* and **that** should be untouched.
+        As should `this` and ``that``.
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_plaintext(), @r"
+        Here _this_ and ___that__ and should be escaped.
+        But *this* and **that** should be untouched.
+        As should `this` and ``that``.
+        ");
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        Here \_this\_ and \_\_\_that\_\_ and should be escaped.  
+        But *this* and **that** should be untouched.  
+        As should `this` and ``that``.
+        ");
+    }
+
+    // A literal block where the `::` is flush with the paragraph
+    // and should become `:`
+    #[test]
+    fn literal_colon() {
+        let docstring = r#"
+        Check out this great example code::
+
+            x_y = "hello"
+            
+            if len(x_y) > 4:
+                print(x_y)
+            else:
+                print("too short :(")
+            
+            print("done")
+
+        You love to see it.
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_plaintext(), @r#"
+        Check out this great example code::
+
+            x_y = "hello"
+
+            if len(x_y) > 4:
+                print(x_y)
+            else:
+                print("too short :(")
+
+            print("done")
+
+        You love to see it.
+        "#);
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        Check out this great example code:    
+        ```python
+            x_y = "hello"
+
+            if len(x_y) > 4:
+                print(x_y)
+            else:
+                print("too short :(")
+
+            print("done")
+
+        ```
+        You love to see it.
+        "#);
+    }
+
+    // A literal block where the `::`  with the paragraph
+    // and should be erased
+    #[test]
+    fn literal_space() {
+        let docstring = r#"
+        Check out this great example code ::
+
+            x_y = "hello"
+            
+            if len(x_y) > 4:
+                print(x_y)
+            else:
+                print("too short :(")
+            
+            print("done")
+
+        You love to see it.
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_plaintext(), @r#"
+        Check out this great example code ::
+
+            x_y = "hello"
+
+            if len(x_y) > 4:
+                print(x_y)
+            else:
+                print("too short :(")
+
+            print("done")
+
+        You love to see it.
+        "#);
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        Check out this great example code :    
+        ```python
+            x_y = "hello"
+
+            if len(x_y) > 4:
+                print(x_y)
+            else:
+                print("too short :(")
+
+            print("done")
+
+        ```
+        You love to see it.
+        "#);
+    }
+
+    // A literal block where the `::` is floating
+    // and the whole line should be deleted
+    #[test]
+    fn literal_own_line() {
+        let docstring = r#"
+        Check out this great example code
+            ::
+
+            x_y = "hello"
+            
+            if len(x_y) > 4:
+                print(x_y)
+            else:
+                print("too short :(")
+            
+            print("done")
+
+        You love to see it.
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_plaintext(), @r#"
+        Check out this great example code
+            ::
+
+            x_y = "hello"
+
+            if len(x_y) > 4:
+                print(x_y)
+            else:
+                print("too short :(")
+
+            print("done")
+
+        You love to see it.
+        "#);
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        Check out this great example code  
+        &nbsp;&nbsp;&nbsp;&nbsp;    
+        ```python
+            x_y = "hello"
+
+            if len(x_y) > 4:
+                print(x_y)
+            else:
+                print("too short :(")
+
+            print("done")
+
+        ```
+        You love to see it.
+        "#);
+    }
+
+    // A literal block where the blank lines are missing
+    // and I have no idea what Should happen but let's record what Does
+    #[test]
+    fn literal_squeezed() {
+        let docstring = r#"
+        Check out this great example code::
+            x_y = "hello"
+            
+            if len(x_y) > 4:
+                print(x_y)
+            else:
+                print("too short :(")
+            
+            print("done")
+        You love to see it.
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_plaintext(), @r#"
+        Check out this great example code::
+            x_y = "hello"
+
+            if len(x_y) > 4:
+                print(x_y)
+            else:
+                print("too short :(")
+
+            print("done")
+        You love to see it.
+        "#);
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        Check out this great example code:  
+        ```python
+            x_y = "hello"
+
+            if len(x_y) > 4:
+                print(x_y)
+            else:
+                print("too short :(")
+
+            print("done")
+        ```
+        You love to see it.
+        "#);
+    }
+
+    // A literal block where the docstring just ends
+    // and we should tidy up
+    #[test]
+    fn literal_flush() {
+        let docstring = r#"
+        Check out this great example code::
+
+            x_y = "hello"
+            
+            if len(x_y) > 4:
+                print(x_y)
+            else:
+                print("too short :(")
+            
+            print("done")"#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_plaintext(), @r#"
+        Check out this great example code::
+
+            x_y = "hello"
+
+            if len(x_y) > 4:
+                print(x_y)
+            else:
+                print("too short :(")
+
+            print("done")
+        "#);
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        Check out this great example code:    
+        ```python
+            x_y = "hello"
+
+            if len(x_y) > 4:
+                print(x_y)
+            else:
+                print("too short :(")
+
+            print("done")
+        ```
+        "#);
+    }
+
+    // A nice doctest that is surrounded by prose
+    #[test]
+    fn doctest_simple() {
+        let docstring = r#"
+        This is a function description
+
+        >>> thing.do_thing()
+        wow it did the thing
+        >>> thing.do_other_thing()
+        it sure did the thing
+
+        As you can see it did the thing!
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_plaintext(), @r"
+        This is a function description
+
+        >>> thing.do_thing()
+        wow it did the thing
+        >>> thing.do_other_thing()
+        it sure did the thing
+
+        As you can see it did the thing!
+        ");
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        This is a function description  
+          
+        ```python
+        >>> thing.do_thing()
+        wow it did the thing
+        >>> thing.do_other_thing()
+        it sure did the thing
+        ```  
+        As you can see it did the thing!
+        ");
+    }
+
+    // A nice doctest that is surrounded by prose with an indent
+    #[test]
+    fn doctest_simple_indent() {
+        let docstring = r#"
+        This is a function description
+
+            >>> thing.do_thing()
+            wow it did the thing
+            >>> thing.do_other_thing()
+            it sure did the thing
+
+        As you can see it did the thing!
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_plaintext(), @r"
+        This is a function description
+
+            >>> thing.do_thing()
+            wow it did the thing
+            >>> thing.do_other_thing()
+            it sure did the thing
+
+        As you can see it did the thing!
+        ");
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        This is a function description  
+          
+        ```python
+            >>> thing.do_thing()
+            wow it did the thing
+            >>> thing.do_other_thing()
+            it sure did the thing
+        ```  
+        As you can see it did the thing!
+        ");
+    }
+
+    // A doctest that has nothing around it
+    #[test]
+    fn doctest_flush() {
+        let docstring = r#">>> thing.do_thing()
+        wow it did the thing
+        >>> thing.do_other_thing()
+        it sure did the thing"#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_plaintext(), @r"
+        >>> thing.do_thing()
+        wow it did the thing
+        >>> thing.do_other_thing()
+        it sure did the thing
+        ");
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        ```python
+        >>> thing.do_thing()
+        wow it did the thing
+        >>> thing.do_other_thing()
+        it sure did the thing
+        ```
+        ");
+    }
+
+    // A doctest embedded in a literal block (it's just a literal block)
+    #[test]
+    fn literal_doctest() {
+        let docstring = r#"
+        This is a function description::
+
+            >>> thing.do_thing()
+            wow it did the thing
+            >>> thing.do_other_thing()
+            it sure did the thing
+
+        As you can see it did the thing!
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_plaintext(), @r"
+        This is a function description::
+
+            >>> thing.do_thing()
+            wow it did the thing
+            >>> thing.do_other_thing()
+            it sure did the thing
+
+        As you can see it did the thing!
+        ");
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        This is a function description:    
+        ```python
+            >>> thing.do_thing()
+            wow it did the thing
+            >>> thing.do_other_thing()
+            it sure did the thing
+
+        ```
+        As you can see it did the thing!
+        ");
+    }
+
+    #[test]
+    fn doctest_indent_flush() {
+        let docstring = r#"
+        And so you can see that
+            >>> thing.do_thing()
+            wow it did the thing
+            >>> thing.do_other_thing()
+            it sure did the thing"#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_plaintext(), @r"
+        And so you can see that
+            >>> thing.do_thing()
+            wow it did the thing
+            >>> thing.do_other_thing()
+            it sure did the thing
+        ");
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        And so you can see that  
+        ```python
+            >>> thing.do_thing()
+            wow it did the thing
+            >>> thing.do_other_thing()
+            it sure did the thing
+        ```
+        ");
+    }
+
     #[test]
     fn test_google_style_parameter_documentation() {
         let docstring = r#"
@@ -549,19 +1105,16 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
-        ```text
-        This is a function description.
-
-        Args:
-            param1 (str): The first parameter description
-            param2 (int): The second parameter description
-                This is a continuation of param2 description.
-            param3: A parameter without type annotation
-
-        Returns:
-            str: The return value description
-
-        ```
+        This is a function description.  
+          
+        Args:  
+        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter description  
+        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter description  
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
+        &nbsp;&nbsp;&nbsp;&nbsp;param3: A parameter without type annotation  
+          
+        Returns:  
+        &nbsp;&nbsp;&nbsp;&nbsp;str: The return value description
         ");
     }
 
@@ -623,24 +1176,77 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
-        ```text
-        This is a function description.
+        This is a function description.  
+          
+        Parameters  
+        ----------  
+        param1 : str  
+        &nbsp;&nbsp;&nbsp;&nbsp;The first parameter description  
+        param2 : int  
+        &nbsp;&nbsp;&nbsp;&nbsp;The second parameter description  
+        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
+        param3  
+        &nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation  
+          
+        Returns  
+        -------  
+        str  
+        &nbsp;&nbsp;&nbsp;&nbsp;The return value description
+        ");
+    }
 
-        Parameters
-        ----------
-        param1 : str
-            The first parameter description
-        param2 : int
-            The second parameter description
-            This is a continuation of param2 description.
-        param3
-            A parameter without type annotation
+    #[test]
+    fn test_pep257_style_parameter_documentation() {
+        let docstring = r#"Insert an entry into the list of warnings filters (at the front).
 
-        Returns
-        -------
-        str
-            The return value description
+        'param1' -- The first parameter description
+        'param2' -- The second parameter description
+                    This is a continuation of param2 description.
+        'param3' -- A parameter without type annotation
 
+        >>> print repr(foo.__doc__)
+        '\n    This is the second line of the docstring.\n    '
+        >>> foo.__doc__.splitlines()
+        ['', '    This is the second line of the docstring.', '    ']
+        >>> trim(foo.__doc__)
+        'This is the second line of the docstring.'
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+        let param_docs = docstring.parameter_documentation();
+        assert!(param_docs.is_empty());
+
+        assert_snapshot!(docstring.render_plaintext(), @r"
+        Insert an entry into the list of warnings filters (at the front).
+
+        'param1' -- The first parameter description
+        'param2' -- The second parameter description
+                    This is a continuation of param2 description.
+        'param3' -- A parameter without type annotation
+
+        >>> print repr(foo.__doc__)
+        '\n    This is the second line of the docstring.\n    '
+        >>> foo.__doc__.splitlines()
+        ['', '    This is the second line of the docstring.', '    ']
+        >>> trim(foo.__doc__)
+        'This is the second line of the docstring.'
+        ");
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        Insert an entry into the list of warnings filters (at the front).  
+          
+        'param1' -- The first parameter description  
+        'param2' -- The second parameter description  
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
+        'param3' -- A parameter without type annotation  
+          
+        ```python
+        >>> print repr(foo.__doc__)
+        '\n    This is the second line of the docstring.\n    '
+        >>> foo.__doc__.splitlines()
+        ['', '    This is the second line of the docstring.', '    ']
+        >>> trim(foo.__doc__)
+        'This is the second line of the docstring.'
         ```
         ");
     }
@@ -657,12 +1263,7 @@ mod tests {
 
         assert_snapshot!(docstring.render_plaintext(), @"This is a simple function description without parameter documentation.");
 
-        assert_snapshot!(docstring.render_markdown(), @r"
-        ```text
-        This is a simple function description without parameter documentation.
-
-        ```
-        ");
+        assert_snapshot!(docstring.render_markdown(), @"This is a simple function description without parameter documentation.");
     }
 
     #[test]
@@ -711,19 +1312,16 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
-        ```text
-        This is a function description.
-
-        Args:
-            param1 (str): Google-style parameter
-            param2 (int): Another Google-style parameter
-
-        Parameters
-        ----------
-        param3 : bool
-            NumPy-style parameter
-
-        ```
+        This is a function description.  
+          
+        Args:  
+        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): Google-style parameter  
+        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): Another Google-style parameter  
+          
+        Parameters  
+        ----------  
+        param3 : bool  
+        &nbsp;&nbsp;&nbsp;&nbsp;NumPy-style parameter
         ");
     }
 
@@ -769,17 +1367,14 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
-        ```text
-        This is a function description.
-
-        :param str param1: The first parameter description
-        :param int param2: The second parameter description
-            This is a continuation of param2 description.
-        :param param3: A parameter without type annotation
-        :returns: The return value description
+        This is a function description.  
+          
+        :param str param1: The first parameter description  
+        :param int param2: The second parameter description  
+        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
+        :param param3: A parameter without type annotation  
+        :returns: The return value description  
         :rtype: str
-
-        ```
         ");
     }
 
@@ -837,21 +1432,18 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
-        ```text
-        This is a function description.
-
-        Args:
-            param1 (str): Google-style parameter
-
-        :param int param2: reST-style parameter
-        :param param3: Another reST-style parameter
-
-        Parameters
-        ----------
-        param4 : bool
-            NumPy-style parameter
-
-        ```
+        This is a function description.  
+          
+        Args:  
+        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): Google-style parameter  
+          
+        :param int param2: reST-style parameter  
+        :param param3: Another reST-style parameter  
+          
+        Parameters  
+        ----------  
+        param4 : bool  
+        &nbsp;&nbsp;&nbsp;&nbsp;NumPy-style parameter
         ");
     }
 
@@ -913,25 +1505,22 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
-        ```text
-        This is a function description.
-
-        Parameters
-        ----------
-        param1 : str
-            The first parameter description
-        param2 : int
-            The second parameter description
-            This is a continuation of param2 description.
-        param3
-            A parameter without type annotation
-
-        Returns
-        -------
-        str
-            The return value description
-
-        ```
+        This is a function description.  
+          
+        Parameters  
+        ----------  
+        param1 : str  
+        &nbsp;&nbsp;&nbsp;&nbsp;The first parameter description  
+        param2 : int  
+        &nbsp;&nbsp;&nbsp;&nbsp;The second parameter description  
+        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
+        param3  
+        &nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation  
+          
+        Returns  
+        -------  
+        str  
+        &nbsp;&nbsp;&nbsp;&nbsp;The return value description
         ");
     }
 
@@ -984,20 +1573,17 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
-        ```text
-        This is a function description.
-
-        Parameters
-        ----------
-        param1 : str
-                The first parameter description
-        param2 : int
-                The second parameter description
-                This is a continuation of param2 description.
-        param3
-                A parameter without type annotation
-
-        ```
+        This is a function description.  
+          
+        Parameters  
+        ----------  
+        param1 : str  
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The first parameter description  
+        param2 : int  
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The second parameter description  
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
+        param3  
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation
         ");
     }
 
@@ -1047,14 +1633,11 @@ mod tests {
         ");
 
         assert_snapshot!(docstring_windows.render_markdown(), @r"
-        ```text
-        This is a function description.
-
-        Args:
-            param1 (str): The first parameter
-            param2 (int): The second parameter
-
-        ```
+        This is a function description.  
+          
+        Args:  
+        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter  
+        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
         ");
 
         assert_snapshot!(docstring_mac.render_plaintext(), @r"
@@ -1066,14 +1649,11 @@ mod tests {
         ");
 
         assert_snapshot!(docstring_mac.render_markdown(), @r"
-        ```text
-        This is a function description.
-
-        Args:
-            param1 (str): The first parameter
-            param2 (int): The second parameter
-
-        ```
+        This is a function description.  
+          
+        Args:  
+        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter  
+        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
         ");
 
         assert_snapshot!(docstring_unix.render_plaintext(), @r"
@@ -1085,14 +1665,11 @@ mod tests {
         ");
 
         assert_snapshot!(docstring_unix.render_markdown(), @r"
-        ```text
-        This is a function description.
-
-        Args:
-            param1 (str): The first parameter
-            param2 (int): The second parameter
-
-        ```
+        This is a function description.  
+          
+        Args:  
+        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter  
+        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
         ");
     }
 }
