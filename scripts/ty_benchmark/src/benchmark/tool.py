@@ -4,6 +4,7 @@ import abc
 import json
 import os
 import shutil
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
@@ -117,7 +118,18 @@ class Pyright(Tool):
     path: Path
 
     def __init__(self, *, path: Path | None = None):
-        self.path = path or which_tool("pyright")
+        if path:
+            self.path = path
+        else:
+            if sys.platform == "win32":
+                self.path = Path("./node_modules/.bin/pyright.exe").resolve()
+            else:
+                self.path = Path("./node_modules/.bin/pyright").resolve()
+
+            if not self.path.exists():
+                print(
+                    "Pyright executable not found. Did you ran `npm install` in the `ty_benchmark` directory?"
+                )
 
     def command(self, project: Project, venv: Venv, single_threaded: bool) -> Command:
         command = [str(self.path), "--skipunannotated"]
