@@ -10872,7 +10872,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "`typing.{}` requires exactly one argument",
-                            special_form.repr()
+                            special_form.name()
                         ));
                     }
                     Type::unknown()
@@ -10907,7 +10907,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             builder.into_diagnostic(format_args!(
                                 "`typing.{}` requires exactly two arguments, got {}",
-                                special_form.repr(),
+                                special_form.name(),
                                 arguments.len()
                             ));
                         }
@@ -10931,7 +10931,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "`typing.{}` requires exactly two arguments, got 1",
-                            special_form.repr()
+                            special_form.name()
                         ));
                     }
 

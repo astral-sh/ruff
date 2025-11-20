@@ -439,53 +439,53 @@ impl SpecialFormType {
         }
     }
 
-    /// Return the repr of the symbol at runtime
-    pub(super) const fn repr(self) -> &'static str {
+    /// Return the name of the symbol at runtime
+    pub(super) const fn name(self) -> &'static str {
         match self {
-            SpecialFormType::Any => "typing.Any",
-            SpecialFormType::Annotated => "typing.Annotated",
-            SpecialFormType::Literal => "typing.Literal",
-            SpecialFormType::LiteralString => "typing.LiteralString",
-            SpecialFormType::Optional => "typing.Optional",
-            SpecialFormType::Union => "typing.Union",
-            SpecialFormType::NoReturn => "typing.NoReturn",
-            SpecialFormType::Never => "typing.Never",
-            SpecialFormType::Tuple => "typing.Tuple",
-            SpecialFormType::Type => "typing.Type",
-            SpecialFormType::TypingSelf => "typing.Self",
-            SpecialFormType::Final => "typing.Final",
-            SpecialFormType::ClassVar => "typing.ClassVar",
-            SpecialFormType::Callable => "typing.Callable",
-            SpecialFormType::Concatenate => "typing.Concatenate",
-            SpecialFormType::Unpack => "typing.Unpack",
-            SpecialFormType::Required => "typing.Required",
-            SpecialFormType::NotRequired => "typing.NotRequired",
-            SpecialFormType::TypeAlias => "typing.TypeAlias",
-            SpecialFormType::TypeGuard => "typing.TypeGuard",
-            SpecialFormType::TypedDict => "typing.TypedDict",
-            SpecialFormType::TypeIs => "typing.TypeIs",
-            SpecialFormType::List => "typing.List",
-            SpecialFormType::Dict => "typing.Dict",
-            SpecialFormType::DefaultDict => "typing.DefaultDict",
-            SpecialFormType::Set => "typing.Set",
-            SpecialFormType::FrozenSet => "typing.FrozenSet",
-            SpecialFormType::Counter => "typing.Counter",
-            SpecialFormType::Deque => "typing.Deque",
-            SpecialFormType::ChainMap => "typing.ChainMap",
-            SpecialFormType::OrderedDict => "typing.OrderedDict",
-            SpecialFormType::ReadOnly => "typing.ReadOnly",
-            SpecialFormType::Unknown => "ty_extensions.Unknown",
-            SpecialFormType::AlwaysTruthy => "ty_extensions.AlwaysTruthy",
-            SpecialFormType::AlwaysFalsy => "ty_extensions.AlwaysFalsy",
-            SpecialFormType::Not => "ty_extensions.Not",
-            SpecialFormType::Intersection => "ty_extensions.Intersection",
-            SpecialFormType::TypeOf => "ty_extensions.TypeOf",
-            SpecialFormType::CallableTypeOf => "ty_extensions.CallableTypeOf",
-            SpecialFormType::Top => "ty_extensions.Top",
-            SpecialFormType::Bottom => "ty_extensions.Bottom",
-            SpecialFormType::Protocol => "typing.Protocol",
-            SpecialFormType::Generic => "typing.Generic",
-            SpecialFormType::NamedTuple => "typing.NamedTuple",
+            SpecialFormType::Any => "Any",
+            SpecialFormType::Annotated => "Annotated",
+            SpecialFormType::Literal => "Literal",
+            SpecialFormType::LiteralString => "LiteralString",
+            SpecialFormType::Optional => "Optional",
+            SpecialFormType::Union => "Union",
+            SpecialFormType::NoReturn => "NoReturn",
+            SpecialFormType::Never => "Never",
+            SpecialFormType::Tuple => "Tuple",
+            SpecialFormType::Type => "Type",
+            SpecialFormType::TypingSelf => "Self",
+            SpecialFormType::Final => "Final",
+            SpecialFormType::ClassVar => "ClassVar",
+            SpecialFormType::Callable => "Callable",
+            SpecialFormType::Concatenate => "Concatenate",
+            SpecialFormType::Unpack => "Unpack",
+            SpecialFormType::Required => "Required",
+            SpecialFormType::NotRequired => "NotRequired",
+            SpecialFormType::TypeAlias => "TypeAlias",
+            SpecialFormType::TypeGuard => "TypeGuard",
+            SpecialFormType::TypedDict => "TypedDict",
+            SpecialFormType::TypeIs => "TypeIs",
+            SpecialFormType::List => "List",
+            SpecialFormType::Dict => "Dict",
+            SpecialFormType::DefaultDict => "DefaultDict",
+            SpecialFormType::Set => "Set",
+            SpecialFormType::FrozenSet => "FrozenSet",
+            SpecialFormType::Counter => "Counter",
+            SpecialFormType::Deque => "Deque",
+            SpecialFormType::ChainMap => "ChainMap",
+            SpecialFormType::OrderedDict => "OrderedDict",
+            SpecialFormType::ReadOnly => "ReadOnly",
+            SpecialFormType::Unknown => "Unknown",
+            SpecialFormType::AlwaysTruthy => "AlwaysTruthy",
+            SpecialFormType::AlwaysFalsy => "AlwaysFalsy",
+            SpecialFormType::Not => "Not",
+            SpecialFormType::Intersection => "Intersection",
+            SpecialFormType::TypeOf => "TypeOf",
+            SpecialFormType::CallableTypeOf => "CallableTypeOf",
+            SpecialFormType::Top => "Top",
+            SpecialFormType::Bottom => "Bottom",
+            SpecialFormType::Protocol => "Protocol",
+            SpecialFormType::Generic => "Generic",
+            SpecialFormType::NamedTuple => "NamedTuple",
         }
     }
 
@@ -546,8 +546,7 @@ impl SpecialFormType {
             .find_map(|module| {
                 let file = resolve_module(db, &module.name())?.file(db)?;
                 let scope = FileScopeId::global().to_scope_id(db, file);
-                let name = self.repr().rsplit('.').next()?;
-                let symbol_id = place_table(db, scope).symbol_id(name)?;
+                let symbol_id = place_table(db, scope).symbol_id(self.name())?;
 
                 use_def_map(db, scope)
                     .end_of_scope_bindings(ScopedPlaceId::Symbol(symbol_id))
@@ -561,6 +560,11 @@ impl SpecialFormType {
 
 impl std::fmt::Display for SpecialFormType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.repr())
+        write!(
+            f,
+            "{}.{}",
+            self.definition_modules()[0].as_str(),
+            self.name()
+        )
     }
 }
