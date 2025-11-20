@@ -213,12 +213,12 @@ async def connect() -> AsyncGenerator[Session]:
     yield Session()
 
 # TODO: this should be `() -> _AsyncGeneratorContextManager[Session, None]`
-reveal_type(connect)  # revealed: (...) -> _AsyncGeneratorContextManager[Unknown, None]
+reveal_type(connect)  # revealed: () -> _AsyncGeneratorContextManager[_T_co@asynccontextmanager, None]
 
 async def main():
     async with connect() as session:
         # TODO: should be `Session`
-        reveal_type(session)  # revealed: Unknown
+        reveal_type(session)  # revealed: _T_co@asynccontextmanager
 ```
 
 ## `asyncio.timeout`

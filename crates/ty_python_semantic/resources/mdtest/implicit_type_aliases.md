@@ -500,7 +500,7 @@ def _(
     # TODO: Should be `dict[Unknown, Unknown]`
     reveal_type(my_dict)  # revealed: dict[typing.TypeVar, typing.TypeVar]
     # TODO: Should be `(...) -> Unknown`
-    reveal_type(my_callable)  # revealed: (...) -> typing.TypeVar
+    reveal_type(my_callable)  # revealed: (**P) -> typing.TypeVar
 ```
 
 (Generic) implicit type aliases can be used as base classes:
