@@ -940,13 +940,7 @@ impl<'db> Specialization<'db> {
             .generic_context(db)
             .variables_inner(db)
             .get_index_of(&bound_typevar.identity(db))?;
-        let ty = self.types(db).get(index).copied();
-        tracing::debug!(
-            "Specialization for typevar {} is {:?}",
-            Type::TypeVar(bound_typevar).display(db),
-            ty,
-        );
-        ty
+        self.types(db).get(index).copied()
     }
 
     /// Applies a specialization to this specialization. This is used, for instance, when a generic
@@ -1663,8 +1657,8 @@ impl<'db> SpecializationBuilder<'db> {
             }
 
             (Type::Callable(formal_callable), Type::Callable(actual_callable)) => {
-                // We're only interested in callable of the form `Callable[P, ...]` for now where
-                // `P` is a `ParamSpec`.
+                // We're only interested in a formal callable of the form `Callable[P, ...]` for
+                // now where `P` is a `ParamSpec`.
                 let [signature] = formal_callable.signatures(self.db).as_slice() else {
                     return Ok(());
                 };

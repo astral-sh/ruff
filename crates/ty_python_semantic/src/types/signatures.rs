@@ -186,11 +186,16 @@ impl<'db> CallableSignature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        // Check if `TypeMapping` is `ReplaceParamSpecVars` and take a special route which does the
-        // replacement in one pass for all overloads. I think in the case of overloads, the `self`
-        // is going to be `Callable[P, ...]` i.e., the one that actually contains the `ParamSpec`
-        // and not the actual overloaded function. That means that this needs to be converted into
-        // an overloaded callable.
+        if let TypeMapping::Specialization(specialization) = type_mapping
+            && let [self_signature] = self.overloads.as_slice()
+            && let ParametersKind::ParamSpec(typevar) = self_signature.parameters.kind
+            && let Some(Type::Callable(callable)) = specialization.get(db, typevar)
+        {
+            return Self::from_overloads(callable.signatures(db).iter().map(|signature| {
+                Signature::new(signature.parameters.clone(), self_signature.return_ty)
+            }));
+        }
+
         Self::from_overloads(
             self.overloads
                 .iter()
@@ -930,18 +935,13 @@ impl<'db> Signature<'db> {
         if let ParametersKind::ParamSpec(typevar) = other.parameters.kind() {
             let paramspec_value =
                 CallableType::paramspec_value(db, Signature::new(self.parameters().clone(), None));
-            let constrained_typevar = ConstraintSet::constrain_typevar(
+            return ConstraintSet::constrain_typevar(
                 db,
                 typevar,
                 paramspec_value,
                 paramspec_value,
                 relation,
             );
-            tracing::debug!(
-                "constrained paramspec typevar: {}",
-                constrained_typevar.display(db)
-            );
-            return constrained_typevar;
         }
 
         let mut parameters = ParametersZip {

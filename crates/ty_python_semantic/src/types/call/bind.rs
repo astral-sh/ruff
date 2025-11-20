@@ -2839,11 +2839,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
     fn infer_specialization(&mut self) {
         let Some(generic_context) = self.signature.generic_context else {
-            tracing::debug!("No generic context for signature, skipping specialization inference");
             return;
         };
-
-        tracing::debug!("generic_context: {}", generic_context.display(self.db));
 
         let return_with_tcx = self
             .constructor_instance_type
@@ -2851,10 +2848,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .zip(self.call_expression_tcx.annotation);
 
         self.inferable_typevars = generic_context.inferable_typevars(self.db);
-        tracing::debug!(
-            "inferable_typevars: {}",
-            self.inferable_typevars.display(self.db)
-        );
         let mut builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
 
         // Prefer the declared type of generic classes.
@@ -3016,16 +3009,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let parameters = self.signature.parameters();
         let parameter = &parameters[parameter_index];
         if let Some(mut expected_ty) = parameter.annotated_type() {
-            tracing::debug!("argument_type: {}", argument_type.display(self.db));
-            tracing::debug!("expected_ty: {}", expected_ty.display(self.db));
             if let Some(specialization) = self.specialization {
                 argument_type = argument_type.apply_specialization(self.db, specialization);
                 expected_ty = expected_ty.apply_specialization(self.db, specialization);
-                tracing::debug!(
-                    "specialized argument_type: {}",
-                    argument_type.display(self.db)
-                );
-                tracing::debug!("specialized expected_ty: {}", expected_ty.display(self.db));
             }
             // This is one of the few places where we want to check if there's _any_ specialization
             // where assignability holds; normally we want to check that assignability holds for

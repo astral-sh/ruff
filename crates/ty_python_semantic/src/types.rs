@@ -4587,9 +4587,9 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeVar(typevar)
-                if typevar.is_paramspec(db) && matches!(name.as_str(), "args" | "kwargs") =>
+                if typevar.is_paramspec(db) && matches!(name_str, "args" | "kwargs") =>
             {
-                Place::bound(Type::TypeVar(match name.as_str() {
+                Place::bound(Type::TypeVar(match name_str {
                     "args" => typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
                     "kwargs" => typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs),
                     _ => unreachable!(),
