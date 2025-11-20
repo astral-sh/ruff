@@ -1,0 +1,25 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF066 name is a property with no return statement
+  --> RUF066.py:10:5
+   |
+ 9 |   class User:
+10 | /     @property
+11 | |     def name(self):
+12 | |         f"{self.first_name} {self.last_name}"
+   | |_____________________________________________^
+13 |
+14 |       @property
+   |
+
+RUF066 prop2 is a property with no return statement
+  --> RUF066.py:35:5
+   |
+33 |           return 1
+34 |
+35 | /     @property
+36 | |     def prop2(self):
+37 | |         50
+   | |__________^
+   |
