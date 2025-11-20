@@ -1,6 +1,6 @@
 """
 Should emit:
-RUF066 - on lines 11, 36
+RUF066 - on lines 11, 22, 44
 """
 
 import abc
@@ -8,12 +8,20 @@ import abc
 
 class User:
     @property
-    def name(self):
+    def name(self):  # No return
         f"{self.first_name} {self.last_name}"
 
     @property
     def age(self):
         return 100
+
+    def method(self):
+        x = 1
+
+    @property
+    def nested(self):  # No return
+        def inner():
+            return 0
 
 
 class UserMeta(metaclass=abc.ABCMeta):
@@ -33,5 +41,12 @@ class UserMeta(metaclass=abc.ABCMeta):
         return 1
 
     @property
-    def prop2(self):
+    def prop2(self):  # No return
         50
+
+    def method(self):
+        x = 1
+
+
+def func():
+    x = 1
