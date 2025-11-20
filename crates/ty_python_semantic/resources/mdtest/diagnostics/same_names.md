@@ -171,7 +171,7 @@ class Config:
 import generic_a
 import generic_b
 
-# TODO should be error: [invalid-assignment] "Object of type `<class 'generic_b.Container[int]'>` is not assignable to `type[generic_a.Container[int]]`"
+# error: [invalid-assignment] "Object of type `<class 'generic_b.Container[int]'>` is not assignable to `type[generic_a.Container[int]]`"
 container: type[generic_a.Container[int]] = generic_b.Container[int]
 ```
 
