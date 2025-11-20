@@ -676,3 +676,65 @@ class C:
             else storage.Bucket(mock_service, destination_bucket_name)
         )
 ```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -280,9 +280,7 @@
+ ]  # Trailing
+ # Trailing
+ 
+-lambda self, araa, kkkwargs=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+-    *args, **kwargs
+-), e=1, f=2, g=2: d
++lambda self, araa, kkkwargs=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs), e=1, f=2, g=2: d
+ 
+ 
+ # Regression tests for https://github.com/astral-sh/ruff/issues/8179
+@@ -291,9 +289,9 @@
+         c,
+         d,
+         e,
+-        f=lambda self,
+-        *args,
+-        **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs),
++        f=lambda self, *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
++            *args, **kwargs
++        ),
+     )
+ 
+ 
+@@ -302,15 +300,7 @@
+         c,
+         d,
+         e,
+-        f=lambda self,
+-        araa,
+-        kkkwargs,
+-        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+-        args,
+-        kwargs,
+-        e=1,
+-        f=2,
+-        g=2: d,
++        f=lambda self, araa, kkkwargs, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, args, kwargs, e=1, f=2, g=2: d,
+         g=10,
+     )
+ 
+@@ -320,9 +310,10 @@
+         c,
+         d,
+         e,
+-        f=lambda self,
+-        *args,
+-        **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1,
++        f=lambda self, *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
++            *args, **kwargs
++        )
++        + 1,
+     )
+ 
+ 
+```
