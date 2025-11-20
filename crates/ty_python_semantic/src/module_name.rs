@@ -296,7 +296,7 @@ impl ModuleName {
     }
 
     /// Computes the absolute module name from the LHS components of `from LHS import RHS`
-    pub(crate) fn from_identifier_parts(
+    pub fn from_identifier_parts(
         db: &dyn Db,
         importing_file: File,
         module: Option<&str>,
