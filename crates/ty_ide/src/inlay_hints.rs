@@ -588,6 +588,8 @@ mod tests {
             y = x
             z = i(1)
             w = z
+            aa = b'foo'
+            bb = aa
             ",
         );
 
@@ -599,6 +601,8 @@ mod tests {
         y[: Literal[1]] = x
         z[: int] = i(1)
         w[: int] = z
+        aa = b'foo'
+        bb[: Literal[b"foo"]] = aa
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
@@ -630,12 +634,12 @@ mod tests {
         350 |     int(x, base=10) -> integer
             |
         info: Source
-         --> main2.py:7:5
+         --> main2.py:6:13
           |
         5 | x = 1
         6 | y[: Literal[1]] = x
+          |             ^
         7 | z[: int] = i(1)
-          |     ^^^
         8 | w[: int] = z
           |
 
@@ -649,13 +653,71 @@ mod tests {
         350 |     int(x, base=10) -> integer
             |
         info: Source
-         --> main2.py:8:5
+         --> main2.py:7:5
           |
+        5 | x = 1
         6 | y[: Literal[1]] = x
         7 | z[: int] = i(1)
-        8 | w[: int] = z
           |     ^^^
+        8 | w[: int] = z
+        9 | aa = b'foo'
           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+          --> main2.py:8:5
+           |
+         6 | y[: Literal[1]] = x
+         7 | z[: int] = i(1)
+         8 | w[: int] = z
+           |     ^^^
+         9 | aa = b'foo'
+        10 | bb[: Literal[b"foo"]] = aa
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:351:1
+            |
+        349 | Final: _SpecialForm
+        350 |
+        351 | Literal: _SpecialForm
+            | ^^^^^^^
+        352 | TypedDict: _SpecialForm
+            |
+        info: Source
+          --> main2.py:10:6
+           |
+         8 | w[: int] = z
+         9 | aa = b'foo'
+        10 | bb[: Literal[b"foo"]] = aa
+           |      ^^^^^^^
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:1448:7
+             |
+        1447 | @disjoint_base
+        1448 | class bytes(Sequence[int]):
+             |       ^^^^^
+        1449 |     """bytes(iterable_of_ints) -> bytes
+        1450 |     bytes(string, encoding[, errors]) -> bytes
+             |
+        info: Source
+          --> main2.py:10:14
+           |
+         8 | w[: int] = z
+         9 | aa = b'foo'
+        10 | bb[: Literal[b"foo"]] = aa
+           |              ^^^^^^
+           |
         "#);
     }
 
@@ -707,6 +769,25 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+          --> main2.py:8:14
+           |
+         7 | x1, y1 = (1, 'abc')
+         8 | x2[: Literal[1]], y2[: Literal["abc"]] = (x1, y1)
+           |              ^
+         9 | x3[: int], y3[: str] = (i(1), s('abc'))
+        10 | x4[: int], y4[: str] = (x3, y3)
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
            --> stdlib/typing.pyi:351:1
             |
         349 | Final: _SpecialForm
@@ -721,6 +802,25 @@ mod tests {
          7 | x1, y1 = (1, 'abc')
          8 | x2[: Literal[1]], y2[: Literal["abc"]] = (x1, y1)
            |                        ^^^^^^^
+         9 | x3[: int], y3[: str] = (i(1), s('abc'))
+        10 | x4[: int], y4[: str] = (x3, y3)
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+          --> main2.py:8:32
+           |
+         7 | x1, y1 = (1, 'abc')
+         8 | x2[: Literal[1]], y2[: Literal["abc"]] = (x1, y1)
+           |                                ^^^^^
          9 | x3[: int], y3[: str] = (i(1), s('abc'))
         10 | x4[: int], y4[: str] = (x3, y3)
            |
@@ -849,6 +949,25 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+          --> main2.py:8:14
+           |
+         7 | x1, y1 = 1, 'abc'
+         8 | x2[: Literal[1]], y2[: Literal["abc"]] = x1, y1
+           |              ^
+         9 | x3[: int], y3[: str] = i(1), s('abc')
+        10 | x4[: int], y4[: str] = x3, y3
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
            --> stdlib/typing.pyi:351:1
             |
         349 | Final: _SpecialForm
@@ -863,6 +982,25 @@ mod tests {
          7 | x1, y1 = 1, 'abc'
          8 | x2[: Literal[1]], y2[: Literal["abc"]] = x1, y1
            |                        ^^^^^^^
+         9 | x3[: int], y3[: str] = i(1), s('abc')
+        10 | x4[: int], y4[: str] = x3, y3
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+          --> main2.py:8:32
+           |
+         7 | x1, y1 = 1, 'abc'
+         8 | x2[: Literal[1]], y2[: Literal["abc"]] = x1, y1
+           |                                ^^^^^
          9 | x3[: int], y3[: str] = i(1), s('abc')
         10 | x4[: int], y4[: str] = x3, y3
            |
@@ -1009,6 +1147,25 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+          --> main2.py:8:19
+           |
+         7 | x = (1, 'abc')
+         8 | y[: tuple[Literal[1], Literal["abc"]]] = x
+           |                   ^
+         9 | z[: tuple[int, str]] = (i(1), s('abc'))
+        10 | w[: tuple[int, str]] = z
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
            --> stdlib/typing.pyi:351:1
             |
         349 | Final: _SpecialForm
@@ -1023,6 +1180,25 @@ mod tests {
          7 | x = (1, 'abc')
          8 | y[: tuple[Literal[1], Literal["abc"]]] = x
            |                       ^^^^^^^
+         9 | z[: tuple[int, str]] = (i(1), s('abc'))
+        10 | w[: tuple[int, str]] = z
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+          --> main2.py:8:31
+           |
+         7 | x = (1, 'abc')
+         8 | y[: tuple[Literal[1], Literal["abc"]]] = x
+           |                               ^^^^^
          9 | z[: tuple[int, str]] = (i(1), s('abc'))
         10 | w[: tuple[int, str]] = z
            |
@@ -1184,6 +1360,25 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+          --> main2.py:8:14
+           |
+         7 | x1, (y1, z1) = (1, ('abc', 2))
+         8 | x2[: Literal[1]], (y2[: Literal["abc"]], z2[: Literal[2]]) = (x1, (y1, z1))
+           |              ^
+         9 | x3[: int], (y3[: str], z3[: int]) = (i(1), (s('abc'), i(2)))
+        10 | x4[: int], (y4[: str], z4[: int]) = (x3, (y3, z3))
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
            --> stdlib/typing.pyi:351:1
             |
         349 | Final: _SpecialForm
@@ -1203,6 +1398,25 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+          --> main2.py:8:33
+           |
+         7 | x1, (y1, z1) = (1, ('abc', 2))
+         8 | x2[: Literal[1]], (y2[: Literal["abc"]], z2[: Literal[2]]) = (x1, (y1, z1))
+           |                                 ^^^^^
+         9 | x3[: int], (y3[: str], z3[: int]) = (i(1), (s('abc'), i(2)))
+        10 | x4[: int], (y4[: str], z4[: int]) = (x3, (y3, z3))
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
            --> stdlib/typing.pyi:351:1
             |
         349 | Final: _SpecialForm
@@ -1217,6 +1431,25 @@ mod tests {
          7 | x1, (y1, z1) = (1, ('abc', 2))
          8 | x2[: Literal[1]], (y2[: Literal["abc"]], z2[: Literal[2]]) = (x1, (y1, z1))
            |                                               ^^^^^^^
+         9 | x3[: int], (y3[: str], z3[: int]) = (i(1), (s('abc'), i(2)))
+        10 | x4[: int], (y4[: str], z4[: int]) = (x3, (y3, z3))
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+          --> main2.py:8:55
+           |
+         7 | x1, (y1, z1) = (1, ('abc', 2))
+         8 | x2[: Literal[1]], (y2[: Literal["abc"]], z2[: Literal[2]]) = (x1, (y1, z1))
+           |                                                       ^
          9 | x3[: int], (y3[: str], z3[: int]) = (i(1), (s('abc'), i(2)))
         10 | x4[: int], (y4[: str], z4[: int]) = (x3, (y3, z3))
            |
@@ -1371,6 +1604,25 @@ mod tests {
         5 | x: int = 1
         6 | y[: Literal[1]] = x
           |     ^^^^^^^
+        7 | z: int = i(1)
+        8 | w[: int] = z
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:6:13
+          |
+        5 | x: int = 1
+        6 | y[: Literal[1]] = x
+          |             ^
         7 | z: int = i(1)
         8 | w[: int] = z
           |
@@ -4989,6 +5241,78 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+          --> main2.py:13:17
+           |
+        11 |     else:
+        12 |         x = None
+        13 |     y[: Literal[1, 2, 3, "hello"] | None] = x
+           |                 ^
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+          --> main2.py:13:20
+           |
+        11 |     else:
+        12 |         x = None
+        13 |     y[: Literal[1, 2, 3, "hello"] | None] = x
+           |                    ^
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+          --> main2.py:13:23
+           |
+        11 |     else:
+        12 |         x = None
+        13 |     y[: Literal[1, 2, 3, "hello"] | None] = x
+           |                       ^
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+          --> main2.py:13:26
+           |
+        11 |     else:
+        12 |         x = None
+        13 |     y[: Literal[1, 2, 3, "hello"] | None] = x
+           |                          ^^^^^^^
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
            --> stdlib/types.pyi:950:11
             |
         948 | if sys.version_info >= (3, 10):
@@ -5121,6 +5445,45 @@ mod tests {
           |                   ^^^
           |
         "#);
+    }
+
+    #[test]
+    fn test_property_literal_type() {
+        let mut test = inlay_hint_test(
+            r"
+            class F:
+                @property
+                def whatever(self): ...
+
+            ab = F.whatever",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        class F:
+            @property
+            def whatever(self): ...
+
+        ab[: property] = F.whatever
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:4:9
+          |
+        2 | class F:
+        3 |     @property
+        4 |     def whatever(self): ...
+          |         ^^^^^^^^
+        5 |
+        6 | ab = F.whatever
+          |
+        info: Source
+         --> main2.py:6:6
+          |
+        4 |     def whatever(self): ...
+        5 |
+        6 | ab[: property] = F.whatever
+          |      ^^^^^^^^
+          |
+        ");
     }
 
     #[test]
