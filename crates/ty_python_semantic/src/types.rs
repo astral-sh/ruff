@@ -50,8 +50,8 @@ use crate::types::constraints::{
 };
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
-pub use crate::types::display::DisplaySettings;
 use crate::types::display::TupleSpecialization;
+pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
 use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
