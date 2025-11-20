@@ -4,6 +4,10 @@
 use super::{ClassType, Type, class::KnownClass};
 use crate::db::Db;
 use crate::module_resolver::{KnownModule, file_to_module};
+use crate::resolve_module;
+use crate::semantic_index::place::ScopedPlaceId;
+use crate::semantic_index::{FileScopeId, place_table, use_def_map};
+use crate::types::TypeDefinition;
 use ruff_db::files::File;
 use std::str::FromStr;
 
@@ -483,6 +487,75 @@ impl SpecialFormType {
             SpecialFormType::Generic => "typing.Generic",
             SpecialFormType::NamedTuple => "typing.NamedTuple",
         }
+    }
+
+    /// Return the module(s) in which this special form could be defined
+    fn definition_modules(self) -> &'static [KnownModule] {
+        match self {
+            SpecialFormType::Any
+            | SpecialFormType::Annotated
+            | SpecialFormType::Literal
+            | SpecialFormType::LiteralString
+            | SpecialFormType::Optional
+            | SpecialFormType::Union
+            | SpecialFormType::NoReturn
+            | SpecialFormType::Never
+            | SpecialFormType::Tuple
+            | SpecialFormType::Type
+            | SpecialFormType::TypingSelf
+            | SpecialFormType::Final
+            | SpecialFormType::ClassVar
+            | SpecialFormType::Callable
+            | SpecialFormType::Concatenate
+            | SpecialFormType::Unpack
+            | SpecialFormType::Required
+            | SpecialFormType::NotRequired
+            | SpecialFormType::TypeAlias
+            | SpecialFormType::TypeGuard
+            | SpecialFormType::TypedDict
+            | SpecialFormType::TypeIs
+            | SpecialFormType::ReadOnly
+            | SpecialFormType::Protocol
+            | SpecialFormType::Generic
+            | SpecialFormType::NamedTuple
+            | SpecialFormType::List
+            | SpecialFormType::Dict
+            | SpecialFormType::DefaultDict
+            | SpecialFormType::Set
+            | SpecialFormType::FrozenSet
+            | SpecialFormType::Counter
+            | SpecialFormType::Deque
+            | SpecialFormType::ChainMap
+            | SpecialFormType::OrderedDict => &[KnownModule::Typing, KnownModule::TypingExtensions],
+
+            SpecialFormType::Unknown
+            | SpecialFormType::AlwaysTruthy
+            | SpecialFormType::AlwaysFalsy
+            | SpecialFormType::Not
+            | SpecialFormType::Intersection
+            | SpecialFormType::TypeOf
+            | SpecialFormType::CallableTypeOf
+            | SpecialFormType::Top
+            | SpecialFormType::Bottom => &[KnownModule::TyExtensions],
+        }
+    }
+
+    pub(super) fn definition(self, db: &dyn Db) -> Option<TypeDefinition<'_>> {
+        self.definition_modules()
+            .iter()
+            .find_map(|module| {
+                let file = resolve_module(db, &module.name())?.file(db)?;
+                let scope = FileScopeId::global().to_scope_id(db, file);
+                let name = self.repr().rsplit('.').next()?;
+                let symbol_id = place_table(db, scope).symbol_id(name)?;
+
+                use_def_map(db, scope)
+                    .end_of_scope_bindings(ScopedPlaceId::Symbol(symbol_id))
+                    .next()?
+                    .binding
+                    .definition()
+            })
+            .map(TypeDefinition::SpecialForm)
     }
 }
 

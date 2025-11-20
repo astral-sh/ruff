@@ -4828,7 +4828,7 @@ impl KnownClass {
     }
 
     /// Return the module in which we should look up the definition for this class
-    fn canonical_module(self, db: &dyn Db) -> KnownModule {
+    pub(super) fn canonical_module(self, db: &dyn Db) -> KnownModule {
         match self {
             Self::Bool
             | Self::Object

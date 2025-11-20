@@ -7604,13 +7604,14 @@ impl<'db> Type<'db> {
 
             Self::Union(_) | Self::Intersection(_) => None,
 
+            Self::SpecialForm(special_form) => special_form.definition(db),
+
             // These types have no definition
             Self::Dynamic(_)
             | Self::Never
             | Self::Callable(_)
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy
-            | Self::SpecialForm(_)
             | Self::TypeIs(_) => None,
         }
     }
