@@ -1,4 +1,4 @@
-use ruff_formatter::write;
+use ruff_formatter::{RemoveSoftLinesBuffer, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprLambda;
 use ruff_text_size::Ranged;
@@ -7,6 +7,7 @@ use crate::comments::dangling_comments;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
+use crate::preview::is_force_single_line_lambda_parameters_enabled;
 
 #[derive(Default)]
 pub struct FormatExprLambda;
@@ -37,12 +38,25 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 write!(f, [dangling_comments(dangling_before_parameters)])?;
             }
 
-            write!(
-                f,
-                [parameters
-                    .format()
-                    .with_options(ParametersParentheses::Never)]
-            )?;
+            // Try to keep the parameters on a single line, unless there are intervening comments.
+            if is_force_single_line_lambda_parameters_enabled(f.context())
+                && !comments.contains_comments(parameters.as_ref().into())
+            {
+                let mut buffer = RemoveSoftLinesBuffer::new(f);
+                write!(
+                    buffer,
+                    [parameters
+                        .format()
+                        .with_options(ParametersParentheses::Never)]
+                )?;
+            } else {
+                write!(
+                    f,
+                    [parameters
+                        .format()
+                        .with_options(ParametersParentheses::Never)]
+                )?;
+            }
 
             write!(f, [token(":")])?;
 
