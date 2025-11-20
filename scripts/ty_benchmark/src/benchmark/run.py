@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Final
 
 from benchmark import Hyperfine
 from benchmark.projects import ALL as ALL_PROJECTS
+from benchmark.snapshot import SnapshotRunner
 from benchmark.tool import Mypy, Pyrefly, Pyright, Tool, Ty
 from benchmark.venv import Venv
 
@@ -71,12 +72,31 @@ def main() -> None:
         help="Run warm benchmarks in addition to cold benchmarks (for tools supporting it)",
     )
 
+    parser.add_argument(
+        "--snapshot",
+        action="store_true",
+        help="Run commands and snapshot their output instead of benchmarking with hyperfine.",
+    )
+
+    parser.add_argument(
+        "--accept",
+        action="store_true",
+        help="Accept snapshot changes (only valid with --snapshot).",
+    )
+
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.INFO if args.verbose else logging.WARN,
         format="%(asctime)s %(levelname)s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+
+    # Validate arguments.
+    if args.accept and not args.snapshot:
+        parser.error("--accept can only be used with --snapshot")
+
+    if args.snapshot and args.warm:
+        parser.error("--warm cannot be used with --snapshot")
 
     verbose = args.verbose
     warmup = args.warmup
@@ -140,14 +160,27 @@ def main() -> None:
             print("-" * len(project.name))
             print("")
 
-            hyperfine = Hyperfine(
-                name=f"{project.name}",
-                commands=commands,
-                warmup=warmup,
-                min_runs=min_runs,
-                verbose=verbose,
-                json=False,
-            )
-            hyperfine.run(cwd=cwd, env=benchmark_env)
+            if args.snapshot:
+                # Get the directory where run.py is located to find snapshots directory.
+                script_dir = Path(__file__).parent.parent.parent
+                snapshot_dir = script_dir / "snapshots"
+
+                snapshot_runner = SnapshotRunner(
+                    name=f"{project.name}",
+                    commands=commands,
+                    snapshot_dir=snapshot_dir,
+                    accept=args.accept,
+                )
+                snapshot_runner.run(cwd=cwd, env=benchmark_env)
+            else:
+                hyperfine = Hyperfine(
+                    name=f"{project.name}",
+                    commands=commands,
+                    warmup=warmup,
+                    min_runs=min_runs,
+                    verbose=verbose,
+                    json=False,
+                )
+                hyperfine.run(cwd=cwd, env=benchmark_env)
 
             first = False

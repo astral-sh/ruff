@@ -1,0 +1,20 @@
+isort/_vendored/tomli/_re.py:7:10: error[unresolved-import] Cannot resolve imported module `tomli._parser`
+isort/core.py:86:27: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `Iterable[None]`, found `TextIO`
+isort/core.py:126:40: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `Iterable[None]`, found `TextIO`
+isort/output.py:534:25: error[invalid-argument-type] Argument to function `import_statement` is incorrect: Expected `Sequence[str]`, found `@Todo | None | list[Unknown]`
+isort/output.py:544:25: error[invalid-argument-type] Argument to function `import_statement` is incorrect: Expected `Sequence[str]`, found `@Todo | None | list[Unknown]`
+isort/output.py:552:29: error[invalid-argument-type] Argument to function `import_statement` is incorrect: Expected `Sequence[str]`, found `@Todo | None | list[Unknown]`
+isort/place.py:104:31: error[unresolved-attribute] Module `importlib` has no member `machinery`
+isort/settings.py:605:32: error[invalid-argument-type] Argument to function `fnmatch` is incorrect: Argument type `bytes | str` does not satisfy constraints (`str`, `bytes`) of type variable `AnyStr`
+isort/settings.py:605:32: error[invalid-argument-type] Argument to function `fnmatch` is incorrect: Expected `str`, found `bytes | str`
+isort/settings.py:605:69: error[unsupported-operator] Operator `+` is unsupported between objects of type `Literal["/"]` and `bytes | str`
+isort/settings.py:641:9: error[invalid-assignment] Property `_known_patterns` defined in `Self@known_patterns` is read-only
+isort/settings.py:665:9: error[invalid-assignment] Property `_section_comments` defined in `Self@section_comments` is read-only
+isort/settings.py:673:9: error[invalid-assignment] Property `_section_comments_end` defined in `Self@section_comments_end` is read-only
+isort/settings.py:681:9: error[invalid-assignment] Property `_skips` defined in `Self@skips` is read-only
+isort/settings.py:689:9: error[invalid-assignment] Property `_skip_globs` defined in `Self@skip_globs` is read-only
+isort/settings.py:698:13: error[invalid-assignment] Property `_sorting_function` defined in `Self@sorting_function` is read-only
+isort/settings.py:700:13: error[invalid-assignment] Property `_sorting_function` defined in `Self@sorting_function` is read-only
+isort/settings.py:706:21: error[invalid-assignment] Property `_sorting_function` defined in `Self@sorting_function` is read-only
+isort/wrap_modes.py:41:17: error[unresolved-attribute] Object of type `(...) -> str` has no attribute `__name__`
+Found 19 diagnostics
