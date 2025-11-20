@@ -433,18 +433,16 @@ fn member_lookup_cycle_initial<'db>(
     Place::bound(Type::divergent(id)).into()
 }
 
-#[allow(clippy::too_many_arguments)]
 fn member_lookup_cycle_recover<'db>(
     db: &'db dyn Db,
-    cycle_heads: &salsa::CycleHeads,
+    cycle: &salsa::Cycle,
     previous_member: &PlaceAndQualifiers<'db>,
     member: PlaceAndQualifiers<'db>,
-    _count: u32,
     _self_type: Type<'db>,
     _name: Name,
     _policy: MemberLookupPolicy,
 ) -> PlaceAndQualifiers<'db> {
-    member.cycle_normalized(db, *previous_member, cycle_heads)
+    member.cycle_normalized(db, *previous_member, cycle)
 }
 
 fn class_lookup_cycle_initial<'db>(
@@ -457,18 +455,16 @@ fn class_lookup_cycle_initial<'db>(
     Place::bound(Type::divergent(id)).into()
 }
 
-#[allow(clippy::too_many_arguments)]
 fn class_lookup_cycle_recover<'db>(
     db: &'db dyn Db,
-    cycle_heads: &salsa::CycleHeads,
+    cycle: &salsa::Cycle,
     previous_member: &PlaceAndQualifiers<'db>,
     member: PlaceAndQualifiers<'db>,
-    _count: u32,
     _self_type: Type<'db>,
     _name: Name,
     _policy: MemberLookupPolicy,
 ) -> PlaceAndQualifiers<'db> {
-    member.cycle_normalized(db, *previous_member, cycle_heads)
+    member.cycle_normalized(db, *previous_member, cycle)
 }
 
 fn variance_cycle_initial<'db, T>(
@@ -934,10 +930,10 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         previous: Self,
-        cycle_heads: &salsa::CycleHeads,
+        cycle: &salsa::Cycle,
     ) -> Self {
         UnionType::from_elements_cycle_recovery(db, [self, previous])
-            .recursive_type_normalized(db, cycle_heads)
+            .recursive_type_normalized(db, cycle)
     }
 
     fn is_none(&self, db: &'db dyn Db) -> bool {
@@ -1563,12 +1559,8 @@ impl<'db> Type<'db> {
     }
 
     #[must_use]
-    pub(crate) fn recursive_type_normalized(
-        self,
-        db: &'db dyn Db,
-        cycle_heads: &salsa::CycleHeads,
-    ) -> Self {
-        cycle_heads.ids().fold(self, |ty, id| {
+    pub(crate) fn recursive_type_normalized(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
+        cycle.head_ids.clone().fold(self, |ty, id| {
             let visitor = RecursiveTypeNormalizedVisitor::new(Type::divergent(id));
             ty.recursive_type_normalized_impl(db, &visitor)
         })
@@ -8027,17 +8019,15 @@ fn is_redundant_with_cycle_initial<'db>(
     true
 }
 
-#[allow(clippy::too_many_arguments)]
 fn apply_specialization_cycle_recover<'db>(
     db: &'db dyn Db,
-    cycle_heads: &salsa::CycleHeads,
+    cycle: &salsa::Cycle,
     previous_value: &Type<'db>,
     value: Type<'db>,
-    _count: u32,
     _self: Type<'db>,
     _specialization: Specialization<'db>,
 ) -> Type<'db> {
-    value.cycle_normalized(db, *previous_value, cycle_heads)
+    value.cycle_normalized(db, *previous_value, cycle)
 }
 
 fn apply_specialization_cycle_initial<'db>(
@@ -8060,14 +8050,13 @@ fn expand_eagerly_cycle_initial<'db>(
 
 fn expand_eagerly_cycle_recover<'db>(
     db: &'db dyn Db,
-    cycle_heads: &salsa::CycleHeads,
+    cycle: &salsa::Cycle,
     previous_value: &Type<'db>,
     value: Type<'db>,
-    _count: u32,
     _self: Type<'db>,
     _unit: (),
 ) -> Type<'db> {
-    value.cycle_normalized(db, *previous_value, cycle_heads)
+    value.cycle_normalized(db, *previous_value, cycle)
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
@@ -9398,15 +9387,14 @@ fn lazy_bound_or_constraints_cycle_initial<'db>(
 #[allow(clippy::ref_option)]
 fn lazy_default_cycle_recover<'db>(
     db: &'db dyn Db,
-    cycle_heads: &salsa::CycleHeads,
+    cycle: &salsa::Cycle,
     previous_default: &Option<Type<'db>>,
     default: Option<Type<'db>>,
-    _count: u32,
     _typevar: TypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
     match (previous_default, default) {
-        (Some(prev), Some(default)) => Some(default.cycle_normalized(db, *prev, cycle_heads)),
-        (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle_heads)),
+        (Some(prev), Some(default)) => Some(default.cycle_normalized(db, *prev, cycle)),
+        (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle)),
         (_, None) => None,
     }
 }
@@ -12373,13 +12361,12 @@ fn value_type_cycle_initial<'db>(
 
 fn value_type_cycle_recover<'db>(
     db: &'db dyn Db,
-    cycle_heads: &salsa::CycleHeads,
+    cycle: &salsa::Cycle,
     previous_value: &Type<'db>,
     value: Type<'db>,
-    _count: u32,
     _self: PEP695TypeAliasType<'db>,
 ) -> Type<'db> {
-    value.cycle_normalized(db, *previous_value, cycle_heads)
+    value.cycle_normalized(db, *previous_value, cycle)
 }
 
 /// A PEP 695 `types.TypeAliasType` created by manually calling the constructor.

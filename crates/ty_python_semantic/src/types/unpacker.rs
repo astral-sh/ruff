@@ -243,11 +243,11 @@ impl<'db> UnpackResult<'db> {
         mut self,
         db: &'db dyn Db,
         previous_cycle_result: &UnpackResult<'db>,
-        cycle_heads: &salsa::CycleHeads,
+        cycle: &salsa::Cycle,
     ) -> Self {
         for (expr, ty) in &mut self.targets {
             let previous_ty = previous_cycle_result.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle_heads);
+            *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }
 
         self

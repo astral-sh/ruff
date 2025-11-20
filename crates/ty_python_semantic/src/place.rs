@@ -694,23 +694,17 @@ impl<'db> PlaceAndQualifiers<'db> {
         self,
         db: &'db dyn Db,
         previous_place: Self,
-        cycle_heads: &salsa::CycleHeads,
+        cycle: &salsa::Cycle,
     ) -> Self {
         let place = match (previous_place.place, self.place) {
             // In fixed-point iteration of type inference, the member type must be monotonically widened and not "oscillate".
             // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
             (Place::Defined(prev_ty, _, _), Place::Defined(ty, origin, definedness)) => {
-                Place::Defined(
-                    ty.cycle_normalized(db, prev_ty, cycle_heads),
-                    origin,
-                    definedness,
-                )
+                Place::Defined(ty.cycle_normalized(db, prev_ty, cycle), origin, definedness)
             }
-            (_, Place::Defined(ty, origin, definedness)) => Place::Defined(
-                ty.recursive_type_normalized(db, cycle_heads),
-                origin,
-                definedness,
-            ),
+            (_, Place::Defined(ty, origin, definedness)) => {
+                Place::Defined(ty.recursive_type_normalized(db, cycle), origin, definedness)
+            }
             (_, Place::Undefined) => Place::Undefined,
         };
         PlaceAndQualifiers {
@@ -740,16 +734,15 @@ fn place_cycle_initial<'db>(
 #[allow(clippy::too_many_arguments)]
 fn place_cycle_recover<'db>(
     db: &'db dyn Db,
-    cycle_heads: &salsa::CycleHeads,
+    cycle: &salsa::Cycle,
     previous_place: &PlaceAndQualifiers<'db>,
     place: PlaceAndQualifiers<'db>,
-    _count: u32,
     _scope: ScopeId<'db>,
     _place_id: ScopedPlaceId,
     _requires_explicit_reexport: RequiresExplicitReExport,
     _considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
-    place.cycle_normalized(db, *previous_place, cycle_heads)
+    place.cycle_normalized(db, *previous_place, cycle)
 }
 
 #[salsa::tracked(cycle_fn=place_cycle_recover, cycle_initial=place_cycle_initial, heap_size=ruff_memory_usage::heap_size)]

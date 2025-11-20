@@ -100,17 +100,16 @@ fn implicit_attribute_initial<'db>(
 #[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 fn implicit_attribute_cycle_recover<'db>(
     db: &'db dyn Db,
-    cycle_heads: &salsa::CycleHeads,
+    cycle: &salsa::Cycle,
     previous_member: &Member<'db>,
     member: Member<'db>,
-    _count: u32,
     _class_body_scope: ScopeId<'db>,
     _name: String,
     _target_method_decorator: MethodDecorator,
 ) -> Member<'db> {
     let inner = member
         .inner
-        .cycle_normalized(db, previous_member.inner, cycle_heads);
+        .cycle_normalized(db, previous_member.inner, cycle);
     Member { inner }
 }
 
