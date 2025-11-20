@@ -48,6 +48,10 @@ impl ExpandedStatistics<'_> {
     }
 }
 
+/// Accumulator type for grouping diagnostics by code.
+/// Format: (`code`, `representative_diagnostic`, `total_count`, `fixable_count`)
+type DiagnosticGroup<'a> = (Option<&'a SecondaryCode>, &'a Diagnostic, usize, usize);
+
 pub(crate) struct Printer {
     format: OutputFormat,
     log_level: LogLevel,
@@ -296,10 +300,8 @@ impl Printer {
             .sorted_by_key(|(code, _, _)| *code)
             .fold(
                 vec![],
-                |mut acc: Vec<((Option<&SecondaryCode>, &Diagnostic), usize, usize)>,
-                 (code, message, is_fixable)| {
-                    if let Some(((prev_code, _prev_message), count, fixable_count)) = acc.last_mut()
-                    {
+                |mut acc: Vec<DiagnosticGroup>, (code, message, is_fixable)| {
+                    if let Some((prev_code, _prev_message, count, fixable_count)) = acc.last_mut() {
                         if *prev_code == code {
                             *count += 1;
                             if is_fixable {
@@ -308,13 +310,13 @@ impl Printer {
                             return acc;
                         }
                     }
-                    acc.push(((code, message), 1, usize::from(is_fixable)));
+                    acc.push((code, message, 1, usize::from(is_fixable)));
                     acc
                 },
             )
             .iter()
             .map(
-                |&((code, message), count, fixable_count)| ExpandedStatistics {
+                |&(code, message, count, fixable_count)| ExpandedStatistics {
                     code,
                     name: message.name(),
                     count,
@@ -347,7 +349,7 @@ impl Printer {
                     .map(|statistic| statistic.code.map_or(0, |s| s.len()))
                     .max()
                     .unwrap();
-                let any_fixable = statistics.iter().any(|statistic| statistic.any_fixable());
+                let any_fixable = statistics.iter().any(ExpandedStatistics::any_fixable);
 
                 let all_fixable = format!("[{}] ", "*".cyan());
                 let partially_fixable = format!("[{}] ", "~".cyan());
