@@ -127,6 +127,13 @@ lambda a, /, c: a
 
 (
     lambda
+    # comment
+    *x,
+    **y: x
+)
+
+(
+    lambda
     # comment 1
     *
     # comment 2
@@ -197,12 +204,88 @@ lambda: ( # comment
 )
 
 (
+    lambda  # 1
+    # 2
+    x,  # 3
+    # 4
+    y
+    :  # 5
+    # 6
+    x
+)
+
+(
     lambda
     x,
     # comment
     y:
     z
 )
+
+
+# Leading
+lambda x: (
+    lambda y: lambda z: x
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + z  # Trailing
+)  # Trailing
+
+
+# Leading
+lambda x: lambda y: lambda z: [
+    x,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    z
+] # Trailing
+# Trailing
 
 lambda self, araa, kkkwargs=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs), e=1, f=2, g=2: d
 
@@ -228,3 +311,21 @@ def a():
         g = 10
     )
 
+def a():
+    return b(
+        c,
+        d,
+        e,
+        f=lambda self, *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+            *args, **kwargs
+        ) + 1,
+    )
+
+# Additional ecosystem cases from https://github.com/astral-sh/ruff/pull/21385
+class C:
+    def foo():
+        mock_service.return_value.bucket.side_effect = lambda name: (
+            source_bucket
+            if name == source_bucket_name
+            else storage.Bucket(mock_service, destination_bucket_name)
+        )
