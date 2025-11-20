@@ -1680,7 +1680,10 @@ impl<'db> SpecializationBuilder<'db> {
                 );
             }
 
-            (Type::Callable(_), _) => {
+            (
+                Type::Callable(_),
+                Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::KnownBoundMethod(_),
+            ) => {
                 if let Some(actual_callable) = actual.try_upcast_to_callable(self.db) {
                     self.infer_map_impl(formal, actual_callable, polarity, &mut f)?;
                 }
