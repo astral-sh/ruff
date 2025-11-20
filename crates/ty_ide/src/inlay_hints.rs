@@ -1,6 +1,6 @@
 use std::{fmt, vec};
 
-use crate::{Db, NavigationTarget};
+use crate::{Db, HasNavigationTargets, NavigationTarget};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
@@ -19,10 +19,48 @@ pub struct InlayHint {
 
 impl InlayHint {
     fn variable_type(position: TextSize, ty: Type, db: &dyn Db) -> Self {
-        let label_parts = vec![
-            ": ".into(),
-            InlayHintLabelPart::new(ty.display(db).to_string()),
-        ];
+        // Render the type to a string, and get subspans for all the types that make it up
+        let details = ty.display(db).to_string_parts();
+
+        // Ok so the idea here is that we potentially have a random soup of spans here,
+        // and each byte of the string can have at most one target associate with it.
+        // Thankfully, they were generally pushed in print order, with the inner smaller types
+        // appearing before the outer bigger ones.
+        //
+        // So we record where we are in the string, and every time we find a type, we
+        // check if it's further along in the string. If it is, great, we give it the
+        // span for its range, and then advance where we are.
+        let mut offset = 0;
+        let mut label_parts = vec![": ".into()];
+        for (target, detail) in details.targets.iter().zip(&details.details) {
+            match detail {
+                ty_python_semantic::types::TypeDetail::Type(ty) => {
+                    let start = target.start().to_usize();
+                    let end = target.end().to_usize();
+                    // If we skipped over some bytes, push them with no target
+                    if start > offset {
+                        label_parts.push(details.label[offset..start].into());
+                    }
+                    // Ok, this is the first type that claimed these bytes, give it the target
+                    if start >= offset {
+                        let target = ty.navigation_targets(db).into_iter().next();
+                        label_parts.push(
+                            InlayHintLabelPart::new(&details.label[start..end]).with_target(target),
+                        );
+                        offset = end;
+                    }
+                }
+                ty_python_semantic::types::TypeDetail::SignatureStart
+                | ty_python_semantic::types::TypeDetail::SignatureEnd
+                | ty_python_semantic::types::TypeDetail::Parameter(_) => {
+                    // Don't care about these
+                }
+            }
+        }
+        // "flush" the rest of the label without any target
+        if offset < details.label.len() {
+            label_parts.push(details.label[offset..details.label.len()].into());
+        }
 
         Self {
             position,

@@ -101,18 +101,31 @@ impl<'db> DisplaySettings<'db> {
     }
 }
 
+/// Details about a type's formatting
+///
+/// The `targets` and `details` are 1:1 (you can `zip` them)
+pub struct TypeDisplayDetails<'db> {
+    /// The fully formatted type
+    pub label: String,
+    /// Ranges in the label
+    pub targets: Vec<TextRange>,
+    /// Metadata for each range
+    pub details: Vec<TypeDetail<'db>>,
+}
+
+/// Abstraction over "are we doing normal formatting, or tracking ranges with metadata?"
 enum TypeWriter<'a, 'b, 'db> {
     Formatter(&'a mut Formatter<'b>),
     Details(TypeDetailsWriter<'db>),
 }
-
 /// Writer that builds a string with range tracking
 struct TypeDetailsWriter<'db> {
     label: String,
     targets: Vec<TextRange>,
     details: Vec<TypeDetail<'db>>,
 }
-impl TypeDetailsWriter<'_> {
+
+impl<'db> TypeDetailsWriter<'db> {
     fn new() -> Self {
         Self {
             label: String::new(),
@@ -121,7 +134,20 @@ impl TypeDetailsWriter<'_> {
         }
     }
 
+    /// Produce type info
+    fn finish_type_details(self) -> TypeDisplayDetails<'db> {
+        TypeDisplayDetails {
+            label: self.label,
+            targets: self.targets,
+            details: self.details,
+        }
+    }
+
+    /// Produce function signature info
     fn finish_signature_details(self) -> SignatureDisplayDetails {
+        // We use SignatureStart and SignatureEnd to delimit nested function signatures inside
+        // this function signature. We only care about the parameters of the outermost function
+        // which should introduce it's own SignatureStart and SignatureEnd
         let mut parameter_ranges = Vec::new();
         let mut parameter_names = Vec::new();
         let mut parameter_nesting = 0;
@@ -131,6 +157,7 @@ impl TypeDetailsWriter<'_> {
                 TypeDetail::SignatureEnd => parameter_nesting -= 1,
                 TypeDetail::Parameter(parameter) => {
                     if parameter_nesting <= 1 {
+                        // We found parameters at the top-level, record them
                         parameter_names.push(parameter);
                         parameter_ranges.push(target);
                     }
@@ -148,6 +175,10 @@ impl TypeDetailsWriter<'_> {
 }
 
 impl<'a, 'b, 'db> TypeWriter<'a, 'b, 'db> {
+    /// Indicate the given detail is about to start being written to this Writer
+    ///
+    /// This creates a scoped guard that when Dropped will record the given detail
+    /// as spanning from when it was introduced to when it was dropped.
     fn with_detail<'c>(&'c mut self, detail: TypeDetail<'db>) -> TypeDetailGuard<'a, 'b, 'c, 'db> {
         let start = match self {
             TypeWriter::Formatter(_) => None,
@@ -174,13 +205,23 @@ impl std::fmt::Write for TypeDetailsWriter<'_> {
     }
 }
 
-enum TypeDetail<'db> {
+pub enum TypeDetail<'db> {
+    /// Dummy item to indicate a function signature's parameters have started
     SignatureStart,
+    /// Dummy item to indicate a function signature's parameters have ended
     SignatureEnd,
+    /// A function signature's parameter
     Parameter(String),
+    /// A type
     Type(Type<'db>),
 }
 
+/// Look on my Works, ye Mighty, and despair!
+///
+/// It's quite important that we avoid conflating any of these lifetimes, or else the
+/// borrowchecker will throw a ton of confusing errors about things not living long
+/// enough. If you get those kinds of errors, it's probably because you introduced
+/// something like `&'db self`, which, while convenient, and sometimes works, is imprecise.
 struct TypeDetailGuard<'a, 'b, 'c, 'db> {
     inner: &'c mut TypeWriter<'a, 'b, 'db>,
     start: Option<usize>,
@@ -362,6 +403,16 @@ pub struct DisplayType<'db> {
 }
 
 impl<'db> DisplayType<'db> {
+    pub fn to_string_parts(&self) -> TypeDisplayDetails<'db> {
+        let mut f = TypeWriter::Details(TypeDetailsWriter::new());
+        self.fmt_detailed(&mut f).unwrap();
+
+        match f {
+            TypeWriter::Details(details) => details.finish_type_details(),
+            TypeWriter::Formatter(_) => unreachable!("Expected Details variant"),
+        }
+    }
+
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let representation = self.ty.representation(self.db, self.settings.clone());
         match self.ty {
@@ -462,7 +513,8 @@ impl<'db> ClassDisplay<'db> {
                 f.write_char('.')?;
             }
         }
-        f.write_str(self.class.name(self.db))?;
+        f.with_detail(TypeDetail::Type(Type::ClassLiteral(self.class)))
+            .write_str(self.class.name(self.db))?;
         if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
             let file = self.class.file(self.db);
             let path = file.path(self.db);
