@@ -66,6 +66,39 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             .collect()
     }
 
+    /// Like [`Self::from_arguments`] but fills as much typing info in as possible.
+    ///
+    /// This currently only exists for the LSP usecase, and shouldn't be used in normal
+    /// typechecking.
+    pub(crate) fn from_arguments_typed(
+        arguments: &'a ast::Arguments,
+        mut infer_argument_type: impl FnMut(Option<&ast::Expr>, &ast::Expr) -> Type<'db>,
+    ) -> Self {
+        arguments
+            .arguments_source_order()
+            .map(|arg_or_keyword| match arg_or_keyword {
+                ast::ArgOrKeyword::Arg(arg) => match arg {
+                    ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+                        let ty = infer_argument_type(Some(arg), value);
+                        (Argument::Variadic, Some(ty))
+                    }
+                    _ => {
+                        let ty = infer_argument_type(None, arg);
+                        (Argument::Positional, Some(ty))
+                    }
+                },
+                ast::ArgOrKeyword::Keyword(ast::Keyword { arg, value, .. }) => {
+                    let ty = infer_argument_type(None, value);
+                    if let Some(arg) = arg {
+                        (Argument::Keyword(&arg.id), Some(ty))
+                    } else {
+                        (Argument::Keywords, Some(ty))
+                    }
+                }
+            })
+            .collect()
+    }
+
     /// Create a [`CallArguments`] with no arguments.
     pub(crate) fn none() -> Self {
         Self::default()
