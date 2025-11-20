@@ -8043,6 +8043,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // are handled by the default constructor-call logic (we synthesize a `__new__` method for them
                 // in `ClassType::own_class_member()`).
                 class.is_known(self.db(), KnownClass::Tuple) && !class.is_generic()
+            ) || CodeGeneratorKind::TypedDict.matches(
+                self.db(),
+                class.class_literal(self.db()).0,
+                class.class_literal(self.db()).1,
             );
 
             // temporary special-casing for all subclasses of `enum.Enum`

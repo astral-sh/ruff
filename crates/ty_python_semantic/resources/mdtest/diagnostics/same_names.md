@@ -265,7 +265,7 @@ import dict_a
 import dict_b
 
 def _(b_person: dict_b.Person):
-    # TODO should be error: [invalid-assignment] "Object of type `dict_b.Person` is not assignable to `dict_a.Person`"
+    # error: [invalid-assignment] "Object of type `dict_b.Person` is not assignable to `dict_a.Person`"
     person_var: dict_a.Person = b_person
 ```
 
