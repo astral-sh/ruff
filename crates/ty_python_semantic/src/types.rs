@@ -7577,6 +7577,11 @@ impl<'db> Type<'db> {
             Self::TypeAlias(alias) => alias.value_type(db).definition(db),
             Self::NewTypeInstance(newtype) => Some(TypeDefinition::NewType(newtype.definition(db))),
 
+            Self::PropertyInstance(property) => property
+                .getter(db)
+                .and_then(|getter|getter.definition(db))
+                .or_else(||property.setter(db).and_then(|setter|setter.definition(db))),
+
             Self::StringLiteral(_)
             | Self::BooleanLiteral(_)
             | Self::LiteralString
@@ -7588,7 +7593,6 @@ impl<'db> Type<'db> {
             | Self::WrapperDescriptor(_)
             | Self::DataclassDecorator(_)
             | Self::DataclassTransformer(_)
-            | Self::PropertyInstance(_)
             | Self::BoundSuper(_) => self.to_meta_type(db).definition(db),
 
             Self::TypeVar(bound_typevar) => Some(TypeDefinition::TypeVar(bound_typevar.typevar(db).definition(db)?)),
@@ -7598,20 +7602,22 @@ impl<'db> Type<'db> {
                 Protocol::Synthesized(_) => None,
             },
 
-            Type::TypedDict(typed_dict) => {
+            Self::TypedDict(typed_dict) => {
                 Some(TypeDefinition::Class(typed_dict.defining_class().definition(db)))
             }
 
             Self::Union(_) | Self::Intersection(_) => None,
 
             Self::SpecialForm(special_form) => special_form.definition(db),
+            Self::Never => Type::SpecialForm(SpecialFormType::Never).definition(db),
+            Self::Dynamic(DynamicType::Any) => Type::SpecialForm(SpecialFormType::Any).definition(db),
+            Self::Dynamic(DynamicType::Unknown) => Type::SpecialForm(SpecialFormType::Unknown).definition(db),
+            Self::AlwaysTruthy => Type::SpecialForm(SpecialFormType::AlwaysTruthy).definition(db),
+            Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
 
             // These types have no definition
-            Self::Dynamic(_)
-            | Self::Never
+            Self::Dynamic(DynamicType::Divergent(_) | DynamicType::Todo(_) | DynamicType::TodoTypeAlias | DynamicType::TodoUnpack)
             | Self::Callable(_)
-            | Self::AlwaysTruthy
-            | Self::AlwaysFalsy
             | Self::TypeIs(_) => None,
         }
     }

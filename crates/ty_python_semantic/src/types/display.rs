@@ -23,9 +23,9 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleSpec;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    BoundTypeVarIdentity, CallableType, DynamicType, IntersectionType, KnownBoundMethodType,
-    KnownClass, MaterializationKind, Protocol, ProtocolInstanceType, SpecialFormType,
-    StringLiteralType, SubclassOfInner, Type, UnionType, WrapperDescriptorKind, visitor,
+    BoundTypeVarIdentity, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
+    MaterializationKind, Protocol, ProtocolInstanceType, SpecialFormType, StringLiteralType,
+    SubclassOfInner, Type, UnionType, WrapperDescriptorKind, visitor,
 };
 use ruff_db::parsed::parsed_module;
 
@@ -611,9 +611,7 @@ impl Display for DisplayRepresentation<'_> {
 impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         match self.ty {
-            Type::Dynamic(dynamic) => dynamic
-                .display_with(self.db, self.settings.clone())
-                .fmt_detailed(f),
+            Type::Dynamic(dynamic) => write!(f.with_detail(TypeDetail::Type(self.ty)), "{dynamic}"),
             Type::Never => f.with_detail(TypeDetail::Type(self.ty)).write_str("Never"),
             Type::NominalInstance(instance) => {
                 let class = instance.class(self.db);
@@ -662,7 +660,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     f.write_char('>')
                 }
             },
-            Type::PropertyInstance(_) => f.write_str("property"),
+            Type::PropertyInstance(_) => f
+                .with_detail(TypeDetail::Type(self.ty))
+                .write_str("property"),
             Type::ModuleLiteral(module) => {
                 write!(
                     f.with_detail(TypeDetail::Type(self.ty)),
@@ -709,9 +709,10 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     f.with_detail(TypeDetail::Type(KnownClass::Type.to_class_literal(self.db)))
                         .write_str("type")?;
                     f.write_char('[')?;
-                    dynamic
-                        .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f)?;
+                    write!(
+                        f.with_detail(TypeDetail::Type(Type::Dynamic(dynamic))),
+                        "{dynamic}"
+                    )?;
                     f.write_char(']')
                 }
             },
@@ -847,18 +848,33 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::Intersection(intersection) => intersection
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
-            Type::IntLiteral(n) => write!(f, "{n}"),
-            Type::BooleanLiteral(boolean) => f.write_str(if boolean { "True" } else { "False" }),
+            Type::IntLiteral(n) => write!(f.with_detail(TypeDetail::Type(self.ty)), "{n}"),
+            Type::BooleanLiteral(boolean) => f
+                .with_detail(TypeDetail::Type(self.ty))
+                .write_str(if boolean { "True" } else { "False" }),
             Type::StringLiteral(string) => {
-                write!(f, "{}", string.display_with(self.db, self.settings.clone()))
+                write!(
+                    f.with_detail(TypeDetail::Type(self.ty)),
+                    "{}",
+                    string.display_with(self.db, self.settings.clone())
+                )
             }
+            // an alternative would be to use `Type::SpecialForm(SpecialFormType::LiteralString)` here,
+            // which would mean users would be able to jump to the definition of `LiteralString` from the
+            // inlay hint, but that seems less useful than the definition of `str` for a variable that is
+            // inferred as an *inhabitant* of `LiteralString` (since that variable will just be a string
+            // at runtime)
             Type::LiteralString => f
                 .with_detail(TypeDetail::Type(self.ty))
                 .write_str("LiteralString"),
             Type::BytesLiteral(bytes) => {
                 let escape = AsciiEscape::with_preferred_quote(bytes.value(self.db), Quote::Double);
 
-                escape.bytes_repr(TripleQuotes::No).write(f)
+                write!(
+                    f.with_detail(TypeDetail::Type(self.ty)),
+                    "{}",
+                    escape.bytes_repr(TripleQuotes::No)
+                )
             }
             Type::EnumLiteral(enum_literal) => {
                 enum_literal
@@ -1162,48 +1178,6 @@ impl Display for DisplayFunctionType<'_> {
     }
 }
 
-impl<'db> DynamicType<'db> {
-    fn display_with<'a>(
-        &'a self,
-        db: &'db dyn Db,
-        settings: DisplaySettings<'db>,
-    ) -> DisplayDynamicType<'a, 'db> {
-        DisplayDynamicType {
-            dynamic_type: self,
-            db,
-            settings,
-        }
-    }
-}
-
-struct DisplayDynamicType<'a, 'db> {
-    dynamic_type: &'a DynamicType<'db>,
-    #[allow(dead_code)]
-    db: &'db dyn Db,
-    #[allow(dead_code)]
-    settings: DisplaySettings<'db>,
-}
-
-impl<'db> FmtDetailed<'db> for DisplayDynamicType<'_, 'db> {
-    fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        match self.dynamic_type {
-            DynamicType::Any => write!(
-                f.with_detail(TypeDetail::Type(Type::SpecialForm(SpecialFormType::Any))),
-                "{}",
-                self.dynamic_type,
-            ),
-            DynamicType::Unknown => write!(
-                f.with_detail(TypeDetail::Type(Type::SpecialForm(
-                    SpecialFormType::Unknown
-                ))),
-                "{}",
-                self.dynamic_type,
-            ),
-            _ => write!(f, "{}", self.dynamic_type),
-        }
-    }
-}
-
 impl<'db> GenericAlias<'db> {
     pub(crate) fn display(self, db: &'db dyn Db) -> DisplayGenericAlias<'db> {
         self.display_with(db, DisplaySettings::default())
@@ -1237,16 +1211,20 @@ impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'db> {
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f)
         } else {
-            let prefix = match self.specialization.materialization_kind(self.db) {
-                None => "",
-                Some(MaterializationKind::Top) => "Top[",
-                Some(MaterializationKind::Bottom) => "Bottom[",
+            let prefix_details = match self.specialization.materialization_kind(self.db) {
+                None => None,
+                Some(MaterializationKind::Top) => Some(("Top", SpecialFormType::Top)),
+                Some(MaterializationKind::Bottom) => Some(("Bottom", SpecialFormType::Bottom)),
             };
             let suffix = match self.specialization.materialization_kind(self.db) {
                 None => "",
                 Some(_) => "]",
             };
-            f.write_str(prefix)?;
+            if let Some((name, form)) = prefix_details {
+                f.with_detail(TypeDetail::Type(Type::SpecialForm(form)))
+                    .write_str(name)?;
+                f.write_char('[')?;
+            }
             self.origin
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f)?;
