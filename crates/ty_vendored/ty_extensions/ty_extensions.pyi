@@ -91,6 +91,23 @@ class ConstraintSet:
     def __or__(self, other: ConstraintSet) -> ConstraintSet: ...
     def __invert__(self) -> ConstraintSet: ...
 
+class GenericContext:
+    """
+    The set of typevars that are bound by a generic class, function, or type
+    alias.
+    """
+
+    def specialize_constrained(
+        self, constraints: ConstraintSet
+    ) -> Specialization | None:
+        """
+        Returns a specialization of this generic context that satisfies the
+        given constraints, or None if the constraints cannot be satisfied.
+        """
+
+class Specialization:
+    """A mapping of typevars to specific types"""
+
 # Predicates on types
 #
 # Ideally, these would be annotated using `TypeForm`, but that has not been
@@ -128,7 +145,7 @@ def is_single_valued(ty: Any) -> bool:
 
 # Returns the generic context of a type as a tuple of typevars, or `None` if the
 # type is not generic.
-def generic_context(ty: Any) -> Any: ...
+def generic_context(ty: Any) -> GenericContext | None: ...
 
 # Returns the `__all__` names of a module as a tuple of sorted strings, or `None` if
 # either the module does not have `__all__` or it has invalid elements.

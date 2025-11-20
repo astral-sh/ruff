@@ -452,28 +452,6 @@ impl Diagnostic {
             .map(|sub| sub.inner.message.as_str())
     }
 
-    /// Returns the URL for the rule documentation, if it exists.
-    pub fn to_ruff_url(&self) -> Option<String> {
-        match self.id() {
-            DiagnosticId::Panic
-            | DiagnosticId::Io
-            | DiagnosticId::InvalidSyntax
-            | DiagnosticId::RevealedType
-            | DiagnosticId::UnknownRule
-            | DiagnosticId::InvalidGlob
-            | DiagnosticId::EmptyInclude
-            | DiagnosticId::UnnecessaryOverridesSection
-            | DiagnosticId::UselessOverridesSection
-            | DiagnosticId::DeprecatedSetting
-            | DiagnosticId::Unformatted
-            | DiagnosticId::InvalidCliOption
-            | DiagnosticId::InternalError => None,
-            DiagnosticId::Lint(lint_name) => {
-                Some(format!("{}/rules/{lint_name}", env!("CARGO_PKG_HOMEPAGE")))
-            }
-        }
-    }
-
     /// Returns the filename for the message.
     ///
     /// Panics if the diagnostic has no primary span, or if its file is not a `SourceFile`.

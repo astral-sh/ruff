@@ -18,7 +18,7 @@ use crate::types::{
     ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type, TypeContext,
     TypeVarBoundOrConstraints, class::CodeGeneratorKind,
 };
-use crate::{Db, HasType, NameKind, SemanticModel};
+use crate::{Db, DisplaySettings, HasType, NameKind, SemanticModel};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
@@ -1020,6 +1020,65 @@ pub fn call_signature_details<'db>(
         // Type is not callable, return empty signatures
         vec![]
     }
+}
+
+/// Given a call expression that has overloads, and whose overload is resolved to a
+/// single option by its arguments, return the type of the Signature.
+///
+/// This is only used for simplifying complex call types, so if we ever detect that
+/// the given callable type *is* simple, or that our answer *won't* be simple, we
+/// bail at out and return None, so that the original type can be used.
+///
+/// We do this because `Type::Signature` intentionally loses a lot of context, and
+/// so it has a "worse" display than say `Type::FunctionLiteral` or `Type::BoundMethod`,
+/// which this analysis would naturally wipe away. The contexts this function
+/// succeeds in are those where we would print a complicated/ugly type anyway.
+pub fn call_type_simplified_by_overloads<'db>(
+    db: &'db dyn Db,
+    model: &SemanticModel<'db>,
+    call_expr: &ast::ExprCall,
+) -> Option<String> {
+    let func_type = call_expr.func.inferred_type(model);
+
+    // Use into_callable to handle all the complex type conversions
+    let callable_type = func_type.try_upcast_to_callable(db)?;
+    let bindings = callable_type.bindings(db);
+
+    // If the callable is trivial this analysis is useless, bail out
+    if let Some(binding) = bindings.single_element()
+        && binding.overloads().len() < 2
+    {
+        return None;
+    }
+
+    // Hand the overload resolution system as much type info as we have
+    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |_, splatted_value| {
+        splatted_value.inferred_type(model)
+    });
+
+    // Try to resolve overloads with the arguments/types we have
+    let mut resolved = bindings
+        .match_parameters(db, &args)
+        .check_types(db, &args, TypeContext::default(), &[])
+        // Only use the Ok
+        .iter()
+        .flatten()
+        .flat_map(|binding| {
+            binding.matching_overloads().map(|(_, overload)| {
+                overload
+                    .signature
+                    .display_with(db, DisplaySettings::default().multiline())
+                    .to_string()
+            })
+        })
+        .collect::<Vec<_>>();
+
+    // If at the end of this we still got multiple signatures (or no signatures), give up
+    if resolved.len() != 1 {
+        return None;
+    }
+
+    resolved.pop()
 }
 
 /// Returns the definitions of the binary operation along with its callable type.

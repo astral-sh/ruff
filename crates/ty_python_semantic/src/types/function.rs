@@ -1790,14 +1790,21 @@ impl KnownFunction {
                                 // `Any` can be used in `issubclass()` calls but not `isinstance()` calls
                                 Type::SpecialForm(SpecialFormType::Any)
                                     if function == KnownFunction::IsSubclass => {}
-                                Type::KnownInstance(KnownInstanceType::UnionType(union)) => {
-                                    for element in union.elements(db) {
-                                        find_invalid_elements(
-                                            db,
-                                            function,
-                                            *element,
-                                            invalid_elements,
-                                        );
+                                Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
+                                    match instance.value_expression_types(db) {
+                                        Ok(value_expression_types) => {
+                                            for element in value_expression_types {
+                                                find_invalid_elements(
+                                                    db,
+                                                    function,
+                                                    element,
+                                                    invalid_elements,
+                                                );
+                                            }
+                                        }
+                                        Err(_) => {
+                                            invalid_elements.push(ty);
+                                        }
                                     }
                                 }
                                 _ => invalid_elements.push(ty),

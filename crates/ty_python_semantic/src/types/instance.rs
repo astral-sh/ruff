@@ -10,7 +10,7 @@ use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
-use crate::types::protocol_class::walk_protocol_interface;
+use crate::types::protocol_class::{ProtocolClass, walk_protocol_interface};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
@@ -44,13 +44,17 @@ impl<'db> Type<'db> {
                     .as_ref(),
             )),
             Some(KnownClass::Object) => Type::object(),
-            _ if class_literal.is_protocol(db) => {
-                Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
-            }
-            _ if class_literal.is_typed_dict(db) => Type::typed_dict(class),
-            // We don't call non_tuple_instance here because we've already checked that the class
-            // is not `object`
-            _ => Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class))),
+            _ => class_literal
+                .is_typed_dict(db)
+                .then(|| Type::typed_dict(class))
+                .or_else(|| {
+                    class.into_protocol_class(db).map(|protocol_class| {
+                        Self::ProtocolInstance(ProtocolInstanceType::from_class(protocol_class))
+                    })
+                })
+                .unwrap_or(Type::NominalInstance(NominalInstanceType(
+                    NominalInstanceInner::NonTuple(class),
+                ))),
         }
     }
 
@@ -601,7 +605,7 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
 impl<'db> ProtocolInstanceType<'db> {
     // Keep this method private, so that the only way of constructing `ProtocolInstanceType`
     // instances is through the `Type::instance` constructor function.
-    fn from_class(class: ClassType<'db>) -> Self {
+    fn from_class(class: ProtocolClass<'db>) -> Self {
         Self {
             inner: Protocol::FromClass(class),
             _phantom: PhantomData,
@@ -625,7 +629,7 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn as_nominal_type(self) -> Option<NominalInstanceType<'db>> {
         match self.inner {
             Protocol::FromClass(class) => {
-                Some(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
+                Some(NominalInstanceType(NominalInstanceInner::NonTuple(*class)))
             }
             Protocol::Synthesized(_) => None,
         }
@@ -805,11 +809,17 @@ impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {
 
 /// An enumeration of the two kinds of protocol types: those that originate from a class
 /// definition in source code, and those that are synthesized from a set of members.
+///
+/// # Ordering
+///
+/// Ordering between variants is stable and should be the same between runs.
+/// Ordering within variants is based on the wrapped data's salsa-assigned id and not on its values.
+/// The id may change between runs, or when e.g. a `Protocol` was garbage-collected and recreated.
 #[derive(
     Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
 )]
 pub(super) enum Protocol<'db> {
-    FromClass(ClassType<'db>),
+    FromClass(ProtocolClass<'db>),
     Synthesized(SynthesizedProtocolType<'db>),
 }
 
@@ -817,10 +827,7 @@ impl<'db> Protocol<'db> {
     /// Return the members of this protocol type
     fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         match self {
-            Self::FromClass(class) => class
-                .into_protocol_class(db)
-                .expect("Class wrapped by `Protocol` should be a protocol class")
-                .interface(db),
+            Self::FromClass(class) => class.interface(db),
             Self::Synthesized(synthesized) => synthesized.interface(),
         }
     }

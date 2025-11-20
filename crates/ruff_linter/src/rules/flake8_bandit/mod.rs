@@ -104,6 +104,8 @@ mod tests {
     #[test_case(Rule::SuspiciousURLOpenUsage, Path::new("S310.py"))]
     #[test_case(Rule::SuspiciousNonCryptographicRandomUsage, Path::new("S311.py"))]
     #[test_case(Rule::SuspiciousTelnetUsage, Path::new("S312.py"))]
+    #[test_case(Rule::SnmpInsecureVersion, Path::new("S508.py"))]
+    #[test_case(Rule::SnmpWeakCryptography, Path::new("S509.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

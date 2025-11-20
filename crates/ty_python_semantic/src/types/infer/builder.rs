@@ -102,13 +102,13 @@ use crate::types::typed_dict::{
 use crate::types::visitor::any_over_type;
 use crate::types::{
     CallDunderError, CallableBinding, CallableType, ClassLiteral, ClassType, DataclassParams,
-    DynamicType, InferredAs, InternedType, InternedTypes, IntersectionBuilder, IntersectionType,
-    KnownClass, KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
+    DynamicType, InternedType, IntersectionBuilder, IntersectionType, KnownClass,
+    KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
     PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType, SubclassOfType,
     TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
     TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
     TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
-    binding_type, liskov, todo_type,
+    UnionTypeInstance, binding_type, liskov, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -7916,6 +7916,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ty
             });
 
+        if callable_type.is_notimplemented(self.db()) {
+            if let Some(builder) = self
+                .context
+                .report_lint(&CALL_NON_CALLABLE, call_expression)
+            {
+                let mut diagnostic = builder.into_diagnostic("`NotImplemented` is not callable");
+                diagnostic.annotate(
+                    self.context
+                        .secondary(&**func)
+                        .message("Did you mean `NotImplementedError`?"),
+                );
+                diagnostic.set_concise_message(
+                    "`NotImplemented` is not callable - did you mean `NotImplementedError`?",
+                );
+            }
+            return Type::unknown();
+        }
+
         // Special handling for `TypedDict` method calls
         if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
             let value_type = self.expression_type(value);
@@ -8029,6 +8047,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // are handled by the default constructor-call logic (we synthesize a `__new__` method for them
                 // in `ClassType::own_class_member()`).
                 class.is_known(self.db(), KnownClass::Tuple) && !class.is_generic()
+            ) || CodeGeneratorKind::TypedDict.matches(
+                self.db(),
+                class.class_literal(self.db()).0,
+                class.class_literal(self.db()).1,
             );
 
             // temporary special-casing for all subclasses of `enum.Enum`
@@ -9511,7 +9533,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     | KnownInstanceType::Literal(_)
                     | KnownInstanceType::Annotated(_)
                     | KnownInstanceType::TypeGenericAlias(_)
-                    | KnownInstanceType::Callable(_),
+                    | KnownInstanceType::Callable(_)
+                    | KnownInstanceType::TypeVar(_),
                 ),
                 Type::ClassLiteral(..)
                 | Type::SubclassOf(..)
@@ -9522,20 +9545,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     | KnownInstanceType::Literal(_)
                     | KnownInstanceType::Annotated(_)
                     | KnownInstanceType::TypeGenericAlias(_)
-                    | KnownInstanceType::Callable(_),
+                    | KnownInstanceType::Callable(_)
+                    | KnownInstanceType::TypeVar(_),
                 ),
                 ast::Operator::BitOr,
             ) if pep_604_unions_allowed() => {
                 if left_ty.is_equivalent_to(self.db(), right_ty) {
                     Some(left_ty)
                 } else {
-                    Some(Type::KnownInstance(KnownInstanceType::UnionType(
-                        InternedTypes::from_elements(
-                            self.db(),
-                            [left_ty, right_ty],
-                            InferredAs::ValueExpression,
-                        ),
-                    )))
+                    Some(UnionTypeInstance::from_value_expression_types(
+                        self.db(),
+                        [left_ty, right_ty],
+                        self.scope(),
+                        self.typevar_binding_context,
+                    ))
                 }
             }
             (
@@ -9558,13 +9581,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ) if pep_604_unions_allowed()
                 && instance.has_known_class(self.db(), KnownClass::NoneType) =>
             {
-                Some(Type::KnownInstance(KnownInstanceType::UnionType(
-                    InternedTypes::from_elements(
-                        self.db(),
-                        [left_ty, right_ty],
-                        InferredAs::ValueExpression,
-                    ),
-                )))
+                Some(UnionTypeInstance::from_value_expression_types(
+                    self.db(),
+                    [left_ty, right_ty],
+                    self.scope(),
+                    self.typevar_binding_context,
+                ))
             }
 
             // We avoid calling `type.__(r)or__`, as typeshed annotates these methods as
@@ -10785,13 +10807,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return ty;
                 }
 
-                return Type::KnownInstance(KnownInstanceType::UnionType(
-                    InternedTypes::from_elements(
-                        self.db(),
-                        [ty, Type::none(self.db())],
-                        InferredAs::ValueExpression,
-                    ),
-                ));
+                return UnionTypeInstance::from_value_expression_types(
+                    self.db(),
+                    [ty, Type::none(self.db())],
+                    self.scope(),
+                    self.typevar_binding_context,
+                );
             }
             Type::SpecialForm(SpecialFormType::Union) => {
                 let db = self.db();
@@ -10806,7 +10827,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                         let is_empty = elements.peek().is_none();
                         let union_type = Type::KnownInstance(KnownInstanceType::UnionType(
-                            InternedTypes::from_elements(db, elements, InferredAs::TypeExpression),
+                            UnionTypeInstance::new(
+                                db,
+                                None,
+                                Ok(UnionType::from_elements(db, elements)),
+                            ),
                         ));
 
                         if is_empty {
@@ -10855,7 +10880,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "`typing.{}` requires exactly one argument",
-                            special_form.repr()
+                            special_form.name()
                         ));
                     }
                     Type::unknown()
@@ -10890,7 +10915,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             builder.into_diagnostic(format_args!(
                                 "`typing.{}` requires exactly two arguments, got {}",
-                                special_form.repr(),
+                                special_form.name(),
                                 arguments.len()
                             ));
                         }
@@ -10914,7 +10939,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "`typing.{}` requires exactly two arguments, got 1",
-                            special_form.repr()
+                            special_form.name()
                         ));
                     }
 
@@ -10929,6 +10954,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .to_specialized_class_type(self.db(), [first_ty, second_ty])
                     .map(Type::from)
                     .unwrap_or_else(Type::unknown);
+            }
+            Type::KnownInstance(KnownInstanceType::UnionType(_)) => {
+                return todo_type!("Specialization of union type alias");
             }
             _ => {}
         }

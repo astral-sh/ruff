@@ -155,6 +155,11 @@ impl Renderer {
         self
     }
 
+    pub const fn hyperlink(mut self, hyperlink: bool) -> Self {
+        self.stylesheet.hyperlink = hyperlink;
+        self
+    }
+
     /// Set the string used for when a long line is cut.
     ///
     /// The default is `...` (three `U+002E` characters).

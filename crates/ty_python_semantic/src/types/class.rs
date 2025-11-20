@@ -127,6 +127,16 @@ fn try_metaclass_cycle_initial<'db>(
     })
 }
 
+fn fields_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: ClassLiteral<'db>,
+    _specialization: Option<Specialization<'db>>,
+    _field_policy: CodeGeneratorKind<'db>,
+) -> FxIndexMap<Name, Field<'db>> {
+    FxIndexMap::default()
+}
+
 /// A category of classes with code generation capabilities (with synthesized methods).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum CodeGeneratorKind<'db> {
@@ -556,8 +566,10 @@ impl<'db> ClassType<'db> {
                     TypeRelation::Assignability => ConstraintSet::from(!other.is_final(db)),
                 },
 
-                // Protocol and Generic are not represented by a ClassType.
-                ClassBase::Protocol | ClassBase::Generic => ConstraintSet::from(false),
+                // Protocol, Generic, and TypedDict are not represented by a ClassType.
+                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => {
+                    ConstraintSet::from(false)
+                }
 
                 ClassBase::Class(base) => match (base, other) {
                     (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => {
@@ -580,11 +592,6 @@ impl<'db> ClassType<'db> {
                         ConstraintSet::from(false)
                     }
                 },
-
-                ClassBase::TypedDict => {
-                    // TODO: Implement subclassing and assignability for TypedDicts.
-                    ConstraintSet::from(true)
-                }
             }
         })
     }
@@ -2825,7 +2832,10 @@ impl<'db> ClassLiteral<'db> {
     /// Returns a list of all annotated attributes defined in this class, or any of its superclasses.
     ///
     /// See [`ClassLiteral::own_fields`] for more details.
-    #[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial=fields_cycle_initial,
+        heap_size=get_size2::GetSize::get_heap_size)]
     pub(crate) fn fields(
         self,
         db: &'db dyn Db,
@@ -4006,6 +4016,7 @@ pub enum KnownClass {
     SupportsIndex,
     Iterable,
     Iterator,
+    Mapping,
     // typing_extensions
     ExtensionsTypeVar, // must be distinct from typing.TypeVar, backports new features
     // Collections
@@ -4030,6 +4041,8 @@ pub enum KnownClass {
     Path,
     // ty_extensions
     ConstraintSet,
+    GenericContext,
+    Specialization,
 }
 
 impl KnownClass {
@@ -4118,6 +4131,7 @@ impl KnownClass {
             | Self::ABCMeta
             | Self::Iterable
             | Self::Iterator
+            | Self::Mapping
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
@@ -4133,6 +4147,8 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::GenericContext
+            | Self::Specialization
             | Self::ProtocolMeta
             | Self::TypedDictFallback => Some(Truthiness::Ambiguous),
 
@@ -4202,6 +4218,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::Mapping
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -4216,6 +4233,8 @@ impl KnownClass {
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
             | KnownClass::ConstraintSet
+            | KnownClass::GenericContext
+            | KnownClass::Specialization
             | KnownClass::TypedDictFallback
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
@@ -4285,6 +4304,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::Mapping
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -4299,6 +4319,8 @@ impl KnownClass {
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
             | KnownClass::ConstraintSet
+            | KnownClass::GenericContext
+            | KnownClass::Specialization
             | KnownClass::TypedDictFallback
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
@@ -4368,6 +4390,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::Mapping
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -4382,6 +4405,8 @@ impl KnownClass {
             | KnownClass::NamedTupleLike
             | KnownClass::NamedTupleFallback
             | KnownClass::ConstraintSet
+            | KnownClass::GenericContext
+            | KnownClass::Specialization
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
             | KnownClass::Template
@@ -4476,11 +4501,14 @@ impl KnownClass {
             | Self::InitVar
             | Self::NamedTupleFallback
             | Self::ConstraintSet
+            | Self::GenericContext
+            | Self::Specialization
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
             | Self::Template
-            | KnownClass::Path => false,
+            | Self::Path
+            | Self::Mapping => false,
         }
     }
 
@@ -4553,6 +4581,7 @@ impl KnownClass {
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
             | KnownClass::Iterator
+            | KnownClass::Mapping
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -4565,6 +4594,8 @@ impl KnownClass {
             | KnownClass::Template
             | KnownClass::Path
             | KnownClass::ConstraintSet
+            | KnownClass::GenericContext
+            | KnownClass::Specialization
             | KnownClass::InitVar => false,
             KnownClass::NamedTupleFallback | KnownClass::TypedDictFallback => true,
         }
@@ -4641,6 +4672,7 @@ impl KnownClass {
             Self::Super => "super",
             Self::Iterable => "Iterable",
             Self::Iterator => "Iterator",
+            Self::Mapping => "Mapping",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
             Self::StdlibAlias => "_Alias",
             // This is the name the type of `sys.version_info` has in typeshed,
@@ -4673,6 +4705,8 @@ impl KnownClass {
             Self::NamedTupleFallback => "NamedTupleFallback",
             Self::NamedTupleLike => "NamedTupleLike",
             Self::ConstraintSet => "ConstraintSet",
+            Self::GenericContext => "GenericContext",
+            Self::Specialization => "Specialization",
             Self::TypedDictFallback => "TypedDictFallback",
             Self::Template => "Template",
             Self::Path => "Path",
@@ -4885,7 +4919,7 @@ impl KnownClass {
     }
 
     /// Return the module in which we should look up the definition for this class
-    fn canonical_module(self, db: &dyn Db) -> KnownModule {
+    pub(super) fn canonical_module(self, db: &dyn Db) -> KnownModule {
         match self {
             Self::Bool
             | Self::Object
@@ -4937,6 +4971,7 @@ impl KnownClass {
             | Self::StdlibAlias
             | Self::Iterable
             | Self::Iterator
+            | Self::Mapping
             | Self::ProtocolMeta
             | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType
@@ -4984,7 +5019,10 @@ impl KnownClass {
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field | Self::KwOnly | Self::InitVar => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
-            Self::NamedTupleLike | Self::ConstraintSet => KnownModule::TyExtensions,
+            Self::NamedTupleLike
+            | Self::ConstraintSet
+            | Self::GenericContext
+            | Self::Specialization => KnownModule::TyExtensions,
             Self::Template => KnownModule::Templatelib,
             Self::Path => KnownModule::Pathlib,
         }
@@ -5064,9 +5102,12 @@ impl KnownClass {
             | Self::InitVar
             | Self::Iterable
             | Self::Iterator
+            | Self::Mapping
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::GenericContext
+            | Self::Specialization
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
@@ -5152,9 +5193,12 @@ impl KnownClass {
             | Self::InitVar
             | Self::Iterable
             | Self::Iterator
+            | Self::Mapping
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::GenericContext
+            | Self::Specialization
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
@@ -5213,6 +5257,7 @@ impl KnownClass {
             "TypeVar" => &[Self::TypeVar, Self::ExtensionsTypeVar],
             "Iterable" => &[Self::Iterable],
             "Iterator" => &[Self::Iterator],
+            "Mapping" => &[Self::Mapping],
             "ParamSpec" => &[Self::ParamSpec],
             "ParamSpecArgs" => &[Self::ParamSpecArgs],
             "ParamSpecKwargs" => &[Self::ParamSpecKwargs],
@@ -5258,6 +5303,8 @@ impl KnownClass {
             "NamedTupleFallback" => &[Self::NamedTupleFallback],
             "NamedTupleLike" => &[Self::NamedTupleLike],
             "ConstraintSet" => &[Self::ConstraintSet],
+            "GenericContext" => &[Self::GenericContext],
+            "Specialization" => &[Self::Specialization],
             "TypedDictFallback" => &[Self::TypedDictFallback],
             "Template" => &[Self::Template],
             "Path" => &[Self::Path],
@@ -5335,6 +5382,8 @@ impl KnownClass {
             | Self::ExtensionsTypeVar
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::GenericContext
+            | Self::Specialization
             | Self::Awaitable
             | Self::Generator
             | Self::Template
@@ -5350,6 +5399,7 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::Iterable
             | Self::Iterator
+            | Self::Mapping
             | Self::ProtocolMeta
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
             Self::Deprecated => matches!(module, KnownModule::Warnings | KnownModule::TypingExtensions),

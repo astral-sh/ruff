@@ -16,23 +16,24 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
  2 | 
  3 | class Person(TypedDict):
  4 |     name: str
- 5 | 
- 6 | class Animal(TypedDict):
- 7 |     name: str
- 8 |     legs: int
- 9 | 
-10 | def _(being: Person | Animal) -> None:
-11 |     being["legs"] = 4  # error: [invalid-key]
+ 5 |     phone_number: str
+ 6 | 
+ 7 | class Animal(TypedDict):
+ 8 |     name: str
+ 9 |     legs: int
+10 | 
+11 | def _(being: Person | Animal) -> None:
+12 |     being["legs"] = 4  # error: [invalid-key]
 ```
 
 # Diagnostics
 
 ```
 error[invalid-key]: Unknown key "legs" for TypedDict `Person`
-  --> src/mdtest_snippet.py:11:5
+  --> src/mdtest_snippet.py:12:5
    |
-10 | def _(being: Person | Animal) -> None:
-11 |     being["legs"] = 4  # error: [invalid-key]
+11 | def _(being: Person | Animal) -> None:
+12 |     being["legs"] = 4  # error: [invalid-key]
    |     ----- ^^^^^^ Unknown key "legs"
    |     |
    |     TypedDict `Person` in union type `Person | Animal`
