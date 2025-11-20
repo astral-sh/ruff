@@ -212,19 +212,12 @@ IntOrStr = Union[int, str]
 reveal_type(IntOrStr)  # revealed: types.UnionType
 
 def f(x: type[int | str | bytes | range]):
-    # TODO: No error
-    # error: [invalid-argument-type]
     if issubclass(x, IntOrStr):
-        # TODO: Should be `type[int] | type[str]`
-        reveal_type(x)  # revealed: type[int] | type[str] | type[bytes] | <class 'range'>
-    # TODO: No error
-    # error: [invalid-argument-type]
+        reveal_type(x)  # revealed: type[int] | type[str]
     elif issubclass(x, Union[bytes, memoryview]):
-        # TODO: Should be `type[bytes]`
-        reveal_type(x)  # revealed: type[int] | type[str] | type[bytes] | <class 'range'>
+        reveal_type(x)  # revealed: type[bytes]
     else:
-        # TODO: Should be `<class 'range'>`
-        reveal_type(x)  # revealed: type[int] | type[str] | type[bytes] | <class 'range'>
+        reveal_type(x)  # revealed: <class 'range'>
 ```
 
 ## Special cases

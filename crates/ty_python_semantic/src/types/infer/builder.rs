@@ -102,13 +102,13 @@ use crate::types::typed_dict::{
 use crate::types::visitor::any_over_type;
 use crate::types::{
     CallDunderError, CallableBinding, CallableType, ClassLiteral, ClassType, DataclassParams,
-    DynamicType, InferredAs, InternedType, InternedTypes, IntersectionBuilder, IntersectionType,
-    KnownClass, KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
+    DynamicType, InternedType, IntersectionBuilder, IntersectionType, KnownClass,
+    KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
     PEP695TypeAliasType, ParameterForm, SpecialFormType, SubclassOfType, TrackedConstraintSet,
     Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
     TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
     TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
-    binding_type, infer_scope_types, todo_type,
+    UnionTypeInstance, binding_type, infer_scope_types, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -9584,13 +9584,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if left_ty.is_equivalent_to(self.db(), right_ty) {
                     Some(left_ty)
                 } else {
-                    Some(Type::KnownInstance(KnownInstanceType::UnionType(
-                        InternedTypes::from_elements(
-                            self.db(),
-                            [left_ty, right_ty],
-                            InferredAs::ValueExpression,
-                        ),
-                    )))
+                    Some(UnionTypeInstance::from_value_expression_types(
+                        self.db(),
+                        [left_ty, right_ty],
+                        self.scope(),
+                        self.typevar_binding_context,
+                    ))
                 }
             }
             (
@@ -9613,13 +9612,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ) if pep_604_unions_allowed()
                 && instance.has_known_class(self.db(), KnownClass::NoneType) =>
             {
-                Some(Type::KnownInstance(KnownInstanceType::UnionType(
-                    InternedTypes::from_elements(
-                        self.db(),
-                        [left_ty, right_ty],
-                        InferredAs::ValueExpression,
-                    ),
-                )))
+                Some(UnionTypeInstance::from_value_expression_types(
+                    self.db(),
+                    [left_ty, right_ty],
+                    self.scope(),
+                    self.typevar_binding_context,
+                ))
             }
 
             // We avoid calling `type.__(r)or__`, as typeshed annotates these methods as
@@ -10840,13 +10838,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return ty;
                 }
 
-                return Type::KnownInstance(KnownInstanceType::UnionType(
-                    InternedTypes::from_elements(
-                        self.db(),
-                        [ty, Type::none(self.db())],
-                        InferredAs::ValueExpression,
-                    ),
-                ));
+                return UnionTypeInstance::from_value_expression_types(
+                    self.db(),
+                    [ty, Type::none(self.db())],
+                    self.scope(),
+                    self.typevar_binding_context,
+                );
             }
             Type::SpecialForm(SpecialFormType::Union) => {
                 let db = self.db();
@@ -10861,7 +10858,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                         let is_empty = elements.peek().is_none();
                         let union_type = Type::KnownInstance(KnownInstanceType::UnionType(
-                            InternedTypes::from_elements(db, elements, InferredAs::TypeExpression),
+                            UnionTypeInstance::new(
+                                db,
+                                None,
+                                Ok(UnionType::from_elements(db, elements)),
+                            ),
                         ));
 
                         if is_empty {
