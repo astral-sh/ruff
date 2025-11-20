@@ -322,6 +322,10 @@ multiline_bad_or_dict = {
     "bad": 123
 }
 
+multiline_bad_dict_one_element = {
+    "bad": 123
+}
+
 # ==> multiline_good_dict.py <==
 multiline_good_dict = {
     "good": 123,

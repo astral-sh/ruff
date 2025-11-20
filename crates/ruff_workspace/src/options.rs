@@ -892,6 +892,10 @@ pub struct LintCommonOptions {
     #[option_group]
     pub flake8_builtins: Option<Flake8BuiltinsOptions>,
 
+    /// Options for the `flake8-commas` plugin.
+    #[option_group]
+    pub flake8_commas: Option<Flake8CommasOptions>,
+
     /// Options for the `flake8-comprehensions` plugin.
     #[option_group]
     pub flake8_comprehensions: Option<Flake8ComprehensionsOptions>,
@@ -1344,6 +1348,32 @@ impl Flake8BuiltinsOptions {
                 .strict_checking
                 .or(self.builtins_strict_checking)
                 // use the old default of true on non-preview
+                .unwrap_or_default(),
+        }
+    }
+}
+
+/// Options for the `flake8-commas` plugin.
+#[derive(
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct Flake8CommasOptions {
+    /// Don't require trailing comma in function calls with a single argument.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = "allow-single-arg-function-calls = true"
+    )]
+    pub allow_single_arg_function_calls: Option<bool>,
+}
+
+impl Flake8CommasOptions {
+    pub fn into_settings(self) -> ruff_linter::rules::flake8_commas::settings::Settings {
+        ruff_linter::rules::flake8_commas::settings::Settings {
+            allow_single_arg_function_calls: self
+                .allow_single_arg_function_calls
                 .unwrap_or_default(),
         }
     }
@@ -3935,6 +3965,7 @@ pub struct LintOptionsWire {
     flake8_boolean_trap: Option<Flake8BooleanTrapOptions>,
     flake8_bugbear: Option<Flake8BugbearOptions>,
     flake8_builtins: Option<Flake8BuiltinsOptions>,
+    flake8_commas: Option<Flake8CommasOptions>,
     flake8_comprehensions: Option<Flake8ComprehensionsOptions>,
     flake8_copyright: Option<Flake8CopyrightOptions>,
     flake8_errmsg: Option<Flake8ErrMsgOptions>,
@@ -3992,6 +4023,7 @@ impl From<LintOptionsWire> for LintOptions {
             flake8_boolean_trap,
             flake8_bugbear,
             flake8_builtins,
+            flake8_commas,
             flake8_comprehensions,
             flake8_copyright,
             flake8_errmsg,
@@ -4048,6 +4080,7 @@ impl From<LintOptionsWire> for LintOptions {
                 flake8_boolean_trap,
                 flake8_bugbear,
                 flake8_builtins,
+                flake8_commas,
                 flake8_comprehensions,
                 flake8_copyright,
                 flake8_errmsg,
