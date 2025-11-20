@@ -1647,6 +1647,27 @@ impl<'db> SpecializationBuilder<'db> {
                 }
             }
 
+            (Type::Callable(formal_callable), _) => {
+                if let Some(Type::Callable(actual_callable)) =
+                    actual.try_upcast_to_callable(self.db)
+                {
+                    for formal_signature in &formal_callable.signatures(self.db).overloads {
+                        for actual_signature in &actual_callable.signatures(self.db).overloads {
+                            if let Some(formal_return_ty) = formal_signature.return_ty
+                                && let Some(actual_return_ty) = actual_signature.return_ty
+                            {
+                                self.infer_map_impl(
+                                    formal_return_ty,
+                                    actual_return_ty,
+                                    polarity,
+                                    &mut f,
+                                )?;
+                            }
+                        }
+                    }
+                }
+            }
+
             // TODO: Add more forms that we can structurally induct into: type[C], callables
             _ => {}
         }

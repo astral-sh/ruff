@@ -82,8 +82,7 @@ def get_default() -> str:
 
 reveal_type(field(default=1))  # revealed: dataclasses.Field[Literal[1]]
 reveal_type(field(default=None))  # revealed: dataclasses.Field[None]
-# TODO: this could ideally be `dataclasses.Field[str]` with a better generics solver
-reveal_type(field(default_factory=get_default))  # revealed: dataclasses.Field[Unknown]
+reveal_type(field(default_factory=get_default))  # revealed: dataclasses.Field[str]
 ```
 
 ## dataclass_transform field_specifiers
