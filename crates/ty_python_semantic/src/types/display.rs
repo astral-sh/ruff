@@ -101,6 +101,122 @@ impl<'db> DisplaySettings<'db> {
     }
 }
 
+enum TypeWriter<'a, 'b, 'db> {
+    Formatter(&'a mut Formatter<'b>),
+    Details(TypeDetailsWriter<'db>),
+}
+
+/// Writer that builds a string with range tracking
+struct TypeDetailsWriter<'db> {
+    label: String,
+    targets: Vec<TextRange>,
+    details: Vec<TypeDetail<'db>>,
+}
+impl TypeDetailsWriter<'_> {
+    fn new() -> Self {
+        Self {
+            label: String::new(),
+            targets: Vec::new(),
+            details: Vec::new(),
+        }
+    }
+
+    fn finish_signature_details(self) -> SignatureDisplayDetails {
+        let mut parameter_ranges = Vec::new();
+        let mut parameter_names = Vec::new();
+        let mut parameter_nesting = 0;
+        for (target, detail) in self.targets.into_iter().zip(self.details) {
+            match detail {
+                TypeDetail::SignatureStart => parameter_nesting += 1,
+                TypeDetail::SignatureEnd => parameter_nesting -= 1,
+                TypeDetail::Parameter(parameter) => {
+                    if parameter_nesting <= 1 {
+                        parameter_names.push(parameter);
+                        parameter_ranges.push(target);
+                    }
+                }
+                TypeDetail::Type(_) => { /* don't care */ }
+            }
+        }
+
+        SignatureDisplayDetails {
+            label: self.label,
+            parameter_names,
+            parameter_ranges,
+        }
+    }
+}
+
+impl<'a, 'b, 'db> TypeWriter<'a, 'b, 'db> {
+    fn with_detail<'c>(&'c mut self, detail: TypeDetail<'db>) -> TypeDetailGuard<'a, 'b, 'c, 'db> {
+        let start = match self {
+            TypeWriter::Formatter(_) => None,
+            TypeWriter::Details(details) => Some(details.label.len()),
+        };
+        TypeDetailGuard {
+            start,
+            inner: self,
+            payload: Some(detail),
+        }
+    }
+}
+impl std::fmt::Write for TypeWriter<'_, '_, '_> {
+    fn write_str(&mut self, val: &str) -> fmt::Result {
+        match self {
+            TypeWriter::Formatter(formatter) => formatter.write_str(val),
+            TypeWriter::Details(formatter) => formatter.write_str(val),
+        }
+    }
+}
+impl std::fmt::Write for TypeDetailsWriter<'_> {
+    fn write_str(&mut self, val: &str) -> fmt::Result {
+        self.label.write_str(val)
+    }
+}
+
+enum TypeDetail<'db> {
+    SignatureStart,
+    SignatureEnd,
+    Parameter(String),
+    Type(Type<'db>),
+}
+
+struct TypeDetailGuard<'a, 'b, 'c, 'db> {
+    inner: &'c mut TypeWriter<'a, 'b, 'db>,
+    start: Option<usize>,
+    payload: Option<TypeDetail<'db>>,
+}
+
+impl Drop for TypeDetailGuard<'_, '_, '_, '_> {
+    fn drop(&mut self) {
+        // The fallibility here is primarily retrieving `TypeWriter::Details`
+        // everything else is ideally-never-fails pedantry (yay for pedantry!)
+        if let TypeWriter::Details(details) = &mut self.inner
+            && let Ok(end) = u32::try_from(details.label.len())
+            && let Some(start) = self.start
+            && let Ok(start) = u32::try_from(start)
+            && let Some(len) = end.checked_sub(start)
+            && let Some(payload) = self.payload.take()
+        {
+            let target = TextRange::at(TextSize::new(start), TextSize::new(len));
+            details.targets.push(target);
+            details.details.push(payload);
+        }
+    }
+}
+
+impl<'a, 'b, 'db> std::ops::Deref for TypeDetailGuard<'a, 'b, '_, 'db> {
+    type Target = TypeWriter<'a, 'b, 'db>;
+    fn deref(&self) -> &Self::Target {
+        self.inner
+    }
+}
+impl std::ops::DerefMut for TypeDetailGuard<'_, '_, '_, '_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.inner
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QualificationLevel {
     ModuleName,
@@ -1179,17 +1295,21 @@ pub(crate) struct DisplaySignature<'db> {
 impl DisplaySignature<'_> {
     /// Get detailed display information including component ranges
     pub(crate) fn to_string_parts(&self) -> SignatureDisplayDetails {
-        let mut writer = SignatureWriter::Details(SignatureDetailsWriter::new());
+        let mut writer = TypeWriter::Details(TypeDetailsWriter::new());
         self.write_signature(&mut writer).unwrap();
 
         match writer {
-            SignatureWriter::Details(details) => details.finish(),
-            SignatureWriter::Formatter(_) => unreachable!("Expected Details variant"),
+            TypeWriter::Details(details) => details.finish_signature_details(),
+            TypeWriter::Formatter(_) => unreachable!("Expected Details variant"),
         }
     }
 
     /// Internal method to write signature with the signature writer
-    fn write_signature(&self, writer: &mut SignatureWriter) -> fmt::Result {
+    fn write_signature(&self, writer: &mut TypeWriter) -> fmt::Result {
+        // Immediately write a marker signaling we're starting a signature
+        let _ = writer.with_detail(TypeDetail::SignatureStart);
+        // When we exit this function, write a marker signaling we're ending a signature
+        let mut writer = writer.with_detail(TypeDetail::SignatureEnd);
         let multiline = self.settings.multiline && self.parameters.len() > 1;
         // Opening parenthesis
         writer.write_char('(')?;
@@ -1233,10 +1353,15 @@ impl DisplaySignature<'_> {
                 }
 
                 // Write parameter with range tracking
-                let param_name = parameter.display_name();
-                writer.write_parameter(
-                    &parameter.display_with(self.db, self.settings.singleline()),
-                    param_name.as_deref(),
+                let param_name = parameter
+                    .display_name()
+                    .map(|name| name.to_string())
+                    .unwrap_or_default();
+                let mut writer = writer.with_detail(TypeDetail::Parameter(param_name));
+                write!(
+                    &mut writer,
+                    "{}",
+                    parameter.display_with(self.db, self.settings.singleline())
                 )?;
 
                 first = false;
@@ -1258,7 +1383,11 @@ impl DisplaySignature<'_> {
 
         // Return type
         let return_ty = self.return_ty.unwrap_or_else(Type::unknown);
-        writer.write_return_type(&return_ty.display_with(self.db, self.settings.singleline()))?;
+        write!(
+            &mut writer,
+            " -> {}",
+            return_ty.display_with(self.db, self.settings.singleline())
+        )?;
 
         Ok(())
     }
@@ -1266,102 +1395,10 @@ impl DisplaySignature<'_> {
 
 impl Display for DisplaySignature<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut writer = SignatureWriter::Formatter(f);
+        let mut writer = TypeWriter::Formatter(f);
         self.write_signature(&mut writer)
     }
 }
-
-/// Writer for building signature strings with different output targets
-enum SignatureWriter<'a, 'b> {
-    /// Write directly to a formatter (for Display trait)
-    Formatter(&'a mut Formatter<'b>),
-    /// Build a string with range tracking (for `to_string_parts`)
-    Details(SignatureDetailsWriter),
-}
-
-/// Writer that builds a string with range tracking
-struct SignatureDetailsWriter {
-    label: String,
-    parameter_ranges: Vec<TextRange>,
-    parameter_names: Vec<String>,
-}
-
-impl SignatureDetailsWriter {
-    fn new() -> Self {
-        Self {
-            label: String::new(),
-            parameter_ranges: Vec::new(),
-            parameter_names: Vec::new(),
-        }
-    }
-
-    fn finish(self) -> SignatureDisplayDetails {
-        SignatureDisplayDetails {
-            label: self.label,
-            parameter_ranges: self.parameter_ranges,
-            parameter_names: self.parameter_names,
-        }
-    }
-}
-
-impl SignatureWriter<'_, '_> {
-    fn write_char(&mut self, c: char) -> fmt::Result {
-        match self {
-            SignatureWriter::Formatter(f) => f.write_char(c),
-            SignatureWriter::Details(details) => {
-                details.label.push(c);
-                Ok(())
-            }
-        }
-    }
-
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        match self {
-            SignatureWriter::Formatter(f) => f.write_str(s),
-            SignatureWriter::Details(details) => {
-                details.label.push_str(s);
-                Ok(())
-            }
-        }
-    }
-
-    fn write_parameter<T: Display>(&mut self, param: &T, param_name: Option<&str>) -> fmt::Result {
-        match self {
-            SignatureWriter::Formatter(f) => param.fmt(f),
-            SignatureWriter::Details(details) => {
-                let param_start = details.label.len();
-                let param_display = param.to_string();
-                details.label.push_str(&param_display);
-
-                // Use TextSize::try_from for safe conversion, falling back to empty range on overflow
-                let start = TextSize::try_from(param_start).unwrap_or_default();
-                let length = TextSize::try_from(param_display.len()).unwrap_or_default();
-                details.parameter_ranges.push(TextRange::at(start, length));
-
-                // Store the parameter name if available
-                if let Some(name) = param_name {
-                    details.parameter_names.push(name.to_string());
-                } else {
-                    details.parameter_names.push(String::new());
-                }
-
-                Ok(())
-            }
-        }
-    }
-
-    fn write_return_type<T: Display>(&mut self, return_ty: &T) -> fmt::Result {
-        match self {
-            SignatureWriter::Formatter(f) => write!(f, " -> {return_ty}"),
-            SignatureWriter::Details(details) => {
-                let return_display = format!(" -> {return_ty}");
-                details.label.push_str(&return_display);
-                Ok(())
-            }
-        }
-    }
-}
-
 /// Details about signature display components, including ranges for parameters and return type
 #[derive(Debug, Clone)]
 pub(crate) struct SignatureDisplayDetails {
