@@ -23,6 +23,7 @@ use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
+use smallvec::{SmallVec, smallvec};
 use std::collections::hash_map::Entry;
 
 use super::UnionType;
@@ -261,6 +262,7 @@ impl ClassInfoConstraintFunction {
             | Type::IntLiteral(_)
             | Type::KnownInstance(_)
             | Type::TypeIs(_)
+            | Type::TypeGuard(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_)
@@ -269,46 +271,242 @@ impl ClassInfoConstraintFunction {
     }
 }
 
+/// Represents a single conjunction (AND) of constraints in Disjunctive Normal
+/// Form (DNF).
+///
+/// A conjunction may contain: - A regular constraint (intersection of types) -
+/// An optional `TypeGuard` constraint that "replaces" the type rather than
+/// intersecting
+///
+/// For example, `(Conjunction { constraint: A, typeguard: Some(B) } &
+/// Conjunction { constraint: C, typeguard: Some(D)})` evlaluates to
+/// `Conjunction { constraint: C, typeguard: Some(D) }` because the type guard
+/// in the second clobbers the first.
+#[derive(Hash, PartialEq, Debug, Eq, Clone, Copy)]
+struct Conjunction<'db> {
+    /// The intersected constraints (represented as an intersection type)
+    constraint: Type<'db>,
+    /// If any constraint in this conjunction is a `TypeGuard`, this is Some and
+    /// contains the union of all `TypeGuard` types in this conjunction
+    typeguard: Option<Type<'db>>,
+}
+
+impl get_size2::GetSize for Conjunction<'_> {}
+
+impl<'db> Conjunction<'db> {
+    /// Create a new conjunction with just a regular constraint
+    fn regular(constraint: Type<'db>) -> Self {
+        Self {
+            constraint,
+            typeguard: None,
+        }
+    }
+
+    /// Create a new conjunction with a `TypeGuard` constraint
+    fn typeguard(constraint: Type<'db>) -> Self {
+        Self {
+            constraint: Type::object(),
+            typeguard: Some(constraint),
+        }
+    }
+
+    /// Evaluate this conjunction to a single type.
+    /// If there's a `TypeGuard` constraint, it replaces the regular constraint.
+    /// Otherwise, returns the regular constraint.
+    fn evaluate_type_constraint(self, db: &'db dyn Db) -> Type<'db> {
+        self.typeguard.map_or_else(
+            || self.constraint,
+            |typeguard_constraint| {
+                IntersectionBuilder::new(db)
+                    .add_positive(typeguard_constraint)
+                    .add_positive(self.constraint)
+                    .build()
+            },
+        )
+    }
+}
+
+/// Represents narrowing constraints in Disjunctive Normal Form (DNF).
+///
+/// This is a disjunction (OR) of conjunctions (AND) of constraints.
+/// The DNF representation allows us to properly track `TypeGuard` constraints
+/// through boolean operations.
+///
+/// For example:
+/// - `f(x) and g(x)` where f returns `TypeIs[A]` and g returns `TypeGuard[B]`
+///   => `[Conjunction { constraint: A, typeguard: Some(B) }]`
+///   => evaluates to `B` (`TypeGuard` clobbers)
+///
+/// - `f(x) or g(x)` where f returns `TypeIs[A]` and g returns `TypeGuard[B]`
+///   => `[Conjunction { constraint: A, typeguard: None }, Conjunction { constraint: object, typeguard: Some(B) }]`
+///   => evaluates to `A | B`
+#[derive(Hash, PartialEq, Debug, Eq, Clone)]
+struct NarrowingConstraint<'db> {
+    /// Disjunctions of conjunctions (DNF)
+    disjuncts: SmallVec<[Conjunction<'db>; 4]>,
+}
+
+impl get_size2::GetSize for NarrowingConstraint<'_> {}
+
+impl<'db> NarrowingConstraint<'db> {
+    /// Create a constraint from a regular (non-`TypeGuard`) type
+    fn regular(constraint: Type<'db>) -> Self {
+        Self {
+            disjuncts: smallvec![Conjunction::regular(constraint)],
+        }
+    }
+
+    /// Create a constraint from a `TypeGuard` type
+    fn typeguard(constraint: Type<'db>) -> Self {
+        Self {
+            disjuncts: smallvec![Conjunction::typeguard(constraint)],
+        }
+    }
+
+    /// Evaluate the type this effectively constrains to
+    ///
+    /// Forgets whether each constraint originated from a `TypeGuard` or not
+    fn evaluate_type_constraint(self, db: &'db dyn Db) -> Type<'db> {
+        UnionType::from_elements(
+            db,
+            self.disjuncts
+                .into_iter()
+                .map(|disjunct| Conjunction::evaluate_type_constraint(disjunct, db)),
+        )
+    }
+}
+
+impl<'db> From<Type<'db>> for NarrowingConstraint<'db> {
+    fn from(constraint: Type<'db>) -> Self {
+        Self::regular(constraint)
+    }
+}
+
+/// Internal representation of constraints with DNF structure for tracking `TypeGuard` semantics.
+///
+/// This is a newtype wrapper around `FxHashMap<ScopedPlaceId, NarrowingConstraint<'db>>` that
+/// provides methods for working with constraints during boolean operation evaluation.
+#[derive(Clone, Debug, Default)]
+struct InternalConstraints<'db> {
+    constraints: FxHashMap<ScopedPlaceId, NarrowingConstraint<'db>>,
+}
+
+impl<'db> InternalConstraints<'db> {
+    /// Insert a regular (non-`TypeGuard`) constraint for a place
+    fn insert_regular(&mut self, place: ScopedPlaceId, ty: Type<'db>) {
+        self.constraints
+            .insert(place, NarrowingConstraint::regular(ty));
+    }
+
+    /// Convert internal constraints to public constraints by evaluating each DNF constraint to a Type
+    fn evaluate_type_constraints(self, db: &'db dyn Db) -> NarrowingConstraints<'db> {
+        self.constraints
+            .into_iter()
+            .map(|(place, constraint)| (place, constraint.evaluate_type_constraint(db)))
+            .collect()
+    }
+}
+
+impl<'db> FromIterator<(ScopedPlaceId, NarrowingConstraint<'db>)> for InternalConstraints<'db> {
+    fn from_iter<T: IntoIterator<Item = (ScopedPlaceId, NarrowingConstraint<'db>)>>(
+        iter: T,
+    ) -> Self {
+        Self {
+            constraints: FxHashMap::from_iter(iter),
+        }
+    }
+}
+
+/// Public representation of constraints as returned by tracked functions
 type NarrowingConstraints<'db> = FxHashMap<ScopedPlaceId, Type<'db>>;
 
+/// Merge constraints with AND semantics (intersection/conjunction).
+///
+/// When we have `constraint1 & constraint2`, we need to distribute AND over the OR
+/// in the DNF representations:
+/// `(A | B) & (C | D)` becomes `(A & C) | (A & D) | (B & C) | (B & D)`
+///
+/// For each conjunction pair, we:
+/// - Take the right conjunct if it has a `TypeGuard`
+/// - Intersect the constraints normally otherwise
 fn merge_constraints_and<'db>(
-    into: &mut NarrowingConstraints<'db>,
-    from: &NarrowingConstraints<'db>,
+    into: &mut InternalConstraints<'db>,
+    from: &InternalConstraints<'db>,
     db: &'db dyn Db,
 ) {
-    for (key, value) in from {
-        match into.entry(*key) {
+    for (key, from_constraint) in &from.constraints {
+        match into.constraints.entry(*key) {
             Entry::Occupied(mut entry) => {
-                *entry.get_mut() = IntersectionBuilder::new(db)
-                    .add_positive(*entry.get())
-                    .add_positive(*value)
-                    .build();
+                let into_constraint = entry.get();
+
+                // Distribute AND over OR: (A1 | A2 | ...) AND (B1 | B2 | ...)
+                // becomes (A1 & B1) | (A1 & B2) | ... | (A2 & B1) | ...
+                let mut new_disjuncts = SmallVec::new();
+
+                for left_conj in &into_constraint.disjuncts {
+                    for right_conj in &from_constraint.disjuncts {
+                        if right_conj.typeguard.is_some() {
+                            // If the right conjunct has a TypeGuard, it "wins" the conjunction
+                            new_disjuncts.push(*right_conj);
+                        } else {
+                            // Intersect the regular constraints
+                            let new_regular = IntersectionBuilder::new(db)
+                                .add_positive(left_conj.constraint)
+                                .add_positive(right_conj.constraint)
+                                .build();
+
+                            new_disjuncts.push(Conjunction {
+                                constraint: new_regular,
+                                typeguard: left_conj.typeguard,
+                            });
+                        }
+                    }
+                }
+
+                *entry.get_mut() = NarrowingConstraint {
+                    disjuncts: new_disjuncts,
+                };
             }
             Entry::Vacant(entry) => {
-                entry.insert(*value);
+                entry.insert(from_constraint.clone());
             }
         }
     }
 }
 
+/// Merge constraints with OR semantics (union/disjunction).
+///
+/// When we have `constraint1 OR constraint2`, we simply concatenate the disjuncts
+/// from both constraints: `(A | B) OR (C | D)` becomes `A | B | C | D`
+///
+/// However, if a place appears in only one branch of the OR, we need to widen it
+/// to `object` in the overall result (because the other branch doesn't constrain it).
 fn merge_constraints_or<'db>(
-    into: &mut NarrowingConstraints<'db>,
-    from: &NarrowingConstraints<'db>,
-    db: &'db dyn Db,
+    into: &mut InternalConstraints<'db>,
+    from: &InternalConstraints<'db>,
+    _db: &'db dyn Db,
 ) {
-    for (key, value) in from {
-        match into.entry(*key) {
-            Entry::Occupied(mut entry) => {
-                *entry.get_mut() = UnionBuilder::new(db).add(*entry.get()).add(*value).build();
-            }
-            Entry::Vacant(entry) => {
-                entry.insert(Type::object());
-            }
+    // For places that appear in `into` but not in `from`, widen to object
+    for (key, value) in &mut into.constraints {
+        if !from.constraints.contains_key(key) {
+            *value = NarrowingConstraint::regular(Type::object());
         }
     }
-    for (key, value) in into.iter_mut() {
-        if !from.contains_key(key) {
-            *value = Type::object();
+
+    for (key, from_constraint) in &from.constraints {
+        match into.constraints.entry(*key) {
+            Entry::Occupied(mut entry) => {
+                // Simply concatenate the disjuncts
+                entry
+                    .get_mut()
+                    .disjuncts
+                    .extend(from_constraint.disjuncts.clone());
+            }
+            Entry::Vacant(entry) => {
+                // Place only appears in `from`, not in `into`.
+                // Widen to object since the other branch doesn't constrain it.
+                entry.insert(NarrowingConstraint::regular(Type::object()));
+            }
         }
     }
 }
@@ -343,7 +541,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     fn finish(mut self) -> Option<NarrowingConstraints<'db>> {
-        let constraints: Option<NarrowingConstraints<'db>> = match self.predicate {
+        let constraints: Option<InternalConstraints<'db>> = match self.predicate {
             PredicateNode::Expression(expression) => {
                 self.evaluate_expression_predicate(expression, self.is_positive)
             }
@@ -354,8 +552,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PredicateNode::StarImportPlaceholder(_) => return None,
         };
         if let Some(mut constraints) = constraints {
-            constraints.shrink_to_fit();
-            Some(constraints)
+            constraints.constraints.shrink_to_fit();
+            Some(constraints.evaluate_type_constraints(self.db))
         } else {
             None
         }
@@ -365,7 +563,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         expression: Expression<'db>,
         is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> Option<InternalConstraints<'db>> {
         let expression_node = expression.node_ref(self.db, self.module);
         self.evaluate_expression_node_predicate(expression_node, expression, is_positive)
     }
@@ -375,7 +573,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expression_node: &ruff_python_ast::Expr,
         expression: Expression<'db>,
         is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> Option<InternalConstraints<'db>> {
         match expression_node {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
                 self.evaluate_simple_expr(expression_node, is_positive)
@@ -400,7 +598,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         pattern_predicate_kind: &PatternPredicateKind<'db>,
         subject: Expression<'db>,
         is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> Option<InternalConstraints<'db>> {
         match pattern_predicate_kind {
             PatternPredicateKind::Singleton(singleton) => {
                 self.evaluate_match_pattern_singleton(subject, *singleton, is_positive)
@@ -425,7 +623,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         pattern: PatternPredicate<'db>,
         is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> Option<InternalConstraints<'db>> {
         self.evaluate_pattern_predicate_kind(
             pattern.kind(self.db),
             pattern.subject(self.db),
@@ -459,7 +657,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         expr: &ast::Expr,
         is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> Option<InternalConstraints<'db>> {
         let target = place_expr(expr)?;
         let place = self.expect_place(&target);
 
@@ -469,14 +667,17 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             Type::AlwaysTruthy.negate(self.db)
         };
 
-        Some(NarrowingConstraints::from_iter([(place, ty)]))
+        Some(InternalConstraints::from_iter([(
+            place,
+            NarrowingConstraint::regular(ty),
+        )]))
     }
 
     fn evaluate_expr_named(
         &mut self,
         expr_named: &ast::ExprNamed,
         is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> Option<InternalConstraints<'db>> {
         self.evaluate_simple_expr(&expr_named.target, is_positive)
     }
 
@@ -744,7 +945,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expr_compare: &ast::ExprCompare,
         expression: Expression<'db>,
         is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> Option<InternalConstraints<'db>> {
         fn is_narrowing_target_candidate(expr: &ast::Expr) -> bool {
             matches!(
                 expr,
@@ -786,7 +987,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let comparator_tuples = std::iter::once(&**left)
             .chain(comparators)
             .tuple_windows::<(&ruff_python_ast::Expr, &ruff_python_ast::Expr)>();
-        let mut constraints = NarrowingConstraints::default();
+        let mut constraints = InternalConstraints::default();
 
         let mut last_rhs_ty: Option<Type> = None;
 
@@ -805,7 +1006,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                             self.evaluate_expr_compare_op(lhs_ty, rhs_ty, *op, is_positive)
                     {
                         let place = self.expect_place(&left);
-                        constraints.insert(place, ty);
+                        constraints.insert_regular(place, ty);
                     }
                 }
                 ast::Expr::Call(ast::ExprCall {
@@ -851,7 +1052,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         .is_some_and(|c| c.is_known(self.db, KnownClass::Type))
                     {
                         let place = self.expect_place(&target);
-                        constraints.insert(
+                        constraints.insert_regular(
                             place,
                             Type::instance(self.db, rhs_class.unknown_specialization(self.db))
                                 .negate_if(self.db, !is_positive),
@@ -869,7 +1070,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expr_call: &ast::ExprCall,
         expression: Expression<'db>,
         is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> Option<InternalConstraints<'db>> {
         let inference = infer_expression_types(self.db, expression, TypeContext::default());
 
         let callable_ty = inference.expression_type(&*expr_call.func);
@@ -883,19 +1084,30 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             {
                 let return_ty = inference.expression_type(expr_call);
 
-                let (guarded_ty, place) = match return_ty {
-                    // TODO: TypeGuard
+                let place_and_constraint = match return_ty {
                     Type::TypeIs(type_is) => {
                         let (_, place) = type_is.place_info(self.db)?;
-                        (type_is.return_type(self.db), place)
+                        Some((
+                            place,
+                            NarrowingConstraint::regular(
+                                type_is
+                                    .return_type(self.db)
+                                    .negate_if(self.db, !is_positive),
+                            ),
+                        ))
                     }
-                    _ => return None,
-                };
+                    // TypeGuard only narrows in the positive case
+                    Type::TypeGuard(type_guard) if is_positive => {
+                        let (_, place) = type_guard.place_info(self.db)?;
+                        Some((
+                            place,
+                            NarrowingConstraint::typeguard(type_guard.return_type(self.db)),
+                        ))
+                    }
+                    _ => None,
+                }?;
 
-                Some(NarrowingConstraints::from_iter([(
-                    place,
-                    guarded_ty.negate_if(self.db, !is_positive),
-                )]))
+                Some(InternalConstraints::from_iter([place_and_constraint]))
             }
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
                 let [first_arg, second_arg] = &*expr_call.arguments.args else {
@@ -920,9 +1132,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     let constraint =
                         Type::protocol_with_readonly_members(self.db, [(attr, Type::object())]);
 
-                    return Some(NarrowingConstraints::from_iter([(
+                    return Some(InternalConstraints::from_iter([(
                         place,
-                        constraint.negate_if(self.db, !is_positive),
+                        NarrowingConstraint::regular(constraint.negate_if(self.db, !is_positive)),
                     )]));
                 }
 
@@ -933,9 +1145,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 function
                     .generate_constraint(self.db, class_info_ty)
                     .map(|constraint| {
-                        NarrowingConstraints::from_iter([(
+                        InternalConstraints::from_iter([(
                             place,
-                            constraint.negate_if(self.db, !is_positive),
+                            NarrowingConstraint::regular(
+                                constraint.negate_if(self.db, !is_positive),
+                            ),
                         )])
                     })
             }
@@ -960,7 +1174,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subject: Expression<'db>,
         singleton: ast::Singleton,
         is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> Option<InternalConstraints<'db>> {
         let subject = place_expr(subject.node_ref(self.db, self.module))?;
         let place = self.expect_place(&subject);
 
@@ -970,7 +1184,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             ast::Singleton::False => Type::BooleanLiteral(false),
         };
         let ty = ty.negate_if(self.db, !is_positive);
-        Some(NarrowingConstraints::from_iter([(place, ty)]))
+        Some(InternalConstraints::from_iter([(
+            place,
+            NarrowingConstraint::regular(ty),
+        )]))
     }
 
     fn evaluate_match_pattern_class(
@@ -979,7 +1196,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         cls: Expression<'db>,
         kind: ClassPatternKind,
         is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> Option<InternalConstraints<'db>> {
         if !kind.is_irrefutable() && !is_positive {
             // A class pattern like `case Point(x=0, y=0)` is not irrefutable. In the positive case,
             // we can still narrow the type of the match subject to `Point`. But in the negative case,
@@ -1003,7 +1220,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             _ => return None,
         };
 
-        Some(NarrowingConstraints::from_iter([(place, narrowed_type)]))
+        Some(InternalConstraints::from_iter([(
+            place,
+            NarrowingConstraint::regular(narrowed_type),
+        )]))
     }
 
     fn evaluate_match_pattern_value(
@@ -1011,7 +1231,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subject: Expression<'db>,
         value: Expression<'db>,
         is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> Option<InternalConstraints<'db>> {
         let place = {
             let subject = place_expr(subject.node_ref(self.db, self.module))?;
             self.expect_place(&subject)
@@ -1023,7 +1243,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             infer_same_file_expression_type(self.db, value, TypeContext::default(), self.module);
 
         self.evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, is_positive)
-            .map(|ty| NarrowingConstraints::from_iter([(place, ty)]))
+            .map(|ty| InternalConstraints::from_iter([(place, NarrowingConstraint::regular(ty))]))
     }
 
     fn evaluate_match_pattern_or(
@@ -1031,7 +1251,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subject: Expression<'db>,
         predicates: &Vec<PatternPredicateKind<'db>>,
         is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> Option<InternalConstraints<'db>> {
         let db = self.db;
 
         // DeMorgan's law---if the overall `or` is negated, we need to `and` the negated sub-constraints.
@@ -1057,9 +1277,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expr_bool_op: &ExprBoolOp,
         expression: Expression<'db>,
         is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> Option<InternalConstraints<'db>> {
         let inference = infer_expression_types(self.db, expression, TypeContext::default());
-        let mut sub_constraints = expr_bool_op
+        let sub_constraints = expr_bool_op
             .values
             .iter()
             // filter our arms with statically known truthiness
@@ -1076,7 +1296,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             .collect::<Vec<_>>();
         match (expr_bool_op.op, is_positive) {
             (BoolOp::And, true) | (BoolOp::Or, false) => {
-                let mut aggregation: Option<NarrowingConstraints> = None;
+                let mut aggregation: Option<InternalConstraints> = None;
                 for sub_constraint in sub_constraints.into_iter().flatten() {
                     if let Some(ref mut some_aggregation) = aggregation {
                         merge_constraints_and(some_aggregation, &sub_constraint, self.db);
@@ -1087,17 +1307,21 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 aggregation
             }
             (BoolOp::Or, true) | (BoolOp::And, false) => {
-                let (first, rest) = sub_constraints.split_first_mut()?;
-                if let Some(first) = first {
+                let (mut first, rest) = {
+                    let mut it = sub_constraints.into_iter();
+                    (it.next()?, it)
+                };
+
+                if let Some(ref mut first) = first {
                     for rest_constraint in rest {
                         if let Some(rest_constraint) = rest_constraint {
-                            merge_constraints_or(first, rest_constraint, self.db);
+                            merge_constraints_or(first, &rest_constraint, self.db);
                         } else {
                             return None;
                         }
                     }
                 }
-                first.clone()
+                first
             }
         }
     }
