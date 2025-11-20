@@ -935,7 +935,17 @@ impl<'db> Signature<'db> {
 
         match (self.parameters.kind(), other.parameters.kind()) {
             (ParametersKind::ParamSpec(self_typevar), ParametersKind::ParamSpec(other_typevar)) => {
-                return ConstraintSet::from(self_typevar.is_same_typevar_as(db, other_typevar));
+                return if self_typevar.is_same_typevar_as(db, other_typevar) {
+                    ConstraintSet::from(true)
+                } else {
+                    ConstraintSet::constrain_typevar(
+                        db,
+                        self_typevar,
+                        Type::TypeVar(other_typevar),
+                        Type::TypeVar(other_typevar),
+                        relation,
+                    )
+                };
             }
             (ParametersKind::ParamSpec(typevar), _) => {
                 let paramspec_value = CallableType::paramspec_value(
