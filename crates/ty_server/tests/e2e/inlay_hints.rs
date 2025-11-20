@@ -49,7 +49,7 @@ y = foo(1)
           {
             "value": "int",
             "location": {
-              "uri": "file://ty/vendored/typeshed/f8cdc0bd526301e873cd952eb0d457bdf2554e57/stdlib/builtins.pyi",
+              "uri": "file://<typeshed>/stdlib/builtins.pyi",
               "range": {
                 "start": {
                   "line": 347,
