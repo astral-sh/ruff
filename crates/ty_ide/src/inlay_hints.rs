@@ -570,7 +570,10 @@ mod tests {
                 write!(buf, "{}", diag.display(&self.db, &config)).unwrap();
             }
 
-            buf
+            // Windows path normalization for typeshed references
+            // "hey why is \x08 getting clobbered to /x08?"
+            // no it's not I don't know what you're talking about
+            buf.replace('\\', "/")
         }
     }
 
@@ -1673,7 +1676,7 @@ mod tests {
          8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
            |     ^^^^
          9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-        10 | i[: list[Unknown | bytes]] = [b'\x01', b'\x02']
+        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -1693,7 +1696,7 @@ mod tests {
          8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
            |                    ^^^
          9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-        10 | i[: list[Unknown | bytes]] = [b'\x01', b'\x02']
+        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
            |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -1711,7 +1714,7 @@ mod tests {
          8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
          9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
            |     ^^^^
-        10 | i[: list[Unknown | bytes]] = [b'\x01', b'\x02']
+        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
         11 | j[: list[Unknown | int | float]] = [+1, +2.0]
            |
 
@@ -1730,7 +1733,7 @@ mod tests {
          8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
          9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
            |                    ^^^^^^^^
-        10 | i[: list[Unknown | bytes]] = [b'\x01', b'\x02']
+        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
         11 | j[: list[Unknown | int | float]] = [+1, +2.0]
            |
 
@@ -1747,7 +1750,7 @@ mod tests {
            |
          8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
          9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-        10 | i[: list[Unknown | bytes]] = [b'\x01', b'\x02']
+        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
            |     ^^^^
         11 | j[: list[Unknown | int | float]] = [+1, +2.0]
         12 | k[: list[Unknown | int | float]] = [-1, -2.0]
@@ -1767,7 +1770,7 @@ mod tests {
            |
          8 | g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
          9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-        10 | i[: list[Unknown | bytes]] = [b'\x01', b'\x02']
+        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
            |                    ^^^^^
         11 | j[: list[Unknown | int | float]] = [+1, +2.0]
         12 | k[: list[Unknown | int | float]] = [-1, -2.0]
@@ -1785,7 +1788,7 @@ mod tests {
           --> main2.py:11:5
            |
          9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-        10 | i[: list[Unknown | bytes]] = [b'\x01', b'\x02']
+        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
         11 | j[: list[Unknown | int | float]] = [+1, +2.0]
            |     ^^^^
         12 | k[: list[Unknown | int | float]] = [-1, -2.0]
@@ -1804,7 +1807,7 @@ mod tests {
           --> main2.py:11:20
            |
          9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-        10 | i[: list[Unknown | bytes]] = [b'\x01', b'\x02']
+        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
         11 | j[: list[Unknown | int | float]] = [+1, +2.0]
            |                    ^^^
         12 | k[: list[Unknown | int | float]] = [-1, -2.0]
@@ -1822,7 +1825,7 @@ mod tests {
           --> main2.py:11:26
            |
          9 | h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-        10 | i[: list[Unknown | bytes]] = [b'\x01', b'\x02']
+        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
         11 | j[: list[Unknown | int | float]] = [+1, +2.0]
            |                          ^^^^^
         12 | k[: list[Unknown | int | float]] = [-1, -2.0]
@@ -1839,7 +1842,7 @@ mod tests {
         info: Source
           --> main2.py:12:5
            |
-        10 | i[: list[Unknown | bytes]] = [b'\x01', b'\x02']
+        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
         11 | j[: list[Unknown | int | float]] = [+1, +2.0]
         12 | k[: list[Unknown | int | float]] = [-1, -2.0]
            |     ^^^^
@@ -1857,7 +1860,7 @@ mod tests {
         info: Source
           --> main2.py:12:20
            |
-        10 | i[: list[Unknown | bytes]] = [b'\x01', b'\x02']
+        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
         11 | j[: list[Unknown | int | float]] = [+1, +2.0]
         12 | k[: list[Unknown | int | float]] = [-1, -2.0]
            |                    ^^^
@@ -1874,7 +1877,7 @@ mod tests {
         info: Source
           --> main2.py:12:26
            |
-        10 | i[: list[Unknown | bytes]] = [b'\x01', b'\x02']
+        10 | i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
         11 | j[: list[Unknown | int | float]] = [+1, +2.0]
         12 | k[: list[Unknown | int | float]] = [-1, -2.0]
            |                          ^^^^^
