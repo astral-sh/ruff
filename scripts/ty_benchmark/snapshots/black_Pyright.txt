@@ -1,0 +1,81 @@
+<CWD>/src/black/__init__.py
+  <CWD>/src/black/__init__.py:30:6 - warning: Import "_black_version" could not be resolved from source (reportMissingModuleSource)
+  <CWD>/src/black/__init__.py:989:15 - error: Cannot access attribute "detach" for class "AnsiToWin32"
+    Attribute "detach" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/black/__init__.py:1049:11 - error: Cannot access attribute "detach" for class "AnsiToWin32"
+    Attribute "detach" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/black/__init__.py:1285:24 - error: "normalized_contents" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/black/__init__.py:1286:24 - error: "newline_type" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/black/__init__.py:1297:52 - error: "newline_type" is possibly unbound (reportPossiblyUnboundVariable)
+<CWD>/src/black/cache.py
+  <CWD>/src/black/cache.py:15:6 - warning: Import "_black_version" could not be resolved from source (reportMissingModuleSource)
+  <CWD>/src/black/cache.py:144:59 - error: Type "dict[str, tuple[float | int | str, ...]]" is not assignable to declared type "dict[str, tuple[float, int, str]]" (reportAssignmentType)
+<CWD>/src/black/files.py
+  <CWD>/src/black/files.py:95:12 - error: "directory" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/black/files.py:426:16 - error: Type "TextIOWrapper[_WrappedBuffer] | StreamWrapper" is not assignable to return type "TextIOWrapper[_WrappedBuffer] | AnsiToWin32"
+    Type "TextIOWrapper[_WrappedBuffer] | StreamWrapper" is not assignable to type "TextIOWrapper[_WrappedBuffer] | AnsiToWin32"
+      Type "StreamWrapper" is not assignable to type "TextIOWrapper[_WrappedBuffer] | AnsiToWin32"
+        "StreamWrapper" is not assignable to "TextIOWrapper[_WrappedBuffer]"
+        "StreamWrapper" is not assignable to "AnsiToWin32" (reportReturnType)
+<CWD>/src/black/handle_ipynb_magics.py
+  <CWD>/src/black/handle_ipynb_magics.py:106:10 - error: Import "tokenize_rt" could not be resolved (reportMissingImports)
+  <CWD>/src/black/handle_ipynb_magics.py:130:10 - error: Import "tokenize_rt" could not be resolved (reportMissingImports)
+  <CWD>/src/black/handle_ipynb_magics.py:171:10 - error: Import "IPython.core.inputtransformer2" could not be resolved (reportMissingImports)
+<CWD>/src/black/linegen.py
+  <CWD>/src/black/linegen.py:766:21 - error: Type "list[StringMerger | StringParenStripper | StringSplitter | Transformer | StringParenWrapper | rhs]" is not assignable to declared type "list[Transformer]"
+    Type "rhs" is not assignable to type "Transformer" (reportAssignmentType)
+  <CWD>/src/black/linegen.py:774:21 - error: Type "list[StringMerger | StringParenStripper | StringSplitter | StringParenWrapper | rhs]" is not assignable to declared type "list[Transformer]"
+    Type "rhs" is not assignable to type "Transformer" (reportAssignmentType)
+  <CWD>/src/black/linegen.py:778:76 - error: Type "list[Transformer | rhs]" is not assignable to declared type "list[Transformer]"
+    Type "rhs" is not assignable to type "Transformer" (reportAssignmentType)
+  <CWD>/src/black/linegen.py:780:33 - error: Type "list[rhs]" is not assignable to declared type "list[Transformer]"
+    Type "rhs" is not assignable to type "Transformer" (reportAssignmentType)
+  <CWD>/src/black/linegen.py:887:12 - error: "matching_bracket" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/black/linegen.py:887:36 - error: "tail_leaves" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/black/linegen.py:891:9 - error: "head_leaves" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/black/linegen.py:894:9 - error: "body_leaves" is possibly unbound (reportPossiblyUnboundVariable)
+<CWD>/src/black/strings.py
+  <CWD>/src/black/strings.py:295:8 - error: Operator ">" not supported for types "Unbound | Unknown" and "Unbound | int"
+    Operator ">" not supported for types "Unbound" and "Unbound" (reportOperatorIssue)
+  <CWD>/src/black/strings.py:295:8 - error: "new_escape_count" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/black/strings.py:295:27 - error: "orig_escape_count" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/black/strings.py:298:8 - error: Operator "==" not supported for types "Unbound | Unknown" and "Unbound | int"
+    Operator "==" not supported for types "Unbound" and "Unbound" (reportOperatorIssue)
+  <CWD>/src/black/strings.py:298:8 - error: "new_escape_count" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/black/strings.py:298:28 - error: "orig_escape_count" is possibly unbound (reportPossiblyUnboundVariable)
+<CWD>/src/black/trans.py
+  <CWD>/src/black/trans.py:232:5 - error: Variable "__name__" is marked Final and overrides non-Final variable of same name in class "type" (reportIncompatibleVariableOverride)
+  <CWD>/src/black/trans.py:1041:42 - error: "idx" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/black/trans.py:1630:25 - error: "csplit" is possibly unbound (reportPossiblyUnboundVariable)
+<CWD>/src/blackd/__init__.py
+  <CWD>/src/blackd/__init__.py:23:6 - warning: Import "_black_version" could not be resolved from source (reportMissingModuleSource)
+<CWD>/src/blib2to3/pgen2/driver.py
+  <CWD>/src/blib2to3/pgen2/driver.py:76:20 - error: "token" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/blib2to3/pgen2/driver.py:169:26 - error: "_prefix" is possibly unbound (reportPossiblyUnboundVariable)
+<CWD>/src/blib2to3/pgen2/tokenize.py
+  <CWD>/src/blib2to3/pgen2/tokenize.py:64:1 - warning: Operation on "__all__" is not supported, so exported symbol list may be incorrect (reportUnsupportedDunderAll)
+<CWD>/src/blib2to3/pytree.py
+  <CWD>/src/blib2to3/pytree.py:365:18 - error: "current" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/blib2to3/pytree.py:373:5 - error: Declaration "fixers_applied" is obscured by a declaration of the same name (reportRedeclaration)
+  <CWD>/src/blib2to3/pytree.py:433:9 - error: Method "_eq" overrides class "Base" in an incompatible manner
+    Parameter 2 type mismatch: base parameter is type "_P@_eq", override parameter is type "Leaf"
+      "Base*" is not assignable to "Leaf" (reportIncompatibleMethodOverride)
+  <CWD>/src/blib2to3/pytree.py:444:28 - error: Argument of type "list[Any] | None" cannot be assigned to parameter "fixers_applied" of type "list[Any]" in function "__init__"
+    Type "list[Any] | None" is not assignable to type "list[Any]"
+      "None" is not assignable to "list[Any]" (reportArgumentType)
+  <CWD>/src/blib2to3/pytree.py:670:24 - error: "newcontent" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/blib2to3/pytree.py:756:24 - error: "wrapped_content" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/blib2to3/pytree.py:800:25 - error: Argument of type "list[NL]" cannot be assigned to parameter "value" of type "NL" in function "__setitem__"
+    Type "list[NL]" is not assignable to type "NL"
+      "list[NL]" is not assignable to "Node"
+      "list[NL]" is not assignable to "Leaf" (reportArgumentType)
+  <CWD>/src/blib2to3/pytree.py:836:25 - error: Argument of type "list[NL]" cannot be assigned to parameter "value" of type "NL" in function "__setitem__"
+    Type "list[NL]" is not assignable to type "NL"
+      "list[NL]" is not assignable to "Node"
+      "list[NL]" is not assignable to "Leaf" (reportArgumentType)
+  <CWD>/src/blib2to3/pytree.py:843:25 - error: Argument of type "list[NL]" cannot be assigned to parameter "value" of type "NL" in function "__setitem__"
+    Type "list[NL]" is not assignable to type "NL"
+      "list[NL]" is not assignable to "Node"
+      "list[NL]" is not assignable to "Leaf" (reportArgumentType)
+  <CWD>/src/blib2to3/pytree.py:847:34 - error: "save_stderr" is possibly unbound (reportPossiblyUnboundVariable)
+40 errors, 4 warnings, 0 informations
