@@ -1268,7 +1268,8 @@ emp_invalid2 = Employee(id=3)
 ### Legacy generics
 
 ```py
-from typing import Generic, TypeVar, TypedDict
+from typing import Generic, TypeVar, TypedDict, Any
+from ty_extensions import static_assert, is_assignable_to, is_subtype_of
 
 T = TypeVar("T")
 
@@ -1293,6 +1294,14 @@ items2: Items[str] = {"items": ["a", "b", "c"]}
 items3: Items[int] = {"items": homogeneous_list(1, 2, 3)}
 items4: Items[str] = {"items": homogeneous_list("a", "b", "c")}
 items5: Items[int | str] = {"items": homogeneous_list(1, 2, 3)}
+
+# structural assignability
+static_assert(is_assignable_to(Items[int], Items[int]))
+static_assert(is_subtype_of(Items[int], Items[int]))
+static_assert(not is_assignable_to(Items[str], Items[int]))
+static_assert(not is_subtype_of(Items[str], Items[int]))
+static_assert(is_assignable_to(Items[Any], Items[int]))
+static_assert(not is_subtype_of(Items[Any], Items[int]))
 ```
 
 ### PEP-695 generics
@@ -1303,7 +1312,8 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import TypedDict
+from typing import TypedDict, Any
+from ty_extensions import static_assert, is_assignable_to, is_subtype_of
 
 class TaggedData[T](TypedDict):
     data: T
@@ -1326,6 +1336,14 @@ items2: Items[str] = {"items": ["a", "b", "c"]}
 items3: Items[int] = {"items": homogeneous_list(1, 2, 3)}
 items4: Items[str] = {"items": homogeneous_list("a", "b", "c")}
 items5: Items[int | str] = {"items": homogeneous_list(1, 2, 3)}
+
+# structural assignability
+static_assert(is_assignable_to(Items[int], Items[int]))
+static_assert(is_subtype_of(Items[int], Items[int]))
+static_assert(not is_assignable_to(Items[str], Items[int]))
+static_assert(not is_subtype_of(Items[str], Items[int]))
+static_assert(is_assignable_to(Items[Any], Items[int]))
+static_assert(not is_subtype_of(Items[Any], Items[int]))
 ```
 
 ## Recursive `TypedDict`
