@@ -682,18 +682,86 @@ class C:
 ```diff
 --- Stable
 +++ Preview
-@@ -280,9 +280,7 @@
+@@ -74,7 +74,9 @@
+ 
+ # lambda arguments don't have parentheses, so we never add a magic trailing comma ...
+ def f(
+-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = lambda x: y,
++    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = lambda x: (
++        y
++    ),
+ ):
+     pass
+ 
+@@ -218,29 +220,31 @@
+ 
+ # Leading
+ lambda x: (
+-    lambda y: lambda z: x
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + y
+-    + z  # Trailing
++    lambda y: lambda z: (
++        x
++        + y
++        + y
++        + y
++        + y
++        + y
++        + y
++        + y
++        + y
++        + y
++        + y
++        + y
++        + y
++        + y
++        + y
++        + y
++        + y
++        + y
++        + y
++        + y
++        + y
++        + y
++        + z
++    )  # Trailing
+ )  # Trailing
+ 
+ 
+@@ -280,9 +284,9 @@
  ]  # Trailing
  # Trailing
  
 -lambda self, araa, kkkwargs=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
 -    *args, **kwargs
 -), e=1, f=2, g=2: d
-+lambda self, araa, kkkwargs=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs), e=1, f=2, g=2: d
++lambda self, araa, kkkwargs=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs), e=1, f=2, g=2: (
++    d
++)
  
  
  # Regression tests for https://github.com/astral-sh/ruff/issues/8179
-@@ -291,9 +289,9 @@
+@@ -291,9 +295,9 @@
          c,
          d,
          e,
@@ -706,7 +774,7 @@ class C:
      )
  
  
-@@ -302,15 +300,7 @@
+@@ -302,15 +306,9 @@
          c,
          d,
          e,
@@ -719,21 +787,22 @@ class C:
 -        e=1,
 -        f=2,
 -        g=2: d,
-+        f=lambda self, araa, kkkwargs, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, args, kwargs, e=1, f=2, g=2: d,
++        f=lambda self, araa, kkkwargs, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, args, kwargs, e=1, f=2, g=2: (
++            d
++        ),
          g=10,
      )
  
-@@ -320,9 +310,10 @@
+@@ -320,9 +318,9 @@
          c,
          d,
          e,
 -        f=lambda self,
 -        *args,
 -        **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1,
-+        f=lambda self, *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
-+            *args, **kwargs
-+        )
-+        + 1,
++        f=lambda self, *args, **kwargs: (
++            aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
++        ),
      )
  
  
