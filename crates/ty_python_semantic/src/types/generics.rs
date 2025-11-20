@@ -17,11 +17,12 @@ use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral,
-    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeContext,
-    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance,
-    TypeVarKind, TypeVarVariance, UnionType, declaration_type, walk_bound_type_var_type,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableTypes,
+    ClassLiteral, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
+    IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
+    Type, TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, declaration_type,
+    walk_bound_type_var_type,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -1663,6 +1664,28 @@ impl<'db> SpecializationBuilder<'db> {
                             self.infer_map_impl(*formal_ty, *base_ty, variance, &mut f)?;
                         }
                         return Ok(());
+                    }
+                }
+            }
+
+            (Type::Callable(formal_callable), _) => {
+                if let Some(actual_callable) = actual
+                    .try_upcast_to_callable(self.db)
+                    .and_then(CallableTypes::exactly_one)
+                {
+                    for formal_signature in &formal_callable.signatures(self.db).overloads {
+                        for actual_signature in &actual_callable.signatures(self.db).overloads {
+                            if let Some(formal_return_ty) = formal_signature.return_ty
+                                && let Some(actual_return_ty) = actual_signature.return_ty
+                            {
+                                self.infer_map_impl(
+                                    formal_return_ty,
+                                    actual_return_ty,
+                                    polarity,
+                                    &mut f,
+                                )?;
+                            }
+                        }
                     }
                 }
             }
