@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::statement_visitor::{self, StatementVisitor};
-use ruff_python_ast::{Stmt, StmtFunctionDef};
+use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
+use ruff_python_ast::{Expr, Stmt, StmtFunctionDef};
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_text_size::Ranged;
 
@@ -8,7 +8,12 @@ use crate::checkers::ast::Checker;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
-/// Detects `@property` methods that do not contain a return statement.
+/// Detects unnecessary `@property` methods.
+///
+/// An unnecessary property is a property that does not:
+/// - return
+/// - yield (or `yield from`)
+/// - raises
 ///
 /// ## Why is this bad?
 /// Property methods are expected to return a computed value, a missing return in a property usually indicates an implementation mistake.
@@ -30,22 +35,22 @@ use crate::{FixAvailability, Violation};
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.14.6")]
-pub(crate) struct PropertyNoReturn {
+pub(crate) struct UnnecessaryProperty {
     name: String,
 }
 
-impl Violation for PropertyNoReturn {
+impl Violation for UnnecessaryProperty {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { name } = self;
-        format!("{name} is a property with no return statement")
+        format!("{name} is an unnecessary property")
     }
 }
 
 /// RUF066
-pub(crate) fn property_no_return(checker: &Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn unnecessary_property(checker: &Checker, function_def: &StmtFunctionDef) {
     let semantic = checker.semantic();
 
     if checker.source_type.is_stub() || semantic.in_protocol_or_abstract_method() {
@@ -66,14 +71,14 @@ pub(crate) fn property_no_return(checker: &Checker, function_def: &StmtFunctionD
         return;
     }
 
-    let mut visitor = ReturnFinder::default();
+    let mut visitor = PropertyVisitor::default();
     visitor.visit_body(body);
-    if visitor.found {
+    if visitor.necessary {
         return;
     }
 
     checker.report_diagnostic(
-        PropertyNoReturn {
+        UnnecessaryProperty {
             name: name.to_string(),
         },
         function_def.range(),
@@ -81,18 +86,42 @@ pub(crate) fn property_no_return(checker: &Checker, function_def: &StmtFunctionD
 }
 
 #[derive(Default)]
-struct ReturnFinder {
-    found: bool,
+struct PropertyVisitor {
+    necessary: bool,
 }
 
-impl StatementVisitor<'_> for ReturnFinder {
+impl Visitor<'_> for PropertyVisitor {
+    fn visit_expr(&mut self, expr: &Expr) {
+        if self.necessary {
+            return;
+        }
+
+        match expr {
+            Expr::Yield(_) | Expr::YieldFrom(_) => self.necessary = true,
+            _ => walk_expr(self, expr),
+        }
+    }
+
     fn visit_stmt(&mut self, stmt: &Stmt) {
-        match stmt {
-            Stmt::Return(_) => self.found = true,
-            Stmt::FunctionDef(_) => {
-                // Do not recurse into nested functions; they're evaluated separately.
+        if !self.necessary {
+            match stmt {
+                // Sometimes a property is defined because of an ABC requiremnet but it will always raise.
+                // Thus not an unnecessary property.
+                Stmt::Return(_) | Stmt::Raise(_) => self.necessary = true,
+                Stmt::FunctionDef(_) => {
+                    // Do not recurse into nested functions; they're evaluated separately.
+                }
+                _ => walk_stmt(self, stmt),
             }
-            _ => statement_visitor::walk_stmt(self, stmt),
+        }
+    }
+
+    fn visit_body(&mut self, body: &[Stmt]) {
+        for stmt in body {
+            self.visit_stmt(stmt);
+            if self.necessary {
+                return;
+            }
         }
     }
 }

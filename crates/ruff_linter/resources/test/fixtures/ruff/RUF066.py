@@ -59,3 +59,17 @@ def func():
 class Prot(typing.Protocol):
     @property
     def prop1(self) -> int: ...
+
+
+class File:
+    @property
+    def stream1(self):
+        yield
+
+    @property
+    def stream2(self):
+        yield from self.stream1
+
+    @property
+    def children(self):
+        raise ValueError("File does not have children")
