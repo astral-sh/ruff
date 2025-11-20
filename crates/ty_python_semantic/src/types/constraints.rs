@@ -494,7 +494,11 @@ impl<'db> ConstrainedTypeVar<'db> {
                     })
                 }) =>
             {
-                return Node::AlwaysFalse;
+                return Node::new_constraint(
+                    db,
+                    ConstrainedTypeVar::new(db, typevar, Type::Never, Type::object()),
+                )
+                .negate(db);
             }
             _ => {}
         }
@@ -520,12 +524,6 @@ impl<'db> ConstrainedTypeVar<'db> {
         // is both greater than `lower`, and less than `upper`.
         if !lower.is_subtype_of(db, upper) {
             return Node::AlwaysFalse;
-        }
-
-        // If the requested constraint is `Never ≤ T ≤ object`, then the typevar can be specialized
-        // to _any_ type, and the constraint does nothing.
-        if lower.is_never() && upper.is_object() {
-            return Node::AlwaysTrue;
         }
 
         // We have an (arbitrary) ordering for typevars. If the upper and/or lower bounds are
@@ -574,13 +572,21 @@ impl<'db> ConstrainedTypeVar<'db> {
                     db,
                     ConstrainedTypeVar::new(db, lower, Type::Never, Type::TypeVar(typevar)),
                 );
-                let upper = Self::new_node(db, typevar, Type::Never, upper);
+                let upper = if upper.is_object() {
+                    Node::AlwaysTrue
+                } else {
+                    Self::new_node(db, typevar, Type::Never, upper)
+                };
                 lower.and(db, upper)
             }
 
             // L ≤ T ≤ U == (L ≤ [T]) && (T ≤ [U])
             (_, Type::TypeVar(upper)) if typevar.can_be_bound_for(db, upper) => {
-                let lower = Self::new_node(db, typevar, lower, Type::object());
+                let lower = if lower.is_never() {
+                    Node::AlwaysTrue
+                } else {
+                    Self::new_node(db, typevar, lower, Type::object())
+                };
                 let upper = Node::new_constraint(
                     db,
                     ConstrainedTypeVar::new(db, upper, Type::TypeVar(typevar), Type::object()),
@@ -700,6 +706,15 @@ impl<'db> ConstrainedTypeVar<'db> {
                         typevar.identity(self.db).display(self.db),
                         if self.negated { "≠" } else { "=" },
                         lower.display(self.db)
+                    );
+                }
+
+                if lower.is_never() && upper.is_object() {
+                    return write!(
+                        f,
+                        "({} {} *)",
+                        typevar.identity(self.db).display(self.db),
+                        if self.negated { "≠" } else { "=" }
                     );
                 }
 
@@ -2729,6 +2744,14 @@ impl<'db> PathAssignments<'db> {
         // TODO: This is very naive at the moment, partly for expediency, and partly because we
         // don't anticipate the sequent maps to be very large. We might consider avoiding the
         // brute-force search.
+
+        for ante in &map.single_tautologies {
+            if self.assignment_holds(ante.when_false()) {
+                // The sequent map says (ante1) is always true, and the current path asserts that
+                // it's false.
+                return Err(PathAssignmentConflict);
+            }
+        }
 
         for (ante1, ante2) in &map.pair_impossibilities {
             if self.assignment_holds(ante1.when_true()) && self.assignment_holds(ante2.when_true())
