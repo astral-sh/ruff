@@ -612,16 +612,19 @@ impl Display for DisplayRepresentation<'_> {
 impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         match self.ty {
-            Type::Dynamic(dynamic) => {
-                if let DynamicType::Any = dynamic {
-                    write!(
-                        f.with_detail(TypeDetail::Type(Type::SpecialForm(SpecialFormType::Any))),
-                        "{dynamic}"
-                    )
-                } else {
-                    write!(f, "{dynamic}")
-                }
-            }
+            Type::Dynamic(dynamic) => match dynamic {
+                DynamicType::Any => write!(
+                    f.with_detail(TypeDetail::Type(Type::SpecialForm(SpecialFormType::Any))),
+                    "{dynamic}"
+                ),
+                DynamicType::Unknown => write!(
+                    f.with_detail(TypeDetail::Type(Type::SpecialForm(
+                        SpecialFormType::Unknown
+                    ))),
+                    "{dynamic}"
+                ),
+                _ => write!(f, "{dynamic}"),
+            },
             Type::Never => f.with_detail(TypeDetail::Type(self.ty)).write_str("Never"),
             Type::NominalInstance(instance) => {
                 let class = instance.class(self.db);
