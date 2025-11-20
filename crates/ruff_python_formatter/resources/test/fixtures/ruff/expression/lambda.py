@@ -336,3 +336,5 @@ class C:
         if crf_token.pos_tag is not None
         else None,
 	}
+
+name = re.sub(r"[^\x21\x23-\x5b\x5d-\x7e]...............", lambda m: f"\\{m.group(0)}", p["name"])
