@@ -1,7 +1,10 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor::{self, StatementVisitor};
 use ruff_python_ast::{Stmt, StmtFunctionDef};
-use ruff_python_semantic::analyze::visibility::{is_abstract, is_property};
+use ruff_python_semantic::analyze::{
+    function_type,
+    visibility::{is_abstract, is_property},
+};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -54,11 +57,11 @@ pub(crate) fn property_no_return(checker: &Checker, function_def: &StmtFunctionD
     } = function_def;
 
     let semantic = checker.semantic();
-    if !is_property(decorator_list, [], semantic) {
-        return;
-    }
-
-    if is_abstract(decorator_list, semantic) {
+    if checker.source_type.is_stub()
+        || !is_property(decorator_list, [], semantic)
+        || is_abstract(decorator_list, semantic)
+        || function_type::is_stub(function_def, semantic)
+    {
         return;
     }
 

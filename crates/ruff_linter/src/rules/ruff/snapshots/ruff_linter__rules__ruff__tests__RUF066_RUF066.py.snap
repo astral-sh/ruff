@@ -23,17 +23,19 @@ RUF066 nested is a property with no return statement
 23 | |         def inner():
 24 | |             return 0
    | |____________________^
+25 |
+26 |       @property
    |
 
 RUF066 prop2 is a property with no return statement
-  --> RUF066.py:43:5
+  --> RUF066.py:46:5
    |
-41 |           return 1
-42 |
-43 | /     @property
-44 | |     def prop2(self):  # No return
-45 | |         50
+44 |           return 1
+45 |
+46 | /     @property
+47 | |     def prop2(self):  # No return
+48 | |         50
    | |__________^
-46 |
-47 |       def method(self):
+49 |
+50 |       def method(self):
    |

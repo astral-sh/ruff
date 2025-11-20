@@ -1,6 +1,6 @@
 """
 Should emit:
-RUF066 - on lines 11, 22, 44
+RUF066 - on lines 11, 22, 47
 """
 
 import abc
@@ -22,6 +22,9 @@ class User:
     def nested(self):  # No return
         def inner():
             return 0
+
+    @property
+    def stub(self): ...
 
 
 class UserMeta(metaclass=abc.ABCMeta):
