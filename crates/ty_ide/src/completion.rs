@@ -646,7 +646,16 @@ struct FromImport<'a> {
 #[derive(Clone, Debug)]
 enum FromImportKind {
     Module,
-    Submodule { parent: ModuleName },
+    Submodule {
+        parent: ModuleName,
+    },
+    Relative {
+        parent: ModuleName,
+        /// When `true`, an `import` keyword is allowed next.
+        /// For example, `from ...<CURSOR>` should offer `import`
+        /// but also submodule completions.
+        import_keyword_allowed: bool,
+    },
     Attribute,
 }
 
@@ -1048,20 +1057,51 @@ impl<'a> ImportStatement<'a> {
             }
             (Some(from), import) => {
                 let ast = find_ast_for_from_import(parsed, from)?;
+                // If we saw an `import` keyword, then that means the
+                // cursor must be *after* the `import`. And thus we
+                // only ever need to offer completions for importable
+                // elements from the module being imported.
                 let kind = if import.is_some() {
                     FromImportKind::Attribute
-                } else if initial_dot {
-                    // TODO: Handle relative imports here.
-                    if to_complete.starts_with('.') {
-                        return Some(ImportStatement::Incomplete(IncompleteImport::Import));
-                    }
-                    let (parent, _) = to_complete.rsplit_once('.')?;
-                    let module_name = ModuleName::new(parent)?;
-                    FromImportKind::Submodule {
-                        parent: module_name,
-                    }
-                } else {
+                } else if !initial_dot {
                     FromImportKind::Module
+                } else {
+                    let to_complete_without_leading_dots = to_complete.trim_start_matches('.');
+
+                    // When there aren't any leading dots to trim, then we
+                    // have a regular absolute import. Otherwise, it's relative.
+                    if to_complete == to_complete_without_leading_dots {
+                        let (parent, _) = to_complete.rsplit_once('.')?;
+                        let parent = ModuleName::new(parent)?;
+                        FromImportKind::Submodule { parent }
+                    } else {
+                        let all_dots = to_complete.chars().all(|c| c == '.');
+                        // We should suggest `import` in `from ...<CURSOR>`
+                        // and `from ...imp<CURSOR>`.
+                        let import_keyword_allowed =
+                            all_dots || !to_complete_without_leading_dots.contains('.');
+                        let parent = if all_dots {
+                            ModuleName::from_import_statement(db, file, ast).ok()?
+                        } else {
+                            // We know `to_complete` is not all dots.
+                            // But that it starts with a dot.
+                            // So we must have one of `..foo`, `..foo.`
+                            // or `..foo.bar`. We drop the leading dots,
+                            // since those are captured by `ast.level`.
+                            // From there, we can treat it like a normal
+                            // module name. We want to list submodule
+                            // completions, so we pop off the last element
+                            // if there are any remaining dots.
+                            let parent = to_complete_without_leading_dots
+                                .rsplit_once('.')
+                                .map(|(parent, _)| parent);
+                            ModuleName::from_identifier_parts(db, file, parent, ast.level).ok()?
+                        };
+                        FromImportKind::Relative {
+                            parent,
+                            import_keyword_allowed,
+                        }
+                    }
                 };
                 Some(ImportStatement::FromImport(FromImport { ast, kind }))
             }
@@ -1092,6 +1132,15 @@ impl<'a> ImportStatement<'a> {
                 }
                 FromImportKind::Submodule { ref parent } => {
                     completions.extend(model.import_submodule_completions_for_name(parent));
+                }
+                FromImportKind::Relative {
+                    ref parent,
+                    import_keyword_allowed,
+                } => {
+                    completions.extend(model.import_submodule_completions_for_name(parent));
+                    if import_keyword_allowed {
+                        completions.try_add(Completion::keyword("import"));
+                    }
                 }
                 FromImportKind::Attribute => {
                     completions.extend(model.from_import_completions(ast));
@@ -5178,9 +5227,9 @@ match status:
     }
 
     #[test]
-    fn from_import_importt_suggests_import() {
+    fn from_import_importt_suggests_nothing() {
         let builder = completion_test_builder("from typing importt<CURSOR>");
-        assert_snapshot!(builder.build().snapshot(), @"import");
+        assert_snapshot!(builder.build().snapshot(), @"<No completions found>");
     }
 
     #[test]
@@ -5207,12 +5256,10 @@ match status:
         assert_snapshot!(builder.build().snapshot(), @"import");
     }
 
-    /// The following behaviour may not be reflected in editors, since LSP
-    /// clients may do their own filtering of completion suggestions.
     #[test]
-    fn from_import_random_name_suggests_import() {
+    fn from_import_random_name_suggests_nothing() {
         let builder = completion_test_builder("from typing aa<CURSOR>");
-        assert_snapshot!(builder.build().snapshot(), @"import");
+        assert_snapshot!(builder.build().snapshot(), @"<No completions found>");
     }
 
     #[test]
@@ -5261,29 +5308,37 @@ match status:
     #[test]
     fn from_import_only_dot() {
         let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/foo.py", "")
             .source(
-                "main.py",
+                "package/sub1/sub2/bar.py",
                 "
-                import_zqzqzq = 1
-                from .<CURSOR>
-                ",
+import_zqzqzq = 1
+from .<CURSOR>
+",
             )
             .completion_test_builder();
-        assert_snapshot!(builder.build().snapshot(), @"import");
+        assert_snapshot!(builder.build().snapshot(), @r"
+        import
+        ");
     }
 
     #[test]
     fn from_import_only_dot_incomplete() {
         let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/foo.py", "")
             .source(
-                "main.py",
+                "package/sub1/sub2/bar.py",
                 "
-                import_zqzqzq = 1
-                from .imp<CURSOR>
-                ",
+import_zqzqzq = 1
+from .imp<CURSOR>
+",
             )
             .completion_test_builder();
-        assert_snapshot!(builder.build().snapshot(), @"import");
+        assert_snapshot!(builder.build().snapshot(), @r"
+        import
+        ");
     }
 
     #[test]
@@ -5295,6 +5350,114 @@ match status:
              ZQ<CURSOR>",
         );
         assert_snapshot!(builder.build().snapshot(), @"ZQZQZQ");
+    }
+
+    #[test]
+    fn relative_import_module_after_dots1() {
+        let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/foo.py", "")
+            .source("package/sub1/sub2/bar.py", "from ...<CURSOR>")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        import
+        foo
+        ");
+    }
+
+    #[test]
+    fn relative_import_module_after_dots2() {
+        let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/foo/__init__.py", "")
+            .source("package/foo/bar.py", "")
+            .source("package/foo/baz.py", "")
+            .source("package/sub1/sub2/bar.py", "from ...foo.<CURSOR>")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        bar
+        baz
+        ");
+    }
+
+    #[test]
+    fn relative_import_module_after_dots3() {
+        let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/foo.py", "")
+            .source("package/sub1/sub2/bar.py", "from.<CURSOR>")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        import
+        ");
+    }
+
+    #[test]
+    fn relative_import_module_after_dots4() {
+        let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/foo.py", "")
+            .source("package/sub1/bar.py", "from ..<CURSOR>")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        import
+        foo
+        ");
+    }
+
+    #[test]
+    fn relative_import_module_after_typing1() {
+        let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/foo.py", "")
+            .source("package/sub1/sub2/bar.py", "from ...fo<CURSOR>")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @"foo");
+    }
+
+    #[test]
+    fn relative_import_module_after_typing2() {
+        let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/foo/__init__.py", "")
+            .source("package/foo/bar.py", "")
+            .source("package/foo/baz.py", "")
+            .source("package/sub1/sub2/bar.py", "from ...foo.ba<CURSOR>")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        bar
+        baz
+        ");
+    }
+
+    #[test]
+    fn relative_import_module_after_typing3() {
+        let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/foo.py", "")
+            .source("package/imposition.py", "")
+            .source("package/sub1/sub2/bar.py", "from ...im<CURSOR>")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        import
+        imposition
+        ");
+    }
+
+    #[test]
+    fn relative_import_module_after_typing4() {
+        let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/sub1/__init__.py", "")
+            .source("package/sub1/foo.py", "")
+            .source("package/sub1/imposition.py", "")
+            .source("package/sub1/bar.py", "from ..sub1.<CURSOR>")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        bar
+        foo
+        imposition
+        ");
     }
 
     /// A way to create a simple single-file (named `main.py`) completion test
