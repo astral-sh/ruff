@@ -43,13 +43,13 @@ reveal_type(len((1,)))  # revealed: Literal[1]
 reveal_type(len((1, 2)))  # revealed: Literal[2]
 reveal_type(len(tuple()))  # revealed: Literal[0]
 
-# TODO: Handle star unpacks; Should be: Literal[0]
-reveal_type(len((*[],)))  # revealed: Literal[1]
+# could also be `Literal[0]`, but `int` is accurate
+reveal_type(len((*[],)))  # revealed: int
 
 # fmt: off
 
-# TODO: Handle star unpacks; Should be: Literal[1]
-reveal_type(len(  # revealed: Literal[2]
+# could also be `Literal[1]`, but `int` is accurate
+reveal_type(len(  # revealed: int
     (
         *[],
         1,
@@ -58,11 +58,11 @@ reveal_type(len(  # revealed: Literal[2]
 
 # fmt: on
 
-# TODO: Handle star unpacks; Should be: Literal[2]
-reveal_type(len((*[], 1, 2)))  # revealed: Literal[3]
+# Could also be `Literal[2]`, but `int` is accurate
+reveal_type(len((*[], 1, 2)))  # revealed: int
 
-# TODO: Handle star unpacks; Should be: Literal[0]
-reveal_type(len((*[], *{})))  # revealed: Literal[2]
+# Could also be `Literal[0]`, but `int` is accurate
+reveal_type(len((*[], *{})))  # revealed: int
 ```
 
 Tuple subclasses:

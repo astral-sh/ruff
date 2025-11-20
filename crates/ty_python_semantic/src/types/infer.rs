@@ -377,6 +377,27 @@ impl<'db> TypeContext<'db> {
             annotation: self.annotation.map(f),
         }
     }
+
+    pub(crate) fn for_starred_expression(
+        db: &'db dyn Db,
+        expected_element_type: Type<'db>,
+        expr: &ast::ExprStarred,
+    ) -> Self {
+        match &*expr.value {
+            ast::Expr::List(_) => Self::new(Some(
+                KnownClass::List.to_specialized_instance(db, [expected_element_type]),
+            )),
+            ast::Expr::Set(_) => Self::new(Some(
+                KnownClass::Set.to_specialized_instance(db, [expected_element_type]),
+            )),
+            ast::Expr::Tuple(_) => {
+                Self::new(Some(Type::homogeneous_tuple(db, expected_element_type)))
+            }
+            // `Iterable[<expected_element_type>]` would work well for an arbitrary other node
+            // if <https://github.com/astral-sh/ty/issues/1576> is implemented.
+            _ => Self::default(),
+        }
+    }
 }
 
 /// Returns the statically-known truthiness of a given expression.
