@@ -667,7 +667,7 @@ fn attrs(criterion: &mut Criterion) {
             max_dep_date: "2025-06-17",
             python_version: PythonVersion::PY313,
         },
-        110,
+        120,
     );
 
     bench_project(&benchmark, criterion);

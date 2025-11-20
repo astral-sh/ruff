@@ -784,6 +784,12 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::GenericContext) => {
                             if let [Some(ty)] = overload.parameter_types() {
+                                let wrap_generic_context = |generic_context| {
+                                    Type::KnownInstance(KnownInstanceType::GenericContext(
+                                        generic_context,
+                                    ))
+                                };
+
                                 let function_generic_context = |function: FunctionType<'db>| {
                                     let union = UnionType::from_elements(
                                         db,
@@ -792,7 +798,7 @@ impl<'db> Bindings<'db> {
                                             .overloads
                                             .iter()
                                             .filter_map(|signature| signature.generic_context)
-                                            .map(|generic_context| generic_context.as_tuple(db)),
+                                            .map(wrap_generic_context),
                                     );
                                     if union.is_never() {
                                         Type::none(db)
@@ -806,7 +812,7 @@ impl<'db> Bindings<'db> {
                                 overload.set_return_type(match ty {
                                     Type::ClassLiteral(class) => class
                                         .generic_context(db)
-                                        .map(|generic_context| generic_context.as_tuple(db))
+                                        .map(wrap_generic_context)
                                         .unwrap_or_else(|| Type::none(db)),
 
                                     Type::FunctionLiteral(function) => {
@@ -821,7 +827,7 @@ impl<'db> Bindings<'db> {
                                         TypeAliasType::PEP695(alias),
                                     )) => alias
                                         .generic_context(db)
-                                        .map(|generic_context| generic_context.as_tuple(db))
+                                        .map(wrap_generic_context)
                                         .unwrap_or_else(|| Type::none(db)),
 
                                     _ => Type::none(db),
@@ -1268,6 +1274,28 @@ impl<'db> Bindings<'db> {
                             .constraints(db)
                             .satisfied_by_all_typevars(db, InferableTypeVars::One(&inferable));
                         overload.set_return_type(Type::BooleanLiteral(result));
+                    }
+
+                    Type::KnownBoundMethod(
+                        KnownBoundMethodType::GenericContextSpecializeConstrained(generic_context),
+                    ) => {
+                        let [Some(constraints)] = overload.parameter_types() else {
+                            continue;
+                        };
+                        let Type::KnownInstance(KnownInstanceType::ConstraintSet(constraints)) =
+                            constraints
+                        else {
+                            continue;
+                        };
+                        let specialization =
+                            generic_context.specialize_constrained(db, constraints.constraints(db));
+                        let result = match specialization {
+                            Ok(specialization) => Type::KnownInstance(
+                                KnownInstanceType::Specialization(specialization),
+                            ),
+                            Err(()) => Type::none(db),
+                        };
+                        overload.set_return_type(result);
                     }
 
                     Type::ClassLiteral(class) => match class.known(db) {
@@ -3089,8 +3117,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         if let Type::TypedDict(typed_dict) = argument_type {
             for (argument_type, parameter_index) in typed_dict
                 .items(self.db)
-                .iter()
-                .map(|(_, field)| field.declared_ty)
+                .values()
+                .map(|field| field.declared_ty)
                 .zip(&self.argument_matches[argument_index].parameters)
             {
                 self.check_argument_type(

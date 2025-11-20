@@ -396,7 +396,7 @@ impl<'db> BoundSuperType<'db> {
                 let mut key_builder = UnionBuilder::new(db);
                 let mut value_builder = UnionBuilder::new(db);
                 for (name, field) in td.items(db) {
-                    key_builder = key_builder.add(Type::string_literal(db, &name));
+                    key_builder = key_builder.add(Type::string_literal(db, name));
                     value_builder = value_builder.add(field.declared_ty);
                 }
                 return delegate_to(

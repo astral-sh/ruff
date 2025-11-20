@@ -200,6 +200,9 @@ isinstance("", t.Any)  # error: [invalid-argument-type]
 
 ## The builtin `NotImplemented` constant is not callable
 
+<!-- snapshot-diagnostics -->
+
 ```py
-NotImplemented()  # error: [call-non-callable]
+raise NotImplemented()  # error: [call-non-callable]
+raise NotImplemented("this module is not implemented yet!!!")  # error: [call-non-callable]
 ```

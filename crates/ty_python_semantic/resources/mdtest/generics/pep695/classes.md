@@ -20,17 +20,21 @@ class TypeVarAndParamSpec[T, **P]: ...
 class SingleTypeVarTuple[*Ts]: ...
 class TypeVarAndTypeVarTuple[T, *Ts]: ...
 
-# revealed: tuple[T@SingleTypevar]
+# revealed: ty_extensions.GenericContext[T@SingleTypevar]
 reveal_type(generic_context(SingleTypevar))
-# revealed: tuple[T@MultipleTypevars, S@MultipleTypevars]
+# revealed: ty_extensions.GenericContext[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
 
 # TODO: support `ParamSpec`/`TypeVarTuple` properly
 # (these should include the `ParamSpec`s and `TypeVarTuple`s in their generic contexts)
-reveal_type(generic_context(SingleParamSpec))  # revealed: tuple[()]
-reveal_type(generic_context(TypeVarAndParamSpec))  # revealed: tuple[T@TypeVarAndParamSpec]
-reveal_type(generic_context(SingleTypeVarTuple))  # revealed: tuple[()]
-reveal_type(generic_context(TypeVarAndTypeVarTuple))  # revealed: tuple[T@TypeVarAndTypeVarTuple]
+# revealed: ty_extensions.GenericContext[]
+reveal_type(generic_context(SingleParamSpec))
+# revealed: ty_extensions.GenericContext[T@TypeVarAndParamSpec]
+reveal_type(generic_context(TypeVarAndParamSpec))
+# revealed: ty_extensions.GenericContext[]
+reveal_type(generic_context(SingleTypeVarTuple))
+# revealed: ty_extensions.GenericContext[T@TypeVarAndTypeVarTuple]
+reveal_type(generic_context(TypeVarAndTypeVarTuple))
 ```
 
 You cannot use the same typevar more than once.
@@ -49,9 +53,9 @@ class InheritedGeneric[U, V](MultipleTypevars[U, V]): ...
 class InheritedGenericPartiallySpecialized[U](MultipleTypevars[U, int]): ...
 class InheritedGenericFullySpecialized(MultipleTypevars[str, int]): ...
 
-# revealed: tuple[U@InheritedGeneric, V@InheritedGeneric]
+# revealed: ty_extensions.GenericContext[U@InheritedGeneric, V@InheritedGeneric]
 reveal_type(generic_context(InheritedGeneric))
-# revealed: tuple[U@InheritedGenericPartiallySpecialized]
+# revealed: ty_extensions.GenericContext[U@InheritedGenericPartiallySpecialized]
 reveal_type(generic_context(InheritedGenericPartiallySpecialized))
 # revealed: None
 reveal_type(generic_context(InheritedGenericFullySpecialized))
@@ -64,7 +68,8 @@ the inheriting class generic.
 ```py
 class InheritedGenericDefaultSpecialization(MultipleTypevars): ...
 
-reveal_type(generic_context(InheritedGenericDefaultSpecialization))  # revealed: None
+# revealed: None
+reveal_type(generic_context(InheritedGenericDefaultSpecialization))
 ```
 
 You cannot use PEP-695 syntax and the legacy syntax in the same class definition.
@@ -512,18 +517,27 @@ class C[T]:
     # TODO: error
     def cannot_shadow_class_typevar[T](self, t: T): ...
 
-reveal_type(generic_context(C))  # revealed: tuple[T@C]
-reveal_type(generic_context(C.method))  # revealed: tuple[Self@method]
-reveal_type(generic_context(C.generic_method))  # revealed: tuple[Self@generic_method, U@generic_method]
-reveal_type(generic_context(C[int]))  # revealed: None
-reveal_type(generic_context(C[int].method))  # revealed: tuple[Self@method]
-reveal_type(generic_context(C[int].generic_method))  # revealed: tuple[Self@generic_method, U@generic_method]
+# revealed: ty_extensions.GenericContext[T@C]
+reveal_type(generic_context(C))
+# revealed: ty_extensions.GenericContext[Self@method]
+reveal_type(generic_context(C.method))
+# revealed: ty_extensions.GenericContext[Self@generic_method, U@generic_method]
+reveal_type(generic_context(C.generic_method))
+# revealed: None
+reveal_type(generic_context(C[int]))
+# revealed: ty_extensions.GenericContext[Self@method]
+reveal_type(generic_context(C[int].method))
+# revealed: ty_extensions.GenericContext[Self@generic_method, U@generic_method]
+reveal_type(generic_context(C[int].generic_method))
 
 c: C[int] = C[int]()
 reveal_type(c.generic_method(1, "string"))  # revealed: Literal["string"]
-reveal_type(generic_context(c))  # revealed: None
-reveal_type(generic_context(c.method))  # revealed: tuple[Self@method]
-reveal_type(generic_context(c.generic_method))  # revealed: tuple[Self@generic_method, U@generic_method]
+# revealed: None
+reveal_type(generic_context(c))
+# revealed: ty_extensions.GenericContext[Self@method]
+reveal_type(generic_context(c.method))
+# revealed: ty_extensions.GenericContext[Self@generic_method, U@generic_method]
+reveal_type(generic_context(c.generic_method))
 ```
 
 ## Specializations propagate

@@ -923,7 +923,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let kw_only_sentinel_fields: Vec<_> = class
                     .fields(self.db(), specialization, field_policy)
-                    .into_iter()
+                    .iter()
                     .filter_map(|(name, field)| {
                         field.is_kw_only_sentinel(self.db()).then_some(name)
                     })
@@ -7838,7 +7838,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_expression(target, TypeContext::default());
 
-        self.add_binding(named.into(), definition, |builder, tcx| {
+        self.add_binding(named.target.as_ref().into(), definition, |builder, tcx| {
             builder.infer_expression(value, tcx)
         })
     }
@@ -7989,6 +7989,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ty
             });
 
+        if callable_type.is_notimplemented(self.db()) {
+            if let Some(builder) = self
+                .context
+                .report_lint(&CALL_NON_CALLABLE, call_expression)
+            {
+                let mut diagnostic = builder.into_diagnostic("`NotImplemented` is not callable");
+                diagnostic.annotate(
+                    self.context
+                        .secondary(&**func)
+                        .message("Did you mean `NotImplementedError`?"),
+                );
+                diagnostic.set_concise_message(
+                    "`NotImplemented` is not callable - did you mean `NotImplementedError`?",
+                );
+            }
+            return Type::unknown();
+        }
+
         // Special handling for `TypedDict` method calls
         if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
             let value_type = self.expression_type(value);
@@ -8031,7 +8049,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     Type::TypedDict(typed_dict_ty),
                                     None,
                                     key_ty,
-                                    &items,
+                                    items,
                                 );
                                 // Return `Unknown` to prevent the overload system from generating its own error
                                 return Type::unknown();
@@ -9597,7 +9615,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     | KnownInstanceType::Literal(_)
                     | KnownInstanceType::Annotated(_)
                     | KnownInstanceType::TypeGenericAlias(_)
-                    | KnownInstanceType::Callable(_),
+                    | KnownInstanceType::Callable(_)
+                    | KnownInstanceType::TypeVar(_),
                 ),
                 Type::ClassLiteral(..)
                 | Type::SubclassOf(..)
@@ -9608,7 +9627,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     | KnownInstanceType::Literal(_)
                     | KnownInstanceType::Annotated(_)
                     | KnownInstanceType::TypeGenericAlias(_)
-                    | KnownInstanceType::Callable(_),
+                    | KnownInstanceType::Callable(_)
+                    | KnownInstanceType::TypeVar(_),
                 ),
                 ast::Operator::BitOr,
             ) if pep_604_unions_allowed() => {
@@ -11016,6 +11036,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .map(Type::from)
                     .unwrap_or_else(Type::unknown);
             }
+            Type::KnownInstance(KnownInstanceType::UnionType(_)) => {
+                return todo_type!("Specialization of union type alias");
+            }
             _ => {}
         }
 
@@ -11385,7 +11408,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 value_ty,
                                 None,
                                 slice_ty,
-                                &typed_dict.items(db),
+                                typed_dict.items(db),
                             );
                         } else {
                             if let Some(builder) =

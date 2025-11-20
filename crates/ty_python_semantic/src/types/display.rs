@@ -394,12 +394,14 @@ impl Display for DisplayRepresentation<'_> {
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner {
-                Protocol::FromClass(ClassType::NonGeneric(class)) => {
-                    class.display_with(self.db, self.settings.clone()).fmt(f)
-                }
-                Protocol::FromClass(ClassType::Generic(alias)) => {
-                    alias.display_with(self.db, self.settings.clone()).fmt(f)
-                }
+                Protocol::FromClass(class) => match *class {
+                    ClassType::NonGeneric(class) => {
+                        class.display_with(self.db, self.settings.clone()).fmt(f)
+                    }
+                    ClassType::Generic(alias) => {
+                        alias.display_with(self.db, self.settings.clone()).fmt(f)
+                    }
+                },
                 Protocol::Synthesized(synthetic) => {
                     f.write_str("<Protocol with members ")?;
                     let interface = synthetic.interface();
@@ -543,6 +545,9 @@ impl Display for DisplayRepresentation<'_> {
             Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(
                 _,
             )) => f.write_str("bound method `ConstraintSet.satisfied_by_all_typevars`"),
+            Type::KnownBoundMethod(KnownBoundMethodType::GenericContextSpecializeConstrained(
+                _,
+            )) => f.write_str("bound method `GenericContext.specialize_constrained`"),
             Type::WrapperDescriptor(kind) => {
                 let (method, object) = match kind {
                     WrapperDescriptorKind::FunctionTypeDunderGet => ("__get__", "function"),
@@ -897,6 +902,16 @@ impl<'db> GenericContext<'db> {
     pub fn display(&'db self, db: &'db dyn Db) -> DisplayGenericContext<'db> {
         Self::display_with(self, db, DisplaySettings::default())
     }
+
+    pub fn display_full(&'db self, db: &'db dyn Db) -> DisplayGenericContext<'db> {
+        DisplayGenericContext {
+            generic_context: self,
+            db,
+            settings: DisplaySettings::default(),
+            full: true,
+        }
+    }
+
     pub fn display_with(
         &'db self,
         db: &'db dyn Db,
@@ -906,6 +921,7 @@ impl<'db> GenericContext<'db> {
             generic_context: self,
             db,
             settings,
+            full: false,
         }
     }
 }
@@ -919,12 +935,9 @@ struct DisplayOptionalGenericContext<'db> {
 impl Display for DisplayOptionalGenericContext<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         if let Some(generic_context) = self.generic_context {
-            DisplayGenericContext {
-                generic_context,
-                db: self.db,
-                settings: self.settings.clone(),
-            }
-            .fmt(f)
+            generic_context
+                .display_with(self.db, self.settings.clone())
+                .fmt(f)
         } else {
             Ok(())
         }
@@ -936,10 +949,11 @@ pub struct DisplayGenericContext<'db> {
     db: &'db dyn Db,
     #[expect(dead_code)]
     settings: DisplaySettings<'db>,
+    full: bool,
 }
 
-impl Display for DisplayGenericContext<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl DisplayGenericContext<'_> {
+    fn fmt_normal(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let variables = self.generic_context.variables(self.db);
 
         let non_implicit_variables: Vec<_> = variables
@@ -959,40 +973,75 @@ impl Display for DisplayGenericContext<'_> {
         }
         f.write_char(']')
     }
+
+    fn fmt_full(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let variables = self.generic_context.variables(self.db);
+        f.write_char('[')?;
+        for (idx, bound_typevar) in variables.enumerate() {
+            if idx > 0 {
+                f.write_str(", ")?;
+            }
+            bound_typevar.identity(self.db).display(self.db).fmt(f)?;
+        }
+        f.write_char(']')
+    }
+}
+
+impl Display for DisplayGenericContext<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if self.full {
+            self.fmt_full(f)
+        } else {
+            self.fmt_normal(f)
+        }
+    }
 }
 
 impl<'db> Specialization<'db> {
-    pub fn display(&'db self, db: &'db dyn Db) -> DisplaySpecialization<'db> {
+    pub fn display(self, db: &'db dyn Db) -> DisplaySpecialization<'db> {
         self.display_short(db, TupleSpecialization::No, DisplaySettings::default())
+    }
+
+    pub(crate) fn display_full(self, db: &'db dyn Db) -> DisplaySpecialization<'db> {
+        DisplaySpecialization {
+            specialization: self,
+            db,
+            tuple_specialization: TupleSpecialization::No,
+            settings: DisplaySettings::default(),
+            full: true,
+        }
     }
 
     /// Renders the specialization as it would appear in a subscript expression, e.g. `[int, str]`.
     pub fn display_short(
-        &'db self,
+        self,
         db: &'db dyn Db,
         tuple_specialization: TupleSpecialization,
         settings: DisplaySettings<'db>,
     ) -> DisplaySpecialization<'db> {
         DisplaySpecialization {
-            types: self.types(db),
+            specialization: self,
             db,
             tuple_specialization,
             settings,
+            full: false,
         }
     }
 }
 
 pub struct DisplaySpecialization<'db> {
-    types: &'db [Type<'db>],
+    specialization: Specialization<'db>,
     db: &'db dyn Db,
     tuple_specialization: TupleSpecialization,
     settings: DisplaySettings<'db>,
+    full: bool,
 }
 
-impl Display for DisplaySpecialization<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl DisplaySpecialization<'_> {
+    fn fmt_normal(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_char('[')?;
-        for (idx, ty) in self.types.iter().enumerate() {
+        let types = self.specialization.types(self.db);
+        for (idx, ty) in types.iter().enumerate() {
             if idx > 0 {
                 f.write_str(", ")?;
             }
@@ -1002,6 +1051,37 @@ impl Display for DisplaySpecialization<'_> {
             f.write_str(", ...")?;
         }
         f.write_char(']')
+    }
+
+    fn fmt_full(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_char('[')?;
+        let variables = self
+            .specialization
+            .generic_context(self.db)
+            .variables(self.db);
+        let types = self.specialization.types(self.db);
+        for (idx, (bound_typevar, ty)) in variables.zip(types).enumerate() {
+            if idx > 0 {
+                f.write_str(", ")?;
+            }
+            write!(
+                f,
+                "{} = {}",
+                bound_typevar.identity(self.db).display(self.db),
+                ty.display_with(self.db, self.settings.clone()),
+            )?;
+        }
+        f.write_char(']')
+    }
+}
+
+impl Display for DisplaySpecialization<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if self.full {
+            self.fmt_full(f)
+        } else {
+            self.fmt_normal(f)
+        }
     }
 }
 

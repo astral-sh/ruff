@@ -5,6 +5,7 @@ mod python_version;
 mod version;
 
 pub use args::Cli;
+use ty_project::metadata::settings::TerminalSettings;
 use ty_static::EnvVars;
 
 use std::fmt::Write;
@@ -21,7 +22,9 @@ use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, DisplayDiagnostics, Severity};
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
+};
 use ruff_db::files::File;
 use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
@@ -193,6 +196,12 @@ pub enum ExitStatus {
     InternalError = 101,
 }
 
+impl ExitStatus {
+    pub const fn is_internal_error(self) -> bool {
+        matches!(self, ExitStatus::InternalError)
+    }
+}
+
 impl Termination for ExitStatus {
     fn report(self) -> ExitCode {
         ExitCode::from(self as u8)
@@ -334,11 +343,8 @@ impl MainLoop {
                             let diagnostics_count = result.len();
 
                             let mut stdout = self.printer.stream_for_details().lock();
-                            let max_severity = result
-                                .iter()
-                                .map(Diagnostic::severity)
-                                .max()
-                                .unwrap_or(Severity::Info);
+                            let exit_status =
+                                exit_status_from_diagnostics(&result, terminal_settings);
 
                             // Only render diagnostics if they're going to be displayed, since doing
                             // so is expensive.
@@ -359,25 +365,14 @@ impl MainLoop {
                                 )?;
                             }
 
-                            if max_severity.is_fatal() {
+                            if exit_status.is_internal_error() {
                                 tracing::warn!(
                                     "A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details."
                                 );
                             }
 
                             if self.watcher.is_none() {
-                                return Ok(match max_severity {
-                                    Severity::Info => ExitStatus::Success,
-                                    Severity::Warning => {
-                                        if terminal_settings.error_on_warning {
-                                            ExitStatus::Failure
-                                        } else {
-                                            ExitStatus::Success
-                                        }
-                                    }
-                                    Severity::Error => ExitStatus::Failure,
-                                    Severity::Fatal => ExitStatus::InternalError,
-                                });
+                                return Ok(exit_status);
                             }
                         }
                     } else {
@@ -407,6 +402,40 @@ impl MainLoop {
         }
 
         Ok(ExitStatus::Success)
+    }
+}
+
+fn exit_status_from_diagnostics(
+    diagnostics: &[Diagnostic],
+    terminal_settings: &TerminalSettings,
+) -> ExitStatus {
+    if diagnostics.is_empty() {
+        return ExitStatus::Success;
+    }
+
+    let mut max_severity = Severity::Info;
+    let mut io_error = false;
+
+    for diagnostic in diagnostics {
+        max_severity = max_severity.max(diagnostic.severity());
+        io_error = io_error || matches!(diagnostic.id(), DiagnosticId::Io);
+    }
+
+    if !max_severity.is_fatal() && io_error {
+        return ExitStatus::Error;
+    }
+
+    match max_severity {
+        Severity::Info => ExitStatus::Success,
+        Severity::Warning => {
+            if terminal_settings.error_on_warning {
+                ExitStatus::Failure
+            } else {
+                ExitStatus::Success
+            }
+        }
+        Severity::Error => ExitStatus::Failure,
+        Severity::Fatal => ExitStatus::InternalError,
     }
 }
 

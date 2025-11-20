@@ -7,7 +7,6 @@ use super::{
     SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
     function::FunctionType, infer_expression_type, infer_unpack_types,
 };
-use crate::FxOrderMap;
 use crate::module_resolver::KnownModule;
 use crate::place::TypeOrigin;
 use crate::semantic_index::definition::{Definition, DefinitionState};
@@ -128,7 +127,7 @@ fn try_metaclass_cycle_initial<'db>(
 }
 
 /// A category of classes with code generation capabilities (with synthesized methods).
-#[derive(Clone, Copy, Debug, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum CodeGeneratorKind<'db> {
     /// Classes decorated with `@dataclass` or similar dataclass-like decorators
     DataclassLike(Option<DataclassTransformerParams<'db>>),
@@ -1256,7 +1255,7 @@ impl MethodDecorator {
 }
 
 /// Kind-specific metadata for different types of fields
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum FieldKind<'db> {
     /// `NamedTuple` field metadata
     NamedTuple { default_ty: Option<Type<'db>> },
@@ -1284,7 +1283,7 @@ pub(crate) enum FieldKind<'db> {
 }
 
 /// Metadata regarding a dataclass field/attribute or a `TypedDict` "item" / key-value pair.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct Field<'db> {
     /// The declared type of the field
     pub(crate) declared_ty: Type<'db>,
@@ -2334,7 +2333,8 @@ impl<'db> ClassLiteral<'db> {
                     || kw_only.unwrap_or(has_dataclass_param(DataclassFlags::KW_ONLY));
 
                 // Use the alias name if provided, otherwise use the field name
-                let parameter_name = alias.map(Name::new).unwrap_or(field_name);
+                let parameter_name =
+                    Name::new(alias.map(|alias| &**alias).unwrap_or(&**field_name));
 
                 let mut parameter = if is_kw_only {
                     Parameter::keyword_only(parameter_name)
@@ -2600,7 +2600,7 @@ impl<'db> ClassLiteral<'db> {
             (CodeGeneratorKind::TypedDict, "get") => {
                 let overloads = self
                     .fields(db, specialization, field_policy)
-                    .into_iter()
+                    .iter()
                     .flat_map(|(name, field)| {
                         let key_type =
                             Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
@@ -2829,12 +2829,13 @@ impl<'db> ClassLiteral<'db> {
     /// Returns a list of all annotated attributes defined in this class, or any of its superclasses.
     ///
     /// See [`ClassLiteral::own_fields`] for more details.
+    #[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
     pub(crate) fn fields(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
-        field_policy: CodeGeneratorKind,
-    ) -> FxOrderMap<Name, Field<'db>> {
+        field_policy: CodeGeneratorKind<'db>,
+    ) -> FxIndexMap<Name, Field<'db>> {
         if field_policy == CodeGeneratorKind::NamedTuple {
             // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
             // fields of this class only.
@@ -2882,8 +2883,8 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind,
-    ) -> FxOrderMap<Name, Field<'db>> {
-        let mut attributes = FxOrderMap::default();
+    ) -> FxIndexMap<Name, Field<'db>> {
+        let mut attributes = FxIndexMap::default();
 
         let class_body_scope = self.body_scope(db);
         let table = place_table(db, class_body_scope);
@@ -3961,6 +3962,8 @@ pub enum KnownClass {
     Path,
     // ty_extensions
     ConstraintSet,
+    GenericContext,
+    Specialization,
 }
 
 impl KnownClass {
@@ -4064,6 +4067,8 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::GenericContext
+            | Self::Specialization
             | Self::ProtocolMeta
             | Self::TypedDictFallback => Some(Truthiness::Ambiguous),
 
@@ -4147,6 +4152,8 @@ impl KnownClass {
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
             | KnownClass::ConstraintSet
+            | KnownClass::GenericContext
+            | KnownClass::Specialization
             | KnownClass::TypedDictFallback
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
@@ -4230,6 +4237,8 @@ impl KnownClass {
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
             | KnownClass::ConstraintSet
+            | KnownClass::GenericContext
+            | KnownClass::Specialization
             | KnownClass::TypedDictFallback
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
@@ -4313,6 +4322,8 @@ impl KnownClass {
             | KnownClass::NamedTupleLike
             | KnownClass::NamedTupleFallback
             | KnownClass::ConstraintSet
+            | KnownClass::GenericContext
+            | KnownClass::Specialization
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
             | KnownClass::Template
@@ -4407,6 +4418,8 @@ impl KnownClass {
             | Self::InitVar
             | Self::NamedTupleFallback
             | Self::ConstraintSet
+            | Self::GenericContext
+            | Self::Specialization
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
@@ -4496,6 +4509,8 @@ impl KnownClass {
             | KnownClass::Template
             | KnownClass::Path
             | KnownClass::ConstraintSet
+            | KnownClass::GenericContext
+            | KnownClass::Specialization
             | KnownClass::InitVar => false,
             KnownClass::NamedTupleFallback | KnownClass::TypedDictFallback => true,
         }
@@ -4604,6 +4619,8 @@ impl KnownClass {
             Self::NamedTupleFallback => "NamedTupleFallback",
             Self::NamedTupleLike => "NamedTupleLike",
             Self::ConstraintSet => "ConstraintSet",
+            Self::GenericContext => "GenericContext",
+            Self::Specialization => "Specialization",
             Self::TypedDictFallback => "TypedDictFallback",
             Self::Template => "Template",
             Self::Path => "Path",
@@ -4915,7 +4932,10 @@ impl KnownClass {
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field | Self::KwOnly | Self::InitVar => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
-            Self::NamedTupleLike | Self::ConstraintSet => KnownModule::TyExtensions,
+            Self::NamedTupleLike
+            | Self::ConstraintSet
+            | Self::GenericContext
+            | Self::Specialization => KnownModule::TyExtensions,
             Self::Template => KnownModule::Templatelib,
             Self::Path => KnownModule::Pathlib,
         }
@@ -4998,6 +5018,8 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::GenericContext
+            | Self::Specialization
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
@@ -5086,6 +5108,8 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::GenericContext
+            | Self::Specialization
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
@@ -5189,6 +5213,8 @@ impl KnownClass {
             "NamedTupleFallback" => &[Self::NamedTupleFallback],
             "NamedTupleLike" => &[Self::NamedTupleLike],
             "ConstraintSet" => &[Self::ConstraintSet],
+            "GenericContext" => &[Self::GenericContext],
+            "Specialization" => &[Self::Specialization],
             "TypedDictFallback" => &[Self::TypedDictFallback],
             "Template" => &[Self::Template],
             "Path" => &[Self::Path],
@@ -5266,6 +5292,8 @@ impl KnownClass {
             | Self::ExtensionsTypeVar
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::GenericContext
+            | Self::Specialization
             | Self::Awaitable
             | Self::Generator
             | Self::Template

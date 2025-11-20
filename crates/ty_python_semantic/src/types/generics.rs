@@ -483,11 +483,6 @@ impl<'db> GenericContext<'db> {
         self.specialize(db, types.into())
     }
 
-    /// Returns a tuple type of the typevars introduced by this generic context.
-    pub(crate) fn as_tuple(self, db: &'db dyn Db) -> Type<'db> {
-        Type::heterogeneous_tuple(db, self.variables(db).map(Type::TypeVar))
-    }
-
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
         let other_variables = other.variables_inner(db);
         self.variables(db)
@@ -514,9 +509,16 @@ impl<'db> GenericContext<'db> {
     }
 
     /// Creates a specialization of this generic context. Panics if the length of `types` does not
-    /// match the number of typevars in the generic context. You must provide a specific type for
-    /// each typevar; no defaults are used. (Use [`specialize_partial`](Self::specialize_partial)
-    /// if you might not have types for every typevar.)
+    /// match the number of typevars in the generic context.
+    ///
+    /// You must provide a specific type for each typevar; no defaults are used. (Use
+    /// [`specialize_partial`](Self::specialize_partial) if you might not have types for every
+    /// typevar.)
+    ///
+    /// The types you provide should not mention any of the typevars in this generic context;
+    /// otherwise, you will be left with a partial specialization. (Use
+    /// [`specialize_recursive`](Self::specialize_recursive) if your types might mention typevars
+    /// in this generic context.)
     pub(crate) fn specialize(
         self,
         db: &'db dyn Db,
@@ -524,6 +526,41 @@ impl<'db> GenericContext<'db> {
     ) -> Specialization<'db> {
         assert!(self.len(db) == types.len());
         Specialization::new(db, self, types, None, None)
+    }
+
+    /// Creates a specialization of this generic context. Panics if the length of `types` does not
+    /// match the number of typevars in the generic context.
+    ///
+    /// You are allowed to provide types that mention the typevars in this generic context.
+    pub(crate) fn specialize_recursive(
+        self,
+        db: &'db dyn Db,
+        mut types: Box<[Type<'db>]>,
+    ) -> Specialization<'db> {
+        let len = types.len();
+        assert!(self.len(db) == len);
+        loop {
+            let mut any_changed = false;
+            for i in 0..len {
+                let partial = PartialSpecialization {
+                    generic_context: self,
+                    types: &types,
+                };
+                let updated = types[i].apply_type_mapping(
+                    db,
+                    &TypeMapping::PartialSpecialization(partial),
+                    TypeContext::default(),
+                );
+                if updated != types[i] {
+                    types[i] = updated;
+                    any_changed = true;
+                }
+            }
+
+            if !any_changed {
+                return Specialization::new(db, self, types, None, None);
+            }
+        }
     }
 
     /// Creates a specialization of this generic context for the `tuple` class.
@@ -633,7 +670,12 @@ impl std::fmt::Display for LegacyGenericBase {
 ///
 /// TODO: Handle nested specializations better, with actual parent links to the specialization of
 /// the lexically containing context.
+///
+/// # Ordering
+/// Ordering is based on the context's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the context was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
 pub struct Specialization<'db> {
     pub(crate) generic_context: GenericContext<'db>,
     #[returns(deref)]
@@ -1016,6 +1058,11 @@ impl<'db> Specialization<'db> {
         // TODO: Combine the tuple specs too
         // TODO(jelle): specialization type?
         Specialization::new(db, self.generic_context(db), types, None, None)
+    }
+
+    #[must_use]
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        self.normalized_impl(db, &NormalizedVisitor::default())
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
@@ -1580,9 +1627,9 @@ impl<'db> SpecializationBuilder<'db> {
                     // generic protocol, we will need to check the types of the protocol members to be
                     // able to infer the specialization of the protocol that the class implements.
                     Type::ProtocolInstance(ProtocolInstanceType {
-                        inner: Protocol::FromClass(ClassType::Generic(alias)),
+                        inner: Protocol::FromClass(class),
                         ..
-                    }) => Some(alias),
+                    }) => class.into_generic_alias(),
                     _ => None,
                 };
 

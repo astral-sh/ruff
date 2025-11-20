@@ -320,15 +320,11 @@ pub(super) fn to_lsp_diagnostic(
         })
         .filter(|mapped_tags| !mapped_tags.is_empty());
 
-    let code_description = diagnostic
-        .id()
-        .is_lint()
-        .then(|| {
-            Some(CodeDescription {
-                href: Url::parse(&format!("https://ty.dev/rules#{}", diagnostic.id())).ok()?,
-            })
-        })
-        .flatten();
+    let code_description = diagnostic.documentation_url().and_then(|url| {
+        let href = Url::parse(url).ok()?;
+
+        Some(CodeDescription { href })
+    });
 
     let mut related_information = Vec::new();
 

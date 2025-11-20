@@ -32,7 +32,7 @@ camino = { workspace = true }
 colored = { workspace = true }
 compact_str = { workspace = true }
 drop_bomb = { workspace = true }
-get-size2 = { workspace = true }
+get-size2 = { workspace = true, features = ["indexmap"]}
 indexmap = { workspace = true }
 itertools = { workspace = true }
 ordermap = { workspace = true }
