@@ -2227,6 +2227,9 @@ impl<'db> ConstraintAssignment<'db> {
 ///
 /// We support several kinds of sequent:
 ///
+/// - `¬C₁ → false`: This indicates that `C₁` is always true. Any path that assumes it is false is
+///   impossible and can be pruned.
+///
 /// - `C₁ ∧ C₂ → false`: This indicates that `C₁` and `C₂` are disjoint: it is not possible for
 ///   both to hold. Any path that assumes both is impossible and can be pruned.
 ///
@@ -2238,8 +2241,10 @@ impl<'db> ConstraintAssignment<'db> {
 ///   holds but `D` does _not_ is impossible and can be pruned.
 #[derive(Debug, Default, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
 struct SequentMap<'db> {
+    /// Sequents of the form `¬C₁ → false`
+    single_tautologies: FxHashSet<ConstrainedTypeVar<'db>>,
     /// Sequents of the form `C₁ ∧ C₂ → false`
-    impossibilities: FxHashSet<(ConstrainedTypeVar<'db>, ConstrainedTypeVar<'db>)>,
+    pair_impossibilities: FxHashSet<(ConstrainedTypeVar<'db>, ConstrainedTypeVar<'db>)>,
     /// Sequents of the form `C₁ ∧ C₂ → D`
     pair_implications: FxHashMap<
         (ConstrainedTypeVar<'db>, ConstrainedTypeVar<'db>),
@@ -2298,13 +2303,17 @@ impl<'db> SequentMap<'db> {
         }
     }
 
-    fn add_impossibility(
+    fn add_single_tautology(&mut self, ante: ConstrainedTypeVar<'db>) {
+        self.single_tautologies.insert(ante);
+    }
+
+    fn add_pair_impossibility(
         &mut self,
         db: &'db dyn Db,
         ante1: ConstrainedTypeVar<'db>,
         ante2: ConstrainedTypeVar<'db>,
     ) {
-        self.impossibilities
+        self.pair_impossibilities
             .insert(Self::pair_key(db, ante1, ante2));
     }
 
@@ -2340,6 +2349,15 @@ impl<'db> SequentMap<'db> {
     }
 
     fn add_sequents_for_single(&mut self, db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) {
+        // If this constraint binds its typevar to `Never ≤ T ≤ object`, then the typevar can take
+        // on any type, and the constraint is always satisfied.
+        let lower = constraint.lower(db);
+        let upper = constraint.upper(db);
+        if lower.is_never() && upper.is_object() {
+            self.add_single_tautology(constraint);
+            return;
+        }
+
         // If the lower or upper bound of this constraint is a typevar, we can propagate the
         // constraint:
         //
@@ -2350,8 +2368,6 @@ impl<'db> SequentMap<'db> {
         // Technically, (1) also allows `(S = T) → (S = S)`, but the rhs of that is vacuously true,
         // so we don't add a sequent for that case.
 
-        let lower = constraint.lower(db);
-        let upper = constraint.upper(db);
         let post_constraint = match (lower, upper) {
             // Case 1
             (Type::TypeVar(lower_typevar), Type::TypeVar(upper_typevar)) => {
@@ -2556,7 +2572,7 @@ impl<'db> SequentMap<'db> {
                 self.enqueue_constraint(intersection_constraint);
             }
             None => {
-                self.add_impossibility(db, left_constraint, right_constraint);
+                self.add_pair_impossibility(db, left_constraint, right_constraint);
             }
         }
     }
@@ -2581,7 +2597,7 @@ impl<'db> SequentMap<'db> {
                     }
                 };
 
-                for (ante1, ante2) in &self.map.impossibilities {
+                for (ante1, ante2) in &self.map.pair_impossibilities {
                     maybe_write_prefix(f)?;
                     write!(
                         f,
@@ -2714,7 +2730,7 @@ impl<'db> PathAssignments<'db> {
         // don't anticipate the sequent maps to be very large. We might consider avoiding the
         // brute-force search.
 
-        for (ante1, ante2) in &map.impossibilities {
+        for (ante1, ante2) in &map.pair_impossibilities {
             if self.assignment_holds(ante1.when_true()) && self.assignment_holds(ante2.when_true())
             {
                 // The sequent map says (ante1 ∧ ante2) is an impossible combination, and the
