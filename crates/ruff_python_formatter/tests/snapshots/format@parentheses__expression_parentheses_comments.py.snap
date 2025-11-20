@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/parentheses/expression_parentheses_comments.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -179,13 +178,13 @@ nested_parentheses4 = [
 
 x = (
     # unary comment
+    not
     # in-between comment
-    not (
+    (
         # leading inner
         "a"
     ),
-    # in-between comment
-    not (
+    not (  # in-between comment
         # leading inner
         "b"
     ),
@@ -194,8 +193,7 @@ x = (
         "c"
     ),
     # 1
-    # 2
-    not (  # 3
+    not (  # 2  # 3
         # 4
         "d"
     ),
@@ -203,8 +201,9 @@ x = (
 
 if (
     # unary comment
+    not
     # in-between comment
-    not (
+    (
         # leading inner
         1
     )

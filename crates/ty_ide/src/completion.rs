@@ -244,7 +244,7 @@ pub fn completion<'db>(
     let tokens = tokens_start_before(parsed.tokens(), offset);
     let typed = find_typed_text(db, file, &parsed, offset);
 
-    if is_in_no_completions_place(db, tokens, file) {
+    if is_in_no_completions_place(db, file, tokens, typed.as_deref()) {
         return vec![];
     }
     if let Some(completions) = only_keyword_completion(tokens, typed.as_deref()) {
@@ -357,6 +357,9 @@ fn add_keyword_completions<'db>(
 fn only_keyword_completion<'db>(tokens: &[Token], typed: Option<&str>) -> Option<Completion<'db>> {
     if is_import_from_incomplete(tokens, typed) {
         return Some(Completion::keyword("import"));
+    }
+    if is_import_alias_incomplete(tokens, typed) {
+        return Some(Completion::keyword("as"));
     }
     None
 }
@@ -914,6 +917,59 @@ fn is_import_from_incomplete(tokens: &[Token], typed: Option<&str>) -> bool {
     false
 }
 
+/// Detects `import <name> <CURSOR>` statements with a potentially incomplete
+/// `as` clause.
+///
+/// Note that this works for `from <module> import <name> <CURSOR>` as well.
+///
+/// If found, `true` is returned.
+fn is_import_alias_incomplete(tokens: &[Token], typed: Option<&str>) -> bool {
+    use TokenKind as TK;
+
+    const LIMIT: usize = 1_000;
+
+    /// A state used to "parse" the tokens preceding the user's cursor,
+    /// in reverse, to detect a "import <name> as" statement.
+    enum S {
+        Start,
+        As,
+        Name,
+    }
+
+    if typed.is_none() {
+        return false;
+    }
+
+    let mut state = S::Start;
+    for token in tokens.iter().rev().take(LIMIT) {
+        state = match (state, token.kind()) {
+            (S::Start, TK::Name | TK::Unknown | TK::As) => S::As,
+            (S::As, TK::Name | TK::Case | TK::Match | TK::Type | TK::Unknown) => S::Name,
+            (
+                S::Name,
+                TK::Name
+                | TK::Dot
+                | TK::Ellipsis
+                | TK::Case
+                | TK::Match
+                | TK::Type
+                | TK::Unknown
+                | TK::Comma
+                | TK::As
+                | TK::Newline
+                | TK::NonLogicalNewline
+                | TK::Lpar
+                | TK::Rpar,
+            ) => S::Name,
+            // Once we reach the `import` token we know we're in
+            // `import name <CURSOR>`.
+            (S::Name, TK::Import) => return true,
+            _ => return false,
+        };
+    }
+    false
+}
+
 /// Looks for the text typed immediately before the cursor offset
 /// given.
 ///
@@ -930,8 +986,9 @@ fn find_typed_text(
     let last = tokens.last()?;
     // It's odd to include `TokenKind::Import` here, but it
     // indicates that the user has typed `import`. This is
-    // useful to know in some contexts.
-    if !matches!(last.kind(), TokenKind::Name | TokenKind::Import) {
+    // useful to know in some contexts. And this applies also
+    // to the other keywords.
+    if !matches!(last.kind(), TokenKind::Name) && !last.kind().is_keyword() {
         return None;
     }
     // This one's weird, but if the cursor is beyond
@@ -947,8 +1004,13 @@ fn find_typed_text(
 }
 
 /// Whether the last token is in a place where we should not provide completions.
-fn is_in_no_completions_place(db: &dyn Db, tokens: &[Token], file: File) -> bool {
-    is_in_comment(tokens) || is_in_string(tokens) || is_in_definition_place(db, tokens, file)
+fn is_in_no_completions_place(
+    db: &dyn Db,
+    file: File,
+    tokens: &[Token],
+    typed: Option<&str>,
+) -> bool {
+    is_in_comment(tokens) || is_in_string(tokens) || is_in_definition_place(db, file, tokens, typed)
 }
 
 /// Whether the last token is within a comment or not.
@@ -969,13 +1031,18 @@ fn is_in_string(tokens: &[Token]) -> bool {
     })
 }
 
-/// Returns true when the tokens indicate that the definition of a new name is being introduced at the end.
-fn is_in_definition_place(db: &dyn Db, tokens: &[Token], file: File) -> bool {
-    let is_definition_keyword = |token: &Token| {
-        if matches!(
+/// Returns true when the tokens indicate that the definition of a new
+/// name is being introduced at the end.
+fn is_in_definition_place(db: &dyn Db, file: File, tokens: &[Token], typed: Option<&str>) -> bool {
+    fn is_definition_token(token: &Token) -> bool {
+        matches!(
             token.kind(),
-            TokenKind::Def | TokenKind::Class | TokenKind::Type
-        ) {
+            TokenKind::Def | TokenKind::Class | TokenKind::Type | TokenKind::As
+        )
+    }
+
+    let is_definition_keyword = |token: &Token| {
+        if is_definition_token(token) {
             true
         } else if token.kind() == TokenKind::Name {
             let source = source_text(db, file);
@@ -984,12 +1051,11 @@ fn is_in_definition_place(db: &dyn Db, tokens: &[Token], file: File) -> bool {
             false
         }
     };
-
-    tokens
-        .len()
-        .checked_sub(2)
-        .and_then(|i| tokens.get(i))
-        .is_some_and(is_definition_keyword)
+    match tokens {
+        [.., penultimate, _] if typed.is_some() => is_definition_keyword(penultimate),
+        [.., last] if typed.is_none() => is_definition_keyword(last),
+        _ => false,
+    }
 }
 
 /// Order completions according to the following rules:
@@ -1196,7 +1262,6 @@ type<CURSOR>
             @r"
         TypeError :: <class 'TypeError'>
         type :: <class 'type'>
-        _NotImplementedType :: <class '_NotImplementedType'>
         ",
         );
     }
@@ -2082,7 +2147,7 @@ C.<CURSOR>
         __call__ :: bound method <class 'C'>.__call__(...) -> Any
         __class__ :: <class 'Meta'>
         __delattr__ :: def __delattr__(self, name: str, /) -> None
-        __dict__ :: MappingProxyType[str, Any]
+        __dict__ :: dict[str, Any]
         __dictoffset__ :: int
         __dir__ :: def __dir__(self) -> Iterable[str]
         __doc__ :: str | None
@@ -2281,7 +2346,7 @@ Quux.<CURSOR>
         __call__ :: bound method <class 'Quux'>.__call__(...) -> Any
         __class__ :: <class 'type'>
         __delattr__ :: def __delattr__(self, name: str, /) -> None
-        __dict__ :: MappingProxyType[str, Any]
+        __dict__ :: dict[str, Any]
         __dictoffset__ :: int
         __dir__ :: def __dir__(self) -> Iterable[str]
         __doc__ :: str | None
@@ -2355,7 +2420,7 @@ Answer.<CURSOR>
                 __copy__ :: def __copy__(self) -> Self@__copy__
                 __deepcopy__ :: def __deepcopy__(self, memo: Any) -> Self@__deepcopy__
                 __delattr__ :: def __delattr__(self, name: str, /) -> None
-                __dict__ :: MappingProxyType[str, Any]
+                __dict__ :: dict[str, Any]
                 __dictoffset__ :: int
                 __dir__ :: def __dir__(self) -> list[str]
                 __doc__ :: str | None
@@ -2409,6 +2474,73 @@ Answer.<CURSOR>
                 ");
             }
         );
+    }
+
+    #[test]
+    fn namedtuple_methods() {
+        let builder = completion_test_builder(
+            "\
+from typing import NamedTuple
+
+class Quux(NamedTuple):
+    x: int
+    y: str
+
+quux = Quux()
+quux.<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r"
+        count :: bound method Quux.count(value: Any, /) -> int
+        index :: bound method Quux.index(value: Any, start: SupportsIndex = Literal[0], stop: SupportsIndex = int, /) -> int
+        x :: int
+        y :: str
+        __add__ :: Overload[(value: tuple[int | str, ...], /) -> tuple[int | str, ...], (value: tuple[_T@__add__, ...], /) -> tuple[int | str | _T@__add__, ...]]
+        __annotations__ :: dict[str, Any]
+        __class__ :: type[Quux]
+        __class_getitem__ :: bound method type[Quux].__class_getitem__(item: Any, /) -> GenericAlias
+        __contains__ :: bound method Quux.__contains__(key: object, /) -> bool
+        __delattr__ :: bound method Quux.__delattr__(name: str, /) -> None
+        __dict__ :: dict[str, Any]
+        __dir__ :: bound method Quux.__dir__() -> Iterable[str]
+        __doc__ :: str | None
+        __eq__ :: bound method Quux.__eq__(value: object, /) -> bool
+        __format__ :: bound method Quux.__format__(format_spec: str, /) -> str
+        __ge__ :: bound method Quux.__ge__(value: tuple[int | str, ...], /) -> bool
+        __getattribute__ :: bound method Quux.__getattribute__(name: str, /) -> Any
+        __getitem__ :: Overload[(index: Literal[-2, 0], /) -> int, (index: Literal[-1, 1], /) -> str, (index: SupportsIndex, /) -> int | str, (index: slice[Any, Any, Any], /) -> tuple[int | str, ...]]
+        __getstate__ :: bound method Quux.__getstate__() -> object
+        __gt__ :: bound method Quux.__gt__(value: tuple[int | str, ...], /) -> bool
+        __hash__ :: bound method Quux.__hash__() -> int
+        __init__ :: bound method Quux.__init__() -> None
+        __init_subclass__ :: bound method type[Quux].__init_subclass__() -> None
+        __iter__ :: bound method Quux.__iter__() -> Iterator[int | str]
+        __le__ :: bound method Quux.__le__(value: tuple[int | str, ...], /) -> bool
+        __len__ :: () -> Literal[2]
+        __lt__ :: bound method Quux.__lt__(value: tuple[int | str, ...], /) -> bool
+        __module__ :: str
+        __mul__ :: bound method Quux.__mul__(value: SupportsIndex, /) -> tuple[int | str, ...]
+        __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
+        __new__ :: (x: int, y: str) -> None
+        __orig_bases__ :: tuple[Any, ...]
+        __reduce__ :: bound method Quux.__reduce__() -> str | tuple[Any, ...]
+        __reduce_ex__ :: bound method Quux.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
+        __replace__ :: bound method NamedTupleFallback.__replace__(**kwargs: Any) -> NamedTupleFallback
+        __repr__ :: bound method Quux.__repr__() -> str
+        __reversed__ :: bound method Quux.__reversed__() -> Iterator[int | str]
+        __rmul__ :: bound method Quux.__rmul__(value: SupportsIndex, /) -> tuple[int | str, ...]
+        __setattr__ :: bound method Quux.__setattr__(name: str, value: Any, /) -> None
+        __sizeof__ :: bound method Quux.__sizeof__() -> int
+        __str__ :: bound method Quux.__str__() -> str
+        __subclasshook__ :: bound method type[Quux].__subclasshook__(subclass: type, /) -> bool
+        _asdict :: bound method NamedTupleFallback._asdict() -> dict[str, Any]
+        _field_defaults :: dict[str, Any]
+        _fields :: tuple[str, ...]
+        _make :: bound method type[NamedTupleFallback]._make(iterable: Iterable[Any]) -> NamedTupleFallback
+        _replace :: bound method NamedTupleFallback._replace(**kwargs: Any) -> NamedTupleFallback
+        ");
     }
 
     // We don't yet take function parameters into account.
@@ -3091,8 +3223,13 @@ import foo as ba<CURSOR>
         // which is kind of annoying. So just assert that it
         // runs without panicking and produces some non-empty
         // output.
+        //
+        // ... some time passes ...
+        //
+        // Actually, this shouldn't offer any completions since
+        // the context here is introducing a new name.
         assert!(
-            !builder
+            builder
                 .skip_keywords()
                 .skip_builtins()
                 .build()
@@ -4511,7 +4648,6 @@ foo = 1
 def f<CURSOR>
     ",
         );
-
         assert!(builder.build().completions().is_empty());
     }
 
@@ -4522,9 +4658,7 @@ def f<CURSOR>
 def <CURSOR>
         ",
         );
-
-        // This is okay because the ide will not request completions when the cursor is in this position.
-        assert!(!builder.build().completions().is_empty());
+        assert!(builder.build().completions().is_empty());
     }
 
     #[test]
@@ -4536,7 +4670,6 @@ foo = 1
 class f<CURSOR>
     ",
         );
-
         assert!(builder.build().completions().is_empty());
     }
 
@@ -4547,9 +4680,7 @@ class f<CURSOR>
 class <CURSOR>
         ",
         );
-
-        // This is okay because the ide will not request completions when the cursor is in this position.
-        assert!(!builder.build().completions().is_empty());
+        assert!(builder.build().completions().is_empty());
     }
 
     #[test]
@@ -4574,7 +4705,6 @@ foo = 1
 type f<CURSOR>
        ",
         );
-
         assert!(builder.build().completions().is_empty());
     }
 
@@ -4585,9 +4715,160 @@ type f<CURSOR>
 type <CURSOR>
         ",
         );
+        assert!(builder.build().completions().is_empty());
+    }
 
-        // This is okay because the ide will not request completions when the cursor is in this position.
-        assert!(!builder.build().completions().is_empty());
+    #[test]
+    fn no_completions_in_import_alias() {
+        let builder = completion_test_builder(
+            "\
+foo = 1
+import collections as f<CURSOR>
+    ",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn no_completions_in_from_import_alias() {
+        let builder = completion_test_builder(
+            "\
+foo = 1
+from collections import defaultdict as f<CURSOR>
+    ",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn import_missing_alias_suggests_as() {
+        let builder = completion_test_builder(
+            "\
+import collections a<CURSOR>
+    ",
+        );
+        assert_snapshot!(builder.build().snapshot(), @"as");
+    }
+
+    #[test]
+    fn import_dotted_module_missing_alias_suggests_as() {
+        let builder = completion_test_builder(
+            "\
+import collections.abc a<CURSOR>
+    ",
+        );
+        assert_snapshot!(builder.build().snapshot(), @"as");
+    }
+
+    #[test]
+    fn import_multiple_modules_missing_alias_suggests_as() {
+        let builder = completion_test_builder(
+            "\
+import collections.abc as c, typing a<CURSOR>
+    ",
+        );
+        assert_snapshot!(builder.build().snapshot(), @"as");
+    }
+
+    #[test]
+    fn from_import_missing_alias_suggests_as() {
+        let builder = completion_test_builder(
+            "\
+from collections.abc import Mapping a<CURSOR>
+    ",
+        );
+        assert_snapshot!(builder.build().snapshot(), @"as");
+    }
+
+    #[test]
+    fn from_import_parenthesized_missing_alias_suggests_as() {
+        let builder = completion_test_builder(
+            "\
+from typing import (
+    NamedTuple a<CURSOR>
+)
+    ",
+        );
+        assert_snapshot!(builder.build().snapshot(), @"as");
+    }
+
+    #[test]
+    fn from_relative_import_missing_alias_suggests_as() {
+        let builder = completion_test_builder(
+            "\
+from ...foo import bar a<CURSOR>
+    ",
+        );
+        assert_snapshot!(builder.build().snapshot(), @"as");
+    }
+
+    #[test]
+    fn no_completions_in_with_alias() {
+        let builder = completion_test_builder(
+            "\
+foo = 1
+with open('bar') as f<CURSOR>
+    ",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn no_completions_in_except_alias() {
+        let builder = completion_test_builder(
+            "\
+foo = 1
+try:
+    [][0]
+except IndexError as f<CURSOR>
+    ",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn no_completions_in_match_alias() {
+        let builder = completion_test_builder(
+            "\
+foo = 1
+status = 400
+match status:
+    case 400 as f<CURSOR>:
+        return 'Bad request'
+    ",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+
+        // Also check that completions are suppressed
+        // when nothing has been typed.
+        let builder = completion_test_builder(
+            "\
+foo = 1
+status = 400
+match status:
+    case 400 as <CURSOR>:
+        return 'Bad request'
+    ",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
     }
 
     #[test]

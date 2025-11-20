@@ -125,6 +125,7 @@ where
     }
 
     diagnostic.set_secondary_code(SecondaryCode::new(rule.noqa_code().to_string()));
+    diagnostic.set_documentation_url(rule.url());
 
     diagnostic
 }

@@ -2107,8 +2107,10 @@ pub trait SemanticSyntaxContext {
 
     fn report_semantic_error(&self, error: SemanticSyntaxError);
 
+    /// Returns `true` if the visitor is inside a `for` or `while` loop.
     fn in_loop_context(&self) -> bool;
 
+    /// Returns `true` if `name` is a bound parameter in the current function or lambda scope.
     fn is_bound_parameter(&self, name: &str) -> bool;
 }
 

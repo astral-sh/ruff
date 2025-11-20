@@ -24,12 +24,12 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
 # Diagnostics
 
 ```
-error[invalid-key]: Invalid key for TypedDict `Config`
+error[invalid-key]: Unknown key "Retries" for TypedDict `Config`
  --> src/mdtest_snippet.py:7:5
   |
 6 | def _(config: Config) -> None:
 7 |     config["Retries"] = 30.0  # error: [invalid-key]
-  |     ------ ^^^^^^^^^ Unknown key "Retries" - did you mean "retries"?
+  |     ------ ^^^^^^^^^ Did you mean "retries"?
   |     |
   |     TypedDict `Config`
   |

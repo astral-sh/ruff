@@ -414,7 +414,7 @@ def parse_args() -> ResolvedCliArgs:
         except subprocess.CalledProcessError as e:
             print(e.stderr)
             raise
-        args.test_executable = Path("target", "release", executable)
+        args.test_executable = Path("target", "profiling", executable)
         assert args.test_executable.is_file()
 
     seed_arguments: list[range | int] = args.seeds

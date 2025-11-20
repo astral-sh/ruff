@@ -958,6 +958,22 @@ pub struct CallSignatureDetails<'db> {
     pub argument_to_parameter_mapping: Vec<MatchedArgument<'db>>,
 }
 
+impl CallSignatureDetails<'_> {
+    fn get_definition_parameter_range(&self, db: &dyn Db, name: &str) -> Option<FileRange> {
+        let definition = self.signature.definition()?;
+        let file = definition.file(db);
+        let module_ref = parsed_module(db, file).load(db);
+
+        let parameters = match definition.kind(db) {
+            DefinitionKind::Function(node) => &node.node(&module_ref).parameters,
+            // TODO: lambda functions
+            _ => return None,
+        };
+
+        Some(FileRange::new(file, parameters.find(name)?.name().range))
+    }
+}
+
 /// Extract signature details from a function call expression.
 /// This function analyzes the callable being invoked and returns zero or more
 /// `CallSignatureDetails` objects, each representing one possible signature
@@ -1153,15 +1169,16 @@ pub fn find_active_signature_from_details(
 }
 
 #[derive(Default)]
-pub struct InlayHintFunctionArgumentDetails {
-    pub argument_names: HashMap<usize, String>,
+pub struct InlayHintCallArgumentDetails {
+    /// The position of the arguments mapped to their name and the range of the argument definition in the signature.
+    pub argument_names: HashMap<usize, (String, Option<FileRange>)>,
 }
 
-pub fn inlay_hint_function_argument_details<'db>(
+pub fn inlay_hint_call_argument_details<'db>(
     db: &'db dyn Db,
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
-) -> Option<InlayHintFunctionArgumentDetails> {
+) -> Option<InlayHintCallArgumentDetails> {
     let signature_details = call_signature_details(db, model, call_expr);
 
     if signature_details.is_empty() {
@@ -1173,6 +1190,7 @@ pub fn inlay_hint_function_argument_details<'db>(
     let call_signature_details = signature_details.get(active_signature_index)?;
 
     let parameters = call_signature_details.signature.parameters();
+
     let mut argument_names = HashMap::new();
 
     for arg_index in 0..call_expr.arguments.args.len() {
@@ -1195,16 +1213,19 @@ pub fn inlay_hint_function_argument_details<'db>(
             continue;
         };
 
+        let parameter_label_offset =
+            call_signature_details.get_definition_parameter_range(db, param.name()?);
+
         // Only add hints for parameters that can be specified by name
         if !param.is_positional_only() && !param.is_variadic() && !param.is_keyword_variadic() {
             let Some(name) = param.name() else {
                 continue;
             };
-            argument_names.insert(arg_index, name.to_string());
+            argument_names.insert(arg_index, (name.to_string(), parameter_label_offset));
         }
     }
 
-    Some(InlayHintFunctionArgumentDetails { argument_names })
+    Some(InlayHintCallArgumentDetails { argument_names })
 }
 
 /// Find the text range of a specific parameter in function parameters by name.

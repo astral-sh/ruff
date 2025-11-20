@@ -197,3 +197,12 @@ isinstance("", t.ClassVar)  # error: [invalid-argument-type]
 isinstance("", t.Final)  # error: [invalid-argument-type]
 isinstance("", t.Any)  # error: [invalid-argument-type]
 ```
+
+## The builtin `NotImplemented` constant is not callable
+
+<!-- snapshot-diagnostics -->
+
+```py
+raise NotImplemented()  # error: [call-non-callable]
+raise NotImplemented("this module is not implemented yet!!!")  # error: [call-non-callable]
+```

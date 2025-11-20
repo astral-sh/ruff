@@ -860,23 +860,17 @@ impl SemanticSyntaxContext for Checker<'_> {
     }
 
     fn is_bound_parameter(&self, name: &str) -> bool {
-        for scope in self.semantic.current_scopes() {
-            match scope.kind {
-                ScopeKind::Class(_) => return false,
-                ScopeKind::Function(ast::StmtFunctionDef { parameters, .. })
-                | ScopeKind::Lambda(ast::ExprLambda {
-                    parameters: Some(parameters),
-                    ..
-                }) => return parameters.includes(name),
-                ScopeKind::Lambda(_)
-                | ScopeKind::Generator { .. }
-                | ScopeKind::Module
-                | ScopeKind::Type
-                | ScopeKind::DunderClassCell => {}
+        match self.semantic.current_scope().kind {
+            ScopeKind::Function(ast::StmtFunctionDef { parameters, .. }) => {
+                parameters.includes(name)
             }
+            ScopeKind::Class(_)
+            | ScopeKind::Lambda(_)
+            | ScopeKind::Generator { .. }
+            | ScopeKind::Module
+            | ScopeKind::Type
+            | ScopeKind::DunderClassCell => false,
         }
-
-        false
     }
 }
 

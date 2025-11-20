@@ -82,7 +82,7 @@ fn diagnostic_to_rdjson<'a>(
             value: diagnostic
                 .secondary_code()
                 .map_or_else(|| diagnostic.name(), |code| code.as_str()),
-            url: diagnostic.to_ruff_url(),
+            url: diagnostic.documentation_url(),
         },
         suggestions: rdjson_suggestions(
             edits,
@@ -182,7 +182,7 @@ impl RdjsonRange {
 #[derive(Serialize)]
 struct RdjsonCode<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
-    url: Option<String>,
+    url: Option<&'a str>,
     value: &'a str,
 }
 
@@ -217,7 +217,10 @@ mod tests {
         env.format(DiagnosticFormat::Rdjson);
         env.preview(false);
 
-        let diag = env.err().build();
+        let diag = env
+            .err()
+            .documentation_url("https://docs.astral.sh/ruff/rules/test-diagnostic")
+            .build();
 
         insta::assert_snapshot!(env.render(&diag));
     }
@@ -228,7 +231,10 @@ mod tests {
         env.format(DiagnosticFormat::Rdjson);
         env.preview(true);
 
-        let diag = env.err().build();
+        let diag = env
+            .err()
+            .documentation_url("https://docs.astral.sh/ruff/rules/test-diagnostic")
+            .build();
 
         insta::assert_snapshot!(env.render(&diag));
     }

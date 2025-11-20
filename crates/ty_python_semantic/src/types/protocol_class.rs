@@ -6,7 +6,7 @@ use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
-use crate::types::TypeContext;
+use crate::types::{RecursiveTypeNormalizedVisitor, TypeContext};
 use crate::{
     Db, FxOrderSet,
     place::{Definedness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
@@ -42,7 +42,14 @@ impl<'db> ClassType<'db> {
 }
 
 /// Representation of a single `Protocol` class definition.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+///
+/// # Ordering
+///
+/// Ordering is based on the wrapped data's salsa-assigned id and not on its values.
+/// The id may change between runs, or when e.g. a `ProtocolClass` was garbage-collected and recreated.
+#[derive(
+    Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize, PartialOrd, Ord,
+)]
 pub(super) struct ProtocolClass<'db>(ClassType<'db>);
 
 impl<'db> ProtocolClass<'db> {
@@ -124,6 +131,27 @@ impl<'db> ProtocolClass<'db> {
             report_undeclared_protocol_member(context, first_definition, self, class_place_table);
         }
     }
+
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        Self(
+            self.0
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+        )
+    }
+
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        Self(self.0.recursive_type_normalized_impl(db, visitor))
+    }
 }
 
 impl<'db> Deref for ProtocolClass<'db> {
@@ -131,6 +159,12 @@ impl<'db> Deref for ProtocolClass<'db> {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl<'db> From<ProtocolClass<'db>> for Type<'db> {
+    fn from(value: ProtocolClass<'db>) -> Self {
+        Self::from(value.0)
     }
 }
 
@@ -234,7 +268,7 @@ impl<'db> ProtocolInterface<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -674,7 +708,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         db: &'db dyn Db,
         other: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {

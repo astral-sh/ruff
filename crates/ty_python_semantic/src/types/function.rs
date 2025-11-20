@@ -971,7 +971,7 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -979,8 +979,10 @@ impl<'db> FunctionType<'db> {
         // our representation of a function type includes any specialization that should be applied
         // to the signature. Different specializations of the same function type are only subtypes
         // of each other if they result in subtype signatures.
-        if matches!(relation, TypeRelation::Subtyping | TypeRelation::Redundancy)
-            && self.normalized(db) == other.normalized(db)
+        if matches!(
+            relation,
+            TypeRelation::Subtyping | TypeRelation::Redundancy | TypeRelation::SubtypingAssuming(_)
+        ) && self.normalized(db) == other.normalized(db)
         {
             return ConstraintSet::from(true);
         }
@@ -1513,6 +1515,12 @@ impl KnownFunction {
                         asserted_type = asserted_ty.display(db),
                         inferred_type = actual_ty.display(db),
                     ));
+
+                    diagnostic.set_concise_message(format_args!(
+                        "Type `{}` does not match asserted type `{}`",
+                        asserted_ty.display(db),
+                        actual_ty.display(db),
+                    ));
                 }
             }
 
@@ -1537,6 +1545,11 @@ impl KnownFunction {
                     diagnostic.info(format_args!(
                         "`Never` and `{inferred_type}` are not equivalent types",
                         inferred_type = actual_ty.display(db),
+                    ));
+
+                    diagnostic.set_concise_message(format_args!(
+                        "Type `{}` is not equivalent to `Never`",
+                        actual_ty.display(db),
                     ));
                 }
             }

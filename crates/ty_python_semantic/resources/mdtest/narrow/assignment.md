@@ -206,7 +206,7 @@ dd: defaultdict[int, int] = defaultdict(int)
 dd[0] = 0
 cm: ChainMap[int, int] = ChainMap({1: 1}, {0: 0})
 cm[0] = 0
-reveal_type(cm)  # revealed: ChainMap[int | Unknown, int | Unknown]
+reveal_type(cm)  # revealed: ChainMap[int, int]
 
 reveal_type(l[0])  # revealed: Literal[0]
 reveal_type(d[0])  # revealed: Literal[0]
@@ -313,7 +313,7 @@ def f(c: C, s: str):
     reveal_type(c.x)  # revealed: int | None
     s = c.x  # error: [invalid-assignment]
 
-    # error: [invalid-assignment] "Method `__setitem__` of type `Overload[(key: SupportsIndex, value: int, /) -> None, (key: slice[Any, Any, Any], value: Iterable[int], /) -> None]` cannot be called with a key of type `Literal[0]` and a value of type `str` on object of type `list[int]`"
+    # error: [invalid-assignment] "Invalid subscript assignment with key of type `Literal[0]` and value of type `str` on object of type `list[int]`"
     c.l[0] = s
     reveal_type(c.l[0])  # revealed: int
 ```

@@ -64,6 +64,8 @@ impl Diagnostic {
             id,
             severity,
             message: message.into_diagnostic_message(),
+            custom_concise_message: None,
+            documentation_url: None,
             annotations: vec![],
             subs: vec![],
             fix: None,
@@ -213,6 +215,10 @@ impl Diagnostic {
     /// cases, just converting it to a string (or printing it) will do what
     /// you want.
     pub fn concise_message(&self) -> ConciseMessage<'_> {
+        if let Some(custom_message) = &self.inner.custom_concise_message {
+            return ConciseMessage::Custom(custom_message.as_str());
+        }
+
         let main = self.inner.message.as_str();
         let annotation = self
             .primary_annotation()
@@ -224,6 +230,15 @@ impl Diagnostic {
             (false, false) => ConciseMessage::Both { main, annotation },
             (true, true) => ConciseMessage::Empty,
         }
+    }
+
+    /// Set a custom message for the concise formatting of this diagnostic.
+    ///
+    /// This overrides the default behavior of generating a concise message
+    /// from the main diagnostic message and the primary annotation.
+    pub fn set_concise_message(&mut self, message: impl IntoDiagnosticMessage) {
+        Arc::make_mut(&mut self.inner).custom_concise_message =
+            Some(message.into_diagnostic_message());
     }
 
     /// Returns the severity of this diagnostic.
@@ -356,6 +371,14 @@ impl Diagnostic {
             .is_some_and(|fix| fix.applies(config.fix_applicability))
     }
 
+    pub fn documentation_url(&self) -> Option<&str> {
+        self.inner.documentation_url.as_deref()
+    }
+
+    pub fn set_documentation_url(&mut self, url: Option<String>) {
+        Arc::make_mut(&mut self.inner).documentation_url = url;
+    }
+
     /// Returns the offset of the parent statement for this diagnostic if it exists.
     ///
     /// This is primarily used for checking noqa/secondary code suppressions.
@@ -427,28 +450,6 @@ impl Diagnostic {
             .iter()
             .find(|sub| matches!(sub.inner.severity, SubDiagnosticSeverity::Help))
             .map(|sub| sub.inner.message.as_str())
-    }
-
-    /// Returns the URL for the rule documentation, if it exists.
-    pub fn to_ruff_url(&self) -> Option<String> {
-        match self.id() {
-            DiagnosticId::Panic
-            | DiagnosticId::Io
-            | DiagnosticId::InvalidSyntax
-            | DiagnosticId::RevealedType
-            | DiagnosticId::UnknownRule
-            | DiagnosticId::InvalidGlob
-            | DiagnosticId::EmptyInclude
-            | DiagnosticId::UnnecessaryOverridesSection
-            | DiagnosticId::UselessOverridesSection
-            | DiagnosticId::DeprecatedSetting
-            | DiagnosticId::Unformatted
-            | DiagnosticId::InvalidCliOption
-            | DiagnosticId::InternalError => None,
-            DiagnosticId::Lint(lint_name) => {
-                Some(format!("{}/rules/{lint_name}", env!("CARGO_PKG_HOMEPAGE")))
-            }
-        }
     }
 
     /// Returns the filename for the message.
@@ -530,8 +531,10 @@ impl Diagnostic {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 struct DiagnosticInner {
     id: DiagnosticId,
+    documentation_url: Option<String>,
     severity: Severity,
     message: DiagnosticMessage,
+    custom_concise_message: Option<DiagnosticMessage>,
     annotations: Vec<Annotation>,
     subs: Vec<SubDiagnostic>,
     fix: Option<Fix>,
@@ -1520,6 +1523,8 @@ pub enum ConciseMessage<'a> {
     /// This indicates that the diagnostic is probably using the old
     /// model.
     Empty,
+    /// A custom concise message has been provided.
+    Custom(&'a str),
 }
 
 impl std::fmt::Display for ConciseMessage<'_> {
@@ -1535,6 +1540,9 @@ impl std::fmt::Display for ConciseMessage<'_> {
                 write!(f, "{main}: {annotation}")
             }
             ConciseMessage::Empty => Ok(()),
+            ConciseMessage::Custom(message) => {
+                write!(f, "{message}")
+            }
         }
     }
 }

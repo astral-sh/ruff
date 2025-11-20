@@ -247,7 +247,7 @@ impl<'db> CallableSignature<'db> {
         db: &'db dyn Db,
         other: &Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -269,7 +269,7 @@ impl<'db> CallableSignature<'db> {
         self_signatures: &[Signature<'db>],
         other_signatures: &[Signature<'db>],
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -662,6 +662,13 @@ impl<'db> Signature<'db> {
         }
     }
 
+    fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db, 'db> {
+        match self.generic_context {
+            Some(generic_context) => generic_context.inferable_typevars(db),
+            None => InferableTypeVars::None,
+        }
+    }
+
     /// Return `true` if `self` has exactly the same set of possible static materializations as
     /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
     /// `other`).
@@ -672,15 +679,40 @@ impl<'db> Signature<'db> {
         inferable: InferableTypeVars<'_, 'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        // The typevars in self and other should also be considered inferable when checking whether
-        // two signatures are equivalent.
-        let self_inferable =
-            (self.generic_context).map(|generic_context| generic_context.inferable_typevars(db));
-        let other_inferable =
-            (other.generic_context).map(|generic_context| generic_context.inferable_typevars(db));
-        let inferable = inferable.merge(self_inferable.as_ref());
-        let inferable = inferable.merge(other_inferable.as_ref());
+        // If either signature is generic, their typevars should also be considered inferable when
+        // checking whether the signatures are equivalent, since we only need to find one
+        // specialization that causes the check to succeed.
+        //
+        // TODO: We should alpha-rename these typevars, too, to correctly handle when a generic
+        // callable refers to typevars from within the context that defines them. This primarily
+        // comes up when referring to a generic function recursively from within its body:
+        //
+        //     def identity[T](t: T) -> T:
+        //         # Here, TypeOf[identity2] is a generic callable that should consider T to be
+        //         # inferable, even though other uses of T in the function body are non-inferable.
+        //         return t
+        let self_inferable = self.inferable_typevars(db);
+        let other_inferable = other.inferable_typevars(db);
+        let inferable = inferable.merge(&self_inferable);
+        let inferable = inferable.merge(&other_inferable);
 
+        // `inner` will create a constraint set that references these newly inferable typevars.
+        let when = self.is_equivalent_to_inner(db, other, inferable, visitor);
+
+        // But the caller does not need to consider those extra typevars. Whatever constraint set
+        // we produce, we reduce it back down to the inferable set that the caller asked about.
+        // If we introduced new inferable typevars, those will be existentially quantified away
+        // before returning.
+        when.reduce_inferable(db, self_inferable.iter().chain(other_inferable.iter()))
+    }
+
+    fn is_equivalent_to_inner(
+        &self,
+        db: &'db dyn Db,
+        other: &Signature<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        visitor: &IsEquivalentVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         let mut result = ConstraintSet::from(true);
         let mut check_types = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
             let self_type = self_type.unwrap_or(Type::unknown());
@@ -766,7 +798,50 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         other: &Signature<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        // If either signature is generic, their typevars should also be considered inferable when
+        // checking whether one signature is a subtype/etc of the other, since we only need to find
+        // one specialization that causes the check to succeed.
+        //
+        // TODO: We should alpha-rename these typevars, too, to correctly handle when a generic
+        // callable refers to typevars from within the context that defines them. This primarily
+        // comes up when referring to a generic function recursively from within its body:
+        //
+        //     def identity[T](t: T) -> T:
+        //         # Here, TypeOf[identity2] is a generic callable that should consider T to be
+        //         # inferable, even though other uses of T in the function body are non-inferable.
+        //         return t
+        let self_inferable = self.inferable_typevars(db);
+        let other_inferable = other.inferable_typevars(db);
+        let inferable = inferable.merge(&self_inferable);
+        let inferable = inferable.merge(&other_inferable);
+
+        // `inner` will create a constraint set that references these newly inferable typevars.
+        let when = self.has_relation_to_inner(
+            db,
+            other,
+            inferable,
+            relation,
+            relation_visitor,
+            disjointness_visitor,
+        );
+
+        // But the caller does not need to consider those extra typevars. Whatever constraint set
+        // we produce, we reduce it back down to the inferable set that the caller asked about.
+        // If we introduced new inferable typevars, those will be existentially quantified away
+        // before returning.
+        when.reduce_inferable(db, self_inferable.iter().chain(other_inferable.iter()))
+    }
+
+    fn has_relation_to_inner(
+        &self,
+        db: &'db dyn Db,
+        other: &Signature<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -830,15 +905,6 @@ impl<'db> Signature<'db> {
                 )
             }
         }
-
-        // The typevars in self and other should also be considered inferable when checking whether
-        // two signatures are equivalent.
-        let self_inferable =
-            (self.generic_context).map(|generic_context| generic_context.inferable_typevars(db));
-        let other_inferable =
-            (other.generic_context).map(|generic_context| generic_context.inferable_typevars(db));
-        let inferable = inferable.merge(self_inferable.as_ref());
-        let inferable = inferable.merge(other_inferable.as_ref());
 
         let mut result = ConstraintSet::from(true);
         let mut check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {

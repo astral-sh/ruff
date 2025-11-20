@@ -59,10 +59,10 @@ In a non-stub file, there's no special treatment of ellipsis literals. An ellips
 be assigned if `EllipsisType` is actually assignable to the annotated type.
 
 ```py
-# error: 7 [invalid-parameter-default] "Default value of type `EllipsisType` is not assignable to annotated parameter type `int`"
+# error: [invalid-parameter-default] "Default value of type `EllipsisType` is not assignable to annotated parameter type `int`"
 def f(x: int = ...) -> None: ...
 
-# error: 1 [invalid-assignment] "Object of type `EllipsisType` is not assignable to `int`"
+# error: [invalid-assignment] "Object of type `EllipsisType` is not assignable to `int`"
 a: int = ...
 b = ...
 reveal_type(b)  # revealed: EllipsisType
@@ -73,6 +73,6 @@ reveal_type(b)  # revealed: EllipsisType
 There is no special treatment of the builtin name `Ellipsis` in stubs, only of `...` literals.
 
 ```pyi
-# error: 7 [invalid-parameter-default] "Default value of type `EllipsisType` is not assignable to annotated parameter type `int`"
+# error: [invalid-parameter-default] "Default value of type `EllipsisType` is not assignable to annotated parameter type `int`"
 def f(x: int = Ellipsis) -> None: ...
 ```

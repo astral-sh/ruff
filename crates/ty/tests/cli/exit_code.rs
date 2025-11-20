@@ -153,7 +153,7 @@ fn both_warnings_and_errors() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -171,14 +171,14 @@ fn both_warnings_and_errors() -> anyhow::Result<()> {
       |
     2 | print(x)     # [unresolved-reference]
     3 | print(4[1])  # [non-subscriptable]
-      |       ^
+      |       ^^^^
       |
     info: rule `non-subscriptable` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -193,7 +193,7 @@ fn both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::Result<()>
         "###,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--error-on-warning"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--error-on-warning"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -211,14 +211,14 @@ fn both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::Result<()>
       |
     2 | print(x)     # [unresolved-reference]
     3 | print(4[1])  # [non-subscriptable]
-      |       ^
+      |       ^^^^
       |
     info: rule `non-subscriptable` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -233,7 +233,7 @@ fn exit_zero_is_true() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--exit-zero").arg("--warn").arg("unresolved-reference"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--exit-zero").arg("--warn").arg("unresolved-reference"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -251,14 +251,14 @@ fn exit_zero_is_true() -> anyhow::Result<()> {
       |
     2 | print(x)     # [unresolved-reference]
     3 | print(4[1])  # [non-subscriptable]
-      |       ^
+      |       ^^^^
       |
     info: rule `non-subscriptable` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
