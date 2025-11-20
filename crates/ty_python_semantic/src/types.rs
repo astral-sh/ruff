@@ -6738,14 +6738,11 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Generic],
                     fallback_type: Type::unknown(),
                 }),
-                KnownInstanceType::UnionType(list) => match list {
-                    UnionTypeInstance::PEP604(instance) => {
-                        // Cloning here is cheap if the result is a `Type` (which is `Copy`). It's more
-                        // expensive if there are errors.
-                        instance.union_type(db).clone()
-                    }
-                    UnionTypeInstance::Legacy(union_type) => Ok(union_type.inner(db)),
-                },
+                KnownInstanceType::UnionType(instance) => {
+                    // Cloning here is cheap if the result is a `Type` (which is `Copy`). It's more
+                    // expensive if there are errors.
+                    instance.union_type(db).clone()
+                }
                 KnownInstanceType::Literal(ty) => Ok(ty.inner(db)),
                 KnownInstanceType::Annotated(ty) => Ok(ty.inner(db)),
                 KnownInstanceType::TypeGenericAlias(ty) => {
@@ -8000,8 +7997,8 @@ pub enum KnownInstanceType<'db> {
     /// `ty_extensions.Specialization`.
     Specialization(Specialization<'db>),
 
-    /// A single instance of `types.UnionType`, which stores the left- and
-    /// right-hand sides of a PEP 604 union.
+    /// A single instance of `types.UnionType`, which stores the elements of
+    /// a PEP 604 union, or a `typing.Union`.
     UnionType(UnionTypeInstance<'db>),
 
     /// A single instance of `typing.Literal`
@@ -8048,19 +8045,11 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
                 visitor.visit_type(db, default_ty);
             }
         }
-        KnownInstanceType::UnionType(instance) => match instance {
-            UnionTypeInstance::PEP604(instance) => {
-                if let Ok(union_type) = instance.union_type(db) {
-                    visitor.visit_type(db, *union_type);
-                }
-                for element in instance.value_expr_types(db) {
-                    visitor.visit_type(db, *element);
-                }
+        KnownInstanceType::UnionType(instance) => {
+            if let Ok(union_type) = instance.union_type(db) {
+                visitor.visit_type(db, *union_type);
             }
-            UnionTypeInstance::Legacy(union_type) => {
-                visitor.visit_type(db, union_type.inner(db));
-            }
-        },
+        }
         KnownInstanceType::Literal(ty)
         | KnownInstanceType::Annotated(ty)
         | KnownInstanceType::TypeGenericAlias(ty) => {
@@ -9404,15 +9393,19 @@ impl InferredAs {
 }
 
 /// Contains information about a `types.UnionType` instance built from a PEP 604
-/// union in a value expression context (e.g. `IntOrStr = int | str`).
+/// union or a legacy `typing.Union[…]` annotation in a value expression context,
+/// e.g. `IntOrStr = int | str` or `IntOrStr = Union[int, str]`.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
-pub struct PEP604UnionTypeInstance<'db> {
+pub struct UnionTypeInstance<'db> {
     /// The types of the elements of this union, as they were inferred in a value
     /// expression context. For `int | str`, this would contain `<class 'int'>` and
-    /// `<class 'str'>`.
+    /// `<class 'str'>`. For `Union[int, str]`, this field is `None`, as we infer
+    /// the elements as type expressions. Use `value_expression_types` to get the
+    /// corresponding value expression types.
+    #[expect(clippy::ref_option)]
     #[returns(ref)]
-    value_expr_types: Box<[Type<'db>]>,
+    _value_expr_types: Option<Box<[Type<'db>]>>,
 
     /// The type of the full union, which can be used when this `UnionType` instance
     /// is used in a type expression context. For `int | str`, this would contain
@@ -9422,10 +9415,10 @@ pub struct PEP604UnionTypeInstance<'db> {
     union_type: Result<Type<'db>, InvalidTypeExpressionError<'db>>,
 }
 
-impl get_size2::GetSize for PEP604UnionTypeInstance<'_> {}
+impl get_size2::GetSize for UnionTypeInstance<'_> {}
 
-impl<'db> PEP604UnionTypeInstance<'db> {
-    pub(crate) fn from_value_expr_types(
+impl<'db> UnionTypeInstance<'db> {
+    pub(crate) fn from_value_expression_types(
         db: &'db dyn Db,
         value_expr_types: impl IntoIterator<Item = Type<'db>>,
         scope_id: ScopeId<'db>,
@@ -9439,60 +9432,62 @@ impl<'db> PEP604UnionTypeInstance<'db> {
                 Ok(ty) => builder.add_in_place(ty),
                 Err(error) => {
                     return Type::KnownInstance(KnownInstanceType::UnionType(
-                        UnionTypeInstance::PEP604(PEP604UnionTypeInstance::new(
-                            db,
-                            value_expr_types,
-                            Err(error),
-                        )),
+                        UnionTypeInstance::new(db, Some(value_expr_types), Err(error)),
                     ));
                 }
             }
         }
 
-        Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::PEP604(
-            PEP604UnionTypeInstance::new(db, value_expr_types, Ok(builder.build())),
+        Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::new(
+            db,
+            Some(value_expr_types),
+            Ok(builder.build()),
         )))
     }
-}
 
-/// A specific instance of `types.UnionType`.
-#[derive(
-    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, get_size2::GetSize, salsa::Update,
-)]
-pub enum UnionTypeInstance<'db> {
-    // A `UnionType` instance originating from PEP 604 syntax (e.g. `int | str`)
-    PEP604(PEP604UnionTypeInstance<'db>),
+    /// Get the types of the elements of this union as they would appear in a value
+    /// expression context. For a PEP 604 union, we return the actual types that were
+    /// inferred when we encountered the union in a value expression context. For a
+    /// legacy `typing.Union[…]` annotation, we turn the type-expression types into
+    /// their corresponding value-expression types, i.e. we turn instances like `int`
+    /// into class literals like `<class 'int'>`. This operation is potentially lossy.
+    pub(crate) fn value_expression_types(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<impl Iterator<Item = Type<'db>> + 'db, InvalidTypeExpressionError<'db>> {
+        let to_class_literal = |ty: Type<'db>| {
+            ty.as_nominal_instance()
+                .map(|instance| Type::ClassLiteral(instance.class(db).class_literal(db).0))
+                .unwrap_or_else(Type::unknown)
+        };
 
-    // A `UnionType` instance originating from legacy syntax (e.g. `typing.Union[int, str]`).
-    //
-    // The stored type can be directly used when this `UnionTypeInstance` is used in a type
-    // expression context.
-    Legacy(InternedType<'db>),
-}
-
-impl<'db> UnionTypeInstance<'db> {
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        match self {
-            UnionTypeInstance::PEP604(instance) => {
-                let value_expr_types = instance
-                    .value_expr_types(db)
-                    .iter()
-                    .map(|ty| ty.normalized_impl(db, visitor))
-                    .collect::<Box<_>>();
-                let union_type = instance
-                    .union_type(db)
-                    .clone()
-                    .map(|ty| ty.normalized_impl(db, visitor));
-                UnionTypeInstance::PEP604(PEP604UnionTypeInstance::new(
-                    db,
-                    value_expr_types,
-                    union_type,
-                ))
-            }
-            UnionTypeInstance::Legacy(types) => {
-                UnionTypeInstance::Legacy(types.normalized_impl(db, visitor))
+        if let Some(value_expr_types) = self._value_expr_types(db) {
+            Ok(Either::Left(value_expr_types.iter().copied()))
+        } else {
+            match self.union_type(db).clone()? {
+                Type::Union(union) => Ok(Either::Right(Either::Left(
+                    union.elements(db).iter().copied().map(to_class_literal),
+                ))),
+                ty => Ok(Either::Right(Either::Right(std::iter::once(
+                    to_class_literal(ty),
+                )))),
             }
         }
+    }
+
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        let value_expr_types = self._value_expr_types(db).as_ref().map(|types| {
+            types
+                .iter()
+                .map(|ty| ty.normalized_impl(db, visitor))
+                .collect::<Box<_>>()
+        });
+        let union_type = self
+            .union_type(db)
+            .clone()
+            .map(|ty| ty.normalized_impl(db, visitor));
+
+        Self::new(db, value_expr_types, union_type)
     }
 }
 

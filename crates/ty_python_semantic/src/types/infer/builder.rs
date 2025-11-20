@@ -104,11 +104,11 @@ use crate::types::{
     CallDunderError, CallableBinding, CallableType, ClassLiteral, ClassType, DataclassParams,
     DynamicType, InternedType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
-    PEP604UnionTypeInstance, PEP695TypeAliasType, Parameter, ParameterForm, Parameters,
-    SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType,
-    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
-    TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type, todo_type,
+    PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType, SubclassOfType,
+    TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
+    UnionTypeInstance, binding_type, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -9545,7 +9545,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if left_ty.is_equivalent_to(self.db(), right_ty) {
                     Some(left_ty)
                 } else {
-                    Some(PEP604UnionTypeInstance::from_value_expr_types(
+                    Some(UnionTypeInstance::from_value_expression_types(
                         self.db(),
                         [left_ty, right_ty],
                         self.scope(),
@@ -9573,7 +9573,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ) if pep_604_unions_allowed()
                 && instance.has_known_class(self.db(), KnownClass::NoneType) =>
             {
-                Some(PEP604UnionTypeInstance::from_value_expr_types(
+                Some(UnionTypeInstance::from_value_expression_types(
                     self.db(),
                     [left_ty, right_ty],
                     self.scope(),
@@ -10799,7 +10799,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return ty;
                 }
 
-                return PEP604UnionTypeInstance::from_value_expr_types(
+                return UnionTypeInstance::from_value_expression_types(
                     self.db(),
                     [ty, Type::none(self.db())],
                     self.scope(),
@@ -10819,10 +10819,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                         let is_empty = elements.peek().is_none();
                         let union_type = Type::KnownInstance(KnownInstanceType::UnionType(
-                            UnionTypeInstance::Legacy(InternedType::new(
+                            UnionTypeInstance::new(
                                 db,
-                                UnionType::from_elements(db, elements),
-                            )),
+                                None,
+                                Ok(UnionType::from_elements(db, elements)),
+                            ),
                         ));
 
                         if is_empty {

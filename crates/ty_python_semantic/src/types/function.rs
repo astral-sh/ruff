@@ -83,7 +83,7 @@ use crate::types::{
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
     NormalizedVisitor, SpecialFormType, Truthiness, Type, TypeContext, TypeMapping, TypeRelation,
-    UnionBuilder, UnionTypeInstance, binding_type, todo_type, walk_signature,
+    UnionBuilder, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -1791,17 +1791,19 @@ impl KnownFunction {
                                 Type::SpecialForm(SpecialFormType::Any)
                                     if function == KnownFunction::IsSubclass => {}
                                 Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
-                                    match instance {
-                                        UnionTypeInstance::Legacy(..) => {}
-                                        UnionTypeInstance::PEP604(instance) => {
-                                            for element in instance.value_expr_types(db) {
+                                    match instance.value_expression_types(db) {
+                                        Ok(value_expression_types) => {
+                                            for element in value_expression_types {
                                                 find_invalid_elements(
                                                     db,
                                                     function,
-                                                    *element,
+                                                    element,
                                                     invalid_elements,
                                                 );
                                             }
+                                        }
+                                        Err(_) => {
+                                            invalid_elements.push(ty);
                                         }
                                     }
                                 }

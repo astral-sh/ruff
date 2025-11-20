@@ -13,7 +13,7 @@ use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, KnownClass, KnownInstanceType,
     SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionBuilder, UnionTypeInstance, infer_expression_types,
+    TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
 };
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -213,28 +213,20 @@ impl ClassInfoConstraintFunction {
             }),
 
             Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
-                match instance {
-                    UnionTypeInstance::Legacy { .. } => None,
-                    UnionTypeInstance::PEP604(instance) => {
-                        UnionType::try_from_elements(
-                            db,
-                            instance.value_expr_types(db).iter().map(|element| {
-                                // A special case is made for `None` at runtime
-                                // (it's implicitly converted to `NoneType` in `int | None`)
-                                // which means that `isinstance(x, int | None)` works even though
-                                // `None` is not a class literal.
-                                if element.is_none(db) {
-                                    self.generate_constraint(
-                                        db,
-                                        KnownClass::NoneType.to_class_literal(db),
-                                    )
-                                } else {
-                                    self.generate_constraint(db, *element)
-                                }
-                            }),
-                        )
-                    }
-                }
+                UnionType::try_from_elements(
+                    db,
+                    instance.value_expression_types(db).ok()?.map(|element| {
+                        // A special case is made for `None` at runtime
+                        // (it's implicitly converted to `NoneType` in `int | None`)
+                        // which means that `isinstance(x, int | None)` works even though
+                        // `None` is not a class literal.
+                        if element.is_none(db) {
+                            self.generate_constraint(db, KnownClass::NoneType.to_class_literal(db))
+                        } else {
+                            self.generate_constraint(db, element)
+                        }
+                    }),
+                )
             }
 
             // We don't have a good meta-type for `Callable`s right now,
@@ -882,8 +874,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
         let callable_ty = inference.expression_type(&*expr_call.func);
 
-        // TODO: add support for PEP 604 union types on the right hand side of `isinstance`
-        // and `issubclass`, for example `isinstance(x, str | (int | float))`.
         match callable_ty {
             Type::FunctionLiteral(function_type)
                 if matches!(
