@@ -7503,7 +7503,7 @@ impl<'db> Type<'db> {
                     name = enum_literal.name(db)
                 ),
             ),
-            Type::SpecialForm(special_form) => Type::string_literal(db, special_form.repr()),
+            Type::SpecialForm(special_form) => Type::string_literal(db, &special_form.to_string()),
             Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
                 db,
                 known_instance.repr(db).to_compact_string(),
@@ -7525,7 +7525,7 @@ impl<'db> Type<'db> {
                 Type::string_literal(db, &format!("'{}'", literal.value(db).escape_default()))
             }
             Type::LiteralString => Type::LiteralString,
-            Type::SpecialForm(special_form) => Type::string_literal(db, special_form.repr()),
+            Type::SpecialForm(special_form) => Type::string_literal(db, &special_form.to_string()),
             Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
                 db,
                 known_instance.repr(db).to_compact_string(),
@@ -7604,13 +7604,14 @@ impl<'db> Type<'db> {
 
             Self::Union(_) | Self::Intersection(_) => None,
 
+            Self::SpecialForm(special_form) => special_form.definition(db),
+
             // These types have no definition
             Self::Dynamic(_)
             | Self::Never
             | Self::Callable(_)
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy
-            | Self::SpecialForm(_)
             | Self::TypeIs(_) => None,
         }
     }

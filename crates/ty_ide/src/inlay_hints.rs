@@ -602,6 +602,25 @@ mod tests {
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:351:1
+            |
+        349 | Final: _SpecialForm
+        350 |
+        351 | Literal: _SpecialForm
+            | ^^^^^^^
+        352 | TypedDict: _SpecialForm
+            |
+        info: Source
+         --> main2.py:6:5
+          |
+        5 | x = 1
+        6 | y[: Literal[1]] = x
+          |     ^^^^^^^
+        7 | z[: int] = i(1)
+        8 | w[: int] = z
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
            --> stdlib/builtins.pyi:348:7
             |
         347 | @disjoint_base
@@ -668,6 +687,44 @@ mod tests {
         x4[: int], y4[: str] = (x3, y3)
 
         ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:351:1
+            |
+        349 | Final: _SpecialForm
+        350 |
+        351 | Literal: _SpecialForm
+            | ^^^^^^^
+        352 | TypedDict: _SpecialForm
+            |
+        info: Source
+          --> main2.py:8:6
+           |
+         7 | x1, y1 = (1, 'abc')
+         8 | x2[: Literal[1]], y2[: Literal["abc"]] = (x1, y1)
+           |      ^^^^^^^
+         9 | x3[: int], y3[: str] = (i(1), s('abc'))
+        10 | x4[: int], y4[: str] = (x3, y3)
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:351:1
+            |
+        349 | Final: _SpecialForm
+        350 |
+        351 | Literal: _SpecialForm
+            | ^^^^^^^
+        352 | TypedDict: _SpecialForm
+            |
+        info: Source
+          --> main2.py:8:24
+           |
+         7 | x1, y1 = (1, 'abc')
+         8 | x2[: Literal[1]], y2[: Literal["abc"]] = (x1, y1)
+           |                        ^^^^^^^
+         9 | x3[: int], y3[: str] = (i(1), s('abc'))
+        10 | x4[: int], y4[: str] = (x3, y3)
+           |
+
         info[inlay-hint-location]: Inlay Hint Target
            --> stdlib/builtins.pyi:348:7
             |
@@ -773,6 +830,44 @@ mod tests {
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:351:1
+            |
+        349 | Final: _SpecialForm
+        350 |
+        351 | Literal: _SpecialForm
+            | ^^^^^^^
+        352 | TypedDict: _SpecialForm
+            |
+        info: Source
+          --> main2.py:8:6
+           |
+         7 | x1, y1 = 1, 'abc'
+         8 | x2[: Literal[1]], y2[: Literal["abc"]] = x1, y1
+           |      ^^^^^^^
+         9 | x3[: int], y3[: str] = i(1), s('abc')
+        10 | x4[: int], y4[: str] = x3, y3
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:351:1
+            |
+        349 | Final: _SpecialForm
+        350 |
+        351 | Literal: _SpecialForm
+            | ^^^^^^^
+        352 | TypedDict: _SpecialForm
+            |
+        info: Source
+          --> main2.py:8:24
+           |
+         7 | x1, y1 = 1, 'abc'
+         8 | x2[: Literal[1]], y2[: Literal["abc"]] = x1, y1
+           |                        ^^^^^^^
+         9 | x3[: int], y3[: str] = i(1), s('abc')
+        10 | x4[: int], y4[: str] = x3, y3
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
            --> stdlib/builtins.pyi:348:7
             |
         347 | @disjoint_base
@@ -877,6 +972,44 @@ mod tests {
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:351:1
+            |
+        349 | Final: _SpecialForm
+        350 |
+        351 | Literal: _SpecialForm
+            | ^^^^^^^
+        352 | TypedDict: _SpecialForm
+            |
+        info: Source
+          --> main2.py:8:11
+           |
+         7 | x = (1, 'abc')
+         8 | y[: tuple[Literal[1], Literal["abc"]]] = x
+           |           ^^^^^^^
+         9 | z[: tuple[int, str]] = (i(1), s('abc'))
+        10 | w[: tuple[int, str]] = z
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:351:1
+            |
+        349 | Final: _SpecialForm
+        350 |
+        351 | Literal: _SpecialForm
+            | ^^^^^^^
+        352 | TypedDict: _SpecialForm
+            |
+        info: Source
+          --> main2.py:8:23
+           |
+         7 | x = (1, 'abc')
+         8 | y[: tuple[Literal[1], Literal["abc"]]] = x
+           |                       ^^^^^^^
+         9 | z[: tuple[int, str]] = (i(1), s('abc'))
+        10 | w[: tuple[int, str]] = z
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
            --> stdlib/builtins.pyi:348:7
             |
         347 | @disjoint_base
@@ -978,6 +1111,63 @@ mod tests {
         x3[: int], (y3[: str], z3[: int]) = (i(1), (s('abc'), i(2)))
         x4[: int], (y4[: str], z4[: int]) = (x3, (y3, z3))
         ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:351:1
+            |
+        349 | Final: _SpecialForm
+        350 |
+        351 | Literal: _SpecialForm
+            | ^^^^^^^
+        352 | TypedDict: _SpecialForm
+            |
+        info: Source
+          --> main2.py:8:6
+           |
+         7 | x1, (y1, z1) = (1, ('abc', 2))
+         8 | x2[: Literal[1]], (y2[: Literal["abc"]], z2[: Literal[2]]) = (x1, (y1, z1))
+           |      ^^^^^^^
+         9 | x3[: int], (y3[: str], z3[: int]) = (i(1), (s('abc'), i(2)))
+        10 | x4[: int], (y4[: str], z4[: int]) = (x3, (y3, z3))
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:351:1
+            |
+        349 | Final: _SpecialForm
+        350 |
+        351 | Literal: _SpecialForm
+            | ^^^^^^^
+        352 | TypedDict: _SpecialForm
+            |
+        info: Source
+          --> main2.py:8:25
+           |
+         7 | x1, (y1, z1) = (1, ('abc', 2))
+         8 | x2[: Literal[1]], (y2[: Literal["abc"]], z2[: Literal[2]]) = (x1, (y1, z1))
+           |                         ^^^^^^^
+         9 | x3[: int], (y3[: str], z3[: int]) = (i(1), (s('abc'), i(2)))
+        10 | x4[: int], (y4[: str], z4[: int]) = (x3, (y3, z3))
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:351:1
+            |
+        349 | Final: _SpecialForm
+        350 |
+        351 | Literal: _SpecialForm
+            | ^^^^^^^
+        352 | TypedDict: _SpecialForm
+            |
+        info: Source
+          --> main2.py:8:47
+           |
+         7 | x1, (y1, z1) = (1, ('abc', 2))
+         8 | x2[: Literal[1]], (y2[: Literal["abc"]], z2[: Literal[2]]) = (x1, (y1, z1))
+           |                                               ^^^^^^^
+         9 | x3[: int], (y3[: str], z3[: int]) = (i(1), (s('abc'), i(2)))
+        10 | x4[: int], (y4[: str], z4[: int]) = (x3, (y3, z3))
+           |
+
         info[inlay-hint-location]: Inlay Hint Target
            --> stdlib/builtins.pyi:348:7
             |
@@ -1113,6 +1303,25 @@ mod tests {
         z: int = i(1)
         w[: int] = z
         ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:351:1
+            |
+        349 | Final: _SpecialForm
+        350 |
+        351 | Literal: _SpecialForm
+            | ^^^^^^^
+        352 | TypedDict: _SpecialForm
+            |
+        info: Source
+         --> main2.py:6:5
+          |
+        5 | x: int = 1
+        6 | y[: Literal[1]] = x
+          |     ^^^^^^^
+        7 | z: int = i(1)
+        8 | w[: int] = z
+          |
+
         info[inlay-hint-location]: Inlay Hint Target
            --> stdlib/builtins.pyi:348:7
             |
