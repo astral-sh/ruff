@@ -24,9 +24,9 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleSpec;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    BoundTypeVarIdentity, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
-    MaterializationKind, Protocol, ProtocolInstanceType, StringLiteralType, SubclassOfInner, Type,
-    UnionType, WrapperDescriptorKind, visitor,
+    BoundTypeVarIdentity, CallableType, DynamicType, IntersectionType, KnownBoundMethodType,
+    KnownClass, MaterializationKind, Protocol, ProtocolInstanceType, SpecialFormType,
+    StringLiteralType, SubclassOfInner, Type, UnionType, WrapperDescriptorKind, visitor,
 };
 use ruff_db::parsed::parsed_module;
 
@@ -470,7 +470,11 @@ impl<'db> FmtDetailed<'db> for DisplayType<'db> {
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
             | Type::EnumLiteral(_) => {
-                f.write_str("Literal[")?;
+                f.with_detail(TypeDetail::Type(Type::SpecialForm(
+                    SpecialFormType::Literal,
+                )))
+                .write_str("Literal")?;
+                f.write_char('[')?;
                 representation.fmt_detailed(f)?;
                 f.write_str("]")
             }
@@ -608,7 +612,16 @@ impl Display for DisplayRepresentation<'_> {
 impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         match self.ty {
-            Type::Dynamic(dynamic) => write!(f, "{dynamic}"),
+            Type::Dynamic(dynamic) => {
+                if let DynamicType::Any = dynamic {
+                    write!(
+                        f.with_detail(TypeDetail::Type(Type::SpecialForm(SpecialFormType::Any))),
+                        "{dynamic}"
+                    )
+                } else {
+                    write!(f, "{dynamic}")
+                }
+            }
             Type::Never => f.with_detail(TypeDetail::Type(self.ty)).write_str("Never"),
             Type::NominalInstance(instance) => {
                 let class = instance.class(self.db);
@@ -638,7 +651,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .fmt_detailed(f),
                 },
                 Protocol::Synthesized(synthetic) => {
-                    f.write_str("<Protocol with members ")?;
+                    f.write_char('<')?;
+                    f.with_detail(TypeDetail::Type(Type::SpecialForm(
+                        SpecialFormType::Protocol,
+                    )))
+                    .write_str("Protocol")?;
+                    f.write_str(" with members ")?;
                     let interface = synthetic.interface();
                     let member_list = interface.members(self.db);
                     let num_members = member_list.len();
@@ -687,8 +705,14 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 }
                 SubclassOfInner::Dynamic(dynamic) => write!(f, "type[{dynamic}]"),
             },
-            Type::SpecialForm(special_form) => write!(f, "{special_form}"),
-            Type::KnownInstance(known_instance) => write!(f, "{}", known_instance.repr(self.db)),
+            Type::SpecialForm(special_form) => {
+                write!(f.with_detail(TypeDetail::Type(self.ty)), "{special_form}")
+            }
+            Type::KnownInstance(known_instance) => write!(
+                f.with_detail(TypeDetail::Type(self.ty)),
+                "{}",
+                known_instance.repr(self.db)
+            ),
             Type::FunctionLiteral(function) => function
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
@@ -724,7 +748,10 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     signatures => {
                         // TODO: How to display overloads?
                         if !self.settings.multiline {
-                            f.write_str("Overload[")?;
+                            // TODO: This should ideally have a TypeDetail but we actually
+                            // don't have a type for @overload (we just detect the decorator)
+                            f.write_str("Overload")?;
+                            f.write_char('[')?;
                         }
                         let separator = if self.settings.multiline { "\n" } else { ", " };
                         let mut join = f.join(separator);
@@ -815,7 +842,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::StringLiteral(string) => {
                 write!(f, "{}", string.display_with(self.db, self.settings.clone()))
             }
-            Type::LiteralString => f.write_str("LiteralString"),
+            Type::LiteralString => f
+                .with_detail(TypeDetail::Type(self.ty))
+                .write_str("LiteralString"),
             Type::BytesLiteral(bytes) => {
                 let escape = AsciiEscape::with_preferred_quote(bytes.value(self.db), Quote::Double);
 
@@ -831,8 +860,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::TypeVar(bound_typevar) => {
                 write!(f, "{}", bound_typevar.identity(self.db).display(self.db))
             }
-            Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
-            Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
+            Type::AlwaysTruthy => f
+                .with_detail(TypeDetail::Type(self.ty))
+                .write_str("AlwaysTruthy"),
+            Type::AlwaysFalsy => f
+                .with_detail(TypeDetail::Type(self.ty))
+                .write_str("AlwaysFalsy"),
             Type::BoundSuper(bound_super) => {
                 f.write_str("<super: ")?;
                 Type::from(bound_super.pivot_class(self.db))
@@ -845,7 +878,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.write_str(">")
             }
             Type::TypeIs(type_is) => {
-                f.write_str("TypeIs[")?;
+                f.with_detail(TypeDetail::Type(Type::SpecialForm(SpecialFormType::TypeIs)))
+                    .write_str("TypeIs")?;
+                f.write_char('[')?;
                 type_is
                     .return_type(self.db)
                     .display_with(self.db, self.settings.singleline())
