@@ -147,6 +147,8 @@ substitutability with respect to the grandparent class is just as important:
 `stub.pyi`:
 
 ```pyi
+from typing import Any
+
 class Grandparent:
     def method(self, x: int) -> None: ...
 
@@ -160,6 +162,15 @@ class Child(Parent):
 class OtherChild(Parent):
     # compatible with the signature of `Grandparent.method`, but not with `Parent.method`:
     def method(self, x: int) -> None: ...  # error: [invalid-method-override]
+
+class GradualParent(Grandparent):
+    def method(self, x: Any) -> None: ...
+
+class ThirdChild(GradualParent):
+    # `GradualParent.method` is compatible with the signature of `Grandparent.method`,
+    # and `ThirdChild.method` is compatible with the signature of `GradualParent.method`,
+    # but `ThirdChild.method` is not compatible with the signature of `Grandparent.method`
+    def method(self, x: str) -> None: ...  # error: [invalid-method-override]
 ```
 
 `other_stub.pyi`:
@@ -181,6 +192,167 @@ class C(B):
 class D(C):
     # compatible with `C.get` and `B.get`, but not with `A.get`
     def get(self, my_default): ...  # error: [invalid-method-override]
+```
+
+## Non-generic methods on generic classes work as expected
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+class A[T]:
+    def method(self, x: T) -> None: ...
+
+class B[T](A[T]):
+    def method(self, x: T) -> None: ...  # fine
+
+class C(A[int]):
+    def method(self, x: int) -> None: ...  # fine
+
+class D[T](A[T]):
+    def method(self, x: object) -> None: ...  # fine
+
+class E(A[int]):
+    def method(self, x: object) -> None: ...  # fine
+
+class F[T](A[T]):
+    # TODO: we should emit `invalid-method-override` on this:
+    # `str` is not necessarily a subtype of `T`!
+    def method(self, x: str) -> None: ...
+
+class G(A[int]):
+    def method(self, x: bool) -> None: ...  # error: [invalid-method-override]
+```
+
+## Generic methods on non-generic classes work as expected
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing import Never, Self
+
+class A:
+    def method[T](self, x: T) -> T: ...
+
+class B(A):
+    def method[T](self, x: T) -> T: ...  # fine
+
+class C(A):
+    def method(self, x: object) -> Never: ...  # fine
+
+class D(A):
+    # TODO: we should emit [invalid-method-override] here:
+    # `A.method` accepts an argument of any type,
+    # but `D.method` only accepts `int`s
+    def method(self, x: int) -> int: ...
+
+class A2:
+    def method(self, x: int) -> int: ...
+
+class B2(A2):
+    # fine: although `B2.method()` will not always return an `int`,
+    # an instance of `B2` can be substituted wherever an instance of `A2` is expected,
+    # and it *will* always return an `int` if it is passed an `int`
+    # (which is all that will be allowed if an instance of `A2` is expected)
+    def method[T](self, x: T) -> T: ...
+
+class C2(A2):
+    def method[T: int](self, x: T) -> T: ...
+
+class D2(A2):
+    # The type variable is bound to a type disjoint from `int`,
+    # so the method will not accept integers, and therefore this is an invalid override
+    def method[T: str](self, x: T) -> T: ...  # error: [invalid-method-override]
+
+class A3:
+    def method(self) -> Self: ...
+
+class B3(A3):
+    def method(self) -> Self: ...  # fine
+
+class C3(A3):
+    # TODO: should this be allowed?
+    # Mypy/pyright/pyrefly all allow it,
+    # but conceptually it seems similar to `B4.method` below,
+    # which mypy/pyrefly agree is a Liskov violation
+    # (pyright disagrees as of 20/11/2025: https://github.com/microsoft/pyright/issues/11128)
+    # when called on a subclass, `C3.method()` will not return an
+    # instance of that subclass
+    def method(self) -> C3: ...
+
+class D3(A3):
+    def method(self: Self) -> Self: ...  # fine
+
+class E3(A3):
+    def method(self: E3) -> Self: ...  # fine
+
+class F3(A3):
+    def method(self: A3) -> Self: ...  # fine
+
+class G3(A3):
+    def method(self: object) -> Self: ...  # fine
+
+class H3(A3):
+    # TODO: we should emit `invalid-method-override` here
+    # (`A3.method()` can be called on any instance of `A3`,
+    # but `H3.method()` can only be called on objects that are
+    # instances of `str`)
+    def method(self: str) -> Self: ...
+
+class I3(A3):
+    # TODO: we should emit `invalid-method-override` here
+    # (`I3.method()` cannot be called with any inhabited type!)
+    def method(self: Never) -> Self: ...
+
+class A4:
+    def method[T: int](self, x: T) -> T: ...
+
+class B4(A4):
+    # TODO: we should emit `invalid-method-override` here.
+    # `A4.method` promises that if it is passed a `bool`, it will return a `bool`,
+    # but this is not necessarily true for `B4.method`: if passed a `bool`,
+    # it could return a non-`bool` `int`!
+    def method(self, x: int) -> int: ...
+```
+
+## Generic methods on generic classes work as expected
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing import Never
+
+class A[T]:
+    def method[S](self, x: T, y: S) -> S: ...
+
+class B[T](A[T]):
+    def method[S](self, x: T, y: S) -> S: ...  # fine
+
+class C(A[int]):
+    def method[S](self, x: int, y: S) -> S: ...  # fine
+
+class D[T](A[T]):
+    def method[S](self, x: object, y: S) -> S: ...  # fine
+
+class E(A[int]):
+    def method[S](self, x: object, y: S) -> S: ...  # fine
+
+class F(A[int]):
+    def method(self, x: object, y: object) -> Never: ...  # fine
+
+class A2[T]:
+    def method(self, x: T, y: int) -> int: ...
+
+class B2[T](A2[T]):
+    def method[S](self, x: T, y: S) -> S: ...  # fine
 ```
 
 ## Fully qualified names are used in diagnostics where appropriate
@@ -281,4 +453,26 @@ class Bad:
     x: int
     def __eq__(self, other: "Bad") -> bool:  # error: [invalid-method-override]
         return self.x == other.x
+```
+
+## Bad override of a synthesized method
+
+<!-- snapshot-diagnostics -->
+
+```pyi
+from dataclasses import dataclass
+from typing import NamedTuple
+
+@dataclass(order=True)
+class Foo:
+    x: int
+
+class Bar(Foo):
+    def __lt__(self, other: Bar) -> bool: ...  # error: [invalid-method-override]
+
+class Baz(NamedTuple):
+    x: int
+
+class Spam(Baz):
+    def _asdict(self) -> tuple[int, ...]: ...  # error: [invalid-method-override]
 ```

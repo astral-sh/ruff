@@ -16,6 +16,7 @@ use crate::types::KnownInstanceType;
 use crate::types::call::CallError;
 use crate::types::class::{DisjointBase, DisjointBaseKind, Field};
 use crate::types::function::{FunctionType, KnownFunction};
+use crate::types::liskov::{MethodKind, SynthesizedMethodKind};
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
@@ -39,7 +40,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef, Identifier};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
-use std::fmt::Formatter;
+use std::fmt::{self, Formatter};
 
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
@@ -3449,6 +3450,9 @@ pub(crate) fn report_rebound_typevar<'db>(
     }
 }
 
+// I tried refactoring this function to placate Clippy,
+// but it did not improve readability! -- AW.
+#[expect(clippy::too_many_arguments)]
 pub(super) fn report_invalid_method_override<'db>(
     context: &InferContext<'db, '_>,
     member: &str,
@@ -3457,6 +3461,7 @@ pub(super) fn report_invalid_method_override<'db>(
     subclass_function: FunctionType<'db>,
     superclass: ClassType<'db>,
     superclass_type: Type<'db>,
+    superclass_method_kind: MethodKind,
 ) {
     let db = context.db();
 
@@ -3522,43 +3527,73 @@ pub(super) fn report_invalid_method_override<'db>(
 
     let superclass_scope = superclass.class_literal(db).0.body_scope(db);
 
-    if let Some(superclass_symbol) = place_table(db, superclass_scope).symbol_id(member)
-        && let Some(binding) = use_def_map(db, superclass_scope)
-            .end_of_scope_bindings(ScopedPlaceId::Symbol(superclass_symbol))
-            .next()
-        && let Some(definition) = binding.binding.definition()
-    {
-        let definition_span = Span::from(
-            definition.full_range(db, &parsed_module(db, superclass_scope.file(db)).load(db)),
-        );
+    match superclass_method_kind {
+        MethodKind::NotSynthesized => {
+            if let Some(superclass_symbol) = place_table(db, superclass_scope).symbol_id(member)
+                && let Some(binding) = use_def_map(db, superclass_scope)
+                    .end_of_scope_bindings(ScopedPlaceId::Symbol(superclass_symbol))
+                    .next()
+                && let Some(definition) = binding.binding.definition()
+            {
+                let definition_span = Span::from(
+                    definition
+                        .full_range(db, &parsed_module(db, superclass_scope.file(db)).load(db)),
+                );
 
-        let superclass_function_span = superclass_type
-            .as_bound_method()
-            .and_then(|method| signature_span(method.function(db)));
+                let superclass_function_span = superclass_type
+                    .as_bound_method()
+                    .and_then(|method| signature_span(method.function(db)));
 
-        let superclass_definition_kind = definition.kind(db);
+                let superclass_definition_kind = definition.kind(db);
 
-        let secondary_span = if superclass_definition_kind.is_function_def()
-            && let Some(function_span) = superclass_function_span.clone()
-        {
-            function_span
-        } else {
-            definition_span
-        };
+                let secondary_span = if superclass_definition_kind.is_function_def()
+                    && let Some(function_span) = superclass_function_span.clone()
+                {
+                    function_span
+                } else {
+                    definition_span
+                };
 
-        diagnostic.annotate(
-            Annotation::secondary(secondary_span.clone())
-                .message(format_args!("`{overridden_method}` defined here")),
-        );
+                diagnostic.annotate(
+                    Annotation::secondary(secondary_span.clone())
+                        .message(format_args!("`{overridden_method}` defined here")),
+                );
 
-        if !superclass_definition_kind.is_function_def()
-            && let Some(function_span) = superclass_function_span
-            && function_span != secondary_span
-        {
-            diagnostic.annotate(
-                Annotation::secondary(function_span)
-                    .message(format_args!("Signature of `{overridden_method}`")),
+                if !superclass_definition_kind.is_function_def()
+                    && let Some(function_span) = superclass_function_span
+                    && function_span != secondary_span
+                {
+                    diagnostic.annotate(
+                        Annotation::secondary(function_span)
+                            .message(format_args!("Signature of `{overridden_method}`")),
+                    );
+                }
+            }
+        }
+        MethodKind::Synthesized(synthesized_kind) => {
+            let make_sub =
+                |message: fmt::Arguments| SubDiagnostic::new(SubDiagnosticSeverity::Info, message);
+
+            let mut sub = match synthesized_kind {
+                SynthesizedMethodKind::Dataclass => make_sub(format_args!(
+                    "`{overridden_method}` is a generated method created because \
+                        `{superclass_name}` is a dataclass"
+                )),
+                SynthesizedMethodKind::NamedTuple => make_sub(format_args!(
+                    "`{overridden_method}` is a generated method created because \
+                        `{superclass_name}` inherits from `typing.NamedTuple`"
+                )),
+                SynthesizedMethodKind::TypedDict => make_sub(format_args!(
+                    "`{overridden_method}` is a generated method created because \
+                        `{superclass_name}` is a `TypedDict`"
+                )),
+            };
+
+            sub.annotate(
+                Annotation::primary(superclass.header_span(db))
+                    .message(format_args!("Definition of `{superclass_name}`")),
             );
+            diagnostic.sub(sub);
         }
     }
 

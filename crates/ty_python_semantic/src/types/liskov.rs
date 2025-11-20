@@ -72,13 +72,48 @@ fn check_class_declaration<'db>(
         return;
     }
 
-    let Place::Defined(type_on_instance, _, _) =
+    let Place::Defined(type_on_subclass_instance, _, _) =
         Type::instance(db, class).member(db, &member.name).place
     else {
         return;
     };
 
     for superclass in class.iter_mro(db).skip(1).filter_map(ClassBase::into_class) {
+        let superclass_symbol_table =
+            place_table(db, superclass.class_literal(db).0.body_scope(db));
+
+        let mut method_kind = MethodKind::NotSynthesized;
+
+        // If the member is not defined on the class itself, skip it
+        if let Some(superclass_symbol) = superclass_symbol_table.symbol_by_name(&member.name) {
+            if !(superclass_symbol.is_bound() || superclass_symbol.is_declared()) {
+                continue;
+            }
+        } else {
+            let (superclass_literal, superclass_specialization) = superclass.class_literal(db);
+            if superclass_literal
+                .own_synthesized_member(db, superclass_specialization, None, &member.name)
+                .is_none()
+            {
+                continue;
+            }
+            let class_kind =
+                CodeGeneratorKind::from_class(db, superclass_literal, superclass_specialization);
+
+            method_kind = match class_kind {
+                Some(CodeGeneratorKind::NamedTuple) => {
+                    MethodKind::Synthesized(SynthesizedMethodKind::NamedTuple)
+                }
+                Some(CodeGeneratorKind::DataclassLike(_)) => {
+                    MethodKind::Synthesized(SynthesizedMethodKind::Dataclass)
+                }
+                Some(CodeGeneratorKind::TypedDict) => {
+                    MethodKind::Synthesized(SynthesizedMethodKind::TypedDict)
+                }
+                None => MethodKind::NotSynthesized,
+            };
+        }
+
         let Place::Defined(superclass_type, _, _) = Type::instance(db, superclass)
             .member(db, &member.name)
             .place
@@ -87,22 +122,11 @@ fn check_class_declaration<'db>(
             break;
         };
 
-        let superclass_symbol_table =
-            place_table(db, superclass.class_literal(db).0.body_scope(db));
-
-        // If the member is not defined on the class itself, skip it
-        let Some(superclass_symbol) = superclass_symbol_table.symbol_by_name(&member.name) else {
-            continue;
-        };
-        if !(superclass_symbol.is_bound() || superclass_symbol.is_declared()) {
-            continue;
-        }
-
         let Some(superclass_type_as_callable) = superclass_type.try_upcast_to_callable(db) else {
             continue;
         };
 
-        if type_on_instance.is_assignable_to(db, superclass_type_as_callable) {
+        if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_callable) {
             continue;
         }
 
@@ -114,6 +138,7 @@ fn check_class_declaration<'db>(
             function,
             superclass,
             superclass_type,
+            method_kind,
         );
 
         // Only one diagnostic should be emitted per each invalid override,
@@ -122,4 +147,17 @@ fn check_class_declaration<'db>(
         // suppression comment, but that too should cause us to exit early here.
         break;
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum MethodKind {
+    Synthesized(SynthesizedMethodKind),
+    NotSynthesized,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum SynthesizedMethodKind {
+    NamedTuple,
+    Dataclass,
+    TypedDict,
 }
