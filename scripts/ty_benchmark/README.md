@@ -7,6 +7,7 @@
 
 1. Build ty: `cargo build --bin ty --release`
 1. `cd` into the benchmark directory: `cd scripts/ty_benchmark`
+1. Install Pyright: `npm install`
 1. Run benchmarks: `uv run benchmark`
 
 Requires hyperfine 1.20 or newer.

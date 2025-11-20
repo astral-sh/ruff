@@ -5,7 +5,6 @@ description = "Package for running end-to-end ty benchmarks"
 requires-python = ">=3.12"
 dependencies = [
     "pyrefly>=0.41.3",
-    "pyright",
 ]
 
 [project.scripts]
