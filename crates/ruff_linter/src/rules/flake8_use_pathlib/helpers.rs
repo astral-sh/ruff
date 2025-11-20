@@ -96,18 +96,9 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
             _ => {
                 let determined_applicability = if checker.comment_ranges().intersects(range) {
                     Applicability::Unsafe
-                } else if applicability.is_none() {
-                    // When applicability is None, we need to determine it based on return type changes
-                    if is_top_level_expression_call(checker, call) {
-                        // Safe when the call is a top-level expression (return value not used)
-                        Applicability::Safe
-                    } else {
-                        // Unsafe because the return type changes (str/bytes -> Path or None -> Path)
-                        Applicability::Unsafe
-                    }
                 } else {
                     // applicability is Some(Applicability::Safe), use it
-                    Applicability::Safe
+                    applicability.unwrap_or(Applicability::Safe)
                 };
                 Fix::applicable_edits(edit, [import_edit], determined_applicability)
             }
@@ -148,6 +139,7 @@ pub(crate) fn is_file_descriptor(expr: &Expr, semantic: &SemanticModel) -> bool 
     typing::is_int(binding, semantic)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check_os_pathlib_two_arg_calls(
     checker: &Checker,
     call: &ExprCall,
@@ -156,6 +148,7 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
     second_arg: &str,
     fix_enabled: bool,
     violation: impl Violation,
+    applicability: Option<Applicability>,
 ) {
     let range = call.range();
     let mut diagnostic = checker.report_diagnostic(violation, call.func.range());
@@ -184,20 +177,16 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
                 format!("{binding}({path_code}).{attr}({second_code})")
             };
 
-            let applicability = if checker.comment_ranges().intersects(range) {
+            let determined_applicability = if checker.comment_ranges().intersects(range) {
                 Applicability::Unsafe
-            } else if is_top_level_expression_call(checker, call) {
-                // Safe when the call is a top-level expression (return value not used)
-                Applicability::Safe
             } else {
-                // Unsafe because the return type changes (None -> Path)
-                Applicability::Unsafe
+                applicability.unwrap_or(Applicability::Safe)
             };
 
             Ok(Fix::applicable_edits(
                 Edit::range_replacement(replacement, range),
                 [import_edit],
-                applicability,
+                determined_applicability,
             ))
         });
     }

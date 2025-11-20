@@ -42,8 +42,8 @@ use crate::{FixAvailability, Violation};
 /// As a result, code relying on the exact string returned by `os.path.dirname`
 /// may behave differently after the fix.
 ///
-/// Additionally, the fix is marked as unsafe because `os.path.dirname()` returns a `str`, while
-/// `Path.parent` returns a `Path` object. This change in return type can break code that uses
+/// Additionally, the fix is marked as unsafe because `os.path.dirname()` returns `str` or `bytes`,
+/// while `Path.parent` returns a `Path` object. This change in return type can break code that uses
 /// the return value.
 ///
 /// ## Known issues

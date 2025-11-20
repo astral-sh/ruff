@@ -2,9 +2,10 @@ use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_rename_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
     check_os_pathlib_two_arg_calls, has_unknown_keywords_or_starred_expr,
-    is_keyword_only_argument_non_default,
+    is_keyword_only_argument_non_default, is_top_level_expression_call,
 };
 use crate::{FixAvailability, Violation};
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 
@@ -89,5 +90,22 @@ pub(crate) fn os_rename(checker: &Checker, call: &ExprCall, segments: &[&str]) {
             &["src", "dst", "src_dir_fd", "dst_dir_fd"],
         );
 
-    check_os_pathlib_two_arg_calls(checker, call, "rename", "src", "dst", fix_enabled, OsRename);
+    // Unsafe when the fix would delete comments or change a used return value
+    let applicability = if fix_enabled && !is_top_level_expression_call(checker, call) {
+        // Unsafe because the return type changes (None -> Path)
+        Some(Applicability::Unsafe)
+    } else {
+        None
+    };
+
+    check_os_pathlib_two_arg_calls(
+        checker,
+        call,
+        "rename",
+        "src",
+        "dst",
+        fix_enabled,
+        OsRename,
+        applicability,
+    );
 }

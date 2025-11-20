@@ -41,8 +41,8 @@ use crate::{FixAvailability, Violation};
 /// directory can't be resolved: `os.path.expanduser` returns the
 /// input unchanged, while `Path.expanduser` raises `RuntimeError`.
 ///
-/// Additionally, the fix is marked as unsafe because `os.path.expanduser()` returns a `str`, while
-/// `Path.expanduser()` returns a `Path` object. This change in return type can break code that uses
+/// Additionally, the fix is marked as unsafe because `os.path.expanduser()` returns `str` or `bytes`,
+/// while `Path.expanduser()` returns a `Path` object. This change in return type can break code that uses
 /// the return value.
 ///
 /// ## References
