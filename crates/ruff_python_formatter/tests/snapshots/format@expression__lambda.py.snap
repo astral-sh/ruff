@@ -342,6 +342,8 @@ class C:
         if crf_token.pos_tag is not None
         else None,
 	}
+
+name = re.sub(r"[^\x21\x23-\x5b\x5d-\x7e]...............", lambda m: f"\\{m.group(0)}", p["name"])
 ```
 
 ## Output
@@ -690,6 +692,11 @@ class C:
         if crf_token.pos_tag is not None
         else None,
     }
+
+
+name = re.sub(
+    r"[^\x21\x23-\x5b\x5d-\x7e]...............", lambda m: f"\\{m.group(0)}", p["name"]
+)
 ```
 
 
@@ -697,7 +704,42 @@ class C:
 ```diff
 --- Stable
 +++ Preview
-@@ -74,7 +74,9 @@
+@@ -27,30 +27,10 @@
+ # Trailing
+ 
+ # Leading
+-lambda x: lambda y: lambda z: (
+-    x,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    z,
++lambda x: (
++    lambda y: (
++        lambda z: (x, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, z)
++    )
+ )  # Trailing
+ # Trailing
+ 
+@@ -74,7 +54,9 @@
  
  # lambda arguments don't have parentheses, so we never add a magic trailing comma ...
  def f(
@@ -708,7 +750,7 @@ class C:
  ):
      pass
  
-@@ -218,29 +220,31 @@
+@@ -218,71 +200,79 @@
  
  # Leading
  lambda x: (
@@ -735,36 +777,107 @@ class C:
 -    + y
 -    + y
 -    + z  # Trailing
-+    lambda y: lambda z: (
-+        x
-+        + y
-+        + y
-+        + y
-+        + y
-+        + y
-+        + y
-+        + y
-+        + y
-+        + y
-+        + y
-+        + y
-+        + y
-+        + y
-+        + y
-+        + y
-+        + y
-+        + y
-+        + y
-+        + y
-+        + y
-+        + y
-+        + z
++    lambda y: (
++        lambda z: (
++            x
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + y
++            + z
++        )
 +    )  # Trailing
  )  # Trailing
  
  
-@@ -280,9 +284,9 @@
- ]  # Trailing
+ # Leading
+-lambda x: lambda y: lambda z: [
+-    x,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    y,
+-    z,
+-]  # Trailing
++lambda x: (
++    lambda y: (
++        lambda z: [
++            x,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            y,
++            z,
++        ]
++    )
++)  # Trailing
  # Trailing
  
 -lambda self, araa, kkkwargs=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
@@ -776,7 +889,7 @@ class C:
  
  
  # Regression tests for https://github.com/astral-sh/ruff/issues/8179
-@@ -291,9 +295,9 @@
+@@ -291,9 +281,9 @@
          c,
          d,
          e,
@@ -789,7 +902,7 @@ class C:
      )
  
  
-@@ -302,15 +306,9 @@
+@@ -302,15 +292,9 @@
          c,
          d,
          e,
@@ -808,7 +921,7 @@ class C:
          g=10,
      )
  
-@@ -320,9 +318,9 @@
+@@ -320,9 +304,9 @@
          c,
          d,
          e,
@@ -821,15 +934,17 @@ class C:
      )
  
  
-@@ -338,7 +336,7 @@
+@@ -338,9 +322,9 @@
  
  class C:
      function_dict: Dict[Text, Callable[[CRFToken], Any]] = {
 -        CRFEntityExtractorOptions.POS2: lambda crf_token: crf_token.pos_tag[:2]
 -        if crf_token.pos_tag is not None
 -        else None,
-+        CRFEntityExtractorOptions.POS2: lambda crf_token: crf_token.pos_tag[
-+            :2
-+        ] if crf_token.pos_tag is not None else None,
++        CRFEntityExtractorOptions.POS2: lambda crf_token: (
++            crf_token.pos_tag[:2] if crf_token.pos_tag is not None else None
++        ),
      }
+ 
+ 
 ```
