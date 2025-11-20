@@ -3076,8 +3076,8 @@ impl<'db> GenericContext<'db> {
             });
 
         // Then we find all of the "representative types" for each typevar in the constraint set.
-        let mut types = vec![Type::Never; self.len(db)];
-        for (i, bound_typevar) in self.variables(db).enumerate() {
+        let mut error_occurred = false;
+        let types = self.variables(db).map(|bound_typevar| {
             // Each representative type represents one of the ways that the typevar can satisfy the
             // constraint, expressed as a lower/upper bound on the types that the typevar can
             // specialize to.
@@ -3107,22 +3107,27 @@ impl<'db> GenericContext<'db> {
             // for this constraint set.
             if !satisfied {
                 // TODO: Construct a useful error here
-                return Err(());
+                error_occurred = true;
+                return None;
             }
 
             // If `lower ≰ upper`, then there is no type that satisfies all of the paths in the
             // BDD. That's an ambiguous specialization, as described above.
             if !greatest_lower_bound.is_subtype_of(db, least_upper_bound) {
-                // TODO: Construct a useful error here
-                return Err(());
+                error_occurred = true;
+                return None;
             }
 
             // Of all of the types that satisfy all of the paths in the BDD, we choose the
             // "largest" one (i.e., "closest to `object`") as the specialization.
-            types[i] = least_upper_bound;
-        }
+            Some(least_upper_bound)
+        });
 
-        Ok(self.specialize_recursive(db, types.into_boxed_slice()))
+        let specialization = self.specialize_recursive(db, types);
+        if error_occurred {
+            return Err(());
+        }
+        Ok(specialization)
     }
 }
 
