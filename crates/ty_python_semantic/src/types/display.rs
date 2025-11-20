@@ -611,19 +611,9 @@ impl Display for DisplayRepresentation<'_> {
 impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         match self.ty {
-            Type::Dynamic(dynamic) => match dynamic {
-                DynamicType::Any => write!(
-                    f.with_detail(TypeDetail::Type(Type::SpecialForm(SpecialFormType::Any))),
-                    "{dynamic}"
-                ),
-                DynamicType::Unknown => write!(
-                    f.with_detail(TypeDetail::Type(Type::SpecialForm(
-                        SpecialFormType::Unknown
-                    ))),
-                    "{dynamic}"
-                ),
-                _ => write!(f, "{dynamic}"),
-            },
+            Type::Dynamic(dynamic) => dynamic
+                .display_with(self.db, self.settings.clone())
+                .fmt_detailed(f),
             Type::Never => f.with_detail(TypeDetail::Type(self.ty)).write_str("Never"),
             Type::NominalInstance(instance) => {
                 let class = instance.class(self.db);
@@ -698,7 +688,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             }
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
-                    f.with_detail(TypeDetail::Type(Type::SpecialForm(SpecialFormType::Type)))
+                    f.with_detail(TypeDetail::Type(KnownClass::Type.to_class_literal(self.db)))
                         .write_str("type")?;
                     f.write_char('[')?;
                     class
@@ -707,7 +697,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     f.write_char(']')
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
-                    f.with_detail(TypeDetail::Type(Type::SpecialForm(SpecialFormType::Type)))
+                    f.with_detail(TypeDetail::Type(KnownClass::Type.to_class_literal(self.db)))
                         .write_str("type")?;
                     f.write_char('[')?;
                     alias
@@ -716,10 +706,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     f.write_char(']')
                 }
                 SubclassOfInner::Dynamic(dynamic) => {
-                    f.with_detail(TypeDetail::Type(Type::SpecialForm(SpecialFormType::Type)))
+                    f.with_detail(TypeDetail::Type(KnownClass::Type.to_class_literal(self.db)))
                         .write_str("type")?;
                     f.write_char('[')?;
-                    write!(f, "{dynamic}")?;
+                    dynamic
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)?;
                     f.write_char(']')
                 }
             },
@@ -1167,6 +1159,48 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
 impl Display for DisplayFunctionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
+    }
+}
+
+impl<'db> DynamicType<'db> {
+    fn display_with<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        settings: DisplaySettings<'db>,
+    ) -> DisplayDynamicType<'a, 'db> {
+        DisplayDynamicType {
+            dynamic_type: self,
+            db,
+            settings,
+        }
+    }
+}
+
+struct DisplayDynamicType<'a, 'db> {
+    dynamic_type: &'a DynamicType<'db>,
+    #[allow(dead_code)]
+    db: &'db dyn Db,
+    #[allow(dead_code)]
+    settings: DisplaySettings<'db>,
+}
+
+impl<'db> FmtDetailed<'db> for DisplayDynamicType<'_, 'db> {
+    fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        match self.dynamic_type {
+            DynamicType::Any => write!(
+                f.with_detail(TypeDetail::Type(Type::SpecialForm(SpecialFormType::Any))),
+                "{}",
+                self.dynamic_type,
+            ),
+            DynamicType::Unknown => write!(
+                f.with_detail(TypeDetail::Type(Type::SpecialForm(
+                    SpecialFormType::Unknown
+                ))),
+                "{}",
+                self.dynamic_type,
+            ),
+            _ => write!(f, "{}", self.dynamic_type),
+        }
     }
 }
 

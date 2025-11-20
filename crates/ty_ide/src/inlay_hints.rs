@@ -5072,14 +5072,13 @@ mod tests {
             y[: type[list[str]]] = type(x)
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:343:1
+           --> stdlib/builtins.pyi:247:7
             |
-        341 | Protocol: _SpecialForm
-        342 | Callable: _SpecialForm
-        343 | Type: _SpecialForm
-            | ^^^^
-        344 | NoReturn: _SpecialForm
-        345 | ClassVar: _SpecialForm
+        246 | @disjoint_base
+        247 | class type:
+            |       ^^^^
+        248 |     """type(object) -> the object's type
+        249 |     type(name, bases, dict, **kwds) -> a new type
             |
         info: Source
          --> main2.py:3:9
