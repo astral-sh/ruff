@@ -4144,6 +4144,43 @@ mod tests {
     }
 
     #[test]
+    fn test_literal_string() {
+        let mut test = inlay_hint_test(
+            r#"
+            from typing import LiteralString
+            def my_func(x: LiteralString):
+                y = x
+            my_func(x="hello")"#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        from typing import LiteralString
+        def my_func(x: LiteralString):
+            y[: LiteralString] = x
+        my_func(x="hello")
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+         --> main2.py:4:9
+          |
+        2 | from typing import LiteralString
+        3 | def my_func(x: LiteralString):
+        4 |     y[: LiteralString] = x
+          |         ^^^^^^^^^^^^^
+        5 | my_func(x="hello")
+          |
+        "#);
+    }
+
+    #[test]
     fn test_complex_parameter_combinations() {
         let mut test = inlay_hint_test(
             "
