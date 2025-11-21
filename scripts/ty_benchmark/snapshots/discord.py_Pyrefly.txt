@@ -652,4 +652,5 @@ ERROR discord/webhook/sync.py:840:37-47: Cannot set item in `dict[str, str]` [un
 ERROR discord/welcome_screen.py:104:33-48: Object of class `_EmojiTag` has no attribute `name` [missing-attribute]
 ERROR discord/welcome_screen.py:211:37-48: Cannot set item in `dict[str, list[Unknown]]` [unsupported-operation]
 ERROR discord/welcome_screen.py:214:33-40: Cannot set item in `dict[str, list[Unknown]]` [unsupported-operation]
- INFO 652 errors (526 suppressed)
+ INFO Checking project configured at `<CWD>/pyrefly.toml`
+ INFO 652 errors (521 suppressed)

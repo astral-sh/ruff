@@ -158,4 +158,5 @@ ERROR src/prefect/server/models/workers.py:755:55-81: Cannot set item in `dict[s
 ERROR src/prefect/server/models/workers.py:770:12-27: Object of class `Result` has no attribute `rowcount` [missing-attribute]
 ERROR src/prefect/server/models/workers.py:799:12-27: Object of class `Result` has no attribute `rowcount` [missing-attribute]
 ERROR src/prefect/server/models/workers.py:811:16-43: Cannot use `PrefectServerEventsClient` as a context manager [bad-context-manager]
+ INFO Checking project configured at `<CWD>/pyrefly.toml`
  INFO 159 errors (12 suppressed)

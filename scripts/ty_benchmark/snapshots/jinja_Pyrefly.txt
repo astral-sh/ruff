@@ -63,4 +63,5 @@ ERROR src/jinja2/runtime.py:424:14-23: Attribute `_iterator` cannot depend on ty
 ERROR src/jinja2/sandbox.py:244:33-43: Cannot set item in `dict[str, ((n: int = 5, html: bool = True, min: int = 20, max: int = 100) -> str) | type[Cycler] | type[Joiner] | type[Namespace] | type[dict] | type[range]]` [unsupported-operation]
 ERROR src/jinja2/utils.py:271:16-39: `>` is not supported between `int` and `None` [unsupported-operation]
 ERROR src/jinja2/utils.py:431:2-29: Class `MutableMapping` has no class attribute `register` [missing-attribute]
+ INFO Checking project configured at `<CWD>/pyrefly.toml`
  INFO 65 errors (80 suppressed)

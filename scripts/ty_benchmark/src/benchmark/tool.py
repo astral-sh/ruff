@@ -6,6 +6,7 @@ import os
 import shutil
 import sys
 from pathlib import Path
+from textwrap import dedent
 from typing import TYPE_CHECKING, override
 
 from benchmark import Command
@@ -26,6 +27,23 @@ def which_tool(name: str, path: Path | None = None) -> Path:
 
 
 class Tool(abc.ABC):
+    def write_config(self, project: Project, venv: Venv) -> None:
+        """Write the tool's configuration file."""
+
+        if config := self.config(project, venv):
+            config_name, config_text = config
+            config_path = venv.project_path / config_name
+            config_path.write_text(dedent(config_text))
+
+    def config(self, project: Project, venv: Venv) -> tuple[Path, str] | None:
+        """Returns the path to the tool's configuration file with the configuration
+        content or `None` if the tool requires no configuration file.
+
+        We write a configuration over using CLI arguments because
+        most LSPs don't accept per CLI.
+        """
+        return None
+
     @abc.abstractmethod
     def command(self, project: Project, venv: Venv, single_threaded: bool) -> Command:
         """Generate a command to benchmark a given tool."""
@@ -46,21 +64,31 @@ class Ty(Tool):
         )
 
     @override
+    def config(self, project: Project, venv: Venv):
+        return (
+            Path("ty.toml"),
+            f"""
+            [src]
+            include = [{", ".join([f'"{include}"' for include in project.include])}]
+            exclude = [{", ".join([f'"{exclude}"' for exclude in project.exclude])}]
+
+            [environment]
+            python-version = "{project.python_version}"
+            python = "{venv.path}"
+            """,
+        )
+
+    @override
     def command(self, project: Project, venv: Venv, single_threaded: bool) -> Command:
         command = [
             str(self.path),
             "check",
             "--output-format=concise",
             "--no-progress",
-            "--python-version",
-            project.python_version,
-            *project.include,
         ]
 
         for exclude in project.exclude:
             command.extend(["--exclude", exclude])
-
-        command.extend(["--python", str(venv.path)])
 
         return Command(name=self.name, command=command)
 
@@ -131,31 +159,31 @@ class Pyright(Tool):
                     "Pyright executable not found. Did you ran `npm install` in the `ty_benchmark` directory?"
                 )
 
-    def command(self, project: Project, venv: Venv, single_threaded: bool) -> Command:
-        command = [str(self.path), "--skipunannotated"]
-
-        (venv.project_path / "pyrightconfig.json").write_text(
+    @override
+    def config(self, project: Project, venv: Venv):
+        return (
+            Path("pyrightconfig.json"),
             json.dumps(
                 {
                     "exclude": [str(path) for path in project.exclude],
                     # Set the `venv` config for pyright. Pyright only respects the `--venvpath`
                     # CLI option when `venv` is set in the configuration... 🤷‍♂️
                     "venv": venv.name,
+                    # This is not the path to the venv folder, but the folder that contains the venv...
+                    "venvPath": str(venv.path.parent),
+                    "pythonVersion": project.python_version,
                 }
-            )
+            ),
         )
+
+    def command(self, project: Project, venv: Venv, single_threaded: bool) -> Command:
+        command = [str(self.path), "--skipunannotated"]
 
         if not single_threaded:
             command.append("--threads")
 
         command.extend(
             [
-                "--venvpath",
-                str(
-                    venv.path.parent
-                ),  # This is not the path to the venv folder, but the folder that contains the venv...
-                "--pythonversion",
-                project.python_version,
                 "--level=warning",
                 "--project",
                 "pyrightconfig.json",
@@ -176,30 +204,30 @@ class Pyrefly(Tool):
         self.path = path or which_tool("pyrefly")
 
     @override
+    def config(self, project: Project, venv: Venv):
+        return (
+            Path("pyrefly.toml"),
+            f"""
+            project-includes = [{", ".join([f'"{include}"' for include in project.include])}]
+            project-excludes = [{", ".join([f'"{exclude}"' for exclude in project.exclude])}]
+            python-interpreter-path = "{venv.python}"
+            python-version = "{project.python_version}"
+            site-package-path = ["{venv.path}"]
+            ignore-missing-source = true
+            untyped-def-behavior="check-and-infer-return-any"
+            """,
+        )
+
+    @override
     def command(self, project: Project, venv: Venv, single_threaded: bool) -> Command:
         command = [
             str(self.path),
             "check",
-            "--python-interpreter-path",
-            str(venv.python),
-            "--python-version",
-            project.python_version,
             "--output-format=min-text",
-            "--site-package-path",
-            str(
-                venv.path.parent
-            ),  # This is not the path to the venv folder, but the folder that contains the venv...
-            "--untyped-def-behavior=check-and-infer-return-any",
-            "--ignore=missing-source-for-stubs",  # not supported by ty
         ]
-
-        for exclude in project.exclude:
-            command.extend(["--project-excludes", exclude])
 
         if single_threaded:
             command.extend(["--threads", "1"])
-
-        command.extend(project.include)
 
         return Command(
             name="Pyrefly",

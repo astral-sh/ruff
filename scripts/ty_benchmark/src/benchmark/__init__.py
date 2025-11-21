@@ -37,7 +37,7 @@ class Hyperfine(NamedTuple):
     json: bool
     """Whether to export results to JSON."""
 
-    def run(self, *, cwd: Path | None = None, env: Mapping[str, str] = dict()) -> None:
+    def run(self, *, cwd: Path | None = None, env: Mapping[str, str]) -> None:
         """Run the benchmark using `hyperfine`."""
         args = [
             "hyperfine",

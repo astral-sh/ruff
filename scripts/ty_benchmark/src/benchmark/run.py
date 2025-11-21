@@ -141,10 +141,11 @@ def main() -> None:
             venv = Venv.create(cwd, project.python_version)
             venv.install(project.install_arguments)
 
-            # Generate the benchmark command for each tool.
-            commands = [
-                suite.command(project, venv, args.single_threaded) for suite in suites
-            ]
+            commands = []
+
+            for suite in suites:
+                suite.write_config(project, venv)
+                commands.append(suite.command(project, venv, args.single_threaded))
 
             if not commands:
                 continue

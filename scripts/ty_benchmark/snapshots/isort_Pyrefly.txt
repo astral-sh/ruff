@@ -16,4 +16,5 @@ ERROR isort/settings.py:495:40-61: `IMPORT_HEADING_PREFIX` may be uninitialized 
 ERROR isort/settings.py:499:40-60: `IMPORT_FOOTER_PREFIX` may be uninitialized [unbound-name]
 ERROR isort/settings.py:835:23-27: String literal used as condition. It's equivalent to `True` [redundant-condition]
 ERROR isort/sorting.py:121:34-37: Expected a callable, got `None` [not-callable]
+ INFO Checking project configured at `<CWD>/pyrefly.toml`
  INFO 18 errors (18 suppressed)
