@@ -74,7 +74,8 @@ use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{any_over_type, exceeds_max_specialization_depth};
 use crate::unpack::EvaluationMode;
 use crate::{Db, FxOrderSet, Module, Program};
-pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
+pub use class::KnownClass;
+pub(crate) use class::{ClassLiteral, ClassType, GenericAlias};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
 pub use special_form::SpecialFormType;
@@ -892,7 +893,7 @@ impl<'db> Type<'db> {
         !(check_dunder("__eq__", true) && check_dunder("__ne__", false))
     }
 
-    pub(crate) fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
+    pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
         self.is_instance_of(db, KnownClass::NotImplementedType)
     }
 
@@ -1670,8 +1671,8 @@ impl<'db> Type<'db> {
 
     /// Return true if this type is assignable to type `target`.
     ///
-    /// See [`TypeRelation::Assignability`] for more details.
-    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+    /// See `TypeRelation::Assignability` for more details.
+    pub fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         self.when_assignable_to(db, target, InferableTypeVars::None)
             .is_always_satisfied(db)
     }
@@ -12108,7 +12109,7 @@ impl get_size2::GetSize for UnionType<'_> {}
 impl<'db> UnionType<'db> {
     /// Create a union from a list of elements
     /// (which may be eagerly simplified into a different variant of [`Type`] altogether).
-    pub(crate) fn from_elements<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
+    pub fn from_elements<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
     where
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
