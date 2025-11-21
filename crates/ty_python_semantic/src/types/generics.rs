@@ -142,6 +142,25 @@ impl<'db> BoundTypeVarInstance<'db> {
             }
         }
     }
+
+    /// Returns `true` if all bounds or constraints on this typevar are fully static.
+    ///
+    /// A type is fully static if its top and bottom materializations are the same; dynamic types
+    /// (like `Any`) will have different materializations.
+    pub(crate) fn has_fully_static_bound_or_constraints(self, db: &'db dyn Db) -> bool {
+        match self.typevar(db).bound_or_constraints(db) {
+            None => true,
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                bound.top_materialization(db) == bound.bottom_materialization(db)
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                .elements(db)
+                .iter()
+                .all(|constraint| {
+                    constraint.top_materialization(db) == constraint.bottom_materialization(db)
+                }),
+        }
+    }
 }
 
 impl<'a, 'db> InferableTypeVars<'a, 'db> {
@@ -1521,6 +1540,20 @@ impl<'db> SpecializationBuilder<'db> {
                 let bound_typevars =
                     (formal.elements(self.db).iter()).filter_map(|ty| ty.as_typevar());
                 if let Ok(bound_typevar) = bound_typevars.exactly_one() {
+                    // If the actual argument can be satisfied by a non-typevar element of the
+                    // union, then prefer that element and avoid inferring a mapping for the
+                    // typevar. This lets other occurrences of the typevar (if any) drive the
+                    // specialization instead of opportunistically binding it here.
+                    let matches_non_typevar = formal.elements(self.db).iter().any(|ty| {
+                        !ty.has_typevar(self.db)
+                            && actual
+                                .when_subtype_of(self.db, *ty, self.inferable)
+                                .satisfied_by_all_typevars(self.db, self.inferable)
+                    });
+                    if matches_non_typevar {
+                        return Ok(());
+                    }
+
                     self.add_type_mapping(bound_typevar, actual, polarity, f);
                 }
             }

@@ -1756,6 +1756,24 @@ impl<'db> Type<'db> {
         }
 
         match (self, target) {
+            // Pretend that instances of `dataclasses.Field` are assignable to their default type.
+            // This allows field definitions like `name: str = field(default="")` in dataclasses
+            // to pass the assignability check of the inferred type to the declared type.
+            (Type::KnownInstance(KnownInstanceType::Field(field)), right)
+                if relation.is_assignability() =>
+            {
+                field.default_type(db).when_none_or(|default_type| {
+                    default_type.has_relation_to_impl(
+                        db,
+                        right,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
+            }
+
             // Two identical typevars must always solve to the same type, so they are always
             // subtypes of each other and assignable to each other.
             //
@@ -1765,6 +1783,30 @@ impl<'db> Type<'db> {
                 if lhs_bound_typevar.is_same_typevar_as(db, rhs_bound_typevar) =>
             {
                 ConstraintSet::from(true)
+            }
+            (Type::TypeVar(lhs_bound_typevar), Type::TypeVar(rhs_bound_typevar))
+                if relation.is_assignability()
+                    && lhs_bound_typevar.typevar(db).identity(db)
+                        == rhs_bound_typevar.typevar(db).identity(db) =>
+            {
+                ConstraintSet::from(true)
+            }
+
+            // Typevars with non-fully-static bounds or constraints do not participate in
+            // subtyping while they are in a non-inferable position.
+            (Type::TypeVar(bound_typevar), _)
+                if relation.is_subtyping()
+                    && !bound_typevar.is_inferable(db, inferable)
+                    && !bound_typevar.has_fully_static_bound_or_constraints(db) =>
+            {
+                ConstraintSet::from(false)
+            }
+            (_, Type::TypeVar(bound_typevar))
+                if relation.is_subtyping()
+                    && !bound_typevar.is_inferable(db, inferable)
+                    && !bound_typevar.has_fully_static_bound_or_constraints(db) =>
+            {
+                ConstraintSet::from(false)
             }
 
             // A typevar satisfies a relation when...it satisfies the relation. Yes that's a
@@ -1817,24 +1859,6 @@ impl<'db> Type<'db> {
                     self.has_relation_to_impl(
                         db,
                         target_alias.value_type(db),
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
-                })
-            }
-
-            // Pretend that instances of `dataclasses.Field` are assignable to their default type.
-            // This allows field definitions like `name: str = field(default="")` in dataclasses
-            // to pass the assignability check of the inferred type to the declared type.
-            (Type::KnownInstance(KnownInstanceType::Field(field)), right)
-                if relation.is_assignability() =>
-            {
-                field.default_type(db).when_none_or(|default_type| {
-                    default_type.has_relation_to_impl(
-                        db,
-                        right,
                         inferable,
                         relation,
                         relation_visitor,
@@ -1991,12 +2015,12 @@ impl<'db> Type<'db> {
                 self_function.has_relation_to_impl(
                     db,
                     target_function,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            }
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            )
+        }
             (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => self_method
                 .has_relation_to_impl(
                     db,
