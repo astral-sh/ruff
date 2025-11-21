@@ -5803,6 +5803,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ".".repeat(level as usize),
             module.unwrap_or_default()
         ));
+
         if level == 0 {
             if let Some(module_name) = module.and_then(ModuleName::new) {
                 let program = Program::get(self.db());
@@ -5831,39 +5832,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
-
-            // Add search paths information to the diagnostic
-            // Use the same search paths function that is used in actual module resolution
-            let verbose = self.db().verbose();
-            let search_paths = search_paths(self.db(), ModuleResolveMode::StubsAllowed);
-
-            diagnostic.info(format_args!(
-                "Searched in the following paths during module resolution:"
-            ));
-
-            let mut search_paths = search_paths.enumerate();
-
-            while let Some((index, path)) = search_paths.next() {
-                if index > 4 && !verbose {
-                    let more = search_paths.count() + 1;
-                    diagnostic.info(format_args!(
-                        "  ... and {more} more paths. Run with `-v` to see all paths."
-                    ));
-                    break;
-                }
-                diagnostic.info(format_args!(
-                    "  {}. {} ({})",
-                    index + 1,
-                    path,
-                    path.describe_kind()
-                ));
-            }
-
-            diagnostic.info(
-                "make sure your Python environment is properly configured: \
-                https://docs.astral.sh/ty/modules/#python-environment",
-            );
         }
+
+        // Add search paths information to the diagnostic
+        // Use the same search paths function that is used in actual module resolution
+        let verbose = self.db().verbose();
+        let search_paths = search_paths(self.db(), ModuleResolveMode::StubsAllowed);
+
+        diagnostic.info(format_args!(
+            "Searched in the following paths during module resolution:"
+        ));
+
+        let mut search_paths = search_paths.enumerate();
+
+        while let Some((index, path)) = search_paths.next() {
+            if index > 4 && !verbose {
+                let more = search_paths.count() + 1;
+                diagnostic.info(format_args!(
+                    "  ... and {more} more paths. Run with `-v` to see all paths."
+                ));
+                break;
+            }
+            diagnostic.info(format_args!(
+                "  {}. {} ({})",
+                index + 1,
+                path,
+                path.describe_kind()
+            ));
+        }
+
+        diagnostic.info(
+            "make sure your Python environment is properly configured: \
+                https://docs.astral.sh/ty/modules/#python-environment",
+        );
     }
 
     fn infer_import_definition(
