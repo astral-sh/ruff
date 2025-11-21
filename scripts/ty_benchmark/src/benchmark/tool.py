@@ -48,6 +48,10 @@ class Tool(abc.ABC):
     def command(self, project: Project, venv: Venv, single_threaded: bool) -> Command:
         """Generate a command to benchmark a given tool."""
 
+    @abc.abstractmethod
+    def lsp_command(self, project: Project, venv: Venv) -> list[str] | None:
+        """Generate command to start LSP server, or None if not supported."""
+
 
 class Ty(Tool):
     path: Path
@@ -92,6 +96,10 @@ class Ty(Tool):
             command.extend(["--exclude", exclude])
 
         return Command(name=self.name, command=command)
+
+    @override
+    def lsp_command(self, project: Project, venv: Venv) -> list[str] | None:
+        return [str(self.path), "server"]
 
 
 class Mypy(Tool):
@@ -142,18 +150,27 @@ class Mypy(Tool):
             command=command,
         )
 
+    @override
+    def lsp_command(self, project: Project, venv: Venv) -> list[str] | None:
+        # Mypy doesn't have official LSP support.
+        return None
+
 
 class Pyright(Tool):
     path: Path
+    lsp_path: Path
 
     def __init__(self, *, path: Path | None = None):
         if path:
             self.path = path
-        else:
+            # Assume langserver is in the same directory.
             if sys.platform == "win32":
-                self.path = Path("./node_modules/.bin/pyright.cmd").resolve()
+                self.lsp_path = path.with_name("pyright-langserver.cmd")
             else:
-                self.path = Path("./node_modules/.bin/pyright").resolve()
+                self.lsp_path = path.with_name("pyright-langserver")
+        else:
+            self.path = npm_bin_path("pyright")
+            self.lsp_path = npm_bin_path("pyright-langserver")
 
             if not self.path.exists():
                 print(
@@ -197,6 +214,11 @@ class Pyright(Tool):
             command=command,
         )
 
+    @override
+    def lsp_command(self, project: Project, venv: Venv) -> list[str] | None:
+        # Pyright LSP server is a separate executable.
+        return [str(self.lsp_path), "--stdio"]
+
 
 class Pyrefly(Tool):
     path: Path
@@ -234,3 +256,16 @@ class Pyrefly(Tool):
             name="Pyrefly",
             command=command,
         )
+
+    @override
+    def lsp_command(self, project: Project, venv: Venv) -> list[str] | None:
+        # Pyrefly LSP server.
+        return [str(self.path), "lsp"]
+
+
+def npm_bin_path(name: str) -> Path:
+    if sys.platform == "win32":
+        return Path(f"./node_modules/.bin/{name}.cmd").resolve()
+
+    else:
+        return (Path("./node_modules/.bin") / name).resolve()

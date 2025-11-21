@@ -12,6 +12,13 @@
 
 Requires hyperfine 1.20 or newer.
 
+## LSP benchmarks
+
+```bash
+uv run pytest src/benchmark/test_lsp_diagnostics.py::test_lsp_initial_diagnostics \
+    --benchmark-group-by=param:project_setup
+```
+
 ## Known limitations
 
 The tested type checkers implement Python's type system to varying degrees and
