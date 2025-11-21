@@ -103,25 +103,19 @@ impl Visitor<'_> for PropertyVisitor {
     }
 
     fn visit_stmt(&mut self, stmt: &Stmt) {
-        if !self.necessary {
-            match stmt {
-                // Sometimes a property is defined because of an ABC requiremnet but it will always raise.
-                // Thus not an unnecessary property.
-                Stmt::Return(_) | Stmt::Raise(_) => self.necessary = true,
-                Stmt::FunctionDef(_) => {
-                    // Do not recurse into nested functions; they're evaluated separately.
-                }
-                _ => walk_stmt(self, stmt),
-            }
+        if self.necessary {
+            return;
         }
-    }
 
-    fn visit_body(&mut self, body: &[Stmt]) {
-        for stmt in body {
-            self.visit_stmt(stmt);
-            if self.necessary {
-                return;
+        match stmt {
+            Stmt::Return(_) => self.necessary = true,
+            // Sometimes a property is defined because of an ABC requiremnet but it will always raise.
+            // Thus not an unnecessary property.
+            Stmt::Raise(_) => self.necessary = true,
+            Stmt::FunctionDef(_) => {
+                // Do not recurse into nested functions; they're evaluated separately.
             }
+            _ => walk_stmt(self, stmt),
         }
     }
 }
