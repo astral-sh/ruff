@@ -1,10 +1,11 @@
 use core::fmt;
+use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::LineRanges;
-use std::{error::Error, fmt::Formatter};
+use std::{error::Error, fmt::Formatter, thread::current};
 use thiserror::Error;
 
-use ruff_python_trivia::{CommentRanges, Cursor, is_python_whitespace};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_python_trivia::{Cursor, is_python_whitespace};
+use ruff_text_size::{Ranged, TextRange, TextSize, TextSlice};
 use smallvec::{SmallVec, smallvec};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -17,6 +18,9 @@ enum SuppressionAction {
 pub(crate) struct SuppressionComment {
     /// Range containing the entire suppression comment
     range: TextRange,
+
+    /// How indented an own-line comment is, or None for trailing comments
+    indent: Option<usize>,
 
     /// The action directive
     action: SuppressionAction,
@@ -33,21 +37,22 @@ impl SuppressionComment {
     fn codes_as_str(&self, source: &str) -> Vec<String> {
         self.codes
             .iter()
-            .map(|range| source[*range].to_string())
+            .map(|range| source.slice(range).to_string())
             .collect()
     }
 
-    /// Whether the comment is an own-line comment, and how indented it is
-    fn own_line_indent(&self, source: &str) -> Option<usize> {
-        let before =
-            &source[TextRange::new(source.line_start(self.range.start()), self.range.start())];
-        let is_own_line = before.chars().all(is_python_whitespace);
-        is_own_line.then(|| before.chars().count())
+    /// Whether the comment "matches" another comment, based on indentation and suppressed codes
+    fn matches(&self, other: &SuppressionComment, source: &str) -> bool {
+        ((self.action == SuppressionAction::Enable && other.action == SuppressionAction::Disable)
+            || (self.action == SuppressionAction::Disable
+                && other.action == SuppressionAction::Enable))
+            && self.indent == other.indent
+            && self.codes_as_str(source) == other.codes_as_str(source)
     }
 }
 
 #[allow(unused)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Suppression {
     /// The lint code being suppressed
     code: String,
@@ -62,101 +67,142 @@ pub(crate) struct Suppression {
 #[allow(unused)]
 #[derive(Debug)]
 pub(crate) struct Suppressions {
+    /// Valid suppression ranges with associated comments
     valid: Vec<Suppression>,
+
+    /// Invalid suppression comments
     invalid: Vec<SuppressionComment>,
+
+    /// Parse errors from suppression comments
     errors: Vec<ParseError>,
 }
 
 impl Suppressions {
-    pub(crate) fn load(source: &str, comment_ranges: &CommentRanges) -> Self {
-        let mut suppression_comments = comment_ranges
-            .iter()
-            .map(|comment_range| {
-                let mut parser = SuppressionParser::new(source, *comment_range);
-                parser.parse_comment()
-            })
-            .collect::<Vec<_>>();
+    pub(crate) fn from_tokens(source: &str, tokens: &Tokens) -> Suppressions {
+        let mut builder = SuppressionsBuilder::new(source);
+        builder.load_from_tokens(tokens)
+    }
+}
 
-        let mut index = 0;
-        let mut suppressions: Vec<Suppression> = Vec::new();
-        let mut invalid: Vec<SuppressionComment> = Vec::new();
-        let mut errors: Vec<ParseError> = Vec::new();
+#[derive(Default)]
+pub(crate) struct SuppressionsBuilder<'a> {
+    source: &'a str,
 
-        // Process all parsed comments in order generating appropriate suppression ranges
-        while index < suppression_comments.len() {
-            let mut remove_index: Option<usize> = None;
-            match &suppression_comments[index] {
-                Ok(comment) => {
-                    match comment.action {
-                        SuppressionAction::Enable => {
-                            let Some(_indent) = comment.own_line_indent(source) else {
-                                invalid.push(comment.clone());
+    valid: Vec<Suppression>,
+    invalid: Vec<SuppressionComment>,
+    errors: Vec<ParseError>,
+
+    pending: Vec<SuppressionComment>,
+}
+
+impl<'a> SuppressionsBuilder<'a> {
+    pub(crate) fn new(source: &'a str) -> Self {
+        Self {
+            source,
+            ..Default::default()
+        }
+    }
+
+    fn match_comments(&mut self, current_indent: usize) {
+        let mut comment_index = 0;
+        while comment_index < self.pending.len() {
+            let comment = &self.pending[comment_index];
+
+            if comment.indent.is_some_and(|indent| indent < current_indent) {
+                comment_index += 1;
+                continue;
+            }
+
+            // find the first matching comment
+            if let Some(other_index) = self.pending[comment_index + 1..]
+                .iter()
+                .position(|other| comment.matches(other, self.source))
+            {
+                // offset from current candidate
+                let other_index = comment_index + 1 + other_index;
+                let other = &self.pending[other_index];
+
+                let combined_range = TextRange::new(comment.range.start(), other.range.end());
+
+                for code in comment.codes_as_str(self.source) {
+                    self.valid.push(Suppression {
+                        code,
+                        range: combined_range,
+                        comments: smallvec![comment.clone(), other.clone()],
+                    });
+                }
+
+                // remove both comments from further consideration
+                self.pending.remove(other_index);
+                self.pending.remove(comment_index);
+            } else {
+                self.invalid
+                    .push(self.pending.remove(comment_index).clone());
+            }
+        }
+    }
+
+    pub(crate) fn load_from_tokens(&mut self, tokens: &Tokens) -> Suppressions {
+        let mut indents: Vec<usize> = vec![0];
+        let mut current_indent: usize = 0;
+
+        for (token_index, token) in tokens.iter().enumerate() {
+            match token {
+                token if token.kind() == TokenKind::Indent => {
+                    current_indent = token.range().len().to_usize();
+                    indents.push(current_indent);
+                }
+                token if token.kind() == TokenKind::Dedent => {
+                    self.match_comments(current_indent);
+
+                    indents.pop();
+                    current_indent = *(indents.last().unwrap_or(&0));
+                }
+                token if token.kind() == TokenKind::Comment => {
+                    let mut parser = SuppressionParser::new(self.source, token.range());
+                    match parser.parse_comment() {
+                        Ok(comment) => {
+                            let Some(indent) = comment.indent else {
+                                // trailing suppressions are not supported
+                                self.invalid.push(comment);
                                 continue;
                             };
 
-                            invalid.push(comment.clone());
-                        }
-                        SuppressionAction::Disable => {
-                            let Some(indent) = comment.own_line_indent(source) else {
-                                invalid.push(comment.clone());
-                                continue;
-                            };
-
-                            // Look for matching "enable" comments.
-                            // Match by indentation and suppressed codes.
-                            // TODO: search only within the same scope
-                            let codes = comment.codes_as_str(source);
-                            if let Some(other_index) =
-                                suppression_comments[index + 1..].iter().position(|k| {
-                                    k.as_ref().is_ok_and(|other| {
-                                        other.action == SuppressionAction::Enable
-                                            && other.own_line_indent(source) == Some(indent)
-                                            && other.codes_as_str(source) == codes
+                            // comment matches current block's indentation, or precedes a dedent
+                            if indent == current_indent
+                                || tokens[token_index..]
+                                    .iter()
+                                    .find(|t| !t.kind().is_trivia())
+                                    .is_some_and(|t| {
+                                        t.kind() == TokenKind::Dedent
+                                            || t.kind() == TokenKind::Indent
                                     })
-                                })
                             {
-                                // Offset from current position
-                                let other_index = index + 1 + other_index;
-
-                                // Create a suppression range spanning from the starting disable
-                                // comment to the ending enable comment.
-                                let other = suppression_comments[other_index].as_ref().unwrap();
-                                let combined_range =
-                                    TextRange::new(comment.range.start(), other.range.end());
-                                for code in codes {
-                                    suppressions.push(Suppression {
-                                        code,
-                                        range: combined_range,
-                                        comments: smallvec![comment.clone(), other.clone()],
-                                    });
-                                }
-                                // Mark the matched enable comment to be removed from the vector
-                                // so that it doesn't get processed and treated as unmatched.
-                                remove_index = Some(other_index);
+                                self.pending.push(comment);
                             } else {
-                                invalid.push(comment.clone());
+                                // weirdly indented? ¯\_(ツ)_/¯
+                                self.invalid.push(comment);
                             }
                         }
+                        Err(ParseError {
+                            kind: ParseErrorKind::NotASuppression,
+                            ..
+                        }) => {}
+                        Err(error) => {
+                            self.errors.push(error);
+                        }
                     }
                 }
-                Err(error) => {
-                    if error.kind != ParseErrorKind::NotASuppression {
-                        errors.push(error.clone());
-                    }
-                }
+                _ => {}
             }
-            // Remove a marked comment from the vector.
-            if let Some(remove_index) = remove_index {
-                suppression_comments.remove(remove_index).ok();
-            }
-            index += 1;
         }
 
-        suppressions.shrink_to_fit();
-        Self {
-            valid: suppressions,
-            invalid,
-            errors,
+        self.match_comments(0);
+
+        Suppressions {
+            valid: self.valid.clone(),
+            invalid: self.invalid.clone(),
+            errors: self.errors.clone(),
         }
     }
 }
@@ -207,13 +253,18 @@ impl Error for ParseError {}
 
 struct SuppressionParser<'src> {
     cursor: Cursor<'src>,
+    source: &'src str,
     range: TextRange,
 }
 
 impl<'src> SuppressionParser<'src> {
     fn new(source: &'src str, range: TextRange) -> Self {
         let cursor = Cursor::new(&source[range]);
-        Self { cursor, range }
+        Self {
+            cursor,
+            source,
+            range,
+        }
     }
 
     fn parse_comment(&mut self) -> Result<SuppressionComment, ParseError> {
@@ -233,9 +284,16 @@ impl<'src> SuppressionParser<'src> {
 
         self.eat_whitespace();
         let reason = TextRange::new(self.offset(), self.range.end());
+        let text_before = self.source.slice(TextRange::new(
+            self.source.line_start(self.range.start()),
+            self.range.start(),
+        ));
+        let is_own_line = text_before.chars().all(is_python_whitespace);
+        let indent = is_own_line.then(|| text_before.chars().count());
 
         Ok(SuppressionComment {
             range: self.range,
+            indent,
             action,
             codes,
             reason,
@@ -342,13 +400,120 @@ impl<'src> SuppressionParser<'src> {
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
-    use ruff_python_trivia::CommentRanges;
+    use ruff_python_parser::{Mode, ParseOptions, parse};
     use ruff_text_size::{TextRange, TextSize};
     use similar::DiffableStr;
 
     use crate::suppression::{
         ParseError, SuppressionAction, SuppressionComment, SuppressionParser, Suppressions,
     };
+
+    #[test]
+    fn suppressions_from_tokens() {
+        let source = "
+# comment here
+print('hello')
+
+# ruff: disable[alpha]
+def foo():
+    # ruff: disable[beta]
+    if True:
+        # ruff: disable[gamma]  # unmatched!
+        pass
+    # ruff: enable[beta]
+# ruff: enable[alpha]
+
+# ruff: disable  # parse error!
+def bar():
+    pass
+";
+        let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
+        let suppressions = Suppressions::from_tokens(source, parsed.tokens());
+        assert_debug_snapshot!(
+            suppressions,
+            @r#"
+        Suppressions {
+            valid: [
+                Suppression {
+                    code: "beta",
+                    range: 70..187,
+                    comments: [
+                        SuppressionComment {
+                            range: 70..91,
+                            indent: Some(
+                                4,
+                            ),
+                            action: Disable,
+                            codes: [
+                                86..90,
+                            ],
+                            reason: 91..91,
+                        },
+                        SuppressionComment {
+                            range: 167..187,
+                            indent: Some(
+                                4,
+                            ),
+                            action: Enable,
+                            codes: [
+                                182..186,
+                            ],
+                            reason: 187..187,
+                        },
+                    ],
+                },
+                Suppression {
+                    code: "alpha",
+                    range: 32..209,
+                    comments: [
+                        SuppressionComment {
+                            range: 32..54,
+                            indent: Some(
+                                0,
+                            ),
+                            action: Disable,
+                            codes: [
+                                48..53,
+                            ],
+                            reason: 54..54,
+                        },
+                        SuppressionComment {
+                            range: 188..209,
+                            indent: Some(
+                                0,
+                            ),
+                            action: Enable,
+                            codes: [
+                                203..208,
+                            ],
+                            reason: 209..209,
+                        },
+                    ],
+                },
+            ],
+            invalid: [
+                SuppressionComment {
+                    range: 113..149,
+                    indent: Some(
+                        8,
+                    ),
+                    action: Disable,
+                    codes: [
+                        129..134,
+                    ],
+                    reason: 137..149,
+                },
+            ],
+            errors: [
+                ParseError {
+                    kind: MissingCodes,
+                    range: 228..242,
+                },
+            ],
+        }
+        "#,
+        );
+    }
 
     fn parse_suppression_comment(source: &str) -> Result<SuppressionComment, ParseError> {
         let offset = TextSize::new(source.find('#').unwrap_or(0).try_into().unwrap());
@@ -457,6 +622,9 @@ mod tests {
         Ok(
             SuppressionComment {
                 range: 0..20,
+                indent: Some(
+                    0,
+                ),
                 action: Disable,
                 codes: [
                     16..19,
@@ -476,6 +644,9 @@ mod tests {
         Ok(
             SuppressionComment {
                 range: 0..38,
+                indent: Some(
+                    0,
+                ),
                 action: Disable,
                 codes: [
                     16..19,
@@ -495,6 +666,9 @@ mod tests {
         Ok(
             SuppressionComment {
                 range: 0..25,
+                indent: Some(
+                    0,
+                ),
                 action: Disable,
                 codes: [
                     16..19,
@@ -515,6 +689,9 @@ mod tests {
         Ok(
             SuppressionComment {
                 range: 0..26,
+                indent: Some(
+                    0,
+                ),
                 action: Enable,
                 codes: [
                     15..25,
@@ -536,6 +713,7 @@ mod tests {
         Ok(
             SuppressionComment {
                 range: 22..48,
+                indent: None,
                 action: Enable,
                 codes: [
                     37..47,
@@ -546,7 +724,7 @@ mod tests {
         ",
         );
         assert_debug_snapshot!(
-            comment.unwrap().own_line_indent(source),
+            comment.unwrap().indent,
             @"None",
         );
     }
@@ -561,6 +739,9 @@ mod tests {
         Ok(
             SuppressionComment {
                 range: 4..30,
+                indent: Some(
+                    4,
+                ),
                 action: Enable,
                 codes: [
                     19..29,
@@ -571,107 +752,11 @@ mod tests {
         ",
         );
         assert_debug_snapshot!(
-            comment.unwrap().own_line_indent(source),
+            comment.unwrap().indent,
             @r"
         Some(
             4,
         )
-        ",
-        );
-    }
-
-    #[test]
-    fn load_no_comments() {
-        let source = "print('hello world')";
-        let suppressions = Suppressions::load(source, &CommentRanges::new(vec![]));
-        assert_debug_snapshot!(
-            suppressions,
-            @r"
-        Suppressions {
-            valid: [],
-            invalid: [],
-            errors: [],
-        }
-        ",
-        );
-    }
-
-    #[test]
-    fn load_matched_range() {
-        let source = "
-# ruff: disable[foo]
-print('hello world')
-# ruff: enable[foo]
-";
-        let ranges = vec![
-            TextRange::at(1.into(), 20.into()),
-            TextRange::at(43.into(), 19.into()),
-        ];
-        let suppressions = Suppressions::load(source, &CommentRanges::new(ranges));
-        assert_debug_snapshot!(
-            suppressions,
-            @r#"
-        Suppressions {
-            valid: [
-                Suppression {
-                    code: "foo",
-                    range: 1..62,
-                    comments: [
-                        SuppressionComment {
-                            range: 1..21,
-                            action: Disable,
-                            codes: [
-                                17..20,
-                            ],
-                            reason: 21..21,
-                        },
-                        SuppressionComment {
-                            range: 43..62,
-                            action: Enable,
-                            codes: [
-                                58..61,
-                            ],
-                            reason: 62..62,
-                        },
-                    ],
-                },
-            ],
-            invalid: [],
-            errors: [],
-        }
-        "#,
-        );
-    }
-
-    #[test]
-    fn load_unmatched_range() {
-        let source = "
-# ruff: disable[foo]
-print('hello world')
-# unrelated comment
-";
-        let ranges = vec![
-            TextRange::at(1.into(), 20.into()),
-            TextRange::at(43.into(), 19.into()),
-        ];
-        let suppressions = Suppressions::load(source, &CommentRanges::new(ranges));
-        assert_debug_snapshot!(
-            suppressions,
-            @r"
-        Suppressions {
-            valid: [],
-            invalid: [
-                SuppressionComment {
-                    range: 1..21,
-                    action: Disable,
-                    codes: [
-                        17..20,
-                    ],
-                    reason: 21..21,
-                },
-            ],
-            errors: [],
-        }
         ",
         );
     }
