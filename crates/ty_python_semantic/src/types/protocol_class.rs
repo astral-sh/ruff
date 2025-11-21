@@ -693,12 +693,24 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                     attribute_type
                 };
 
+                // TODO: Instances of `typing.Self` in the protocol member should specialize to the
+                // type that we are checking. Without this, we will treat `Self` as an inferable
+                // typevar, and allow it to match against _any_ type.
+                //
+                // It's not very principled, but we also use the literal fallback type, instead of
+                // `other` directly. This lets us check whether things like `Literal[0]` satisfy a
+                // protocol that includes methods that have `typing.Self` annotations, without
+                // overly constraining `Self` to that specific literal.
+                //
+                // With the new solver, we should be to replace all of this with an additional
+                // constraint that enforces what `Self` can specialize to.
+                let fallback_other = other.literal_fallback_instance(db).unwrap_or(other);
                 attribute_type
                     .try_upcast_to_callable(db)
-                    .map(|callable| callable.apply_self(db, other))
+                    .map(|callable| callable.apply_self(db, fallback_other))
                     .has_relation_to_impl(
                         db,
-                        method.bind_self(db, Some(other)),
+                        method.bind_self(db, Some(fallback_other)),
                         inferable,
                         relation,
                         relation_visitor,
