@@ -992,7 +992,7 @@ fn find_module_component(
 
 /// Helper to get the module name up to the given component index
 fn import_name(module_name: &str, component_index: usize) -> &str {
-    // We want everything to the left of the nth `.`, i
+    // We want everything to the left of the nth `.`
     // If there's no nth `.` then we want the whole thing.
     let idx = module_name
         .match_indices('.')
