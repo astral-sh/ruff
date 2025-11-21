@@ -214,8 +214,8 @@ reveal_type(mypackage.imported.X)  # revealed: Unknown
 
 ## Relative `from` Import of Nested Submodule in `__init__`
 
-`from .submodule import nested` in an `__init__.pyi` does not re-export `mypackage.submodule`,
-`mypackage.submodule.nested`, or `nested`.
+`from .submodule import nested` in an `__init__.pyi` does re-export `mypackage.submodule`, but not
+`mypackage.submodule.nested` or `nested`.
 
 ### In Stub
 
