@@ -1,11 +1,11 @@
 use core::fmt;
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::LineRanges;
-use std::{error::Error, fmt::Formatter, thread::current};
+use std::{error::Error, fmt::Formatter};
 use thiserror::Error;
 
 use ruff_python_trivia::{Cursor, is_python_whitespace};
-use ruff_text_size::{Ranged, TextRange, TextSize, TextSlice};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize, TextSlice};
 use smallvec::{SmallVec, smallvec};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -20,7 +20,7 @@ pub(crate) struct SuppressionComment {
     range: TextRange,
 
     /// How indented an own-line comment is, or None for trailing comments
-    indent: Option<usize>,
+    indent: Option<String>,
 
     /// The action directive
     action: SuppressionAction,
@@ -103,12 +103,16 @@ impl<'a> SuppressionsBuilder<'a> {
         }
     }
 
-    fn match_comments(&mut self, current_indent: usize) {
+    fn match_comments(&mut self, current_indent: &String) {
         let mut comment_index = 0;
         while comment_index < self.pending.len() {
             let comment = &self.pending[comment_index];
 
-            if comment.indent.is_some_and(|indent| indent < current_indent) {
+            if comment
+                .indent
+                .as_ref()
+                .is_some_and(|indent| indent.text_len() < current_indent.text_len())
+            {
                 comment_index += 1;
                 continue;
             }
@@ -143,26 +147,27 @@ impl<'a> SuppressionsBuilder<'a> {
     }
 
     pub(crate) fn load_from_tokens(&mut self, tokens: &Tokens) -> Suppressions {
-        let mut indents: Vec<usize> = vec![0];
-        let mut current_indent: usize = 0;
+        let default_indent = String::new();
+        let mut current_indent: &String = &default_indent;
+        let mut indents: Vec<String> = vec![];
 
         for (token_index, token) in tokens.iter().enumerate() {
-            match token {
-                token if token.kind() == TokenKind::Indent => {
-                    current_indent = token.range().len().to_usize();
-                    indents.push(current_indent);
+            match token.kind() {
+                TokenKind::Indent => {
+                    indents.push(self.source.slice(token).to_string());
+                    current_indent = indents.last().unwrap_or(&default_indent);
                 }
-                token if token.kind() == TokenKind::Dedent => {
+                TokenKind::Dedent => {
                     self.match_comments(current_indent);
 
                     indents.pop();
-                    current_indent = *(indents.last().unwrap_or(&0));
+                    current_indent = indents.last().unwrap_or(&default_indent);
                 }
-                token if token.kind() == TokenKind::Comment => {
+                TokenKind::Comment => {
                     let mut parser = SuppressionParser::new(self.source, token.range());
                     match parser.parse_comment() {
                         Ok(comment) => {
-                            let Some(indent) = comment.indent else {
+                            let Some(indent) = &comment.indent else {
                                 // trailing suppressions are not supported
                                 self.invalid.push(comment);
                                 continue;
@@ -197,7 +202,7 @@ impl<'a> SuppressionsBuilder<'a> {
             }
         }
 
-        self.match_comments(0);
+        self.match_comments(&default_indent);
 
         Suppressions {
             valid: self.valid.clone(),
@@ -289,7 +294,7 @@ impl<'src> SuppressionParser<'src> {
             self.range.start(),
         ));
         let is_own_line = text_before.chars().all(is_python_whitespace);
-        let indent = is_own_line.then(|| text_before.chars().count());
+        let indent = is_own_line.then(|| text_before.to_string());
 
         Ok(SuppressionComment {
             range: self.range,
@@ -441,7 +446,7 @@ def bar():
                         SuppressionComment {
                             range: 70..91,
                             indent: Some(
-                                4,
+                                "    ",
                             ),
                             action: Disable,
                             codes: [
@@ -452,7 +457,7 @@ def bar():
                         SuppressionComment {
                             range: 167..187,
                             indent: Some(
-                                4,
+                                "    ",
                             ),
                             action: Enable,
                             codes: [
@@ -469,7 +474,7 @@ def bar():
                         SuppressionComment {
                             range: 32..54,
                             indent: Some(
-                                0,
+                                "",
                             ),
                             action: Disable,
                             codes: [
@@ -480,7 +485,7 @@ def bar():
                         SuppressionComment {
                             range: 188..209,
                             indent: Some(
-                                0,
+                                "",
                             ),
                             action: Enable,
                             codes: [
@@ -495,7 +500,7 @@ def bar():
                 SuppressionComment {
                     range: 113..149,
                     indent: Some(
-                        8,
+                        "        ",
                     ),
                     action: Disable,
                     codes: [
@@ -618,12 +623,12 @@ def bar():
     fn disable_single_code() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable[foo]"),
-            @r"
+            @r#"
         Ok(
             SuppressionComment {
                 range: 0..20,
                 indent: Some(
-                    0,
+                    "",
                 ),
                 action: Disable,
                 codes: [
@@ -632,7 +637,7 @@ def bar():
                 reason: 20..20,
             },
         )
-        ",
+        "#,
         );
     }
 
@@ -640,12 +645,12 @@ def bar():
     fn disable_single_code_with_reason() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable[foo] I like bar better"),
-            @r"
+            @r#"
         Ok(
             SuppressionComment {
                 range: 0..38,
                 indent: Some(
-                    0,
+                    "",
                 ),
                 action: Disable,
                 codes: [
@@ -654,7 +659,7 @@ def bar():
                 reason: 21..38,
             },
         )
-        ",
+        "#,
         );
     }
 
@@ -662,12 +667,12 @@ def bar():
     fn disable_multiple_codes() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable[foo, bar]"),
-            @r"
+            @r#"
         Ok(
             SuppressionComment {
                 range: 0..25,
                 indent: Some(
-                    0,
+                    "",
                 ),
                 action: Disable,
                 codes: [
@@ -677,7 +682,7 @@ def bar():
                 reason: 25..25,
             },
         )
-        ",
+        "#,
         );
     }
 
@@ -685,12 +690,12 @@ def bar():
     fn enable_single_code() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: enable[some-thing]"),
-            @r"
+            @r#"
         Ok(
             SuppressionComment {
                 range: 0..26,
                 indent: Some(
-                    0,
+                    "",
                 ),
                 action: Enable,
                 codes: [
@@ -699,7 +704,7 @@ def bar():
                 reason: 26..26,
             },
         )
-        ",
+        "#,
         );
     }
 
@@ -735,12 +740,12 @@ def bar():
         let comment = parse_suppression_comment(source);
         assert_debug_snapshot!(
             comment,
-            @r"
+            @r#"
         Ok(
             SuppressionComment {
                 range: 4..30,
                 indent: Some(
-                    4,
+                    "    ",
                 ),
                 action: Enable,
                 codes: [
@@ -749,15 +754,15 @@ def bar():
                 reason: 30..30,
             },
         )
-        ",
+        "#,
         );
         assert_debug_snapshot!(
             comment.unwrap().indent,
-            @r"
+            @r#"
         Some(
-            4,
+            "    ",
         )
-        ",
+        "#,
         );
     }
 
