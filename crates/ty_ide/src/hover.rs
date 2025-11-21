@@ -20,7 +20,6 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     }
 
     let model = SemanticModel::new(db, file);
-    let ty = goto_target.inferred_type(&model);
     let docs = goto_target
         .get_definition_targets(
             file,
@@ -30,9 +29,10 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         .and_then(|definitions| definitions.docstring(db))
         .map(HoverContent::Docstring);
 
-    // TODO: Render the symbol's signature instead of just its type.
     let mut contents = Vec::new();
-    if let Some(ty) = ty {
+    if let Some(signature) = goto_target.call_type_simplified_by_overloads(&model) {
+        contents.push(HoverContent::Signature(signature));
+    } else if let Some(ty) = goto_target.inferred_type(&model) {
         tracing::debug!("Inferred type of covering node is {}", ty.display(db));
         contents.push(match ty {
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => typevar
@@ -62,7 +62,7 @@ pub struct Hover<'db> {
 
 impl<'db> Hover<'db> {
     /// Renders the hover to a string using the specified markup kind.
-    pub const fn display<'a>(&'a self, db: &'a dyn Db, kind: MarkupKind) -> DisplayHover<'a> {
+    pub const fn display<'a>(&'a self, db: &'db dyn Db, kind: MarkupKind) -> DisplayHover<'db, 'a> {
         DisplayHover {
             db,
             hover: self,
@@ -93,13 +93,13 @@ impl<'a, 'db> IntoIterator for &'a Hover<'db> {
     }
 }
 
-pub struct DisplayHover<'a> {
-    db: &'a dyn Db,
-    hover: &'a Hover<'a>,
+pub struct DisplayHover<'db, 'a> {
+    db: &'db dyn Db,
+    hover: &'a Hover<'db>,
     kind: MarkupKind,
 }
 
-impl fmt::Display for DisplayHover<'_> {
+impl fmt::Display for DisplayHover<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut first = true;
         for content in &self.hover.contents {
@@ -115,8 +115,9 @@ impl fmt::Display for DisplayHover<'_> {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum HoverContent<'db> {
+    Signature(String),
     Type(Type<'db>, Option<TypeVarVariance>),
     Docstring(Docstring),
 }
@@ -140,6 +141,9 @@ pub(crate) struct DisplayHoverContent<'a, 'db> {
 impl fmt::Display for DisplayHoverContent<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.content {
+            HoverContent::Signature(signature) => {
+                self.kind.fenced_code_block(&signature, "python").fmt(f)
+            }
             HoverContent::Type(ty, variance) => {
                 let variance = match variance {
                     Some(TypeVarVariance::Covariant) => " (covariant)",
@@ -961,14 +965,12 @@ def ab(a: str): ...
 
         assert_snapshot!(test.hover(), @r"
         (a: int) -> Unknown
-        (a: str) -> Unknown
         ---------------------------------------------
         the int overload
 
         ---------------------------------------------
         ```python
         (a: int) -> Unknown
-        (a: str) -> Unknown
         ```
         ---
         ```text
@@ -1025,14 +1027,12 @@ def ab(a: str):
             .build();
 
         assert_snapshot!(test.hover(), @r#"
-        (a: int) -> Unknown
         (a: str) -> Unknown
         ---------------------------------------------
         the int overload
 
         ---------------------------------------------
         ```python
-        (a: int) -> Unknown
         (a: str) -> Unknown
         ```
         ---
@@ -1094,7 +1094,6 @@ def ab(a: int):
             a: int,
             b: int
         ) -> Unknown
-        (a: int) -> Unknown
         ---------------------------------------------
         the two arg overload
 
@@ -1104,7 +1103,6 @@ def ab(a: int):
             a: int,
             b: int
         ) -> Unknown
-        (a: int) -> Unknown
         ```
         ---
         ```text
@@ -1161,20 +1159,12 @@ def ab(a: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (
-            a: int,
-            b: int
-        ) -> Unknown
         (a: int) -> Unknown
         ---------------------------------------------
         the two arg overload
 
         ---------------------------------------------
         ```python
-        (
-            a: int,
-            b: int
-        ) -> Unknown
         (a: int) -> Unknown
         ```
         ---
@@ -1236,32 +1226,20 @@ def ab(a: int, *, c: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (a: int) -> Unknown
         (
             a: int,
             *,
             b: int
-        ) -> Unknown
-        (
-            a: int,
-            *,
-            c: int
         ) -> Unknown
         ---------------------------------------------
         keywordless overload
 
         ---------------------------------------------
         ```python
-        (a: int) -> Unknown
         (
             a: int,
             *,
             b: int
-        ) -> Unknown
-        (
-            a: int,
-            *,
-            c: int
         ) -> Unknown
         ```
         ---
@@ -1323,12 +1301,6 @@ def ab(a: int, *, c: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (a: int) -> Unknown
-        (
-            a: int,
-            *,
-            b: int
-        ) -> Unknown
         (
             a: int,
             *,
@@ -1339,12 +1311,6 @@ def ab(a: int, *, c: int):
 
         ---------------------------------------------
         ```python
-        (a: int) -> Unknown
-        (
-            a: int,
-            *,
-            b: int
-        ) -> Unknown
         (
             a: int,
             *,

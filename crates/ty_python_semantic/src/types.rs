@@ -50,8 +50,8 @@ use crate::types::constraints::{
 };
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
-pub use crate::types::display::DisplaySettings;
 use crate::types::display::TupleSpecialization;
+pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
 use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
@@ -861,6 +861,10 @@ impl<'db> Type<'db> {
         self.as_nominal_instance()
             .and_then(|instance| crate::types::enums::enum_metadata(db, instance.class_literal(db)))
             .is_some()
+    }
+
+    fn is_typealias_special_form(&self) -> bool {
+        matches!(self, Type::SpecialForm(SpecialFormType::TypeAlias))
     }
 
     /// Return true if this type overrides __eq__ or __ne__ methods
@@ -2093,14 +2097,6 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(false)
             }
 
-            (Type::TypedDict(_), _) => {
-                // TODO: Implement assignability and subtyping for TypedDict
-                ConstraintSet::from(relation.is_assignability())
-            }
-
-            // A non-`TypedDict` cannot subtype a `TypedDict`
-            (_, Type::TypedDict(_)) => ConstraintSet::from(false),
-
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
             (left, Type::AlwaysFalsy) => ConstraintSet::from(left.bool(db).is_always_false()),
@@ -2206,6 +2202,38 @@ impl<'db> Type<'db> {
 
             // A protocol instance can never be a subtype of a nominal type, with the *sole* exception of `object`.
             (Type::ProtocolInstance(_), _) => ConstraintSet::from(false),
+
+            (Type::TypedDict(self_typeddict), Type::TypedDict(other_typeddict)) => relation_visitor
+                .visit((self, target, relation), || {
+                    self_typeddict.has_relation_to_impl(
+                        db,
+                        other_typeddict,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                }),
+
+            // TODO: When we support `closed` and/or `extra_items`, we could allow assignments to other
+            // compatible `Mapping`s. `extra_items` could also allow for some assignments to `dict`, as
+            // long as `total=False`. (But then again, does anyone want a non-total `TypedDict` where all
+            // key types are a supertype of the extra items type?)
+            (Type::TypedDict(_), _) => relation_visitor.visit((self, target, relation), || {
+                KnownClass::Mapping
+                    .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::object()])
+                    .has_relation_to_impl(
+                        db,
+                        target,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+            }),
+
+            // A non-`TypedDict` cannot subtype a `TypedDict`
+            (_, Type::TypedDict(_)) => ConstraintSet::from(false),
 
             // All `StringLiteral` types are a subtype of `LiteralString`.
             (Type::StringLiteral(_), Type::LiteralString) => ConstraintSet::from(true),
@@ -4379,11 +4407,6 @@ impl<'db> Type<'db> {
                 Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(literal)),
             )
             .into(),
-            Type::NominalInstance(instance)
-                if instance.has_known_class(db, KnownClass::Path) && name == "open" =>
-            {
-                Place::bound(Type::KnownBoundMethod(KnownBoundMethodType::PathOpen)).into()
-            }
 
             Type::ClassLiteral(class)
                 if name == "range" && class.is_known(db, KnownClass::ConstraintSet) =>
@@ -6738,17 +6761,10 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Generic],
                     fallback_type: Type::unknown(),
                 }),
-                KnownInstanceType::UnionType(list) => {
-                    let mut builder = UnionBuilder::new(db);
-                    let inferred_as = list.inferred_as(db);
-                    for element in list.elements(db) {
-                        builder = builder.add(if inferred_as.type_expression() {
-                            *element
-                        } else {
-                            element.in_type_expression(db, scope_id, typevar_binding_context)?
-                        });
-                    }
-                    Ok(builder.build())
+                KnownInstanceType::UnionType(instance) => {
+                    // Cloning here is cheap if the result is a `Type` (which is `Copy`). It's more
+                    // expensive if there are errors.
+                    instance.union_type(db).clone()
                 }
                 KnownInstanceType::Literal(ty) => Ok(ty.inner(db)),
                 KnownInstanceType::Annotated(ty) => Ok(ty.inner(db)),
@@ -6764,6 +6780,7 @@ impl<'db> Type<'db> {
                     Ok(ty.inner(db).to_meta_type(db))
                 }
                 KnownInstanceType::Callable(callable) => Ok(Type::Callable(*callable)),
+                KnownInstanceType::LiteralStringAlias(ty) => Ok(ty.inner(db)),
             },
 
             Type::SpecialForm(special_form) => match special_form {
@@ -6818,7 +6835,15 @@ impl<'db> Type<'db> {
 
                     Ok(typing_self(db, scope_id, typevar_binding_context, class).unwrap_or(*self))
                 }
-                SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),
+                // We ensure that `typing.TypeAlias` used in the expected position (annotating an
+                // annotated assignment statement) doesn't reach here. Using it in any other type
+                // expression is an error.
+                SpecialFormType::TypeAlias => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec_inline![
+                        InvalidTypeExpression::TypeAlias
+                    ],
+                    fallback_type: Type::unknown(),
+                }),
                 SpecialFormType::TypedDict => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec_inline![
                         InvalidTypeExpression::TypedDict
@@ -7296,7 +7321,6 @@ impl<'db> Type<'db> {
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(
                 KnownBoundMethodType::StrStartswith(_)
-                | KnownBoundMethodType::PathOpen
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
@@ -7457,7 +7481,6 @@ impl<'db> Type<'db> {
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(
                 KnownBoundMethodType::StrStartswith(_)
-                | KnownBoundMethodType::PathOpen
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
@@ -7510,7 +7533,7 @@ impl<'db> Type<'db> {
                     name = enum_literal.name(db)
                 ),
             ),
-            Type::SpecialForm(special_form) => Type::string_literal(db, special_form.repr()),
+            Type::SpecialForm(special_form) => Type::string_literal(db, &special_form.to_string()),
             Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
                 db,
                 known_instance.repr(db).to_compact_string(),
@@ -7532,7 +7555,7 @@ impl<'db> Type<'db> {
                 Type::string_literal(db, &format!("'{}'", literal.value(db).escape_default()))
             }
             Type::LiteralString => Type::LiteralString,
-            Type::SpecialForm(special_form) => Type::string_literal(db, special_form.repr()),
+            Type::SpecialForm(special_form) => Type::string_literal(db, &special_form.to_string()),
             Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
                 db,
                 known_instance.repr(db).to_compact_string(),
@@ -7584,6 +7607,11 @@ impl<'db> Type<'db> {
             Self::TypeAlias(alias) => alias.value_type(db).definition(db),
             Self::NewTypeInstance(newtype) => Some(TypeDefinition::NewType(newtype.definition(db))),
 
+            Self::PropertyInstance(property) => property
+                .getter(db)
+                .and_then(|getter|getter.definition(db))
+                .or_else(||property.setter(db).and_then(|setter|setter.definition(db))),
+
             Self::StringLiteral(_)
             | Self::BooleanLiteral(_)
             | Self::LiteralString
@@ -7595,7 +7623,6 @@ impl<'db> Type<'db> {
             | Self::WrapperDescriptor(_)
             | Self::DataclassDecorator(_)
             | Self::DataclassTransformer(_)
-            | Self::PropertyInstance(_)
             | Self::BoundSuper(_) => self.to_meta_type(db).definition(db),
 
             Self::TypeVar(bound_typevar) => Some(TypeDefinition::TypeVar(bound_typevar.typevar(db).definition(db)?)),
@@ -7605,19 +7632,22 @@ impl<'db> Type<'db> {
                 Protocol::Synthesized(_) => None,
             },
 
-            Type::TypedDict(typed_dict) => {
+            Self::TypedDict(typed_dict) => {
                 Some(TypeDefinition::Class(typed_dict.defining_class().definition(db)))
             }
 
             Self::Union(_) | Self::Intersection(_) => None,
 
+            Self::SpecialForm(special_form) => special_form.definition(db),
+            Self::Never => Type::SpecialForm(SpecialFormType::Never).definition(db),
+            Self::Dynamic(DynamicType::Any) => Type::SpecialForm(SpecialFormType::Any).definition(db),
+            Self::Dynamic(DynamicType::Unknown) => Type::SpecialForm(SpecialFormType::Unknown).definition(db),
+            Self::AlwaysTruthy => Type::SpecialForm(SpecialFormType::AlwaysTruthy).definition(db),
+            Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
+
             // These types have no definition
-            Self::Dynamic(_)
-            | Self::Never
+            Self::Dynamic(DynamicType::Divergent(_) | DynamicType::Todo(_) | DynamicType::TodoUnpack)
             | Self::Callable(_)
-            | Self::AlwaysTruthy
-            | Self::AlwaysFalsy
-            | Self::SpecialForm(_)
             | Self::TypeIs(_) => None,
         }
     }
@@ -8004,9 +8034,9 @@ pub enum KnownInstanceType<'db> {
     /// `ty_extensions.Specialization`.
     Specialization(Specialization<'db>),
 
-    /// A single instance of `types.UnionType`, which stores the left- and
-    /// right-hand sides of a PEP 604 union.
-    UnionType(InternedTypes<'db>),
+    /// A single instance of `types.UnionType`, which stores the elements of
+    /// a PEP 604 union, or a `typing.Union`.
+    UnionType(UnionTypeInstance<'db>),
 
     /// A single instance of `typing.Literal`
     Literal(InternedType<'db>),
@@ -8019,6 +8049,9 @@ pub enum KnownInstanceType<'db> {
 
     /// An instance of `typing.GenericAlias` representing a `Callable[...]` expression.
     Callable(CallableType<'db>),
+
+    /// A literal string which is the right-hand side of a PEP 613 `TypeAlias`.
+    LiteralStringAlias(InternedType<'db>),
 
     /// An identity callable created with `typing.NewType(name, base)`, which behaves like a
     /// subtype of `base` in type expressions. See the `struct NewType` payload for an example.
@@ -8052,14 +8085,15 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
                 visitor.visit_type(db, default_ty);
             }
         }
-        KnownInstanceType::UnionType(list) => {
-            for element in list.elements(db) {
-                visitor.visit_type(db, *element);
+        KnownInstanceType::UnionType(instance) => {
+            if let Ok(union_type) = instance.union_type(db) {
+                visitor.visit_type(db, *union_type);
             }
         }
         KnownInstanceType::Literal(ty)
         | KnownInstanceType::Annotated(ty)
-        | KnownInstanceType::TypeGenericAlias(ty) => {
+        | KnownInstanceType::TypeGenericAlias(ty)
+        | KnownInstanceType::LiteralStringAlias(ty) => {
             visitor.visit_type(db, ty.inner(db));
         }
         KnownInstanceType::Callable(callable) => {
@@ -8098,11 +8132,14 @@ impl<'db> KnownInstanceType<'db> {
                 Self::TypeAliasType(type_alias.normalized_impl(db, visitor))
             }
             Self::Field(field) => Self::Field(field.normalized_impl(db, visitor)),
-            Self::UnionType(list) => Self::UnionType(list.normalized_impl(db, visitor)),
+            Self::UnionType(instance) => Self::UnionType(instance.normalized_impl(db, visitor)),
             Self::Literal(ty) => Self::Literal(ty.normalized_impl(db, visitor)),
             Self::Annotated(ty) => Self::Annotated(ty.normalized_impl(db, visitor)),
             Self::TypeGenericAlias(ty) => Self::TypeGenericAlias(ty.normalized_impl(db, visitor)),
             Self::Callable(callable) => Self::Callable(callable.normalized_impl(db, visitor)),
+            Self::LiteralStringAlias(ty) => {
+                Self::LiteralStringAlias(ty.normalized_impl(db, visitor))
+            }
             Self::NewType(newtype) => Self::NewType(
                 newtype
                     .map_base_class_type(db, |class_type| class_type.normalized_impl(db, visitor)),
@@ -8138,6 +8175,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Annotated(_)
             | Self::TypeGenericAlias(_)
             | Self::Callable(_) => KnownClass::GenericAlias,
+            Self::LiteralStringAlias(_) => KnownClass::Str,
             Self::NewType(_) => KnownClass::NewType,
         }
     }
@@ -8241,6 +8279,7 @@ impl<'db> KnownInstanceType<'db> {
                     KnownInstanceType::TypeGenericAlias(_) | KnownInstanceType::Callable(_) => {
                         f.write_str("GenericAlias")
                     }
+                    KnownInstanceType::LiteralStringAlias(_) => f.write_str("str"),
                     KnownInstanceType::NewType(declaration) => {
                         write!(f, "<NewType pseudo-class '{}'>", declaration.name(self.db))
                     }
@@ -8282,9 +8321,6 @@ pub enum DynamicType<'db> {
     ///
     /// This variant should be created with the `todo_type!` macro.
     Todo(TodoType),
-    /// A special Todo-variant for type aliases declared using `typing.TypeAlias`.
-    /// A temporary variant to detect and special-case the handling of these aliases in autocomplete suggestions.
-    TodoTypeAlias,
     /// A special Todo-variant for `Unpack[Ts]`, so that we can treat it specially in `Generic[Unpack[Ts]]`
     TodoUnpack,
     /// A type that is determined to be divergent during type inference for a recursive function.
@@ -8312,13 +8348,6 @@ impl std::fmt::Display for DynamicType<'_> {
             DynamicType::TodoUnpack => {
                 if cfg!(debug_assertions) {
                     f.write_str("@Todo(typing.Unpack)")
-                } else {
-                    f.write_str("@Todo")
-                }
-            }
-            DynamicType::TodoTypeAlias => {
-                if cfg!(debug_assertions) {
-                    f.write_str("@Todo(Support for `typing.TypeAlias`)")
                 } else {
                     f.write_str("@Todo")
                 }
@@ -8430,7 +8459,7 @@ impl<'db> TypeAndQualifiers<'db> {
 /// Error struct providing information on type(s) that were deemed to be invalid
 /// in a type expression context, and the type we should therefore fallback to
 /// for the problematic type expression.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct InvalidTypeExpressionError<'db> {
     fallback_type: Type<'db>,
     invalid_expressions: smallvec::SmallVec<[InvalidTypeExpression<'db>; 1]>,
@@ -8461,7 +8490,7 @@ impl<'db> InvalidTypeExpressionError<'db> {
 }
 
 /// Enumeration of various types that are invalid in type-expression contexts
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 enum InvalidTypeExpression<'db> {
     /// Some types always require exactly one argument when used in a type expression
     RequiresOneArgument(Type<'db>),
@@ -8485,6 +8514,9 @@ enum InvalidTypeExpression<'db> {
     Specialization,
     /// Same for `typing.TypedDict`
     TypedDict,
+    /// Same for `typing.TypeAlias`, anywhere except for as the sole annotation on an annotated
+    /// assignment
+    TypeAlias,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
     TypeQualifier(SpecialFormType),
@@ -8545,6 +8577,11 @@ impl<'db> InvalidTypeExpression<'db> {
                         f.write_str(
                             "The special form `typing.TypedDict` is not allowed in type expressions. \
                             Did you mean to use a concrete TypedDict or `collections.abc.Mapping[str, object]` instead?")
+                    }
+                    InvalidTypeExpression::TypeAlias => {
+                        f.write_str(
+                            "`typing.TypeAlias` is only allowed as the sole annotation on an annotated assignment",
+                        )
                     }
                     InvalidTypeExpression::TypeQualifier(qualifier) => write!(
                         f,
@@ -9399,39 +9436,106 @@ impl InferredAs {
     }
 }
 
-/// A salsa-interned list of types.
+/// Contains information about a `types.UnionType` instance built from a PEP 604
+/// union or a legacy `typing.Union[…]` annotation in a value expression context,
+/// e.g. `IntOrStr = int | str` or `IntOrStr = Union[int, str]`.
 ///
 /// # Ordering
 /// Ordering is based on the context's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the context was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
-pub struct InternedTypes<'db> {
-    #[returns(deref)]
-    elements: Box<[Type<'db>]>,
-    inferred_as: InferredAs,
+pub struct UnionTypeInstance<'db> {
+    /// The types of the elements of this union, as they were inferred in a value
+    /// expression context. For `int | str`, this would contain `<class 'int'>` and
+    /// `<class 'str'>`. For `Union[int, str]`, this field is `None`, as we infer
+    /// the elements as type expressions. Use `value_expression_types` to get the
+    /// corresponding value expression types.
+    #[expect(clippy::ref_option)]
+    #[returns(ref)]
+    _value_expr_types: Option<Box<[Type<'db>]>>,
+
+    /// The type of the full union, which can be used when this `UnionType` instance
+    /// is used in a type expression context. For `int | str`, this would contain
+    /// `Ok(int | str)`. If any of the element types could not be converted, this
+    /// contains the first encountered error.
+    #[returns(ref)]
+    union_type: Result<Type<'db>, InvalidTypeExpressionError<'db>>,
 }
 
-impl get_size2::GetSize for InternedTypes<'_> {}
+impl get_size2::GetSize for UnionTypeInstance<'_> {}
 
-impl<'db> InternedTypes<'db> {
-    pub(crate) fn from_elements(
+impl<'db> UnionTypeInstance<'db> {
+    pub(crate) fn from_value_expression_types(
         db: &'db dyn Db,
-        elements: impl IntoIterator<Item = Type<'db>>,
-        inferred_as: InferredAs,
-    ) -> InternedTypes<'db> {
-        InternedTypes::new(db, elements.into_iter().collect::<Box<[_]>>(), inferred_as)
+        value_expr_types: impl IntoIterator<Item = Type<'db>>,
+        scope_id: ScopeId<'db>,
+        typevar_binding_context: Option<Definition<'db>>,
+    ) -> Type<'db> {
+        let value_expr_types = value_expr_types.into_iter().collect::<Box<_>>();
+
+        let mut builder = UnionBuilder::new(db);
+        for ty in &value_expr_types {
+            match ty.in_type_expression(db, scope_id, typevar_binding_context) {
+                Ok(ty) => builder.add_in_place(ty),
+                Err(error) => {
+                    return Type::KnownInstance(KnownInstanceType::UnionType(
+                        UnionTypeInstance::new(db, Some(value_expr_types), Err(error)),
+                    ));
+                }
+            }
+        }
+
+        Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::new(
+            db,
+            Some(value_expr_types),
+            Ok(builder.build()),
+        )))
+    }
+
+    /// Get the types of the elements of this union as they would appear in a value
+    /// expression context. For a PEP 604 union, we return the actual types that were
+    /// inferred when we encountered the union in a value expression context. For a
+    /// legacy `typing.Union[…]` annotation, we turn the type-expression types into
+    /// their corresponding value-expression types, i.e. we turn instances like `int`
+    /// into class literals like `<class 'int'>`. This operation is potentially lossy.
+    pub(crate) fn value_expression_types(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<impl Iterator<Item = Type<'db>> + 'db, InvalidTypeExpressionError<'db>> {
+        let to_class_literal = |ty: Type<'db>| {
+            ty.as_nominal_instance()
+                .map(|instance| Type::ClassLiteral(instance.class(db).class_literal(db).0))
+                .unwrap_or_else(Type::unknown)
+        };
+
+        if let Some(value_expr_types) = self._value_expr_types(db) {
+            Ok(Either::Left(value_expr_types.iter().copied()))
+        } else {
+            match self.union_type(db).clone()? {
+                Type::Union(union) => Ok(Either::Right(Either::Left(
+                    union.elements(db).iter().copied().map(to_class_literal),
+                ))),
+                ty => Ok(Either::Right(Either::Right(std::iter::once(
+                    to_class_literal(ty),
+                )))),
+            }
+        }
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        InternedTypes::new(
-            db,
-            self.elements(db)
+        let value_expr_types = self._value_expr_types(db).as_ref().map(|types| {
+            types
                 .iter()
                 .map(|ty| ty.normalized_impl(db, visitor))
-                .collect::<Box<[_]>>(),
-            self.inferred_as(db),
-        )
+                .collect::<Box<_>>()
+        });
+        let union_type = self
+            .union_type(db)
+            .clone()
+            .map(|ty| ty.normalized_impl(db, visitor));
+
+        Self::new(db, value_expr_types, union_type)
     }
 }
 
@@ -10986,8 +11090,6 @@ pub enum KnownBoundMethodType<'db> {
     /// this allows us to understand statically known branches for common tests such as
     /// `if sys.platform.startswith("freebsd")`.
     StrStartswith(StringLiteralType<'db>),
-    /// Method wrapper for `Path.open`,
-    PathOpen,
 
     // ConstraintSet methods
     ConstraintSetRange,
@@ -11022,8 +11124,7 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         KnownBoundMethodType::StrStartswith(string_literal) => {
             visitor.visit_type(db, Type::StringLiteral(string_literal));
         }
-        KnownBoundMethodType::PathOpen
-        | KnownBoundMethodType::ConstraintSetRange
+        KnownBoundMethodType::ConstraintSetRange
         | KnownBoundMethodType::ConstraintSetAlways
         | KnownBoundMethodType::ConstraintSetNever
         | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
@@ -11081,8 +11182,7 @@ impl<'db> KnownBoundMethodType<'db> {
                 ConstraintSet::from(self == other)
             }
 
-            (KnownBoundMethodType::PathOpen, KnownBoundMethodType::PathOpen)
-            | (
+            (
                 KnownBoundMethodType::ConstraintSetRange,
                 KnownBoundMethodType::ConstraintSetRange,
             )
@@ -11117,7 +11217,6 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::StrStartswith(_)
-                | KnownBoundMethodType::PathOpen
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
@@ -11130,7 +11229,6 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::StrStartswith(_)
-                | KnownBoundMethodType::PathOpen
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
@@ -11173,8 +11271,7 @@ impl<'db> KnownBoundMethodType<'db> {
                 ConstraintSet::from(self == other)
             }
 
-            (KnownBoundMethodType::PathOpen, KnownBoundMethodType::PathOpen)
-            | (
+            (
                 KnownBoundMethodType::ConstraintSetRange,
                 KnownBoundMethodType::ConstraintSetRange,
             )
@@ -11213,7 +11310,6 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::StrStartswith(_)
-                | KnownBoundMethodType::PathOpen
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
@@ -11226,7 +11322,6 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::StrStartswith(_)
-                | KnownBoundMethodType::PathOpen
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
@@ -11253,7 +11348,6 @@ impl<'db> KnownBoundMethodType<'db> {
                 KnownBoundMethodType::PropertyDunderSet(property.normalized_impl(db, visitor))
             }
             KnownBoundMethodType::StrStartswith(_)
-            | KnownBoundMethodType::PathOpen
             | KnownBoundMethodType::ConstraintSetRange
             | KnownBoundMethodType::ConstraintSetAlways
             | KnownBoundMethodType::ConstraintSetNever
@@ -11272,7 +11366,6 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::PropertyDunderGet(_)
             | KnownBoundMethodType::PropertyDunderSet(_) => KnownClass::MethodWrapperType,
             KnownBoundMethodType::StrStartswith(_) => KnownClass::BuiltinFunctionType,
-            KnownBoundMethodType::PathOpen => KnownClass::MethodType,
             KnownBoundMethodType::ConstraintSetRange
             | KnownBoundMethodType::ConstraintSetAlways
             | KnownBoundMethodType::ConstraintSetNever
@@ -11377,9 +11470,6 @@ impl<'db> KnownBoundMethodType<'db> {
                     ]),
                     Some(KnownClass::Bool.to_instance(db)),
                 )))
-            }
-            KnownBoundMethodType::PathOpen => {
-                Either::Right(std::iter::once(Signature::todo("`Path.open` return type")))
             }
 
             KnownBoundMethodType::ConstraintSetRange => {
