@@ -398,6 +398,11 @@ impl<'db> TypeContext<'db> {
             annotation: self.annotation.map(f),
         }
     }
+
+    pub(crate) fn is_typealias(&self) -> bool {
+        self.annotation
+            .is_some_and(|ty| ty.is_typealias_special_form())
+    }
 }
 
 /// Returns the statically-known truthiness of a given expression.

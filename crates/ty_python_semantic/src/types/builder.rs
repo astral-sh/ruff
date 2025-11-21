@@ -514,6 +514,17 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
+            // Comparing `TypedDict`s for redundancy requires iterating over their fields, which is
+            // problematic if some of those fields point to recursive `Union`s. To avoid cycles,
+            // compare `TypedDict`s by name/identity instead of using the `has_relation_to`
+            // machinery.
+            if let (Type::TypedDict(element_td), Type::TypedDict(ty_td)) = (element_type, ty) {
+                if element_td == ty_td {
+                    return;
+                }
+                continue;
+            }
+
             if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
                 if ty.is_redundant_with(self.db, element_type) {
                     return;

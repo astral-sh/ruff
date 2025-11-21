@@ -1109,7 +1109,7 @@ from typing import List, Dict
 # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 InvalidList = List[1]
 
-# error: [invalid-type-form] "`typing.typing.List` requires exactly one argument"
+# error: [invalid-type-form] "`typing.List` requires exactly one argument"
 ListTooManyArgs = List[int, str]
 
 # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
@@ -1118,10 +1118,10 @@ InvalidDict1 = Dict[1, str]
 # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 InvalidDict2 = Dict[str, 2]
 
-# error: [invalid-type-form] "`typing.typing.Dict` requires exactly two arguments, got 1"
+# error: [invalid-type-form] "`typing.Dict` requires exactly two arguments, got 1"
 DictTooFewArgs = Dict[str]
 
-# error: [invalid-type-form] "`typing.typing.Dict` requires exactly two arguments, got 3"
+# error: [invalid-type-form] "`typing.Dict` requires exactly two arguments, got 3"
 DictTooManyArgs = Dict[str, int, float]
 
 def _(

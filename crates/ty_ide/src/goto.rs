@@ -15,7 +15,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
-    call_signature_details, definitions_for_keyword_argument,
+    call_signature_details, call_type_simplified_by_overloads, definitions_for_keyword_argument,
 };
 use ty_python_semantic::{
     HasDefinition, HasType, ImportAliasResolution, SemanticModel, definitions_for_imported_symbol,
@@ -213,6 +213,7 @@ impl<'db> DefinitionsOrTargets<'db> {
             | ty_python_semantic::types::TypeDefinition::Function(definition)
             | ty_python_semantic::types::TypeDefinition::TypeVar(definition)
             | ty_python_semantic::types::TypeDefinition::TypeAlias(definition)
+            | ty_python_semantic::types::TypeDefinition::SpecialForm(definition)
             | ty_python_semantic::types::TypeDefinition::NewType(definition) => {
                 ResolvedDefinition::Definition(definition)
             }
@@ -324,6 +325,18 @@ impl GotoTarget<'_> {
         };
 
         Some(ty)
+    }
+
+    /// Try to get a simplified display of this callable type by resolving overloads
+    pub(crate) fn call_type_simplified_by_overloads(
+        &self,
+        model: &SemanticModel,
+    ) -> Option<String> {
+        if let GotoTarget::Call { call, .. } = self {
+            call_type_simplified_by_overloads(model.db(), model, call)
+        } else {
+            None
+        }
     }
 
     /// Gets the definitions for this goto target.

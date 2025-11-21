@@ -64,9 +64,7 @@ impl<'db> ClassBase<'db> {
             ClassBase::Class(class) => class.name(db),
             ClassBase::Dynamic(DynamicType::Any) => "Any",
             ClassBase::Dynamic(DynamicType::Unknown) => "Unknown",
-            ClassBase::Dynamic(
-                DynamicType::Todo(_) | DynamicType::TodoTypeAlias | DynamicType::TodoUnpack,
-            ) => "@Todo",
+            ClassBase::Dynamic(DynamicType::Todo(_) | DynamicType::TodoUnpack) => "@Todo",
             ClassBase::Dynamic(DynamicType::Divergent(_)) => "Divergent",
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",
@@ -195,6 +193,7 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Specialization(_)
                 | KnownInstanceType::UnionType(_)
                 | KnownInstanceType::Literal(_)
+                | KnownInstanceType::LiteralStringAlias(_)
                 // A class inheriting from a newtype would make intuitive sense, but newtype
                 // wrappers are just identity callables at runtime, so this sort of inheritance
                 // doesn't work and isn't allowed.
