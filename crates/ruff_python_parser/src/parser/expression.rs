@@ -2791,6 +2791,9 @@ impl<'src> Parser<'src> {
             value,
         };
 
+        // test_err ipython_help_escape_command_as_expression
+        // # parse_options: {"mode": "ipython"}
+        // with a,?b: pass
         if !matches!(kind, IpyEscapeKind::Magic | IpyEscapeKind::Shell) {
             // IPython escape commands like `?` (Help) are not allowed in expression contexts.
             // Only `%` (Magic) and `!` (Shell) escape commands can be used as expressions.
