@@ -9,9 +9,10 @@ use ruff_python_ast::name::Name;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{Token, TokenAt, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use ty_python_semantic::types::UnionType;
 use ty_python_semantic::{
-    Completion as SemanticCompletion, ModuleName, NameKind, SemanticModel,
-    types::{CycleDetector, Type},
+    Completion as SemanticCompletion, KnownModule, ModuleName, NameKind, SemanticModel,
+    types::{CycleDetector, KnownClass, Type},
 };
 
 use crate::docstring::Docstring;
@@ -81,6 +82,31 @@ impl<'db> Completions<'db> {
     /// Always adds the given completion to this collection.
     fn force_add(&mut self, completion: Completion<'db>) {
         self.items.push(completion);
+    }
+
+    /// Tags completions with whether they are known to be usable in
+    /// a `raise` context.
+    ///
+    /// It's possible that some completions are usable in a `raise`
+    /// but aren't marked by this method. That is, false negatives are
+    /// possible but false positives are not.
+    fn tag_raisable(&mut self) {
+        let raisable_type = UnionType::from_elements(
+            self.db,
+            [
+                KnownClass::BaseException.to_subclass_of(self.db),
+                KnownClass::BaseException.to_instance(self.db),
+            ],
+        );
+        for item in &mut self.items {
+            let Some(ty) = item.ty else { continue };
+            item.is_definitively_raisable = ty.is_assignable_to(self.db, raisable_type);
+        }
+    }
+
+    /// Removes any completion that doesn't satisfy the given predicate.
+    fn retain(&mut self, predicate: impl FnMut(&Completion<'_>) -> bool) {
+        self.items.retain(predicate);
     }
 }
 
@@ -153,6 +179,13 @@ pub struct Completion<'db> {
     /// Whether this item only exists for type checking purposes and
     /// will be missing at runtime
     pub is_type_check_only: bool,
+    /// Whether this item can definitively be used in a `raise` context.
+    ///
+    /// Note that this may not always be computed. (i.e., Only computed
+    /// when we are in a `raise` context.) And also note that if this
+    /// is `true`, then it's definitively usable in `raise`, but if
+    /// it's `false`, it _may_ still be usable in `raise`.
+    pub is_definitively_raisable: bool,
     /// The documentation associated with this item, if
     /// available.
     pub documentation: Option<Docstring>,
@@ -177,6 +210,7 @@ impl<'db> Completion<'db> {
             import: None,
             builtin: semantic.builtin,
             is_type_check_only,
+            is_definitively_raisable: false,
             documentation,
         }
     }
@@ -257,6 +291,7 @@ impl<'db> Completion<'db> {
             import: None,
             builtin: false,
             is_type_check_only: false,
+            is_definitively_raisable: false,
             documentation: None,
         }
     }
@@ -271,6 +306,7 @@ impl<'db> Completion<'db> {
             import: None,
             builtin: true,
             is_type_check_only: false,
+            is_definitively_raisable: false,
             documentation: None,
         }
     }
@@ -364,6 +400,20 @@ pub fn completion<'db>(
         }
     }
 
+    if is_raising_exception(tokens) {
+        completions.tag_raisable();
+
+        // As a special case, and because it's a common footgun, we
+        // specifically disallow `NotImplemented` in this context.
+        // `NotImplementedError` should be used instead. So if we can
+        // definitively detect `NotImplemented`, then we can safely
+        // omit it from suggestions.
+        completions.retain(|item| {
+            let Some(ty) = item.ty else { return true };
+            !ty.is_notimplemented(db)
+        });
+    }
+
     completions.into_completions()
 }
 
@@ -427,7 +477,8 @@ fn add_unimported_completions<'db>(
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
 
     for symbol in all_symbols(db, &completions.query) {
-        if symbol.module.file(db) == Some(file) {
+        if symbol.module.file(db) == Some(file) || symbol.module.is_known(db, KnownModule::Builtins)
+        {
             continue;
         }
 
@@ -450,6 +501,7 @@ fn add_unimported_completions<'db>(
             builtin: false,
             // TODO: `is_type_check_only` requires inferring the type of the symbol
             is_type_check_only: false,
+            is_definitively_raisable: false,
             documentation: None,
         });
     }
@@ -1358,6 +1410,30 @@ fn is_in_variable_binding(parsed: &ParsedModuleRef, offset: TextSize, typed: Opt
     })
 }
 
+/// Returns true when the cursor is after a `raise` keyword.
+fn is_raising_exception(tokens: &[Token]) -> bool {
+    /// The maximum number of tokens we're willing to
+    /// look-behind to find a `raise` keyword.
+    const LIMIT: usize = 10;
+
+    // This only looks for things like `raise foo.bar.baz.qu<CURSOR>`.
+    // Technically, any kind of expression is allowed after `raise`.
+    // But we may not always want to treat it specially. So we're
+    // rather conservative about what we consider "raising an
+    // exception" to be for the purposes of completions. The failure
+    // mode here is that we may wind up suggesting things that
+    // shouldn't be raised. The benefit is that when this heuristic
+    // does work, we won't suggest things that shouldn't be raised.
+    for token in tokens.iter().rev().take(LIMIT) {
+        match token.kind() {
+            TokenKind::Name | TokenKind::Dot => continue,
+            TokenKind::Raise => return true,
+            _ => return false,
+        }
+    }
+    false
+}
+
 /// Order completions according to the following rules:
 ///
 /// 1) Names with no underscore prefix
@@ -1370,8 +1446,16 @@ fn is_in_variable_binding(parsed: &ParsedModuleRef, offset: TextSize, typed: Opt
 /// This has the effect of putting all dunder attributes after "normal"
 /// attributes, and all single-underscore attributes after dunder attributes.
 fn compare_suggestions(c1: &Completion, c2: &Completion) -> Ordering {
-    fn key<'a>(completion: &'a Completion) -> (bool, bool, bool, NameKind, bool, &'a Name) {
+    fn key<'a>(completion: &'a Completion) -> (bool, bool, bool, bool, NameKind, bool, &'a Name) {
         (
+            // This is only true when we are both in a `raise` context
+            // *and* we know this suggestion is definitively usable
+            // in a `raise` context. So we should sort these before
+            // anything else.
+            !completion.is_definitively_raisable,
+            // When `None`, a completion is for something in the
+            // current module, which we should generally prefer over
+            // something from outside the module.
             completion.module_name.is_some(),
             // At time of writing (2025-11-11), keyword completions
             // are classified as builtins, which makes them sort after
