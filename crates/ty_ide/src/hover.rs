@@ -20,7 +20,6 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     }
 
     let model = SemanticModel::new(db, file);
-    let ty = goto_target.inferred_type(&model);
     let docs = goto_target
         .get_definition_targets(
             file,
@@ -30,9 +29,10 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         .and_then(|definitions| definitions.docstring(db))
         .map(HoverContent::Docstring);
 
-    // TODO: Render the symbol's signature instead of just its type.
     let mut contents = Vec::new();
-    if let Some(ty) = ty {
+    if let Some(signature) = goto_target.call_type_simplified_by_overloads(&model) {
+        contents.push(HoverContent::Signature(signature));
+    } else if let Some(ty) = goto_target.inferred_type(&model) {
         tracing::debug!("Inferred type of covering node is {}", ty.display(db));
         contents.push(match ty {
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => typevar
@@ -62,7 +62,7 @@ pub struct Hover<'db> {
 
 impl<'db> Hover<'db> {
     /// Renders the hover to a string using the specified markup kind.
-    pub const fn display<'a>(&'a self, db: &'a dyn Db, kind: MarkupKind) -> DisplayHover<'a> {
+    pub const fn display<'a>(&'a self, db: &'db dyn Db, kind: MarkupKind) -> DisplayHover<'db, 'a> {
         DisplayHover {
             db,
             hover: self,
@@ -93,13 +93,13 @@ impl<'a, 'db> IntoIterator for &'a Hover<'db> {
     }
 }
 
-pub struct DisplayHover<'a> {
-    db: &'a dyn Db,
-    hover: &'a Hover<'a>,
+pub struct DisplayHover<'db, 'a> {
+    db: &'db dyn Db,
+    hover: &'a Hover<'db>,
     kind: MarkupKind,
 }
 
-impl fmt::Display for DisplayHover<'_> {
+impl fmt::Display for DisplayHover<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut first = true;
         for content in &self.hover.contents {
@@ -115,8 +115,9 @@ impl fmt::Display for DisplayHover<'_> {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum HoverContent<'db> {
+    Signature(String),
     Type(Type<'db>, Option<TypeVarVariance>),
     Docstring(Docstring),
 }
@@ -140,6 +141,9 @@ pub(crate) struct DisplayHoverContent<'a, 'db> {
 impl fmt::Display for DisplayHoverContent<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.content {
+            HoverContent::Signature(signature) => {
+                self.kind.fenced_code_block(&signature, "python").fmt(f)
+            }
             HoverContent::Type(ty, variance) => {
                 let variance = match variance {
                     Some(TypeVarVariance::Covariant) => " (covariant)",
@@ -241,14 +245,11 @@ mod tests {
         ) -> Unknown
         ```
         ---
-        ```text
-        This is such a great func!!
-
-        Args:
-            a: first for a reason
-            b: coming for `a`'s title
-
-        ```
+        This is such a great func!!  
+          
+        Args:  
+        &nbsp;&nbsp;&nbsp;&nbsp;a: first for a reason  
+        &nbsp;&nbsp;&nbsp;&nbsp;b: coming for `a`'s title
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:11:1
@@ -299,14 +300,11 @@ mod tests {
         ) -> Unknown
         ```
         ---
-        ```text
-        This is such a great func!!
-
-        Args:
-            a: first for a reason
-            b: coming for `a`'s title
-
-        ```
+        This is such a great func!!  
+          
+        Args:  
+        &nbsp;&nbsp;&nbsp;&nbsp;a: first for a reason  
+        &nbsp;&nbsp;&nbsp;&nbsp;b: coming for `a`'s title
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:2:5
@@ -365,14 +363,11 @@ mod tests {
         <class 'MyClass'>
         ```
         ---
-        ```text
-        This is such a great class!!
-
-            Don't you know?
-
+        This is such a great class!!  
+          
+        &nbsp;&nbsp;&nbsp;&nbsp;Don't you know?  
+          
         Everyone loves my class!!
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:24:1
@@ -430,14 +425,11 @@ mod tests {
         <class 'MyClass'>
         ```
         ---
-        ```text
-        This is such a great class!!
-
-            Don't you know?
-
+        This is such a great class!!  
+          
+        &nbsp;&nbsp;&nbsp;&nbsp;Don't you know?  
+          
         Everyone loves my class!!
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:2:7
@@ -493,10 +485,7 @@ mod tests {
         <class 'MyClass'>
         ```
         ---
-        ```text
         initializes MyClass (perfectly)
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:24:5
@@ -552,10 +541,7 @@ mod tests {
         <class 'MyClass'>
         ```
         ---
-        ```text
         initializes MyClass (perfectly)
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:11
@@ -614,14 +600,11 @@ mod tests {
         <class 'MyClass'>
         ```
         ---
-        ```text
-        This is such a great class!!
-
-            Don't you know?
-
+        This is such a great class!!  
+          
+        &nbsp;&nbsp;&nbsp;&nbsp;Don't you know?  
+          
         Everyone loves my class!!
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:23:5
@@ -688,14 +671,11 @@ mod tests {
         ) -> Unknown
         ```
         ---
-        ```text
-        This is such a great func!!
-
-        Args:
-            a: first for a reason
-            b: coming for `a`'s title
-
-        ```
+        This is such a great func!!  
+          
+        Args:  
+        &nbsp;&nbsp;&nbsp;&nbsp;a: first for a reason  
+        &nbsp;&nbsp;&nbsp;&nbsp;b: coming for `a`'s title
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:25:3
@@ -961,20 +941,15 @@ def ab(a: str): ...
 
         assert_snapshot!(test.hover(), @r"
         (a: int) -> Unknown
-        (a: str) -> Unknown
         ---------------------------------------------
         the int overload
 
         ---------------------------------------------
         ```python
         (a: int) -> Unknown
-        (a: str) -> Unknown
         ```
         ---
-        ```text
         the int overload
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -1025,21 +1000,16 @@ def ab(a: str):
             .build();
 
         assert_snapshot!(test.hover(), @r#"
-        (a: int) -> Unknown
         (a: str) -> Unknown
         ---------------------------------------------
         the int overload
 
         ---------------------------------------------
         ```python
-        (a: int) -> Unknown
         (a: str) -> Unknown
         ```
         ---
-        ```text
         the int overload
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -1094,7 +1064,6 @@ def ab(a: int):
             a: int,
             b: int
         ) -> Unknown
-        (a: int) -> Unknown
         ---------------------------------------------
         the two arg overload
 
@@ -1104,13 +1073,9 @@ def ab(a: int):
             a: int,
             b: int
         ) -> Unknown
-        (a: int) -> Unknown
         ```
         ---
-        ```text
         the two arg overload
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -1161,27 +1126,16 @@ def ab(a: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (
-            a: int,
-            b: int
-        ) -> Unknown
         (a: int) -> Unknown
         ---------------------------------------------
         the two arg overload
 
         ---------------------------------------------
         ```python
-        (
-            a: int,
-            b: int
-        ) -> Unknown
         (a: int) -> Unknown
         ```
         ---
-        ```text
         the two arg overload
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -1236,39 +1190,24 @@ def ab(a: int, *, c: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (a: int) -> Unknown
         (
             a: int,
             *,
             b: int
-        ) -> Unknown
-        (
-            a: int,
-            *,
-            c: int
         ) -> Unknown
         ---------------------------------------------
         keywordless overload
 
         ---------------------------------------------
         ```python
-        (a: int) -> Unknown
         (
             a: int,
             *,
             b: int
         ) -> Unknown
-        (
-            a: int,
-            *,
-            c: int
-        ) -> Unknown
         ```
         ---
-        ```text
         keywordless overload
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -1323,12 +1262,6 @@ def ab(a: int, *, c: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (a: int) -> Unknown
-        (
-            a: int,
-            *,
-            b: int
-        ) -> Unknown
         (
             a: int,
             *,
@@ -1339,12 +1272,6 @@ def ab(a: int, *, c: int):
 
         ---------------------------------------------
         ```python
-        (a: int) -> Unknown
-        (
-            a: int,
-            *,
-            b: int
-        ) -> Unknown
         (
             a: int,
             *,
@@ -1352,10 +1279,7 @@ def ab(a: int, *, c: int):
         ) -> Unknown
         ```
         ---
-        ```text
         keywordless overload
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -1420,10 +1344,7 @@ def ab(a: int, *, c: int):
         ) -> Unknown
         ```
         ---
-        ```text
         The first overload
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:19:1
@@ -1475,10 +1396,7 @@ def ab(a: int, *, c: int):
         (a: str) -> Unknown
         ```
         ---
-        ```text
         The first overload
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:19:1
@@ -1528,12 +1446,9 @@ def ab(a: int, *, c: int):
         <module 'lib'>
         ```
         ---
-        ```text
-        The cool lib_py module!
-
+        The cool lib/_py module!  
+          
         Wow this module rocks.
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:1
@@ -1578,12 +1493,9 @@ def ab(a: int, *, c: int):
         Wow this module rocks.
 
         ---------------------------------------------
-        ```text
-        The cool lib_py module!
-
+        The cool lib/_py module!  
+          
         Wow this module rocks.
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:2:8
@@ -2533,10 +2445,7 @@ def ab(a: int, *, c: int):
         bound method int.__add__(value: int, /) -> int
         ```
         ---
-        ```text
         Return self+value.
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:2:12
@@ -2652,10 +2561,7 @@ def ab(a: int, *, c: int):
         int | float
         ```
         ---
-        ```text
         Convert a string or number to a floating-point number, if possible.
-
-        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:2:4
