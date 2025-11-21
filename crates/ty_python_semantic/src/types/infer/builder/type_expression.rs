@@ -725,7 +725,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 }
                                 None => {
                                     // TODO: emit a diagnostic if you try to specialize a non-generic class.
-                                    self.infer_type_expression(slice);
+                                    self.infer_type_expression(parameters);
                                     todo_type!("specialized non-generic class")
                                 }
                             }
