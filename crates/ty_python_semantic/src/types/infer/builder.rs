@@ -2287,8 +2287,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     let is_input_function_like = inferred_ty
                         .try_upcast_to_callable(self.db())
-                        .into_type(self.db())
-                        .and_then(Type::as_callable)
+                        .exactly_one()
                         .is_some_and(|callable| callable.is_function_like(self.db()));
 
                     if is_input_function_like

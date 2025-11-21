@@ -1227,7 +1227,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let argument_type = self.infer_expression(&arguments[0], TypeContext::default());
 
-                let Some(callable) = argument_type.try_upcast_to_callable(db).exactly_one() else {
+                let Some(callable_type) = argument_type
+                    .try_upcast_to_callable(db)
+                    .into_type(self.db())
+                else {
                     if let Some(builder) = self
                         .context
                         .report_lint(&INVALID_TYPE_FORM, arguments_slice)
@@ -1245,7 +1248,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return Type::unknown();
                 };
 
-                let callable_type = Type::Callable(callable);
                 if arguments_slice.is_tuple_expr() {
                     self.store_expression_type(arguments_slice, callable_type);
                 }
