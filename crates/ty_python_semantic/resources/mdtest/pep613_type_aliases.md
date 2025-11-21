@@ -46,6 +46,30 @@ except MyExc as e:
     reveal_type(e)  # revealed: Exception
 ```
 
+## Can inherit from an alias
+
+```py
+from typing import TypeAlias
+from ty_extensions import is_subtype_of, static_assert
+
+MyList: TypeAlias = list["int"]
+
+class Foo(MyList): ...
+
+static_assert(is_subtype_of(Foo, list[int]))
+```
+
+## Cannot inherit from a stringified alias
+
+```py
+from typing import TypeAlias
+
+MyList: TypeAlias = "list[int]"
+
+# error: [invalid-base] "Invalid class base with type `str`"
+class Foo(MyList): ...
+```
+
 ## Unknown type in PEP 604 union
 
 If we run into an unknown type in a PEP 604 union in the right-hand side of a PEP 613 type alias, we
