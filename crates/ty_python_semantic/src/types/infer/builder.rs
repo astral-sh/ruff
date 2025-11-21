@@ -6026,7 +6026,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             Err(ModuleNameResolutionError::TooManyDots) => {
                 tracing::debug!(
-                    "Relative module resolution `{}` failed: too many leading dots",
+                    "Relative module resolution `{}` failed: too many leading dots \
+                    (try adjusting configured search paths?)",
                     format_import_from_module(*level, module),
                 );
                 self.report_unresolved_import(
@@ -6039,7 +6040,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             Err(ModuleNameResolutionError::UnknownCurrentModule) => {
                 tracing::debug!(
-                    "Relative module resolution `{}` failed; could not resolve file `{}` to a module",
+                    "Relative module resolution `{}` failed: could not resolve file `{}` to a module \
+                    (try adjusting configured search paths?)",
                     format_import_from_module(*level, module),
                     self.file().path(self.db())
                 );
