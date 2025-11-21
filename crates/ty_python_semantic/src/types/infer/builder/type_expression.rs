@@ -755,6 +755,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             value_ty,
             generic_context,
             specialize,
+            true,
         )
     }
 

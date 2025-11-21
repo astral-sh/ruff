@@ -392,8 +392,8 @@ TransparentAlias = T
 MyOptional = T | None
 
 # TODO: Consider displaying this as `<class 'list[T]'>`, … instead? (and similar for some others below)
-reveal_type(MyList)  # revealed: <class 'list[typing.TypeVar]'>
-reveal_type(MyDict)  # revealed: <class 'dict[typing.TypeVar, typing.TypeVar]'>
+reveal_type(MyList)  # revealed: <class 'list[T]'>
+reveal_type(MyDict)  # revealed: <class 'dict[T, U]'>
 reveal_type(MyType)  # revealed: GenericAlias
 reveal_type(IntAndType)  # revealed: <class 'tuple[int, typing.TypeVar]'>
 reveal_type(Pair)  # revealed: <class 'tuple[typing.TypeVar, typing.TypeVar]'>
@@ -445,7 +445,7 @@ U = TypeVar("U")
 
 DictStrTo = MyDict[str, U]
 
-reveal_type(DictStrTo)  # revealed: <class 'dict[str, typing.TypeVar]'>
+reveal_type(DictStrTo)  # revealed: <class 'dict[str, U]'>
 
 def _(
     dict_str_to_int: DictStrTo[int],
@@ -480,7 +480,7 @@ A generic implicit type alias can also be used in another generic implicit type 
 ```py
 MyOtherList = MyList[T]
 
-reveal_type(MyOtherList)  # revealed: <class 'list[typing.TypeVar]'>
+reveal_type(MyOtherList)  # revealed: <class 'list[T]'>
 
 def _(
     list_of_ints: MyOtherList[int],
@@ -498,9 +498,9 @@ def _(
     my_callable: MyCallable,
 ):
     # TODO: Should be `list[Unknown]`
-    reveal_type(my_list)  # revealed: list[typing.TypeVar]
+    reveal_type(my_list)  # revealed: list[T]
     # TODO: Should be `dict[Unknown, Unknown]`
-    reveal_type(my_dict)  # revealed: dict[typing.TypeVar, typing.TypeVar]
+    reveal_type(my_dict)  # revealed: dict[T, U]
     # TODO: Should be `(...) -> Unknown`
     reveal_type(my_callable)  # revealed: (...) -> typing.TypeVar
 ```
