@@ -190,7 +190,7 @@ impl<'a, 'b, 'db> TypeWriter<'a, 'b, 'db> {
         }
     }
 
-    /// Convenience for `with_type(ty))`
+    /// Convenience for `with_detail(TypeDetail::Type(ty))`
     fn with_type<'c>(&'c mut self, ty: Type<'db>) -> TypeDetailGuard<'a, 'b, 'c, 'db> {
         self.with_detail(TypeDetail::Type(ty))
     }
