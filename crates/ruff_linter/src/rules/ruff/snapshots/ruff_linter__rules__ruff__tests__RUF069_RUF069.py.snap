@@ -1,8 +1,8 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF066 name is an unnecessary property
-  --> RUF066.py:11:5
+RUF069 name is an unnecessary property
+  --> RUF069.py:11:5
    |
 10 |   class User:
 11 | /     @property
@@ -13,8 +13,8 @@ RUF066 name is an unnecessary property
 15 |       @property
    |
 
-RUF066 nested is an unnecessary property
-  --> RUF066.py:22:5
+RUF069 nested is an unnecessary property
+  --> RUF069.py:22:5
    |
 20 |           x = 1
 21 |
@@ -27,8 +27,8 @@ RUF066 nested is an unnecessary property
 27 |       @property
    |
 
-RUF066 prop2 is an unnecessary property
-  --> RUF066.py:47:5
+RUF069 prop2 is an unnecessary property
+  --> RUF069.py:47:5
    |
 45 |           return 1
 46 |

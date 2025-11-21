@@ -49,7 +49,7 @@ impl Violation for UnnecessaryProperty {
     }
 }
 
-/// RUF066
+/// RUF069
 pub(crate) fn unnecessary_property(checker: &Checker, function_def: &StmtFunctionDef) {
     let semantic = checker.semantic();
 
