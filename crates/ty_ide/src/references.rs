@@ -20,7 +20,7 @@ use ruff_python_ast::{
 };
 use ruff_python_parser::Tokens;
 use ruff_text_size::{Ranged, TextRange};
-use ty_python_semantic::ImportAliasResolution;
+use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 
 /// Mode for references search behavior
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,8 +48,9 @@ pub(crate) fn references(
     // Get the definitions for the symbol at the cursor position
 
     // When finding references, do not resolve any local aliases.
+    let model = SemanticModel::new(db, file);
     let target_definitions_nav = goto_target
-        .get_definition_targets(file, db, ImportAliasResolution::PreserveAliases)?
+        .get_definition_targets(&model, ImportAliasResolution::PreserveAliases)?
         .definition_targets(db)?;
     let target_definitions: Vec<NavigationTarget> = target_definitions_nav.into_iter().collect();
 
@@ -289,8 +290,9 @@ impl LocalReferencesFinder<'_> {
             GotoTarget::from_covering_node(covering_node, offset, self.tokens)
         {
             // Get the definitions for this goto target
+            let model = SemanticModel::new(self.db, self.file);
             if let Some(current_definitions_nav) = goto_target
-                .get_definition_targets(self.file, self.db, ImportAliasResolution::PreserveAliases)
+                .get_definition_targets(&model, ImportAliasResolution::PreserveAliases)
                 .and_then(|definitions| definitions.declaration_targets(self.db))
             {
                 let current_definitions: Vec<NavigationTarget> =
