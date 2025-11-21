@@ -38,10 +38,9 @@ use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, ClassLiteral, DATACLASS_FLAGS, DataclassFlags,
     DataclassParams, FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    MemberLookupPolicy, NominalInstanceType, ParamSpecAttrKind, PropertyInstanceType,
-    SpecialFormType, TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance,
-    UnionBuilder, UnionType, WrapperDescriptorKind, enums, ide_support, infer_isolated_expression,
-    todo_type,
+    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType,
+    TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, ide_support, infer_isolated_expression, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
@@ -2561,18 +2560,14 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument_type: Option<Type<'db>>,
     ) -> Result<(), ()> {
         enum VariadicArgumentType<'db> {
-            ParamSpecArgs(Type<'db>),
+            ParamSpec(Type<'db>),
             Other(Cow<'db, TupleSpec<'db>>),
             None,
         }
 
         let variadic_type = match argument_type {
             Some(paramspec @ Type::TypeVar(typevar)) if typevar.is_paramspec(db) => {
-                if matches!(typevar.paramspec_attr(db), Some(ParamSpecAttrKind::Args)) {
-                    VariadicArgumentType::ParamSpecArgs(paramspec)
-                } else {
-                    VariadicArgumentType::None
-                }
+                VariadicArgumentType::ParamSpec(paramspec)
             }
             Some(ty) => {
                 // TODO: `Type::iterate` internally handles unions, but in a lossy way.
@@ -2587,10 +2582,10 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         };
 
         let (mut argument_types, length, variable_element) = match &variadic_type {
-            VariadicArgumentType::ParamSpecArgs(paramspec_args) => (
+            VariadicArgumentType::ParamSpec(paramspec) => (
                 Either::Right(std::iter::empty()),
                 TupleLength::unknown(),
-                Some(*paramspec_args),
+                Some(*paramspec),
             ),
             VariadicArgumentType::Other(tuple) => (
                 Either::Left(tuple.all_elements().copied()),
@@ -2673,14 +2668,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             }
         } else {
             let value_type = match argument_type {
-                // TODO: Is this correct?
-                Some(paramspec @ Type::TypeVar(typevar)) if typevar.is_paramspec(db) => {
-                    if matches!(typevar.paramspec_attr(db), Some(ParamSpecAttrKind::Kwargs)) {
-                        paramspec
-                    } else {
-                        Type::unknown()
-                    }
-                }
+                Some(paramspec @ Type::TypeVar(typevar)) if typevar.is_paramspec(db) => paramspec,
                 Some(ty) => {
                     match ty
                         .member_lookup_with_policy(
@@ -3118,14 +3106,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             let value_type = if let Type::TypeVar(typevar) = argument_type
                 && typevar.is_paramspec(self.db)
             {
-                if matches!(
-                    typevar.paramspec_attr(self.db),
-                    Some(ParamSpecAttrKind::Kwargs)
-                ) {
-                    argument_type
-                } else {
-                    Type::unknown()
-                }
+                argument_type
             } else {
                 // TODO: Instead of calling the `keys` and `__getitem__` methods, we should
                 // instead get the constraints which satisfies the `SupportsKeysAndGetItem`

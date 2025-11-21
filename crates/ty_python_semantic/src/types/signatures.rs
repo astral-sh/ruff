@@ -1294,10 +1294,11 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
     }
 }
 
+// TODO: the spec also allows signatures like `Concatenate[int, ...]` or `Concatenate[int, P]`,
+// which have some number of required positional-only parameters followed by a gradual form or a
+// `ParamSpec`. Our representation will need some adjustments to represent that.
+
 /// The kind of parameter list represented.
-// TODO: the spec also allows signatures like `Concatenate[int, ...]`, which have some number
-// of required positional parameters followed by a gradual form. Our representation will need
-// some adjustments to represent that.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum ParametersKind<'db> {
     /// A standard parameter list.

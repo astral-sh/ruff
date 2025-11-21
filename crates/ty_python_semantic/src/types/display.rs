@@ -969,7 +969,12 @@ impl DisplayGenericContext<'_> {
             if idx > 0 {
                 f.write_str(", ")?;
             }
-            f.write_str(bound_typevar.typevar(self.db).name(self.db))?;
+            let typevar = bound_typevar.typevar(self.db);
+            if typevar.is_paramspec(self.db) {
+                write!(f, "**{}", typevar.name(self.db))?;
+            } else {
+                f.write_str(typevar.name(self.db))?;
+            }
         }
         f.write_char(']')
     }
@@ -1937,7 +1942,7 @@ mod tests {
     }
 
     fn display_signature<'db>(
-        db: &dyn Db,
+        db: &'db dyn Db,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
         return_ty: Option<Type<'db>>,
     ) -> String {
@@ -1947,7 +1952,7 @@ mod tests {
     }
 
     fn display_signature_multiline<'db>(
-        db: &dyn Db,
+        db: &'db dyn Db,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
         return_ty: Option<Type<'db>>,
     ) -> String {
