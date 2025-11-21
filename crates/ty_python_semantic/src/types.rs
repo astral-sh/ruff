@@ -7197,6 +7197,8 @@ impl<'db> Type<'db> {
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             },
 
+            Type::NewTypeInstance(_) if matches!(type_mapping, TypeMapping::BindLegacyTypevars(_)) => self,
+
             Type::NewTypeInstance(newtype) => visitor.visit(self, || {
                 Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
                     class_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
@@ -7274,6 +7276,8 @@ impl<'db> Type<'db> {
 
             // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
             Type::TypeIs(type_is) => type_is.with_type(db, type_is.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
+
+            Type::TypeAlias(_) if matches!(type_mapping, TypeMapping::BindLegacyTypevars(_)) => self,
 
             Type::TypeAlias(alias) => {
                 // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is performed without `visitor` inheritance.

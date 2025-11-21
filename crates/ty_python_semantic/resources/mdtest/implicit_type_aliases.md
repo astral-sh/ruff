@@ -389,9 +389,8 @@ ListOrTupleLegacy = Union[list[T], tuple[T, ...]]
 MyCallable = Callable[P, T]
 AnnotatedType = Annotated[T, "tag"]
 
-# TODO: Consider displaying this as `<class 'list[T]'>`, … instead? (and similar for some others below)
-reveal_type(MyList)  # revealed: <class 'list[typing.TypeVar]'>
-reveal_type(MyDict)  # revealed: <class 'dict[typing.TypeVar, typing.TypeVar]'>
+reveal_type(MyList)  # revealed: <class 'list[T]'>
+reveal_type(MyDict)  # revealed: <class 'dict[T, U]'>
 reveal_type(MyType)  # revealed: GenericAlias
 reveal_type(IntAndType)  # revealed: <class 'tuple[int, typing.TypeVar]'>
 reveal_type(Pair)  # revealed: <class 'tuple[typing.TypeVar, typing.TypeVar]'>
@@ -496,9 +495,9 @@ def _(
     my_callable: MyCallable,
 ):
     # TODO: Should be `list[Unknown]`
-    reveal_type(my_list)  # revealed: list[typing.TypeVar]
+    reveal_type(my_list)  # revealed: list[T]
     # TODO: Should be `dict[Unknown, Unknown]`
-    reveal_type(my_dict)  # revealed: dict[typing.TypeVar, typing.TypeVar]
+    reveal_type(my_dict)  # revealed: dict[T, U]
     # TODO: Should be `(...) -> Unknown`
     reveal_type(my_callable)  # revealed: (...) -> typing.TypeVar
 ```
@@ -523,7 +522,7 @@ reveal_mro(Derived1)
 GenericBaseAlias = GenericBase[T]
 
 # TODO: No error here
-# error: [non-subscriptable] "Cannot subscript object of type `<class 'GenericBase[typing.TypeVar]'>` with no `__class_getitem__` method"
+# error: [non-subscriptable] "Cannot subscript object of type `<class 'GenericBase[T]'>` with no `__class_getitem__` method"
 class Derived2(GenericBaseAlias[int]):
     pass
 ```

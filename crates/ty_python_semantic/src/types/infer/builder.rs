@@ -101,14 +101,14 @@ use crate::types::typed_dict::{
 };
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    CallDunderError, CallableBinding, CallableType, ClassLiteral, ClassType, DataclassParams,
-    DynamicType, InternedType, IntersectionBuilder, IntersectionType, KnownClass,
+    BindingContext, CallDunderError, CallableBinding, CallableType, ClassLiteral, ClassType,
+    DataclassParams, DynamicType, InternedType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
     PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType, SubclassOfType,
     TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
-    UnionTypeInstance, binding_type, todo_type,
+    TypeMapping, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
+    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
+    UnionType, UnionTypeInstance, binding_type, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -11046,6 +11046,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value_ty,
             generic_context,
             specialize,
+            true,
         )
     }
 
@@ -11070,6 +11071,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value_ty,
             generic_context,
             specialize,
+            false,
         )
     }
 
@@ -11079,12 +11081,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         value_ty: Type<'db>,
         generic_context: GenericContext<'db>,
         specialize: impl FnOnce(&[Option<Type<'db>>]) -> Type<'db>,
+        bind_legacy_typevars: bool,
     ) -> Type<'db> {
         let slice_node = subscript.slice.as_ref();
+
+        let db = self.db();
+        let do_bind_legacy_typevars = |ty: Type<'db>| {
+            if bind_legacy_typevars {
+                ty.apply_type_mapping(
+                    db,
+                    &TypeMapping::BindLegacyTypevars(BindingContext::Synthetic),
+                    TypeContext::default(),
+                )
+            } else {
+                ty
+            }
+        };
+
         let call_argument_types = match slice_node {
             ast::Expr::Tuple(tuple) => {
                 let arguments = CallArguments::positional(
-                    tuple.elts.iter().map(|elt| self.infer_type_expression(elt)),
+                    tuple
+                        .elts
+                        .iter()
+                        .map(|elt| do_bind_legacy_typevars(self.infer_type_expression(elt))),
                 );
                 self.store_expression_type(
                     slice_node,
@@ -11092,8 +11112,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
                 arguments
             }
-            _ => CallArguments::positional([self.infer_type_expression(slice_node)]),
+            _ => CallArguments::positional([do_bind_legacy_typevars(
+                self.infer_type_expression(slice_node),
+            )]),
         };
+
         let binding = Binding::single(value_ty, generic_context.signature(self.db()));
         let bindings = match Bindings::from(binding)
             .match_parameters(self.db(), &call_argument_types)
