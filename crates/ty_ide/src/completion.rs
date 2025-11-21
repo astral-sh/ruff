@@ -1341,7 +1341,7 @@ fn is_in_definition_place(
 /// E.g. naming a parameter, type parameter, or `for` <name>).
 fn is_in_variable_binding(parsed: &ParsedModuleRef, offset: TextSize, typed: Option<&str>) -> bool {
     let range = if let Some(typed) = typed {
-        let start = offset - typed.text_len();
+        let start = offset.saturating_sub(typed.text_len());
         TextRange::new(start, offset)
     } else {
         TextRange::empty(offset)
