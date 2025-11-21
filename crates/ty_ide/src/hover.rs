@@ -11,7 +11,8 @@ use ty_python_semantic::{DisplaySettings, SemanticModel};
 
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
     let parsed = parsed_module(db, file).load(db);
-    let goto_target = find_goto_target(&parsed, offset)?;
+    let model = SemanticModel::new(db, file);
+    let goto_target = find_goto_target(&model, &parsed, offset)?;
 
     if let GotoTarget::Expression(expr) = goto_target {
         if expr.is_literal_expr() {
@@ -19,7 +20,6 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         }
     }
 
-    let model = SemanticModel::new(db, file);
     let docs = goto_target
         .get_definition_targets(
             &model,

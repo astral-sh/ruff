@@ -16,9 +16,9 @@ pub fn goto_declaration(
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
     let module = parsed_module(db, file).load(db);
-    let goto_target = find_goto_target(&module, offset)?;
-
     let model = SemanticModel::new(db, file);
+    let goto_target = find_goto_target(&model, &module, offset)?;
+
     let declaration_targets = goto_target
         .get_definition_targets(&model, ImportAliasResolution::ResolveAliases)?
         .declaration_targets(db)?;
