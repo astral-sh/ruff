@@ -2136,10 +2136,10 @@ C.<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r"
+            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r###"
         meta_attr :: int
         mro :: bound method <class 'C'>.mro() -> list[type]
-        __annotate__ :: @Todo | None
+        __annotate__ :: (() -> dict[str, Any]) | None
         __annotations__ :: dict[str, Any]
         __base__ :: type | None
         __bases__ :: tuple[type, ...]
@@ -2182,7 +2182,7 @@ C.<CURSOR>
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
         __weakrefoffset__ :: int
-        ");
+        "###);
     }
 
     #[test]
@@ -2331,14 +2331,14 @@ Quux.<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r"
+            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r###"
         mro :: bound method <class 'Quux'>.mro() -> list[type]
         some_attribute :: int
         some_class_method :: bound method <class 'Quux'>.some_class_method() -> int
         some_method :: def some_method(self) -> int
         some_property :: property
         some_static_method :: def some_static_method(self) -> int
-        __annotate__ :: @Todo | None
+        __annotate__ :: (() -> dict[str, Any]) | None
         __annotations__ :: dict[str, Any]
         __base__ :: type | None
         __bases__ :: tuple[type, ...]
@@ -2381,7 +2381,7 @@ Quux.<CURSOR>
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
         __weakrefoffset__ :: int
-        ");
+        "###);
     }
 
     #[test]

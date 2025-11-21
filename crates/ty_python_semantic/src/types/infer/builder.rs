@@ -5407,7 +5407,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target = assignment.target(self.module());
         let value = assignment.value(self.module());
 
-        let mut declared = self.infer_annotation_expression(
+        let mut declared = self.infer_annotation_expression_allow_pep_613(
             annotation,
             DeferredExpressionState::from(self.defer_annotations()),
         );
@@ -5459,6 +5459,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             declared.inner = Type::BooleanLiteral(true);
         }
 
+        // Check if this is a PEP 613 `TypeAlias`. (This must come below the SpecialForm handling
+        // immediately below, since that can overwrite the type to be `TypeAlias`.)
+        let is_pep_613_type_alias = declared.inner_type().is_typealias_special_form();
+
         // Handle various singletons.
         if let Some(name_expr) = target.as_name_expr() {
             if let Some(special_form) =
@@ -5504,20 +5508,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // We defer the r.h.s. of PEP-613 `TypeAlias` assignments in stub files.
-            let declared_type = declared.inner_type();
             let previous_deferred_state = self.deferred_state;
 
-            if matches!(
-                declared_type,
-                Type::SpecialForm(SpecialFormType::TypeAlias)
-                    | Type::Dynamic(DynamicType::TodoTypeAlias)
-            ) && self.in_stub()
-            {
+            if is_pep_613_type_alias && self.in_stub() {
                 self.deferred_state = DeferredExpressionState::Deferred;
             }
 
-            let inferred_ty = self
-                .infer_maybe_standalone_expression(value, TypeContext::new(Some(declared_type)));
+            let inferred_ty = self.infer_maybe_standalone_expression(
+                value,
+                TypeContext::new(Some(declared.inner_type())),
+            );
 
             self.deferred_state = previous_deferred_state;
 
@@ -5534,17 +5534,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 inferred_ty
             };
 
-            self.add_declaration_with_binding(
-                target.into(),
-                definition,
-                &DeclaredAndInferredType::MightBeDifferent {
-                    declared_ty: declared,
-                    inferred_ty,
-                },
-            );
+            if is_pep_613_type_alias {
+                self.add_declaration_with_binding(
+                    target.into(),
+                    definition,
+                    &DeclaredAndInferredType::AreTheSame(TypeAndQualifiers::declared(inferred_ty)),
+                );
+            } else {
+                self.add_declaration_with_binding(
+                    target.into(),
+                    definition,
+                    &DeclaredAndInferredType::MightBeDifferent {
+                        declared_ty: declared,
+                        inferred_ty,
+                    },
+                );
+            }
 
             self.store_expression_type(target, inferred_ty);
         } else {
+            if is_pep_613_type_alias {
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, annotation) {
+                    builder.into_diagnostic(
+                        "`TypeAlias` must be assigned a value in annotated assignments",
+                    );
+                }
+                declared.inner = Type::unknown();
+            }
             if self.in_stub() {
                 self.add_declaration_with_binding(
                     target.into(),
@@ -6894,7 +6910,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }) => Type::none(self.db()),
             ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
             ast::Expr::BooleanLiteral(literal) => self.infer_boolean_literal_expression(literal),
-            ast::Expr::StringLiteral(literal) => self.infer_string_literal_expression(literal),
+            ast::Expr::StringLiteral(literal) => self.infer_string_literal_expression(literal, tcx),
             ast::Expr::BytesLiteral(bytes_literal) => {
                 self.infer_bytes_literal_expression(bytes_literal)
             }
@@ -6916,7 +6932,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::Name(name) => self.infer_name_expression(name),
             ast::Expr::Attribute(attribute) => self.infer_attribute_expression(attribute),
             ast::Expr::UnaryOp(unary_op) => self.infer_unary_expression(unary_op),
-            ast::Expr::BinOp(binary) => self.infer_binary_expression(binary),
+            ast::Expr::BinOp(binary) => self.infer_binary_expression(binary, tcx),
             ast::Expr::BoolOp(bool_op) => self.infer_boolean_expression(bool_op),
             ast::Expr::Compare(compare) => self.infer_compare_expression(compare),
             ast::Expr::Subscript(subscript) => self.infer_subscript_expression(subscript),
@@ -7011,7 +7027,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Type::BooleanLiteral(*value)
     }
 
-    fn infer_string_literal_expression(&mut self, literal: &ast::ExprStringLiteral) -> Type<'db> {
+    fn infer_string_literal_expression(
+        &mut self,
+        literal: &ast::ExprStringLiteral,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        if tcx.is_typealias() {
+            let aliased_type = self.infer_string_type_expression(literal);
+            return Type::KnownInstance(KnownInstanceType::LiteralStringAlias(InternedType::new(
+                self.db(),
+                aliased_type,
+            )));
+        }
         if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
             Type::string_literal(self.db(), literal.value.to_str())
         } else {
@@ -9212,7 +9239,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_binary_expression(&mut self, binary: &ast::ExprBinOp) -> Type<'db> {
+    fn infer_binary_expression(
+        &mut self,
+        binary: &ast::ExprBinOp,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        if tcx.is_typealias() {
+            return self.infer_pep_604_union_type_alias(binary, tcx);
+        }
+
         let ast::ExprBinOp {
             left,
             op,
@@ -9248,6 +9283,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 Type::unknown()
             })
+    }
+
+    fn infer_pep_604_union_type_alias(
+        &mut self,
+        node: &ast::ExprBinOp,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        let ast::ExprBinOp {
+            left,
+            op,
+            right,
+            range: _,
+            node_index: _,
+        } = node;
+
+        if *op != ast::Operator::BitOr {
+            // TODO diagnostic?
+            return Type::unknown();
+        }
+
+        let left_ty = self.infer_expression(left, tcx);
+        let right_ty = self.infer_expression(right, tcx);
+
+        // TODO this is overly aggressive; if the operands' `__or__` does not actually return a
+        // `UnionType` at runtime, we should ideally not infer one here. But this is unlikely to be
+        // a problem in practice: it would require someone having an explicitly annotated
+        // `TypeAlias`, which uses `X | Y` syntax, where the returned type is not actually a union.
+        // And attempting to enforce this more tightly showed a lot of potential false positives in
+        // the ecosystem.
+        if left_ty.is_equivalent_to(self.db(), right_ty) {
+            left_ty
+        } else {
+            UnionTypeInstance::from_value_expression_types(
+                self.db(),
+                [left_ty, right_ty],
+                self.scope(),
+                self.typevar_binding_context,
+            )
+        }
     }
 
     fn infer_binary_expression_type(
@@ -9325,20 +9399,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
 
-            (
-                todo @ Type::Dynamic(
-                    DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoTypeAlias,
-                ),
-                _,
-                _,
-            )
-            | (
-                _,
-                todo @ Type::Dynamic(
-                    DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoTypeAlias,
-                ),
-                _,
-            ) => Some(todo),
+            (todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::TodoUnpack), _, _)
+            | (_, todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::TodoUnpack), _) => {
+                Some(todo)
+            }
 
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 
