@@ -19,7 +19,7 @@ use crate::types::{
     TypeVarBoundOrConstraints, class::CodeGeneratorKind,
 };
 use crate::{Db, DisplaySettings, HasType, NameKind, SemanticModel};
-use ruff_db::files::{File, FileRange};
+use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
@@ -512,11 +512,10 @@ pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Member<'db>
 /// Returns the first definition kind that is reachable for this name in its scope.
 /// This is useful for IDE features like semantic tokens.
 pub fn definition_for_name<'db>(
-    db: &'db dyn Db,
-    file: File,
+    semantic_model: &SemanticModel<'db>,
     name: &ast::ExprName,
 ) -> Option<Definition<'db>> {
-    let definitions = definitions_for_name(db, file, name);
+    let definitions = definitions_for_name(semantic_model, name);
 
     // Find the first valid definition and return its kind
     for declaration in definitions {
@@ -531,15 +530,18 @@ pub fn definition_for_name<'db>(
 /// Returns all definitions for a name. If any definitions are imports, they
 /// are resolved (recursively) to the original definitions or module files.
 pub fn definitions_for_name<'db>(
-    db: &'db dyn Db,
-    file: File,
+    semantic_model: &SemanticModel<'db>,
     name: &ast::ExprName,
 ) -> Vec<ResolvedDefinition<'db>> {
+    let db = semantic_model.db();
+    let file = semantic_model.file();
     let index = semantic_index(db, file);
     let name_str = name.id.as_str();
 
     // Get the scope for this name expression
-    let file_scope = index.expression_scope_id(&ast::ExprRef::from(name));
+    let Some(file_scope) = semantic_model.scope(name.into()) else {
+        return vec![];
+    };
 
     let mut all_definitions = Vec::new();
 
@@ -716,19 +718,18 @@ fn is_float_or_complex_annotation(db: &dyn Db, ty: UnionType, name: &str) -> boo
 /// changing the corresponding logic in the semantic analyzer to conditionally
 /// handle this case through the use of mode flags.
 pub fn definitions_for_attribute<'db>(
-    db: &'db dyn Db,
-    file: File,
+    model: &SemanticModel<'db>,
     attribute: &ast::ExprAttribute,
 ) -> Vec<ResolvedDefinition<'db>> {
+    let db = model.db();
     let name_str = attribute.attr.as_str();
-    let model = SemanticModel::new(db, file);
 
     let mut resolved = Vec::new();
 
     // Determine the type of the LHS
-    let lhs_ty = attribute.value.inferred_type(&model);
+    let lhs_ty = attribute.value.inferred_type(model);
     let tys = match lhs_ty {
-        Type::Union(union) => union.elements(db).to_vec(),
+        Type::Union(union) => union.elements(model.db()).to_vec(),
         _ => vec![lhs_ty],
     };
 
@@ -861,13 +862,12 @@ pub fn definitions_for_attribute<'db>(
 /// Returns definitions for a keyword argument in a call expression.
 /// This resolves the keyword argument to the corresponding parameter(s) in the callable's signature(s).
 pub fn definitions_for_keyword_argument<'db>(
-    db: &'db dyn Db,
-    file: File,
+    model: &SemanticModel<'db>,
     keyword: &ast::Keyword,
     call_expr: &ast::ExprCall,
 ) -> Vec<ResolvedDefinition<'db>> {
-    let model = SemanticModel::new(db, file);
-    let func_type = call_expr.func.inferred_type(&model);
+    let db = model.db();
+    let func_type = call_expr.func.inferred_type(model);
 
     let Some(keyword_name) = keyword.arg.as_ref() else {
         return Vec::new();
@@ -918,16 +918,15 @@ pub fn definitions_for_keyword_argument<'db>(
 /// aliases (like "x" in "from a import b as x") are resolved to their targets or kept
 /// as aliases.
 pub fn definitions_for_imported_symbol<'db>(
-    db: &'db dyn Db,
-    file: File,
+    model: &SemanticModel<'db>,
     import_node: &ast::StmtImportFrom,
     symbol_name: &str,
     alias_resolution: ImportAliasResolution,
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut visited = FxHashSet::default();
     resolve_definition::resolve_from_import_definitions(
-        db,
-        file,
+        model.db(),
+        model.file(),
         import_node,
         symbol_name,
         &mut visited,
@@ -983,7 +982,6 @@ impl CallSignatureDetails<'_> {
 /// `CallSignatureDetails` objects, each representing one possible signature
 /// (in case of overloads or union types).
 pub fn call_signature_details<'db>(
-    db: &'db dyn Db,
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Vec<CallSignatureDetails<'db>> {
@@ -991,7 +989,7 @@ pub fn call_signature_details<'db>(
 
     // Use into_callable to handle all the complex type conversions
     if let Some(callable_type) = func_type
-        .try_upcast_to_callable(db)
+        .try_upcast_to_callable(model.db())
         .map(|callables| callables.into_type(db))
     {
         let call_arguments =
@@ -999,8 +997,8 @@ pub fn call_signature_details<'db>(
                 splatted_value.inferred_type(model)
             });
         let bindings = callable_type
-            .bindings(db)
-            .match_parameters(db, &call_arguments);
+            .bindings(model.db())
+            .match_parameters(model.db(), &call_arguments);
 
         // Extract signature details from all callable bindings
         bindings
@@ -1009,7 +1007,7 @@ pub fn call_signature_details<'db>(
             .map(|binding| {
                 let argument_to_parameter_mapping = binding.argument_matches().to_vec();
                 let signature = binding.signature;
-                let display_details = signature.display(db).to_string_parts();
+                let display_details = signature.display(model.db()).to_string_parts();
                 let parameter_label_offsets = display_details.parameter_ranges;
                 let parameter_names = display_details.parameter_names;
 
@@ -1040,11 +1038,11 @@ pub fn call_signature_details<'db>(
 /// so it has a "worse" display than say `Type::FunctionLiteral` or `Type::BoundMethod`,
 /// which this analysis would naturally wipe away. The contexts this function
 /// succeeds in are those where we would print a complicated/ugly type anyway.
-pub fn call_type_simplified_by_overloads<'db>(
-    db: &'db dyn Db,
-    model: &SemanticModel<'db>,
+pub fn call_type_simplified_by_overloads(
+    model: &SemanticModel,
     call_expr: &ast::ExprCall,
 ) -> Option<String> {
+    let db = model.db();
     let func_type = call_expr.func.inferred_type(model);
 
     // Use into_callable to handle all the complex type conversions
@@ -1090,18 +1088,17 @@ pub fn call_type_simplified_by_overloads<'db>(
 
 /// Returns the definitions of the binary operation along with its callable type.
 pub fn definitions_for_bin_op<'db>(
-    db: &'db dyn Db,
     model: &SemanticModel<'db>,
     binary_op: &ast::ExprBinOp,
 ) -> Option<(Vec<ResolvedDefinition<'db>>, Type<'db>)> {
     let left_ty = binary_op.left.inferred_type(model);
     let right_ty = binary_op.right.inferred_type(model);
 
-    let Ok(bindings) = Type::try_call_bin_op(db, left_ty, binary_op.op, right_ty) else {
+    let Ok(bindings) = Type::try_call_bin_op(model.db(), left_ty, binary_op.op, right_ty) else {
         return None;
     };
 
-    let callable_type = promote_literals_for_self(db, bindings.callable_type());
+    let callable_type = promote_literals_for_self(model.db(), bindings.callable_type());
 
     let definitions: Vec<_> = bindings
         .into_iter()
@@ -1118,7 +1115,6 @@ pub fn definitions_for_bin_op<'db>(
 
 /// Returns the definitions for an unary operator along with their callable types.
 pub fn definitions_for_unary_op<'db>(
-    db: &'db dyn Db,
     model: &SemanticModel<'db>,
     unary_op: &ast::ExprUnaryOp,
 ) -> Option<(Vec<ResolvedDefinition<'db>>, Type<'db>)> {
@@ -1132,7 +1128,7 @@ pub fn definitions_for_unary_op<'db>(
     };
 
     let bindings = match operand_ty.try_call_dunder(
-        db,
+        model.db(),
         unary_dunder_method,
         CallArguments::none(),
         TypeContext::default(),
@@ -1141,7 +1137,7 @@ pub fn definitions_for_unary_op<'db>(
         Err(CallDunderError::MethodNotAvailable) if unary_op.op == ast::UnaryOp::Not => {
             // The runtime falls back to `__len__` for `not` if `__bool__` is not defined.
             match operand_ty.try_call_dunder(
-                db,
+                model.db(),
                 "__len__",
                 CallArguments::none(),
                 TypeContext::default(),
@@ -1160,7 +1156,7 @@ pub fn definitions_for_unary_op<'db>(
         ) => *bindings,
     };
 
-    let callable_type = promote_literals_for_self(db, bindings.callable_type());
+    let callable_type = promote_literals_for_self(model.db(), bindings.callable_type());
 
     let definitions = bindings
         .into_iter()
@@ -1245,7 +1241,7 @@ pub fn inlay_hint_call_argument_details<'db>(
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Option<InlayHintCallArgumentDetails> {
-    let signature_details = call_signature_details(db, model, call_expr);
+    let signature_details = call_signature_details(model, call_expr);
 
     if signature_details.is_empty() {
         return None;

@@ -285,12 +285,11 @@ impl LocalReferencesFinder<'_> {
         // the node is fine here. Offsets matter only for import statements
         // where the identifier might be a multi-part module name.
         let offset = covering_node.node().start();
-
+        let model = SemanticModel::new(self.db, self.file);
         if let Some(goto_target) =
-            GotoTarget::from_covering_node(covering_node, offset, self.tokens)
+            GotoTarget::from_covering_node(&model, covering_node, offset, self.tokens)
         {
             // Get the definitions for this goto target
-            let model = SemanticModel::new(self.db, self.file);
             if let Some(current_definitions_nav) = goto_target
                 .get_definition_targets(&model, ImportAliasResolution::PreserveAliases)
                 .and_then(|definitions| definitions.declaration_targets(self.db))

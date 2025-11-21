@@ -3,6 +3,7 @@ use crate::references::{ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
 use ruff_db::files::File;
 use ruff_text_size::TextSize;
+use ty_python_semantic::SemanticModel;
 
 /// Find all references to a symbol at the given position.
 /// Search for references across all files in the project.
@@ -14,9 +15,10 @@ pub fn goto_references(
 ) -> Option<Vec<ReferenceTarget>> {
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
+    let model = SemanticModel::new(db, file);
 
     // Get the definitions for the symbol at the cursor position
-    let goto_target = find_goto_target(&module, offset)?;
+    let goto_target = find_goto_target(&model, &module, offset)?;
 
     let mode = if include_declaration {
         ReferencesMode::References
