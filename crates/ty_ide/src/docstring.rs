@@ -269,6 +269,8 @@ fn render_markdown(docstring: &str) -> String {
         for _ in 0..line_indent {
             // If we're not in a codeblock use non-breaking spaces to preserve the indent
             if !in_any_code {
+                // TODO: would the raw unicode codepoint be handled *better* or *worse*
+                // by various IDEs? VS Code handles this approach well, at least.
                 output.push_str("&nbsp;");
             } else {
                 output.push(' ');
