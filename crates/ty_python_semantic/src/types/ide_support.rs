@@ -987,12 +987,12 @@ pub fn call_signature_details<'db>(
     let func_type = call_expr.func.inferred_type(model);
 
     // Use into_callable to handle all the complex type conversions
-    if let Some(callable) = func_type.try_upcast_to_callable(db).exactly_one() {
+    if let Some(callable_type) = func_type.try_upcast_to_callable(db).into_type(db) {
         let call_arguments =
             CallArguments::from_arguments(&call_expr.arguments, |_, splatted_value| {
                 splatted_value.inferred_type(model)
             });
-        let bindings = Type::Callable(callable)
+        let bindings = callable_type
             .bindings(db)
             .match_parameters(db, &call_arguments);
 
