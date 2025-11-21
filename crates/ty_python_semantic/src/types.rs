@@ -3476,9 +3476,10 @@ impl<'db> Type<'db> {
             return;
         };
 
-        let tcx_specialization = tcx
-            .annotation
-            .and_then(|tcx| tcx.specialization_of(db, class_literal));
+        let tcx_specialization = tcx.annotation.and_then(|tcx| {
+            tcx.filter_union(db, |ty| ty.specialization_of(db, class_literal).is_some())
+                .specialization_of(db, class_literal)
+        });
 
         for (typevar, ty) in specialization
             .generic_context(db)
