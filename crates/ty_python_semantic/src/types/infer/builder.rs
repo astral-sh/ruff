@@ -9299,27 +9299,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = node;
 
         if *op != ast::Operator::BitOr {
-            if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, node) {
-                let mut diag = builder.into_diagnostic(format_args!(
-                    "Invalid binary operator `{}` in type alias",
-                    op.as_str()
-                ));
-                diag.info("Did you mean to use `|`?");
-            }
+            // TODO diagnostic?
             return Type::unknown();
         }
 
         let left_ty = self.infer_expression(left, tcx);
         let right_ty = self.infer_expression(right, tcx);
 
+        // TODO this is overly aggressive; if the operands' `__or__` does not actually return a
+        // `UnionType` at runtime, we should ideally not infer one here. But this is unlikely to be
+        // a problem in practice: it would require someone having an explicitly annotated
+        // `TypeAlias`, which uses `X | Y` syntax, where the returned type is not actually a union.
+        // And attempting to enforce this more tightly showed a lot of potential false positives in
+        // the ecosystem.
         if left_ty.is_equivalent_to(self.db(), right_ty) {
             left_ty
         } else {
-            Type::KnownInstance(KnownInstanceType::UnionType(InternedTypes::from_elements(
+            UnionTypeInstance::from_value_expression_types(
                 self.db(),
                 [left_ty, right_ty],
-                InferredAs::ValueExpression,
-            )))
+                self.scope(),
+                self.typevar_binding_context,
+            )
         }
     }
 

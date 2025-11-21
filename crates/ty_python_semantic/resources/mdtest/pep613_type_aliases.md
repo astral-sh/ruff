@@ -48,8 +48,8 @@ except MyExc as e:
 
 ## Unknown type in PEP 604 union
 
-If we run into an unknown type in a PEP 604 union in the RHS of a PEP 613 type alias, we still
-understand it as a union type, just with an unknown element.
+If we run into an unknown type in a PEP 604 union in the right-hand side of a PEP 613 type alias, we
+still understand it as a union type, just with an unknown element.
 
 ```py
 from typing import TypeAlias
@@ -69,7 +69,6 @@ from typing import TypeAlias, Callable
 MyAlias: TypeAlias = int | Callable[[str], int]
 
 def _(x: MyAlias):
-    # TODO: int | (str) -> int
     reveal_type(x)  # revealed: int | ((str, /) -> int)
 ```
 
@@ -107,7 +106,7 @@ def _(x: MyAlias):
     reveal_type(x)  # revealed: int | str
 ```
 
-## String literal in RHS
+## String literal in right-hand side
 
 ```py
 from typing import TypeAlias
@@ -202,7 +201,7 @@ def _(x: TypeAlias):
 y: list[TypeAlias] = []
 ```
 
-## RHS is required
+## Right-hand side is required
 
 ```py
 from typing import TypeAlias
