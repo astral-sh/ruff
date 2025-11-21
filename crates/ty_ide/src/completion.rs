@@ -8,7 +8,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{Token, TokenAt, TokenKind, Tokens};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ty_python_semantic::{
     Completion as SemanticCompletion, ModuleName, NameKind, SemanticModel,
     types::{CycleDetector, Type},
@@ -329,7 +329,7 @@ pub fn completion<'db>(
     let tokens = tokens_start_before(parsed.tokens(), offset);
     let typed = find_typed_text(db, file, &parsed, offset);
 
-    if is_in_no_completions_place(db, file, tokens, typed.as_deref()) {
+    if is_in_no_completions_place(db, file, &parsed, offset, tokens, typed.as_deref()) {
         return vec![];
     }
 
@@ -1270,10 +1270,14 @@ fn find_typed_text(
 fn is_in_no_completions_place(
     db: &dyn Db,
     file: File,
+    parsed: &ParsedModuleRef,
+    offset: TextSize,
     tokens: &[Token],
     typed: Option<&str>,
 ) -> bool {
-    is_in_comment(tokens) || is_in_string(tokens) || is_in_definition_place(db, file, tokens, typed)
+    is_in_comment(tokens)
+        || is_in_string(tokens)
+        || is_in_definition_place(db, file, parsed, offset, tokens, typed)
 }
 
 /// Whether the last token is within a comment or not.
@@ -1296,11 +1300,18 @@ fn is_in_string(tokens: &[Token]) -> bool {
 
 /// Returns true when the tokens indicate that the definition of a new
 /// name is being introduced at the end.
-fn is_in_definition_place(db: &dyn Db, file: File, tokens: &[Token], typed: Option<&str>) -> bool {
+fn is_in_definition_place(
+    db: &dyn Db,
+    file: File,
+    parsed: &ParsedModuleRef,
+    offset: TextSize,
+    tokens: &[Token],
+    typed: Option<&str>,
+) -> bool {
     fn is_definition_token(token: &Token) -> bool {
         matches!(
             token.kind(),
-            TokenKind::Def | TokenKind::Class | TokenKind::Type | TokenKind::As
+            TokenKind::Def | TokenKind::Class | TokenKind::Type | TokenKind::As | TokenKind::For
         )
     }
 
@@ -1314,11 +1325,37 @@ fn is_in_definition_place(db: &dyn Db, file: File, tokens: &[Token], typed: Opti
             false
         }
     };
-    match tokens {
+    if match tokens {
         [.., penultimate, _] if typed.is_some() => is_definition_keyword(penultimate),
         [.., last] if typed.is_none() => is_definition_keyword(last),
         _ => false,
+    } {
+        return true;
     }
+    // Analyze the AST if token matching is insufficient
+    // to determine if we're inside a name definition.
+    is_in_variable_binding(parsed, offset, typed)
+}
+
+/// Returns true when the cursor sits on a binding statement.
+/// E.g. naming a parameter, type parameter, or `for` <name>).
+fn is_in_variable_binding(parsed: &ParsedModuleRef, offset: TextSize, typed: Option<&str>) -> bool {
+    let range = if let Some(typed) = typed {
+        let start = offset - typed.text_len();
+        TextRange::new(start, offset)
+    } else {
+        TextRange::empty(offset)
+    };
+
+    let covering = covering_node(parsed.syntax().into(), range);
+    covering.ancestors().any(|node| match node {
+        ast::AnyNodeRef::Parameter(param) => param.name.range.contains_range(range),
+        ast::AnyNodeRef::TypeParamTypeVar(type_param) => {
+            type_param.name.range.contains_range(range)
+        }
+        ast::AnyNodeRef::StmtFor(stmt_for) => stmt_for.target.range().contains_range(range),
+        _ => false,
+    })
 }
 
 /// Order completions according to the following rules:
@@ -5172,6 +5209,96 @@ match status:
             builder.build().snapshot(),
             @"<No completions found>",
         );
+    }
+
+    #[test]
+    fn no_completions_in_empty_for_variable_binding() {
+        let builder = completion_test_builder(
+            "\
+for <CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn no_completions_in_for_variable_binding() {
+        let builder = completion_test_builder(
+            "\
+for foo<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn no_completions_in_for_tuple_variable_binding() {
+        let builder = completion_test_builder(
+            "\
+for foo, bar<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn no_completions_in_function_param() {
+        let builder = completion_test_builder(
+            "\
+def foo(p<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn no_completions_in_function_type_param() {
+        let builder = completion_test_builder(
+            "\
+def foo[T<CURSOR>]
+",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn completions_in_function_type_param_bound() {
+        completion_test_builder(
+            "\
+def foo[T: s<CURSOR>]
+",
+        )
+        .build()
+        .contains("str");
+    }
+
+    #[test]
+    fn completions_in_function_param_type_annotation() {
+        // Ensure that completions are no longer
+        // suppressed when have left the name
+        // definition block.
+        completion_test_builder(
+            "\
+def foo(param: s<CURSOR>)
+",
+        )
+        .build()
+        .contains("str");
     }
 
     #[test]
