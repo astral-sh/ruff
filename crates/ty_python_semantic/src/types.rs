@@ -1578,21 +1578,15 @@ impl<'db> Type<'db> {
             },
 
             Type::Union(union) => {
-                let mut any_not_callable = false;
-                let callables: SmallVec<_> = union
-                    .elements(db)
-                    .iter()
-                    .flat_map(|element| {
-                        let element_callable = element.try_upcast_to_callable(db);
-                        any_not_callable |= element_callable.is_empty();
-                        element_callable.into_inner().into_iter()
-                    })
-                    .collect();
-                if any_not_callable {
-                    CallableTypes::none()
-                } else {
-                    CallableTypes(callables)
+                let mut callables = SmallVec::new();
+                for element in union.elements(db) {
+                    let element_callable = element.try_upcast_to_callable(db);
+                    if element_callable.is_empty() {
+                        return CallableTypes::none();
+                    }
+                    callables.extend(element_callable.into_inner());
                 }
+                CallableTypes(callables)
             }
 
             Type::EnumLiteral(enum_literal) => enum_literal
