@@ -676,7 +676,8 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 //    unfortunately not sufficient to obtain the `Callable` supertypes of these types, due to the
                 //    complex interaction between `__new__`, `__init__` and metaclass `__call__`.
                 let attribute_type = if self.name == "__call__" {
-                    let Some(attribute_type) = other.try_upcast_to_callable(db) else {
+                    let Some(attribute_type) = other.try_upcast_to_callable(db).into_type(db)
+                    else {
                         return ConstraintSet::from(false);
                     };
                     attribute_type

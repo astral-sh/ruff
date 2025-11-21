@@ -876,7 +876,7 @@ pub fn definitions_for_keyword_argument<'db>(
 
     let mut resolved_definitions = Vec::new();
 
-    if let Some(Type::Callable(callable_type)) = func_type.try_upcast_to_callable(db) {
+    if let Some(callable_type) = func_type.try_upcast_to_callable(db).exactly_one() {
         let signatures = callable_type.signatures(db);
 
         // For each signature, find the parameter with the matching name
@@ -987,12 +987,12 @@ pub fn call_signature_details<'db>(
     let func_type = call_expr.func.inferred_type(model);
 
     // Use into_callable to handle all the complex type conversions
-    if let Some(callable_type) = func_type.try_upcast_to_callable(db) {
+    if let Some(callable) = func_type.try_upcast_to_callable(db).exactly_one() {
         let call_arguments =
             CallArguments::from_arguments(&call_expr.arguments, |_, splatted_value| {
                 splatted_value.inferred_type(model)
             });
-        let bindings = callable_type
+        let bindings = Type::Callable(callable)
             .bindings(db)
             .match_parameters(db, &call_arguments);
 
@@ -1042,7 +1042,7 @@ pub fn call_type_simplified_by_overloads<'db>(
     let func_type = call_expr.func.inferred_type(model);
 
     // Use into_callable to handle all the complex type conversions
-    let callable_type = func_type.try_upcast_to_callable(db)?;
+    let callable_type = func_type.try_upcast_to_callable(db).into_type(db)?;
     let bindings = callable_type.bindings(db);
 
     // If the callable is trivial this analysis is useless, bail out
