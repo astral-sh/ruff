@@ -1198,6 +1198,7 @@ impl TestContext {
             r#"The system cannot find the file specified."#,
             "No such file or directory",
         );
+        settings.add_filter(r"file://.*/stdlib/", "file://<typeshed>/stdlib/");
 
         let settings_scope = settings.bind_to_scope();
 

@@ -147,6 +147,57 @@ def _(x: int | str | bytes):
         reveal_type(x)  # revealed: (int & Unknown) | (str & Unknown) | (bytes & Unknown)
 ```
 
+## `classinfo` is a `types.UnionType`
+
+Python 3.10 added the ability to use `Union[int, str]` as the second argument to `isinstance()`:
+
+```py
+from typing import Union
+
+IntOrStr = Union[int, str]
+
+reveal_type(IntOrStr)  # revealed: types.UnionType
+
+def _(x: int | str | bytes | memoryview | range):
+    if isinstance(x, IntOrStr):
+        reveal_type(x)  # revealed: int | str
+    elif isinstance(x, Union[bytes, memoryview]):
+        reveal_type(x)  # revealed: bytes | memoryview[int]
+    else:
+        reveal_type(x)  # revealed: range
+
+def _(x: int | str | None):
+    if isinstance(x, Union[int, None]):
+        reveal_type(x)  # revealed: int | None
+    else:
+        reveal_type(x)  # revealed: str
+
+ListStrOrInt = Union[list[str], int]
+
+def _(x: dict[int, str] | ListStrOrInt):
+    # TODO: this should ideally be an error
+    if isinstance(x, ListStrOrInt):
+        # TODO: this should not be narrowed
+        reveal_type(x)  # revealed: list[str] | int
+
+    # TODO: this should ideally be an error
+    if isinstance(x, Union[list[str], int]):
+        # TODO: this should not be narrowed
+        reveal_type(x)  # revealed: list[str] | int
+```
+
+## `Optional` as `classinfo`
+
+```py
+from typing import Optional
+
+def _(x: int | str | None):
+    if isinstance(x, Optional[int]):
+        reveal_type(x)  # revealed: int | None
+    else:
+        reveal_type(x)  # revealed: str
+```
+
 ## `classinfo` is a `typing.py` special form
 
 Certain special forms in `typing.py` are aliases to classes elsewhere in the standard library; these
@@ -260,6 +311,23 @@ def _(flag: bool):
     # error: [unknown-argument]
     if isinstance(x, int, foo="bar"):
         reveal_type(x)  # revealed: Literal[1, "a"]
+```
+
+## Generic aliases are not supported as second argument
+
+The `classinfo` argument cannot be a generic alias:
+
+```py
+def _(x: list[str] | list[int] | list[bytes]):
+    # TODO: Ideally, this would be an error (requires https://github.com/astral-sh/ty/issues/116)
+    if isinstance(x, list[int]):
+        # No narrowing here:
+        reveal_type(x)  # revealed: list[str] | list[int] | list[bytes]
+
+    # error: [invalid-argument-type] "Invalid second argument to `isinstance`"
+    if isinstance(x, list[int] | list[str]):
+        # No narrowing here:
+        reveal_type(x)  # revealed: list[str] | list[int] | list[bytes]
 ```
 
 ## `type[]` types are narrowed as well as class-literal types

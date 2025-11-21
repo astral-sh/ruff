@@ -212,10 +212,10 @@ impl ClassInfoConstraintFunction {
                 )
             }),
 
-            Type::KnownInstance(KnownInstanceType::UnionType(elements)) => {
+            Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
                 UnionType::try_from_elements(
                     db,
-                    elements.elements(db).iter().map(|element| {
+                    instance.value_expression_types(db).ok()?.map(|element| {
                         // A special case is made for `None` at runtime
                         // (it's implicitly converted to `NoneType` in `int | None`)
                         // which means that `isinstance(x, int | None)` works even though
@@ -223,7 +223,7 @@ impl ClassInfoConstraintFunction {
                         if element.is_none(db) {
                             self.generate_constraint(db, KnownClass::NoneType.to_class_literal(db))
                         } else {
-                            self.generate_constraint(db, *element)
+                            self.generate_constraint(db, element)
                         }
                     }),
                 )
@@ -874,8 +874,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
         let callable_ty = inference.expression_type(&*expr_call.func);
 
-        // TODO: add support for PEP 604 union types on the right hand side of `isinstance`
-        // and `issubclass`, for example `isinstance(x, str | (int | float))`.
         match callable_ty {
             Type::FunctionLiteral(function_type)
                 if matches!(

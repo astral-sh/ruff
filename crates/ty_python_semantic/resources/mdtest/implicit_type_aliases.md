@@ -191,13 +191,13 @@ def _(
     reveal_type(int_or_callable)  # revealed: int | ((str, /) -> bytes)
     reveal_type(callable_or_int)  # revealed: ((str, /) -> bytes) | int
     # TODO should be Unknown | int
-    reveal_type(type_var_or_int)  # revealed: T@_ | int
+    reveal_type(type_var_or_int)  # revealed: typing.TypeVar | int
     # TODO should be int | Unknown
-    reveal_type(int_or_type_var)  # revealed: int | T@_
+    reveal_type(int_or_type_var)  # revealed: int | typing.TypeVar
     # TODO should be Unknown | None
-    reveal_type(type_var_or_none)  # revealed: T@_ | None
+    reveal_type(type_var_or_none)  # revealed: typing.TypeVar | None
     # TODO should be None | Unknown
-    reveal_type(none_or_type_var)  # revealed: None | T@_
+    reveal_type(none_or_type_var)  # revealed: None | typing.TypeVar
 ```
 
 If a type is unioned with itself in a value expression, the result is just that type. No
@@ -1109,7 +1109,7 @@ from typing import List, Dict
 # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 InvalidList = List[1]
 
-# error: [invalid-type-form] "`typing.typing.List` requires exactly one argument"
+# error: [invalid-type-form] "`typing.List` requires exactly one argument"
 ListTooManyArgs = List[int, str]
 
 # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
@@ -1118,10 +1118,10 @@ InvalidDict1 = Dict[1, str]
 # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 InvalidDict2 = Dict[str, 2]
 
-# error: [invalid-type-form] "`typing.typing.Dict` requires exactly two arguments, got 1"
+# error: [invalid-type-form] "`typing.Dict` requires exactly two arguments, got 1"
 DictTooFewArgs = Dict[str]
 
-# error: [invalid-type-form] "`typing.typing.Dict` requires exactly two arguments, got 3"
+# error: [invalid-type-form] "`typing.Dict` requires exactly two arguments, got 3"
 DictTooManyArgs = Dict[str, int, float]
 
 def _(

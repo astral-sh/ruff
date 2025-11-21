@@ -69,6 +69,134 @@ mod tests {
     }
 
     #[test]
+    fn goto_type_of_typing_dot_literal() {
+        let test = cursor_test(
+            r#"
+            from typing import Literal
+
+            a<CURSOR>b = Literal
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+           --> stdlib/typing.pyi:351:1
+            |
+        349 | Final: _SpecialForm
+        350 |
+        351 | Literal: _SpecialForm
+            | ^^^^^^^
+        352 | TypedDict: _SpecialForm
+            |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from typing import Literal
+        3 |
+        4 | ab = Literal
+          | ^^
+          |
+        ");
+    }
+
+    // this is a slightly different case to the one above,
+    // since `Any` is a class in typeshed rather than a variable
+    #[test]
+    fn goto_type_of_typing_dot_any() {
+        let test = cursor_test(
+            r#"
+            from typing import Any
+
+            a<CURSOR>b = Any
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+           --> stdlib/typing.pyi:166:7
+            |
+        164 | # from _typeshed import AnnotationForm
+        165 |
+        166 | class Any:
+            |       ^^^
+        167 |     """Special type indicating an unconstrained type.
+            |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from typing import Any
+        3 |
+        4 | ab = Any
+          | ^^
+          |
+        "#);
+    }
+
+    // Similarly, `Generic` is a `type[]` type in typeshed
+    #[test]
+    fn goto_type_of_typing_dot_generic() {
+        let test = cursor_test(
+            r#"
+            from typing import Generic
+
+            a<CURSOR>b = Generic
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+           --> stdlib/typing.pyi:770:1
+            |
+        768 |         def __class_getitem__(cls, args: TypeVar | tuple[TypeVar, ...]) -> _Final: ...
+        769 |
+        770 | Generic: type[_Generic]
+            | ^^^^^^^
+        771 |
+        772 | class _ProtocolMeta(ABCMeta):
+            |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from typing import Generic
+        3 |
+        4 | ab = Generic
+          | ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_ty_extensions_special_form() {
+        let test = cursor_test(
+            r#"
+            from ty_extensions import AlwaysTruthy
+
+            a<CURSOR>b = AlwaysTruthy
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+          --> stdlib/ty_extensions.pyi:21:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+        21 | AlwaysTruthy = object()
+           | ^^^^^^^^^^^^
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from ty_extensions import AlwaysTruthy
+        3 |
+        4 | ab = AlwaysTruthy
+          | ^^
+          |
+        ");
+    }
+
+    #[test]
     fn goto_type_of_expression_with_function_type() {
         let test = cursor_test(
             r#"
