@@ -2,6 +2,7 @@ use itertools::Either;
 use ruff_python_ast as ast;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
+use crate::FxOrderSet;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NON_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_callable,
@@ -12,9 +13,9 @@ use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    CallableType, DynamicType, IntersectionBuilder, KnownClass, KnownInstanceType,
-    LintDiagnosticGuard, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext,
-    TypeIsType, UnionBuilder, UnionType, todo_type,
+    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
+    KnownInstanceType, LintDiagnosticGuard, SpecialFormType, SubclassOfType, Type, TypeAliasType,
+    TypeContext, TypeIsType, TypeMapping, UnionBuilder, UnionType, todo_type,
 };
 
 /// Type expressions
@@ -734,6 +735,49 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    pub(crate) fn infer_explicitly_specialized_implicit_type_alias(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+        value_ty: Type<'db>,
+        in_type_expression: bool,
+    ) -> Type<'db> {
+        let db = self.db();
+
+        let generic_type_alias = value_ty.apply_type_mapping(
+            db,
+            &TypeMapping::BindLegacyTypevars(BindingContext::Synthetic),
+            TypeContext::default(),
+        );
+
+        let mut variables = FxOrderSet::default();
+        generic_type_alias.find_legacy_typevars(db, None, &mut variables);
+        let generic_context = GenericContext::from_typevar_instances(db, variables);
+
+        let scope_id = self.scope();
+        let typevar_binding_context = self.typevar_binding_context;
+        let specialize = |types: &[Option<Type<'db>>]| {
+            let specialized = generic_type_alias.apply_specialization(
+                db,
+                generic_context.specialize_partial(db, types.iter().copied()),
+            );
+
+            if in_type_expression {
+                specialized
+                    .in_type_expression(db, scope_id, typevar_binding_context)
+                    .unwrap_or_else(|_| Type::unknown())
+            } else {
+                specialized
+            }
+        };
+
+        self.infer_explicit_callable_specialization(
+            subscript,
+            value_ty,
+            generic_context,
+            specialize,
+        )
+    }
+
     fn infer_subscript_type_expression(
         &mut self,
         subscript: &ast::ExprSubscript,
@@ -824,10 +868,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
-                KnownInstanceType::TypeVar(_) => {
-                    self.infer_type_expression(slice);
-                    todo_type!("TypeVar annotations")
-                }
                 KnownInstanceType::TypeAliasType(type_alias @ TypeAliasType::PEP695(_)) => {
                     match type_alias.generic_context(self.db()) {
                         Some(generic_context) => {
@@ -870,11 +910,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_type_expression(slice);
                     todo_type!("Generic stringified PEP-613 type alias")
                 }
-                KnownInstanceType::UnionType(_) => {
-                    self.infer_type_expression(slice);
-                    todo_type!("Generic specialization of types.UnionType")
-                }
-                KnownInstanceType::Literal(ty) | KnownInstanceType::TypeGenericAlias(ty) => {
+                KnownInstanceType::Literal(ty) => {
                     self.infer_type_expression(slice);
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
@@ -884,13 +920,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
-                KnownInstanceType::Callable(_) => {
-                    self.infer_type_expression(slice);
-                    todo_type!("Generic specialization of typing.Callable")
-                }
-                KnownInstanceType::Annotated(_) => {
-                    self.infer_type_expression(slice);
-                    todo_type!("Generic specialization of typing.Annotated")
+                KnownInstanceType::TypeVar(_) => self
+                    .infer_explicitly_specialized_implicit_type_alias(subscript, value_ty, false),
+
+                KnownInstanceType::UnionType(_)
+                | KnownInstanceType::Callable(_)
+                | KnownInstanceType::Annotated(_)
+                | KnownInstanceType::TypeGenericAlias(_) => {
+                    self.infer_explicitly_specialized_implicit_type_alias(subscript, value_ty, true)
                 }
                 KnownInstanceType::NewType(newtype) => {
                     self.infer_type_expression(&subscript.slice);
@@ -933,11 +970,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
             Type::GenericAlias(_) => {
-                self.infer_type_expression(slice);
-                // If the generic alias is already fully specialized, this is an error. But it
-                // could have been specialized with another typevar (e.g. a type alias like `MyList
-                // = list[T]`), in which case it's later valid to do `MyList[int]`.
-                todo_type!("specialized generic alias in type expression")
+                self.infer_explicitly_specialized_implicit_type_alias(subscript, value_ty, true)
             }
             Type::StringLiteral(_) => {
                 self.infer_type_expression(slice);
