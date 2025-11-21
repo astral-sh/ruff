@@ -181,7 +181,6 @@ fn documentation_trim(docs: &str) -> String {
 /// with longer docs
 /// </code>
 /// ```
-
 fn render_markdown(docstring: &str) -> String {
     // TODO: there is a convention that `singletick` is for items that can
     // be looked up in-scope while ``multitick`` is for opaque inline code.
