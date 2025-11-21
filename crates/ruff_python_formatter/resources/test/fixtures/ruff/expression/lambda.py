@@ -338,3 +338,10 @@ class C:
 	}
 
 name = re.sub(r"[^\x21\x23-\x5b\x5d-\x7e]...............", lambda m: f"\\{m.group(0)}", p["name"])
+
+def foo():
+    if True:
+        if True:
+            return (
+                lambda x: np.exp(cs(np.log(x.to(u.MeV).value))) * u.MeV * u.cm**2 / u.g
+            )
