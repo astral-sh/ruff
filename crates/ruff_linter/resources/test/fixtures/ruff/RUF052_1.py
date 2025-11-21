@@ -33,7 +33,7 @@ def test_list_comprehensions():
     result = [_item["foo"] for _item in my_list]  # RUF052: Local dummy variable `_item` is accessed
 
     # Should detect used dummy variable in nested comprehension
-    nested = [[_item["foo"] for _item in sublist] for _sublist in [my_list, my_list]]
+    nested = [[_item["foo"] for _item in _sublist] for _sublist in [my_list, my_list]]
     # RUF052: Both `_item` and `_sublist` are accessed
 
     # Should detect with conditions

@@ -81,14 +81,14 @@ help: Remove leading underscores
 33 +     result = [item["foo"] for item in my_list]  # RUF052: Local dummy variable `_item` is accessed
 34 | 
 35 |     # Should detect used dummy variable in nested comprehension
-36 |     nested = [[_item["foo"] for _item in sublist] for _sublist in [my_list, my_list]]
+36 |     nested = [[_item["foo"] for _item in _sublist] for _sublist in [my_list, my_list]]
 note: This is an unsafe fix and may change runtime behavior
 
 RUF052 [*] Local dummy variable `_item` is accessed
   --> RUF052_1.py:36:33
    |
 35 |     # Should detect used dummy variable in nested comprehension
-36 |     nested = [[_item["foo"] for _item in sublist] for _sublist in [my_list, my_list]]
+36 |     nested = [[_item["foo"] for _item in _sublist] for _sublist in [my_list, my_list]]
    |                                 ^^^^^
 37 |     # RUF052: Both `_item` and `_sublist` are accessed
    |
@@ -96,8 +96,27 @@ help: Remove leading underscores
 33 |     result = [_item["foo"] for _item in my_list]  # RUF052: Local dummy variable `_item` is accessed
 34 | 
 35 |     # Should detect used dummy variable in nested comprehension
-   -     nested = [[_item["foo"] for _item in sublist] for _sublist in [my_list, my_list]]
-36 +     nested = [[item["foo"] for item in sublist] for _sublist in [my_list, my_list]]
+   -     nested = [[_item["foo"] for _item in _sublist] for _sublist in [my_list, my_list]]
+36 +     nested = [[item["foo"] for item in _sublist] for _sublist in [my_list, my_list]]
+37 |     # RUF052: Both `_item` and `_sublist` are accessed
+38 | 
+39 |     # Should detect with conditions
+note: This is an unsafe fix and may change runtime behavior
+
+RUF052 [*] Local dummy variable `_sublist` is accessed
+  --> RUF052_1.py:36:56
+   |
+35 |     # Should detect used dummy variable in nested comprehension
+36 |     nested = [[_item["foo"] for _item in _sublist] for _sublist in [my_list, my_list]]
+   |                                                        ^^^^^^^^
+37 |     # RUF052: Both `_item` and `_sublist` are accessed
+   |
+help: Remove leading underscores
+33 |     result = [_item["foo"] for _item in my_list]  # RUF052: Local dummy variable `_item` is accessed
+34 | 
+35 |     # Should detect used dummy variable in nested comprehension
+   -     nested = [[_item["foo"] for _item in _sublist] for _sublist in [my_list, my_list]]
+36 +     nested = [[_item["foo"] for _item in sublist] for sublist in [my_list, my_list]]
 37 |     # RUF052: Both `_item` and `_sublist` are accessed
 38 | 
 39 |     # Should detect with conditions
