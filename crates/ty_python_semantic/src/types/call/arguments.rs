@@ -5,8 +5,8 @@ use ruff_python_ast as ast;
 
 use crate::Db;
 use crate::types::KnownClass;
-use crate::types::enums::enum_member_literals;
-use crate::types::tuple::{TupleLength, TupleSpec};
+use crate::types::enums::{enum_member_literals, enum_metadata};
+use crate::types::tuple::{Tuple, TupleType};
 
 use super::Type;
 
@@ -17,7 +17,7 @@ pub(crate) enum Argument<'a> {
     /// A positional argument.
     Positional,
     /// A starred positional argument (e.g. `*args`) containing the specified number of elements.
-    Variadic(TupleLength),
+    Variadic,
     /// A keyword argument (e.g. `a=1`).
     Keyword(&'a str),
     /// The double-starred keywords argument (e.g. `**kwargs`).
@@ -41,29 +41,58 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// type of each splatted argument, so that we can determine its length. All other arguments
     /// will remain uninitialized as `Unknown`.
     pub(crate) fn from_arguments(
-        db: &'db dyn Db,
         arguments: &'a ast::Arguments,
-        mut infer_argument_type: impl FnMut(&ast::Expr, &ast::Expr) -> Type<'db>,
+        mut infer_argument_type: impl FnMut(Option<&ast::Expr>, &ast::Expr) -> Type<'db>,
     ) -> Self {
         arguments
             .arguments_source_order()
             .map(|arg_or_keyword| match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                        let ty = infer_argument_type(arg, value);
-                        let length = ty
-                            .try_iterate(db)
-                            .map(|tuple| tuple.len())
-                            .unwrap_or(TupleLength::unknown());
-                        (Argument::Variadic(length), Some(ty))
+                        let ty = infer_argument_type(Some(arg), value);
+                        (Argument::Variadic, Some(ty))
                     }
                     _ => (Argument::Positional, None),
                 },
-                ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
+                ast::ArgOrKeyword::Keyword(ast::Keyword { arg, value, .. }) => {
                     if let Some(arg) = arg {
                         (Argument::Keyword(&arg.id), None)
                     } else {
-                        (Argument::Keywords, None)
+                        let ty = infer_argument_type(None, value);
+                        (Argument::Keywords, Some(ty))
+                    }
+                }
+            })
+            .collect()
+    }
+
+    /// Like [`Self::from_arguments`] but fills as much typing info in as possible.
+    ///
+    /// This currently only exists for the LSP usecase, and shouldn't be used in normal
+    /// typechecking.
+    pub(crate) fn from_arguments_typed(
+        arguments: &'a ast::Arguments,
+        mut infer_argument_type: impl FnMut(Option<&ast::Expr>, &ast::Expr) -> Type<'db>,
+    ) -> Self {
+        arguments
+            .arguments_source_order()
+            .map(|arg_or_keyword| match arg_or_keyword {
+                ast::ArgOrKeyword::Arg(arg) => match arg {
+                    ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+                        let ty = infer_argument_type(Some(arg), value);
+                        (Argument::Variadic, Some(ty))
+                    }
+                    _ => {
+                        let ty = infer_argument_type(None, arg);
+                        (Argument::Positional, Some(ty))
+                    }
+                },
+                ast::ArgOrKeyword::Keyword(ast::Keyword { arg, value, .. }) => {
+                    let ty = infer_argument_type(None, value);
+                    if let Some(arg) = arg {
+                        (Argument::Keyword(&arg.id), Some(ty))
+                    } else {
+                        (Argument::Keywords, Some(ty))
                     }
                 }
             })
@@ -97,7 +126,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// Prepend an optional extra synthetic argument (for a `self` or `cls` parameter) to the front
     /// of this argument list. (If `bound_self` is none, we return the argument list
     /// unmodified.)
-    pub(crate) fn with_self(&self, bound_self: Option<Type<'db>>) -> Cow<Self> {
+    pub(crate) fn with_self(&self, bound_self: Option<Type<'db>>) -> Cow<'_, Self> {
         if bound_self.is_some() {
             let arguments = std::iter::once(Argument::Synthetic)
                 .chain(self.arguments.iter().copied())
@@ -127,31 +156,39 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// contains the same arguments, but with one or more of the argument types expanded.
     ///
     /// [argument type expansion]: https://typing.python.org/en/latest/spec/overload.html#argument-type-expansion
-    pub(crate) fn expand(
-        &self,
-        db: &'db dyn Db,
-    ) -> impl Iterator<Item = Vec<CallArguments<'a, 'db>>> + '_ {
+    pub(super) fn expand(&self, db: &'db dyn Db) -> impl Iterator<Item = Expansion<'a, 'db>> + '_ {
+        /// Maximum number of argument lists that can be generated in a single expansion step.
+        static MAX_EXPANSIONS: usize = 512;
+
         /// Represents the state of the expansion process.
+        enum State<'a, 'b, 'db> {
+            LimitReached(usize),
+            Expanding(ExpandingState<'a, 'b, 'db>),
+        }
+
+        /// Represents the expanding state with either the initial types or the expanded types.
         ///
         /// This is useful to avoid cloning the initial types vector if none of the types can be
         /// expanded.
-        enum State<'a, 'b, 'db> {
+        enum ExpandingState<'a, 'b, 'db> {
             Initial(&'b Vec<Option<Type<'db>>>),
             Expanded(Vec<CallArguments<'a, 'db>>),
         }
 
-        impl<'db> State<'_, '_, 'db> {
+        impl<'db> ExpandingState<'_, '_, 'db> {
             fn len(&self) -> usize {
                 match self {
-                    State::Initial(_) => 1,
-                    State::Expanded(expanded) => expanded.len(),
+                    ExpandingState::Initial(_) => 1,
+                    ExpandingState::Expanded(expanded) => expanded.len(),
                 }
             }
 
             fn iter(&self) -> impl Iterator<Item = &[Option<Type<'db>>]> + '_ {
                 match self {
-                    State::Initial(types) => Either::Left(std::iter::once(types.as_slice())),
-                    State::Expanded(expanded) => {
+                    ExpandingState::Initial(types) => {
+                        Either::Left(std::iter::once(types.as_slice()))
+                    }
+                    ExpandingState::Expanded(expanded) => {
                         Either::Right(expanded.iter().map(CallArguments::types))
                     }
                 }
@@ -160,42 +197,80 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
         let mut index = 0;
 
-        std::iter::successors(Some(State::Initial(&self.types)), move |previous| {
-            // Find the next type that can be expanded.
-            let expanded_types = loop {
-                let arg_type = self.types.get(index)?;
-                if let Some(arg_type) = arg_type {
-                    if let Some(expanded_types) = expand_type(db, *arg_type) {
-                        break expanded_types;
+        std::iter::successors(
+            Some(State::Expanding(ExpandingState::Initial(&self.types))),
+            move |previous| {
+                let state = match previous {
+                    State::LimitReached(index) => return Some(State::LimitReached(*index)),
+                    State::Expanding(expanding_state) => expanding_state,
+                };
+
+                // Find the next type that can be expanded.
+                let expanded_types = loop {
+                    let arg_type = self.types.get(index)?;
+                    if let Some(arg_type) = arg_type {
+                        if let Some(expanded_types) = expand_type(db, *arg_type) {
+                            break expanded_types;
+                        }
+                    }
+                    index += 1;
+                };
+
+                let expansion_size = expanded_types.len() * state.len();
+                if expansion_size > MAX_EXPANSIONS {
+                    tracing::debug!(
+                        "Skipping argument type expansion as it would exceed the \
+                    maximum number of expansions ({MAX_EXPANSIONS})"
+                    );
+                    return Some(State::LimitReached(index));
+                }
+
+                let mut expanded_arguments = Vec::with_capacity(expansion_size);
+
+                for pre_expanded_types in state.iter() {
+                    for subtype in &expanded_types {
+                        let mut new_expanded_types = pre_expanded_types.to_vec();
+                        new_expanded_types[index] = Some(*subtype);
+                        expanded_arguments.push(CallArguments::new(
+                            self.arguments.clone(),
+                            new_expanded_types,
+                        ));
                     }
                 }
+
+                // Increment the index to move to the next argument type for the next iteration.
                 index += 1;
-            };
 
-            let mut expanded_arguments = Vec::with_capacity(expanded_types.len() * previous.len());
-
-            for pre_expanded_types in previous.iter() {
-                for subtype in &expanded_types {
-                    let mut new_expanded_types = pre_expanded_types.to_vec();
-                    new_expanded_types[index] = Some(*subtype);
-                    expanded_arguments.push(CallArguments::new(
-                        self.arguments.clone(),
-                        new_expanded_types,
-                    ));
-                }
-            }
-
-            // Increment the index to move to the next argument type for the next iteration.
-            index += 1;
-
-            Some(State::Expanded(expanded_arguments))
-        })
+                Some(State::Expanding(ExpandingState::Expanded(
+                    expanded_arguments,
+                )))
+            },
+        )
         .skip(1) // Skip the initial state, which has no expanded types.
         .map(|state| match state {
-            State::Initial(_) => unreachable!("initial state should be skipped"),
-            State::Expanded(expanded) => expanded,
+            State::LimitReached(index) => Expansion::LimitReached(index),
+            State::Expanding(ExpandingState::Initial(_)) => {
+                unreachable!("initial state should be skipped")
+            }
+            State::Expanding(ExpandingState::Expanded(expanded)) => Expansion::Expanded(expanded),
         })
     }
+}
+
+/// Represents a single element of the expansion process for argument types for [`expand`].
+///
+/// [`expand`]: CallArguments::expand
+pub(super) enum Expansion<'a, 'db> {
+    /// Indicates that the expansion process has reached the maximum number of argument lists
+    /// that can be generated in a single step.
+    ///
+    /// The contained `usize` is the index of the argument type which would have been expanded
+    /// next, if not for the limit.
+    LimitReached(usize),
+
+    /// Contains the expanded argument lists, where each list contains the same arguments, but with
+    /// one or more of the argument types expanded.
+    Expanded(Vec<CallArguments<'a, 'db>>),
 }
 
 impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<'a, 'db> {
@@ -208,54 +283,78 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
     }
 }
 
+/// Returns `true` if the type can be expanded into its subtypes.
+///
+/// In other words, it returns `true` if [`expand_type`] returns [`Some`] for the given type.
+pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty {
+        Type::NominalInstance(instance) => {
+            let class = instance.class(db);
+            class.is_known(db, KnownClass::Bool)
+                || instance.tuple_spec(db).is_some_and(|spec| match &*spec {
+                    Tuple::Fixed(fixed_length_tuple) => fixed_length_tuple
+                        .all_elements()
+                        .any(|element| is_expandable_type(db, *element)),
+                    Tuple::Variable(_) => false,
+                })
+                || enum_metadata(db, class.class_literal(db).0).is_some()
+        }
+        Type::Union(_) => true,
+        _ => false,
+    }
+}
+
 /// Expands a type into its possible subtypes, if applicable.
 ///
 /// Returns [`None`] if the type cannot be expanded.
 fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
+    // NOTE: Update `is_expandable_type` if this logic changes accordingly.
     match ty {
         Type::NominalInstance(instance) => {
-            if instance.class.is_known(db, KnownClass::Bool) {
+            let class = instance.class(db);
+
+            if class.is_known(db, KnownClass::Bool) {
                 return Some(vec![
                     Type::BooleanLiteral(true),
                     Type::BooleanLiteral(false),
                 ]);
             }
 
-            let class_literal = instance.class.class_literal(db).0;
+            // If the class is a fixed-length tuple subtype, we expand it to its elements.
+            if let Some(spec) = instance.tuple_spec(db) {
+                return match &*spec {
+                    Tuple::Fixed(fixed_length_tuple) => {
+                        let expanded = fixed_length_tuple
+                            .all_elements()
+                            .map(|element| {
+                                if let Some(expanded) = expand_type(db, *element) {
+                                    Either::Left(expanded.into_iter())
+                                } else {
+                                    Either::Right(std::iter::once(*element))
+                                }
+                            })
+                            .multi_cartesian_product()
+                            .map(|types| Type::tuple(TupleType::heterogeneous(db, types)))
+                            .collect::<Vec<_>>();
 
-            if let Some(enum_members) = enum_member_literals(db, class_literal, None) {
+                        if expanded.len() == 1 {
+                            // There are no elements in the tuple type that can be expanded.
+                            None
+                        } else {
+                            Some(expanded)
+                        }
+                    }
+                    Tuple::Variable(_) => None,
+                };
+            }
+
+            if let Some(enum_members) = enum_member_literals(db, class.class_literal(db).0, None) {
                 return Some(enum_members.collect());
             }
 
             None
         }
-        Type::Tuple(tuple_type) => {
-            // Note: This should only account for tuples of known length, i.e., `tuple[bool, ...]`
-            // should not be expanded here.
-            let tuple = tuple_type.tuple(db);
-            if !matches!(tuple, TupleSpec::Fixed(_)) {
-                return None;
-            }
-            let expanded = tuple
-                .all_elements()
-                .map(|element| {
-                    if let Some(expanded) = expand_type(db, *element) {
-                        Either::Left(expanded.into_iter())
-                    } else {
-                        Either::Right(std::iter::once(*element))
-                    }
-                })
-                .multi_cartesian_product()
-                .map(|types| Type::heterogeneous_tuple(db, types))
-                .collect::<Vec<_>>();
-            if expanded.len() == 1 {
-                // There are no elements in the tuple type that can be expanded.
-                None
-            } else {
-                Some(expanded)
-            }
-        }
-        Type::Union(union) => Some(union.iter(db).copied().collect()),
+        Type::Union(union) => Some(union.elements(db).to_vec()),
         // We don't handle `type[A | B]` here because it's already stored in the expanded form
         // i.e., `type[A] | type[B]` which is handled by the `Type::Union` case.
         _ => None,

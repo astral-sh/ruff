@@ -29,11 +29,18 @@ const DFA_SIZE_LIMIT: usize = 1_000_000;
 ///
 /// Because of that, two filters that include the exact same files but were
 /// constructed from different patterns (or even just order) compare unequal.
-#[derive(Clone)]
+#[derive(Clone, get_size2::GetSize)]
 pub(crate) struct IncludeFilter {
+    #[get_size(ignore)]
     glob_set: GlobSet,
     original_patterns: Box<[String]>,
+    #[get_size(size_fn = dfa_memory_usage)]
     dfa: Option<dfa::dense::DFA<Vec<u32>>>,
+}
+
+#[allow(clippy::ref_option)]
+fn dfa_memory_usage(dfa: &Option<dfa::dense::DFA<Vec<u32>>>) -> usize {
+    dfa.as_ref().map(dfa::dense::DFA::memory_usage).unwrap_or(0)
 }
 
 impl IncludeFilter {

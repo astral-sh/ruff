@@ -61,6 +61,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// [code coverage]: https://github.com/nedbat/coveragepy/issues/509
 /// [pycodestyle.max-line-length]: https://docs.astral.sh/ruff/settings/#lint_pycodestyle_max-line-length
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.213")]
 pub(crate) struct IfElseBlockInsteadOfIfExp {
     /// The ternary or binary expression to replace the `if`-`else`-block.
     contents: String,
@@ -266,13 +267,13 @@ fn assignment_ternary(
         body: Box::new(body_value.clone()),
         orelse: Box::new(orelse_value.clone()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let node1 = ast::StmtAssign {
         targets: vec![target_var.clone()],
         value: Box::new(node.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     node1.into()
 }
@@ -282,13 +283,13 @@ fn assignment_binary_and(target_var: &Expr, left_value: &Expr, right_value: &Exp
         op: BoolOp::And,
         values: vec![left_value.clone(), right_value.clone()],
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let node1 = ast::StmtAssign {
         targets: vec![target_var.clone()],
         value: Box::new(node.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     node1.into()
 }
@@ -296,12 +297,12 @@ fn assignment_binary_and(target_var: &Expr, left_value: &Expr, right_value: &Exp
 fn assignment_binary_or(target_var: &Expr, left_value: &Expr, right_value: &Expr) -> Stmt {
     (ast::StmtAssign {
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         targets: vec![target_var.clone()],
         value: Box::new(
             (ast::ExprBoolOp {
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 op: BoolOp::Or,
                 values: vec![left_value.clone(), right_value.clone()],
             })

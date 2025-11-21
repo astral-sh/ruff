@@ -304,7 +304,7 @@ impl<'src> Parser<'src> {
                         op: bin_op,
                         right: Box::new(right.expr),
                         range: self.node_range(start),
-                        node_index: AtomicNodeIndex::dummy(),
+                        node_index: AtomicNodeIndex::NONE,
                     })
                 }
             };
@@ -472,7 +472,7 @@ impl<'src> Parser<'src> {
             range: identifier.range,
             id: identifier.id,
             ctx,
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -491,7 +491,7 @@ impl<'src> Parser<'src> {
             return ast::Identifier {
                 id: name,
                 range,
-                node_index: AtomicNodeIndex::dummy(),
+                node_index: AtomicNodeIndex::NONE,
             };
         }
 
@@ -501,7 +501,7 @@ impl<'src> Parser<'src> {
             return ast::Identifier {
                 id,
                 range,
-                node_index: AtomicNodeIndex::dummy(),
+                node_index: AtomicNodeIndex::NONE,
             };
         }
 
@@ -520,7 +520,7 @@ impl<'src> Parser<'src> {
             ast::Identifier {
                 id,
                 range,
-                node_index: AtomicNodeIndex::dummy(),
+                node_index: AtomicNodeIndex::NONE,
             }
         } else {
             self.add_error(
@@ -531,7 +531,7 @@ impl<'src> Parser<'src> {
             ast::Identifier {
                 id: Name::empty(),
                 range: self.missing_node_range(),
-                node_index: AtomicNodeIndex::dummy(),
+                node_index: AtomicNodeIndex::NONE,
             }
         }
     }
@@ -551,7 +551,7 @@ impl<'src> Parser<'src> {
                 Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: Number::Float(value),
                     range: self.node_range(start),
-                    node_index: AtomicNodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             }
             TokenKind::Complex => {
@@ -561,7 +561,7 @@ impl<'src> Parser<'src> {
                 Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: Number::Complex { real, imag },
                     range: self.node_range(start),
-                    node_index: AtomicNodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             }
             TokenKind::Int => {
@@ -571,7 +571,7 @@ impl<'src> Parser<'src> {
                 Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: Number::Int(value),
                     range: self.node_range(start),
-                    node_index: AtomicNodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             }
             TokenKind::True => {
@@ -579,7 +579,7 @@ impl<'src> Parser<'src> {
                 Expr::BooleanLiteral(ast::ExprBooleanLiteral {
                     value: true,
                     range: self.node_range(start),
-                    node_index: AtomicNodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             }
             TokenKind::False => {
@@ -587,21 +587,21 @@ impl<'src> Parser<'src> {
                 Expr::BooleanLiteral(ast::ExprBooleanLiteral {
                     value: false,
                     range: self.node_range(start),
-                    node_index: AtomicNodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             }
             TokenKind::None => {
                 self.bump(TokenKind::None);
                 Expr::NoneLiteral(ast::ExprNoneLiteral {
                     range: self.node_range(start),
-                    node_index: AtomicNodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             }
             TokenKind::Ellipsis => {
                 self.bump(TokenKind::Ellipsis);
                 Expr::EllipsisLiteral(ast::ExprEllipsisLiteral {
                     range: self.node_range(start),
-                    node_index: AtomicNodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             }
             TokenKind::Name => Expr::Name(self.parse_name()),
@@ -629,7 +629,7 @@ impl<'src> Parser<'src> {
                         range: self.missing_node_range(),
                         id: Name::empty(),
                         ctx: ExprContext::Invalid,
-                        node_index: AtomicNodeIndex::dummy(),
+                        node_index: AtomicNodeIndex::NONE,
                     })
                 }
             }
@@ -672,7 +672,7 @@ impl<'src> Parser<'src> {
             func: Box::new(func),
             arguments,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -702,7 +702,7 @@ impl<'src> Parser<'src> {
                         arg: None,
                         value: value.expr,
                         range: parser.node_range(argument_start),
-                        node_index: AtomicNodeIndex::dummy(),
+                        node_index: AtomicNodeIndex::NONE,
                     });
 
                     seen_keyword_unpacking = true;
@@ -767,7 +767,7 @@ impl<'src> Parser<'src> {
                             ast::Identifier {
                                 id: ident_expr.id,
                                 range: ident_expr.range,
-                                node_index: AtomicNodeIndex::dummy(),
+                                node_index: AtomicNodeIndex::NONE,
                             }
                         } else {
                             // TODO(dhruvmanila): Parser shouldn't drop the `parsed_expr` if it's
@@ -780,7 +780,7 @@ impl<'src> Parser<'src> {
                             ast::Identifier {
                                 id: Name::empty(),
                                 range: parsed_expr.range(),
-                                node_index: AtomicNodeIndex::dummy(),
+                                node_index: AtomicNodeIndex::NONE,
                             }
                         };
 
@@ -790,7 +790,7 @@ impl<'src> Parser<'src> {
                             arg: Some(arg),
                             value: value.expr,
                             range: parser.node_range(argument_start),
-                            node_index: AtomicNodeIndex::dummy(),
+                            node_index: AtomicNodeIndex::NONE,
                         });
                     } else {
                         if !parsed_expr.is_unparenthesized_starred_expr() {
@@ -815,7 +815,7 @@ impl<'src> Parser<'src> {
 
         let arguments = ast::Arguments {
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             args: args.into_boxed_slice(),
             keywords: keywords.into_boxed_slice(),
         };
@@ -857,11 +857,11 @@ impl<'src> Parser<'src> {
                     range: slice_range,
                     id: Name::empty(),
                     ctx: ExprContext::Invalid,
-                    node_index: AtomicNodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::NONE,
                 })),
                 ctx: ExprContext::Load,
                 range: self.node_range(start),
-                node_index: AtomicNodeIndex::dummy(),
+                node_index: AtomicNodeIndex::NONE,
             };
         }
 
@@ -881,7 +881,7 @@ impl<'src> Parser<'src> {
                 ctx: ExprContext::Load,
                 range: self.node_range(slice_start),
                 parenthesized: false,
-                node_index: AtomicNodeIndex::dummy(),
+                node_index: AtomicNodeIndex::NONE,
             });
         } else if slice.is_starred_expr() {
             // If the only slice element is a starred expression, that is represented
@@ -892,7 +892,7 @@ impl<'src> Parser<'src> {
                 ctx: ExprContext::Load,
                 range: self.node_range(slice_start),
                 parenthesized: false,
-                node_index: AtomicNodeIndex::dummy(),
+                node_index: AtomicNodeIndex::NONE,
             });
         }
 
@@ -941,7 +941,7 @@ impl<'src> Parser<'src> {
             slice: Box::new(slice),
             ctx: ExprContext::Load,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1035,7 +1035,7 @@ impl<'src> Parser<'src> {
 
         Expr::Slice(ast::ExprSlice {
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             lower,
             upper,
             step,
@@ -1066,7 +1066,7 @@ impl<'src> Parser<'src> {
             op,
             operand: Box::new(operand.expr),
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1091,7 +1091,7 @@ impl<'src> Parser<'src> {
             attr,
             ctx: ExprContext::Load,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1135,7 +1135,7 @@ impl<'src> Parser<'src> {
             values,
             op,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1215,7 +1215,7 @@ impl<'src> Parser<'src> {
             ops: operators.into_boxed_slice(),
             comparators: comparators.into_boxed_slice(),
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1285,22 +1285,22 @@ impl<'src> Parser<'src> {
                 StringType::Str(string) => Expr::StringLiteral(ast::ExprStringLiteral {
                     value: ast::StringLiteralValue::single(string),
                     range,
-                    node_index: AtomicNodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::NONE,
                 }),
                 StringType::Bytes(bytes) => Expr::BytesLiteral(ast::ExprBytesLiteral {
                     value: ast::BytesLiteralValue::single(bytes),
                     range,
-                    node_index: AtomicNodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::NONE,
                 }),
                 StringType::FString(fstring) => Expr::FString(ast::ExprFString {
                     value: ast::FStringValue::single(fstring),
                     range,
-                    node_index: AtomicNodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::NONE,
                 }),
                 StringType::TString(tstring) => Expr::TString(ast::ExprTString {
                     value: ast::TStringValue::single(tstring),
                     range,
-                    node_index: AtomicNodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::NONE,
                 }),
             },
             _ => self.handle_implicitly_concatenated_strings(strings, range),
@@ -1367,7 +1367,7 @@ impl<'src> Parser<'src> {
                 return Expr::from(ast::ExprBytesLiteral {
                     value: ast::BytesLiteralValue::concatenated(values),
                     range,
-                    node_index: AtomicNodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::NONE,
                 });
             }
         }
@@ -1395,7 +1395,7 @@ impl<'src> Parser<'src> {
                 return Expr::from(ast::ExprTString {
                     value: ast::TStringValue::concatenated(values),
                     range,
-                    node_index: AtomicNodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::NONE,
                 });
             }
         }
@@ -1433,7 +1433,7 @@ impl<'src> Parser<'src> {
             return Expr::from(ast::ExprStringLiteral {
                 value: ast::StringLiteralValue::concatenated(values),
                 range,
-                node_index: AtomicNodeIndex::dummy(),
+                node_index: AtomicNodeIndex::NONE,
             });
         }
 
@@ -1457,7 +1457,7 @@ impl<'src> Parser<'src> {
         Expr::from(ast::ExprFString {
             value: ast::FStringValue::concatenated(parts),
             range,
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         })
     }
 
@@ -1493,7 +1493,7 @@ impl<'src> Parser<'src> {
                         value: Box::new([]),
                         range,
                         flags: ast::BytesLiteralFlags::from(flags).with_invalid(),
-                        node_index: AtomicNodeIndex::dummy(),
+                        node_index: AtomicNodeIndex::NONE,
                     })
                 } else {
                     // test_err invalid_string_literal
@@ -1503,7 +1503,7 @@ impl<'src> Parser<'src> {
                         value: "".into(),
                         range,
                         flags: ast::StringLiteralFlags::from(flags).with_invalid(),
-                        node_index: AtomicNodeIndex::dummy(),
+                        node_index: AtomicNodeIndex::NONE,
                     })
                 }
             }
@@ -1526,7 +1526,7 @@ impl<'src> Parser<'src> {
         kind: InterpolatedStringKind,
     ) -> InterpolatedStringData {
         let start = self.node_start();
-        let flags = self.tokens.current_flags().as_any_string_flags();
+        let mut flags = self.tokens.current_flags().as_any_string_flags();
 
         self.bump(kind.start_token());
         let elements = self.parse_interpolated_string_elements(
@@ -1535,89 +1535,13 @@ impl<'src> Parser<'src> {
             kind,
         );
 
-        self.expect(kind.end_token());
-
-        // test_ok pep701_f_string_py312
-        // # parse_options: {"target-version": "3.12"}
-        // f'Magic wand: { bag['wand'] }'     # nested quotes
-        // f"{'\n'.join(a)}"                  # escape sequence
-        // f'''A complex trick: {
-        //     bag['bag']                     # comment
-        // }'''
-        // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
-        // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
-        // f"test {a \
-        //     } more"                        # line continuation
-
-        // test_ok pep750_t_string_py314
-        // # parse_options: {"target-version": "3.14"}
-        // t'Magic wand: { bag['wand'] }'     # nested quotes
-        // t"{'\n'.join(a)}"                  # escape sequence
-        // t'''A complex trick: {
-        //     bag['bag']                     # comment
-        // }'''
-        // t"{t"{t"{t"{t"{t"{1+1}"}"}"}"}"}"  # arbitrary nesting
-        // t"{t'''{"nested"} inner'''} outer" # nested (triple) quotes
-        // t"test {a \
-        //     } more"                        # line continuation
-
-        // test_ok pep701_f_string_py311
-        // # parse_options: {"target-version": "3.11"}
-        // f"outer {'# not a comment'}"
-        // f'outer {x:{"# not a comment"} }'
-        // f"""{f'''{f'{"# not a comment"}'}'''}"""
-        // f"""{f'''# before expression {f'# aro{f"#{1+1}#"}und #'}'''} # after expression"""
-        // f"escape outside of \t {expr}\n"
-        // f"test\"abcd"
-
-        // test_err pep701_f_string_py311
-        // # parse_options: {"target-version": "3.11"}
-        // f'Magic wand: { bag['wand'] }'     # nested quotes
-        // f"{'\n'.join(a)}"                  # escape sequence
-        // f'''A complex trick: {
-        //     bag['bag']                     # comment
-        // }'''
-        // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
-        // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
-        // f"test {a \
-        //     } more"                        # line continuation
-        // f"""{f"""{x}"""}"""                # mark the whole triple quote
-        // f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
-
-        let range = self.node_range(start);
-
-        if !self.options.target_version.supports_pep_701()
-            && matches!(kind, InterpolatedStringKind::FString)
-        {
-            let quote_bytes = flags.quote_str().as_bytes();
-            let quote_len = flags.quote_len();
-            for expr in elements.interpolations() {
-                for slash_position in memchr::memchr_iter(b'\\', self.source[expr.range].as_bytes())
-                {
-                    let slash_position = TextSize::try_from(slash_position).unwrap();
-                    self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
-                        TextRange::at(expr.range.start() + slash_position, '\\'.text_len()),
-                    );
-                }
-
-                if let Some(quote_position) =
-                    memchr::memmem::find(self.source[expr.range].as_bytes(), quote_bytes)
-                {
-                    let quote_position = TextSize::try_from(quote_position).unwrap();
-                    self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
-                        TextRange::at(expr.range.start() + quote_position, quote_len),
-                    );
-                }
-            }
-
-            self.check_fstring_comments(range);
+        if !self.expect(kind.end_token()) {
+            flags = flags.with_unclosed(true);
         }
 
         InterpolatedStringData {
             elements,
-            range,
+            range: self.node_range(start),
             flags,
         }
     }
@@ -1677,7 +1601,7 @@ impl<'src> Parser<'src> {
                                     ast::InterpolatedStringLiteralElement {
                                         value: "".into(),
                                         range,
-                                        node_index: AtomicNodeIndex::dummy(),
+                                        node_index: AtomicNodeIndex::NONE,
                                     }
                                 }),
                         )
@@ -1719,6 +1643,9 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
+        self.tokens
+            .re_lex_string_token_in_interpolation_element(string_kind);
+
         // test_err f_string_empty_expression
         // f"{}"
         // f"{  }"
@@ -1740,6 +1667,7 @@ impl<'src> Parser<'src> {
         // t"{*}"
         // t"{*x and y}"
         // t"{*yield x}"
+
         let value = self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
 
         if !value.is_parenthesized && value.expr.is_lambda_expr() {
@@ -1773,6 +1701,10 @@ impl<'src> Parser<'src> {
         };
 
         let conversion = if self.eat(TokenKind::Exclamation) {
+            // Ensure that the `r` is lexed as a `r` name token instead of a raw string
+            // in `f{abc!r"` (note the missing `}`).
+            self.tokens.re_lex_raw_string_in_format_spec();
+
             let conversion_flag_range = self.current_token_range();
             if self.at(TokenKind::Name) {
                 // test_err f_string_conversion_follows_exclamation
@@ -1846,11 +1778,14 @@ impl<'src> Parser<'src> {
             Some(Box::new(ast::InterpolatedStringFormatSpec {
                 range: self.node_range(spec_start),
                 elements,
-                node_index: AtomicNodeIndex::dummy(),
+                node_index: AtomicNodeIndex::NONE,
             }))
         } else {
             None
         };
+
+        self.tokens
+            .re_lex_string_token_in_interpolation_element(string_kind);
 
         // We're using `eat` here instead of `expect` to use the f-string specific error type.
         if !self.eat(TokenKind::Rbrace) {
@@ -1892,13 +1827,111 @@ impl<'src> Parser<'src> {
             );
         }
 
+        // test_ok pep701_f_string_py312
+        // # parse_options: {"target-version": "3.12"}
+        // f'Magic wand: { bag['wand'] }'     # nested quotes
+        // f"{'\n'.join(a)}"                  # escape sequence
+        // f'''A complex trick: {
+        //     bag['bag']                     # comment
+        // }'''
+        // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+        // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // f"test {a \
+        //     } more"                        # line continuation
+
+        // test_ok pep750_t_string_py314
+        // # parse_options: {"target-version": "3.14"}
+        // t'Magic wand: { bag['wand'] }'     # nested quotes
+        // t"{'\n'.join(a)}"                  # escape sequence
+        // t'''A complex trick: {
+        //     bag['bag']                     # comment
+        // }'''
+        // t"{t"{t"{t"{t"{t"{1+1}"}"}"}"}"}"  # arbitrary nesting
+        // t"{t'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // t"test {a \
+        //     } more"                        # line continuation
+
+        // test_ok pep701_f_string_py311
+        // # parse_options: {"target-version": "3.11"}
+        // f"outer {'# not a comment'}"
+        // f'outer {x:{"# not a comment"} }'
+        // f"""{f'''{f'{"# not a comment"}'}'''}"""
+        // f"""{f'''# before expression {f'# aro{f"#{1+1}#"}und #'}'''} # after expression"""
+        // f"escape outside of \t {expr}\n"
+        // f"test\"abcd"
+        // f"{1:\x64}"  # escapes are valid in the format spec
+        // f"{1:\"d\"}"  # this also means that escaped outer quotes are valid
+
+        // test_err pep701_f_string_py311
+        // # parse_options: {"target-version": "3.11"}
+        // f'Magic wand: { bag['wand'] }'     # nested quotes
+        // f"{'\n'.join(a)}"                  # escape sequence
+        // f'''A complex trick: {
+        //     bag['bag']                     # comment
+        // }'''
+        // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+        // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // f"test {a \
+        //     } more"                        # line continuation
+        // f"""{f"""{x}"""}"""                # mark the whole triple quote
+        // f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+
+        // test_err pep701_nested_interpolation_py311
+        // # parse_options: {"target-version": "3.11"}
+        // # nested interpolations also need to be checked
+        // f'{1: abcd "{'aa'}" }'
+        // f'{1: abcd "{"\n"}" }'
+
+        // test_err nested_quote_in_format_spec_py312
+        // # parse_options: {"target-version": "3.12"}
+        // f"{1:""}"  # this is a ParseError on all versions
+
+        // test_ok non_nested_quote_in_format_spec_py311
+        // # parse_options: {"target-version": "3.11"}
+        // f"{1:''}"  # but this is okay on all versions
+        let range = self.node_range(start);
+
+        if !self.options.target_version.supports_pep_701()
+            && matches!(string_kind, InterpolatedStringKind::FString)
+        {
+            // We need to check the whole expression range, including any leading or trailing
+            // debug text, but exclude the format spec, where escapes and escaped, reused quotes
+            // are allowed.
+            let range = format_spec
+                .as_ref()
+                .map(|format_spec| TextRange::new(range.start(), format_spec.start()))
+                .unwrap_or(range);
+
+            let quote_bytes = flags.quote_str().as_bytes();
+            let quote_len = flags.quote_len();
+            for slash_position in memchr::memchr_iter(b'\\', self.source[range].as_bytes()) {
+                let slash_position = TextSize::try_from(slash_position).unwrap();
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
+                    TextRange::at(range.start() + slash_position, '\\'.text_len()),
+                );
+            }
+
+            if let Some(quote_position) =
+                memchr::memmem::find(self.source[range].as_bytes(), quote_bytes)
+            {
+                let quote_position = TextSize::try_from(quote_position).unwrap();
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
+                    TextRange::at(range.start() + quote_position, quote_len),
+                );
+            }
+
+            self.check_fstring_comments(range);
+        }
+
         ast::InterpolatedElement {
             expression: Box::new(value.expr),
             debug_text,
             conversion,
             format_spec,
-            range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            range,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1928,7 +1961,7 @@ impl<'src> Parser<'src> {
                 elts: vec![],
                 ctx: ExprContext::Load,
                 range: self.node_range(start),
-                node_index: AtomicNodeIndex::dummy(),
+                node_index: AtomicNodeIndex::NONE,
             });
         }
 
@@ -1980,7 +2013,7 @@ impl<'src> Parser<'src> {
             return Expr::Dict(ast::ExprDict {
                 items: vec![],
                 range: self.node_range(start),
-                node_index: AtomicNodeIndex::dummy(),
+                node_index: AtomicNodeIndex::NONE,
             });
         }
 
@@ -2091,7 +2124,7 @@ impl<'src> Parser<'src> {
                 elts: vec![],
                 ctx: ExprContext::Load,
                 range: self.node_range(start),
-                node_index: AtomicNodeIndex::dummy(),
+                node_index: AtomicNodeIndex::NONE,
                 parenthesized: true,
             })
             .into();
@@ -2180,7 +2213,7 @@ impl<'src> Parser<'src> {
             elts,
             ctx: ExprContext::Load,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             parenthesized: parenthesized.is_yes(),
         }
     }
@@ -2209,7 +2242,7 @@ impl<'src> Parser<'src> {
             elts,
             ctx: ExprContext::Load,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2258,7 +2291,7 @@ impl<'src> Parser<'src> {
 
         ast::ExprSet {
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             elts,
         }
     }
@@ -2301,7 +2334,7 @@ impl<'src> Parser<'src> {
 
         ast::ExprDict {
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             items,
         }
     }
@@ -2369,7 +2402,7 @@ impl<'src> Parser<'src> {
 
         ast::Comprehension {
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             target: target.expr,
             iter: iter.expr,
             ifs,
@@ -2399,7 +2432,7 @@ impl<'src> Parser<'src> {
             elt: Box::new(element),
             generators,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             parenthesized: parenthesized.is_yes(),
         }
     }
@@ -2420,7 +2453,7 @@ impl<'src> Parser<'src> {
             elt: Box::new(element),
             generators,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2442,7 +2475,7 @@ impl<'src> Parser<'src> {
             value: Box::new(value),
             generators,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2462,7 +2495,7 @@ impl<'src> Parser<'src> {
             elt: Box::new(element),
             generators,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2499,7 +2532,7 @@ impl<'src> Parser<'src> {
             value: Box::new(parsed_expr.expr),
             ctx: ExprContext::Load,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2522,7 +2555,7 @@ impl<'src> Parser<'src> {
         ast::ExprAwait {
             value: Box::new(parsed_expr.expr),
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2571,7 +2604,7 @@ impl<'src> Parser<'src> {
         Expr::Yield(ast::ExprYield {
             value,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         })
     }
 
@@ -2611,7 +2644,7 @@ impl<'src> Parser<'src> {
         Expr::YieldFrom(ast::ExprYieldFrom {
             value: Box::new(expr),
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         })
     }
 
@@ -2652,7 +2685,7 @@ impl<'src> Parser<'src> {
             target: Box::new(target),
             value: Box::new(value.expr),
             range,
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2700,7 +2733,7 @@ impl<'src> Parser<'src> {
             body: Box::new(body.expr),
             parameters,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2725,7 +2758,7 @@ impl<'src> Parser<'src> {
             test: Box::new(test.expr),
             orelse: Box::new(orelse.expr),
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2751,7 +2784,7 @@ impl<'src> Parser<'src> {
 
         let command = ast::ExprIpyEscapeCommand {
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             kind,
             value,
         };
@@ -3010,7 +3043,7 @@ impl From<InterpolatedStringData> for FString {
             elements: value.elements,
             range: value.range,
             flags: value.flags.into(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 }
@@ -3021,7 +3054,7 @@ impl From<InterpolatedStringData> for TString {
             elements: value.elements,
             range: value.range,
             flags: value.flags.into(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 }

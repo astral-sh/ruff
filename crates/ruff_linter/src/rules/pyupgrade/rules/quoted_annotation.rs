@@ -66,7 +66,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Fix safety
 ///
 /// The rule's fix is marked as safe, unless [preview] and
-/// [`lint.future_annotations`] are enabled and a `from __future__ import
+/// [`lint.future-annotations`] are enabled and a `from __future__ import
 /// annotations` import is added. Such an import may change the behavior of all annotations in the
 /// file.
 ///
@@ -87,6 +87,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// [TC008]: https://docs.astral.sh/ruff/rules/quoted-type-alias/
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.242")]
 pub(crate) struct QuotedAnnotation;
 
 impl AlwaysFixableViolation for QuotedAnnotation {
@@ -102,7 +103,7 @@ impl AlwaysFixableViolation for QuotedAnnotation {
 
 /// UP037
 pub(crate) fn quoted_annotation(checker: &Checker, annotation: &str, range: TextRange) {
-    let add_future_import = checker.settings().future_annotations()
+    let add_future_import = checker.settings().future_annotations
         && checker.semantic().in_runtime_evaluated_annotation();
 
     if !(checker.semantic().in_typing_only_annotation() || add_future_import) {

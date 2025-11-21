@@ -44,6 +44,7 @@ use crate::checkers::ast::Checker;
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.77")]
 pub(crate) struct InvalidArgumentName {
     name: String,
 }

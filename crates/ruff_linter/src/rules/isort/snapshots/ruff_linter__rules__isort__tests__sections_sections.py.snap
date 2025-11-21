@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-sections.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+I001 [*] Import block is un-sorted or un-formatted
+ --> sections.py:1:1
   |
 1 | / from __future__ import annotations
 2 | | import os
@@ -10,20 +11,18 @@ sections.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 5 | | import django.settings
 6 | | from library import foo
 7 | | from . import local
-  | |___________________^ I001
+  | |___________________^
   |
-  = help: Organize imports
-
-ℹ Safe fix
-1  1  | from __future__ import annotations
-   2  |+
-2  3  | import os
-3  4  | import sys
-   5  |+
-4  6  | import pytz
-5     |-import django.settings
-6  7  | from library import foo
-   8  |+
-7  9  | from . import local
-   10 |+
-   11 |+import django.settings
+help: Organize imports
+1  | from __future__ import annotations
+2  + 
+3  | import os
+4  | import sys
+5  + 
+6  | import pytz
+   - import django.settings
+7  | from library import foo
+8  + 
+9  | from . import local
+10 + 
+11 + import django.settings

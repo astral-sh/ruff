@@ -4,8 +4,8 @@ use std::sync::Arc;
 use std::{cmp, fmt};
 
 pub use self::changes::ChangeResult;
+use crate::CollectReporter;
 use crate::metadata::settings::file_settings;
-use crate::{CollectReporter, DEFAULT_LINT_REGISTRY};
 use crate::{ProgressReporter, Project, ProjectMetadata};
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Diagnostic;
@@ -21,6 +21,8 @@ mod changes;
 #[salsa::db]
 pub trait Db: SemanticDb {
     fn project(&self) -> Project;
+
+    fn dyn_clone(&self) -> Box<dyn Db>;
 }
 
 #[salsa::db]
@@ -128,18 +130,49 @@ impl ProjectDatabase {
     /// to the CLI after a typechecker run.
     pub fn salsa_memory_dump(&self) -> SalsaMemoryDump {
         let memory_usage = <dyn salsa::Database>::memory_usage(self);
-        let mut ingredients = memory_usage.structs;
-        let mut memos = memory_usage.queries.into_iter().collect::<Vec<_>>();
+        let mut ingredients = memory_usage
+            .structs
+            .into_iter()
+            .filter(|ingredient| ingredient.count() > 0)
+            .collect::<Vec<_>>();
+        let mut memos = memory_usage
+            .queries
+            .into_iter()
+            .filter(|(_, memos)| memos.count() > 0)
+            .collect::<Vec<_>>();
 
-        ingredients.sort_by_key(|ingredient| cmp::Reverse(ingredient.size_of_fields()));
-        memos.sort_by_key(|(_, memo)| cmp::Reverse(memo.size_of_fields()));
+        ingredients.sort_by_key(|ingredient| {
+            let heap_size = ingredient.heap_size_of_fields().unwrap_or_else(|| {
+                // Salsa currently does not expose a way to track the heap size of interned
+                // query arguments.
+                if !ingredient.debug_name().contains("interned_arguments") {
+                    tracing::warn!(
+                        "expected `heap_size` to be provided by Salsa struct `{}`",
+                        ingredient.debug_name()
+                    );
+                }
+
+                0
+            });
+
+            cmp::Reverse(ingredient.size_of_fields() + heap_size)
+        });
+
+        memos.sort_by_key(|(query, memo)| {
+            let heap_size = memo.heap_size_of_fields().unwrap_or_else(|| {
+                tracing::warn!("expected `heap_size` to be provided by Salsa query `{query}`");
+                0
+            });
+
+            cmp::Reverse(memo.size_of_fields() + heap_size)
+        });
 
         let mut total_fields = 0;
         let mut total_metadata = 0;
         for ingredient in &ingredients {
-            total_metadata += ingredient.size_of_metadata();
             total_fields += ingredient.size_of_fields();
             total_fields += ingredient.heap_size_of_fields().unwrap_or(0);
+            total_metadata += ingredient.size_of_metadata();
         }
 
         let mut total_memo_fields = 0;
@@ -171,7 +204,7 @@ impl std::fmt::Debug for ProjectDatabase {
     }
 }
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 #[cfg_attr(test, derive(serde::Serialize))]
 pub enum CheckMode {
     /// Checks the open files in the project.
@@ -281,12 +314,15 @@ impl SalsaMemoryDump {
                 writeln!(f, "=======SALSA STRUCTS=======")?;
 
                 for ingredient in ingredients {
+                    let size_of_fields =
+                        ingredient.size_of_fields() + ingredient.heap_size_of_fields().unwrap_or(0);
+
                     writeln!(
                         f,
                         "{:<50} metadata={:<8} fields={:<8} count={}",
                         format!("`{}`", ingredient.debug_name()),
                         format!("{:.2}MB", bytes_to_mb(ingredient.size_of_metadata())),
-                        format!("{:.2}MB", bytes_to_mb(ingredient.size_of_fields())),
+                        format!("{:.2}MB", bytes_to_mb(size_of_fields)),
                         ingredient.count()
                     )?;
                 }
@@ -294,13 +330,16 @@ impl SalsaMemoryDump {
                 writeln!(f, "=======SALSA QUERIES=======")?;
 
                 for (query_fn, memo) in memos {
+                    let size_of_fields =
+                        memo.size_of_fields() + memo.heap_size_of_fields().unwrap_or(0);
+
                     writeln!(f, "`{query_fn} -> {}`", memo.debug_name())?;
 
                     writeln!(
                         f,
                         "    metadata={:<8} fields={:<8} count={}",
                         format!("{:.2}MB", bytes_to_mb(memo.size_of_metadata())),
-                        format!("{:.2}MB", bytes_to_mb(memo.size_of_fields())),
+                        format!("{:.2}MB", bytes_to_mb(size_of_fields)),
                         memo.count()
                     )?;
                 }
@@ -416,7 +455,11 @@ impl SemanticDb for ProjectDatabase {
     }
 
     fn lint_registry(&self) -> &LintRegistry {
-        &DEFAULT_LINT_REGISTRY
+        ty_python_semantic::default_lint_registry()
+    }
+
+    fn verbose(&self) -> bool {
+        self.project().verbose(self)
     }
 }
 
@@ -447,6 +490,10 @@ impl Db for ProjectDatabase {
     fn project(&self) -> Project {
         self.project.unwrap()
     }
+
+    fn dyn_clone(&self) -> Box<dyn Db> {
+        Box::new(self.clone())
+    }
 }
 
 #[cfg(feature = "format")]
@@ -469,13 +516,14 @@ pub(crate) mod tests {
     use std::sync::{Arc, Mutex};
 
     use ruff_db::Db as SourceDb;
-    use ruff_db::files::Files;
+    use ruff_db::files::{FileRootKind, Files};
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
-    use ty_python_semantic::Program;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
+    use ty_python_semantic::{
+        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
+    };
 
-    use crate::DEFAULT_LINT_REGISTRY;
     use crate::db::Db;
     use crate::{Project, ProjectMetadata};
 
@@ -513,6 +561,27 @@ pub(crate) mod tests {
             let project = Project::from_metadata(&db, project).unwrap();
             db.project = Some(project);
             db
+        }
+
+        pub fn init_program(&mut self) -> anyhow::Result<()> {
+            let root = self.project().root(self);
+
+            let search_paths = SearchPathSettings::new(vec![root.to_path_buf()])
+                .to_search_paths(self.system(), self.vendored())
+                .expect("Valid search path settings");
+
+            Program::from_settings(
+                self,
+                ProgramSettings {
+                    python_version: PythonVersionWithSource::default(),
+                    python_platform: PythonPlatform::default(),
+                    search_paths,
+                },
+            );
+
+            self.files().try_add_root(self, root, FileRootKind::Project);
+
+            Ok(())
         }
     }
 
@@ -565,7 +634,11 @@ pub(crate) mod tests {
         }
 
         fn lint_registry(&self) -> &LintRegistry {
-            &DEFAULT_LINT_REGISTRY
+            ty_python_semantic::default_lint_registry()
+        }
+
+        fn verbose(&self) -> bool {
+            false
         }
     }
 
@@ -573,6 +646,10 @@ pub(crate) mod tests {
     impl Db for TestDb {
         fn project(&self) -> Project {
             self.project.unwrap()
+        }
+
+        fn dyn_clone(&self) -> Box<dyn Db> {
+            Box::new(self.clone())
         }
     }
 

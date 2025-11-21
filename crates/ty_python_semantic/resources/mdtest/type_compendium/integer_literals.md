@@ -32,8 +32,8 @@ static_assert(not is_singleton(Literal[1]))
 static_assert(not is_singleton(Literal[54165]))
 ```
 
-This has implications for type-narrowing. For example, you can not use the `is not` operator to
-check whether a variable has a specific integer literal type, but this is not a recommended practice
+This has implications for type-narrowing. For example, you cannot use the `is not` operator to check
+whether a variable has a specific integer literal type, but this is not a recommended practice
 anyway.
 
 ```py
@@ -44,7 +44,7 @@ def f(x: int):
         reveal_type(x)  # revealed: Literal[54165]
 
     if x is not 54165:
-        # But here, we can not narrow the type (to `int & ~Literal[54165]`), because `x` might also
+        # But here, we cannot narrow the type (to `int & ~Literal[54165]`), because `x` might also
         # have the value `54165`, but a different object identity.
         reveal_type(x)  # revealed: int
 ```

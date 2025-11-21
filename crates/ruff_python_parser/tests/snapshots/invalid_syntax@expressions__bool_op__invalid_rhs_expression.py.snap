@@ -7,22 +7,22 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/bool_op/inva
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..31,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..17,
                     value: BoolOp(
                         ExprBoolOp {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 0..17,
                             op: And,
                             values: [
                                 Name(
                                     ExprName {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 0..1,
                                         id: Name("x"),
                                         ctx: Load,
@@ -30,26 +30,24 @@ Module(
                                 ),
                                 Lambda(
                                     ExprLambda {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 6..17,
                                         parameters: Some(
                                             Parameters {
                                                 range: 13..14,
-                                                node_index: AtomicNodeIndex(
-                                                    0,
-                                                ),
+                                                node_index: NodeIndex(None),
                                                 posonlyargs: [],
                                                 args: [
                                                     ParameterWithDefault {
                                                         range: 13..14,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         parameter: Parameter {
                                                             range: 13..14,
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             name: Identifier {
                                                                 id: Name("y"),
                                                                 range: 13..14,
-                                                                node_index: AtomicNodeIndex(..),
+                                                                node_index: NodeIndex(None),
                                                             },
                                                             annotation: None,
                                                         },
@@ -63,7 +61,7 @@ Module(
                                         ),
                                         body: Name(
                                             ExprName {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 16..17,
                                                 id: Name("y"),
                                                 ctx: Load,
@@ -78,17 +76,17 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 19..31,
                     value: BoolOp(
                         ExprBoolOp {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 19..31,
                             op: Or,
                             values: [
                                 Name(
                                     ExprName {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 19..20,
                                         id: Name("x"),
                                         ctx: Load,
@@ -96,12 +94,12 @@ Module(
                                 ),
                                 Yield(
                                     ExprYield {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 24..31,
                                         value: Some(
                                             Name(
                                                 ExprName {
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     range: 30..31,
                                                     id: Name("y"),
                                                     ctx: Load,

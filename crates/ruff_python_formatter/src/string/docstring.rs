@@ -1613,7 +1613,7 @@ pub(super) fn needs_chaperone_space(
     if is_no_chaperone_for_escaped_quote_in_triple_quoted_docstring_enabled(context) {
         if flags.is_triple_quoted() {
             if let Some(before_quote) = trim_end.strip_suffix(flags.quote_style().as_char()) {
-                if count_consecutive_chars_from_end(before_quote, '\\') % 2 == 0 {
+                if count_consecutive_chars_from_end(before_quote, '\\').is_multiple_of(2) {
                     // Even backslash count preceding quote;
                     // ```py
                     // """a "  """

@@ -22,7 +22,7 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
     use crate::test::{test_path, test_resource_path};
-    use crate::{assert_diagnostics, settings};
+    use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005_slices.py"))]
@@ -85,6 +85,7 @@ mod tests {
     #[test_case(Rule::InvalidAssertMessageLiteralArgument, Path::new("RUF040.py"))]
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.py"))]
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.pyi"))]
+    #[test_case(Rule::PytestRaisesAmbiguousPattern, Path::new("RUF043.py"))]
     #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046.py"))]
     #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046_CR.py"))]
     #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046_LF.py"))]
@@ -111,6 +112,8 @@ mod tests {
     #[test_case(Rule::LegacyFormPytestRaises, Path::new("RUF061_warns.py"))]
     #[test_case(Rule::LegacyFormPytestRaises, Path::new("RUF061_deprecated_call.py"))]
     #[test_case(Rule::NonOctalPermissions, Path::new("RUF064.py"))]
+    #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065_0.py"))]
+    #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065_1.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
@@ -240,6 +243,32 @@ mod tests {
             },
         )?;
         assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn confusables_deferred_annotations_diff() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("ruff/confusables.py"),
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
+                allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::AmbiguousUnicodeCharacterString,
+                    Rule::AmbiguousUnicodeCharacterDocstring,
+                    Rule::AmbiguousUnicodeCharacterComment,
+                ])
+            },
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY314.into(),
+                allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::AmbiguousUnicodeCharacterString,
+                    Rule::AmbiguousUnicodeCharacterDocstring,
+                    Rule::AmbiguousUnicodeCharacterComment,
+                ])
+            },
+        );
         Ok(())
     }
 
@@ -535,7 +564,6 @@ mod tests {
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_1.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_2.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_3.py"))]
-    #[test_case(Rule::PytestRaisesAmbiguousPattern, Path::new("RUF043.py"))]
     #[test_case(Rule::IndentedFormFeed, Path::new("RUF054.py"))]
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -649,7 +677,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
             &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
                 future_annotations: true,
                 unresolved_target_version: PythonVersion::PY39.into(),
                 ..settings::LinterSettings::for_rule(rule_code)

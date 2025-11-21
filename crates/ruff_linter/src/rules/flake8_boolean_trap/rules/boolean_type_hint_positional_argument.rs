@@ -94,6 +94,7 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.127")]
 pub(crate) struct BooleanTypeHintPositionalArgument;
 
 impl Violation for BooleanTypeHintPositionalArgument {

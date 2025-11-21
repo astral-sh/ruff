@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC403_numpy.py:16:5: DOC403 Docstring has a "Yields" section but the function doesn't yield anything
+DOC403 Docstring has a "Yields" section but the function doesn't yield anything
+  --> DOC403_numpy.py:16:5
    |
 14 |   # DOC403
 15 |   def foo(num: int) -> str:
@@ -18,12 +19,13 @@ DOC403_numpy.py:16:5: DOC403 Docstring has a "Yields" section but the function d
 26 | |     str
 27 | |         A string
 28 | |     """
-   | |_______^ DOC403
+   | |_______^
 29 |       print('test')
    |
-   = help: Remove the "Yields" section
+help: Remove the "Yields" section
 
-DOC403_numpy.py:36:9: DOC403 Docstring has a "Yields" section but the function doesn't yield anything
+DOC403 Docstring has a "Yields" section but the function doesn't yield anything
+  --> DOC403_numpy.py:36:9
    |
 34 |       # DOC403
 35 |       def foo(self) -> str:
@@ -40,7 +42,7 @@ DOC403_numpy.py:36:9: DOC403 Docstring has a "Yields" section but the function d
 46 | |         str
 47 | |             A string
 48 | |         """
-   | |___________^ DOC403
+   | |___________^
 49 |           print('test')
    |
-   = help: Remove the "Yields" section
+help: Remove the "Yields" section

@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
-B039_extended.py:7:26: B039 Do not use mutable data structures for `ContextVar` defaults
+B039 Do not use mutable data structures for `ContextVar` defaults
+ --> B039_extended.py:7:26
   |
 6 | from something_else import Depends
 7 | ContextVar("cv", default=Depends())
-  |                          ^^^^^^^^^ B039
+  |                          ^^^^^^^^^
   |
-  = help: Replace with `None`; initialize with `.set()``
+help: Replace with `None`; initialize with `.set()``

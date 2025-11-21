@@ -47,4 +47,19 @@ def _(string_instance: str, literalstring: LiteralString):
     reveal_type("a".startswith(literalstring))  # revealed: bool
 ```
 
+Unlike bound methods for some other classes implemented in C, `"foo".startswith` is an instance of
+`types.BuiltinFunctionType` at runtime, rather than `types.MethodWrapperType`:
+
+```py
+import types
+from ty_extensions import TypeOf, static_assert, is_subtype_of
+
+static_assert(is_subtype_of(TypeOf["foo".startswith], types.BuiltinFunctionType))
+
+# `types.BuiltinMethodType` is just an alias for `types.BuiltinFunctionType`
+static_assert(is_subtype_of(TypeOf["foo".startswith], types.BuiltinMethodType))
+static_assert(not is_subtype_of(TypeOf["foo".startswith], types.MethodWrapperType))
+static_assert(not is_subtype_of(TypeOf["foo".startswith], types.WrapperDescriptorType))
+```
+
 [`sys.platform` checks]: https://docs.python.org/3/library/sys.html#sys.platform

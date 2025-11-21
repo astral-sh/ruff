@@ -9,7 +9,6 @@ from airflow.operators.empty import EmptyOperator
 from airflow.operators.latest_only import LatestOnlyOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.operators.weekday import BranchDayOfWeekOperator
-from airflow.sensors.date_time import DateTimeSensor
 
 FSHook()
 PackageIndexHook()
@@ -22,7 +21,6 @@ EmptyOperator()
 
 LatestOnlyOperator()
 BranchDayOfWeekOperator()
-DateTimeSensor()
 
 from airflow.operators.python import (
     BranchPythonOperator,
@@ -30,16 +28,23 @@ from airflow.operators.python import (
     PythonVirtualenvOperator,
     ShortCircuitOperator,
 )
+from airflow.sensors.bash import BashSensor
+from airflow.sensors.date_time import DateTimeSensor
+
+BranchPythonOperator()
+PythonOperator()
+PythonVirtualenvOperator()
+ShortCircuitOperator()
+
+BashSensor()
+DateTimeSensor()
 from airflow.sensors.date_time import DateTimeSensorAsync
 from airflow.sensors.external_task import (
     ExternalTaskMarker,
     ExternalTaskSensor,
 )
-from airflow.sensors.time_sensor import (
-    TimeSensor,
-    TimeSensorAsync,
-)
 from airflow.sensors.filesystem import FileSensor
+from airflow.sensors.python import PythonSensor
 
 BranchPythonOperator()
 PythonOperator()
@@ -49,6 +54,13 @@ DateTimeSensorAsync()
 ExternalTaskMarker()
 ExternalTaskSensor()
 FileSensor()
+PythonSensor()
+
+from airflow.sensors.time_sensor import (
+    TimeSensor,
+    TimeSensorAsync,
+)
+
 TimeSensor()
 TimeSensorAsync()
 

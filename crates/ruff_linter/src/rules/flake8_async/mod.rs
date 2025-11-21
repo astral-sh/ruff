@@ -23,10 +23,13 @@ mod tests {
     #[test_case(Rule::AsyncZeroSleep, Path::new("ASYNC115.py"))]
     #[test_case(Rule::LongSleepNotForever, Path::new("ASYNC116.py"))]
     #[test_case(Rule::BlockingHttpCallInAsyncFunction, Path::new("ASYNC210.py"))]
+    #[test_case(Rule::BlockingHttpCallHttpxInAsyncFunction, Path::new("ASYNC212.py"))]
     #[test_case(Rule::CreateSubprocessInAsyncFunction, Path::new("ASYNC22x.py"))]
     #[test_case(Rule::RunProcessInAsyncFunction, Path::new("ASYNC22x.py"))]
     #[test_case(Rule::WaitForProcessInAsyncFunction, Path::new("ASYNC22x.py"))]
     #[test_case(Rule::BlockingOpenCallInAsyncFunction, Path::new("ASYNC230.py"))]
+    #[test_case(Rule::BlockingPathMethodInAsyncFunction, Path::new("ASYNC240.py"))]
+    #[test_case(Rule::BlockingInputInAsyncFunction, Path::new("ASYNC250.py"))]
     #[test_case(Rule::BlockingSleepInAsyncFunction, Path::new("ASYNC251.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());

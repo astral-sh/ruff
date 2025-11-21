@@ -2,11 +2,11 @@ use std::borrow::Cow;
 
 use lsp_types::request::DocumentSymbolRequest;
 use lsp_types::{DocumentSymbol, DocumentSymbolParams, SymbolInformation, Url};
-use ruff_db::source::{line_index, source_text};
-use ruff_source_file::LineIndex;
-use ty_ide::{SymbolInfo, SymbolsOptions, document_symbols_with_options};
+use ruff_db::files::File;
+use ty_ide::{HierarchicalSymbols, SymbolId, SymbolInfo, document_symbols};
 use ty_project::ProjectDatabase;
 
+use crate::Db;
 use crate::document::{PositionEncoding, ToRangeExt};
 use crate::server::api::symbols::{convert_symbol_kind, convert_to_lsp_symbol_information};
 use crate::server::api::traits::{
@@ -22,7 +22,7 @@ impl RequestHandler for DocumentSymbolRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
-    fn document_url(params: &DocumentSymbolParams) -> Cow<Url> {
+    fn document_url(params: &DocumentSymbolParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -30,7 +30,7 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
         db: &ProjectDatabase,
         snapshot: &DocumentSnapshot,
         _client: &Client,
-        params: DocumentSymbolParams,
+        _params: DocumentSymbolParams,
     ) -> crate::server::Result<Option<lsp_types::DocumentSymbolResponse>> {
         if snapshot
             .workspace_settings()
@@ -39,39 +39,31 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.file(db) else {
+        let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
-
-        let source = source_text(db, file);
-        let line_index = line_index(db, file);
 
         // Check if the client supports hierarchical document symbols
         let supports_hierarchical = snapshot
             .resolved_client_capabilities()
             .supports_hierarchical_document_symbols();
 
-        let options = SymbolsOptions {
-            hierarchical: supports_hierarchical,
-            global_only: false,
-            query_string: None,
-        };
-
-        let symbols = document_symbols_with_options(db, file, &options);
-
+        let symbols = document_symbols(db, file);
         if symbols.is_empty() {
             return Ok(None);
         }
 
         if supports_hierarchical {
-            // Return hierarchical symbols
+            let symbols = symbols.to_hierarchical();
             let lsp_symbols: Vec<DocumentSymbol> = symbols
-                .into_iter()
-                .map(|symbol| {
+                .iter()
+                .filter_map(|(id, symbol)| {
                     convert_to_lsp_document_symbol(
+                        db,
+                        file,
+                        &symbols,
+                        id,
                         symbol,
-                        &source,
-                        &line_index,
                         snapshot.encoding(),
                     )
                 })
@@ -81,15 +73,9 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
         } else {
             // Return flattened symbols as SymbolInformation
             let lsp_symbols: Vec<SymbolInformation> = symbols
-                .into_iter()
-                .map(|symbol| {
-                    convert_to_lsp_symbol_information(
-                        symbol,
-                        &params.text_document.uri,
-                        &source,
-                        &line_index,
-                        snapshot.encoding(),
-                    )
+                .iter()
+                .filter_map(|(_, symbol)| {
+                    convert_to_lsp_symbol_information(db, file, symbol, snapshot.encoding())
                 })
                 .collect();
 
@@ -101,28 +87,37 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
 impl RetriableRequestHandler for DocumentSymbolRequestHandler {}
 
 fn convert_to_lsp_document_symbol(
-    symbol: SymbolInfo,
-    source: &str,
-    line_index: &LineIndex,
+    db: &dyn Db,
+    file: File,
+    symbols: &HierarchicalSymbols,
+    id: SymbolId,
+    symbol: SymbolInfo<'_>,
     encoding: PositionEncoding,
-) -> DocumentSymbol {
+) -> Option<DocumentSymbol> {
     let symbol_kind = convert_symbol_kind(symbol.kind);
 
-    DocumentSymbol {
-        name: symbol.name,
+    Some(DocumentSymbol {
+        name: symbol.name.into_owned(),
         detail: None,
         kind: symbol_kind,
         tags: None,
         #[allow(deprecated)]
         deprecated: None,
-        range: symbol.full_range.to_lsp_range(source, line_index, encoding),
-        selection_range: symbol.name_range.to_lsp_range(source, line_index, encoding),
+        range: symbol
+            .full_range
+            .to_lsp_range(db, file, encoding)?
+            .local_range(),
+        selection_range: symbol
+            .name_range
+            .to_lsp_range(db, file, encoding)?
+            .local_range(),
         children: Some(
-            symbol
-                .children
-                .into_iter()
-                .map(|child| convert_to_lsp_document_symbol(child, source, line_index, encoding))
+            symbols
+                .children(id)
+                .filter_map(|(child_id, child)| {
+                    convert_to_lsp_document_symbol(db, file, symbols, child_id, child, encoding)
+                })
                 .collect(),
         ),
-    }
+    })
 }

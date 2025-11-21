@@ -9,6 +9,7 @@ pub use os::OsSystem;
 
 use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
+use ruff_python_ast::PySourceType;
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
 use std::path::{Path, PathBuf};
@@ -16,12 +17,11 @@ use std::{fmt, io};
 pub use test::{DbWithTestSystem, DbWithWritableSystem, InMemorySystem, TestSystem};
 use walk_directory::WalkDirectoryBuilder;
 
-use crate::file_revision::FileRevision;
-
 pub use self::path::{
     DeduplicatedNestedPathsIter, SystemPath, SystemPathBuf, SystemVirtualPath,
     SystemVirtualPathBuf, deduplicate_nested_paths,
 };
+use crate::file_revision::FileRevision;
 
 mod memory_fs;
 #[cfg(feature = "os")]
@@ -46,7 +46,7 @@ pub type Result<T> = std::io::Result<T>;
 ///    * File watching isn't supported.
 ///
 /// Abstracting the system also enables tests to use a more efficient in-memory file system.
-pub trait System: Debug {
+pub trait System: Debug + Sync + Send {
     /// Reads the metadata of the file or directory at `path`.
     ///
     /// This function will traverse symbolic links to query information about the destination file.
@@ -65,6 +65,35 @@ pub trait System: Debug {
     /// Unlike `std::fs::canonicalize`, this function does remove UNC prefixes if possible.
     /// See [dunce::canonicalize] for more information.
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf>;
+
+    /// Returns the source type for `path` if known or `None`.
+    ///
+    /// The default is to always return `None`, assuming the system
+    /// has no additional information and that the caller should
+    /// rely on the file extension instead.
+    ///
+    /// This is primarily used for the LSP integration to respect
+    /// the chosen language (or the fact that it is a notebook) in
+    /// the editor.
+    fn source_type(&self, path: &SystemPath) -> Option<PySourceType> {
+        let _ = path;
+        None
+    }
+
+    /// Returns the source type for `path` if known or `None`.
+    ///
+    /// The default is to always return `None`, assuming the system
+    /// has no additional information and that the caller should
+    /// rely on the file extension instead.
+    ///
+    /// This is primarily used for the LSP integration to respect
+    /// the chosen language (or the fact that it is a notebook) in
+    /// the editor.
+    fn virtual_path_source_type(&self, path: &SystemVirtualPath) -> Option<PySourceType> {
+        let _ = path;
+
+        None
+    }
 
     /// Reads the content of the file at `path` into a [`String`].
     fn read_to_string(&self, path: &SystemPath) -> Result<String>;
@@ -197,6 +226,8 @@ pub trait System: Debug {
     fn as_any(&self) -> &dyn std::any::Any;
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
+
+    fn dyn_clone(&self) -> Box<dyn System>;
 }
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]

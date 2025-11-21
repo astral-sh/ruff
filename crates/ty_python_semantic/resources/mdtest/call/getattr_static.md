@@ -57,7 +57,7 @@ We can access attributes on objects of all kinds:
 import sys
 
 reveal_type(inspect.getattr_static(sys, "dont_write_bytecode"))  # revealed: bool
-# revealed: def getattr_static(obj: object, attr: str, default: Any | None = ellipsis) -> Any
+# revealed: def getattr_static(obj: object, attr: str, default: Any | None = EllipsisType) -> Any
 reveal_type(inspect.getattr_static(inspect, "getattr_static"))
 
 reveal_type(inspect.getattr_static(1, "real"))  # revealed: property
@@ -84,7 +84,7 @@ class E(metaclass=Meta): ...
 reveal_type(inspect.getattr_static(E, "attr"))  # revealed: int
 ```
 
-Metaclass attributes can not be added when probing an instance of the class:
+Metaclass attributes cannot be added when probing an instance of the class:
 
 ```py
 reveal_type(inspect.getattr_static(E(), "attr", "non_existent"))  # revealed: Literal["non_existent"]

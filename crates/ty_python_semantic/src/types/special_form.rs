@@ -4,6 +4,10 @@
 use super::{ClassType, Type, class::KnownClass};
 use crate::db::Db;
 use crate::module_resolver::{KnownModule, file_to_module};
+use crate::resolve_module;
+use crate::semantic_index::place::ScopedPlaceId;
+use crate::semantic_index::{FileScopeId, place_table, use_def_map};
+use crate::types::TypeDefinition;
 use ruff_db::files::File;
 use std::str::FromStr;
 
@@ -27,6 +31,7 @@ use std::str::FromStr;
     get_size2::GetSize,
 )]
 pub enum SpecialFormType {
+    Any,
     /// The symbol `typing.Annotated` (which can also be found as `typing_extensions.Annotated`)
     Annotated,
     /// The symbol `typing.Literal` (which can also be found as `typing_extensions.Literal`)
@@ -77,6 +82,10 @@ pub enum SpecialFormType {
     TypeOf,
     /// The symbol `ty_extensions.CallableTypeOf`
     CallableTypeOf,
+    /// The symbol `ty_extensions.Top`
+    Top,
+    /// The symbol `ty_extensions.Bottom`
+    Bottom,
     /// The symbol `typing.Callable`
     /// (which can also be found as `typing_extensions.Callable` or as `collections.abc.Callable`)
     Callable,
@@ -117,6 +126,11 @@ pub enum SpecialFormType {
     /// Note that instances of subscripted `typing.Generic` are not represented by this type;
     /// see also [`super::KnownInstanceType::SubscriptedGeneric`].
     Generic,
+
+    /// The symbol `typing.NamedTuple` (which can also be found as `typing_extensions.NamedTuple`).
+    /// Typeshed defines this symbol as a class, but this isn't accurate: it's actually a factory function
+    /// at runtime. We therefore represent it as a special form internally.
+    NamedTuple,
 }
 
 impl SpecialFormType {
@@ -146,11 +160,18 @@ impl SpecialFormType {
             | Self::TypeIs
             | Self::TypeOf
             | Self::Not
+            | Self::Top
+            | Self::Bottom
             | Self::Intersection
             | Self::CallableTypeOf
-            | Self::Protocol  // actually `_ProtocolMeta` at runtime but this is what typeshed says
-            | Self::Generic  // actually `type` at runtime but this is what typeshed says
             | Self::ReadOnly => KnownClass::SpecialForm,
+
+            // Typeshed says it's an instance of `_SpecialForm`,
+            // but then we wouldn't recognise things like `issubclass(`X, Protocol)`
+            // as being valid.
+            Self::Protocol => KnownClass::ProtocolMeta,
+
+            Self::Generic | Self::Any => KnownClass::Type,
 
             Self::List
             | Self::Dict
@@ -163,6 +184,8 @@ impl SpecialFormType {
             | Self::OrderedDict => KnownClass::StdlibAlias,
 
             Self::Unknown | Self::AlwaysTruthy | Self::AlwaysFalsy => KnownClass::Object,
+
+            Self::NamedTuple => KnownClass::FunctionType,
         }
     }
 
@@ -171,7 +194,7 @@ impl SpecialFormType {
     /// For example, the symbol `typing.Literal` is an instance of `typing._SpecialForm`,
     /// so `SpecialFormType::Literal.instance_fallback(db)`
     /// returns `Type::NominalInstance(NominalInstanceType { class: <typing._SpecialForm> })`.
-    pub(super) fn instance_fallback(self, db: &dyn Db) -> Type {
+    pub(super) fn instance_fallback(self, db: &dyn Db) -> Type<'_> {
         self.class().to_instance(db)
     }
 
@@ -230,6 +253,8 @@ impl SpecialFormType {
             | Self::TypeIs
             | Self::TypingSelf
             | Self::Protocol
+            | Self::NamedTuple
+            | Self::Any
             | Self::ReadOnly => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
@@ -238,13 +263,15 @@ impl SpecialFormType {
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy
             | Self::Not
+            | Self::Top
+            | Self::Bottom
             | Self::Intersection
             | Self::TypeOf
             | Self::CallableTypeOf => module.is_ty_extensions(),
         }
     }
 
-    pub(super) fn to_meta_type(self, db: &dyn Db) -> Type {
+    pub(super) fn to_meta_type(self, db: &dyn Db) -> Type<'_> {
         self.class().to_class_literal(db)
     }
 
@@ -261,6 +288,7 @@ impl SpecialFormType {
             | Self::Counter
             | Self::DefaultDict
             | Self::Deque
+            | Self::NamedTuple
             | Self::OrderedDict => true,
 
             // All other special forms are not callable
@@ -281,6 +309,8 @@ impl SpecialFormType {
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy
             | Self::Not
+            | Self::Top
+            | Self::Bottom
             | Self::Intersection
             | Self::TypeOf
             | Self::CallableTypeOf
@@ -297,59 +327,244 @@ impl SpecialFormType {
             | Self::TypeIs
             | Self::ReadOnly
             | Self::Protocol
+            | Self::Any
             | Self::Generic => false,
         }
     }
 
-    /// Return the repr of the symbol at runtime
-    pub(super) const fn repr(self) -> &'static str {
+    /// Return `Some(KnownClass)` if this special form is an alias
+    /// to a standard library class.
+    pub(super) const fn aliased_stdlib_class(self) -> Option<KnownClass> {
         match self {
-            SpecialFormType::Annotated => "typing.Annotated",
-            SpecialFormType::Literal => "typing.Literal",
-            SpecialFormType::LiteralString => "typing.LiteralString",
-            SpecialFormType::Optional => "typing.Optional",
-            SpecialFormType::Union => "typing.Union",
-            SpecialFormType::NoReturn => "typing.NoReturn",
-            SpecialFormType::Never => "typing.Never",
-            SpecialFormType::Tuple => "typing.Tuple",
-            SpecialFormType::Type => "typing.Type",
-            SpecialFormType::TypingSelf => "typing.Self",
-            SpecialFormType::Final => "typing.Final",
-            SpecialFormType::ClassVar => "typing.ClassVar",
-            SpecialFormType::Callable => "typing.Callable",
-            SpecialFormType::Concatenate => "typing.Concatenate",
-            SpecialFormType::Unpack => "typing.Unpack",
-            SpecialFormType::Required => "typing.Required",
-            SpecialFormType::NotRequired => "typing.NotRequired",
-            SpecialFormType::TypeAlias => "typing.TypeAlias",
-            SpecialFormType::TypeGuard => "typing.TypeGuard",
-            SpecialFormType::TypedDict => "typing.TypedDict",
-            SpecialFormType::TypeIs => "typing.TypeIs",
-            SpecialFormType::List => "typing.List",
-            SpecialFormType::Dict => "typing.Dict",
-            SpecialFormType::DefaultDict => "typing.DefaultDict",
-            SpecialFormType::Set => "typing.Set",
-            SpecialFormType::FrozenSet => "typing.FrozenSet",
-            SpecialFormType::Counter => "typing.Counter",
-            SpecialFormType::Deque => "typing.Deque",
-            SpecialFormType::ChainMap => "typing.ChainMap",
-            SpecialFormType::OrderedDict => "typing.OrderedDict",
-            SpecialFormType::ReadOnly => "typing.ReadOnly",
-            SpecialFormType::Unknown => "ty_extensions.Unknown",
-            SpecialFormType::AlwaysTruthy => "ty_extensions.AlwaysTruthy",
-            SpecialFormType::AlwaysFalsy => "ty_extensions.AlwaysFalsy",
-            SpecialFormType::Not => "ty_extensions.Not",
-            SpecialFormType::Intersection => "ty_extensions.Intersection",
-            SpecialFormType::TypeOf => "ty_extensions.TypeOf",
-            SpecialFormType::CallableTypeOf => "ty_extensions.CallableTypeOf",
-            SpecialFormType::Protocol => "typing.Protocol",
-            SpecialFormType::Generic => "typing.Generic",
+            Self::List => Some(KnownClass::List),
+            Self::Dict => Some(KnownClass::Dict),
+            Self::Set => Some(KnownClass::Set),
+            Self::FrozenSet => Some(KnownClass::FrozenSet),
+            Self::ChainMap => Some(KnownClass::ChainMap),
+            Self::Counter => Some(KnownClass::Counter),
+            Self::DefaultDict => Some(KnownClass::DefaultDict),
+            Self::Deque => Some(KnownClass::Deque),
+            Self::OrderedDict => Some(KnownClass::OrderedDict),
+            Self::Tuple => Some(KnownClass::Tuple),
+            Self::Type => Some(KnownClass::Type),
+
+            Self::AlwaysFalsy
+            | Self::AlwaysTruthy
+            | Self::Annotated
+            | Self::Bottom
+            | Self::CallableTypeOf
+            | Self::ClassVar
+            | Self::Concatenate
+            | Self::Final
+            | Self::Intersection
+            | Self::Literal
+            | Self::LiteralString
+            | Self::Never
+            | Self::NoReturn
+            | Self::Not
+            | Self::ReadOnly
+            | Self::Required
+            | Self::TypeAlias
+            | Self::TypeGuard
+            | Self::NamedTuple
+            | Self::NotRequired
+            | Self::Optional
+            | Self::Top
+            | Self::TypeIs
+            | Self::TypedDict
+            | Self::TypingSelf
+            | Self::Union
+            | Self::Unknown
+            | Self::TypeOf
+            | Self::Any
+            // `typing.Callable` is an alias to `collections.abc.Callable`,
+            // but they're both the same `SpecialFormType` in our model,
+            // and neither is a class in typeshed (even though the `collections.abc` one is at runtime)
+            | Self::Callable
+            | Self::Protocol
+            | Self::Generic
+            | Self::Unpack => None,
         }
+    }
+
+    /// Return `true` if this special form is valid as the second argument
+    /// to `issubclass()` and `isinstance()` calls.
+    pub(super) const fn is_valid_isinstance_target(self) -> bool {
+        match self {
+            Self::Callable
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::FrozenSet
+            | Self::Dict
+            | Self::List
+            | Self::OrderedDict
+            | Self::Set
+            | Self::Tuple
+            | Self::Type
+            | Self::Protocol
+            | Self::Generic => true,
+
+            Self::AlwaysFalsy
+            | Self::AlwaysTruthy
+            | Self::Annotated
+            | Self::Bottom
+            | Self::CallableTypeOf
+            | Self::ClassVar
+            | Self::Concatenate
+            | Self::Final
+            | Self::Intersection
+            | Self::Literal
+            | Self::LiteralString
+            | Self::Never
+            | Self::NoReturn
+            | Self::Not
+            | Self::ReadOnly
+            | Self::Required
+            | Self::TypeAlias
+            | Self::TypeGuard
+            | Self::NamedTuple
+            | Self::NotRequired
+            | Self::Optional
+            | Self::Top
+            | Self::TypeIs
+            | Self::TypedDict
+            | Self::TypingSelf
+            | Self::Union
+            | Self::Unknown
+            | Self::TypeOf
+            | Self::Any  // can be used in `issubclass()` but not `isinstance()`.
+            | Self::Unpack => false,
+        }
+    }
+
+    /// Return the name of the symbol at runtime
+    pub(super) const fn name(self) -> &'static str {
+        match self {
+            SpecialFormType::Any => "Any",
+            SpecialFormType::Annotated => "Annotated",
+            SpecialFormType::Literal => "Literal",
+            SpecialFormType::LiteralString => "LiteralString",
+            SpecialFormType::Optional => "Optional",
+            SpecialFormType::Union => "Union",
+            SpecialFormType::NoReturn => "NoReturn",
+            SpecialFormType::Never => "Never",
+            SpecialFormType::Tuple => "Tuple",
+            SpecialFormType::Type => "Type",
+            SpecialFormType::TypingSelf => "Self",
+            SpecialFormType::Final => "Final",
+            SpecialFormType::ClassVar => "ClassVar",
+            SpecialFormType::Callable => "Callable",
+            SpecialFormType::Concatenate => "Concatenate",
+            SpecialFormType::Unpack => "Unpack",
+            SpecialFormType::Required => "Required",
+            SpecialFormType::NotRequired => "NotRequired",
+            SpecialFormType::TypeAlias => "TypeAlias",
+            SpecialFormType::TypeGuard => "TypeGuard",
+            SpecialFormType::TypedDict => "TypedDict",
+            SpecialFormType::TypeIs => "TypeIs",
+            SpecialFormType::List => "List",
+            SpecialFormType::Dict => "Dict",
+            SpecialFormType::DefaultDict => "DefaultDict",
+            SpecialFormType::Set => "Set",
+            SpecialFormType::FrozenSet => "FrozenSet",
+            SpecialFormType::Counter => "Counter",
+            SpecialFormType::Deque => "Deque",
+            SpecialFormType::ChainMap => "ChainMap",
+            SpecialFormType::OrderedDict => "OrderedDict",
+            SpecialFormType::ReadOnly => "ReadOnly",
+            SpecialFormType::Unknown => "Unknown",
+            SpecialFormType::AlwaysTruthy => "AlwaysTruthy",
+            SpecialFormType::AlwaysFalsy => "AlwaysFalsy",
+            SpecialFormType::Not => "Not",
+            SpecialFormType::Intersection => "Intersection",
+            SpecialFormType::TypeOf => "TypeOf",
+            SpecialFormType::CallableTypeOf => "CallableTypeOf",
+            SpecialFormType::Top => "Top",
+            SpecialFormType::Bottom => "Bottom",
+            SpecialFormType::Protocol => "Protocol",
+            SpecialFormType::Generic => "Generic",
+            SpecialFormType::NamedTuple => "NamedTuple",
+        }
+    }
+
+    /// Return the module(s) in which this special form could be defined
+    fn definition_modules(self) -> &'static [KnownModule] {
+        match self {
+            SpecialFormType::Any
+            | SpecialFormType::Annotated
+            | SpecialFormType::Literal
+            | SpecialFormType::LiteralString
+            | SpecialFormType::Optional
+            | SpecialFormType::Union
+            | SpecialFormType::NoReturn
+            | SpecialFormType::Never
+            | SpecialFormType::Tuple
+            | SpecialFormType::Type
+            | SpecialFormType::TypingSelf
+            | SpecialFormType::Final
+            | SpecialFormType::ClassVar
+            | SpecialFormType::Callable
+            | SpecialFormType::Concatenate
+            | SpecialFormType::Unpack
+            | SpecialFormType::Required
+            | SpecialFormType::NotRequired
+            | SpecialFormType::TypeAlias
+            | SpecialFormType::TypeGuard
+            | SpecialFormType::TypedDict
+            | SpecialFormType::TypeIs
+            | SpecialFormType::ReadOnly
+            | SpecialFormType::Protocol
+            | SpecialFormType::Generic
+            | SpecialFormType::NamedTuple
+            | SpecialFormType::List
+            | SpecialFormType::Dict
+            | SpecialFormType::DefaultDict
+            | SpecialFormType::Set
+            | SpecialFormType::FrozenSet
+            | SpecialFormType::Counter
+            | SpecialFormType::Deque
+            | SpecialFormType::ChainMap
+            | SpecialFormType::OrderedDict => &[KnownModule::Typing, KnownModule::TypingExtensions],
+
+            SpecialFormType::Unknown
+            | SpecialFormType::AlwaysTruthy
+            | SpecialFormType::AlwaysFalsy
+            | SpecialFormType::Not
+            | SpecialFormType::Intersection
+            | SpecialFormType::TypeOf
+            | SpecialFormType::CallableTypeOf
+            | SpecialFormType::Top
+            | SpecialFormType::Bottom => &[KnownModule::TyExtensions],
+        }
+    }
+
+    pub(super) fn definition(self, db: &dyn Db) -> Option<TypeDefinition<'_>> {
+        self.definition_modules()
+            .iter()
+            .find_map(|module| {
+                let file = resolve_module(db, &module.name())?.file(db)?;
+                let scope = FileScopeId::global().to_scope_id(db, file);
+                let symbol_id = place_table(db, scope).symbol_id(self.name())?;
+
+                use_def_map(db, scope)
+                    .end_of_scope_bindings(ScopedPlaceId::Symbol(symbol_id))
+                    .next()?
+                    .binding
+                    .definition()
+            })
+            .map(TypeDefinition::SpecialForm)
     }
 }
 
 impl std::fmt::Display for SpecialFormType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.repr())
+        write!(
+            f,
+            "{}.{}",
+            self.definition_modules()[0].as_str(),
+            self.name()
+        )
     }
 }

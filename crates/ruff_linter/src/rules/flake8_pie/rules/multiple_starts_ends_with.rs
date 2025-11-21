@@ -49,6 +49,7 @@ use crate::{Edit, Fix};
 /// - [Python documentation: `str.startswith`](https://docs.python.org/3/library/stdtypes.html#str.startswith)
 /// - [Python documentation: `str.endswith`](https://docs.python.org/3/library/stdtypes.html#str.endswith)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.243")]
 pub(crate) struct MultipleStartsEndsWith {
     attr: String,
 }
@@ -178,21 +179,21 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                     .collect(),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 parenthesized: true,
             });
             let node1 = Expr::Name(ast::ExprName {
                 id: arg_name.into(),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
             let node2 = Expr::Attribute(ast::ExprAttribute {
                 value: Box::new(node1),
                 attr: Identifier::new(attr_name.to_string(), TextRange::default()),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
             let node3 = Expr::Call(ast::ExprCall {
                 func: Box::new(node2),
@@ -200,10 +201,10 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                     args: Box::from([node]),
                     keywords: Box::from([]),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 },
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
             let call = node3;
 
@@ -223,7 +224,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                     })
                     .collect(),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
             let bool_op = node;
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(

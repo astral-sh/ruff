@@ -26,6 +26,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// x = "\b"
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.257")]
 pub(crate) struct InvalidCharacterBackspace;
 
 impl Violation for InvalidCharacterBackspace {
@@ -48,7 +49,7 @@ impl Violation for InvalidCharacterBackspace {
 /// Control characters are displayed differently by different text editors and
 /// terminals.
 ///
-/// By using the `\x1A` sequence in lieu of the `SUB` control character, the
+/// By using the `\x1a` sequence in lieu of the `SUB` control character, the
 /// string will contain the same value, but will render visibly in all editors.
 ///
 /// ## Example
@@ -61,6 +62,7 @@ impl Violation for InvalidCharacterBackspace {
 /// x = "\x1a"
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.257")]
 pub(crate) struct InvalidCharacterSub;
 
 impl Violation for InvalidCharacterSub {
@@ -68,7 +70,7 @@ impl Violation for InvalidCharacterSub {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Invalid unescaped character SUB, use \"\\x1A\" instead".to_string()
+        "Invalid unescaped character SUB, use \"\\x1a\" instead".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -83,7 +85,7 @@ impl Violation for InvalidCharacterSub {
 /// Control characters are displayed differently by different text editors and
 /// terminals.
 ///
-/// By using the `\x1B` sequence in lieu of the `SUB` control character, the
+/// By using the `\x1b` sequence in lieu of the `ESC` control character, the
 /// string will contain the same value, but will render visibly in all editors.
 ///
 /// ## Example
@@ -96,6 +98,7 @@ impl Violation for InvalidCharacterSub {
 /// x = "\x1b"
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.257")]
 pub(crate) struct InvalidCharacterEsc;
 
 impl Violation for InvalidCharacterEsc {
@@ -103,7 +106,7 @@ impl Violation for InvalidCharacterEsc {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Invalid unescaped character ESC, use \"\\x1B\" instead".to_string()
+        "Invalid unescaped character ESC, use \"\\x1b\" instead".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -131,6 +134,7 @@ impl Violation for InvalidCharacterEsc {
 /// x = "\0"
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.257")]
 pub(crate) struct InvalidCharacterNul;
 
 impl Violation for InvalidCharacterNul {
@@ -165,6 +169,7 @@ impl Violation for InvalidCharacterNul {
 /// x = "Dear Sir\u200b/\u200bMadam"  # zero width space
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.257")]
 pub(crate) struct InvalidCharacterZeroWidthSpace;
 
 impl Violation for InvalidCharacterZeroWidthSpace {
@@ -191,7 +196,7 @@ pub(crate) fn invalid_string_characters(context: &LintContext, token: &Token, lo
         _ => return,
     };
 
-    for (column, match_) in text.match_indices(&['\x08', '\x1A', '\x1B', '\0', '\u{200b}']) {
+    for (column, match_) in text.match_indices(&['\x08', '\x1a', '\x1b', '\0', '\u{200b}']) {
         let location = token.start() + TextSize::try_from(column).unwrap();
         let c = match_.chars().next().unwrap();
         let range = TextRange::at(location, c.text_len());
@@ -209,12 +214,12 @@ pub(crate) fn invalid_string_characters(context: &LintContext, token: &Token, lo
                 "\\b",
                 context.report_diagnostic_if_enabled(InvalidCharacterBackspace, range),
             ),
-            '\x1A' => (
-                "\\x1A",
+            '\x1a' => (
+                "\\x1a",
                 context.report_diagnostic_if_enabled(InvalidCharacterSub, range),
             ),
-            '\x1B' => (
-                "\\x1B",
+            '\x1b' => (
+                "\\x1b",
                 context.report_diagnostic_if_enabled(InvalidCharacterEsc, range),
             ),
             '\0' => (

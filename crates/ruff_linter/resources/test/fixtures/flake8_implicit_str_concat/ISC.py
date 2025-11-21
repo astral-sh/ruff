@@ -187,3 +187,24 @@ _ = (
 		# leading comment
     "end"
 )
+
+# https://github.com/astral-sh/ruff/issues/20310
+# ISC001
+t"The quick " t"brown fox."
+
+# ISC002
+t"The quick brown fox jumps over the lazy "\
+t"dog."
+
+# ISC003
+(
+    t"The quick brown fox jumps over the lazy "
+    + t"dog"
+)
+
+# nested examples with both t and f-strings
+_ = "a" f"b {t"c" t"d"} e" "f"
+_ = t"b {f"c" f"d {t"e" t"f"} g"} h"
+_ = f"b {t"abc" \
+    t"def"} g"
+

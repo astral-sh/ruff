@@ -1,0 +1,162 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: protocols.md - Protocols - Diagnostics for protocols with invalid attribute members
+mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
+---
+
+# Python source files
+
+## a.py
+
+```
+ 1 | from typing import Protocol
+ 2 | 
+ 3 | def coinflip() -> bool:
+ 4 |     return True
+ 5 | 
+ 6 | class A(Protocol):
+ 7 |     # The `x` and `y` members attempt to use Python-2-style type comments
+ 8 |     # to indicate that the type should be `int | None` and `str` respectively,
+ 9 |     # but we don't support those
+10 | 
+11 |     # error: [ambiguous-protocol-member]
+12 |     a = None  # type: int
+13 |     # error: [ambiguous-protocol-member]
+14 |     b = ...  # type: str
+15 | 
+16 |     if coinflip():
+17 |         c = 1  # error: [ambiguous-protocol-member]
+18 |     else:
+19 |         c = 2
+20 | 
+21 |     # error: [ambiguous-protocol-member]
+22 |     for d in range(42):
+23 |         pass
+```
+
+## b.py
+
+```
+1 | from typing import Protocol
+2 | 
+3 | # Ensure the number of scopes in `b.py` is greater than the number of scopes in `c.py`:
+4 | class SomethingUnrelated: ...
+5 | 
+6 | class A(Protocol):
+7 |     x: int
+```
+
+## c.py
+
+```
+1 | from b import A
+2 | from typing import Protocol
+3 | 
+4 | class C(A, Protocol):
+5 |     x = 42  # fine, due to declaration in the base class
+```
+
+# Diagnostics
+
+```
+warning[ambiguous-protocol-member]: Cannot assign to undeclared variable in the body of a protocol class
+  --> src/a.py:12:5
+   |
+11 |     # error: [ambiguous-protocol-member]
+12 |     a = None  # type: int
+   |     ^^^^^^^^ Consider adding an annotation for `a`
+13 |     # error: [ambiguous-protocol-member]
+14 |     b = ...  # type: str
+   |
+info: Assigning to an undeclared variable in a protocol class leads to an ambiguous interface
+ --> src/a.py:6:7
+  |
+4 |     return True
+5 |
+6 | class A(Protocol):
+  |       ^^^^^^^^^^^ `A` declared as a protocol here
+7 |     # The `x` and `y` members attempt to use Python-2-style type comments
+8 |     # to indicate that the type should be `int | None` and `str` respectively,
+  |
+info: No declarations found for `a` in the body of `A` or any of its superclasses
+info: rule `ambiguous-protocol-member` is enabled by default
+
+```
+
+```
+warning[ambiguous-protocol-member]: Cannot assign to undeclared variable in the body of a protocol class
+  --> src/a.py:14:5
+   |
+12 |     a = None  # type: int
+13 |     # error: [ambiguous-protocol-member]
+14 |     b = ...  # type: str
+   |     ^^^^^^^ Consider adding an annotation for `b`
+15 |
+16 |     if coinflip():
+   |
+info: Assigning to an undeclared variable in a protocol class leads to an ambiguous interface
+ --> src/a.py:6:7
+  |
+4 |     return True
+5 |
+6 | class A(Protocol):
+  |       ^^^^^^^^^^^ `A` declared as a protocol here
+7 |     # The `x` and `y` members attempt to use Python-2-style type comments
+8 |     # to indicate that the type should be `int | None` and `str` respectively,
+  |
+info: No declarations found for `b` in the body of `A` or any of its superclasses
+info: rule `ambiguous-protocol-member` is enabled by default
+
+```
+
+```
+warning[ambiguous-protocol-member]: Cannot assign to undeclared variable in the body of a protocol class
+  --> src/a.py:17:9
+   |
+16 |     if coinflip():
+17 |         c = 1  # error: [ambiguous-protocol-member]
+   |         ^^^^^ Consider adding an annotation, e.g. `c: int = ...`
+18 |     else:
+19 |         c = 2
+   |
+info: Assigning to an undeclared variable in a protocol class leads to an ambiguous interface
+ --> src/a.py:6:7
+  |
+4 |     return True
+5 |
+6 | class A(Protocol):
+  |       ^^^^^^^^^^^ `A` declared as a protocol here
+7 |     # The `x` and `y` members attempt to use Python-2-style type comments
+8 |     # to indicate that the type should be `int | None` and `str` respectively,
+  |
+info: No declarations found for `c` in the body of `A` or any of its superclasses
+info: rule `ambiguous-protocol-member` is enabled by default
+
+```
+
+```
+warning[ambiguous-protocol-member]: Cannot assign to undeclared variable in the body of a protocol class
+  --> src/a.py:22:9
+   |
+21 |     # error: [ambiguous-protocol-member]
+22 |     for d in range(42):
+   |         ^ `d` is not declared as a protocol member
+23 |         pass
+   |
+info: Assigning to an undeclared variable in a protocol class leads to an ambiguous interface
+ --> src/a.py:6:7
+  |
+4 |     return True
+5 |
+6 | class A(Protocol):
+  |       ^^^^^^^^^^^ `A` declared as a protocol here
+7 |     # The `x` and `y` members attempt to use Python-2-style type comments
+8 |     # to indicate that the type should be `int | None` and `str` respectively,
+  |
+info: No declarations found for `d` in the body of `A` or any of its superclasses
+info: rule `ambiguous-protocol-member` is enabled by default
+
+```

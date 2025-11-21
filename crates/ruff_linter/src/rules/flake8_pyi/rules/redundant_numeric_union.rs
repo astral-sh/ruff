@@ -53,6 +53,7 @@ use super::generate_union_fix;
 ///
 /// [typing specification]: https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.279")]
 pub(crate) struct RedundantNumericUnion {
     redundancy: Redundancy,
 }
@@ -261,7 +262,7 @@ fn generate_pep604_fix(
                     op: Operator::BitOr,
                     right: Box::new(right.clone()),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 }))
             } else {
                 Some(right.clone())

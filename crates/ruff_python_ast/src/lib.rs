@@ -78,7 +78,9 @@ pub enum TomlSourceType {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PySourceType {
-    /// The source is a Python file (`.py`).
+    /// The source is a Python file (`.py`, `.pyw`).
+    /// Note: `.pyw` files contain Python code, but do not represent importable namespaces.
+    /// Consider adding a separate source type later if combining the two causes issues.
     #[default]
     Python,
     /// The source is a Python stub file (`.pyi`).
@@ -100,6 +102,7 @@ impl PySourceType {
         let ty = match extension {
             "py" => Self::Python,
             "pyi" => Self::Stub,
+            "pyw" => Self::Python,
             "ipynb" => Self::Ipynb,
             _ => return None,
         };

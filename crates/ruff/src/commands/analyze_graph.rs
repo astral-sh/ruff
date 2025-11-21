@@ -7,6 +7,7 @@ use path_absolutize::CWD;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_graph::{Direction, ImportMap, ModuleDb, ModuleImports};
 use ruff_linter::package::PackageRoot;
+use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{warn_user, warn_user_once};
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{ResolvedFile, match_exclusion, python_files_in_path};
@@ -104,6 +105,7 @@ pub(crate) fn analyze_graph(
                 let settings = resolver.resolve(path);
                 let string_imports = settings.analyze.string_imports;
                 let include_dependencies = settings.analyze.include_dependencies.get(path).cloned();
+                let type_checking_imports = settings.analyze.type_checking_imports;
 
                 // Skip excluded files.
                 if (settings.file_resolver.force_exclude || !resolved_file.is_root())
@@ -127,10 +129,6 @@ pub(crate) fn analyze_graph(
                     },
                     Some(language) => PySourceType::from(language),
                 };
-                if matches!(source_type, PySourceType::Ipynb) {
-                    debug!("Ignoring Jupyter notebook: {}", path.display());
-                    continue;
-                }
 
                 // Convert to system paths.
                 let Ok(package) = package.map(SystemPathBuf::from_path_buf).transpose() else {
@@ -147,13 +145,35 @@ pub(crate) fn analyze_graph(
                 let root = root.clone();
                 let result = inner_result.clone();
                 scope.spawn(move |_| {
+                    // Extract source code (handles both .py and .ipynb files)
+                    let source_kind = match SourceKind::from_path(path.as_std_path(), source_type) {
+                        Ok(Some(source_kind)) => source_kind,
+                        Ok(None) => {
+                            debug!("Skipping non-Python notebook: {path}");
+                            return;
+                        }
+                        Err(err) => {
+                            warn!("Failed to read source for {path}: {err}");
+                            return;
+                        }
+                    };
+
+                    let source_code = source_kind.source_code();
+
                     // Identify any imports via static analysis.
-                    let mut imports =
-                        ModuleImports::detect(&db, &path, package.as_deref(), string_imports)
-                            .unwrap_or_else(|err| {
-                                warn!("Failed to generate import map for {path}: {err}");
-                                ModuleImports::default()
-                            });
+                    let mut imports = ModuleImports::detect(
+                        &db,
+                        source_code,
+                        source_type,
+                        &path,
+                        package.as_deref(),
+                        string_imports,
+                        type_checking_imports,
+                    )
+                    .unwrap_or_else(|err| {
+                        warn!("Failed to generate import map for {path}: {err}");
+                        ModuleImports::default()
+                    });
 
                     debug!("Discovered {} imports for {}", imports.len(), path);
 

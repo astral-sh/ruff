@@ -7,21 +7,21 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/set/missing_
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..47,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 46..47,
                     value: Set(
                         ExprSet {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 46..47,
                             elts: [
                                 Name(
                                     ExprName {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 47..47,
                                         id: Name(""),
                                         ctx: Invalid,

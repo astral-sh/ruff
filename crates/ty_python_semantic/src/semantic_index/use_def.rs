@@ -233,7 +233,7 @@
 //! have two live bindings of `x`: `x = 3` and `x = 4`.
 //!
 //! Another piece of information that the `UseDefMap` needs to provide are reachability constraints.
-//! See [`reachability_constraints.rs`] for more details, in particular how they apply to bindings.
+//! See `reachability_constraints.rs` for more details, in particular how they apply to bindings.
 //!
 //! The [`UseDefMapBuilder`] itself just exposes methods for taking a snapshot, resetting to a
 //! snapshot, and merging a snapshot into the current state. The logic using these methods lives in
@@ -243,10 +243,6 @@
 use ruff_index::{IndexVec, newtype_index};
 use rustc_hash::FxHashMap;
 
-use self::place_state::{
-    Bindings, Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclaration,
-    LiveDeclarationsIterator, PlaceState, ScopedDefinitionId,
-};
 use crate::node_key::NodeKey;
 use crate::place::BoundnessAnalysis;
 use crate::semantic_index::ast_ids::ScopedUseId;
@@ -254,6 +250,7 @@ use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::member::ScopedMemberId;
 use crate::semantic_index::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
+    ScopedNarrowingConstraint,
 };
 use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::predicate::{
@@ -264,7 +261,10 @@ use crate::semantic_index::reachability_constraints::{
 };
 use crate::semantic_index::scope::{FileScopeId, ScopeKind, ScopeLaziness};
 use crate::semantic_index::symbol::ScopedSymbolId;
-use crate::semantic_index::use_def::place_state::PreviousDefinitions;
+use crate::semantic_index::use_def::place_state::{
+    Bindings, Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclaration,
+    LiveDeclarationsIterator, PlaceState, PreviousDefinitions, ScopedDefinitionId,
+};
 use crate::semantic_index::{EnclosingSnapshotResult, SemanticIndex};
 use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constraint};
 
@@ -598,19 +598,7 @@ impl<'db> UseDefMap<'db> {
             .is_always_false()
     }
 
-    pub(crate) fn is_declaration_reachable(
-        &self,
-        db: &dyn crate::Db,
-        declaration: &DeclarationWithConstraint<'db>,
-    ) -> Truthiness {
-        self.reachability_constraints.evaluate(
-            db,
-            &self.predicates,
-            declaration.reachability_constraint,
-        )
-    }
-
-    pub(crate) fn is_binding_reachable(
+    pub(crate) fn binding_reachability(
         &self,
         db: &dyn crate::Db,
         binding: &BindingWithConstraints<'_, 'db>,
@@ -652,8 +640,8 @@ impl<'db> UseDefMap<'db> {
     }
 }
 
-/// Uniquely identifies a snapshot of an enclosing scope place state that can be used to resolve a reference in a
-/// nested scope.
+/// Uniquely identifies a snapshot of an enclosing scope place state that can be used to resolve a
+/// reference in a nested scope.
 ///
 /// An eager scope has its entire body executed immediately at the location where it is defined.
 /// For any free references in the nested scope, we use the bindings that are visible at the point
@@ -672,19 +660,17 @@ pub(crate) struct EnclosingSnapshotKey {
     pub(crate) enclosing_place: ScopedPlaceId,
     /// The nested scope containing the reference
     pub(crate) nested_scope: FileScopeId,
-    /// Laziness of the nested scope
+    /// Laziness of the nested scope (technically redundant, but convenient to have here)
     pub(crate) nested_laziness: ScopeLaziness,
 }
 
-/// A snapshot of enclosing scope place states that can be used to resolve a reference in a nested scope.
-/// Normally, if the current scope is lazily evaluated,
-/// we do not snapshot the place states from the enclosing scope,
-/// and infer the type of the place from its reachable definitions
-/// (and any narrowing constraints introduced in the enclosing scope do not apply to the current scope).
-/// The exception is if the symbol has never been reassigned, in which case it is snapshotted.
+/// Snapshots of enclosing scope place states for resolving a reference in a nested scope.
+/// If the nested scope is eager, the snapshot is simply recorded and used as is.
+/// If it is lazy, every time the outer symbol is reassigned, the snapshot is updated to add the
+/// new binding.
 type EnclosingSnapshots = IndexVec<ScopedEnclosingSnapshotId, EnclosingSnapshot>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
     pub(crate) predicates: &'map Predicates<'db>,
@@ -775,6 +761,7 @@ pub(crate) struct DeclarationsIterator<'map, 'db> {
     inner: LiveDeclarationsIterator<'map>,
 }
 
+#[derive(Debug)]
 pub(crate) struct DeclarationWithConstraint<'db> {
     pub(crate) declaration: DefinitionState<'db>,
     pub(crate) reachability_constraint: ScopedReachabilityConstraintId,
@@ -1197,26 +1184,51 @@ impl<'db> UseDefMapBuilder<'db> {
         self.node_reachability.insert(node_key, self.reachability);
     }
 
-    pub(super) fn snapshot_outer_state(
+    pub(super) fn snapshot_enclosing_state(
         &mut self,
         enclosing_place: ScopedPlaceId,
-        scope: ScopeKind,
+        enclosing_scope: ScopeKind,
         enclosing_place_expr: PlaceExprRef,
+        is_parent_of_annotation_scope: bool,
     ) -> ScopedEnclosingSnapshotId {
         let bindings = match enclosing_place {
             ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
             ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
         };
 
-        // Names bound in class scopes are never visible to nested scopes (but attributes/subscripts are visible),
-        // so we never need to save eager scope bindings in a class scope.
-        if (scope.is_class() && enclosing_place.is_symbol()) || !enclosing_place_expr.is_bound() {
+        let is_class_symbol = enclosing_scope.is_class() && enclosing_place.is_symbol();
+        // Names bound in class scopes are never visible to nested scopes (but
+        // attributes/subscripts are visible), so we never need to save eager scope bindings in a
+        // class scope. There is one exception to this rule: annotation scopes can see names
+        // defined in an immediately-enclosing class scope.
+        if (is_class_symbol && !is_parent_of_annotation_scope) || !enclosing_place_expr.is_bound() {
             self.enclosing_snapshots.push(EnclosingSnapshot::Constraint(
                 bindings.unbound_narrowing_constraint(),
             ))
         } else {
             self.enclosing_snapshots
                 .push(EnclosingSnapshot::Bindings(bindings.clone()))
+        }
+    }
+
+    pub(super) fn update_enclosing_snapshot(
+        &mut self,
+        snapshot_id: ScopedEnclosingSnapshotId,
+        enclosing_symbol: ScopedSymbolId,
+    ) {
+        match self.enclosing_snapshots.get_mut(snapshot_id) {
+            Some(EnclosingSnapshot::Bindings(bindings)) => {
+                let new_symbol_state = &self.symbol_states[enclosing_symbol];
+                bindings.merge(
+                    new_symbol_state.bindings().clone(),
+                    &mut self.narrowing_constraints,
+                    &mut self.reachability_constraints,
+                );
+            }
+            Some(EnclosingSnapshot::Constraint(constraint)) => {
+                *constraint = ScopedNarrowingConstraint::empty();
+            }
+            None => {}
         }
     }
 

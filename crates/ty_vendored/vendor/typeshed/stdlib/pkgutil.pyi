@@ -65,6 +65,7 @@ def extend_path(path: _PathT, name: str) -> _PathT:
     """
 
 if sys.version_info < (3, 12):
+    @deprecated("Deprecated since Python 3.3; removed in Python 3.12. Use the `importlib` module instead.")
     class ImpImporter:
         """PEP 302 Finder that wraps Python's "classic" import algorithm
 
@@ -78,29 +79,47 @@ if sys.version_info < (3, 12):
 
         def __init__(self, path: StrOrBytesPath | None = None) -> None: ...
 
+    @deprecated("Deprecated since Python 3.3; removed in Python 3.12. Use the `importlib` module instead.")
     class ImpLoader:
         """PEP 302 Loader that wraps Python's "classic" import algorithm"""
 
         def __init__(self, fullname: str, file: IO[str], filename: StrOrBytesPath, etc: tuple[str, str, int]) -> None: ...
 
 if sys.version_info < (3, 14):
-    @deprecated("Use importlib.util.find_spec() instead. Will be removed in Python 3.14.")
-    def find_loader(fullname: str) -> LoaderProtocol | None:
-        """Find a "loader" object for fullname
+    if sys.version_info >= (3, 12):
+        @deprecated("Deprecated since Python 3.12; removed in Python 3.14. Use `importlib.util.find_spec()` instead.")
+        def find_loader(fullname: str) -> LoaderProtocol | None:
+            """Find a "loader" object for fullname
 
-        This is a backwards compatibility wrapper around
-        importlib.util.find_spec that converts most failures to ImportError
-        and only returns the loader rather than the full spec
-        """
+            This is a backwards compatibility wrapper around
+            importlib.util.find_spec that converts most failures to ImportError
+            and only returns the loader rather than the full spec
+            """
 
-    @deprecated("Use importlib.util.find_spec() instead. Will be removed in Python 3.14.")
-    def get_loader(module_or_name: str) -> LoaderProtocol | None:
-        """Get a "loader" object for module_or_name
+        @deprecated("Deprecated since Python 3.12; removed in Python 3.14. Use `importlib.util.find_spec()` instead.")
+        def get_loader(module_or_name: str) -> LoaderProtocol | None:
+            """Get a "loader" object for module_or_name
 
-        Returns None if the module cannot be found or imported.
-        If the named module is not already imported, its containing package
-        (if any) is imported, in order to establish the package __path__.
-        """
+            Returns None if the module cannot be found or imported.
+            If the named module is not already imported, its containing package
+            (if any) is imported, in order to establish the package __path__.
+            """
+    else:
+        def find_loader(fullname: str) -> LoaderProtocol | None:
+            """Find a "loader" object for fullname
+
+            This is a backwards compatibility wrapper around
+            importlib.util.find_spec that converts most failures to ImportError
+            and only returns the loader rather than the full spec
+            """
+
+        def get_loader(module_or_name: str) -> LoaderProtocol | None:
+            """Get a "loader" object for module_or_name
+
+            Returns None if the module cannot be found or imported.
+            If the named module is not already imported, its containing package
+            (if any) is imported, in order to establish the package __path__.
+            """
 
 def get_importer(path_item: StrOrBytesPath) -> PathEntryFinderProtocol | None:
     """Retrieve a finder for the given path item

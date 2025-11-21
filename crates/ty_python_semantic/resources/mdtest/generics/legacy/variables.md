@@ -6,6 +6,8 @@ for both type variable syntaxes.
 
 Unless otherwise specified, all quotations come from the [Generics] section of the typing spec.
 
+Diagnostics for invalid type variables are snapshotted in `diagnostics/legacy_typevars.md`.
+
 ## Type variables
 
 ### Defining legacy type variables
@@ -24,7 +26,16 @@ reveal_type(T)  # revealed: typing.TypeVar
 reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
 
-### Directly assigned to a variable
+The typevar name can also be provided as a keyword argument:
+
+```py
+from typing import TypeVar
+
+T = TypeVar(name="T")
+reveal_type(T.__name__)  # revealed: Literal["T"]
+```
+
+### Must be directly assigned to a variable
 
 > A `TypeVar()` expression must always directly be assigned to a variable (it should not be used as
 > part of a larger expression).
@@ -33,13 +44,24 @@ reveal_type(T.__name__)  # revealed: Literal["T"]
 from typing import TypeVar
 
 T = TypeVar("T")
-# TODO: no error
 # error: [invalid-legacy-type-variable]
 U: TypeVar = TypeVar("U")
 
-# error: [invalid-legacy-type-variable] "A legacy `typing.TypeVar` must be immediately assigned to a variable"
-# error: [invalid-type-form] "Function calls are not allowed in type expressions"
-TestList = list[TypeVar("W")]
+# error: [invalid-legacy-type-variable]
+tuple_with_typevar = ("foo", TypeVar("W"))
+reveal_type(tuple_with_typevar[1])  # revealed: TypeVar
+```
+
+```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+# error: [invalid-legacy-type-variable]
+U: TypeVar = TypeVar("U")
+
+# error: [invalid-legacy-type-variable]
+tuple_with_typevar = ("foo", TypeVar("W"))
+reveal_type(tuple_with_typevar[1])  # revealed: TypeVar
 ```
 
 ### `TypeVar` parameter must match variable name
@@ -49,7 +71,7 @@ TestList = list[TypeVar("W")]
 ```py
 from typing import TypeVar
 
-# error: [invalid-legacy-type-variable] "The name of a legacy `typing.TypeVar` (`Q`) must match the name of the variable it is assigned to (`T`)"
+# error: [invalid-legacy-type-variable]
 T = TypeVar("Q")
 ```
 
@@ -66,6 +88,22 @@ T = TypeVar("T")
 T = TypeVar("T")
 ```
 
+### No variadic arguments
+
+```py
+from typing import TypeVar
+
+types = (int, str)
+
+# error: [invalid-legacy-type-variable]
+T = TypeVar("T", *types)
+reveal_type(T)  # revealed: TypeVar
+
+# error: [invalid-legacy-type-variable]
+S = TypeVar("S", **{"bound": int})
+reveal_type(S)  # revealed: TypeVar
+```
+
 ### Type variables with a default
 
 Note that the `__default__` property is only available in Python ≥3.13.
@@ -79,6 +117,8 @@ python-version = "3.13"
 from typing import TypeVar
 
 T = TypeVar("T", default=int)
+reveal_type(type(T))  # revealed: <class 'TypeVar'>
+reveal_type(T)  # revealed: typing.TypeVar
 reveal_type(T.__default__)  # revealed: int
 reveal_type(T.__bound__)  # revealed: None
 reveal_type(T.__constraints__)  # revealed: tuple[()]
@@ -88,6 +128,11 @@ reveal_type(S.__default__)  # revealed: NoDefault
 ```
 
 ### Using other typevars as a default
+
+```toml
+[environment]
+python-version = "3.13"
+```
 
 ```py
 from typing import Generic, TypeVar, Union
@@ -113,11 +158,22 @@ class Invalid(Generic[U]): ...
 from typing import TypeVar
 
 T = TypeVar("T", bound=int)
+reveal_type(type(T))  # revealed: <class 'TypeVar'>
+reveal_type(T)  # revealed: typing.TypeVar
 reveal_type(T.__bound__)  # revealed: int
 reveal_type(T.__constraints__)  # revealed: tuple[()]
 
 S = TypeVar("S")
 reveal_type(S.__bound__)  # revealed: None
+```
+
+The upper bound must be a valid type expression:
+
+```py
+from typing import TypedDict
+
+# error: [invalid-type-form]
+T = TypeVar("T", bound=TypedDict)
 ```
 
 ### Type variables with constraints
@@ -126,10 +182,22 @@ reveal_type(S.__bound__)  # revealed: None
 from typing import TypeVar
 
 T = TypeVar("T", int, str)
+reveal_type(type(T))  # revealed: <class 'TypeVar'>
+reveal_type(T)  # revealed: typing.TypeVar
 reveal_type(T.__constraints__)  # revealed: tuple[int, str]
 
 S = TypeVar("S")
 reveal_type(S.__constraints__)  # revealed: tuple[()]
+```
+
+Constraints are not simplified relative to each other, even if one is a subtype of the other:
+
+```py
+T = TypeVar("T", int, bool)
+reveal_type(T.__constraints__)  # revealed: tuple[int, bool]
+
+S = TypeVar("S", float, str)
+reveal_type(S.__constraints__)  # revealed: tuple[int | float, str]
 ```
 
 ### Cannot have only one constraint
@@ -140,8 +208,17 @@ reveal_type(S.__constraints__)  # revealed: tuple[()]
 ```py
 from typing import TypeVar
 
-# TODO: error: [invalid-type-variable-constraints]
+# error: [invalid-legacy-type-variable]
 T = TypeVar("T", int)
+```
+
+### Cannot have both bound and constraint
+
+```py
+from typing import TypeVar
+
+# error: [invalid-legacy-type-variable]
+T = TypeVar("T", int, str, bound=bytes)
 ```
 
 ### Cannot be both covariant and contravariant
@@ -157,10 +234,10 @@ from typing import TypeVar
 T = TypeVar("T", covariant=True, contravariant=True)
 ```
 
-### Variance parameters must be unambiguous
+### Boolean parameters must be unambiguous
 
 ```py
-from typing import TypeVar
+from typing_extensions import TypeVar
 
 def cond() -> bool:
     return True
@@ -170,6 +247,114 @@ T = TypeVar("T", covariant=cond())
 
 # error: [invalid-legacy-type-variable]
 U = TypeVar("U", contravariant=cond())
+
+# error: [invalid-legacy-type-variable]
+V = TypeVar("V", infer_variance=cond())
+```
+
+### Invalid keyword arguments
+
+```py
+from typing import TypeVar
+
+# error: [invalid-legacy-type-variable]
+T = TypeVar("T", invalid_keyword=True)
+```
+
+```pyi
+from typing import TypeVar
+
+# error: [invalid-legacy-type-variable]
+T = TypeVar("T", invalid_keyword=True)
+```
+
+### Forward references in stubs
+
+Stubs natively support forward references, so patterns that would raise `NameError` at runtime are
+allowed in stub files:
+
+`stub.pyi`:
+
+```pyi
+from typing import TypeVar
+
+T = TypeVar("T", bound=A, default=B)
+U = TypeVar("U", C, D)
+
+class A: ...
+class B(A): ...
+class C: ...
+class D: ...
+
+def f(x: T) -> T: ...
+def g(x: U) -> U: ...
+```
+
+`main.py`:
+
+```py
+from stub import f, g, A, B, C, D
+
+reveal_type(f(A()))  # revealed: A
+reveal_type(f(B()))  # revealed: B
+reveal_type(g(C()))  # revealed: C
+reveal_type(g(D()))  # revealed: D
+
+# TODO: one diagnostic would probably be sufficient here...?
+#
+# error: [invalid-argument-type] "Argument type `C` does not satisfy upper bound `A` of type variable `T`"
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `B`, found `C`"
+reveal_type(f(C()))  # revealed: B
+
+# error: [invalid-argument-type]
+reveal_type(g(A()))  # revealed: Unknown
+```
+
+### Constructor signature versioning
+
+#### For `typing.TypeVar`
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+In a stub file, features from the latest supported Python version can be used on any version.
+There's no need to require use of `typing_extensions.TypeVar` in a stub file, when the type checker
+can understand the typevar definition perfectly well either way, and there can be no runtime error.
+(Perhaps it's arguable whether this special case is worth it, but other type checkers do it, so we
+maintain compatibility.)
+
+```pyi
+from typing import TypeVar
+T = TypeVar("T", default=int)
+```
+
+But this raises an error in a non-stub file:
+
+```py
+from typing import TypeVar
+
+# error: [invalid-legacy-type-variable]
+T = TypeVar("T", default=int)
+```
+
+#### For `typing_extensions.TypeVar`
+
+`typing_extensions.TypeVar` always supports the latest features, on any Python version.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T", default=int)
+# TODO: should not error, should reveal `int`
+# error: [unresolved-attribute]
+reveal_type(T.__default__)  # revealed: Unknown
 ```
 
 ## Callability
@@ -223,6 +408,98 @@ T_constrained = TypeVar("T_constrained", int, str)
 
 def constrained(x: T_constrained):
     reveal_type(type(x))  # revealed: type[int] | type[str]
+```
+
+## Cycles
+
+### Bounds and constraints
+
+A typevar's bounds and constraints cannot be generic, cyclic or otherwise:
+
+```py
+from typing import Any, TypeVar
+
+S = TypeVar("S")
+
+# TODO: error
+T = TypeVar("T", bound=list[S])
+
+# TODO: error
+U = TypeVar("U", list["T"], str)
+
+# TODO: error
+V = TypeVar("V", list["V"], str)
+```
+
+However, they are lazily evaluated and can cyclically refer to their own type:
+
+```py
+from typing import TypeVar, Generic
+
+T = TypeVar("T", bound=list["G"])
+
+class G(Generic[T]):
+    x: T
+
+reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
+```
+
+### Defaults
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+Defaults can be generic, but can only refer to typevars from the same scope if they were defined
+earlier in that scope:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U", default=T)
+
+class C(Generic[T, U]):
+    x: T
+    y: U
+
+reveal_type(C[int, str]().x)  # revealed: int
+reveal_type(C[int, str]().y)  # revealed: str
+reveal_type(C[int]().x)  # revealed: int
+reveal_type(C[int]().y)  # revealed: int
+
+# TODO: error
+V = TypeVar("V", default="V")
+
+class D(Generic[V]):
+    x: V
+
+# TODO: we shouldn't leak a typevar like this in type inference
+reveal_type(D().x)  # revealed: V@D
+```
+
+## Regression
+
+### Use of typevar with default inside a function body that binds it
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeVar
+
+_DataT = TypeVar("_DataT", bound=int, default=int)
+
+class Event(Generic[_DataT]):
+    def __init__(self, data: _DataT) -> None:
+        self.data = data
+
+def async_fire_internal(event_data: _DataT):
+    event: Event[_DataT] | None = None
+    event = Event(event_data)
 ```
 
 [generics]: https://typing.python.org/en/latest/spec/generics.html

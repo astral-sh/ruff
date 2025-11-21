@@ -10,10 +10,10 @@ mod exclude;
 mod include;
 mod portable;
 
-/// Path filtering based on an an exclude and include glob pattern set.
+/// Path filtering based on an exclude and include glob pattern set.
 ///
 /// Exclude patterns take precedence over includes.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct IncludeExcludeFilter {
     include: IncludeFilter,
     exclude: ExcludeFilter,

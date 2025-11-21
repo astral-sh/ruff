@@ -1,9 +1,0 @@
----
-source: crates/ruff_linter/src/linter.rs
----
-<filename>:2:5: invalid-syntax: Starred expression cannot be used here
-  |
-2 | for *x in range(10):
-  |     ^^
-3 |     pass
-  |

@@ -5,7 +5,7 @@ from _typeshed import ReadableBuffer
 from collections.abc import Callable
 from types import ModuleType
 from typing import AnyStr, Protocol, final, overload, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing_extensions import Self, TypeAlias, disjoint_base
 
 _DigestMod: TypeAlias = str | Callable[[], _HashObject] | ModuleType | None
 
@@ -24,6 +24,7 @@ class _HashObject(Protocol):
     def hexdigest(self) -> str: ...
     def update(self, obj: ReadableBuffer, /) -> None: ...
 
+@disjoint_base
 class HASH:
     """A hash is an object used to calculate a checksum of a string of information.
 

@@ -13,7 +13,7 @@
 //! of `test`. When evaluating a constraint, there are three possible outcomes: always true, always
 //! false, or ambiguous. For a simple constraint like this, always-true and always-false correspond
 //! to the case in which we can infer that the type of `test` is `Literal[True]` or `Literal[False]`.
-//! In any other case, like if the type of `test` is `bool` or `Unknown`, we can not statically
+//! In any other case, like if the type of `test` is `bool` or `Unknown`, we cannot statically
 //! determine whether `test` is truthy or falsy, so the outcome would be "ambiguous".
 //!
 //!
@@ -29,7 +29,7 @@
 //! Here, we would accumulate a reachability constraint of `test1 AND test2`. We can statically
 //! determine that this position is *always* reachable only if both `test1` and `test2` are
 //! always true. On the other hand, we can statically determine that this position is *never*
-//! reachable if *either* `test1` or `test2` is always false. In any other case, we can not
+//! reachable if *either* `test1` or `test2` is always false. In any other case, we cannot
 //! determine whether this position is reachable or not, so the outcome is "ambiguous". This
 //! corresponds to a ternary *AND* operation in [Kleene] logic:
 //!
@@ -60,7 +60,7 @@
 //! The third branch ends in a terminal statement [^1]. When we merge control flow, we need to consider
 //! the reachability through either the first or the second branch. The current position is only
 //! *definitely* unreachable if both `test1` and `test2` are always false. It is definitely
-//! reachable if *either* `test1` or `test2` is always true. In any other case, we can not statically
+//! reachable if *either* `test1` or `test2` is always true. In any other case, we cannot statically
 //! determine whether it is reachable or not. This operation corresponds to a ternary *OR* operation:
 //!
 //! ```text
@@ -91,7 +91,7 @@
 //! ## Explicit ambiguity
 //!
 //! In some cases, we explicitly record an “ambiguous” constraint. We do this when branching on
-//! something that we can not (or intentionally do not want to) analyze statically. `for` loops are
+//! something that we cannot (or intentionally do not want to) analyze statically. `for` loops are
 //! one example:
 //! ```py
 //! def _():
@@ -208,7 +208,8 @@ use crate::semantic_index::predicate::{
     Predicates, ScopedPredicateId,
 };
 use crate::types::{
-    IntersectionBuilder, Truthiness, Type, UnionBuilder, UnionType, infer_expression_type,
+    IntersectionBuilder, Truthiness, Type, TypeContext, UnionBuilder, UnionType,
+    infer_expression_type, static_expression_truthiness,
 };
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -327,10 +328,12 @@ fn singleton_to_type(db: &dyn Db, singleton: ruff_python_ast::Singleton) -> Type
 fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) -> Type<'db> {
     match kind {
         PatternPredicateKind::Singleton(singleton) => singleton_to_type(db, *singleton),
-        PatternPredicateKind::Value(value) => infer_expression_type(db, *value),
+        PatternPredicateKind::Value(value) => {
+            infer_expression_type(db, *value, TypeContext::default())
+        }
         PatternPredicateKind::Class(class_expr, kind) => {
             if kind.is_irrefutable() {
-                infer_expression_type(db, *class_expr)
+                infer_expression_type(db, *class_expr, TypeContext::default())
                     .to_instance(db)
                     .unwrap_or(Type::Never)
             } else {
@@ -343,7 +346,7 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
         PatternPredicateKind::As(pattern, _) => pattern
             .as_deref()
             .map(|p| pattern_kind_to_type(db, p))
-            .unwrap_or_else(|| Type::object(db)),
+            .unwrap_or_else(Type::object),
         PatternPredicateKind::Unsupported => Type::Never,
     }
 }
@@ -424,9 +427,26 @@ impl ReachabilityConstraintsBuilder {
         }
     }
 
-    /// Returns whether `a` or `b` has a "larger" atom. TDDs are ordered such that interior nodes
-    /// can only have edges to "larger" nodes. Terminals are considered to have a larger atom than
-    /// any internal node, since they are leaf nodes.
+    /// Implements the ordering that determines which level a TDD node appears at.
+    ///
+    /// Each interior node checks the value of a single variable (for us, a `Predicate`).
+    /// TDDs are ordered such that every path from the root of the graph to the leaves must
+    /// check each variable at most once, and must check each variable in the same order.
+    ///
+    /// We can choose any ordering that we want, as long as it's consistent — with the
+    /// caveat that terminal nodes must always be last in the ordering, since they are the
+    /// leaf nodes of the graph.
+    ///
+    /// We currently compare interior nodes by looking at the Salsa IDs of each variable's
+    /// `Predicate`, since this is already available and easy to compare. We also _reverse_
+    /// the comparison of those Salsa IDs. The Salsa IDs are assigned roughly sequentially
+    /// while traversing the source code. Reversing the comparison means `Predicate`s that
+    /// appear later in the source will tend to be placed "higher" (closer to the root) in
+    /// the TDD graph. We have found empirically that this leads to smaller TDD graphs [1],
+    /// since there are often repeated combinations of `Predicate`s from earlier in the
+    /// file.
+    ///
+    /// [1]: https://github.com/astral-sh/ruff/pull/20098
     fn cmp_atoms(
         &self,
         a: ScopedReachabilityConstraintId,
@@ -439,7 +459,12 @@ impl ReachabilityConstraintsBuilder {
         } else if b.is_terminal() {
             Ordering::Less
         } else {
-            self.interiors[a].atom.cmp(&self.interiors[b].atom)
+            // See https://github.com/astral-sh/ruff/pull/20098 for an explanation of why this
+            // ordering is reversed.
+            self.interiors[a]
+                .atom
+                .cmp(&self.interiors[b].atom)
+                .reverse()
         }
     }
 
@@ -695,7 +720,7 @@ impl ReachabilityConstraints {
     ) -> Truthiness {
         match predicate_kind {
             PatternPredicateKind::Value(value) => {
-                let value_ty = infer_expression_type(db, *value);
+                let value_ty = infer_expression_type(db, *value, TypeContext::default());
 
                 if subject_ty.is_single_valued(db) {
                     Truthiness::from(subject_ty.is_equivalent_to(db, value_ty))
@@ -746,7 +771,9 @@ impl ReachabilityConstraints {
                 truthiness
             }
             PatternPredicateKind::Class(class_expr, kind) => {
-                let class_ty = infer_expression_type(db, *class_expr).to_instance(db);
+                let class_ty = infer_expression_type(db, *class_expr, TypeContext::default())
+                    .as_class_literal()
+                    .map(|class| Type::instance(db, class.top_materialization(db)));
 
                 class_ty.map_or(Truthiness::Ambiguous, |class_ty| {
                     if subject_ty.is_subtype_of(db, class_ty) {
@@ -774,12 +801,29 @@ impl ReachabilityConstraints {
     }
 
     fn analyze_single_pattern_predicate(db: &dyn Db, predicate: PatternPredicate) -> Truthiness {
-        let subject_ty = infer_expression_type(db, predicate.subject(db));
+        let subject_ty = infer_expression_type(db, predicate.subject(db), TypeContext::default());
 
-        let narrowed_subject_ty = IntersectionBuilder::new(db)
+        let narrowed_subject = IntersectionBuilder::new(db)
             .add_positive(subject_ty)
-            .add_negative(type_excluded_by_previous_patterns(db, predicate))
+            .add_negative(type_excluded_by_previous_patterns(db, predicate));
+
+        let narrowed_subject_ty = narrowed_subject.clone().build();
+
+        // Consider a case where we match on a subject type of `Self` with an upper bound of `Answer`,
+        // where `Answer` is a {YES, NO} enum. After a previous pattern matching on `NO`, the narrowed
+        // subject type is `Self & ~Literal[NO]`. This type is *not* equivalent to `Literal[YES]`,
+        // because `Self` could also specialize to `Literal[NO]` or `Never`, making the intersection
+        // empty. However, if the current pattern matches on `YES`, the *next* narrowed subject type
+        // will be `Self & ~Literal[NO] & ~Literal[YES]`, which *is* always equivalent to `Never`. This
+        // means that subsequent patterns can never match. And we know that if we reach this point,
+        // the current pattern will have to match. We return `AlwaysTrue` here, since the call to
+        // `analyze_single_pattern_predicate_kind` below would return `Ambiguous` in this case.
+        let next_narrowed_subject_ty = narrowed_subject
+            .add_negative(pattern_kind_to_type(db, predicate.kind(db)))
             .build();
+        if !narrowed_subject_ty.is_never() && next_narrowed_subject_ty.is_never() {
+            return Truthiness::AlwaysTrue;
+        }
 
         let truthiness = Self::analyze_single_pattern_predicate_kind(
             db,
@@ -797,10 +841,11 @@ impl ReachabilityConstraints {
     }
 
     fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
+        let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
+
         match predicate.node {
             PredicateNode::Expression(test_expr) => {
-                let ty = infer_expression_type(db, test_expr);
-                ty.bool(db).negate_if(!predicate.is_positive)
+                static_expression_truthiness(db, test_expr).negate_if(!predicate.is_positive)
             }
             PredicateNode::ReturnsNever(CallableAndCallExpr {
                 callable,
@@ -813,10 +858,21 @@ impl ReachabilityConstraints {
                 // selection algorithm).
                 // Avoiding this on the happy-path is important because these constraints can be
                 // very large in number, since we add them on all statement level function calls.
-                let ty = infer_expression_type(db, callable);
+                let ty = infer_expression_type(db, callable, TypeContext::default());
+
+                // Short-circuit for well known types that are known not to return `Never` when called.
+                // Without the short-circuit, we've seen that threads keep blocking each other
+                // because they all try to acquire Salsa's `CallableType` lock that ensures each type
+                // is only interned once. The lock is so heavily congested because there are only
+                // very few dynamic types, in which case Salsa's sharding the locks by value
+                // doesn't help much.
+                // See <https://github.com/astral-sh/ty/issues/968>.
+                if matches!(ty, Type::Dynamic(_)) {
+                    return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
+                }
 
                 let overloads_iterator =
-                    if let Some(Type::Callable(callable)) = ty.into_callable(db) {
+                    if let Some(Type::Callable(callable)) = ty.try_upcast_to_callable(db) {
                         callable.signatures(db).overloads.iter()
                     } else {
                         return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
@@ -840,7 +896,7 @@ impl ReachabilityConstraints {
                 } else if all_overloads_return_never {
                     Truthiness::AlwaysTrue
                 } else {
-                    let call_expr_ty = infer_expression_type(db, call_expr);
+                    let call_expr_ty = infer_expression_type(db, call_expr, TypeContext::default());
                     if call_expr_ty.is_equivalent_to(db, Type::Never) {
                         Truthiness::AlwaysTrue
                     } else {
@@ -879,13 +935,17 @@ impl ReachabilityConstraints {
                 )
                 .place
                 {
-                    crate::place::Place::Type(_, crate::place::Boundness::Bound) => {
-                        Truthiness::AlwaysTrue
-                    }
-                    crate::place::Place::Type(_, crate::place::Boundness::PossiblyUnbound) => {
-                        Truthiness::Ambiguous
-                    }
-                    crate::place::Place::Unbound => Truthiness::AlwaysFalse,
+                    crate::place::Place::Defined(
+                        _,
+                        _,
+                        crate::place::Definedness::AlwaysDefined,
+                    ) => Truthiness::AlwaysTrue,
+                    crate::place::Place::Defined(
+                        _,
+                        _,
+                        crate::place::Definedness::PossiblyUndefined,
+                    ) => Truthiness::Ambiguous,
+                    crate::place::Place::Undefined => Truthiness::AlwaysFalse,
                 }
             }
         }

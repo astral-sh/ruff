@@ -1,29 +1,16 @@
-use crate::symbols::{SymbolInfo, SymbolsOptions, symbols_for_file};
+use crate::symbols::{FlatSymbols, symbols_for_file};
 use ruff_db::files::File;
 use ty_project::Db;
 
 /// Get all document symbols for a file with the given options.
-pub fn document_symbols_with_options(
-    db: &dyn Db,
-    file: File,
-    options: &SymbolsOptions,
-) -> Vec<SymbolInfo> {
-    symbols_for_file(db, file, options)
-}
-
-/// Get all document symbols for a file (hierarchical by default).
-pub fn document_symbols(db: &dyn Db, file: File) -> Vec<SymbolInfo> {
-    let options = SymbolsOptions {
-        hierarchical: true,
-        global_only: false,
-        query_string: None,
-    };
-    document_symbols_with_options(db, file, &options)
+pub fn document_symbols(db: &dyn Db, file: File) -> &FlatSymbols {
+    symbols_for_file(db, file)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::symbols::{HierarchicalSymbols, SymbolId, SymbolInfo};
     use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
@@ -94,13 +81,13 @@ class MyClass:
     class_var = 100
     typed_class_var: str = 'class_typed'
     annotated_class_var: float
-    
+
     def __init__(self):
         self.instance_var = 0
-    
+
     def public_method(self):
         return self.instance_var
-    
+
     def _private_method(self):
         pass
 
@@ -198,7 +185,7 @@ def standalone_function():
         12 |     typed_class_var: str = 'class_typed'
         13 |     annotated_class_var: float
            |     ^^^^^^^^^^^^^^^^^^^
-        14 |     
+        14 |
         15 |     def __init__(self):
            |
         info: Field annotated_class_var
@@ -207,7 +194,7 @@ def standalone_function():
           --> main.py:15:9
            |
         13 |     annotated_class_var: float
-        14 |     
+        14 |
         15 |     def __init__(self):
            |         ^^^^^^^^
         16 |         self.instance_var = 0
@@ -218,7 +205,7 @@ def standalone_function():
           --> main.py:18:9
            |
         16 |         self.instance_var = 0
-        17 |     
+        17 |
         18 |     def public_method(self):
            |         ^^^^^^^^^^^^^
         19 |         return self.instance_var
@@ -229,7 +216,7 @@ def standalone_function():
           --> main.py:21:9
            |
         19 |         return self.instance_var
-        20 |     
+        20 |
         21 |     def _private_method(self):
            |         ^^^^^^^^^^^^^^^
         22 |         pass
@@ -256,10 +243,10 @@ def standalone_function():
             "
 class OuterClass:
     OUTER_CONSTANT = 100
-    
+
     def outer_method(self):
         return self.OUTER_CONSTANT
-    
+
     class InnerClass:
         def inner_method(self):
             pass
@@ -282,7 +269,7 @@ class OuterClass:
         2 | class OuterClass:
         3 |     OUTER_CONSTANT = 100
           |     ^^^^^^^^^^^^^^
-        4 |     
+        4 |
         5 |     def outer_method(self):
           |
         info: Constant OUTER_CONSTANT
@@ -291,7 +278,7 @@ class OuterClass:
          --> main.py:5:9
           |
         3 |     OUTER_CONSTANT = 100
-        4 |     
+        4 |
         5 |     def outer_method(self):
           |         ^^^^^^^^^^^^
         6 |         return self.OUTER_CONSTANT
@@ -302,7 +289,7 @@ class OuterClass:
           --> main.py:8:11
            |
          6 |         return self.OUTER_CONSTANT
-         7 |     
+         7 |
          8 |     class InnerClass:
            |           ^^^^^^^^^^
          9 |         def inner_method(self):
@@ -324,42 +311,45 @@ class OuterClass:
 
     impl CursorTest {
         fn document_symbols(&self) -> String {
-            let symbols = document_symbols(&self.db, self.cursor.file);
+            let symbols = document_symbols(&self.db, self.cursor.file).to_hierarchical();
 
             if symbols.is_empty() {
                 return "No symbols found".to_string();
             }
 
-            self.render_diagnostics(
-                symbols
-                    .into_iter()
-                    .flat_map(|symbol| symbol_to_diagnostics(symbol, self.cursor.file)),
-            )
+            self.render_diagnostics(symbols.iter().flat_map(|(id, symbol)| {
+                symbol_to_diagnostics(&symbols, id, symbol, self.cursor.file)
+            }))
         }
     }
 
-    fn symbol_to_diagnostics(symbol: SymbolInfo, file: File) -> Vec<DocumentSymbolDiagnostic> {
+    fn symbol_to_diagnostics<'db>(
+        symbols: &'db HierarchicalSymbols,
+        id: SymbolId,
+        symbol: SymbolInfo<'db>,
+        file: File,
+    ) -> Vec<DocumentSymbolDiagnostic<'db>> {
         // Output the symbol and recursively output all child symbols
-        let mut diagnostics = vec![DocumentSymbolDiagnostic::new(symbol.clone(), file)];
+        let mut diagnostics = vec![DocumentSymbolDiagnostic::new(symbol, file)];
 
-        for child in symbol.children {
-            diagnostics.extend(symbol_to_diagnostics(child, file));
+        for (child_id, child) in symbols.children(id) {
+            diagnostics.extend(symbol_to_diagnostics(symbols, child_id, child, file));
         }
 
         diagnostics
     }
-    struct DocumentSymbolDiagnostic {
-        symbol: SymbolInfo,
+    struct DocumentSymbolDiagnostic<'db> {
+        symbol: SymbolInfo<'db>,
         file: File,
     }
 
-    impl DocumentSymbolDiagnostic {
-        fn new(symbol: SymbolInfo, file: File) -> Self {
+    impl<'db> DocumentSymbolDiagnostic<'db> {
+        fn new(symbol: SymbolInfo<'db>, file: File) -> Self {
             Self { symbol, file }
         }
     }
 
-    impl IntoDiagnostic for DocumentSymbolDiagnostic {
+    impl IntoDiagnostic for DocumentSymbolDiagnostic<'_> {
         fn into_diagnostic(self) -> Diagnostic {
             let symbol_kind_str = self.symbol.kind.to_string();
 

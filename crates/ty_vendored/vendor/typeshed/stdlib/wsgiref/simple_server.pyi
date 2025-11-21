@@ -12,15 +12,15 @@ module.  See also the BaseHTTPServer module docs for other API information.
 
 from _typeshed.wsgi import ErrorStream, StartResponse, WSGIApplication, WSGIEnvironment
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import TypeVar, overload
+from typing import Final, TypeVar, overload
 
 from .handlers import SimpleHandler
 
 __all__ = ["WSGIServer", "WSGIRequestHandler", "demo_app", "make_server"]
 
-server_version: str  # undocumented
-sys_version: str  # undocumented
-software_version: str  # undocumented
+server_version: Final[str]  # undocumented
+sys_version: Final[str]  # undocumented
+software_version: Final[str]  # undocumented
 
 class ServerHandler(SimpleHandler):  # undocumented
     server_software: str

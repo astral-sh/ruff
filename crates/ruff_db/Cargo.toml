@@ -34,12 +34,15 @@ glob = { workspace = true }
 ignore = { workspace = true, optional = true }
 matchit = { workspace = true }
 path-slash = { workspace = true }
+pathdiff = { workspace = true }
 quick-junit = { workspace = true, optional = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
+similar = { workspace = true }
+supports-hyperlinks = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
@@ -52,7 +55,7 @@ web-time = { version = "1.1.0" }
 etcetera = { workspace = true, optional = true }
 
 [dev-dependencies]
-insta = { workspace = true }
+insta = { workspace = true, features = ["filters"] }
 tempfile = { workspace = true }
 
 [features]

@@ -8,6 +8,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// ## What it does
 /// Checks for unnecessary default type arguments for `Generator` and
 /// `AsyncGenerator` on Python 3.13+.
+/// In [preview], this rule will also apply to stub files.
 ///
 /// ## Why is this bad?
 /// Python 3.13 introduced the ability for type parameters to specify default
@@ -59,7 +60,10 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// - [Annotating generators and coroutines](https://docs.python.org/3/library/typing.html#annotating-generators-and-coroutines)
 /// - [Python documentation: `typing.Generator`](https://docs.python.org/3/library/typing.html#typing.Generator)
 /// - [Python documentation: `typing.AsyncGenerator`](https://docs.python.org/3/library/typing.html#typing.AsyncGenerator)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct UnnecessaryDefaultTypeArgs;
 
 impl AlwaysFixableViolation for UnnecessaryDefaultTypeArgs {
@@ -127,13 +131,13 @@ pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
                             elts: valid_elts,
                             ctx: ast::ExprContext::Load,
                             range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                             parenthesized: true,
                         })
                     }),
                     ctx: ast::ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 })),
             expr.range(),
         ),

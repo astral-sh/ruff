@@ -5,7 +5,7 @@ This avoids all the overhead of SAX and pulldom to gain performance.
 """
 
 from _typeshed import ReadableBuffer, SupportsRead
-from typing import Any, NoReturn
+from typing import Any, Final, NoReturn
 from typing_extensions import TypeAlias
 from xml.dom.minidom import Document, DocumentFragment, DOMImplementation, Element, Node, TypeInfo
 from xml.dom.xmlbuilder import DOMBuilderFilter, Options
@@ -13,16 +13,17 @@ from xml.parsers.expat import XMLParserType
 
 _Model: TypeAlias = tuple[int, int, str | None, tuple[Any, ...]]  # same as in pyexpat
 
-TEXT_NODE = Node.TEXT_NODE
-CDATA_SECTION_NODE = Node.CDATA_SECTION_NODE
-DOCUMENT_NODE = Node.DOCUMENT_NODE
-FILTER_ACCEPT = DOMBuilderFilter.FILTER_ACCEPT
-FILTER_REJECT = DOMBuilderFilter.FILTER_REJECT
-FILTER_SKIP = DOMBuilderFilter.FILTER_SKIP
-FILTER_INTERRUPT = DOMBuilderFilter.FILTER_INTERRUPT
+TEXT_NODE: Final = Node.TEXT_NODE
+CDATA_SECTION_NODE: Final = Node.CDATA_SECTION_NODE
+DOCUMENT_NODE: Final = Node.DOCUMENT_NODE
+FILTER_ACCEPT: Final = DOMBuilderFilter.FILTER_ACCEPT
+FILTER_REJECT: Final = DOMBuilderFilter.FILTER_REJECT
+FILTER_SKIP: Final = DOMBuilderFilter.FILTER_SKIP
+FILTER_INTERRUPT: Final = DOMBuilderFilter.FILTER_INTERRUPT
 theDOMImplementation: DOMImplementation
 
 class ElementInfo:
+    __slots__ = ("_attr_info", "_model", "tagName")
     tagName: str
     def __init__(self, tagName: str, model: _Model | None = None) -> None: ...
     def getAttributeType(self, aname: str) -> TypeInfo: ...
@@ -94,19 +95,23 @@ class FilterVisibilityController:
     to make the whatToShow filter attribute work.
     """
 
+    __slots__ = ("filter",)
     filter: DOMBuilderFilter
     def __init__(self, filter: DOMBuilderFilter) -> None: ...
     def startContainer(self, node: Node) -> int: ...
     def acceptNode(self, node: Node) -> int: ...
 
 class FilterCrutch:
+    __slots__ = ("_builder", "_level", "_old_start", "_old_end")
     def __init__(self, builder: ExpatBuilder) -> None: ...
 
 class Rejecter(FilterCrutch):
+    __slots__ = ()
     def start_element_handler(self, *args: Any) -> None: ...
     def end_element_handler(self, *args: Any) -> None: ...
 
 class Skipper(FilterCrutch):
+    __slots__ = ()
     def start_element_handler(self, *args: Any) -> None: ...
     def end_element_handler(self, *args: Any) -> None: ...
 

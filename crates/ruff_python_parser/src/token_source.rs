@@ -3,6 +3,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::Mode;
 use crate::error::LexicalError;
 use crate::lexer::{Lexer, LexerCheckpoint};
+use crate::string::InterpolatedStringKind;
 use crate::token::{Token, TokenFlags, TokenKind, TokenValue};
 
 /// Token source for the parser that skips over any trivia tokens.
@@ -86,6 +87,18 @@ impl<'src> TokenSource<'src> {
                 self.tokens.pop();
             }
         }
+    }
+
+    pub(crate) fn re_lex_string_token_in_interpolation_element(
+        &mut self,
+        kind: InterpolatedStringKind,
+    ) {
+        self.lexer
+            .re_lex_string_token_in_interpolation_element(kind);
+    }
+
+    pub(crate) fn re_lex_raw_string_in_format_spec(&mut self) {
+        self.lexer.re_lex_raw_string_in_format_spec();
     }
 
     /// Returns the next non-trivia token without consuming it.

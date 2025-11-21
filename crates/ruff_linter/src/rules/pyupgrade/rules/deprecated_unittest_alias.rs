@@ -39,6 +39,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python 3.11 documentation: Deprecated aliases](https://docs.python.org/3.11/library/unittest.html#deprecated-aliases)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct DeprecatedUnittestAlias {
     alias: String,
     target: String,
@@ -98,6 +99,7 @@ pub(crate) fn deprecated_unittest_alias(checker: &Checker, expr: &Expr) {
         },
         expr.range(),
     );
+    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         format!("self.{target}"),
         expr.range(),

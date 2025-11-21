@@ -1,0 +1,180 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC102 Documented parameter `a` is not in the function's signature
+ --> DOC102_google.py:7:9
+  |
+6 |     Args:
+7 |         a (int): The first number to add.
+  |         ^
+8 |         b (int): The second number to add.
+  |
+help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `multiplier` is not in the function's signature
+  --> DOC102_google.py:23:9
+   |
+21 |     Args:
+22 |         lst (list of int): A list of integers.
+23 |         multiplier (int): The multiplier for each element in the list.
+   |         ^^^^^^^^^^
+24 |
+25 |     Returns:
+   |
+help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `numbers` is not in the function's signature
+  --> DOC102_google.py:37:9
+   |
+36 |     Args:
+37 |         numbers (list of int): A list of integers to search through.
+   |         ^^^^^^^
+38 |
+39 |     Returns:
+   |
+help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `name` is not in the function's signature
+  --> DOC102_google.py:51:9
+   |
+50 |     Args:
+51 |         name (str): The name of the user.
+   |         ^^^^
+52 |         age (int): The age of the user.
+53 |         email (str): The user's email address.
+   |
+help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `age` is not in the function's signature
+  --> DOC102_google.py:52:9
+   |
+50 |     Args:
+51 |         name (str): The name of the user.
+52 |         age (int): The age of the user.
+   |         ^^^
+53 |         email (str): The user's email address.
+54 |         location (str): The location of the user.
+   |
+help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `email` is not in the function's signature
+  --> DOC102_google.py:53:9
+   |
+51 |         name (str): The name of the user.
+52 |         age (int): The age of the user.
+53 |         email (str): The user's email address.
+   |         ^^^^^
+54 |         location (str): The location of the user.
+   |
+help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `tax_rate` is not in the function's signature
+  --> DOC102_google.py:74:9
+   |
+72 |     Args:
+73 |         item_prices (list of float): A list of prices for each item.
+74 |         tax_rate (float): The tax rate to apply.
+   |         ^^^^^^^^
+75 |         discount (float): The discount to subtract from the total.
+   |
+help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `to_address` is not in the function's signature
+  --> DOC102_google.py:94:9
+   |
+92 |         subject (str): The subject of the email.
+93 |         body (str): The content of the email.
+94 |         to_address (str): The recipient's email address.
+   |         ^^^^^^^^^^
+95 |         cc_address (str, optional): The email address for CC. Defaults to None.
+96 |         bcc_address (str, optional): The email address for BCC. Defaults to None.
+   |
+help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `cc_address` is not in the function's signature
+  --> DOC102_google.py:95:9
+   |
+93 |         body (str): The content of the email.
+94 |         to_address (str): The recipient's email address.
+95 |         cc_address (str, optional): The email address for CC. Defaults to None.
+   |         ^^^^^^^^^^
+96 |         bcc_address (str, optional): The email address for BCC. Defaults to None.
+   |
+help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `items` is not in the function's signature
+   --> DOC102_google.py:126:9
+    |
+124 |     Args:
+125 |         order_id (int): The unique identifier for the order.
+126 |         *items (str): Variable length argument list of items in the order.
+    |         ^^^^^^
+127 |         **details (dict): Additional details such as shipping method and address.
+    |
+help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `details` is not in the function's signature
+   --> DOC102_google.py:127:9
+    |
+125 |         order_id (int): The unique identifier for the order.
+126 |         *items (str): Variable length argument list of items in the order.
+127 |         **details (dict): Additional details such as shipping method and address.
+    |         ^^^^^^^^^
+128 |
+129 |     Returns:
+    |
+help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `value` is not in the function's signature
+   --> DOC102_google.py:150:13
+    |
+149 |         Args:
+150 |             value (int, optional): The initial value of the calculator. Defaults to 0.
+    |             ^^^^^
+151 |         """
+152 |         self.value = value
+    |
+help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `number` is not in the function's signature
+   --> DOC102_google.py:160:13
+    |
+159 |         Args:
+160 |             number (int or float): The number to add to the current value.
+    |             ^^^^^^
+161 |
+162 |         Returns:
+    |
+help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `value_str` is not in the function's signature
+   --> DOC102_google.py:175:13
+    |
+174 |         Args:
+175 |             value_str (str): The string representing the initial value.
+    |             ^^^^^^^^^
+176 |
+177 |         Returns:
+    |
+help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `number` is not in the function's signature
+   --> DOC102_google.py:190:13
+    |
+189 |         Args:
+190 |             number (any): The value to check.
+    |             ^^^^^^
+191 |
+192 |         Returns:
+    |
+help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `a` is not in the function's signature
+   --> DOC102_google.py:258:9
+    |
+257 |     Args:
+258 |         a: The first number to add.
+    |         ^
+259 |         b: The second number to add.
+    |
+help: Remove the extraneous parameter from the docstring

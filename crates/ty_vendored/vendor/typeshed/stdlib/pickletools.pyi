@@ -12,7 +12,7 @@ dis(pickle, out=None, memo=None, indentlevel=4)
 
 import sys
 from collections.abc import Callable, Iterator, MutableMapping
-from typing import IO, Any
+from typing import IO, Any, Final
 from typing_extensions import TypeAlias
 
 __all__ = ["dis", "genops", "optimize"]
@@ -20,13 +20,14 @@ __all__ = ["dis", "genops", "optimize"]
 _Reader: TypeAlias = Callable[[IO[bytes]], Any]
 bytes_types: tuple[type[Any], ...]
 
-UP_TO_NEWLINE: int
-TAKEN_FROM_ARGUMENT1: int
-TAKEN_FROM_ARGUMENT4: int
-TAKEN_FROM_ARGUMENT4U: int
-TAKEN_FROM_ARGUMENT8U: int
+UP_TO_NEWLINE: Final = -1
+TAKEN_FROM_ARGUMENT1: Final = -2
+TAKEN_FROM_ARGUMENT4: Final = -3
+TAKEN_FROM_ARGUMENT4U: Final = -4
+TAKEN_FROM_ARGUMENT8U: Final = -5
 
 class ArgumentDescriptor:
+    __slots__ = ("name", "n", "reader", "doc")
     name: str
     n: int
     reader: _Reader
@@ -376,6 +377,7 @@ def read_long4(f: IO[bytes]) -> int:
 long4: ArgumentDescriptor
 
 class StackObject:
+    __slots__ = ("name", "obtype", "doc")
     name: str
     obtype: type[Any] | tuple[type[Any], ...]
     doc: str
@@ -401,6 +403,7 @@ markobject: StackObject
 stackslice: StackObject
 
 class OpcodeInfo:
+    __slots__ = ("name", "code", "arg", "stack_before", "stack_after", "proto", "doc")
     name: str
     code: str
     arg: ArgumentDescriptor | None

@@ -78,6 +78,7 @@ use super::{DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, in_nested
 /// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
 /// [fail]: https://github.com/python/mypy/issues/18507
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct NonPEP695GenericFunction {
     name: String,
 }
@@ -154,7 +155,7 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
         }
     }
 
-    let Some(type_vars) = check_type_vars(type_vars) else {
+    let Some(type_vars) = check_type_vars(type_vars, checker) else {
         return;
     };
 

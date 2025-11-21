@@ -7,37 +7,37 @@ input_file: crates/ruff_python_parser/resources/inline/err/t_string_unclosed_lbr
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..73,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 44..56,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 44..56,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 44..56,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 46..52,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     value: "hello ",
                                                 },
                                             ),
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 52..55,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 53..54,
                                                             id: Name("x"),
                                                             ctx: Load,
@@ -48,7 +48,7 @@ Module(
                                                     format_spec: Some(
                                                         InterpolatedStringFormatSpec {
                                                             range: 55..55,
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             elements: [],
                                                         },
                                                     ),
@@ -59,6 +59,7 @@ Module(
                                             quote_style: Double,
                                             prefix: Regular,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ),
@@ -69,32 +70,32 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 57..72,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 57..72,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 57..72,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 59..65,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     value: "hello ",
                                                 },
                                             ),
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 65..71,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 66..67,
                                                             id: Name("x"),
                                                             ctx: Load,
@@ -105,12 +106,12 @@ Module(
                                                     format_spec: Some(
                                                         InterpolatedStringFormatSpec {
                                                             range: 68..71,
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             elements: [
                                                                 Literal(
                                                                     InterpolatedStringLiteralElement {
                                                                         range: 68..71,
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         value: ".3f",
                                                                     },
                                                                 ),
@@ -124,6 +125,7 @@ Module(
                                             quote_style: Double,
                                             prefix: Regular,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ),
@@ -141,7 +143,7 @@ Module(
   |
 1 | # parse_options: {"target-version": "3.14"}
 2 | t"hello {x:"
-  |            ^ Syntax Error: t-string: expecting '}'
+  |            ^ Syntax Error: t-string: expecting `}`
 3 | t"hello {x:.3f"
   |
 
@@ -150,5 +152,5 @@ Module(
 1 | # parse_options: {"target-version": "3.14"}
 2 | t"hello {x:"
 3 | t"hello {x:.3f"
-  |               ^ Syntax Error: t-string: expecting '}'
+  |               ^ Syntax Error: t-string: expecting `}`
   |

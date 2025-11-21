@@ -307,8 +307,9 @@ Using a `ParamSpec` in a `Callable` annotation:
 from typing_extensions import Callable
 
 def _[**P1](c: Callable[P1, int]):
-    reveal_type(P1.args)  # revealed: @Todo(ParamSpec)
-    reveal_type(P1.kwargs)  # revealed: @Todo(ParamSpec)
+    # TODO: Should reveal `ParamSpecArgs` and `ParamSpecKwargs`
+    reveal_type(P1.args)  # revealed: @Todo(ParamSpecArgs / ParamSpecKwargs)
+    reveal_type(P1.kwargs)  # revealed: @Todo(ParamSpecArgs / ParamSpecKwargs)
 
     # TODO: Signature should be (**P1) -> int
     reveal_type(c)  # revealed: (...) -> int
@@ -366,7 +367,7 @@ on function-like callables:
 
 ```py
 def f_wrong(c: Callable[[], None]):
-    # error: [unresolved-attribute] "Type `() -> None` has no attribute `__qualname__`"
+    # error: [unresolved-attribute] "Object of type `() -> None` has no attribute `__qualname__`"
     c.__qualname__
 
     # error: [unresolved-attribute] "Unresolved attribute `__qualname__` on type `() -> None`."
@@ -392,13 +393,19 @@ from inspect import getattr_static
 
 def f_okay(c: Callable[[], None]):
     if hasattr(c, "__qualname__"):
-        c.__qualname__  # okay
+        reveal_type(c.__qualname__)  # revealed: object
+
+        # TODO: should be `property`
+        # (or complain that we don't know that `type(c)` has the attribute at all!)
+        reveal_type(type(c).__qualname__)  # revealed: @Todo(Intersection meta-type)
+
         # `hasattr` only guarantees that an attribute is readable.
+        #
         # error: [invalid-assignment] "Object of type `Literal["my_callable"]` is not assignable to attribute `__qualname__` on type `(() -> None) & <Protocol with members '__qualname__'>`"
         c.__qualname__ = "my_callable"
 
         result = getattr_static(c, "__qualname__")
-        reveal_type(result)  # revealed: Never
+        reveal_type(result)  # revealed: property
         if isinstance(result, property) and result.fset:
             c.__qualname__ = "my_callable"  # okay
 ```

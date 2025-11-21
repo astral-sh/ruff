@@ -11,7 +11,7 @@ At its simplest, to define a generic class using PEP 695 syntax, you add a list 
 `ParamSpec`s or `TypeVarTuple`s after the class name.
 
 ```py
-from ty_extensions import generic_context
+from ty_extensions import generic_context, reveal_mro
 
 class SingleTypevar[T]: ...
 class MultipleTypevars[T, S]: ...
@@ -20,17 +20,21 @@ class TypeVarAndParamSpec[T, **P]: ...
 class SingleTypeVarTuple[*Ts]: ...
 class TypeVarAndTypeVarTuple[T, *Ts]: ...
 
-# revealed: tuple[T@SingleTypevar]
+# revealed: ty_extensions.GenericContext[T@SingleTypevar]
 reveal_type(generic_context(SingleTypevar))
-# revealed: tuple[T@MultipleTypevars, S@MultipleTypevars]
+# revealed: ty_extensions.GenericContext[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
 
 # TODO: support `ParamSpec`/`TypeVarTuple` properly
 # (these should include the `ParamSpec`s and `TypeVarTuple`s in their generic contexts)
-reveal_type(generic_context(SingleParamSpec))  # revealed: tuple[()]
-reveal_type(generic_context(TypeVarAndParamSpec))  # revealed: tuple[T@TypeVarAndParamSpec]
-reveal_type(generic_context(SingleTypeVarTuple))  # revealed: tuple[()]
-reveal_type(generic_context(TypeVarAndTypeVarTuple))  # revealed: tuple[T@TypeVarAndTypeVarTuple]
+# revealed: ty_extensions.GenericContext[]
+reveal_type(generic_context(SingleParamSpec))
+# revealed: ty_extensions.GenericContext[T@TypeVarAndParamSpec]
+reveal_type(generic_context(TypeVarAndParamSpec))
+# revealed: ty_extensions.GenericContext[]
+reveal_type(generic_context(SingleTypeVarTuple))
+# revealed: ty_extensions.GenericContext[T@TypeVarAndTypeVarTuple]
+reveal_type(generic_context(TypeVarAndTypeVarTuple))
 ```
 
 You cannot use the same typevar more than once.
@@ -38,13 +42,6 @@ You cannot use the same typevar more than once.
 ```py
 # error: [invalid-syntax] "duplicate type parameter"
 class RepeatedTypevar[T, T]: ...
-```
-
-You can only use typevars (TODO: or param specs or typevar tuples) in the class's generic context.
-
-```py
-# TODO: error
-class GenericOfType[int]: ...
 ```
 
 You can also define a generic class by inheriting from some _other_ generic class, and specializing
@@ -56,9 +53,9 @@ class InheritedGeneric[U, V](MultipleTypevars[U, V]): ...
 class InheritedGenericPartiallySpecialized[U](MultipleTypevars[U, int]): ...
 class InheritedGenericFullySpecialized(MultipleTypevars[str, int]): ...
 
-# revealed: tuple[U@InheritedGeneric, V@InheritedGeneric]
+# revealed: ty_extensions.GenericContext[U@InheritedGeneric, V@InheritedGeneric]
 reveal_type(generic_context(InheritedGeneric))
-# revealed: tuple[U@InheritedGenericPartiallySpecialized]
+# revealed: ty_extensions.GenericContext[U@InheritedGenericPartiallySpecialized]
 reveal_type(generic_context(InheritedGenericPartiallySpecialized))
 # revealed: None
 reveal_type(generic_context(InheritedGenericFullySpecialized))
@@ -71,7 +68,8 @@ the inheriting class generic.
 ```py
 class InheritedGenericDefaultSpecialization(MultipleTypevars): ...
 
-reveal_type(generic_context(InheritedGenericDefaultSpecialization))  # revealed: None
+# revealed: None
+reveal_type(generic_context(InheritedGenericDefaultSpecialization))
 ```
 
 You cannot use PEP-695 syntax and the legacy syntax in the same class definition.
@@ -84,13 +82,13 @@ T = TypeVar("T")
 # error: [invalid-generic-class] "Cannot both inherit from `typing.Generic` and use PEP 695 type variables"
 class BothGenericSyntaxes[U](Generic[T]): ...
 
-reveal_type(BothGenericSyntaxes.__mro__)  # revealed: tuple[<class 'BothGenericSyntaxes[Unknown]'>, Unknown, <class 'object'>]
+reveal_mro(BothGenericSyntaxes)  # revealed: (<class 'BothGenericSyntaxes[Unknown]'>, Unknown, <class 'object'>)
 
 # error: [invalid-generic-class] "Cannot both inherit from `typing.Generic` and use PEP 695 type variables"
 # error: [invalid-base] "Cannot inherit from plain `Generic`"
 class DoublyInvalid[T](Generic): ...
 
-reveal_type(DoublyInvalid.__mro__)  # revealed: tuple[<class 'DoublyInvalid[Unknown]'>, Unknown, <class 'object'>]
+reveal_mro(DoublyInvalid)  # revealed: (<class 'DoublyInvalid[Unknown]'>, Unknown, <class 'object'>)
 ```
 
 Generic classes implicitly inherit from `Generic`:
@@ -98,26 +96,26 @@ Generic classes implicitly inherit from `Generic`:
 ```py
 class Foo[T]: ...
 
-# revealed: tuple[<class 'Foo[Unknown]'>, typing.Generic, <class 'object'>]
-reveal_type(Foo.__mro__)
-# revealed: tuple[<class 'Foo[int]'>, typing.Generic, <class 'object'>]
-reveal_type(Foo[int].__mro__)
+# revealed: (<class 'Foo[Unknown]'>, typing.Generic, <class 'object'>)
+reveal_mro(Foo)
+# revealed: (<class 'Foo[int]'>, typing.Generic, <class 'object'>)
+reveal_mro(Foo[int])
 
 class A: ...
 class Bar[T](A): ...
 
-# revealed: tuple[<class 'Bar[Unknown]'>, <class 'A'>, typing.Generic, <class 'object'>]
-reveal_type(Bar.__mro__)
-# revealed: tuple[<class 'Bar[int]'>, <class 'A'>, typing.Generic, <class 'object'>]
-reveal_type(Bar[int].__mro__)
+# revealed: (<class 'Bar[Unknown]'>, <class 'A'>, typing.Generic, <class 'object'>)
+reveal_mro(Bar)
+# revealed: (<class 'Bar[int]'>, <class 'A'>, typing.Generic, <class 'object'>)
+reveal_mro(Bar[int])
 
 class B: ...
 class Baz[T](A, B): ...
 
-# revealed: tuple[<class 'Baz[Unknown]'>, <class 'A'>, <class 'B'>, typing.Generic, <class 'object'>]
-reveal_type(Baz.__mro__)
-# revealed: tuple[<class 'Baz[int]'>, <class 'A'>, <class 'B'>, typing.Generic, <class 'object'>]
-reveal_type(Baz[int].__mro__)
+# revealed: (<class 'Baz[Unknown]'>, <class 'A'>, <class 'B'>, typing.Generic, <class 'object'>)
+reveal_mro(Baz)
+# revealed: (<class 'Baz[int]'>, <class 'A'>, <class 'B'>, typing.Generic, <class 'object'>)
+reveal_mro(Baz[int])
 ```
 
 ## Specializing generic classes explicitly
@@ -237,10 +235,15 @@ If the type of a constructor parameter is a class typevar, we can use that to in
 parameter. The types inferred from a type context and from a constructor parameter must be
 consistent with each other.
 
+We have to add `x: T` to the classes to ensure they're not bivariant in `T` (__new__ and __init__
+signatures don't count towards variance).
+
 ### `__new__` only
 
 ```py
 class C[T]:
+    x: T
+
     def __new__(cls, x: T) -> "C[T]":
         return object.__new__(cls)
 
@@ -254,6 +257,8 @@ wrong_innards: C[int] = C("five")
 
 ```py
 class C[T]:
+    x: T
+
     def __init__(self, x: T) -> None: ...
 
 reveal_type(C(1))  # revealed: C[int]
@@ -266,6 +271,8 @@ wrong_innards: C[int] = C("five")
 
 ```py
 class C[T]:
+    x: T
+
     def __new__(cls, x: T) -> "C[T]":
         return object.__new__(cls)
 
@@ -281,6 +288,8 @@ wrong_innards: C[int] = C("five")
 
 ```py
 class C[T]:
+    x: T
+
     def __new__(cls, *args, **kwargs) -> "C[T]":
         return object.__new__(cls)
 
@@ -292,6 +301,8 @@ reveal_type(C(1))  # revealed: C[int]
 wrong_innards: C[int] = C("five")
 
 class D[T]:
+    x: T
+
     def __new__(cls, x: T) -> "D[T]":
         return object.__new__(cls)
 
@@ -316,7 +327,7 @@ class C[T, U]:
 class D[V](C[V, int]):
     def __init__(self, x: V) -> None: ...
 
-reveal_type(D(1))  # revealed: D[int]
+reveal_type(D(1))  # revealed: D[Literal[1]]
 ```
 
 ### Generic class inherits `__init__` from generic base class
@@ -328,8 +339,8 @@ class C[T, U]:
 class D[T, U](C[T, U]):
     pass
 
-reveal_type(C(1, "str"))  # revealed: C[int, str]
-reveal_type(D(1, "str"))  # revealed: D[int, str]
+reveal_type(C(1, "str"))  # revealed: C[Literal[1], Literal["str"]]
+reveal_type(D(1, "str"))  # revealed: D[Literal[1], Literal["str"]]
 ```
 
 ### Generic class inherits `__init__` from `dict`
@@ -352,13 +363,32 @@ context. But from the user's point of view, this is another example of the above
 ```py
 class C[T, U](tuple[T, U]): ...
 
-reveal_type(C((1, 2)))  # revealed: C[int, int]
+reveal_type(C((1, 2)))  # revealed: C[Literal[1], Literal[2]]
+```
+
+### Upcasting a `tuple` to its `Sequence` supertype
+
+This test is taken from the
+[typing spec conformance suite](https://github.com/python/typing/blob/c141cdfb9d7085c1aafa76726c8ce08362837e8b/conformance/tests/tuples_type_compat.py#L133-L153)
+
+```py
+from typing import Sequence, Never
+
+def test_seq[T](x: Sequence[T]) -> Sequence[T]:
+    return x
+
+def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: tuple[()]):
+    reveal_type(test_seq(t1))  # revealed: Sequence[int | float | complex | list[int]]
+    reveal_type(test_seq(t2))  # revealed: Sequence[int | str]
+    reveal_type(test_seq(t3))  # revealed: Sequence[Never]
 ```
 
 ### `__init__` is itself generic
 
 ```py
 class C[T]:
+    x: T
+
     def __init__[S](self, x: T, y: S) -> None: ...
 
 reveal_type(C(1, 1))  # revealed: C[int]
@@ -372,9 +402,14 @@ wrong_innards: C[int] = C("five", 1)
 ### Some `__init__` overloads only apply to certain specializations
 
 ```py
+from __future__ import annotations
 from typing import overload
 
 class C[T]:
+    # we need to use the type variable or else the class is bivariant in T, and
+    # specializations become meaningless
+    x: T
+
     @overload
     def __init__(self: C[str], x: str) -> None: ...
     @overload
@@ -404,6 +439,17 @@ C[int](12)
 C[None]("string")  # error: [no-matching-overload]
 C[None](b"bytes")  # error: [no-matching-overload]
 C[None](12)
+
+class D[T, U]:
+    @overload
+    def __init__(self: "D[str, U]", u: U) -> None: ...
+    @overload
+    def __init__(self, t: T, u: U) -> None: ...
+    def __init__(self, *args) -> None: ...
+
+reveal_type(D("string"))  # revealed: D[str, Literal["string"]]
+reveal_type(D(1))  # revealed: D[str, Literal[1]]
+reveal_type(D(1, "string"))  # revealed: D[Literal[1], Literal["string"]]
 ```
 
 ### Synthesized methods with dataclasses
@@ -416,6 +462,19 @@ class A[T]:
     x: T
 
 reveal_type(A(x=1))  # revealed: A[int]
+```
+
+### Class typevar has another typevar as a default
+
+```py
+class C[T, U = T]: ...
+
+reveal_type(C())  # revealed: C[Unknown, Unknown]
+
+class D[T, U = T]:
+    def __init__(self) -> None: ...
+
+reveal_type(D())  # revealed: D[Unknown, Unknown]
 ```
 
 ## Generic subclass
@@ -458,18 +517,27 @@ class C[T]:
     # TODO: error
     def cannot_shadow_class_typevar[T](self, t: T): ...
 
-reveal_type(generic_context(C))  # revealed: tuple[T@C]
-reveal_type(generic_context(C.method))  # revealed: None
-reveal_type(generic_context(C.generic_method))  # revealed: tuple[U@generic_method]
-reveal_type(generic_context(C[int]))  # revealed: None
-reveal_type(generic_context(C[int].method))  # revealed: None
-reveal_type(generic_context(C[int].generic_method))  # revealed: tuple[U@generic_method]
+# revealed: ty_extensions.GenericContext[T@C]
+reveal_type(generic_context(C))
+# revealed: ty_extensions.GenericContext[Self@method]
+reveal_type(generic_context(C.method))
+# revealed: ty_extensions.GenericContext[Self@generic_method, U@generic_method]
+reveal_type(generic_context(C.generic_method))
+# revealed: None
+reveal_type(generic_context(C[int]))
+# revealed: ty_extensions.GenericContext[Self@method]
+reveal_type(generic_context(C[int].method))
+# revealed: ty_extensions.GenericContext[Self@generic_method, U@generic_method]
+reveal_type(generic_context(C[int].generic_method))
 
 c: C[int] = C[int]()
 reveal_type(c.generic_method(1, "string"))  # revealed: Literal["string"]
-reveal_type(generic_context(c))  # revealed: None
-reveal_type(generic_context(c.method))  # revealed: None
-reveal_type(generic_context(c.generic_method))  # revealed: tuple[U@generic_method]
+# revealed: None
+reveal_type(generic_context(c))
+# revealed: ty_extensions.GenericContext[Self@method]
+reveal_type(generic_context(c.method))
+# revealed: ty_extensions.GenericContext[Self@generic_method, U@generic_method]
+reveal_type(generic_context(c.generic_method))
 ```
 
 ## Specializations propagate
@@ -508,18 +576,31 @@ from typing import overload
 
 class WithOverloadedMethod[T]:
     @overload
-    def method(self, x: T) -> T:
-        return x
-
+    def method(self, x: T) -> T: ...
     @overload
-    def method[S](self, x: S) -> S | T:
-        return x
-
+    def method[S](self, x: S) -> S | T: ...
     def method[S](self, x: S | T) -> S | T:
         return x
 
 # revealed: Overload[(self, x: int) -> int, (self, x: S@method) -> S@method | int]
 reveal_type(WithOverloadedMethod[int].method)
+```
+
+## Scoping of typevars
+
+### No back-references
+
+Typevar bounds/constraints/defaults are lazy, but cannot refer to later typevars:
+
+```py
+# TODO error
+class C[S: T, T]:
+    pass
+
+class D[S: X]:
+    pass
+
+X = int
 ```
 
 ## Cyclic class definitions
@@ -572,12 +653,60 @@ class Derived[T](list[Derived[T]]): ...
 
 Inheritance that would result in a cyclic MRO is detected as an error.
 
-```py
+```pyi
 # error: [cyclic-class-definition]
 class C[T](C): ...
 
 # error: [cyclic-class-definition]
 class D[T](D[int]): ...
+```
+
+### Cyclic inheritance in a stub file combined with constrained type variables
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/1390>; we used to panic on
+this:
+
+`stub.pyi`:
+
+```pyi
+class A(B): ...
+class G: ...
+class C[T: (G, A)]: ...
+class B(C[A]): ...
+class D(C[G]): ...
+
+def func(x: D): ...
+
+func(G())  # error: [invalid-argument-type]
+```
+
+## Tuple as a PEP-695 generic class
+
+Our special handling for `tuple` does not break if `tuple` is defined as a PEP-695 generic class in
+typeshed:
+
+```toml
+[environment]
+python-version = "3.12"
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class tuple[T]: ...
+```
+
+`/typeshed/stdlib/typing_extensions.pyi`:
+
+```pyi
+def reveal_type(obj, /): ...
+```
+
+`main.py`:
+
+```py
+reveal_type((1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

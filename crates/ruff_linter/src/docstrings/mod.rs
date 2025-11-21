@@ -32,7 +32,7 @@ impl<'a> Docstring<'a> {
     }
 
     /// The contents of the docstring, excluding the opening and closing quotes.
-    pub(crate) fn body(&self) -> DocstringBody {
+    pub(crate) fn body(&self) -> DocstringBody<'_> {
         DocstringBody { docstring: self }
     }
 

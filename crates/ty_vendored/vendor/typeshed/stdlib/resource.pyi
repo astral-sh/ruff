@@ -3,27 +3,28 @@ from _typeshed import structseq
 from typing import Final, final
 
 if sys.platform != "win32":
-    RLIMIT_AS: int
-    RLIMIT_CORE: int
-    RLIMIT_CPU: int
-    RLIMIT_DATA: int
-    RLIMIT_FSIZE: int
-    RLIMIT_MEMLOCK: int
-    RLIMIT_NOFILE: int
-    RLIMIT_NPROC: int
-    RLIMIT_RSS: int
-    RLIMIT_STACK: int
-    RLIM_INFINITY: int
-    RUSAGE_CHILDREN: int
-    RUSAGE_SELF: int
+    # Depends on resource.h
+    RLIMIT_AS: Final[int]
+    RLIMIT_CORE: Final[int]
+    RLIMIT_CPU: Final[int]
+    RLIMIT_DATA: Final[int]
+    RLIMIT_FSIZE: Final[int]
+    RLIMIT_MEMLOCK: Final[int]
+    RLIMIT_NOFILE: Final[int]
+    RLIMIT_NPROC: Final[int]
+    RLIMIT_RSS: Final[int]
+    RLIMIT_STACK: Final[int]
+    RLIM_INFINITY: Final[int]
+    RUSAGE_CHILDREN: Final[int]
+    RUSAGE_SELF: Final[int]
     if sys.platform == "linux":
-        RLIMIT_MSGQUEUE: int
-        RLIMIT_NICE: int
-        RLIMIT_OFILE: int
-        RLIMIT_RTPRIO: int
-        RLIMIT_RTTIME: int
-        RLIMIT_SIGPENDING: int
-        RUSAGE_THREAD: int
+        RLIMIT_MSGQUEUE: Final[int]
+        RLIMIT_NICE: Final[int]
+        RLIMIT_OFILE: Final[int]
+        RLIMIT_RTPRIO: Final[int]
+        RLIMIT_RTTIME: Final[int]
+        RLIMIT_SIGPENDING: Final[int]
+        RUSAGE_THREAD: Final[int]
 
     @final
     class struct_rusage(

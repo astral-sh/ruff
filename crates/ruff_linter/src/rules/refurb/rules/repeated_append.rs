@@ -45,6 +45,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: More on Lists](https://docs.python.org/3/tutorial/datastructures.html#more-on-lists)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.287")]
 pub(crate) struct RepeatedAppend {
     name: String,
     replacement: SourceCodeSnippet,
@@ -342,7 +343,7 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         elts,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         parenthesized: true,
     };
     // Make `var.extend`.
@@ -352,7 +353,7 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         attr: ast::Identifier::new("extend".to_string(), TextRange::default()),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Make the actual call `var.extend((elt1, elt2, ..., eltN))`
     let call = ast::ExprCall {
@@ -361,16 +362,16 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
             args: Box::from([tuple.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(call.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     generator.stmt(&stmt.into())
 }

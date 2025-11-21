@@ -294,19 +294,40 @@ impl CellOffsets {
     }
 
     /// Returns `true` if the given range contains a cell boundary.
+    ///
+    /// A range starting at the cell boundary isn't considered to contain the cell boundary
+    /// as it starts right after it. A range starting before a cell boundary
+    /// and ending exactly at the boundary is considered to contain the cell boundary.
+    ///
+    /// # Examples
+    /// Cell 1:
+    ///
+    /// ```py
+    /// import c
+    /// ```
+    ///
+    /// Cell 2:
+    ///
+    /// ```py
+    /// import os
+    /// ```
+    ///
+    /// The range `import c`..`import os`, contains a cell boundary because it starts before cell 2 and ends in cell 2 (`end=cell2_boundary`).
+    /// The `import os` contains no cell boundary because it starts at the start of cell 2 (at the cell boundary) but doesn't cross into another cell.
     pub fn has_cell_boundary(&self, range: TextRange) -> bool {
-        self.binary_search_by(|offset| {
-            if range.start() <= *offset {
-                if range.end() < *offset {
-                    std::cmp::Ordering::Greater
-                } else {
-                    std::cmp::Ordering::Equal
-                }
-            } else {
-                std::cmp::Ordering::Less
-            }
-        })
-        .is_ok()
+        let after_range_start = self.partition_point(|offset| *offset <= range.start());
+        let Some(boundary) = self.get(after_range_start).copied() else {
+            return false;
+        };
+
+        range.contains_inclusive(boundary)
+    }
+
+    /// Returns an iterator over [`TextRange`]s covered by each cell.
+    pub fn ranges(&self) -> impl Iterator<Item = TextRange> {
+        self.iter()
+            .tuple_windows()
+            .map(|(start, end)| TextRange::new(*start, *end))
     }
 }
 

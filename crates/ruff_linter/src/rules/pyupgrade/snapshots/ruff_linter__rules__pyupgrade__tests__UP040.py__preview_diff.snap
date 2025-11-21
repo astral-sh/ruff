@@ -1,0 +1,49 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 2
+
+--- Added ---
+UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+  --> UP040.py:48:1
+   |
+46 | # `default` was added in Python 3.13
+47 | T = typing.TypeVar("T", default=Any)
+48 | x: typing.TypeAlias = list[T]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+49 |
+50 | # OK
+   |
+help: Use the `type` keyword
+45 | 
+46 | # `default` was added in Python 3.13
+47 | T = typing.TypeVar("T", default=Any)
+   - x: typing.TypeAlias = list[T]
+48 + type x[T = Any] = list[T]
+49 | 
+50 | # OK
+51 | x: TypeAlias
+note: This is an unsafe fix and may change runtime behavior
+
+
+UP040 [*] Type alias `DefaultList` uses `TypeAlias` annotation instead of the `type` keyword
+   --> UP040.py:134:1
+    |
+132 | # Test case for TypeVar with default - should be converted when preview mode is enabled
+133 | T_default = TypeVar("T_default", default=int)
+134 | DefaultList: TypeAlias = list[T_default]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Use the `type` keyword
+131 | 
+132 | # Test case for TypeVar with default - should be converted when preview mode is enabled
+133 | T_default = TypeVar("T_default", default=int)
+    - DefaultList: TypeAlias = list[T_default]
+134 + type DefaultList[T_default = int] = list[T_default]
+note: This is an unsafe fix and may change runtime behavior

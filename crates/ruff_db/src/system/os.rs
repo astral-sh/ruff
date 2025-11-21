@@ -1,3 +1,5 @@
+#![allow(clippy::disallowed_methods)]
+
 use super::walk_directory::{
     self, DirectoryWalker, WalkDirectoryBuilder, WalkDirectoryConfiguration,
     WalkDirectoryVisitorBuilder, WalkState,
@@ -198,7 +200,12 @@ impl System for OsSystem {
     /// The walker ignores files according to [`ignore::WalkBuilder::standard_filters`]
     /// when setting [`WalkDirectoryBuilder::standard_filters`] to true.
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
-        WalkDirectoryBuilder::new(path, OsDirectoryWalker {})
+        WalkDirectoryBuilder::new(
+            path,
+            OsDirectoryWalker {
+                cwd: self.current_directory().to_path_buf(),
+            },
+        )
     }
 
     fn glob(
@@ -254,6 +261,10 @@ impl System for OsSystem {
 
     fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
         std::env::var(name)
+    }
+
+    fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
     }
 }
 
@@ -448,7 +459,9 @@ struct ListedDirectory {
 }
 
 #[derive(Debug)]
-struct OsDirectoryWalker;
+struct OsDirectoryWalker {
+    cwd: SystemPathBuf,
+}
 
 impl DirectoryWalker for OsDirectoryWalker {
     fn walk(
@@ -467,6 +480,7 @@ impl DirectoryWalker for OsDirectoryWalker {
         };
 
         let mut builder = ignore::WalkBuilder::new(first.as_std_path());
+        builder.current_dir(self.cwd.as_std_path());
 
         builder.standard_filters(standard_filters);
         builder.hidden(hidden);

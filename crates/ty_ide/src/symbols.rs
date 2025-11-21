@@ -1,41 +1,276 @@
 //! Implements logic used by the document symbol provider, workspace symbol
 //! provider, and auto-import feature of the completion provider.
 
+use std::borrow::Cow;
+use std::ops::Range;
+
+use regex::Regex;
+
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_python_ast::{Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 use ty_project::Db;
 
-/// Options that control which symbols are returned
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SymbolsOptions {
-    /// Return a hierarchy of symbols or a flattened list?
-    pub hierarchical: bool,
-    /// Include only symbols in the global scope
-    pub global_only: bool,
-    /// Query string for filtering symbol names
-    pub query_string: Option<String>,
+use crate::completion::CompletionKind;
+
+/// A compiled query pattern used for searching symbols.
+///
+/// This can be used with the `FlatSymbols::search` API.
+#[derive(Clone, Debug)]
+pub struct QueryPattern {
+    re: Option<Regex>,
+    original: String,
 }
 
+impl QueryPattern {
+    /// Create a new query pattern from a literal search string given.
+    pub fn new(literal_query_string: &str) -> QueryPattern {
+        let mut pattern = "(?i)".to_string();
+        for ch in literal_query_string.chars() {
+            pattern.push_str(&regex::escape(ch.encode_utf8(&mut [0; 4])));
+            pattern.push_str(".*");
+        }
+        // In theory regex compilation could fail if the pattern string
+        // was long enough to exceed the default regex compilation size
+        // limit. But this length would be approaching ~10MB or so. If
+        // is does somehow fail, we'll just fall back to simple substring
+        // search using `original`.
+        QueryPattern {
+            re: Regex::new(&pattern).ok(),
+            original: literal_query_string.to_string(),
+        }
+    }
+
+    /// Create a new query pattern that matches all symbols.
+    pub fn matches_all_symbols() -> QueryPattern {
+        QueryPattern {
+            re: None,
+            original: String::new(),
+        }
+    }
+
+    fn is_match_symbol(&self, symbol: &SymbolInfo<'_>) -> bool {
+        self.is_match_symbol_name(&symbol.name)
+    }
+
+    pub fn is_match_symbol_name(&self, symbol_name: &str) -> bool {
+        if let Some(ref re) = self.re {
+            re.is_match(symbol_name)
+        } else {
+            // This is a degenerate case. The only way
+            // we should get here is if the query string
+            // was thousands (or more) characters long.
+            // ... or, if "typed" text could not be found.
+            symbol_name.contains(&self.original)
+        }
+    }
+
+    /// Returns true when it is known that this pattern will return `true` for
+    /// all inputs given to `QueryPattern::is_match_symbol_name`.
+    ///
+    /// This will never return `true` incorrectly, but it may return `false`
+    /// incorrectly. That is, it's possible that this query will match all
+    /// inputs but this still returns `false`.
+    pub fn will_match_everything(&self) -> bool {
+        self.re.is_none()
+    }
+}
+
+impl From<&str> for QueryPattern {
+    fn from(literal_query_string: &str) -> QueryPattern {
+        QueryPattern::new(literal_query_string)
+    }
+}
+
+impl Eq for QueryPattern {}
+
+impl PartialEq for QueryPattern {
+    fn eq(&self, rhs: &QueryPattern) -> bool {
+        self.original == rhs.original
+    }
+}
+
+/// A flat list of indexed symbols for a single file.
+#[derive(Clone, Debug, Default, PartialEq, Eq, get_size2::GetSize)]
+pub struct FlatSymbols {
+    symbols: IndexVec<SymbolId, SymbolTree>,
+}
+
+impl FlatSymbols {
+    /// Get the symbol info for the symbol identified by the given ID.
+    ///
+    /// Returns `None` when the given ID does not reference a symbol in this
+    /// collection.
+    pub fn get(&self, id: SymbolId) -> Option<SymbolInfo<'_>> {
+        self.symbols.get(id).map(Into::into)
+    }
+
+    /// Returns true if and only if this collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.symbols.is_empty()
+    }
+
+    /// Returns the total number of symbols in this collection.
+    pub fn len(&self) -> usize {
+        self.symbols.len()
+    }
+
+    /// Returns an iterator over every symbol along with its ID.
+    pub fn iter(&self) -> impl Iterator<Item = (SymbolId, SymbolInfo<'_>)> {
+        self.symbols
+            .iter_enumerated()
+            .map(|(id, symbol)| (id, symbol.into()))
+    }
+
+    /// Returns a sequence of symbols that matches the given query.
+    pub fn search(&self, query: &QueryPattern) -> impl Iterator<Item = (SymbolId, SymbolInfo<'_>)> {
+        self.iter()
+            .filter(|(_, symbol)| query.is_match_symbol(symbol))
+    }
+
+    /// Turns this flat sequence of symbols into a hierarchy of symbols.
+    pub fn to_hierarchical(&self) -> HierarchicalSymbols {
+        let mut children_ids: IndexVec<SymbolId, Vec<SymbolId>> = IndexVec::new();
+        for (id, symbol) in self.symbols.iter_enumerated() {
+            children_ids.push(vec![]);
+            let Some(parent_id) = symbol.parent else {
+                continue;
+            };
+            // OK because the symbol visitor guarantees that
+            // all parents are ordered before their children.
+            assert!(parent_id.index() < id.index());
+            children_ids[parent_id].push(id);
+        }
+
+        // Now flatten our map of symbol ID to its children
+        // IDs into a single vec that doesn't nest allocations.
+        let mut symbols = IndexVec::new();
+        let mut children: Vec<SymbolId> = vec![];
+        let mut last_end: usize = 0;
+        for (tree, child_symbol_ids) in self.symbols.iter().zip(children_ids) {
+            let start = last_end;
+            let end = start + child_symbol_ids.len();
+            symbols.push(SymbolTreeWithChildren {
+                tree: tree.clone(),
+                children: start..end,
+            });
+            children.extend_from_slice(&child_symbol_ids);
+            last_end = end;
+        }
+
+        HierarchicalSymbols { symbols, children }
+    }
+}
+
+/// A collection of hierarchical indexed symbols for a single file.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct HierarchicalSymbols {
+    symbols: IndexVec<SymbolId, SymbolTreeWithChildren>,
+    children: Vec<SymbolId>,
+}
+
+impl HierarchicalSymbols {
+    /// Get the symbol info for the symbol identified by the given ID.
+    ///
+    /// Returns `None` when the given ID does not reference a symbol in this
+    /// collection.
+    pub fn get(&self, id: SymbolId) -> Option<SymbolInfo<'_>> {
+        self.symbols.get(id).map(Into::into)
+    }
+
+    /// Returns true if and only if this collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.symbols.is_empty()
+    }
+
+    /// Returns the total number of symbols in this collection.
+    pub fn len(&self) -> usize {
+        self.symbols.len()
+    }
+
+    /// Returns an iterator over every top-level symbol along with its ID.
+    pub fn iter(&self) -> impl Iterator<Item = (SymbolId, SymbolInfo<'_>)> {
+        self.symbols
+            .iter_enumerated()
+            .filter(|(_, symbol)| symbol.tree.parent.is_none())
+            .map(|(id, symbol)| (id, symbol.into()))
+    }
+
+    /// Returns an iterator over the child symbols for the symbol
+    /// identified by the given ID.
+    ///
+    /// Returns `None` when there aren't any children or when the given
+    /// ID does not reference a symbol in this collection.
+    pub fn children(&self, id: SymbolId) -> impl Iterator<Item = (SymbolId, SymbolInfo<'_>)> {
+        self.symbols
+            .get(id)
+            .into_iter()
+            .flat_map(|symbol| self.children[symbol.children.clone()].iter())
+            .copied()
+            .map(|id| (id, SymbolInfo::from(&self.symbols[id])))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct SymbolTreeWithChildren {
+    tree: SymbolTree,
+    /// The index range into `HierarchicalSymbols::children`
+    /// corresponding to the children symbol IDs for this
+    /// symbol.
+    children: Range<usize>,
+}
+
+/// Uniquely identifies a symbol.
+#[newtype_index]
+#[derive(get_size2::GetSize)]
+pub struct SymbolId;
+
 /// Symbol information for IDE features like document outline.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SymbolInfo {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SymbolInfo<'a> {
     /// The name of the symbol
-    pub name: String,
+    pub name: Cow<'a, str>,
     /// The kind of symbol (function, class, variable, etc.)
     pub kind: SymbolKind,
     /// The range of the symbol name
     pub name_range: TextRange,
     /// The full range of the symbol (including body)
     pub full_range: TextRange,
-    /// Child symbols (e.g., methods in a class)
-    pub children: Vec<SymbolInfo>,
+}
+
+impl SymbolInfo<'_> {
+    pub fn to_owned(&self) -> SymbolInfo<'static> {
+        SymbolInfo {
+            name: Cow::Owned(self.name.to_string()),
+            kind: self.kind,
+            name_range: self.name_range,
+            full_range: self.full_range,
+        }
+    }
+}
+
+impl<'a> From<&'a SymbolTree> for SymbolInfo<'a> {
+    fn from(symbol: &'a SymbolTree) -> SymbolInfo<'a> {
+        SymbolInfo {
+            name: Cow::Borrowed(&symbol.name),
+            kind: symbol.kind,
+            name_range: symbol.name_range,
+            full_range: symbol.full_range,
+        }
+    }
+}
+
+impl<'a> From<&'a SymbolTreeWithChildren> for SymbolInfo<'a> {
+    fn from(symbol: &'a SymbolTreeWithChildren) -> SymbolInfo<'a> {
+        SymbolInfo::from(&symbol.tree)
+    }
 }
 
 /// The kind of symbol
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 pub enum SymbolKind {
     Module,
     Class,
@@ -69,119 +304,140 @@ impl SymbolKind {
             SymbolKind::Import => "Import",
         }
     }
+
+    /// Maps this to a "completion" kind if a sensible mapping exists.
+    pub fn to_completion_kind(self) -> Option<CompletionKind> {
+        Some(match self {
+            SymbolKind::Module => CompletionKind::Module,
+            SymbolKind::Class => CompletionKind::Class,
+            SymbolKind::Method => CompletionKind::Method,
+            SymbolKind::Function => CompletionKind::Function,
+            SymbolKind::Variable => CompletionKind::Variable,
+            SymbolKind::Constant => CompletionKind::Constant,
+            SymbolKind::Property => CompletionKind::Property,
+            SymbolKind::Field => CompletionKind::Field,
+            SymbolKind::Constructor => CompletionKind::Constructor,
+            SymbolKind::Parameter => CompletionKind::Variable,
+            SymbolKind::TypeParameter => CompletionKind::TypeParameter,
+            // Not quite sure what to do with this one. I guess
+            // in theory the import should be "resolved" to its
+            // underlying kind, but that seems expensive.
+            SymbolKind::Import => return None,
+        })
+    }
 }
 
-pub(crate) fn symbols_for_file(
-    db: &dyn Db,
-    file: File,
-    options: &SymbolsOptions,
-) -> Vec<SymbolInfo> {
-    assert!(
-        !options.hierarchical || options.query_string.is_none(),
-        "Cannot use hierarchical mode with a query string"
-    );
-
+/// Returns a flat list of symbols in the file given.
+///
+/// The flattened list includes parent/child information and can be
+/// converted into a hierarchical collection of symbols.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn symbols_for_file(db: &dyn Db, file: File) -> FlatSymbols {
     let parsed = parsed_module(db, file);
     let module = parsed.load(db);
 
-    let mut visitor = SymbolVisitor::new(options);
+    let mut visitor = SymbolVisitor {
+        symbols: IndexVec::new(),
+        symbol_stack: vec![],
+        in_function: false,
+        global_only: false,
+    };
     visitor.visit_body(&module.syntax().body);
-    visitor.symbols
+    FlatSymbols {
+        symbols: visitor.symbols,
+    }
 }
 
-struct SymbolVisitor<'a> {
-    symbols: Vec<SymbolInfo>,
-    symbol_stack: Vec<SymbolInfo>,
+/// Returns a flat list of *only global* symbols in the file given.
+///
+/// While callers can convert this into a hierarchical collection of
+/// symbols, it won't result in anything meaningful since the flat list
+/// returned doesn't include children.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: File) -> FlatSymbols {
+    let parsed = parsed_module(db, file);
+    let module = parsed.load(db);
+
+    let mut visitor = SymbolVisitor {
+        symbols: IndexVec::new(),
+        symbol_stack: vec![],
+        in_function: false,
+        global_only: true,
+    };
+    visitor.visit_body(&module.syntax().body);
+    FlatSymbols {
+        symbols: visitor.symbols,
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+struct SymbolTree {
+    parent: Option<SymbolId>,
+    name: String,
+    kind: SymbolKind,
+    name_range: TextRange,
+    full_range: TextRange,
+}
+
+/// A visitor over all symbols in a single file.
+///
+/// This guarantees that child symbols have a symbol ID greater
+/// than all of its parents.
+struct SymbolVisitor {
+    symbols: IndexVec<SymbolId, SymbolTree>,
+    symbol_stack: Vec<SymbolId>,
     /// Track if we're currently inside a function (to exclude local variables)
     in_function: bool,
-    /// Options controlling symbol collection
-    options: &'a SymbolsOptions,
+    global_only: bool,
 }
 
-impl<'a> SymbolVisitor<'a> {
-    fn new(options: &'a SymbolsOptions) -> Self {
-        Self {
-            symbols: Vec::new(),
-            symbol_stack: Vec::new(),
-            in_function: false,
-            options,
-        }
-    }
-
+impl SymbolVisitor {
     fn visit_body(&mut self, body: &[Stmt]) {
         for stmt in body {
             self.visit_stmt(stmt);
         }
     }
 
-    fn add_symbol(&mut self, symbol: SymbolInfo) {
-        // Filter by query string if provided
-        if let Some(ref query) = self.options.query_string {
-            if !Self::is_pattern_in_symbol(query, &symbol.name) {
-                return;
-            }
+    fn add_symbol(&mut self, mut symbol: SymbolTree) -> SymbolId {
+        if let Some(&parent_id) = self.symbol_stack.last() {
+            symbol.parent = Some(parent_id);
         }
-
-        if self.options.hierarchical {
-            if let Some(parent) = self.symbol_stack.last_mut() {
-                parent.children.push(symbol);
-            } else {
-                self.symbols.push(symbol);
-            }
-        } else {
-            self.symbols.push(symbol);
-        }
+        // It's important that we push the symbol and allocate
+        // an ID before visiting its child. This preserves the
+        // guarantee that parent IDs are always less than their
+        // children IDs.
+        let symbol_id = self.symbols.next_index();
+        self.symbols.push(symbol);
+        symbol_id
     }
 
-    fn push_symbol(&mut self, symbol: SymbolInfo) {
-        if self.options.hierarchical {
-            self.symbol_stack.push(symbol);
-        } else {
-            self.add_symbol(symbol);
-        }
+    fn push_symbol(&mut self, symbol: SymbolTree) {
+        let symbol_id = self.add_symbol(symbol);
+        self.symbol_stack.push(symbol_id);
     }
 
     fn pop_symbol(&mut self) {
-        if self.options.hierarchical {
-            if let Some(symbol) = self.symbol_stack.pop() {
-                self.add_symbol(symbol);
-            }
-        }
+        self.symbol_stack.pop().unwrap();
+    }
+
+    fn iter_symbol_stack(&self) -> impl Iterator<Item = &SymbolTree> {
+        self.symbol_stack
+            .iter()
+            .copied()
+            .map(|id| &self.symbols[id])
     }
 
     fn is_constant_name(name: &str) -> bool {
         name.chars().all(|c| c.is_ascii_uppercase() || c == '_')
     }
-
-    /// Returns true if symbol name contains all characters in the query
-    /// string in order. The comparison is case insensitive.
-    fn is_pattern_in_symbol(query_string: &str, symbol_name: &str) -> bool {
-        let typed_lower = query_string.to_lowercase();
-        let symbol_lower = symbol_name.to_lowercase();
-        let typed_chars: Vec<char> = typed_lower.chars().collect();
-        let symbol_chars: Vec<char> = symbol_lower.chars().collect();
-
-        let mut typed_pos = 0;
-        let mut symbol_pos = 0;
-
-        while typed_pos < typed_chars.len() && symbol_pos < symbol_chars.len() {
-            if typed_chars[typed_pos] == symbol_chars[symbol_pos] {
-                typed_pos += 1;
-            }
-            symbol_pos += 1;
-        }
-
-        typed_pos == typed_chars.len()
-    }
 }
 
-impl SourceOrderVisitor<'_> for SymbolVisitor<'_> {
+impl SourceOrderVisitor<'_> for SymbolVisitor {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::FunctionDef(func_def) => {
                 let kind = if self
-                    .symbol_stack
-                    .iter()
+                    .iter_symbol_stack()
                     .any(|s| s.kind == SymbolKind::Class)
                 {
                     if func_def.name.as_str() == "__init__" {
@@ -193,15 +449,15 @@ impl SourceOrderVisitor<'_> for SymbolVisitor<'_> {
                     SymbolKind::Function
                 };
 
-                let symbol = SymbolInfo {
+                let symbol = SymbolTree {
+                    parent: None,
                     name: func_def.name.to_string(),
                     kind,
                     name_range: func_def.name.range(),
                     full_range: stmt.range(),
-                    children: Vec::new(),
                 };
 
-                if self.options.global_only {
+                if self.global_only {
                     self.add_symbol(symbol);
                     // If global_only, don't walk function bodies
                     return;
@@ -222,15 +478,15 @@ impl SourceOrderVisitor<'_> for SymbolVisitor<'_> {
             }
 
             Stmt::ClassDef(class_def) => {
-                let symbol = SymbolInfo {
+                let symbol = SymbolTree {
+                    parent: None,
                     name: class_def.name.to_string(),
                     kind: SymbolKind::Class,
                     name_range: class_def.name.range(),
                     full_range: stmt.range(),
-                    children: Vec::new(),
                 };
 
-                if self.options.global_only {
+                if self.global_only {
                     self.add_symbol(symbol);
                     // If global_only, don't walk class bodies
                     return;
@@ -243,67 +499,103 @@ impl SourceOrderVisitor<'_> for SymbolVisitor<'_> {
 
             Stmt::Assign(assign) => {
                 // Include assignments only when we're in global or class scope
-                if !self.in_function {
-                    for target in &assign.targets {
-                        if let Expr::Name(name) = target {
-                            let kind = if Self::is_constant_name(name.id.as_str()) {
-                                SymbolKind::Constant
-                            } else if self
-                                .symbol_stack
-                                .iter()
-                                .any(|s| s.kind == SymbolKind::Class)
-                            {
-                                SymbolKind::Field
-                            } else {
-                                SymbolKind::Variable
-                            };
+                if self.in_function {
+                    return;
+                }
+                for target in &assign.targets {
+                    let Expr::Name(name) = target else { continue };
+                    let kind = if Self::is_constant_name(name.id.as_str()) {
+                        SymbolKind::Constant
+                    } else if self
+                        .iter_symbol_stack()
+                        .any(|s| s.kind == SymbolKind::Class)
+                    {
+                        SymbolKind::Field
+                    } else {
+                        SymbolKind::Variable
+                    };
 
-                            let symbol = SymbolInfo {
-                                name: name.id.to_string(),
-                                kind,
-                                name_range: name.range(),
-                                full_range: stmt.range(),
-                                children: Vec::new(),
-                            };
-
-                            self.add_symbol(symbol);
-                        }
-                    }
+                    let symbol = SymbolTree {
+                        parent: None,
+                        name: name.id.to_string(),
+                        kind,
+                        name_range: name.range(),
+                        full_range: stmt.range(),
+                    };
+                    self.add_symbol(symbol);
                 }
             }
 
             Stmt::AnnAssign(ann_assign) => {
                 // Include assignments only when we're in global or class scope
-                if !self.in_function {
-                    if let Expr::Name(name) = &*ann_assign.target {
-                        let kind = if Self::is_constant_name(name.id.as_str()) {
-                            SymbolKind::Constant
-                        } else if self
-                            .symbol_stack
-                            .iter()
-                            .any(|s| s.kind == SymbolKind::Class)
-                        {
-                            SymbolKind::Field
-                        } else {
-                            SymbolKind::Variable
-                        };
-
-                        let symbol = SymbolInfo {
-                            name: name.id.to_string(),
-                            kind,
-                            name_range: name.range(),
-                            full_range: stmt.range(),
-                            children: Vec::new(),
-                        };
-
-                        self.add_symbol(symbol);
-                    }
+                if self.in_function {
+                    return;
                 }
+                let Expr::Name(name) = &*ann_assign.target else {
+                    return;
+                };
+                let kind = if Self::is_constant_name(name.id.as_str()) {
+                    SymbolKind::Constant
+                } else if self
+                    .iter_symbol_stack()
+                    .any(|s| s.kind == SymbolKind::Class)
+                {
+                    SymbolKind::Field
+                } else {
+                    SymbolKind::Variable
+                };
+
+                let symbol = SymbolTree {
+                    parent: None,
+                    name: name.id.to_string(),
+                    kind,
+                    name_range: name.range(),
+                    full_range: stmt.range(),
+                };
+                self.add_symbol(symbol);
             }
 
             _ => {
                 source_order::walk_stmt(self, stmt);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    fn matches(query: &str, symbol: &str) -> bool {
+        super::QueryPattern::new(query).is_match_symbol_name(symbol)
+    }
+
+    #[test]
+    fn various_yes() {
+        assert!(matches("", ""));
+        assert!(matches("", "a"));
+        assert!(matches("", "abc"));
+
+        assert!(matches("a", "a"));
+        assert!(matches("a", "abc"));
+        assert!(matches("a", "xaz"));
+        assert!(matches("a", "xza"));
+
+        assert!(matches("abc", "abc"));
+        assert!(matches("abc", "axbyc"));
+        assert!(matches("abc", "waxbycz"));
+        assert!(matches("abc", "WAXBYCZ"));
+        assert!(matches("ABC", "waxbycz"));
+        assert!(matches("ABC", "WAXBYCZ"));
+        assert!(matches("aBc", "wAXbyCZ"));
+
+        assert!(matches("δ", "Δ"));
+        assert!(matches("δΘπ", "ΔθΠ"));
+    }
+
+    #[test]
+    fn various_no() {
+        assert!(!matches("a", ""));
+        assert!(!matches("abc", "bac"));
+        assert!(!matches("abcd", "abc"));
+        assert!(!matches("δΘπ", "θΔΠ"));
     }
 }

@@ -69,7 +69,7 @@ instance = C()
 instance.non_existent = 1  # error: [unresolved-attribute]
 ```
 
-## Possibly-unbound attributes
+## Possibly-missing attributes
 
 When trying to set an attribute that is not defined in all branches, we emit errors:
 
@@ -79,10 +79,10 @@ def _(flag: bool) -> None:
         if flag:
             attr: int = 0
 
-    C.attr = 1  # error: [possibly-unbound-attribute]
+    C.attr = 1  # error: [possibly-missing-attribute]
 
     instance = C()
-    instance.attr = 1  # error: [possibly-unbound-attribute]
+    instance.attr = 1  # error: [possibly-missing-attribute]
 ```
 
 ## Data descriptors

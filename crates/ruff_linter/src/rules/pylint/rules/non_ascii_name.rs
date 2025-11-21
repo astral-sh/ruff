@@ -26,6 +26,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [PEP 672]: https://peps.python.org/pep-0672/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct NonAsciiName {
     name: String,
     kind: Kind,
@@ -73,7 +74,8 @@ pub(crate) fn non_ascii_name(checker: &Checker, binding: &Binding) {
         | BindingKind::SubmoduleImport(_)
         | BindingKind::Deletion
         | BindingKind::ConditionalDeletion(_)
-        | BindingKind::UnboundException(_) => {
+        | BindingKind::UnboundException(_)
+        | BindingKind::DunderClassCell => {
             return;
         }
     };

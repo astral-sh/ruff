@@ -43,9 +43,17 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// This rule's fix is marked as unsafe because removing an unused variable assignment may
 /// delete comments that are attached to the assignment.
 ///
+/// ## See also
+///
+/// This rule does not apply to bindings in unpacked assignments (e.g. `x, y = 1, 2`). See
+/// [`unused-unpacked-variable`][RUF059] for this case.
+///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
+///
+/// [RUF059]: https://docs.astral.sh/ruff/rules/unused-unpacked-variable/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.22")]
 pub(crate) struct UnusedVariable {
     pub name: String,
 }
@@ -265,4 +273,6 @@ pub(crate) fn unused_variable(checker: &Checker, name: &str, binding: &Binding) 
     if let Some(fix) = remove_unused_variable(binding, checker) {
         diagnostic.set_fix(fix);
     }
+    // Add Unnecessary tag for unused variables
+    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
 }

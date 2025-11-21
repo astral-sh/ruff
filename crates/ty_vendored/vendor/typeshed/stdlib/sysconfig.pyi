@@ -2,7 +2,7 @@
 
 import sys
 from typing import IO, Any, Literal, overload
-from typing_extensions import deprecated
+from typing_extensions import LiteralString, deprecated
 
 __all__ = [
     "get_config_h_filename",
@@ -47,8 +47,10 @@ def get_scheme_names() -> tuple[str, ...]:
     """Return a tuple containing the schemes names."""
 
 if sys.version_info >= (3, 10):
-    def get_default_scheme() -> str: ...
-    def get_preferred_scheme(key: Literal["prefix", "home", "user"]) -> str: ...
+    def get_default_scheme() -> LiteralString: ...
+    def get_preferred_scheme(key: Literal["prefix", "home", "user"]) -> LiteralString: ...
+    # Documented -- see https://docs.python.org/3/library/sysconfig.html#sysconfig._get_preferred_schemes
+    def _get_preferred_schemes() -> dict[Literal["prefix", "home", "user"], LiteralString]: ...
 
 def get_path_names() -> tuple[str, ...]:
     """Return a tuple containing the paths names."""
@@ -77,17 +79,22 @@ def get_platform() -> str:
     isn't particularly important.
 
     Examples of returned values:
-       linux-i586
-       linux-alpha (?)
-       solaris-2.6-sun4u
 
-    Windows will return one of:
-       win-amd64 (64-bit Windows on AMD64 (aka x86_64, Intel64, EM64T, etc)
-       win-arm64 (64-bit Windows on ARM64 (aka AArch64)
-       win32 (all others - specifically, sys.platform is returned)
 
-    For other non-POSIX platforms, currently just returns 'sys.platform'.
+    Windows:
 
+    - win-amd64 (64-bit Windows on AMD64, aka x86_64, Intel64, and EM64T)
+    - win-arm64 (64-bit Windows on ARM64, aka AArch64)
+    - win32 (all others - specifically, sys.platform is returned)
+
+    POSIX based OS:
+
+    - linux-x86_64
+    - macosx-15.5-arm64
+    - macosx-26.0-universal2 (macOS on Apple Silicon or Intel)
+    - android-24-arm64_v8a
+
+    For other non-POSIX platforms, currently just returns :data:`sys.platform`.
     """
 
 if sys.version_info >= (3, 11):

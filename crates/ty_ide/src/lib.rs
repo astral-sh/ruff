@@ -1,3 +1,8 @@
+#![warn(
+    clippy::disallowed_methods,
+    reason = "Prefer System trait methods over std methods in ty crates"
+)]
+mod all_symbols;
 mod completion;
 mod doc_highlights;
 mod docstring;
@@ -9,9 +14,11 @@ mod goto_definition;
 mod goto_references;
 mod goto_type_definition;
 mod hover;
+mod importer;
 mod inlay_hints;
 mod markup;
 mod references;
+mod rename;
 mod selection_range;
 mod semantic_tokens;
 mod signature_help;
@@ -19,25 +26,30 @@ mod stub_mapping;
 mod symbols;
 mod workspace_symbols;
 
-pub use completion::completion;
+pub use all_symbols::{AllSymbolInfo, all_symbols};
+pub use completion::{Completion, CompletionKind, CompletionSettings, completion};
 pub use doc_highlights::document_highlights;
-pub use docstring::get_parameter_documentation;
-pub use document_symbols::{document_symbols, document_symbols_with_options};
+pub use document_symbols::document_symbols;
 pub use goto::{goto_declaration, goto_definition, goto_type_definition};
 pub use goto_references::goto_references;
 pub use hover::hover;
-pub use inlay_hints::inlay_hints;
+pub use inlay_hints::{InlayHintKind, InlayHintLabel, InlayHintSettings, inlay_hints};
 pub use markup::MarkupKind;
 pub use references::ReferencesMode;
+pub use rename::{can_rename, rename};
 pub use selection_range::selection_range;
 pub use semantic_tokens::{
     SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, semantic_tokens,
 };
 pub use signature_help::{ParameterDetails, SignatureDetails, SignatureHelpInfo, signature_help};
-pub use symbols::{SymbolInfo, SymbolKind, SymbolsOptions};
+pub use symbols::{FlatSymbols, HierarchicalSymbols, SymbolId, SymbolInfo, SymbolKind};
 pub use workspace_symbols::{WorkspaceSymbolInfo, workspace_symbols};
 
-use ruff_db::files::{File, FileRange};
+use ruff_db::{
+    files::{File, FileRange},
+    system::SystemPathBuf,
+    vendored::VendoredPath,
+};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::ops::{Deref, DerefMut};
@@ -119,6 +131,20 @@ impl NavigationTarget {
 
     pub fn full_range(&self) -> TextRange {
         self.full_range
+    }
+
+    pub fn full_file_range(&self) -> FileRange {
+        FileRange::new(self.file, self.full_range)
+    }
+}
+
+impl From<FileRange> for NavigationTarget {
+    fn from(value: FileRange) -> Self {
+        Self {
+            file: value.file(),
+            focus_range: value.range(),
+            full_range: value.range(),
+        }
     }
 }
 
@@ -234,7 +260,8 @@ impl HasNavigationTargets for Type<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
         match self {
             Type::Union(union) => union
-                .iter(db)
+                .elements(db)
+                .iter()
                 .flat_map(|target| target.navigation_targets(db))
                 .collect(),
 
@@ -278,18 +305,53 @@ impl HasNavigationTargets for TypeDefinition<'_> {
     }
 }
 
+/// Get the cache-relative path where vendored paths should be written to.
+pub fn relative_cached_vendored_root() -> SystemPathBuf {
+    // The vendored files are uniquely identified by the source commit.
+    SystemPathBuf::from(format!("vendored/typeshed/{}", ty_vendored::SOURCE_COMMIT))
+}
+
+/// Get the cached version of a vendored path in the cache, ensuring the file is written to disk.
+pub fn cached_vendored_path(
+    db: &dyn ty_python_semantic::Db,
+    path: &VendoredPath,
+) -> Option<SystemPathBuf> {
+    let writable = db.system().as_writable()?;
+    let mut relative_path = relative_cached_vendored_root();
+    relative_path.push(path.as_str());
+
+    // Extract the vendored file onto the system.
+    writable
+        .get_or_cache(&relative_path, &|| db.vendored().read_to_string(path))
+        .ok()
+        .flatten()
+}
+
+/// Get the absolute root path of all cached vendored paths.
+///
+/// This does not ensure that this path exists (this is only used for mapping cached paths
+/// back to vendored ones, so this only matters if we've already been handed a path inside here).
+pub fn cached_vendored_root(db: &dyn ty_python_semantic::Db) -> Option<SystemPathBuf> {
+    let writable = db.system().as_writable()?;
+    let relative_root = relative_cached_vendored_root();
+    Some(writable.cache_dir()?.join(relative_root))
+}
+
 #[cfg(test)]
 mod tests {
+    use camino::Utf8Component;
     use insta::internals::SettingsBindDropGuard;
+
     use ruff_db::Db;
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
-    use ruff_db::files::{File, system_path_to_file};
+    use ruff_db::files::{File, FileRootKind, system_path_to_file};
+    use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+    use ruff_db::source::{SourceText, source_text};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_python_codegen::Stylist;
+    use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
     use ty_project::ProjectMetadata;
-    use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
-    };
 
     /// A way to create a simple single-file (named `main.py`) cursor test.
     ///
@@ -339,11 +401,17 @@ mod tests {
         }
     }
 
-    /// The file and offset into that file containing
-    /// a `<CURSOR>` marker.
+    /// The file and offset into that file where a `<CURSOR>` marker
+    /// is located.
+    ///
+    /// (Along with other information about that file, such as the
+    /// parsed AST.)
     pub(super) struct Cursor {
         pub(super) file: File,
         pub(super) offset: TextSize,
+        pub(super) parsed: ParsedModuleRef,
+        pub(super) source: SourceText,
+        pub(super) stylist: Stylist<'static>,
     }
 
     #[derive(Default)]
@@ -360,8 +428,9 @@ mod tests {
                 SystemPathBuf::from("/"),
             ));
 
-            let mut cursor: Option<Cursor> = None;
+            db.init_program().unwrap();
 
+            let mut cursor: Option<Cursor> = None;
             for &Source {
                 ref path,
                 ref contents,
@@ -370,6 +439,19 @@ mod tests {
             {
                 db.write_file(path, contents)
                     .expect("write to memory file system to be successful");
+
+                // Add a root for the top-most component.
+                let top = path.components().find_map(|c| match c {
+                    Utf8Component::Normal(c) => Some(c),
+                    _ => None,
+                });
+                if let Some(top) = top {
+                    let top = SystemPath::new(top);
+                    if db.system().is_directory(top) {
+                        db.files()
+                            .try_add_root(&db, top, FileRootKind::LibrarySearchPath);
+                    }
+                }
 
                 let file = system_path_to_file(&db, path).expect("newly written file to existing");
 
@@ -381,25 +463,22 @@ mod tests {
                         cursor.is_none(),
                         "found more than one source that contains `<CURSOR>`"
                     );
-                    cursor = Some(Cursor { file, offset });
+                    let source = source_text(&db, file);
+                    let parsed = parsed_module(&db, file).load(&db);
+                    let stylist =
+                        Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
+                    cursor = Some(Cursor {
+                        file,
+                        offset,
+                        parsed,
+                        source,
+                        stylist,
+                    });
                 }
             }
 
-            let search_paths = SearchPathSettings::new(vec![SystemPathBuf::from("/")])
-                .to_search_paths(db.system(), db.vendored())
-                .expect("Valid search path settings");
-
-            Program::from_settings(
-                &db,
-                ProgramSettings {
-                    python_version: PythonVersionWithSource::default(),
-                    python_platform: PythonPlatform::default(),
-                    search_paths,
-                },
-            );
-
             let mut insta_settings = insta::Settings::clone_current();
-            insta_settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
+            insta_settings.add_filter(r#"\\(\w\w|\.|")"#, "/$1");
             // Filter out TODO types because they are different between debug and release builds.
             insta_settings.add_filter(r"@Todo\(.+\)", "@Todo");
 
@@ -415,12 +494,12 @@ mod tests {
         pub(super) fn source(
             &mut self,
             path: impl Into<SystemPathBuf>,
-            contents: impl Into<String>,
+            contents: impl AsRef<str>,
         ) -> &mut CursorTestBuilder {
             const MARKER: &str = "<CURSOR>";
 
             let path = path.into();
-            let contents = contents.into();
+            let contents = dedent(contents.as_ref()).into_owned();
             let Some(cursor_offset) = contents.find(MARKER) else {
                 self.sources.push(Source {
                     path,

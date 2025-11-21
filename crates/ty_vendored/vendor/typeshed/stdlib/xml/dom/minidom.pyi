@@ -20,7 +20,7 @@ from _collections_abc import dict_keys, dict_values
 from _typeshed import Incomplete, ReadableBuffer, SupportsRead, SupportsWrite
 from collections.abc import Iterable, Sequence
 from types import TracebackType
-from typing import Any, ClassVar, Generic, Literal, NoReturn, Protocol, TypeVar, overload
+from typing import Any, ClassVar, Generic, Literal, NoReturn, Protocol, TypeVar, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 from xml.dom.minicompat import EmptyNodeList, NodeList
 from xml.dom.xmlbuilder import DocumentLS, DOMImplementationLS
@@ -57,9 +57,11 @@ _ImportableNodeVar = TypeVar(
     | Notation,
 )
 
+@type_check_only
 class _DOMErrorHandler(Protocol):
     def handleError(self, error: Exception) -> bool: ...
 
+@type_check_only
 class _UserDataHandler(Protocol):
     def handle(self, operation: int, key: str, data: Any, src: Node, dst: Node) -> None: ...
 
@@ -217,6 +219,7 @@ _AttrChildrenVar = TypeVar("_AttrChildrenVar", bound=_AttrChildren)
 _AttrChildrenPlusFragment = TypeVar("_AttrChildrenPlusFragment", bound=_AttrChildren | DocumentFragment)
 
 class Attr(Node):
+    __slots__ = ("_name", "_value", "namespaceURI", "_prefix", "childNodes", "_localName", "ownerDocument", "ownerElement")
     nodeType: ClassVar[Literal[2]]
     nodeName: str  # same as Attr.name
     nodeValue: str  # same as Attr.value
@@ -274,6 +277,7 @@ class NamedNodeMap:
     attributes as found in an input document.
     """
 
+    __slots__ = ("_attrs", "_attrsNS", "_ownerElement")
     def __init__(self, attrs: dict[str, Attr], attrsNS: dict[_NSName, Attr], ownerElement: Element) -> None: ...
     @property
     def length(self) -> int:
@@ -307,6 +311,7 @@ class NamedNodeMap:
 AttributeList = NamedNodeMap
 
 class TypeInfo:
+    __slots__ = ("namespace", "name")
     namespace: str | None
     name: str | None
     def __init__(self, namespace: Incomplete | None, name: str | None) -> None: ...
@@ -315,6 +320,20 @@ _ElementChildrenVar = TypeVar("_ElementChildrenVar", bound=_ElementChildren)
 _ElementChildrenPlusFragment = TypeVar("_ElementChildrenPlusFragment", bound=_ElementChildren | DocumentFragment)
 
 class Element(Node):
+    __slots__ = (
+        "ownerDocument",
+        "parentNode",
+        "tagName",
+        "nodeName",
+        "prefix",
+        "namespaceURI",
+        "_localName",
+        "childNodes",
+        "_attrs",
+        "_attrsNS",
+        "nextSibling",
+        "previousSibling",
+    )
     nodeType: ClassVar[Literal[1]]
     nodeName: str  # same as Element.tagName
     nodeValue: None
@@ -409,6 +428,7 @@ class Childless:
     the complexity of the Node methods that deal with children.
     """
 
+    __slots__ = ()
     attributes: None
     childNodes: EmptyNodeList
     @property
@@ -429,6 +449,7 @@ class Childless:
     def replaceChild(self, newChild: _NodesThatAreChildren | DocumentFragment, oldChild: _NodesThatAreChildren) -> NoReturn: ...
 
 class ProcessingInstruction(Childless, Node):
+    __slots__ = ("target", "data")
     nodeType: ClassVar[Literal[7]]
     nodeName: str  # same as ProcessingInstruction.target
     nodeValue: str  # same as ProcessingInstruction.data
@@ -457,6 +478,7 @@ class ProcessingInstruction(Childless, Node):
     def writexml(self, writer: SupportsWrite[str], indent: str = "", addindent: str = "", newl: str = "") -> None: ...
 
 class CharacterData(Childless, Node):
+    __slots__ = ("_data", "ownerDocument", "parentNode", "previousSibling", "nextSibling")
     nodeValue: str
     attributes: None
 
@@ -483,6 +505,7 @@ class CharacterData(Childless, Node):
     def replaceData(self, offset: int, count: int, arg: str) -> None: ...
 
 class Text(CharacterData):
+    __slots__ = ()
     nodeType: ClassVar[Literal[3]]
     nodeName: Literal["#text"]
     nodeValue: str  # same as CharacterData.data, the content of the text node
@@ -543,6 +566,7 @@ class Comment(CharacterData):
     def writexml(self, writer: SupportsWrite[str], indent: str = "", addindent: str = "", newl: str = "") -> None: ...
 
 class CDATASection(Text):
+    __slots__ = ()
     nodeType: ClassVar[Literal[4]]  # type: ignore[assignment]
     nodeName: Literal["#cdata-section"]  # type: ignore[assignment]
     nodeValue: str  # same as CharacterData.data, the content of the CDATA Section
@@ -555,6 +579,7 @@ class CDATASection(Text):
     def writexml(self, writer: SupportsWrite[str], indent: str = "", addindent: str = "", newl: str = "") -> None: ...
 
 class ReadOnlySequentialNamedNodeMap(Generic[_N]):
+    __slots__ = ("_seq",)
     def __init__(self, seq: Sequence[_N] = ()) -> None: ...
     def __len__(self) -> int: ...
     def getNamedItem(self, name: str) -> _N | None: ...
@@ -572,6 +597,7 @@ class ReadOnlySequentialNamedNodeMap(Generic[_N]):
 class Identified:
     """Mix-in class that supports the publicId and systemId attributes."""
 
+    __slots__ = ("publicId", "systemId")
     publicId: str | None
     systemId: str | None
 
@@ -679,6 +705,7 @@ class ElementInfo:
 
     """
 
+    __slots__ = ("tagName",)
     tagName: str
     def __init__(self, name: str) -> None: ...
     def getAttributeType(self, aname: str) -> TypeInfo: ...
@@ -698,6 +725,7 @@ class ElementInfo:
 _DocumentChildrenPlusFragment = TypeVar("_DocumentChildrenPlusFragment", bound=_DocumentChildren | DocumentFragment)
 
 class Document(Node, DocumentLS):
+    __slots__ = ("_elem_info", "doctype", "_id_search_stack", "childNodes", "_id_cache")
     nodeType: ClassVar[Literal[9]]
     nodeName: Literal["#document"]
     nodeValue: None

@@ -36,7 +36,11 @@ fn format_document_range(
         .context("Failed to get text document for the format range request")
         .unwrap();
     let query = snapshot.query();
-    format_text_document_range(text_document, range, query, snapshot.encoding())
+    let backend = snapshot
+        .client_settings()
+        .editor_settings()
+        .format_backend();
+    format_text_document_range(text_document, range, query, snapshot.encoding(), backend)
 }
 
 /// Formats the specified [`Range`] in the [`TextDocument`].
@@ -45,6 +49,7 @@ fn format_text_document_range(
     range: Range,
     query: &DocumentQuery,
     encoding: PositionEncoding,
+    backend: crate::format::FormatBackend,
 ) -> Result<super::FormatResponse> {
     let settings = query.settings();
     let file_path = query.virtual_file_path();
@@ -68,6 +73,7 @@ fn format_text_document_range(
         &settings.formatter,
         range,
         &file_path,
+        backend,
     )
     .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 

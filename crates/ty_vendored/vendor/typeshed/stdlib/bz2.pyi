@@ -9,7 +9,7 @@ from _bz2 import BZ2Compressor as BZ2Compressor, BZ2Decompressor as BZ2Decompres
 from _typeshed import ReadableBuffer, StrOrBytesPath, WriteableBuffer
 from collections.abc import Iterable
 from io import TextIOWrapper
-from typing import IO, Literal, Protocol, SupportsIndex, overload
+from typing import IO, Literal, Protocol, SupportsIndex, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 
 if sys.version_info >= (3, 14):
@@ -22,8 +22,10 @@ __all__ = ["BZ2File", "BZ2Compressor", "BZ2Decompressor", "open", "compress", "d
 # The following attributes and methods are optional:
 # def fileno(self) -> int: ...
 # def close(self) -> object: ...
+@type_check_only
 class _ReadableFileobj(_Reader, Protocol): ...
 
+@type_check_only
 class _WritableFileobj(Protocol):
     def write(self, b: bytes, /) -> object: ...
     # The following attributes and methods are optional:

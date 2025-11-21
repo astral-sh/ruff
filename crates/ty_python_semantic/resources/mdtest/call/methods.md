@@ -69,7 +69,9 @@ reveal_type(bound_method(1))  # revealed: str
 When we call the function object itself, we need to pass the `instance` explicitly:
 
 ```py
-C.f(1)  # error: [missing-argument]
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `C`, found `Literal[1]`"
+# error: [missing-argument]
+C.f(1)
 
 reveal_type(C.f(C(), 1))  # revealed: str
 ```
@@ -198,7 +200,7 @@ python-version = "3.12"
 ```py
 type IntOrStr = int | str
 
-reveal_type(IntOrStr.__or__)  # revealed: bound method typing.TypeAliasType.__or__(right: Any) -> _SpecialForm
+reveal_type(IntOrStr.__or__)  # revealed: bound method typing.TypeAliasType.__or__(right: Any, /) -> _SpecialForm
 ```
 
 ## Method calls on types not disjoint from `None`
@@ -306,10 +308,10 @@ reveal_type(C.f)  # revealed: bound method <class 'C'>.f(arg: int) -> str
 reveal_type(C.f(1))  # revealed: str
 ```
 
-The method `f` can not be accessed from an instance of the class:
+The method `f` cannot be accessed from an instance of the class:
 
 ```py
-# error: [unresolved-attribute] "Type `C` has no attribute `f`"
+# error: [unresolved-attribute] "Object of type `C` has no attribute `f`"
 C().f
 ```
 
@@ -325,7 +327,7 @@ class D(metaclass=Meta):
 reveal_type(D.f(1))  # revealed: Literal["a"]
 ```
 
-If the class method is possibly unbound, we union the return types:
+If the class method is possibly missing, we union the return types:
 
 ```py
 def flag() -> bool:
@@ -462,6 +464,22 @@ reveal_type(C.f2(1))  # revealed: str
 reveal_type(C().f2(1))  # revealed: str
 ```
 
+### `__init_subclass__`
+
+The [`__init_subclass__`] method is implicitly a classmethod:
+
+```py
+class Base:
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls.custom_attribute: int = 0
+
+class Derived(Base):
+    pass
+
+reveal_type(Derived.custom_attribute)  # revealed: int
+```
+
 ## `@staticmethod`
 
 ### Basic
@@ -570,4 +588,153 @@ reveal_type(C.f2(1))  # revealed: str
 reveal_type(C().f2(1))  # revealed: str
 ```
 
+### `__new__`
+
+`__new__` is an implicit `@staticmethod`; accessing it on an instance does not bind the `cls`
+argument:
+
+```py
+from typing_extensions import Self
+
+reveal_type(object.__new__)  # revealed: def __new__(cls) -> Self@__new__
+reveal_type(object().__new__)  # revealed: def __new__(cls) -> Self@__new__
+# revealed: Overload[(cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = Literal[0], /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
+reveal_type(int.__new__)
+# revealed: Overload[(cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = Literal[0], /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
+reveal_type((42).__new__)
+
+class X:
+    def __init__(self, val: int): ...
+    def make_another(self) -> Self:
+        reveal_type(self.__new__)  # revealed: def __new__(cls) -> Self@__new__
+        return self.__new__(X)
+```
+
+## Builtin functions and methods
+
+Some builtin functions and methods are heavily special-cased by ty. This mdtest checks that various
+properties are understood correctly for these functions and methods.
+
+```py
+import types
+from typing import Callable
+from ty_extensions import static_assert, CallableTypeOf, is_assignable_to, TypeOf
+
+def f(obj: type) -> None: ...
+
+class MyClass:
+    @property
+    def my_property(self) -> int:
+        return 42
+
+    @my_property.setter
+    def my_property(self, value: int | str) -> None: ...
+
+static_assert(is_assignable_to(types.FunctionType, Callable))
+
+# revealed: <wrapper-descriptor `__get__` of `function` objects>
+reveal_type(types.FunctionType.__get__)
+static_assert(is_assignable_to(TypeOf[types.FunctionType.__get__], Callable))
+
+# revealed: def f(obj: type) -> None
+reveal_type(f)
+static_assert(is_assignable_to(TypeOf[f], Callable))
+
+# revealed: <method-wrapper `__get__` of `f`>
+reveal_type(f.__get__)
+static_assert(is_assignable_to(TypeOf[f.__get__], Callable))
+
+# revealed: def __call__(self, *args: Any, **kwargs: Any) -> Any
+reveal_type(types.FunctionType.__call__)
+static_assert(is_assignable_to(TypeOf[types.FunctionType.__call__], Callable))
+
+# revealed: <method-wrapper `__call__` of `f`>
+reveal_type(f.__call__)
+static_assert(is_assignable_to(TypeOf[f.__call__], Callable))
+
+# revealed: <wrapper-descriptor `__get__` of `property` objects>
+reveal_type(property.__get__)
+static_assert(is_assignable_to(TypeOf[property.__get__], Callable))
+
+# revealed: property
+reveal_type(MyClass.my_property)
+static_assert(is_assignable_to(TypeOf[property], Callable))
+static_assert(not is_assignable_to(TypeOf[MyClass.my_property], Callable))
+
+# revealed: <method-wrapper `__get__` of `property` object>
+reveal_type(MyClass.my_property.__get__)
+static_assert(is_assignable_to(TypeOf[MyClass.my_property.__get__], Callable))
+
+# revealed: <wrapper-descriptor `__set__` of `property` objects>
+reveal_type(property.__set__)
+static_assert(is_assignable_to(TypeOf[property.__set__], Callable))
+
+# revealed: <method-wrapper `__set__` of `property` object>
+reveal_type(MyClass.my_property.__set__)
+static_assert(is_assignable_to(TypeOf[MyClass.my_property.__set__], Callable))
+
+# revealed: def startswith(self, prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
+reveal_type(str.startswith)
+static_assert(is_assignable_to(TypeOf[str.startswith], Callable))
+
+# revealed: <method-wrapper `startswith` of `str` object>
+reveal_type("foo".startswith)
+static_assert(is_assignable_to(TypeOf["foo".startswith], Callable))
+
+def _(
+    a: CallableTypeOf[types.FunctionType.__get__],
+    b: CallableTypeOf[f],
+    c: CallableTypeOf[f.__get__],
+    d: CallableTypeOf[types.FunctionType.__call__],
+    e: CallableTypeOf[f.__call__],
+    f: CallableTypeOf[property],
+    g: CallableTypeOf[property.__get__],
+    h: CallableTypeOf[MyClass.my_property.__get__],
+    i: CallableTypeOf[property.__set__],
+    j: CallableTypeOf[MyClass.my_property.__set__],
+    k: CallableTypeOf[str.startswith],
+    l: CallableTypeOf["foo".startswith],
+):
+    # revealed: Overload[(self: FunctionType, instance: None, owner: type, /) -> Unknown, (self: FunctionType, instance: object, owner: type | None = None, /) -> Unknown]
+    reveal_type(a)
+
+    # revealed: (obj: type) -> None
+    reveal_type(b)
+
+    # TODO: ideally this would have precise return types rather than `Unknown`
+    # revealed: Overload[(instance: None, owner: type, /) -> Unknown, (instance: object, owner: type | None = None, /) -> Unknown]
+    reveal_type(c)
+
+    # revealed: (self, *args: Any, **kwargs: Any) -> Any
+    reveal_type(d)
+
+    # revealed: (obj: type) -> None
+    reveal_type(e)
+
+    # revealed: (fget: ((Any, /) -> Any) | None = None, fset: ((Any, Any, /) -> None) | None = None, fdel: ((Any, /) -> None) | None = None, doc: str | None = None) -> property
+    reveal_type(f)
+
+    # revealed: Overload[(self: property, instance: None, owner: type, /) -> Unknown, (self: property, instance: object, owner: type | None = None, /) -> Unknown]
+    reveal_type(g)
+
+    # TODO: ideally this would have precise return types rather than `Unknown`
+    # revealed: Overload[(instance: None, owner: type, /) -> Unknown, (instance: object, owner: type | None = None, /) -> Unknown]
+    reveal_type(h)
+
+    # TODO: ideally this would have `-> None` rather than `-> Unknown`
+    # revealed: (self: property, instance: object, value: object, /) -> Unknown
+    reveal_type(i)
+
+    # TODO: ideally this would have a more precise input type and `-> None` rather than `-> Unknown`
+    # revealed: (instance: object, value: object, /) -> Unknown
+    reveal_type(j)
+
+    # revealed: (self, prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
+    reveal_type(k)
+
+    # revealed: (prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
+    reveal_type(l)
+```
+
 [functions and methods]: https://docs.python.org/3/howto/descriptor.html#functions-and-methods
+[`__init_subclass__`]: https://docs.python.org/3/reference/datamodel.html#object.__init_subclass__

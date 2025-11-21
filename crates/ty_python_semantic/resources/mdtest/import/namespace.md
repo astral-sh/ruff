@@ -103,7 +103,7 @@ x = "namespace"
 ```py
 from foo import x
 
-reveal_type(x)  # revealed: Unknown | Literal["module"]
+reveal_type(x)  # revealed: Literal["module"]
 
 import foo.bar  # error: [unresolved-import]
 ```

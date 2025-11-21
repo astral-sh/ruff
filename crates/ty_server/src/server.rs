@@ -65,15 +65,25 @@ impl Server {
             tracing::error!("Failed to deserialize initialization options: {error}");
         }
 
-        tracing::debug!("Initialization options: {initialization_options:?}");
+        tracing::debug!("Initialization options: {initialization_options:#?}");
 
         let resolved_client_capabilities = ResolvedClientCapabilities::new(&client_capabilities);
+
+        tracing::debug!("Resolved client capabilities: {resolved_client_capabilities}");
+
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
-        let server_capabilities =
-            server_capabilities(position_encoding, resolved_client_capabilities);
+        let server_capabilities = server_capabilities(
+            position_encoding,
+            resolved_client_capabilities,
+            &initialization_options
+                .options
+                .global
+                .clone()
+                .into_settings(),
+        );
 
         let version = ruff_db::program_version().unwrap_or("Unknown");
-        tracing::debug!("Version: {version}");
+        tracing::info!("Version: {version}");
 
         connection.initialize_finish(
             id,
@@ -102,7 +112,7 @@ impl Server {
             {
                 tracing::warn!(
                     "Received unknown options during initialization: {}",
-                    serde_json::to_string_pretty(unknown_options)
+                    serde_json::to_string_pretty(&unknown_options)
                         .unwrap_or_else(|_| format!("{unknown_options:?}"))
                 );
 

@@ -8,6 +8,7 @@ use ruff_python_ast::{Expr, ExprCall, ExprName, Keyword, StmtAnnAssign, StmtAssi
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_type_var_default_enabled;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
@@ -83,6 +84,7 @@ use super::{
 /// [UP047]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function/
 /// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.283")]
 pub(crate) struct NonPEP695TypeAlias {
     name: String,
     type_alias_kind: TypeAliasKind,
@@ -232,8 +234,10 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
         .unique_by(|tvar| tvar.name)
         .collect::<Vec<_>>();
 
-    // TODO(brent) handle `default` arg for Python 3.13+
-    if vars.iter().any(|tv| tv.default.is_some()) {
+    // Skip if any TypeVar has defaults and preview mode is not enabled
+    if vars.iter().any(|tv| tv.default.is_some())
+        && !is_type_var_default_enabled(checker.settings())
+    {
         return;
     }
 

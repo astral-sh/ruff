@@ -35,6 +35,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// This fix is always marked as unsafe since we cannot know
 /// for certain which assignment was intended.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct DuplicateClassFieldDefinition {
     name: String,
 }

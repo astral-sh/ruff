@@ -1,0 +1,128 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP043 [*] Unnecessary default type arguments
+ --> UP043.pyi:4:15
+  |
+4 | def func() -> Generator[int, None, None]:
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+5 |     yield 42
+  |
+help: Remove default type arguments
+1 | from collections.abc import Generator, AsyncGenerator
+2 | 
+3 | 
+  - def func() -> Generator[int, None, None]:
+4 + def func() -> Generator[int]:
+5 |     yield 42
+6 | 
+7 | 
+
+UP043 [*] Unnecessary default type arguments
+ --> UP043.pyi:8:15
+  |
+8 | def func() -> Generator[int, None]:
+  |               ^^^^^^^^^^^^^^^^^^^^
+9 |     yield 42
+  |
+help: Remove default type arguments
+5  |     yield 42
+6  | 
+7  | 
+   - def func() -> Generator[int, None]:
+8  + def func() -> Generator[int]:
+9  |     yield 42
+10 | 
+11 | 
+
+UP043 [*] Unnecessary default type arguments
+  --> UP043.pyi:21:15
+   |
+21 | def func() -> Generator[int, int, None]:
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^
+22 |     _ = yield 42
+23 |     return None
+   |
+help: Remove default type arguments
+18 |     return foo
+19 | 
+20 | 
+   - def func() -> Generator[int, int, None]:
+21 + def func() -> Generator[int, int]:
+22 |     _ = yield 42
+23 |     return None
+24 | 
+
+UP043 [*] Unnecessary default type arguments
+  --> UP043.pyi:31:21
+   |
+31 | async def func() -> AsyncGenerator[int, None]:
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+32 |     yield 42
+   |
+help: Remove default type arguments
+28 |     return 42
+29 | 
+30 | 
+   - async def func() -> AsyncGenerator[int, None]:
+31 + async def func() -> AsyncGenerator[int]:
+32 |     yield 42
+33 | 
+34 | 
+
+UP043 [*] Unnecessary default type arguments
+  --> UP043.pyi:47:15
+   |
+47 | def func() -> Generator[str, None, None]:
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+48 |     yield "hello"
+   |
+help: Remove default type arguments
+44 | from typing import Generator, AsyncGenerator
+45 | 
+46 | 
+   - def func() -> Generator[str, None, None]:
+47 + def func() -> Generator[str]:
+48 |     yield "hello"
+49 | 
+50 | 
+
+UP043 [*] Unnecessary default type arguments
+  --> UP043.pyi:51:21
+   |
+51 | async def func() -> AsyncGenerator[str, None]:
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+52 |     yield "hello"
+   |
+help: Remove default type arguments
+48 |     yield "hello"
+49 | 
+50 | 
+   - async def func() -> AsyncGenerator[str, None]:
+51 + async def func() -> AsyncGenerator[str]:
+52 |     yield "hello"
+53 | 
+54 | 
+
+UP043 [*] Unnecessary default type arguments
+  --> UP043.pyi:55:21
+   |
+55 |   async def func() -> AsyncGenerator[  # type: ignore
+   |  _____________________^
+56 | |     str,
+57 | |     None
+58 | | ]:
+   | |_^
+59 |       yield "hello"
+   |
+help: Remove default type arguments
+52 |     yield "hello"
+53 | 
+54 | 
+   - async def func() -> AsyncGenerator[  # type: ignore
+   -     str,
+   -     None
+   - ]:
+55 + async def func() -> AsyncGenerator[str]:
+56 |     yield "hello"
+note: This is an unsafe fix and may change runtime behavior

@@ -46,8 +46,15 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
             .unwrap_or(self.context.options().quote_style());
         let supports_pep_701 = self.context.options().target_version().supports_pep_701();
 
+        // Preserve the existing quote style for nested interpolations more than one layer deep, if
+        // PEP 701 isn't supported.
+        if !supports_pep_701 && self.context.interpolated_string_state().is_nested() {
+            return QuoteStyle::Preserve;
+        }
+
         // For f-strings and t-strings prefer alternating the quotes unless The outer string is triple quoted and the inner isn't.
-        if let InterpolatedStringState::InsideInterpolatedElement(parent_context) =
+        if let InterpolatedStringState::InsideInterpolatedElement(parent_context)
+        | InterpolatedStringState::NestedInterpolatedElement(parent_context) =
             self.context.interpolated_string_state()
         {
             let parent_flags = parent_context.flags();
@@ -645,7 +652,7 @@ pub(crate) fn normalize_string(
     start_offset: usize,
     new_flags: AnyStringFlags,
     escape_braces: bool,
-) -> Cow<str> {
+) -> Cow<'_, str> {
     // The normalized string if `input` is not yet normalized.
     // `output` must remain empty if `input` is already normalized.
     let mut output = String::new();
@@ -798,7 +805,7 @@ impl UnicodeEscape {
     ///
     /// * `\u`, `\U'` and `\x`: To use lower case for the characters `a-f`.
     /// * `\N`: To use uppercase letters
-    fn normalize(self, input: &str) -> Option<Cow<str>> {
+    fn normalize(self, input: &str) -> Option<Cow<'_, str>> {
         let mut normalised = String::new();
 
         let len = match self {

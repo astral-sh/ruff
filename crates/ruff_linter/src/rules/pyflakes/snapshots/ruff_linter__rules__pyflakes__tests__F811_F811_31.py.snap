@@ -1,13 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F811_31.py:19:29: F811 Redefinition of unused `baz` from line 17
+F811 Redefinition of unused `baz` from line 17
+  --> F811_31.py:17:5
    |
+16 | try:
 17 |     baz = None
+   |     --- previous definition of `baz` here
 18 |
 19 |     from some_module import baz
-   |                             ^^^ F811
+   |                             ^^^ `baz` redefined here
 20 | except ImportError:
 21 |     pass
    |
-   = help: Remove definition: `baz`
+help: Remove definition: `baz`

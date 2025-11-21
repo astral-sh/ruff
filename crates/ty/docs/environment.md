@@ -33,10 +33,21 @@ when necessary, e.g. to watch for file system changes or a dedicated UI thread.
 
 ty also reads the following externally defined environment variables:
 
+### `CONDA_DEFAULT_ENV`
+
+Used to determine the name of the active Conda environment.
+
 ### `CONDA_PREFIX`
 
-Used to detect an activated Conda environment location.
+Used to detect the path of an active Conda environment.
 If both `VIRTUAL_ENV` and `CONDA_PREFIX` are present, `VIRTUAL_ENV` will be preferred.
+
+### `PYTHONPATH`
+
+Adds additional directories to ty's search paths.
+The format is the same as the shell’s PATH:
+one or more directory pathnames separated by os appropriate pathsep
+(e.g. colons on Unix or semicolons on Windows).
 
 ### `RAYON_NUM_THREADS`
 
@@ -52,4 +63,8 @@ Used to detect an activated virtual environment.
 ### `XDG_CONFIG_HOME`
 
 Path to user-level configuration directory on Unix systems.
+
+### `_CONDA_ROOT`
+
+Used to determine the root install path of Conda.
 

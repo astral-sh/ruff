@@ -48,6 +48,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.pylint.max-statements`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.240")]
 pub(crate) struct TooManyStatements {
     statements: usize,
     max_statements: usize,

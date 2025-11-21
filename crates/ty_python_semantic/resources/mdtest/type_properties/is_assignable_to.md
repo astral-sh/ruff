@@ -1,5 +1,10 @@
 # Assignable-to relation
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 The `is_assignable_to(S, T)` relation below checks if type `S` is assignable to type `T` (target).
 This allows us to check if a type `S` can be used in a context where a type `T` is expected
 (function arguments, variable assignments). See the [typing documentation] for a precise definition
@@ -221,11 +226,11 @@ static_assert(is_assignable_to(type[Unknown], Meta))
 static_assert(is_assignable_to(Meta, type[Any]))
 static_assert(is_assignable_to(Meta, type[Unknown]))
 
-class AnyMeta(metaclass=Any): ...
-
-static_assert(is_assignable_to(type[AnyMeta], type))
-static_assert(is_assignable_to(type[AnyMeta], type[object]))
-static_assert(is_assignable_to(type[AnyMeta], type[Any]))
+def _(x: Any):
+    class AnyMeta(metaclass=x): ...
+    static_assert(is_assignable_to(type[AnyMeta], type))
+    static_assert(is_assignable_to(type[AnyMeta], type[object]))
+    static_assert(is_assignable_to(type[AnyMeta], type[Any]))
 
 from typing import TypeVar, Generic, Any
 
@@ -721,6 +726,75 @@ static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal[""]]], No
 static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal["", "a"]]], Not[AlwaysFalsy]))
 ```
 
+## Intersections with non-fully-static negated elements
+
+A type can be _assignable_ to an intersection containing negated elements only if the _bottom_
+materialization of that type is disjoint from the _bottom_ materialization of all negated elements
+in the intersection. This differs from subtyping, which should do the disjointness check against the
+_top_ materialization of the negated elements.
+
+```py
+from typing_extensions import Any, Never, Sequence
+from ty_extensions import Not, is_assignable_to, static_assert
+
+# The bottom materialization of `tuple[Any]` is `tuple[Never]`,
+# which simplifies to `Never`, so `tuple[int]` and `tuple[()]` are
+# both assignable to `~tuple[Any]`
+static_assert(is_assignable_to(tuple[int], Not[tuple[Any]]))
+static_assert(is_assignable_to(tuple[()], Not[tuple[Any]]))
+
+# But the bottom materialization of `tuple[Any, ...]` is `tuple[Never, ...]`,
+# which simplifies to `tuple[()]`, so `tuple[int]` is still assignable to
+# `~tuple[Any, ...]`, but `tuple[()]` is not
+static_assert(is_assignable_to(tuple[int], Not[tuple[Any, ...]]))
+static_assert(not is_assignable_to(tuple[()], Not[tuple[Any, ...]]))
+
+# Similarly, the bottom materialization of `Sequence[Any]` is `Sequence[Never]`,
+# so `tuple[()]` is not assignable to `~Sequence[Any]`, and nor is `list[Never]`,
+# since both `tuple[()]` and `list[Never]` are subtypes of `Sequence[Never]`.
+# `tuple[int, ...]` is also not assignable to `~Sequence[Any]`, as although it is
+# not a subtype of `Sequence[Never]` it is also not disjoint from `Sequence[Never]`:
+# `tuple[()]` is a subtype of both `Sequence[Never]` and `tuple[int, ...]`, so
+# `tuple[int, ...]` and `Sequence[Never]` cannot be considered disjoint.
+#
+# Other `list` and `tuple` specializations *are* assignable to `~Sequence[Any]`,
+# however, since there are many fully static materializations of `Sequence[Any]`
+# that would be disjoint from a given `list` or `tuple` specialization.
+static_assert(not is_assignable_to(tuple[()], Not[Sequence[Any]]))
+static_assert(not is_assignable_to(list[Never], Not[Sequence[Any]]))
+static_assert(not is_assignable_to(tuple[int, ...], Not[Sequence[Any]]))
+
+# TODO: should pass (`tuple[int]` should be considered disjoint from `Sequence[Never]`)
+static_assert(is_assignable_to(tuple[int], Not[Sequence[Any]]))  # error: [static-assert-error]
+
+# TODO: should pass (`list[int]` should be considered disjoint from `Sequence[Never]`)
+static_assert(is_assignable_to(list[int], Not[Sequence[Any]]))  # error: [static-assert-error]
+
+# If the left-hand side is also not fully static,
+# the left-hand side will be assignable to the right if the bottom materialization
+# of the left-hand side is disjoint from the bottom materialization of all negated
+# elements on the right-hand side
+
+# `tuple[Any, ...]` cannot be assignable to `~tuple[Any, ...]`,
+# because the bottom materialization of `tuple[Any, ...]` is
+# `tuple[()]`, and `tuple[()]` is not disjoint from itself
+static_assert(not is_assignable_to(tuple[Any, ...], Not[tuple[Any, ...]]))
+
+# but `tuple[Any]` is assignable to `~tuple[Any]`,
+# as the bottom materialization of `tuple[Any]` is `Never`,
+# and `Never` *is* disjoint from itself
+static_assert(is_assignable_to(tuple[Any], Not[tuple[Any]]))
+
+# The same principle applies for non-fully-static `list` specializations.
+# TODO: this should pass (`Bottom[list[Any]]` should simplify to `Never`)
+static_assert(is_assignable_to(list[Any], Not[list[Any]]))  # error: [static-assert-error]
+
+# `Bottom[list[Any]]` is `Never`, which is disjoint from `Bottom[Sequence[Any]]`
+# (which is `Sequence[Never]`).
+# TODO: this should pass (`Bottom[list[Any]]` should simplify to `Never`)
+static_assert(is_assignable_to(list[Any], Not[Sequence[Any]]))  # error: [static-assert-error]
+```
+
 ## General properties
 
 See also: our property tests in `property_tests.rs`.
@@ -892,6 +966,40 @@ c: Callable[[Any], str] = f
 
 # error: [invalid-assignment] "Object of type `def g(x: Any) -> int` is not assignable to `(Any, /) -> str`"
 c: Callable[[Any], str] = g
+```
+
+A function with no explicit return type should be assignable to a callable with a return type of
+`Any`.
+
+```py
+def h():
+    return
+
+c: Callable[[], Any] = h
+```
+
+And, similarly for parameters with no annotations:
+
+```py
+def i(a, b, /) -> None:
+    return
+
+c: Callable[[Any, Any], None] = i
+```
+
+Additionally, a function definition that includes both `*args` and `**kwargs` parameters that are
+annotated as `Any` or kept unannotated should be assignable to a callable with `...` as the
+parameter type.
+
+```py
+def variadic_without_annotation(*args, **kwargs):
+    return
+
+def variadic_with_annotation(*args: Any, **kwargs: Any) -> Any:
+    return
+
+c: Callable[..., Any] = variadic_without_annotation
+c: Callable[..., Any] = variadic_with_annotation
 ```
 
 ### Method types
@@ -1068,9 +1176,7 @@ class EggsLegacy(Generic[T, P]): ...
 static_assert(not is_assignable_to(Spam, Callable[..., Any]))
 static_assert(not is_assignable_to(SpamLegacy, Callable[..., Any]))
 static_assert(not is_assignable_to(Eggs, Callable[..., Any]))
-
-# TODO: should pass
-static_assert(not is_assignable_to(EggsLegacy, Callable[..., Any]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(EggsLegacy, Callable[..., Any]))
 ```
 
 ### Classes with `__call__` as attribute
@@ -1078,18 +1184,17 @@ static_assert(not is_assignable_to(EggsLegacy, Callable[..., Any]))  # error: [s
 An instance type is assignable to a compatible callable type if the instance type's class has a
 callable `__call__` attribute.
 
-TODO: for the moment, we don't consider the callable type as a bound-method descriptor, but this may
-change for better compatibility with mypy/pyright.
-
 ```py
+from __future__ import annotations
+
 from typing import Callable
 from ty_extensions import static_assert, is_assignable_to
 
-def call_impl(a: int) -> str:
+def call_impl(a: A, x: int) -> str:
     return ""
 
 class A:
-    __call__: Callable[[int], str] = call_impl
+    __call__: Callable[[A, int], str] = call_impl
 
 static_assert(is_assignable_to(A, Callable[[int], str]))
 static_assert(not is_assignable_to(A, Callable[[int], int]))
@@ -1125,6 +1230,46 @@ from typing import Callable, Any
 from ty_extensions import static_assert, is_assignable_to
 
 static_assert(is_assignable_to(type, Callable[..., Any]))
+```
+
+### Generic callables
+
+A generic callable can be considered equivalent to an intersection of all of its possible
+specializations. That means that a generic callable is assignable to any particular specialization.
+(If someone expects a function that works with a particular specialization, it's fine to hand them
+the generic callable.)
+
+```py
+from typing import Callable
+from ty_extensions import CallableTypeOf, TypeOf, is_assignable_to, static_assert
+
+def identity[T](t: T) -> T:
+    return t
+
+static_assert(is_assignable_to(TypeOf[identity], Callable[[int], int]))
+static_assert(is_assignable_to(TypeOf[identity], Callable[[str], str]))
+# TODO: no error
+# error: [static-assert-error]
+static_assert(not is_assignable_to(TypeOf[identity], Callable[[str], int]))
+
+static_assert(is_assignable_to(CallableTypeOf[identity], Callable[[int], int]))
+static_assert(is_assignable_to(CallableTypeOf[identity], Callable[[str], str]))
+# TODO: no error
+# error: [static-assert-error]
+static_assert(not is_assignable_to(CallableTypeOf[identity], Callable[[str], int]))
+```
+
+The reverse is not true — if someone expects a generic function that can be called with any
+specialization, we cannot hand them a function that only works with one specialization.
+
+```py
+static_assert(not is_assignable_to(Callable[[int], int], TypeOf[identity]))
+static_assert(not is_assignable_to(Callable[[str], str], TypeOf[identity]))
+static_assert(not is_assignable_to(Callable[[str], int], TypeOf[identity]))
+
+static_assert(not is_assignable_to(Callable[[int], int], CallableTypeOf[identity]))
+static_assert(not is_assignable_to(Callable[[str], str], CallableTypeOf[identity]))
+static_assert(not is_assignable_to(Callable[[str], int], CallableTypeOf[identity]))
 ```
 
 ## Generics

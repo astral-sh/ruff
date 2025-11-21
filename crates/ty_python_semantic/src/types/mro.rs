@@ -7,7 +7,7 @@ use rustc_hash::FxBuildHasher;
 use crate::Db;
 use crate::types::class_base::ClassBase;
 use crate::types::generics::Specialization;
-use crate::types::{ClassLiteral, ClassType, KnownInstanceType, SpecialFormType, Type};
+use crate::types::{ClassLiteral, ClassType, KnownClass, KnownInstanceType, SpecialFormType, Type};
 
 /// The inferred method resolution order of a given class.
 ///
@@ -45,13 +45,18 @@ impl<'db> Mro<'db> {
     /// the default specialization of the class's type variables.)
     ///
     /// (We emit a diagnostic warning about the runtime `TypeError` in
-    /// [`super::infer::TypeInferenceBuilder::infer_region_scope`].)
+    /// [`super::infer::infer_scope_types`].)
     pub(super) fn of_class(
         db: &'db dyn Db,
         class_literal: ClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Result<Self, MroError<'db>> {
         let class = class_literal.apply_optional_specialization(db, specialization);
+        // Special-case `NotImplementedType`: typeshed says that it inherits from `Any`,
+        // but this causes more problems than it fixes.
+        if class_literal.is_known(db, KnownClass::NotImplementedType) {
+            return Ok(Self::from([ClassBase::Class(class), ClassBase::object(db)]));
+        }
         Self::of_class_impl(db, class, class_literal.explicit_bases(db), specialization)
             .map_err(|err| err.into_mro_error(db, class))
     }
@@ -151,7 +156,7 @@ impl<'db> Mro<'db> {
                             )
                     ) =>
             {
-                ClassBase::try_from_type(db, *single_base).map_or_else(
+                ClassBase::try_from_type(db, *single_base, class.class_literal(db).0).map_or_else(
                     || Err(MroErrorKind::InvalidBases(Box::from([(0, *single_base)]))),
                     |single_base| {
                         if single_base.has_cyclic_mro(db) {
@@ -186,7 +191,7 @@ impl<'db> Mro<'db> {
                             &original_bases[i + 1..],
                         );
                     } else {
-                        match ClassBase::try_from_type(db, *base) {
+                        match ClassBase::try_from_type(db, *base, class.class_literal(db).0) {
                             Some(valid_base) => resolved_bases.push(valid_base),
                             None => invalid_bases.push((i, *base)),
                         }
@@ -253,7 +258,9 @@ impl<'db> Mro<'db> {
                     // `inconsistent-mro` diagnostic (which would be accurate -- but not nearly as
                     // precise!).
                     for (index, base) in original_bases.iter().enumerate() {
-                        let Some(base) = ClassBase::try_from_type(db, *base) else {
+                        let Some(base) =
+                            ClassBase::try_from_type(db, *base, class.class_literal(db).0)
+                        else {
                             continue;
                         };
                         base_to_indices.entry(base).or_default().push(index);

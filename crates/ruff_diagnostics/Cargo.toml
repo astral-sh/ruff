@@ -14,8 +14,11 @@ license = { workspace = true }
 doctest = false
 
 [dependencies]
-ruff_text_size = { workspace = true }
+ruff_text_size = { workspace = true, features = ["get-size"] }
 
 get-size2 = { workspace = true }
 is-macro = { workspace = true }
 serde = { workspace = true, optional = true, features = [] }
+
+[features]
+serde = ["dep:serde", "ruff_text_size/serde"]

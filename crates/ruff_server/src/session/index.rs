@@ -187,12 +187,9 @@ impl Index {
             anyhow!("Failed to convert workspace URL to file path: {workspace_url}")
         })?;
 
-        self.settings.remove(&workspace_path).ok_or_else(|| {
-            anyhow!(
-                "Tried to remove non-existent workspace URI {}",
-                workspace_url
-            )
-        })?;
+        self.settings
+            .remove(&workspace_path)
+            .ok_or_else(|| anyhow!("Tried to remove non-existent workspace URI {workspace_url}"))?;
 
         // O(n) complexity, which isn't ideal... but this is an uncommon operation.
         self.documents
@@ -330,7 +327,7 @@ impl Index {
         };
 
         let Some(_) = self.documents.remove(&url) else {
-            anyhow::bail!("tried to close document that didn't exist at {}", url)
+            anyhow::bail!("tried to close document that didn't exist at {url}")
         };
         Ok(())
     }
@@ -351,7 +348,7 @@ impl Index {
             anyhow::bail!("Tried to open unavailable document `{key}`");
         };
         let Some(controller) = self.documents.get_mut(&url) else {
-            anyhow::bail!("Document controller not available at `{}`", url);
+            anyhow::bail!("Document controller not available at `{url}`");
         };
         Ok(controller)
     }
@@ -619,7 +616,7 @@ impl DocumentQuery {
     /// Get the path for the document selected by this query, ignoring whether the file exists on disk.
     ///
     /// Returns the URL's path if this is an unsaved (untitled) document.
-    pub(crate) fn virtual_file_path(&self) -> Cow<Path> {
+    pub(crate) fn virtual_file_path(&self) -> Cow<'_, Path> {
         self.file_path()
             .map(Cow::Owned)
             .unwrap_or_else(|| Cow::Borrowed(Path::new(self.file_url().path())))

@@ -251,3 +251,32 @@ from ty_extensions import Intersection, Not
 def _(x: Union[Intersection[Any, Not[int]], Intersection[Any, Not[int]]]):
     reveal_type(x)  # revealed: Any & ~int
 ```
+
+## Bidirectional Type Inference
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Type inference accounts for parameter type annotations across all signatures in a union.
+
+```py
+from typing import TypedDict, overload
+
+class T(TypedDict):
+    x: int
+
+def _(flag: bool):
+    if flag:
+        def f(x: T) -> int:
+            return 1
+    else:
+        def f(x: dict[str, int]) -> int:
+            return 1
+    x = f({"x": 1})
+    reveal_type(x)  # revealed: int
+
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `T`, found `dict[Unknown | str, Unknown | int]`"
+    f({"y": 1})
+```

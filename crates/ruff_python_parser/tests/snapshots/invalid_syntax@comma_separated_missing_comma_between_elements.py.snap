@@ -7,21 +7,21 @@ input_file: crates/ruff_python_parser/resources/inline/err/comma_separated_missi
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..92,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 83..91,
                     value: List(
                         ExprList {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 83..91,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 84..85,
                                         value: Int(
                                             0,
@@ -30,7 +30,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 87..88,
                                         value: Int(
                                             1,
@@ -39,7 +39,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 89..90,
                                         value: Int(
                                             2,
@@ -61,5 +61,5 @@ Module(
   |
 1 | # The comma between the first two elements is expected in `parse_list_expression`.
 2 | [0, 1 2]
-  |       ^ Syntax Error: Expected ',', found int
+  |       ^ Syntax Error: Expected `,`, found int
   |

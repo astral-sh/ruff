@@ -39,7 +39,7 @@ pub fn generate_noqa_edits(
     let exemption = FileExemption::from(&file_directives);
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, external, path, locator);
     let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
-    build_noqa_edits_by_diagnostic(comments, locator, line_ending)
+    build_noqa_edits_by_diagnostic(comments, locator, line_ending, None)
 }
 
 /// A directive to ignore a set of rules either for a given line of Python source code or an entire file (e.g.,
@@ -99,7 +99,7 @@ pub(crate) struct Codes<'a> {
 
 impl Codes<'_> {
     /// Returns an iterator over the [`Code`]s in the `noqa` directive.
-    pub(crate) fn iter(&self) -> std::slice::Iter<Code> {
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, Code<'_>> {
         self.codes.iter()
     }
 
@@ -306,7 +306,7 @@ impl<'a> FileNoqaDirectives<'a> {
         Self(lines)
     }
 
-    pub(crate) fn lines(&self) -> &[FileNoqaDirectiveLine] {
+    pub(crate) fn lines(&self) -> &[FileNoqaDirectiveLine<'_>] {
         &self.0
     }
 
@@ -715,6 +715,7 @@ impl Display for LexicalError {
 impl Error for LexicalError {}
 
 /// Adds noqa comments to suppress all messages of a file.
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn add_noqa(
     path: &Path,
     diagnostics: &[Diagnostic],
@@ -723,6 +724,7 @@ pub(crate) fn add_noqa(
     external: &[String],
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
+    reason: Option<&str>,
 ) -> Result<usize> {
     let (count, output) = add_noqa_inner(
         path,
@@ -732,12 +734,14 @@ pub(crate) fn add_noqa(
         external,
         noqa_line_for,
         line_ending,
+        reason,
     );
 
     fs::write(path, output)?;
     Ok(count)
 }
 
+#[expect(clippy::too_many_arguments)]
 fn add_noqa_inner(
     path: &Path,
     diagnostics: &[Diagnostic],
@@ -746,6 +750,7 @@ fn add_noqa_inner(
     external: &[String],
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
+    reason: Option<&str>,
 ) -> (usize, String) {
     let mut count = 0;
 
@@ -757,7 +762,7 @@ fn add_noqa_inner(
 
     let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
 
-    let edits = build_noqa_edits_by_line(comments, locator, line_ending);
+    let edits = build_noqa_edits_by_line(comments, locator, line_ending, reason);
 
     let contents = locator.contents();
 
@@ -783,6 +788,7 @@ fn build_noqa_edits_by_diagnostic(
     comments: Vec<Option<NoqaComment>>,
     locator: &Locator,
     line_ending: LineEnding,
+    reason: Option<&str>,
 ) -> Vec<Option<Edit>> {
     let mut edits = Vec::default();
     for comment in comments {
@@ -794,6 +800,7 @@ fn build_noqa_edits_by_diagnostic(
                     FxHashSet::from_iter([comment.code]),
                     locator,
                     line_ending,
+                    reason,
                 ) {
                     edits.push(Some(noqa_edit.into_edit()));
                 }
@@ -808,6 +815,7 @@ fn build_noqa_edits_by_line<'a>(
     comments: Vec<Option<NoqaComment<'a>>>,
     locator: &Locator,
     line_ending: LineEnding,
+    reason: Option<&'a str>,
 ) -> BTreeMap<TextSize, NoqaEdit<'a>> {
     let mut comments_by_line = BTreeMap::default();
     for comment in comments.into_iter().flatten() {
@@ -831,6 +839,7 @@ fn build_noqa_edits_by_line<'a>(
                 .collect(),
             locator,
             line_ending,
+            reason,
         ) {
             edits.insert(offset, edit);
         }
@@ -886,7 +895,10 @@ fn find_noqa_comments<'a>(
             }
         }
 
-        let noqa_offset = noqa_line_for.resolve(message.expect_range().start());
+        let noqa_offset = message
+            .range()
+            .map(|range| noqa_line_for.resolve(range.start()))
+            .unwrap_or_default();
 
         // Or ignored by the directive itself?
         if let Some(directive_line) = directives.find_line_with_directive(noqa_offset) {
@@ -924,6 +936,7 @@ struct NoqaEdit<'a> {
     noqa_codes: FxHashSet<&'a SecondaryCode>,
     codes: Option<&'a Codes<'a>>,
     line_ending: LineEnding,
+    reason: Option<&'a str>,
 }
 
 impl NoqaEdit<'_> {
@@ -951,6 +964,9 @@ impl NoqaEdit<'_> {
                 push_codes(writer, self.noqa_codes.iter().sorted_unstable());
             }
         }
+        if let Some(reason) = self.reason {
+            write!(writer, " {reason}").unwrap();
+        }
         write!(writer, "{}", self.line_ending.as_str()).unwrap();
     }
 }
@@ -967,6 +983,7 @@ fn generate_noqa_edit<'a>(
     noqa_codes: FxHashSet<&'a SecondaryCode>,
     locator: &Locator,
     line_ending: LineEnding,
+    reason: Option<&'a str>,
 ) -> Option<NoqaEdit<'a>> {
     let line_range = locator.full_line_range(offset);
 
@@ -996,6 +1013,7 @@ fn generate_noqa_edit<'a>(
         noqa_codes,
         codes,
         line_ending,
+        reason,
     })
 }
 
@@ -1106,7 +1124,10 @@ impl<'a> NoqaDirectives<'a> {
         Self { inner: directives }
     }
 
-    pub(crate) fn find_line_with_directive(&self, offset: TextSize) -> Option<&NoqaDirectiveLine> {
+    pub(crate) fn find_line_with_directive(
+        &self,
+        offset: TextSize,
+    ) -> Option<&NoqaDirectiveLine<'_>> {
         self.find_line_index(offset).map(|index| &self.inner[index])
     }
 
@@ -1139,7 +1160,7 @@ impl<'a> NoqaDirectives<'a> {
             .ok()
     }
 
-    pub(crate) fn lines(&self) -> &[NoqaDirectiveLine] {
+    pub(crate) fn lines(&self) -> &[NoqaDirectiveLine<'_>] {
         &self.inner
     }
 
@@ -2826,6 +2847,7 @@ mod tests {
             &[],
             &noqa_line_for,
             LineEnding::Lf,
+            None,
         );
         assert_eq!(count, 0);
         assert_eq!(output, format!("{contents}"));
@@ -2849,6 +2871,7 @@ mod tests {
             &[],
             &noqa_line_for,
             LineEnding::Lf,
+            None,
         );
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: F841\n");
@@ -2879,6 +2902,7 @@ mod tests {
             &[],
             &noqa_line_for,
             LineEnding::Lf,
+            None,
         );
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: E741, F841\n");
@@ -2909,6 +2933,7 @@ mod tests {
             &[],
             &noqa_line_for,
             LineEnding::Lf,
+            None,
         );
         assert_eq!(count, 0);
         assert_eq!(output, "x = 1  # noqa");

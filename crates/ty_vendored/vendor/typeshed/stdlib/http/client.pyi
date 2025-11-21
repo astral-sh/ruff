@@ -77,7 +77,7 @@ from _typeshed import MaybeNone, ReadableBuffer, SupportsRead, SupportsReadline,
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from email._policybase import _MessageT
 from socket import socket
-from typing import BinaryIO, Literal, TypeVar, overload
+from typing import BinaryIO, Final, TypeVar, overload
 from typing_extensions import Self, TypeAlias
 
 __all__ = [
@@ -106,85 +106,85 @@ _DataType: TypeAlias = SupportsRead[bytes] | Iterable[ReadableBuffer] | Readable
 _T = TypeVar("_T")
 _HeaderValue: TypeAlias = ReadableBuffer | str | int
 
-HTTP_PORT: int
-HTTPS_PORT: int
+HTTP_PORT: Final = 80
+HTTPS_PORT: Final = 443
 
 # Keep these global constants in sync with http.HTTPStatus (http/__init__.pyi).
 # They are present for backward compatibility reasons.
-CONTINUE: Literal[100]
-SWITCHING_PROTOCOLS: Literal[101]
-PROCESSING: Literal[102]
-EARLY_HINTS: Literal[103]
+CONTINUE: Final = 100
+SWITCHING_PROTOCOLS: Final = 101
+PROCESSING: Final = 102
+EARLY_HINTS: Final = 103
 
-OK: Literal[200]
-CREATED: Literal[201]
-ACCEPTED: Literal[202]
-NON_AUTHORITATIVE_INFORMATION: Literal[203]
-NO_CONTENT: Literal[204]
-RESET_CONTENT: Literal[205]
-PARTIAL_CONTENT: Literal[206]
-MULTI_STATUS: Literal[207]
-ALREADY_REPORTED: Literal[208]
-IM_USED: Literal[226]
+OK: Final = 200
+CREATED: Final = 201
+ACCEPTED: Final = 202
+NON_AUTHORITATIVE_INFORMATION: Final = 203
+NO_CONTENT: Final = 204
+RESET_CONTENT: Final = 205
+PARTIAL_CONTENT: Final = 206
+MULTI_STATUS: Final = 207
+ALREADY_REPORTED: Final = 208
+IM_USED: Final = 226
 
-MULTIPLE_CHOICES: Literal[300]
-MOVED_PERMANENTLY: Literal[301]
-FOUND: Literal[302]
-SEE_OTHER: Literal[303]
-NOT_MODIFIED: Literal[304]
-USE_PROXY: Literal[305]
-TEMPORARY_REDIRECT: Literal[307]
-PERMANENT_REDIRECT: Literal[308]
+MULTIPLE_CHOICES: Final = 300
+MOVED_PERMANENTLY: Final = 301
+FOUND: Final = 302
+SEE_OTHER: Final = 303
+NOT_MODIFIED: Final = 304
+USE_PROXY: Final = 305
+TEMPORARY_REDIRECT: Final = 307
+PERMANENT_REDIRECT: Final = 308
 
-BAD_REQUEST: Literal[400]
-UNAUTHORIZED: Literal[401]
-PAYMENT_REQUIRED: Literal[402]
-FORBIDDEN: Literal[403]
-NOT_FOUND: Literal[404]
-METHOD_NOT_ALLOWED: Literal[405]
-NOT_ACCEPTABLE: Literal[406]
-PROXY_AUTHENTICATION_REQUIRED: Literal[407]
-REQUEST_TIMEOUT: Literal[408]
-CONFLICT: Literal[409]
-GONE: Literal[410]
-LENGTH_REQUIRED: Literal[411]
-PRECONDITION_FAILED: Literal[412]
+BAD_REQUEST: Final = 400
+UNAUTHORIZED: Final = 401
+PAYMENT_REQUIRED: Final = 402
+FORBIDDEN: Final = 403
+NOT_FOUND: Final = 404
+METHOD_NOT_ALLOWED: Final = 405
+NOT_ACCEPTABLE: Final = 406
+PROXY_AUTHENTICATION_REQUIRED: Final = 407
+REQUEST_TIMEOUT: Final = 408
+CONFLICT: Final = 409
+GONE: Final = 410
+LENGTH_REQUIRED: Final = 411
+PRECONDITION_FAILED: Final = 412
 if sys.version_info >= (3, 13):
-    CONTENT_TOO_LARGE: Literal[413]
-REQUEST_ENTITY_TOO_LARGE: Literal[413]
+    CONTENT_TOO_LARGE: Final = 413
+REQUEST_ENTITY_TOO_LARGE: Final = 413
 if sys.version_info >= (3, 13):
-    URI_TOO_LONG: Literal[414]
-REQUEST_URI_TOO_LONG: Literal[414]
-UNSUPPORTED_MEDIA_TYPE: Literal[415]
+    URI_TOO_LONG: Final = 414
+REQUEST_URI_TOO_LONG: Final = 414
+UNSUPPORTED_MEDIA_TYPE: Final = 415
 if sys.version_info >= (3, 13):
-    RANGE_NOT_SATISFIABLE: Literal[416]
-REQUESTED_RANGE_NOT_SATISFIABLE: Literal[416]
-EXPECTATION_FAILED: Literal[417]
-IM_A_TEAPOT: Literal[418]
-MISDIRECTED_REQUEST: Literal[421]
+    RANGE_NOT_SATISFIABLE: Final = 416
+REQUESTED_RANGE_NOT_SATISFIABLE: Final = 416
+EXPECTATION_FAILED: Final = 417
+IM_A_TEAPOT: Final = 418
+MISDIRECTED_REQUEST: Final = 421
 if sys.version_info >= (3, 13):
-    UNPROCESSABLE_CONTENT: Literal[422]
-UNPROCESSABLE_ENTITY: Literal[422]
-LOCKED: Literal[423]
-FAILED_DEPENDENCY: Literal[424]
-TOO_EARLY: Literal[425]
-UPGRADE_REQUIRED: Literal[426]
-PRECONDITION_REQUIRED: Literal[428]
-TOO_MANY_REQUESTS: Literal[429]
-REQUEST_HEADER_FIELDS_TOO_LARGE: Literal[431]
-UNAVAILABLE_FOR_LEGAL_REASONS: Literal[451]
+    UNPROCESSABLE_CONTENT: Final = 422
+UNPROCESSABLE_ENTITY: Final = 422
+LOCKED: Final = 423
+FAILED_DEPENDENCY: Final = 424
+TOO_EARLY: Final = 425
+UPGRADE_REQUIRED: Final = 426
+PRECONDITION_REQUIRED: Final = 428
+TOO_MANY_REQUESTS: Final = 429
+REQUEST_HEADER_FIELDS_TOO_LARGE: Final = 431
+UNAVAILABLE_FOR_LEGAL_REASONS: Final = 451
 
-INTERNAL_SERVER_ERROR: Literal[500]
-NOT_IMPLEMENTED: Literal[501]
-BAD_GATEWAY: Literal[502]
-SERVICE_UNAVAILABLE: Literal[503]
-GATEWAY_TIMEOUT: Literal[504]
-HTTP_VERSION_NOT_SUPPORTED: Literal[505]
-VARIANT_ALSO_NEGOTIATES: Literal[506]
-INSUFFICIENT_STORAGE: Literal[507]
-LOOP_DETECTED: Literal[508]
-NOT_EXTENDED: Literal[510]
-NETWORK_AUTHENTICATION_REQUIRED: Literal[511]
+INTERNAL_SERVER_ERROR: Final = 500
+NOT_IMPLEMENTED: Final = 501
+BAD_GATEWAY: Final = 502
+SERVICE_UNAVAILABLE: Final = 503
+GATEWAY_TIMEOUT: Final = 504
+HTTP_VERSION_NOT_SUPPORTED: Final = 505
+VARIANT_ALSO_NEGOTIATES: Final = 506
+INSUFFICIENT_STORAGE: Final = 507
+LOOP_DETECTED: Final = 508
+NOT_EXTENDED: Final = 510
+NETWORK_AUTHENTICATION_REQUIRED: Final = 511
 
 responses: dict[int, str]
 
@@ -309,6 +309,7 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
     def begin(self) -> None: ...
 
 class HTTPConnection:
+    blocksize: int
     auto_open: int  # undocumented
     debuglevel: int
     default_port: int  # undocumented

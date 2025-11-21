@@ -68,7 +68,7 @@ class Token(Generic[_T]):
             """Enter into Token context manager."""
 
         def __exit__(
-            self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
+            self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None, /
         ) -> None:
             """Exit from Token context manager, restore the linked ContextVar."""
 

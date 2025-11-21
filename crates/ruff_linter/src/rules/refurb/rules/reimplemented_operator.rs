@@ -69,6 +69,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [descriptors]: https://docs.python.org/3/howto/descriptor.html
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.9")]
 pub(crate) struct ReimplementedOperator {
     operator: Operator,
     target: FunctionLikeKind,

@@ -7,9 +7,9 @@ use crate::types::{
     Parameters, Signature, SpecialFormType, SubclassOfType, Type, UnionType,
 };
 use crate::{Db, module_resolver::KnownModule};
-use hashbrown::HashSet;
 use quickcheck::{Arbitrary, Gen};
 use ruff_python_ast::name::Name;
+use rustc_hash::FxHashSet;
 
 /// A test representation of a type that can be transformed unambiguously into a real Type,
 /// given a db.
@@ -153,7 +153,7 @@ impl Ty {
                     .place
                     .expect_type();
                 debug_assert!(
-                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class.class_literal(db).0))
+                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class_literal(db)))
                 );
                 ty
             }
@@ -377,7 +377,7 @@ fn arbitrary_type(g: &mut Gen, size: u32, fully_static: bool) -> Ty {
 
 fn arbitrary_parameter_list(g: &mut Gen, size: u32, fully_static: bool) -> Vec<Param> {
     let mut params: Vec<Param> = vec![];
-    let mut used_names = HashSet::new();
+    let mut used_names = FxHashSet::default();
 
     // First, choose the number of parameters to generate.
     for _ in 0..*g.choose(&[0, 1, 2, 3, 4, 5]).unwrap() {

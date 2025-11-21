@@ -1,22 +1,24 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_datetimez/mod.rs
 ---
-DTZ004.py:4:1: DTZ004 `datetime.datetime.utcfromtimestamp()` used
+DTZ004 `datetime.datetime.utcfromtimestamp()` used
+ --> DTZ004.py:4:1
   |
 3 | # qualified
 4 | datetime.datetime.utcfromtimestamp(1234)
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ004
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 5 |
 6 | from datetime import datetime
   |
-  = help: Use `datetime.datetime.fromtimestamp(ts, tz=...)` instead
+help: Use `datetime.datetime.fromtimestamp(ts, tz=...)` instead
 
-DTZ004.py:9:1: DTZ004 `datetime.datetime.utcfromtimestamp()` used
+DTZ004 `datetime.datetime.utcfromtimestamp()` used
+  --> DTZ004.py:9:1
    |
  8 | # unqualified
  9 | datetime.utcfromtimestamp(1234)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ004
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 10 |
 11 | # uses `astimezone` method
    |
-   = help: Use `datetime.datetime.fromtimestamp(ts, tz=...)` instead
+help: Use `datetime.datetime.fromtimestamp(ts, tz=...)` instead

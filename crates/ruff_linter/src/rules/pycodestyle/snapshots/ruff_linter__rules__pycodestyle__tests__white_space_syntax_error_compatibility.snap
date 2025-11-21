@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E2_syntax_error.py:1:10: invalid-syntax: Expected an expression
+invalid-syntax: Expected an expression
+ --> E2_syntax_error.py:1:10
   |
 1 | a = (1 or)
   |          ^

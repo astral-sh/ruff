@@ -36,6 +36,7 @@ pub(crate) enum SectionKind {
     OtherParameters,
     Parameters,
     Raises,
+    Receives,
     References,
     Return,
     Returns,
@@ -76,6 +77,7 @@ impl SectionKind {
             "other parameters" => Some(Self::OtherParameters),
             "parameters" => Some(Self::Parameters),
             "raises" => Some(Self::Raises),
+            "receives" => Some(Self::Receives),
             "references" => Some(Self::References),
             "return" => Some(Self::Return),
             "returns" => Some(Self::Returns),
@@ -117,6 +119,7 @@ impl SectionKind {
             Self::OtherParameters => "Other Parameters",
             Self::Parameters => "Parameters",
             Self::Raises => "Raises",
+            Self::Receives => "Receives",
             Self::References => "References",
             Self::Return => "Return",
             Self::Returns => "Returns",
@@ -208,7 +211,7 @@ impl<'a> SectionContexts<'a> {
         self.contexts.len()
     }
 
-    pub(crate) fn iter(&self) -> SectionContextsIter {
+    pub(crate) fn iter(&self) -> SectionContextsIter<'_> {
         SectionContextsIter {
             docstring_body: self.docstring.body(),
             inner: self.contexts.iter(),

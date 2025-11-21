@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::rules::pyupgrade::rules::is_import_required_by_isort;
 use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
@@ -27,9 +28,25 @@ use crate::{AlwaysFixableViolation, Fix};
 /// str(1)
 /// ```
 ///
+/// ## Fix safety
+/// This fix is marked as unsafe because removing the import
+/// may change program behavior. For example, in the following
+/// situation:
+///
+/// ```python
+/// def str(x):
+///     return x
+///
+///
+/// from builtins import str
+///
+/// str(1)  # `"1"` with the import, `1` without
+/// ```
+///
 /// ## References
 /// - [Python documentation: The Python Standard Library](https://docs.python.org/3/library/index.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.211")]
 pub(crate) struct UnnecessaryBuiltinImport {
     pub names: Vec<String>,
 }
@@ -58,7 +75,13 @@ pub(crate) fn unnecessary_builtin_import(
     stmt: &Stmt,
     module: &str,
     names: &[Alias],
+    level: u32,
 ) {
+    // Ignore relative imports (they're importing from local modules, not Python's builtins).
+    if level > 0 {
+        return;
+    }
+
     // Ignore irrelevant modules.
     if !matches!(
         module,
@@ -70,6 +93,13 @@ pub(crate) fn unnecessary_builtin_import(
     // Identify unaliased, builtin imports.
     let unused_imports: Vec<&Alias> = names
         .iter()
+        .filter(|alias| {
+            !is_import_required_by_isort(
+                &checker.settings().isort.required_imports,
+                stmt.into(),
+                alias,
+            )
+        })
         .filter(|alias| alias.asname.is_none())
         .filter(|alias| {
             matches!(

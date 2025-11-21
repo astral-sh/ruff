@@ -55,6 +55,7 @@ use crate::{AlwaysFixableViolation, Fix};
 ///
 /// [PEP 597]: https://peps.python.org/pep-0597/
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.1")]
 pub(crate) struct UnspecifiedEncoding {
     function_name: String,
     mode: ModeArgument,
@@ -188,7 +189,7 @@ fn generate_keyword_fix(checker: &Checker, call: &ast::ExprCall) -> Fix {
                 value: Box::from("utf-8"),
                 flags: checker.default_string_flags(),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }))
         ),
         &call.arguments,

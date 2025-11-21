@@ -16,7 +16,8 @@ exclude: |
     crates/ruff_python_formatter/resources/.*|
     crates/ruff_python_formatter/tests/snapshots/.*|
     crates/ruff_python_resolver/resources/.*|
-    crates/ruff_python_resolver/tests/snapshots/.*
+    crates/ruff_python_resolver/tests/snapshots/.*|
+    crates/ty_completion_eval/truth/.*
   )$
 
 repos:
@@ -34,6 +35,7 @@ repos:
     rev: 0.7.22
     hooks:
       - id: mdformat
+        language: python # means renovate will also update `additional_dependencies`
         additional_dependencies:
           - mdformat-mkdocs==4.0.0
           - mdformat-footnote==0.1.1
@@ -57,6 +59,7 @@ repos:
     rev: 1.19.1
     hooks:
       - id: blacken-docs
+        language: python # means renovate will also update `additional_dependencies`
         args: ["--pyi", "--line-length", "130"]
         files: '^crates/.*/resources/mdtest/.*\.md'
         exclude: |
@@ -98,8 +101,8 @@ repos:
 
   # zizmor detects security vulnerabilities in GitHub Actions workflows.
   # Additional configuration for the tool is found in `.github/zizmor.yml`
-  - repo: https://github.com/woodruffw/zizmor-pre-commit
-    rev: v1.11.0
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.16.0
     hooks:
       - id: zizmor
 

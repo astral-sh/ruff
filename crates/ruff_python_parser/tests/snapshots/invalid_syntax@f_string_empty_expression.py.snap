@@ -7,31 +7,31 @@ input_file: crates/ruff_python_parser/resources/inline/err/f_string_empty_expres
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..14,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..5,
                     value: FString(
                         ExprFString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 0..5,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 0..5,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 2..4,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: AtomicNodeIndex(..),
+                                                                node_index: NodeIndex(None),
                                                                 range: 3..3,
                                                                 id: Name(""),
                                                                 ctx: Invalid,
@@ -47,6 +47,7 @@ Module(
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: false,
+                                                unclosed: false,
                                             },
                                         },
                                     ),
@@ -58,26 +59,26 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 6..13,
                     value: FString(
                         ExprFString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 6..13,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 6..13,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 8..12,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: AtomicNodeIndex(..),
+                                                                node_index: NodeIndex(None),
                                                                 range: 9..9,
                                                                 id: Name(""),
                                                                 ctx: Invalid,
@@ -93,6 +94,7 @@ Module(
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: false,
+                                                unclosed: false,
                                             },
                                         },
                                     ),

@@ -1,39 +1,43 @@
 //! Data model, state management, and configuration resolution.
 
-use anyhow::{Context, anyhow};
-use index::DocumentQueryError;
-use lsp_server::{Message, RequestId};
-use lsp_types::notification::{Exit, Notification};
-use lsp_types::request::{
-    DocumentDiagnosticRequest, RegisterCapability, Request, Shutdown, UnregisterCapability,
-    WorkspaceDiagnosticRequest,
-};
-use lsp_types::{
-    DiagnosticRegistrationOptions, DiagnosticServerCapabilities, Registration, RegistrationParams,
-    TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Url,
-};
-use options::GlobalOptions;
-use ruff_db::Db;
-use ruff_db::files::File;
-use ruff_db::system::{System, SystemPath, SystemPathBuf};
-use settings::GlobalSettings;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::ops::{Deref, DerefMut};
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
+
+use anyhow::{Context, anyhow};
+use lsp_server::{Message, RequestId};
+use lsp_types::notification::{DidChangeWatchedFiles, Exit, Notification};
+use lsp_types::request::{
+    DocumentDiagnosticRequest, RegisterCapability, Rename, Request, Shutdown, UnregisterCapability,
+    WorkspaceDiagnosticRequest,
+};
+use lsp_types::{
+    DiagnosticRegistrationOptions, DiagnosticServerCapabilities,
+    DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, Registration, RegistrationParams,
+    TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Url,
+};
+use ruff_db::Db;
+use ruff_db::files::{File, system_path_to_file};
+use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ty_combine::Combine;
 use ty_project::metadata::Options;
-use ty_project::watch::ChangeEvent;
+use ty_project::watch::{ChangeEvent, CreatedKind};
 use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetadata};
 
-pub(crate) use self::index::DocumentQuery;
+use index::DocumentError;
+use options::GlobalOptions;
+
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode};
-pub(crate) use self::settings::WorkspaceSettings;
-use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options};
+pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
+use crate::capabilities::{
+    ResolvedClientCapabilities, server_diagnostic_options, server_rename_options,
+};
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::server::{Action, publish_settings_diagnostics};
 use crate::session::client::Client;
+use crate::session::index::Document;
 use crate::session::request_queue::RequestQueue;
 use crate::system::{AnySystemPath, LSPSystem};
 use crate::{PositionEncoding, TextDocument};
@@ -91,8 +95,6 @@ pub(crate) struct Session {
     shutdown_requested: bool,
 
     /// Whether the server has dynamically registered the diagnostic capability with the client.
-    diagnostic_capability_registered: bool,
-
     /// Is the connected client a `TestServer` instance.
     in_test: bool,
 
@@ -107,6 +109,10 @@ pub(crate) struct Session {
     /// We'll re-run the request after every change to `Session` (see `revision`)
     /// to see if there are now changes and, if so, respond to the client.
     suspended_workspace_diagnostics_request: Option<SuspendedWorkspaceDiagnosticRequest>,
+
+    /// Registrations is a set of LSP methods that have been dynamically registered with the
+    /// client.
+    registrations: HashSet<String>,
 }
 
 /// LSP State for a Project
@@ -166,10 +172,10 @@ impl Session {
             resolved_client_capabilities,
             request_queue: RequestQueue::new(),
             shutdown_requested: false,
-            diagnostic_capability_registered: false,
             in_test,
             suspended_workspace_diagnostics_request: None,
             revision: 0,
+            registrations: HashSet::new(),
         })
     }
 
@@ -305,6 +311,14 @@ impl Session {
         &self.project_state(path).db
     }
 
+    /// Returns an iterator, in arbitrary order, over all project databases
+    /// in this session.
+    pub(crate) fn project_dbs(&self) -> impl Iterator<Item = &ProjectDatabase> {
+        self.projects
+            .values()
+            .map(|project_state| &project_state.db)
+    }
+
     /// Returns a mutable reference to the project's [`ProjectDatabase`] in which the given `path`
     /// belongs.
     ///
@@ -415,7 +429,7 @@ impl Session {
     /// Returns a mutable iterator over all project databases that have been initialized to this point.
     ///
     /// This iterator will only yield the default project database if it has been used.
-    fn projects_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectDatabase> + '_ {
+    pub(crate) fn projects_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectDatabase> + '_ {
         self.project_states_mut().map(|project| &mut project.db)
     }
 
@@ -425,13 +439,6 @@ impl Session {
     pub(crate) fn project_states_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectState> + '_ {
         let default_project = self.default_project.try_get_mut();
         self.projects.values_mut().chain(default_project)
-    }
-
-    /// Returns the [`DocumentKey`] for the given URL.
-    ///
-    /// Refer to [`Index::key_from_url`] for more details.
-    pub(crate) fn key_from_url(&self, url: Url) -> Result<DocumentKey, Url> {
-        self.index().key_from_url(url)
     }
 
     pub(crate) fn initialize_workspaces(
@@ -567,7 +574,7 @@ impl Session {
             self.global_settings = Arc::new(global_settings);
         }
 
-        self.register_diagnostic_capability(client);
+        self.register_capabilities(client);
 
         assert!(
             self.workspaces.all_initialized(),
@@ -583,88 +590,249 @@ impl Session {
         }
     }
 
-    /// Sends a registration notification to the client to enable / disable workspace diagnostics
-    /// as per the `diagnostic_mode`.
+    /// Registers the dynamic capabilities with the client as per the resolved global settings.
     ///
-    /// This method is a no-op if the client doesn't support dynamic registration of diagnostic
-    /// capabilities.
-    fn register_diagnostic_capability(&mut self, client: &Client) {
+    /// ## Diagnostic capability
+    ///
+    /// This capability is used to enable / disable workspace diagnostics as per the
+    /// `ty.diagnosticMode` global setting.
+    ///
+    /// ## Rename capability
+    ///
+    /// This capability is used to enable / disable rename functionality as per the
+    /// `ty.experimental.rename` global setting.
+    fn register_capabilities(&mut self, client: &Client) {
         static DIAGNOSTIC_REGISTRATION_ID: &str = "ty/textDocument/diagnostic";
+        static RENAME_REGISTRATION_ID: &str = "ty/textDocument/rename";
+        static FILE_WATCHER_REGISTRATION_ID: &str = "ty/workspace/didChangeWatchedFiles";
 
-        if !self
+        let mut registrations = vec![];
+        let mut unregistrations = vec![];
+
+        if self
             .resolved_client_capabilities
             .supports_diagnostic_dynamic_registration()
         {
+            if self
+                .registrations
+                .contains(DocumentDiagnosticRequest::METHOD)
+            {
+                unregistrations.push(Unregistration {
+                    id: DIAGNOSTIC_REGISTRATION_ID.into(),
+                    method: DocumentDiagnosticRequest::METHOD.into(),
+                });
+            }
+
+            let diagnostic_mode = self.global_settings.diagnostic_mode;
+
+            tracing::debug!(
+                "Registering diagnostic capability with {diagnostic_mode:?} diagnostic mode"
+            );
+            registrations.push(Registration {
+                id: DIAGNOSTIC_REGISTRATION_ID.into(),
+                method: DocumentDiagnosticRequest::METHOD.into(),
+                register_options: Some(
+                    serde_json::to_value(DiagnosticServerCapabilities::RegistrationOptions(
+                        DiagnosticRegistrationOptions {
+                            diagnostic_options: server_diagnostic_options(
+                                diagnostic_mode.is_workspace(),
+                            ),
+                            ..Default::default()
+                        },
+                    ))
+                    .unwrap(),
+                ),
+            });
+        }
+
+        if self
+            .resolved_client_capabilities
+            .supports_rename_dynamic_registration()
+        {
+            let is_rename_enabled = self.global_settings.is_rename_enabled();
+
+            if !is_rename_enabled {
+                tracing::debug!("Rename capability is disabled in the resolved global settings");
+                if self.registrations.contains(Rename::METHOD) {
+                    unregistrations.push(Unregistration {
+                        id: RENAME_REGISTRATION_ID.into(),
+                        method: Rename::METHOD.into(),
+                    });
+                }
+            }
+
+            if is_rename_enabled {
+                registrations.push(Registration {
+                    id: RENAME_REGISTRATION_ID.into(),
+                    method: Rename::METHOD.into(),
+                    register_options: Some(serde_json::to_value(server_rename_options()).unwrap()),
+                });
+            }
+        }
+
+        if let Some(register_options) = self.file_watcher_registration_options() {
+            if self.registrations.contains(DidChangeWatchedFiles::METHOD) {
+                unregistrations.push(Unregistration {
+                    id: FILE_WATCHER_REGISTRATION_ID.into(),
+                    method: DidChangeWatchedFiles::METHOD.into(),
+                });
+            }
+            registrations.push(Registration {
+                id: FILE_WATCHER_REGISTRATION_ID.into(),
+                method: DidChangeWatchedFiles::METHOD.into(),
+                register_options: Some(serde_json::to_value(register_options).unwrap()),
+            });
+        }
+
+        // First, unregister any existing capabilities and then register or re-register them.
+        self.unregister_dynamic_capability(client, unregistrations);
+        self.register_dynamic_capability(client, registrations);
+    }
+
+    /// Registers a list of dynamic capabilities with the client.
+    fn register_dynamic_capability(&mut self, client: &Client, registrations: Vec<Registration>) {
+        if registrations.is_empty() {
             return;
         }
 
-        let diagnostic_mode = self.global_settings.diagnostic_mode;
-
-        if self.diagnostic_capability_registered {
-            client.send_request::<UnregisterCapability>(
-                self,
-                UnregistrationParams {
-                    unregisterations: vec![Unregistration {
-                        id: DIAGNOSTIC_REGISTRATION_ID.into(),
-                        method: DocumentDiagnosticRequest::METHOD.into(),
-                    }],
-                },
-                |_: &Client, ()| {
-                    tracing::debug!("Unregistered diagnostic capability");
-                },
-            );
+        for registration in &registrations {
+            self.registrations.insert(registration.method.clone());
         }
-
-        let registration = Registration {
-            id: DIAGNOSTIC_REGISTRATION_ID.into(),
-            method: DocumentDiagnosticRequest::METHOD.into(),
-            register_options: Some(
-                serde_json::to_value(DiagnosticServerCapabilities::RegistrationOptions(
-                    DiagnosticRegistrationOptions {
-                        diagnostic_options: server_diagnostic_options(
-                            diagnostic_mode.is_workspace(),
-                        ),
-                        ..Default::default()
-                    },
-                ))
-                .unwrap(),
-            ),
-        };
 
         client.send_request::<RegisterCapability>(
             self,
-            RegistrationParams {
-                registrations: vec![registration],
-            },
-            move |_: &Client, ()| {
-                tracing::debug!(
-                    "Registered diagnostic capability in {diagnostic_mode:?} diagnostic mode"
-                );
+            RegistrationParams { registrations },
+            |_: &Client, ()| {
+                tracing::debug!("Registered dynamic capabilities");
             },
         );
+    }
 
-        self.diagnostic_capability_registered = true;
+    /// Unregisters a list of dynamic capabilities with the client.
+    fn unregister_dynamic_capability(
+        &mut self,
+        client: &Client,
+        unregistrations: Vec<Unregistration>,
+    ) {
+        if unregistrations.is_empty() {
+            return;
+        }
+
+        for unregistration in &unregistrations {
+            if !self.registrations.remove(&unregistration.method) {
+                tracing::debug!(
+                    "Unregistration for `{}` was requested, but it was not registered",
+                    unregistration.method
+                );
+            }
+        }
+
+        client.send_request::<UnregisterCapability>(
+            self,
+            UnregistrationParams {
+                unregisterations: unregistrations,
+            },
+            |_: &Client, ()| {
+                tracing::debug!("Unregistered dynamic capabilities");
+            },
+        );
+    }
+
+    /// Try to register the file watcher provided by the client if the client supports it.
+    ///
+    /// Note that this should be called *after* workspaces/projects have been initialized.
+    /// This is required because the globs we use for registering file watching take
+    /// project search paths into account.
+    fn file_watcher_registration_options(
+        &self,
+    ) -> Option<DidChangeWatchedFilesRegistrationOptions> {
+        fn make_watcher(glob: &str) -> FileSystemWatcher {
+            FileSystemWatcher {
+                glob_pattern: lsp_types::GlobPattern::String(glob.into()),
+                kind: Some(lsp_types::WatchKind::all()),
+            }
+        }
+
+        fn make_relative_watcher(relative_to: &SystemPath, glob: &str) -> FileSystemWatcher {
+            let base_uri = Url::from_file_path(relative_to.as_std_path())
+                .expect("system path must be a valid URI");
+            let glob_pattern = lsp_types::GlobPattern::Relative(lsp_types::RelativePattern {
+                base_uri: lsp_types::OneOf::Right(base_uri),
+                pattern: glob.to_string(),
+            });
+            FileSystemWatcher {
+                glob_pattern,
+                kind: Some(lsp_types::WatchKind::all()),
+            }
+        }
+
+        if !self.client_capabilities().supports_file_watcher() {
+            tracing::warn!(
+                "Your LSP client doesn't support file watching: \
+                 You may see stale results when files change outside the editor"
+            );
+            return None;
+        }
+
+        // We also want to watch everything in the search paths as
+        // well. But this seems to require "relative" watcher support.
+        // I had trouble getting this working without using a base uri.
+        //
+        // Specifically, I tried this for each search path:
+        //
+        //     make_watcher(&format!("{path}/**"))
+        //
+        // But while this seemed to work for the project root, it
+        // simply wouldn't result in any file notifications for changes
+        // to files outside of the project root.
+        let watchers = if !self.client_capabilities().supports_relative_file_watcher() {
+            tracing::warn!(
+                "Your LSP client doesn't support file watching outside of project: \
+                 You may see stale results when dependencies change"
+            );
+            // Initialize our list of watchers with the standard globs relative
+            // to the project root if we can't use relative globs.
+            vec![make_watcher("**")]
+        } else {
+            // Gather up all of our project roots and all of the corresponding
+            // project root system paths, then deduplicate them relative to
+            // one another. Then listen to everything.
+            let roots = self.project_dbs().map(|db| db.project().root(db));
+            let paths = self
+                .project_dbs()
+                .flat_map(|db| {
+                    ty_python_semantic::system_module_search_paths(db).map(move |path| (db, path))
+                })
+                .filter(|(db, path)| !path.starts_with(db.project().root(*db)))
+                .map(|(_, path)| path)
+                .chain(roots);
+            ruff_db::system::deduplicate_nested_paths(paths)
+                .map(|path| make_relative_watcher(path, "**"))
+                .collect()
+        };
+        Some(DidChangeWatchedFilesRegistrationOptions { watchers })
     }
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.
-    pub(crate) fn take_document_snapshot(&self, url: Url) -> DocumentSnapshot {
-        let key = self
-            .key_from_url(url)
-            .map_err(DocumentQueryError::InvalidUrl);
-        DocumentSnapshot {
+    pub(crate) fn snapshot_document(&self, url: &Url) -> Result<DocumentSnapshot, DocumentError> {
+        let index = self.index();
+        let document_handle = index.document_handle(url)?;
+
+        Ok(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities,
-            workspace_settings: key
-                .as_ref()
-                .ok()
-                .and_then(|key| self.workspaces.settings_for_path(key.path().as_system()?))
+            global_settings: self.global_settings.clone(),
+            workspace_settings: document_handle
+                .notebook_or_file_path()
+                .as_system()
+                .and_then(|path| self.workspaces.settings_for_path(path))
                 .unwrap_or_else(|| Arc::new(WorkspaceSettings::default())),
             position_encoding: self.position_encoding,
-            document_query_result: key.and_then(|key| self.index().make_document_ref(key)),
-        }
+            document: document_handle,
+        })
     }
 
     /// Creates a snapshot of the current state of the [`Session`].
-    pub(crate) fn take_session_snapshot(&self) -> SessionSnapshot {
+    pub(crate) fn snapshot_session(&self) -> SessionSnapshot {
         SessionSnapshot {
             projects: self
                 .projects
@@ -682,56 +850,83 @@ impl Session {
     }
 
     /// Iterates over the document keys for all open text documents.
-    pub(super) fn text_document_keys(&self) -> impl Iterator<Item = DocumentKey> + '_ {
+    pub(super) fn text_document_handles(&self) -> impl Iterator<Item = DocumentHandle> + '_ {
         self.index()
-            .text_document_paths()
-            .map(|path| DocumentKey::Text(path.clone()))
+            .text_documents()
+            .map(|(_, document)| DocumentHandle::from_text_document(document))
+    }
+
+    /// Returns a handle to the document specified by its URL.
+    ///
+    /// # Errors
+    ///
+    /// If the document is not found.
+    pub(crate) fn document_handle(
+        &self,
+        url: &lsp_types::Url,
+    ) -> Result<DocumentHandle, DocumentError> {
+        self.index().document_handle(url)
     }
 
     /// Registers a notebook document at the provided `path`.
     /// If a document is already open here, it will be overwritten.
-    pub(crate) fn open_notebook_document(
-        &mut self,
-        path: &AnySystemPath,
-        document: NotebookDocument,
-    ) {
-        self.index_mut().open_notebook_document(path, document);
-        self.bump_revision();
+    ///
+    /// Returns a handle to the opened document.
+    pub(crate) fn open_notebook_document(&mut self, document: NotebookDocument) -> DocumentHandle {
+        let handle = self.index_mut().open_notebook_document(document);
+        self.open_document_in_db(&handle);
+        handle
     }
 
     /// Registers a text document at the provided `path`.
     /// If a document is already open here, it will be overwritten.
-    pub(crate) fn open_text_document(&mut self, path: &AnySystemPath, document: TextDocument) {
-        self.index_mut().open_text_document(path, document);
-        self.bump_revision();
-    }
-
-    /// Updates a text document at the associated `key`.
     ///
-    /// The document key must point to a text document, or this will throw an error.
-    pub(crate) fn update_text_document(
-        &mut self,
-        key: &DocumentKey,
-        content_changes: Vec<TextDocumentContentChangeEvent>,
-        new_version: DocumentVersion,
-    ) -> crate::Result<()> {
-        let position_encoding = self.position_encoding;
-        self.index_mut().update_text_document(
-            key,
-            content_changes,
-            new_version,
-            position_encoding,
-        )?;
-        self.bump_revision();
-        Ok(())
+    /// Returns a handle to the opened document.
+    pub(crate) fn open_text_document(&mut self, document: TextDocument) -> DocumentHandle {
+        let handle = self.index_mut().open_text_document(document);
+        self.open_document_in_db(&handle);
+        handle
     }
 
-    /// De-registers a document, specified by its key.
-    /// Calling this multiple times for the same document is a logic error.
-    pub(crate) fn close_document(&mut self, key: &DocumentKey) -> crate::Result<()> {
-        self.index_mut().close_document(key)?;
+    fn open_document_in_db(&mut self, document: &DocumentHandle) {
+        let path = document.notebook_or_file_path();
+
+        // This is a "maybe" because the `File` might've not been interned yet i.e., the
+        // `try_system` call will return `None` which doesn't mean that the file is new, it's just
+        // that the server didn't need the file yet.
+        let is_maybe_new_system_file = path.as_system().is_some_and(|system_path| {
+            let db = self.project_db(path);
+            db.files()
+                .try_system(db, system_path)
+                .is_none_or(|file| !file.exists(db))
+        });
+
+        match path {
+            AnySystemPath::System(system_path) => {
+                let event = if is_maybe_new_system_file {
+                    ChangeEvent::Created {
+                        path: system_path.clone(),
+                        kind: CreatedKind::File,
+                    }
+                } else {
+                    ChangeEvent::Opened(system_path.clone())
+                };
+                self.apply_changes(path, vec![event]);
+
+                let db = self.project_db_mut(path);
+                match system_path_to_file(db, system_path) {
+                    Ok(file) => db.project().open_file(db, file),
+                    Err(err) => tracing::warn!("Failed to open file {system_path}: {err}"),
+                }
+            }
+            AnySystemPath::SystemVirtual(virtual_path) => {
+                let db = self.project_db_mut(path);
+                let virtual_file = db.files().virtual_file(db, virtual_path);
+                db.project().open_file(db, virtual_file.file());
+            }
+        }
+
         self.bump_revision();
-        Ok(())
     }
 
     /// Returns a reference to the index.
@@ -750,7 +945,7 @@ impl Session {
     /// This method drops all references to the index and returns a guard that will restore the
     /// references when dropped. This guard holds the only reference to the index and allows
     /// modifying it.
-    fn index_mut(&mut self) -> MutIndexGuard {
+    fn index_mut(&mut self) -> MutIndexGuard<'_> {
         let index = self.index.take().unwrap();
 
         for db in self.projects_mut() {
@@ -827,9 +1022,10 @@ impl Drop for MutIndexGuard<'_> {
 #[derive(Debug)]
 pub(crate) struct DocumentSnapshot {
     resolved_client_capabilities: ResolvedClientCapabilities,
+    global_settings: Arc<GlobalSettings>,
     workspace_settings: Arc<WorkspaceSettings>,
     position_encoding: PositionEncoding,
-    document_query_result: Result<DocumentQuery, DocumentQueryError>,
+    document: DocumentHandle,
 }
 
 impl DocumentSnapshot {
@@ -843,32 +1039,38 @@ impl DocumentSnapshot {
         self.position_encoding
     }
 
+    /// Returns the client settings for all workspaces.
+    pub(crate) fn global_settings(&self) -> &GlobalSettings {
+        &self.global_settings
+    }
+
     /// Returns the client settings for the workspace that this document belongs to.
     pub(crate) fn workspace_settings(&self) -> &WorkspaceSettings {
         &self.workspace_settings
     }
 
     /// Returns the result of the document query for this snapshot.
-    pub(crate) fn document(&self) -> Result<&DocumentQuery, &DocumentQueryError> {
-        self.document_query_result.as_ref()
+    pub(crate) fn document(&self) -> &DocumentHandle {
+        &self.document
     }
 
-    pub(crate) fn file(&self, db: &dyn Db) -> Option<File> {
-        let document = match self.document() {
-            Ok(document) => document,
-            Err(err) => {
-                tracing::debug!("Failed to resolve file: {}", err);
-                return None;
-            }
-        };
-        let file = document.file(db);
+    pub(crate) fn url(&self) -> &lsp_types::Url {
+        self.document.url()
+    }
+
+    pub(crate) fn to_notebook_or_file(&self, db: &dyn Db) -> Option<File> {
+        let file = self.document.notebook_or_file(db);
         if file.is_none() {
             tracing::debug!(
-                "Failed to resolve file: file not found for path `{}`",
-                document.file_path()
+                "Failed to resolve file: file not found for `{}`",
+                self.document.url()
             );
         }
         file
+    }
+
+    pub(crate) fn notebook_or_file_path(&self) -> &AnySystemPath {
+        self.document.notebook_or_file_path()
     }
 }
 
@@ -1139,5 +1341,257 @@ impl SuspendedWorkspaceDiagnosticRequest {
         }));
 
         None
+    }
+}
+
+/// A handle to a document stored within [`Index`].
+///
+/// Allows identifying the document within the index but it also carries the URL used by the
+/// client to reference the document as well as the version of the document.
+///
+/// It also exposes methods to get the file-path of the corresponding ty-file.
+#[derive(Clone, Debug)]
+pub(crate) enum DocumentHandle {
+    Text {
+        url: lsp_types::Url,
+        path: AnySystemPath,
+        version: DocumentVersion,
+    },
+    Notebook {
+        url: lsp_types::Url,
+        path: AnySystemPath,
+        version: DocumentVersion,
+    },
+    Cell {
+        url: lsp_types::Url,
+        version: DocumentVersion,
+        notebook_path: AnySystemPath,
+    },
+}
+
+impl DocumentHandle {
+    fn from_text_document(document: &TextDocument) -> Self {
+        match document.notebook() {
+            None => Self::Text {
+                version: document.version(),
+                url: document.url().clone(),
+                path: DocumentKey::from_url(document.url()).into_file_path(),
+            },
+            Some(notebook) => Self::Cell {
+                notebook_path: notebook.clone(),
+                version: document.version(),
+                url: document.url().clone(),
+            },
+        }
+    }
+
+    fn from_notebook_document(document: &NotebookDocument) -> Self {
+        Self::Notebook {
+            path: DocumentKey::from_url(document.url()).into_file_path(),
+            url: document.url().clone(),
+            version: document.version(),
+        }
+    }
+
+    fn from_document(document: &Document) -> Self {
+        match document {
+            Document::Text(text) => Self::from_text_document(text),
+            Document::Notebook(notebook) => Self::from_notebook_document(notebook),
+        }
+    }
+
+    fn key(&self) -> DocumentKey {
+        DocumentKey::from_url(self.url())
+    }
+
+    pub(crate) const fn version(&self) -> DocumentVersion {
+        match self {
+            Self::Text { version, .. }
+            | Self::Notebook { version, .. }
+            | Self::Cell { version, .. } => *version,
+        }
+    }
+
+    /// The URL as used by the client to reference this document.
+    pub(crate) fn url(&self) -> &lsp_types::Url {
+        match self {
+            Self::Text { url, .. } | Self::Notebook { url, .. } | Self::Cell { url, .. } => url,
+        }
+    }
+
+    /// The path to the enclosing file for this document.
+    ///
+    /// This is the path corresponding to the URL, except for notebook cells where the
+    /// path corresponds to the notebook file.
+    pub(crate) fn notebook_or_file_path(&self) -> &AnySystemPath {
+        match self {
+            Self::Text { path, .. } | Self::Notebook { path, .. } => path,
+            Self::Cell { notebook_path, .. } => notebook_path,
+        }
+    }
+
+    #[expect(unused)]
+    pub(crate) fn file_path(&self) -> Option<&AnySystemPath> {
+        match self {
+            Self::Text { path, .. } | Self::Notebook { path, .. } => Some(path),
+            Self::Cell { .. } => None,
+        }
+    }
+
+    #[expect(unused)]
+    pub(crate) fn notebook_path(&self) -> Option<&AnySystemPath> {
+        match self {
+            DocumentHandle::Notebook { path, .. } => Some(path),
+            DocumentHandle::Cell { notebook_path, .. } => Some(notebook_path),
+            DocumentHandle::Text { .. } => None,
+        }
+    }
+
+    /// Returns the salsa interned [`File`] for the document selected by this query.
+    ///
+    /// It returns [`None`] for the following cases:
+    /// - For virtual file, if it's not yet opened
+    /// - For regular file, if it does not exists or is a directory
+    pub(crate) fn notebook_or_file(&self, db: &dyn Db) -> Option<File> {
+        match &self.notebook_or_file_path() {
+            AnySystemPath::System(path) => system_path_to_file(db, path).ok(),
+            AnySystemPath::SystemVirtual(virtual_path) => db
+                .files()
+                .try_virtual_file(virtual_path)
+                .map(|virtual_file| virtual_file.file()),
+        }
+    }
+
+    pub(crate) fn is_cell(&self) -> bool {
+        matches!(self, Self::Cell { .. })
+    }
+
+    pub(crate) fn is_cell_or_notebook(&self) -> bool {
+        matches!(self, Self::Cell { .. } | Self::Notebook { .. })
+    }
+
+    pub(crate) fn update_text_document(
+        &self,
+        session: &mut Session,
+        content_changes: Vec<TextDocumentContentChangeEvent>,
+        new_version: DocumentVersion,
+    ) -> crate::Result<()> {
+        let position_encoding = session.position_encoding();
+        {
+            let mut index = session.index_mut();
+
+            let document_mut = index.document_mut(&self.key())?;
+
+            let Some(document) = document_mut.as_text_mut() else {
+                anyhow::bail!("Text document path does not point to a text document");
+            };
+
+            if content_changes.is_empty() {
+                document.update_version(new_version);
+            } else {
+                document.apply_changes(content_changes, new_version, position_encoding);
+            }
+        }
+
+        self.update_in_db(session);
+
+        Ok(())
+    }
+
+    pub(crate) fn update_notebook_document(
+        &self,
+        session: &mut Session,
+        cells: Option<lsp_types::NotebookDocumentCellChange>,
+        metadata: Option<lsp_types::LSPObject>,
+        new_version: DocumentVersion,
+    ) -> crate::Result<()> {
+        let position_encoding = session.position_encoding();
+        {
+            let mut index = session.index_mut();
+
+            index.update_notebook_document(
+                &self.key(),
+                cells,
+                metadata,
+                new_version,
+                position_encoding,
+            )?;
+        }
+
+        self.update_in_db(session);
+        Ok(())
+    }
+
+    fn update_in_db(&self, session: &mut Session) {
+        let path = self.notebook_or_file_path();
+        let changes = match path {
+            AnySystemPath::System(system_path) => {
+                vec![ChangeEvent::file_content_changed(system_path.clone())]
+            }
+            AnySystemPath::SystemVirtual(virtual_path) => {
+                vec![ChangeEvent::ChangedVirtual(virtual_path.clone())]
+            }
+        };
+
+        session.apply_changes(path, changes);
+    }
+
+    /// De-registers a document, specified by its key.
+    /// Calling this multiple times for the same document is a logic error.
+    ///
+    /// Returns `true` if the client needs to clear the diagnostics for this document.
+    pub(crate) fn close(&self, session: &mut Session) -> crate::Result<bool> {
+        let is_cell = self.is_cell();
+        let path = self.notebook_or_file_path();
+        session.index_mut().close_document(&self.key())?;
+
+        // Close the text or notebook file in the database but skip this
+        // step for cells because closing a cell doesn't close its notebook.
+        let requires_clear_diagnostics = if is_cell {
+            true
+        } else {
+            let db = session.project_db_mut(path);
+
+            match path {
+                AnySystemPath::System(system_path) => {
+                    if let Some(file) = db.files().try_system(db, system_path) {
+                        db.project().close_file(db, file);
+                    } else {
+                        // This can only fail when the path is a directory or it doesn't exists but the
+                        // file should exists for this handler in this branch. This is because every
+                        // close call is preceded by an open call, which ensures that the file is
+                        // interned in the lookup table (`Files`).
+                        tracing::warn!("Salsa file does not exists for {}", system_path);
+                    }
+
+                    // For non-virtual files, we clear diagnostics if:
+                    //
+                    // 1. The file does not belong to any workspace e.g., opening a random file from
+                    //    outside the workspace because closing it acts like the file doesn't exists
+                    // 2. The diagnostic mode is set to open-files only
+                    session.workspaces().for_path(system_path).is_none()
+                        || session
+                            .global_settings()
+                            .diagnostic_mode()
+                            .is_open_files_only()
+                }
+                AnySystemPath::SystemVirtual(virtual_path) => {
+                    if let Some(virtual_file) = db.files().try_virtual_file(virtual_path) {
+                        db.project().close_file(db, virtual_file.file());
+                        virtual_file.close(db);
+                    } else {
+                        tracing::warn!("Salsa virtual file does not exists for {}", virtual_path);
+                    }
+
+                    // Always clear diagnostics for virtual files, as they don't really exist on disk
+                    // which means closing them is like deleting the file.
+                    true
+                }
+            }
+        };
+
+        session.bump_revision();
+
+        Ok(requires_clear_diagnostics)
     }
 }

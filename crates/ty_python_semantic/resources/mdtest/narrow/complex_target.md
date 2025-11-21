@@ -58,6 +58,15 @@ d.x = 1
 reveal_type(d.x)  # revealed: Literal[1]
 d.x = unknown()
 reveal_type(d.x)  # revealed: Unknown
+
+class E:
+    x: int | None = None
+
+e = E()
+
+if e.x is not None:
+    class _:
+        reveal_type(e.x)  # revealed: int
 ```
 
 Narrowing can be "reset" by assigning to the attribute:
@@ -167,11 +176,11 @@ if c.x is not None:
 
 if c.x is not None:
     def _():
-        reveal_type(c.x)  # revealed: Unknown | int | None
+        reveal_type(c.x)  # revealed: int | None
 
 def _():
     if c.x is not None:
-        reveal_type(c.x)  # revealed: (Unknown & ~None) | int
+        reveal_type(c.x)  # revealed: int
 ```
 
 ## Subscript narrowing

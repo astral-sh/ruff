@@ -6,15 +6,17 @@ import unittest.result
 import unittest.suite
 from _typeshed import SupportsFlush, SupportsWrite
 from collections.abc import Callable, Iterable
-from typing import Any, Generic, Protocol, TypeVar
+from typing import Any, Generic, Protocol, TypeVar, type_check_only
 from typing_extensions import Never, TypeAlias
 from warnings import _ActionKind
 
 _ResultClassType: TypeAlias = Callable[[_TextTestStream, bool, int], TextTestResult[Any]]
 
+@type_check_only
 class _SupportsWriteAndFlush(SupportsWrite[str], SupportsFlush, Protocol): ...
 
 # All methods used by unittest.runner.TextTestResult's stream
+@type_check_only
 class _TextTestStream(_SupportsWriteAndFlush, Protocol):
     def writeln(self, arg: str | None = None, /) -> None: ...
 

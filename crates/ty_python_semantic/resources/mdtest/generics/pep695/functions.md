@@ -72,7 +72,7 @@ from typing import Protocol, TypeVar
 S = TypeVar("S")
 
 class CanIndex(Protocol[S]):
-    def __getitem__(self, index: int) -> S: ...
+    def __getitem__(self, index: int, /) -> S: ...
 
 class ExplicitlyImplements[T](CanIndex[T]): ...
 
@@ -286,6 +286,9 @@ def union_param[T](x: T | None) -> T:
 reveal_type(union_param("a"))  # revealed: Literal["a"]
 reveal_type(union_param(1))  # revealed: Literal[1]
 reveal_type(union_param(None))  # revealed: Unknown
+
+def _(x: int | None):
+    reveal_type(union_param(x))  # revealed: int
 ```
 
 ```py
@@ -321,6 +324,27 @@ def g[T](x: T) -> T | None:
 
 reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
 reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
+```
+
+## Passing generic functions to generic functions
+
+```py
+from typing import Callable
+
+def invoke[A, B](fn: Callable[[A], B], value: A) -> B:
+    return fn(value)
+
+def identity[T](x: T) -> T:
+    return x
+
+def head[T](xs: list[T]) -> T:
+    return xs[0]
+
+# TODO: this should be `Literal[1]`
+reveal_type(invoke(identity, 1))  # revealed: Unknown
+
+# TODO: this should be `Unknown | int`
+reveal_type(invoke(head, [1, 2, 3]))  # revealed: Unknown
 ```
 
 ## Protocols as TypeVar bounds
@@ -403,4 +427,159 @@ def decorated[T](t: T) -> None:
 def decorated[T](t: T) -> None:
     # error: [redundant-cast]
     reveal_type(cast(T, t))  # revealed: T@decorated
+```
+
+## Solving TypeVars with upper bounds in unions
+
+```py
+class A: ...
+
+class B[T: A]:
+    x: T
+
+def f[T: A](c: T | None):
+    return None
+
+def g[T: A](b: B[T]):
+    return f(b.x)  # Fine
+```
+
+## Typevars in a union
+
+```py
+def takes_in_union[T](t: T | None) -> T:
+    raise NotImplementedError
+
+def takes_in_bigger_union[T](t: T | int | None) -> T:
+    raise NotImplementedError
+
+def _(x: str | None) -> None:
+    reveal_type(takes_in_union(x))  # revealed: str
+    reveal_type(takes_in_bigger_union(x))  # revealed: str
+
+def _(x: str | int | None) -> None:
+    reveal_type(takes_in_union(x))  # revealed: str | int
+    reveal_type(takes_in_bigger_union(x))  # revealed: str
+```
+
+This is a regression test for an issue that surfaced in the primer report of an early version of
+<https://github.com/astral-sh/ruff/pull/19811>, where we failed to solve the `TypeVar` here due to
+the fact that it only appears in the function's type annotations as part of a union:
+
+```py
+def f[T: (str, bytes)](suffix: T | None, prefix: T | None):
+    return None
+
+def g(x: str):
+    f(prefix=x, suffix=".tar.gz")
+```
+
+If the type variable is present multiple times in the union, we choose the correct union element to
+infer against based on the argument type:
+
+```py
+def h[T](x: list[T] | dict[T, T]) -> T | None: ...
+def _(x: list[int], y: dict[int, int]):
+    reveal_type(h(x))  # revealed: int | None
+    reveal_type(h(y))  # revealed: int | None
+```
+
+## Nested functions see typevars bound in outer function
+
+```py
+from typing import overload
+
+def outer[T](t: T) -> None:
+    def inner[T](t: T) -> None: ...
+
+    inner(t)
+
+@overload
+def overloaded_outer() -> None: ...
+@overload
+def overloaded_outer[T](t: T) -> None: ...
+def overloaded_outer[T](t: T | None = None) -> None:
+    def inner(t: T) -> None: ...
+
+    if t is not None:
+        inner(t)
+
+def outer[T](t: T) -> None:
+    def inner[S](inner_t: T, s: S) -> tuple[T, S]:
+        return inner_t, s
+    reveal_type(inner(t, 1))  # revealed: tuple[T@outer, Literal[1]]
+
+    inner("wrong", 1)  # error: [invalid-argument-type]
+```
+
+## Unpacking a TypeVar
+
+We can infer precise heterogeneous types from the result of an unpacking operation applied to a
+TypeVar if the TypeVar's upper bound is a type with a precise tuple spec:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple, Final
+
+def f[T: tuple[int, str]](x: T) -> T:
+    a, b = x
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: str
+    return x
+
+@dataclass
+class Team[T: tuple[int, str]]:
+    employees: list[T]
+
+def x[T: tuple[int, str]](team: Team[T]) -> Team[T]:
+    age, name = team.employees[0]
+    reveal_type(age)  # revealed: int
+    reveal_type(name)  # revealed: str
+    return team
+
+class Age(int): ...
+class Name(str): ...
+
+class Employee(NamedTuple):
+    age: Age
+    name: Name
+
+EMPLOYEES: Final = (Employee(name=Name("alice"), age=Age(42)),)
+team = Team(employees=list(EMPLOYEES))
+reveal_type(team.employees)  # revealed: list[Employee]
+age, name = team.employees[0]
+reveal_type(age)  # revealed: Age
+reveal_type(name)  # revealed: Name
+```
+
+## `self` in PEP 695 generic methods
+
+When a generic method uses a PEP 695 generic context, an implict or explicit annotation of
+`self: Self` is still part of the full generic context:
+
+```py
+from typing import Self
+
+class C:
+    def explicit_self[T](self: Self, x: T) -> tuple[Self, T]:
+        return self, x
+
+    def implicit_self[T](self, x: T) -> tuple[Self, T]:
+        return self, x
+
+def _(x: int):
+    reveal_type(C().explicit_self(x))  # revealed: tuple[C, int]
+
+    reveal_type(C().implicit_self(x))  # revealed: tuple[C, int]
+```
+
+## `~T` is never assignable to `T`
+
+```py
+from ty_extensions import Not
+
+def f[T](x: T, y: Not[T]) -> T:
+    x = y  # error: [invalid-assignment]
+    y = x  # error: [invalid-assignment]
+    return x
 ```

@@ -11,7 +11,7 @@ if sys.version_info >= (3, 13):
     from io import TextIOWrapper
     from pathlib import Path
     from typing import BinaryIO, Literal, overload
-    from typing_extensions import Unpack
+    from typing_extensions import Unpack, deprecated
 
     def open_binary(anchor: Anchor, *path_names: StrPath) -> BinaryIO:
         """Open for binary reading the *resource* within *package*."""
@@ -44,6 +44,7 @@ if sys.version_info >= (3, 13):
         Otherwise returns ``False``.
         """
 
+    @deprecated("Deprecated since Python 3.11. Use `files(anchor).iterdir()`.")
     def contents(anchor: Anchor, *path_names: StrPath) -> Iterator[str]:
         """Return an iterable over the named resources within the package.
 

@@ -35,6 +35,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `property`](https://docs.python.org/3/library/functions.html#property)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.153")]
 pub(crate) struct PropertyWithParameters;
 
 impl Violation for PropertyWithParameters {

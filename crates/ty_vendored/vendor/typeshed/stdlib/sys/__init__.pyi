@@ -289,6 +289,18 @@ class _flags(_UninstantiableStructseq, tuple[int, ...]):
         @property
         def safe_path(self) -> bool:
             """-P"""
+    if sys.version_info >= (3, 13):
+        @property
+        def gil(self) -> Literal[0, 1]:
+            """-X gil"""
+    if sys.version_info >= (3, 14):
+        @property
+        def thread_inherit_context(self) -> Literal[0, 1]:
+            """-X thread_inherit_context"""
+
+        @property
+        def context_aware_warnings(self) -> Literal[0, 1]:
+            """-X context_aware_warnings"""
     # Whether or not this exists on lower versions of Python
     # may depend on which patch release you're using
     # (it was backported to all Python versions on 3.8+ as a security fix)
@@ -540,7 +552,7 @@ def call_tracing(func: Callable[..., _T], args: Any, /) -> _T:
     """
 
 if sys.version_info >= (3, 13):
-    @deprecated("Deprecated in Python 3.13; use _clear_internal_caches() instead.")
+    @deprecated("Deprecated since Python 3.13. Use `_clear_internal_caches()` instead.")
     def _clear_type_cache() -> None:
         """Clear the internal type lookup cache."""
 
@@ -565,6 +577,21 @@ def _getframe(depth: int = 0, /) -> FrameType:
     This function should be used for internal and specialized purposes
     only.
     """
+
+# documented -- see https://docs.python.org/3/library/sys.html#sys._current_exceptions
+if sys.version_info >= (3, 12):
+    def _current_exceptions() -> dict[int, BaseException | None]:
+        """Return a dict mapping each thread's identifier to its current raised exception.
+
+        This function should be used for specialized purposes only.
+        """
+
+else:
+    def _current_exceptions() -> dict[int, OptExcInfo]:
+        """Return a dict mapping each thread's identifier to its current raised exception.
+
+        This function should be used for specialized purposes only.
+        """
 
 if sys.version_info >= (3, 12):
     def _getframemodulename(depth: int = 0) -> str | None:
@@ -614,6 +641,9 @@ def exit(status: _ExitCode = None, /) -> NoReturn:
     If it is another kind of object, it will be printed and the system
     exit status will be one (i.e., failure).
     """
+
+if sys.platform == "android":  # noqa: Y008
+    def getandroidapilevel() -> int: ...
 
 def getallocatedblocks() -> int:
     """Return the number of memory blocks currently allocated."""
@@ -688,6 +718,7 @@ def settrace(function: TraceFunction | None, /) -> None:
 if sys.platform == "win32":
     # A tuple of length 5, even though it has more than 5 attributes.
     @final
+    @type_check_only
     class _WinVersion(_UninstantiableStructseq, tuple[int, int, int, int, str]):
         @property
         def major(self) -> int: ...
@@ -731,6 +762,8 @@ def intern(string: str, /) -> str:
     purpose is to speed up dictionary lookups. Return the string itself or
     the previously interned string object with the same value.
     """
+
+__interactivehook__: Callable[[], object]
 
 if sys.version_info >= (3, 13):
     def _is_gil_enabled() -> bool:
@@ -935,4 +968,10 @@ if sys.version_info >= (3, 14):
              pid (int): The process ID of the target Python process.
              script (str|bytes): The path to a file containing
                  the Python code to be executed.
+        """
+
+    def _is_immortal(op: object, /) -> bool:
+        """Return True if the given object is "immortal" per PEP 683.
+
+        This function should be used for specialized purposes only.
         """

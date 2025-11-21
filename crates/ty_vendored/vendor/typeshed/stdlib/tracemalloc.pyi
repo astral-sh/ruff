@@ -47,6 +47,7 @@ class Statistic:
     Statistic difference on memory allocations between two Snapshot instance.
     """
 
+    __slots__ = ("traceback", "size", "count")
     count: int
     size: int
     traceback: Traceback
@@ -60,6 +61,7 @@ class StatisticDiff:
     Snapshot instance.
     """
 
+    __slots__ = ("traceback", "size", "size_diff", "count", "count_diff")
     count: int
     count_diff: int
     size: int
@@ -76,6 +78,7 @@ class Frame:
     Frame of a traceback.
     """
 
+    __slots__ = ("_frame",)
     @property
     def filename(self) -> str: ...
     @property
@@ -110,6 +113,7 @@ class Trace:
     Trace of a memory block.
     """
 
+    __slots__ = ("_trace",)
     @property
     def domain(self) -> int: ...
     @property
@@ -126,6 +130,7 @@ class Traceback(Sequence[Frame]):
     to the most recent frame.
     """
 
+    __slots__ = ("_frames", "_total_nframe")
     @property
     def total_nframe(self) -> int | None: ...
     def __init__(self, frames: Sequence[_FrameTuple], total_nframe: int | None = None) -> None: ...

@@ -10,7 +10,7 @@ expression: env.render_diagnostics(&diagnostics)
         "value": "F401"
       },
       "location": {
-        "path": "fib.py",
+        "path": "/fib.py",
         "range": {
           "end": {
             "column": 10,
@@ -45,7 +45,7 @@ expression: env.render_diagnostics(&diagnostics)
         "value": "F841"
       },
       "location": {
-        "path": "fib.py",
+        "path": "/fib.py",
         "range": {
           "end": {
             "column": 6,
@@ -80,7 +80,7 @@ expression: env.render_diagnostics(&diagnostics)
         "value": "F821"
       },
       "location": {
-        "path": "undef.py",
+        "path": "/undef.py",
         "range": {
           "end": {
             "column": 5,

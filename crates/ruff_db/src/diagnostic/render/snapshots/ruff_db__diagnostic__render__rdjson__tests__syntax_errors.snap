@@ -9,7 +9,7 @@ expression: env.render_diagnostics(&diagnostics)
         "value": "invalid-syntax"
       },
       "location": {
-        "path": "syntax_errors.py",
+        "path": "/syntax_errors.py",
         "range": {
           "end": {
             "column": 1,
@@ -28,7 +28,7 @@ expression: env.render_diagnostics(&diagnostics)
         "value": "invalid-syntax"
       },
       "location": {
-        "path": "syntax_errors.py",
+        "path": "/syntax_errors.py",
         "range": {
           "end": {
             "column": 1,

@@ -41,6 +41,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// This rule's fix is marked as unsafe for `split()`/`rsplit()` calls that contain `*args` or `**kwargs` arguments, as
 /// adding a `maxsplit` argument to such a call may lead to duplicated arguments.
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.11.12")]
 pub(crate) struct MissingMaxsplitArg {
     actual_split_type: String,
     suggested_split_type: String,

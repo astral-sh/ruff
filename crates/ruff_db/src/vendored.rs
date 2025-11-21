@@ -195,7 +195,7 @@ impl VendoredFileSystem {
     ///
     /// ## Panics:
     /// If the current thread already holds the lock.
-    fn lock_archive(&self) -> LockedZipArchive {
+    fn lock_archive(&self) -> LockedZipArchive<'_> {
         self.inner.lock().unwrap()
     }
 }
@@ -360,7 +360,7 @@ impl VendoredZipArchive {
         Ok(Self(ZipArchive::new(io::Cursor::new(data))?))
     }
 
-    fn lookup_path(&mut self, path: &NormalizedVendoredPath) -> Result<ZipFile> {
+    fn lookup_path(&mut self, path: &NormalizedVendoredPath) -> Result<ZipFile<'_>> {
         Ok(self.0.by_name(path.as_str())?)
     }
 

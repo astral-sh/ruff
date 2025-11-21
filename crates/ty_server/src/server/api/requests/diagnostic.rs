@@ -23,7 +23,7 @@ impl RequestHandler for DocumentDiagnosticRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
-    fn document_url(params: &DocumentDiagnosticParams) -> Cow<Url> {
+    fn document_url(params: &DocumentDiagnosticParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -33,7 +33,7 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
         _client: &Client,
         params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
-        let diagnostics = compute_diagnostics(db, snapshot);
+        let diagnostics = compute_diagnostics(db, snapshot.document(), snapshot.encoding());
 
         let Some(diagnostics) = diagnostics else {
             return Ok(DocumentDiagnosticReportResult::Report(

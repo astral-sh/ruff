@@ -47,6 +47,7 @@ class HMAC:
     This supports the API for Cryptographic Hash Functions (PEP 247).
     """
 
+    __slots__ = ("_hmac", "_inner", "_outer", "block_size", "digest_size")
     digest_size: int
     block_size: int
     @property

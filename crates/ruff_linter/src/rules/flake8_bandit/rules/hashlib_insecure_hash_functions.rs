@@ -23,6 +23,17 @@ use crate::rules::flake8_bandit::helpers::string_literal;
 /// Avoid using weak or broken cryptographic hash functions in security
 /// contexts. Instead, use a known secure hash function such as SHA256.
 ///
+/// Note: This rule targets the following weak algorithm names in `hashlib`:
+/// `md4`, `md5`, `sha`, and `sha1`. It also flags uses of `crypt.crypt` and
+/// `crypt.mksalt` when configured with `METHOD_CRYPT`, `METHOD_MD5`, or
+/// `METHOD_BLOWFISH`.
+///
+/// It does not attempt to lint OpenSSL- or platform-specific aliases and OIDs
+/// (for example: `"sha-1"`, `"ssl3-sha1"`, `"ssl3-md5"`, or
+/// `"1.3.14.3.2.26"`), nor variations with trailing spaces, as the set of
+/// accepted aliases depends on the underlying OpenSSL version and varies across
+/// platforms and Python builds.
+///
 /// ## Example
 /// ```python
 /// import hashlib
@@ -63,6 +74,7 @@ use crate::rules::flake8_bandit::helpers::string_literal;
 /// - [Common Weakness Enumeration: CWE-328](https://cwe.mitre.org/data/definitions/328.html)
 /// - [Common Weakness Enumeration: CWE-916](https://cwe.mitre.org/data/definitions/916.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.212")]
 pub(crate) struct HashlibInsecureHashFunction {
     library: String,
     string: String,

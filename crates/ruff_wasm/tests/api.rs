@@ -4,12 +4,15 @@ use wasm_bindgen_test::wasm_bindgen_test;
 
 use ruff_linter::registry::Rule;
 use ruff_source_file::OneIndexed;
-use ruff_wasm::{ExpandedMessage, Location, Workspace};
+use ruff_wasm::{ExpandedMessage, Location, PositionEncoding, Workspace};
 
 macro_rules! check {
     ($source:expr, $config:expr, $expected:expr) => {{
         let config = js_sys::JSON::parse($config).unwrap();
-        match Workspace::new(config).unwrap().check($source) {
+        match Workspace::new(config, PositionEncoding::Utf8)
+            .unwrap()
+            .check($source)
+        {
             Ok(output) => {
                 let result: Vec<ExpandedMessage> = serde_wasm_bindgen::from_value(output).unwrap();
                 assert_eq!(result, $expected);

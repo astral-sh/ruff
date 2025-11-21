@@ -196,7 +196,7 @@ impl<K, V> ListBuilder<K, V> {
     /// entries to duplicate for each insertion. If you construct the list in reverse order, we
     /// will have to duplicate O(n) entries for each insertion, making it _quadratic_ to construct
     /// the entire list.
-    pub(crate) fn entry(&mut self, list: List<K, V>, key: K) -> ListEntry<K, V>
+    pub(crate) fn entry(&mut self, list: List<K, V>, key: K) -> ListEntry<'_, K, V>
     where
         K: Clone + Ord,
         V: Clone,
@@ -373,7 +373,7 @@ impl<K, V> ListBuilder<K, V> {
 impl<K> ListStorage<K, ()> {
     /// Iterates through the elements in a set _in reverse order_.
     #[expect(clippy::needless_pass_by_value)]
-    pub(crate) fn iter_set_reverse(&self, set: List<K, ()>) -> ListSetReverseIterator<K> {
+    pub(crate) fn iter_set_reverse(&self, set: List<K, ()>) -> ListSetReverseIterator<'_, K> {
         ListSetReverseIterator {
             storage: self,
             curr: set.last,

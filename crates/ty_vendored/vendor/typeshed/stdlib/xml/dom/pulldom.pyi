@@ -101,7 +101,7 @@ class SAX2DOM(PullDOM):
     def ignorableWhitespace(self, chars: str) -> None: ...
     def characters(self, chars: str) -> None: ...
 
-default_bufsize: int
+default_bufsize: Final[int]
 
 def parse(
     stream_or_string: str | _SupportsReadClose[bytes] | _SupportsReadClose[str],

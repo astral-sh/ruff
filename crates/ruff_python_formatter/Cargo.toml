@@ -34,6 +34,7 @@ rustc-hash = { workspace = true }
 salsa = { workspace = true }
 serde = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 smallvec = { workspace = true }
 static_assertions = { workspace = true }
 thiserror = { workspace = true }
@@ -66,7 +67,7 @@ serde = [
     "ruff_source_file/serde",
     "ruff_python_ast/serde",
 ]
-schemars = ["dep:schemars", "ruff_formatter/schemars"]
+schemars = ["dep:schemars", "dep:serde_json", "ruff_formatter/schemars"]
 
 [lints]
 workspace = true

@@ -2,20 +2,19 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use full::FullRenderer;
 use ruff_annotate_snippets::{
     Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
-    Renderer as AnnotateRenderer, Snippet as AnnotateSnippet,
+    Snippet as AnnotateSnippet,
 };
 use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use crate::diagnostic::stylesheet::DiagnosticStylesheet;
 use crate::{
     Db,
     files::File,
     source::{SourceText, line_index, source_text},
-    system::SystemPath,
 };
 
 use super::{
@@ -25,11 +24,15 @@ use super::{
 
 use azure::AzureRenderer;
 use concise::ConciseRenderer;
+use github::GithubRenderer;
 use pylint::PylintRenderer;
 
 mod azure;
 mod concise;
 mod full;
+pub mod github;
+#[cfg(feature = "serde")]
+mod gitlab;
 #[cfg(feature = "serde")]
 mod json;
 #[cfg(feature = "serde")]
@@ -111,37 +114,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
                 ConciseRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Full => {
-                let stylesheet = if self.config.color {
-                    DiagnosticStylesheet::styled()
-                } else {
-                    DiagnosticStylesheet::plain()
-                };
-
-                let mut renderer = if self.config.color {
-                    AnnotateRenderer::styled()
-                } else {
-                    AnnotateRenderer::plain()
-                }
-                .cut_indicator("…");
-
-                renderer = renderer
-                    .error(stylesheet.error)
-                    .warning(stylesheet.warning)
-                    .info(stylesheet.info)
-                    .note(stylesheet.note)
-                    .help(stylesheet.help)
-                    .line_no(stylesheet.line_no)
-                    .emphasis(stylesheet.emphasis)
-                    .none(stylesheet.none);
-
-                for diag in self.diagnostics {
-                    let resolved = Resolved::new(self.resolver, diag, self.config);
-                    let renderable = resolved.to_renderable(self.config.context);
-                    for diag in renderable.diagnostics.iter() {
-                        writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
-                    }
-                    writeln!(f)?;
-                }
+                FullRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Azure => {
                 AzureRenderer::new(self.resolver).render(f, self.diagnostics)?;
@@ -165,6 +138,13 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             #[cfg(feature = "junit")]
             DiagnosticFormat::Junit => {
                 junit::JunitRenderer::new(self.resolver).render(f, self.diagnostics)?;
+            }
+            #[cfg(feature = "serde")]
+            DiagnosticFormat::Gitlab => {
+                gitlab::GitlabRenderer::new(self.resolver).render(f, self.diagnostics)?;
+            }
+            DiagnosticFormat::Github => {
+                GithubRenderer::new(self.resolver, "ty").render(f, self.diagnostics)?;
             }
         }
 
@@ -225,9 +205,11 @@ impl<'a> Resolved<'a> {
 struct ResolvedDiagnostic<'a> {
     level: AnnotateLevel,
     id: Option<String>,
+    documentation_url: Option<String>,
     message: String,
     annotations: Vec<ResolvedAnnotation<'a>>,
     is_fixable: bool,
+    header_offset: usize,
 }
 
 impl<'a> ResolvedDiagnostic<'a> {
@@ -242,7 +224,12 @@ impl<'a> ResolvedDiagnostic<'a> {
             .annotations
             .iter()
             .filter_map(|ann| {
-                let path = ann.span.file.path(resolver);
+                let path = ann
+                    .span
+                    .file
+                    .relative_path(resolver)
+                    .to_str()
+                    .unwrap_or_else(|| ann.span.file.path(resolver));
                 let diagnostic_source = ann.span.file.diagnostic_source(resolver);
                 ResolvedAnnotation::new(path, &diagnostic_source, ann, resolver)
             })
@@ -254,12 +241,12 @@ impl<'a> ResolvedDiagnostic<'a> {
             // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve
             // the formatting of syntax errors for now. This should also be kept consistent with the
             // concise formatting.
-            Some(diag.secondary_code().map_or_else(
+            diag.secondary_code().map_or_else(
                 || format!("{id}:", id = diag.inner.id),
                 |code| code.to_string(),
-            ))
+            )
         } else {
-            Some(diag.inner.id.to_string())
+            diag.inner.id.to_string()
         };
 
         let level = if config.hide_severity {
@@ -270,12 +257,12 @@ impl<'a> ResolvedDiagnostic<'a> {
 
         ResolvedDiagnostic {
             level,
-            id,
+            id: Some(id),
+            documentation_url: diag.documentation_url().map(ToString::to_string),
             message: diag.inner.message.as_str().to_string(),
             annotations,
-            is_fixable: diag
-                .fix()
-                .is_some_and(|fix| fix.applies(config.fix_applicability)),
+            is_fixable: config.show_fix_status && diag.has_applicable_fix(config),
+            header_offset: diag.inner.header_offset,
         }
     }
 
@@ -289,7 +276,12 @@ impl<'a> ResolvedDiagnostic<'a> {
             .annotations
             .iter()
             .filter_map(|ann| {
-                let path = ann.span.file.path(resolver);
+                let path = ann
+                    .span
+                    .file
+                    .relative_path(resolver)
+                    .to_str()
+                    .unwrap_or_else(|| ann.span.file.path(resolver));
                 let diagnostic_source = ann.span.file.diagnostic_source(resolver);
                 ResolvedAnnotation::new(path, &diagnostic_source, ann, resolver)
             })
@@ -297,9 +289,11 @@ impl<'a> ResolvedDiagnostic<'a> {
         ResolvedDiagnostic {
             level: diag.inner.severity.to_annotate(),
             id: None,
+            documentation_url: None,
             message: diag.inner.message.as_str().to_string(),
             annotations,
             is_fixable: false,
+            header_offset: 0,
         }
     }
 
@@ -394,9 +388,11 @@ impl<'a> ResolvedDiagnostic<'a> {
         RenderableDiagnostic {
             level: self.level,
             id: self.id.as_deref(),
+            documentation_url: self.documentation_url.as_deref(),
             message: &self.message,
             snippets_by_input,
             is_fixable: self.is_fixable,
+            header_offset: self.header_offset,
         }
     }
 }
@@ -416,7 +412,7 @@ struct ResolvedAnnotation<'a> {
     line_end: OneIndexed,
     message: Option<&'a str>,
     is_primary: bool,
-    is_file_level: bool,
+    hide_snippet: bool,
     notebook_index: Option<NotebookIndex>,
 }
 
@@ -464,7 +460,7 @@ impl<'a> ResolvedAnnotation<'a> {
             line_end,
             message: ann.get_message(),
             is_primary: ann.is_primary,
-            is_file_level: ann.is_file_level,
+            hide_snippet: ann.hide_snippet,
             notebook_index: resolver.notebook_index(&ann.span.file),
         })
     }
@@ -493,6 +489,7 @@ struct RenderableDiagnostic<'r> {
     /// An ID is always present for top-level diagnostics and always absent for
     /// sub-diagnostics.
     id: Option<&'r str>,
+    documentation_url: Option<&'r str>,
     /// The message emitted with the diagnostic, before any snippets are
     /// rendered.
     message: &'r str,
@@ -504,6 +501,11 @@ struct RenderableDiagnostic<'r> {
     ///
     /// This is rendered as a `[*]` indicator after the diagnostic ID.
     is_fixable: bool,
+    /// Offset to align the header sigil (`-->`) with the subsequent line number separators.
+    ///
+    /// This is only needed for formatter diagnostics where we don't render a snippet via
+    /// `annotate-snippets` and thus the alignment isn't computed automatically.
+    header_offset: usize,
 }
 
 impl RenderableDiagnostic<'_> {
@@ -516,9 +518,13 @@ impl RenderableDiagnostic<'_> {
                 .iter()
                 .map(|snippet| snippet.to_annotate(path))
         });
-        let mut message = self.level.title(self.message).is_fixable(self.is_fixable);
+        let mut message = self
+            .level
+            .title(self.message)
+            .is_fixable(self.is_fixable)
+            .lineno_offset(self.header_offset);
         if let Some(id) = self.id {
-            message = message.id(id);
+            message = message.id_with_url(id, self.documentation_url);
         }
         message.snippets(snippets)
     }
@@ -655,6 +661,22 @@ impl<'r> RenderableSnippet<'r> {
             .as_source_code()
             .slice(TextRange::new(snippet_start, snippet_end));
 
+        // Strip the BOM from the beginning of the snippet, if present. Doing this here saves us the
+        // trouble of updating the annotation ranges in `replace_unprintable`, and also allows us to
+        // check that the BOM is at the very beginning of the file, not just the beginning of the
+        // snippet.
+        const BOM: char = '\u{feff}';
+        let bom_len = BOM.text_len();
+        let (snippet, snippet_start) =
+            if snippet_start == TextSize::ZERO && snippet.starts_with(BOM) {
+                (
+                    &snippet[bom_len.to_usize()..],
+                    snippet_start + TextSize::new(bom_len.to_u32()),
+                )
+            } else {
+                (snippet, snippet_start)
+            };
+
         let annotations = anns
             .iter()
             .map(|ann| RenderableAnnotation::new(snippet_start, ann))
@@ -705,8 +727,8 @@ struct RenderableAnnotation<'r> {
     message: Option<&'r str>,
     /// Whether this annotation is considered "primary" or not.
     is_primary: bool,
-    /// Whether this annotation applies to an entire file, rather than a snippet within it.
-    is_file_level: bool,
+    /// Whether the snippet for this annotation should be hidden instead of rendered.
+    hide_snippet: bool,
 }
 
 impl<'r> RenderableAnnotation<'r> {
@@ -719,12 +741,16 @@ impl<'r> RenderableAnnotation<'r> {
     /// lifetime parameter here refers to the lifetime of the resolver that
     /// created the given `ResolvedAnnotation`.
     fn new(snippet_start: TextSize, ann: &'_ ResolvedAnnotation<'r>) -> RenderableAnnotation<'r> {
-        let range = ann.range - snippet_start;
+        // This should only ever saturate if a BOM is present _and_ the annotation range points
+        // before the BOM (i.e. at offset 0). In Ruff this typically results from the use of
+        // `TextRange::default()` for a diagnostic range instead of a range relative to file
+        // contents.
+        let range = ann.range.checked_sub(snippet_start).unwrap_or(ann.range);
         RenderableAnnotation {
             range,
             message: ann.message,
             is_primary: ann.is_primary,
-            is_file_level: ann.is_file_level,
+            hide_snippet: ann.hide_snippet,
         }
     }
 
@@ -750,7 +776,7 @@ impl<'r> RenderableAnnotation<'r> {
         if let Some(message) = self.message {
             ann = ann.label(message);
         }
-        ann.is_file_level(self.is_file_level)
+        ann.hide_snippet(self.hide_snippet)
     }
 }
 
@@ -791,7 +817,7 @@ where
     T: Db,
 {
     fn path(&self, file: File) -> &str {
-        relativize_path(self.system().current_directory(), file.path(self).as_str())
+        file.path(self).as_str()
     }
 
     fn input(&self, file: File) -> Input {
@@ -827,7 +853,7 @@ where
 
 impl FileResolver for &dyn Db {
     fn path(&self, file: File) -> &str {
-        relativize_path(self.system().current_directory(), file.path(*self).as_str())
+        file.path(*self).as_str()
     }
 
     fn input(&self, file: File) -> Input {
@@ -946,14 +972,6 @@ fn context_after(
     line
 }
 
-/// Convert an absolute path to be relative to the current working directory.
-fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
-    if let Ok(path) = SystemPath::new(path).strip_prefix(cwd) {
-        return path.as_str();
-    }
-    path
-}
-
 /// Given some source code and annotation ranges, this routine replaces
 /// unprintable characters with printable representations of them.
 ///
@@ -1000,7 +1018,12 @@ fn replace_unprintable<'r>(
     let mut last_end = 0;
     let mut result = String::new();
     for (index, c) in source.char_indices() {
-        if let Some(printable) = unprintable_replacement(c) {
+        // normalize `\r` line endings but don't double `\r\n`
+        if c == '\r' && !source[index + 1..].starts_with("\n") {
+            result.push_str(&source[last_end..index]);
+            result.push('\n');
+            last_end = index + 1;
+        } else if let Some(printable) = unprintable_replacement(c) {
             result.push_str(&source[last_end..index]);
 
             let len = printable.text_len().to_u32();
@@ -1150,6 +1173,31 @@ pub fn ceil_char_boundary(text: &str, offset: TextSize) -> TextSize {
         .map(TextSize::from)
         .find(|offset| text.is_char_boundary(offset.to_usize()))
         .unwrap_or_else(|| TextSize::from(upper_bound))
+}
+
+/// A stub implementation of [`FileResolver`] intended for testing.
+pub struct DummyFileResolver;
+
+impl FileResolver for DummyFileResolver {
+    fn path(&self, _file: File) -> &str {
+        unimplemented!()
+    }
+
+    fn input(&self, _file: File) -> Input {
+        unimplemented!()
+    }
+
+    fn notebook_index(&self, _file: &UnifiedFile) -> Option<NotebookIndex> {
+        None
+    }
+
+    fn is_notebook(&self, _file: &UnifiedFile) -> bool {
+        false
+    }
+
+    fn current_directory(&self) -> &Path {
+        Path::new(".")
+    }
 }
 
 #[cfg(test)]
@@ -2613,14 +2661,21 @@ watermelon
         /// Show fix availability when rendering.
         pub(super) fn show_fix_status(&mut self, yes: bool) {
             let mut config = std::mem::take(&mut self.config);
-            config = config.show_fix_status(yes);
+            config = config.with_show_fix_status(yes);
+            self.config = config;
+        }
+
+        /// Show a diff for the fix when rendering.
+        pub(super) fn show_fix_diff(&mut self, yes: bool) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.show_fix_diff(yes);
             self.config = config;
         }
 
         /// The lowest fix applicability to show when rendering.
         pub(super) fn fix_applicability(&mut self, applicability: Applicability) {
             let mut config = std::mem::take(&mut self.config);
-            config = config.fix_applicability(applicability);
+            config = config.with_fix_applicability(applicability);
             self.config = config;
         }
 
@@ -2826,6 +2881,12 @@ watermelon
             self.diag.help(message);
             self
         }
+
+        /// Set the documentation URL for the diagnostic.
+        pub(super) fn documentation_url(mut self, url: impl Into<String>) -> DiagnosticBuilder<'e> {
+            self.diag.set_documentation_url(Some(url.into()));
+            self
+        }
     }
 
     /// A helper builder for tersely populating a `SubDiagnostic`.
@@ -2940,6 +3001,7 @@ def fibonacci(n):
                     TextSize::from(10),
                 ))))
                 .noqa_offset(TextSize::from(7))
+                .documentation_url("https://docs.astral.sh/ruff/rules/unused-import")
                 .build(),
             env.builder(
                 "unused-variable",
@@ -2954,11 +3016,13 @@ def fibonacci(n):
                 TextSize::from(99),
             )))
             .noqa_offset(TextSize::from(94))
+            .documentation_url("https://docs.astral.sh/ruff/rules/unused-variable")
             .build(),
             env.builder("undefined-name", Severity::Error, "Undefined name `a`")
                 .primary("undef.py", "1:3", "1:4", "")
                 .secondary_code("F821")
                 .noqa_offset(TextSize::from(3))
+                .documentation_url("https://docs.astral.sh/ruff/rules/undefined-name")
                 .build(),
         ];
 
@@ -3073,6 +3137,7 @@ if call(foo
                     TextSize::from(19),
                 ))))
                 .noqa_offset(TextSize::from(16))
+                .documentation_url("https://docs.astral.sh/ruff/rules/unused-import")
                 .build(),
             env.builder(
                 "unused-import",
@@ -3087,6 +3152,7 @@ if call(foo
                 TextSize::from(40),
             ))))
             .noqa_offset(TextSize::from(35))
+            .documentation_url("https://docs.astral.sh/ruff/rules/unused-import")
             .build(),
             env.builder(
                 "unused-variable",
@@ -3101,6 +3167,7 @@ if call(foo
                 TextSize::from(104),
             ))))
             .noqa_offset(TextSize::from(98))
+            .documentation_url("https://docs.astral.sh/ruff/rules/unused-variable")
             .build(),
         ];
 

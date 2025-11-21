@@ -31,7 +31,7 @@
 //! styling.
 //!
 //! The above snippet has been built out of the following structure:
-use crate::snippet;
+use crate::{Id, snippet};
 use std::cmp::{Reverse, max, min};
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -56,6 +56,7 @@ pub(crate) struct DisplayList<'a> {
     pub(crate) stylesheet: &'a Stylesheet,
     pub(crate) anonymized_line_numbers: bool,
     pub(crate) cut_indicator: &'static str,
+    pub(crate) lineno_offset: usize,
 }
 
 impl PartialEq for DisplayList<'_> {
@@ -81,13 +82,14 @@ impl Display for DisplayList<'_> {
                 _ => max,
             })
         });
-        let lineno_width = if lineno_width == 0 {
-            lineno_width
-        } else if self.anonymized_line_numbers {
-            ANONYMIZED_LINE_NUM.len()
-        } else {
-            ((lineno_width as f64).log10().floor() as usize) + 1
-        };
+        let lineno_width = self.lineno_offset
+            + if lineno_width == 0 {
+                lineno_width
+            } else if self.anonymized_line_numbers {
+                ANONYMIZED_LINE_NUM.len()
+            } else {
+                ((lineno_width as f64).log10().floor() as usize) + 1
+            };
 
         let multiline_depth = self.body.iter().fold(0, |max, set| {
             set.display_lines.iter().fold(max, |max2, line| match line {
@@ -124,6 +126,7 @@ impl<'a> DisplayList<'a> {
         term_width: usize,
         cut_indicator: &'static str,
     ) -> DisplayList<'a> {
+        let lineno_offset = message.lineno_offset;
         let body = format_message(
             message,
             term_width,
@@ -137,6 +140,7 @@ impl<'a> DisplayList<'a> {
             stylesheet,
             anonymized_line_numbers,
             cut_indicator,
+            lineno_offset,
         }
     }
 
@@ -185,6 +189,7 @@ impl DisplaySet<'_> {
         }
         Ok(())
     }
+
     fn format_annotation(
         &self,
         line_offset: usize,
@@ -195,11 +200,13 @@ impl DisplaySet<'_> {
     ) -> fmt::Result {
         let hide_severity = annotation.annotation_type.is_none();
         let color = get_annotation_style(&annotation.annotation_type, stylesheet);
+
         let formatted_len = if let Some(id) = &annotation.id {
+            let id_len = id.id.len();
             if hide_severity {
-                id.len()
+                id_len
             } else {
-                2 + id.len() + annotation_type_len(&annotation.annotation_type)
+                2 + id_len + annotation_type_len(&annotation.annotation_type)
             }
         } else {
             annotation_type_len(&annotation.annotation_type)
@@ -252,9 +259,20 @@ impl DisplaySet<'_> {
             let annotation_type = annotation_type_str(&annotation.annotation_type);
             if let Some(id) = annotation.id {
                 if hide_severity {
-                    buffer.append(line_offset, &format!("{id} "), *stylesheet.error());
+                    buffer.append(
+                        line_offset,
+                        &format!("{id} ", id = fmt_with_hyperlink(id.id, id.url, stylesheet)),
+                        *stylesheet.error(),
+                    );
                 } else {
-                    buffer.append(line_offset, &format!("{annotation_type}[{id}]"), *color);
+                    buffer.append(
+                        line_offset,
+                        &format!(
+                            "{annotation_type}[{id}]",
+                            id = fmt_with_hyperlink(id.id, id.url, stylesheet)
+                        ),
+                        *color,
+                    );
                 }
             } else {
                 buffer.append(line_offset, annotation_type, *color);
@@ -703,7 +721,7 @@ impl DisplaySet<'_> {
                             let style =
                                 get_annotation_style(&annotation.annotation_type, stylesheet);
                             let mut formatted_len = if let Some(id) = &annotation.annotation.id {
-                                2 + id.len()
+                                2 + id.id.len()
                                     + annotation_type_len(&annotation.annotation.annotation_type)
                             } else {
                                 annotation_type_len(&annotation.annotation.annotation_type)
@@ -720,7 +738,10 @@ impl DisplaySet<'_> {
                             } else if formatted_len != 0 {
                                 formatted_len += 2;
                                 let id = match &annotation.annotation.id {
-                                    Some(id) => format!("[{id}]"),
+                                    Some(id) => format!(
+                                        "[{id}]",
+                                        id = fmt_with_hyperlink(&id.id, id.url, stylesheet)
+                                    ),
                                     None => String::new(),
                                 };
                                 buffer.puts(
@@ -823,7 +844,7 @@ impl DisplaySet<'_> {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Annotation<'a> {
     pub(crate) annotation_type: DisplayAnnotationType,
-    pub(crate) id: Option<&'a str>,
+    pub(crate) id: Option<Id<'a>>,
     pub(crate) label: Vec<DisplayTextFragment<'a>>,
     pub(crate) is_fixable: bool,
 }
@@ -1088,6 +1109,7 @@ fn format_message<'m>(
         footer,
         snippets,
         is_fixable,
+        lineno_offset: _,
     } = message;
 
     let mut sets = vec![];
@@ -1135,7 +1157,7 @@ fn format_message<'m>(
 
 fn format_title<'a>(
     level: crate::Level,
-    id: Option<&'a str>,
+    id: Option<Id<'a>>,
     label: &'a str,
     is_fixable: bool,
 ) -> DisplayLine<'a> {
@@ -1153,7 +1175,7 @@ fn format_title<'a>(
 
 fn format_footer<'a>(
     level: crate::Level,
-    id: Option<&'a str>,
+    id: Option<Id<'a>>,
     label: &'a str,
 ) -> Vec<DisplayLine<'a>> {
     let mut result = vec![];
@@ -1201,11 +1223,16 @@ fn format_snippet<'m>(
 
     let is_file_level = snippet.annotations.iter().any(|ann| ann.is_file_level);
     if is_file_level {
-        assert!(
-            snippet.source.is_empty(),
-            "Non-empty file-level snippet that won't be rendered: {:?}",
-            snippet.source
-        );
+        // TODO(brent) enable this assertion again once we set `is_file_level` for individual rules.
+        // It's causing too many false positives currently when the default is to make any
+        // annotation with a default range file-level. See
+        // https://github.com/astral-sh/ruff/issues/19688.
+        //
+        // assert!(
+        //     snippet.source.is_empty(),
+        //     "Non-empty file-level snippet that won't be rendered: {:?}",
+        //     snippet.source
+        // );
         let header = format_header(origin, main_range, &[], is_first, snippet.cell_index);
         return DisplaySet {
             display_lines: header.map_or_else(Vec::new, |header| vec![header]),
@@ -1273,12 +1300,19 @@ fn format_header<'a>(
                 ..
             } = item
             {
-                if main_range >= range.0 && main_range < range.1 + max(*end_line as usize, 1) {
+                // At the very end of the `main_range`, report the location as the first character
+                // in the next line instead of falling back to the default location of `1:1`. This
+                // is another divergence from upstream.
+                let end_of_range = range.1 + max(*end_line as usize, 1);
+                if main_range >= range.0 && main_range < end_of_range {
                     let char_column = text[0..(main_range - range.0).min(text.len())]
                         .chars()
                         .count();
                     col = char_column + 1;
                     line_offset = lineno.unwrap_or(1);
+                    break;
+                } else if main_range == end_of_range {
+                    line_offset = lineno.map_or(1, |line| line + 1);
                     break;
                 }
             }
@@ -1689,6 +1723,7 @@ fn format_body<'m>(
                             annotation: Annotation {
                                 annotation_type,
                                 id: None,
+
                                 label: format_label(annotation.label, None),
                                 is_fixable: false,
                             },
@@ -1869,4 +1904,41 @@ fn char_width(c: char) -> Option<usize> {
     } else {
         unicode_width::UnicodeWidthChar::width(c)
     }
+}
+
+pub(super) fn fmt_with_hyperlink<'a, T>(
+    content: T,
+    url: Option<&'a str>,
+    stylesheet: &Stylesheet,
+) -> impl std::fmt::Display + 'a
+where
+    T: std::fmt::Display + 'a,
+{
+    struct FmtHyperlink<'a, T> {
+        content: T,
+        url: Option<&'a str>,
+    }
+
+    impl<T> std::fmt::Display for FmtHyperlink<'_, T>
+    where
+        T: std::fmt::Display,
+    {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            if let Some(url) = self.url {
+                write!(f, "\x1B]8;;{url}\x1B\\")?;
+            }
+
+            self.content.fmt(f)?;
+
+            if self.url.is_some() {
+                f.write_str("\x1B]8;;\x1B\\")?;
+            }
+
+            Ok(())
+        }
+    }
+
+    let url = if stylesheet.hyperlink { url } else { None };
+
+    FmtHyperlink { content, url }
 }

@@ -120,6 +120,7 @@ __all__ = [
     "clear_overloads",
     "dataclass_transform",
     "deprecated",
+    "disjoint_base",
     "Doc",
     "evaluate_forward_ref",
     "get_overloads",
@@ -150,6 +151,7 @@ __all__ = [
     "TypeGuard",
     "TypeIs",
     "TYPE_CHECKING",
+    "type_repr",
     "Never",
     "NoReturn",
     "ReadOnly",
@@ -263,6 +265,28 @@ def final(f: _F) -> _F:
     object to allow runtime introspection.
     """
 
+def disjoint_base(cls: _TC) -> _TC:
+    """This decorator marks a class as a disjoint base.
+
+    Child classes of a disjoint base cannot inherit from other disjoint bases that are
+    not parent classes of the disjoint base.
+
+    For example:
+
+        @disjoint_base
+        class Disjoint1: pass
+
+        @disjoint_base
+        class Disjoint2: pass
+
+        class Disjoint3(Disjoint1, Disjoint2): pass  # Type checker error
+
+    Type checkers can use knowledge of disjoint bases to detect unreachable code
+    and determine when two types can overlap.
+
+    See PEP 800.
+    """
+
 Literal: _SpecialForm
 
 def IntVar(name: str) -> Any: ...  # returns a new TypeVar
@@ -279,7 +303,7 @@ class _TypedDict(Mapping[str, object], metaclass=abc.ABCMeta):
     __readonly_keys__: ClassVar[frozenset[str]]
     __mutable_keys__: ClassVar[frozenset[str]]
     # PEP 728
-    __closed__: ClassVar[bool]
+    __closed__: ClassVar[bool | None]
     __extra_items__: ClassVar[AnnotationForm]
     def copy(self) -> Self: ...
     # Using Never so that only calls using mypy plugin hook that specialize the signature
@@ -776,6 +800,7 @@ else:
     class SupportsInt(Protocol, metaclass=abc.ABCMeta):
         """An ABC with one abstract method __int__."""
 
+        __slots__ = ()
         @abc.abstractmethod
         def __int__(self) -> int: ...
 
@@ -783,6 +808,7 @@ else:
     class SupportsFloat(Protocol, metaclass=abc.ABCMeta):
         """An ABC with one abstract method __float__."""
 
+        __slots__ = ()
         @abc.abstractmethod
         def __float__(self) -> float: ...
 
@@ -790,6 +816,7 @@ else:
     class SupportsComplex(Protocol, metaclass=abc.ABCMeta):
         """An ABC with one abstract method __complex__."""
 
+        __slots__ = ()
         @abc.abstractmethod
         def __complex__(self) -> complex: ...
 
@@ -797,11 +824,13 @@ else:
     class SupportsBytes(Protocol, metaclass=abc.ABCMeta):
         """An ABC with one abstract method __bytes__."""
 
+        __slots__ = ()
         @abc.abstractmethod
         def __bytes__(self) -> bytes: ...
 
     @runtime_checkable
     class SupportsIndex(Protocol, metaclass=abc.ABCMeta):
+        __slots__ = ()
         @abc.abstractmethod
         def __index__(self) -> int: ...
 
@@ -811,6 +840,7 @@ else:
         An ABC with one abstract method __abs__ that is covariant in its return type.
         """
 
+        __slots__ = ()
         @abc.abstractmethod
         def __abs__(self) -> _T_co: ...
 
@@ -820,6 +850,7 @@ else:
         An ABC with one abstract method __round__ that is covariant in its return type.
         """
 
+        __slots__ = ()
         @overload
         @abc.abstractmethod
         def __round__(self) -> int: ...
@@ -837,6 +868,7 @@ else:
         This protocol only supports blocking I/O.
         """
 
+        __slots__ = ()
         @abc.abstractmethod
         def read(self, size: int = ..., /) -> _T_co:
             """Read data from the input stream and return it.
@@ -852,6 +884,7 @@ else:
         This protocol only supports blocking I/O.
         """
 
+        __slots__ = ()
         @abc.abstractmethod
         def write(self, data: _T_contra, /) -> int:
             """Write *data* to the output stream and return the number of items written."""
@@ -901,6 +934,7 @@ else:
         """
 
     @final
+    @type_check_only
     class _NoDefaultType: ...
 
     NoDefault: _NoDefaultType
@@ -1122,8 +1156,8 @@ else:
         def __getitem__(self, parameters: Incomplete | tuple[Incomplete, ...]) -> AnnotationForm: ...
         def __init_subclass__(cls, *args: Unused, **kwargs: Unused) -> NoReturn: ...
         if sys.version_info >= (3, 10):
-            def __or__(self, right: Any) -> _SpecialForm: ...
-            def __ror__(self, left: Any) -> _SpecialForm: ...
+            def __or__(self, right: Any, /) -> _SpecialForm: ...
+            def __ror__(self, left: Any, /) -> _SpecialForm: ...
 
 # PEP 727
 class Doc:
@@ -1150,6 +1184,7 @@ class Doc:
     def __eq__(self, other: object) -> bool: ...
 
 # PEP 728
+@type_check_only
 class _NoExtraItemsType: ...
 
 NoExtraItems: _NoExtraItemsType
@@ -1161,7 +1196,7 @@ TypeForm: _SpecialForm
 if sys.version_info >= (3, 14):
     from typing import evaluate_forward_ref as evaluate_forward_ref
 
-    from annotationlib import Format as Format, get_annotations as get_annotations
+    from annotationlib import Format as Format, get_annotations as get_annotations, type_repr as type_repr
 else:
     class Format(enum.IntEnum):
         """An enumeration."""
@@ -1290,6 +1325,14 @@ else:
         format: Format | None = None,
         _recursive_guard: Container[str] = ...,
     ) -> AnnotationForm: ...
+    def type_repr(value: object) -> str:
+        """Convert a Python value to a format suitable for use with the STRING format.
+
+        This is intended as a helper for tools that support the STRING format but do
+        not have access to the code that originally produced the annotations. It uses
+        repr() for most objects.
+
+        """
 
 # PEP 661
 class Sentinel:

@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.12.7"
+version = "0.14.6"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -111,30 +111,11 @@ force-exclude = '''
 major_labels = []  # Ruff never uses the major version number
 minor_labels = ["breaking"]   # Bump the minor version on breaking changes
 
-changelog_ignore_labels = ["internal", "ci", "testing", "ty"]
-
-changelog_sections.breaking = "Breaking changes"
-changelog_sections.preview = "Preview features"
-changelog_sections.bug = "Bug fixes"
-changelog_sections.rule = "Rule changes"
-changelog_sections.diagnostics = "Rule changes"
-changelog_sections.docstring = "Rule changes"
-changelog_sections.fixes = "Rule changes"
-changelog_sections.isort = "Rule changes"
-changelog_sections.performance = "Performance"
-changelog_sections.formatter = "Formatter"
-changelog_sections.server = "Server"
-changelog_sections.cli = "CLI"
-changelog_sections.configuration = "Configuration"
-changelog_sections.documentation = "Documentation"
-changelog_sections.__unknown__ = "Other changes"
-
-# We exclude contributors from the CHANGELOG file
-# Generate separately with `rooster contributors` for the GitHub release page
-changelog_contributors = false
+ignore_labels = ["internal", "ci", "testing", "ty"]
 
 version_files = [
     "README.md",
+    "pyproject.toml",
     "docs/integrations.md",
     "docs/tutorial.md",
     "crates/ruff/Cargo.toml",
@@ -142,3 +123,22 @@ version_files = [
     "crates/ruff_wasm/Cargo.toml",
     "scripts/benchmarks/pyproject.toml",
 ]
+
+[tool.rooster.section-labels]
+"Breaking changes" = ["breaking"]
+"Preview features" = ["preview"]
+"Bug fixes" = ["bug"]
+"Rule changes" = [
+    "diagnostics",
+    "docstrings",
+    "rule",
+    "fixes",
+    "isort",
+]
+"Performance" = ["performance"]
+"Formatter" = ["formatter"]
+"Server" = ["server"]
+"CLI" = ["cli"]
+"Configuration" = ["configuration"]
+"Documentation" = ["documentation"]
+"Other changes" = ["__unknown__"]

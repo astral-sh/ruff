@@ -1,10 +1,11 @@
 use std::cmp::Ordering;
 
-use crate::db::Db;
+use salsa::plumbing::AsId;
+
+use crate::{db::Db, types::bound_super::SuperOwnerKind};
 
 use super::{
-    DynamicType, SuperOwnerKind, TodoType, Type, TypeIsType, class_base::ClassBase,
-    subclass_of::SubclassOfInner,
+    DynamicType, TodoType, Type, TypeIsType, class_base::ClassBase, subclass_of::SubclassOfInner,
 };
 
 /// Return an [`Ordering`] that describes the canonical order in which two types should appear
@@ -76,33 +77,25 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::BoundMethod(_), _) => Ordering::Less,
         (_, Type::BoundMethod(_)) => Ordering::Greater,
 
-        (Type::MethodWrapper(left), Type::MethodWrapper(right)) => left.cmp(right),
-        (Type::MethodWrapper(_), _) => Ordering::Less,
-        (_, Type::MethodWrapper(_)) => Ordering::Greater,
+        (Type::KnownBoundMethod(left), Type::KnownBoundMethod(right)) => left.cmp(right),
+        (Type::KnownBoundMethod(_), _) => Ordering::Less,
+        (_, Type::KnownBoundMethod(_)) => Ordering::Greater,
 
         (Type::WrapperDescriptor(left), Type::WrapperDescriptor(right)) => left.cmp(right),
         (Type::WrapperDescriptor(_), _) => Ordering::Less,
         (_, Type::WrapperDescriptor(_)) => Ordering::Greater,
 
-        (Type::DataclassDecorator(left), Type::DataclassDecorator(right)) => {
-            left.bits().cmp(&right.bits())
-        }
+        (Type::DataclassDecorator(left), Type::DataclassDecorator(right)) => left.cmp(right),
         (Type::DataclassDecorator(_), _) => Ordering::Less,
         (_, Type::DataclassDecorator(_)) => Ordering::Greater,
 
-        (Type::DataclassTransformer(left), Type::DataclassTransformer(right)) => {
-            left.bits().cmp(&right.bits())
-        }
+        (Type::DataclassTransformer(left), Type::DataclassTransformer(right)) => left.cmp(right),
         (Type::DataclassTransformer(_), _) => Ordering::Less,
         (_, Type::DataclassTransformer(_)) => Ordering::Greater,
 
         (Type::Callable(left), Type::Callable(right)) => left.cmp(right),
         (Type::Callable(_), _) => Ordering::Less,
         (_, Type::Callable(_)) => Ordering::Greater,
-
-        (Type::Tuple(left), Type::Tuple(right)) => left.cmp(right),
-        (Type::Tuple(_), _) => Ordering::Less,
-        (_, Type::Tuple(_)) => Ordering::Greater,
 
         (Type::ModuleLiteral(left), Type::ModuleLiteral(right)) => left.cmp(right),
         (Type::ModuleLiteral(_), _) => Ordering::Less,
@@ -134,7 +127,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::TypeIs(_), _) => Ordering::Less,
         (_, Type::TypeIs(_)) => Ordering::Greater,
 
-        (Type::NominalInstance(left), Type::NominalInstance(right)) => left.class.cmp(&right.class),
+        (Type::NominalInstance(left), Type::NominalInstance(right)) => {
+            left.class(db).cmp(&right.class(db))
+        }
         (Type::NominalInstance(_), _) => Ordering::Less,
         (_, Type::NominalInstance(_)) => Ordering::Greater,
 
@@ -144,7 +139,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::ProtocolInstance(_), _) => Ordering::Less,
         (_, Type::ProtocolInstance(_)) => Ordering::Greater,
 
-        (Type::TypeVar(left), Type::TypeVar(right)) => left.cmp(right),
+        // This is one place where we want to compare the typevar identities directly, instead of
+        // falling back on `is_same_typevar_as` or `can_be_bound_for`.
+        (Type::TypeVar(left), Type::TypeVar(right)) => left.as_id().cmp(&right.as_id()),
         (Type::TypeVar(_), _) => Ordering::Less,
         (_, Type::TypeVar(_)) => Ordering::Greater,
 
@@ -178,7 +175,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SuperOwnerKind::Class(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Class(_)) => Ordering::Greater,
                 (SuperOwnerKind::Instance(left), SuperOwnerKind::Instance(right)) => {
-                    left.class.cmp(&right.class)
+                    left.class(db).cmp(&right.class(db))
                 }
                 (SuperOwnerKind::Instance(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Instance(_)) => Ordering::Greater,
@@ -205,6 +202,20 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::Dynamic(left), Type::Dynamic(right)) => dynamic_elements_ordering(*left, *right),
         (Type::Dynamic(_), _) => Ordering::Less,
         (_, Type::Dynamic(_)) => Ordering::Greater,
+
+        (Type::TypeAlias(left), Type::TypeAlias(right)) => left.cmp(right),
+        (Type::TypeAlias(_), _) => Ordering::Less,
+        (_, Type::TypeAlias(_)) => Ordering::Greater,
+
+        (Type::TypedDict(left), Type::TypedDict(right)) => {
+            left.defining_class().cmp(&right.defining_class())
+        }
+        (Type::TypedDict(_), _) => Ordering::Less,
+        (_, Type::TypedDict(_)) => Ordering::Greater,
+
+        (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => left.cmp(right),
+        (Type::NewTypeInstance(_), _) => Ordering::Less,
+        (_, Type::NewTypeInstance(_)) => Ordering::Greater,
 
         (Type::Union(_), _) | (_, Type::Union(_)) => {
             unreachable!("our type representation does not permit nested unions");
@@ -237,10 +248,6 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
             unreachable!("Two equal, normalized intersections should share the same Salsa ID")
         }
-
-        (Type::TypedDict(left), Type::TypedDict(right)) => left.cmp(right),
-        (Type::TypedDict(_), _) => Ordering::Less,
-        (_, Type::TypedDict(_)) => Ordering::Greater,
     }
 }
 
@@ -259,14 +266,14 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
         #[cfg(not(debug_assertions))]
         (DynamicType::Todo(TodoType), DynamicType::Todo(TodoType)) => Ordering::Equal,
 
-        (DynamicType::TodoPEP695ParamSpec, _) => Ordering::Less,
-        (_, DynamicType::TodoPEP695ParamSpec) => Ordering::Greater,
-
         (DynamicType::TodoUnpack, _) => Ordering::Less,
         (_, DynamicType::TodoUnpack) => Ordering::Greater,
 
-        (DynamicType::TodoTypeAlias, _) => Ordering::Less,
-        (_, DynamicType::TodoTypeAlias) => Ordering::Greater,
+        (DynamicType::Divergent(left), DynamicType::Divergent(right)) => {
+            left.scope.cmp(&right.scope)
+        }
+        (DynamicType::Divergent(_), _) => Ordering::Less,
+        (_, DynamicType::Divergent(_)) => Ordering::Greater,
     }
 }
 

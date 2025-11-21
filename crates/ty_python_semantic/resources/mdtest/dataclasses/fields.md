@@ -37,7 +37,7 @@ class Data:
     content: list[int] = field(default_factory=list)
     timestamp: datetime = field(default_factory=datetime.now, init=False)
 
-# revealed: (self: Data, content: list[int] = list[Unknown]) -> None
+# revealed: (self: Data, content: list[int] = list[int]) -> None
 reveal_type(Data.__init__)
 
 data = Data([1, 2, 3])
@@ -63,13 +63,12 @@ class Person:
     age: int | None = field(default=None, kw_only=True)
     role: str = field(default="user", kw_only=True)
 
-# TODO: the `age` and `role` fields should be keyword-only
-# revealed: (self: Person, name: str, age: int | None = None, role: str = Literal["user"]) -> None
+# revealed: (self: Person, name: str, *, age: int | None = None, role: str = Literal["user"]) -> None
 reveal_type(Person.__init__)
 
 alice = Person(role="admin", name="Alice")
 
-# TODO: this should be an error
+# error: [too-many-positional-arguments] "Too many positional arguments: expected 1, got 2"
 bob = Person("Bob", 30)
 ```
 
@@ -83,5 +82,50 @@ def get_default() -> str:
 
 reveal_type(field(default=1))  # revealed: dataclasses.Field[Literal[1]]
 reveal_type(field(default=None))  # revealed: dataclasses.Field[None]
-reveal_type(field(default_factory=get_default))  # revealed: dataclasses.Field[str]
+# TODO: this could ideally be `dataclasses.Field[str]` with a better generics solver
+reveal_type(field(default_factory=get_default))  # revealed: dataclasses.Field[Unknown]
+```
+
+## dataclass_transform field_specifiers
+
+If `field_specifiers` is not specified, it defaults to an empty tuple, meaning no field specifiers
+are supported and `dataclasses.field` and `dataclasses.Field` should not be accepted by default.
+
+```py
+from typing_extensions import dataclass_transform
+from dataclasses import field, dataclass
+from typing import TypeVar
+
+T = TypeVar("T")
+
+@dataclass_transform()
+def create_model(*, init: bool = True):
+    def deco(cls: type[T]) -> type[T]:
+        return cls
+    return deco
+
+@create_model()
+class A:
+    name: str = field(init=False)
+
+# field(init=False) should be ignored for dataclass_transform without explicit field_specifiers
+reveal_type(A.__init__)  # revealed: (self: A, name: str) -> None
+
+@dataclass
+class B:
+    name: str = field(init=False)
+
+# Regular @dataclass should respect field(init=False)
+reveal_type(B.__init__)  # revealed: (self: B) -> None
+```
+
+Test constructor calls:
+
+```py
+# This should NOT error because field(init=False) is ignored for A
+A(name="foo")
+
+# This should error because field(init=False) is respected for B
+# error: [unknown-argument]
+B(name="foo")
 ```

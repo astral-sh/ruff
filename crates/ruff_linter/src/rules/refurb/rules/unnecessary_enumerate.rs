@@ -58,6 +58,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `range`](https://docs.python.org/3/library/stdtypes.html#range)
 /// - [Python documentation: `len`](https://docs.python.org/3/library/functions.html#len)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.291")]
 pub(crate) struct UnnecessaryEnumerate {
     subset: EnumerateSubset,
 }
@@ -232,7 +233,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
         id: name,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Construct `len(name)`.
     let len = ast::ExprCall {
@@ -241,7 +242,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
                 id: Name::new_static("len"),
                 ctx: ast::ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }
             .into(),
         ),
@@ -249,10 +250,10 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
             args: Box::from([var.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Construct `range(len(name))`.
     let range = ast::ExprCall {
@@ -261,7 +262,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
                 id: Name::new_static("range"),
                 ctx: ast::ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }
             .into(),
         ),
@@ -269,16 +270,16 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
             args: Box::from([len.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(range.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     generator.stmt(&stmt.into())
 }

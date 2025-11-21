@@ -7,29 +7,29 @@ input_file: crates/ruff_python_parser/resources/inline/err/async_unexpected_toke
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..116,
         body: [
             ClassDef(
                 StmtClassDef {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 6..20,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Foo"),
                         range: 12..15,
-                        node_index: AtomicNodeIndex(..),
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     arguments: None,
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 17..20,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 17..20,
                                     },
                                 ),
@@ -40,11 +40,11 @@ Module(
             ),
             While(
                 StmtWhile {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 27..42,
                     test: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 33..37,
                             id: Name("test"),
                             ctx: Load,
@@ -53,11 +53,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 39..42,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 39..42,
                                     },
                                 ),
@@ -69,12 +69,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 49..54,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 49..50,
                                 id: Name("x"),
                                 ctx: Store,
@@ -83,7 +83,7 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 53..54,
                             value: Int(
                                 1,
@@ -94,21 +94,19 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 61..81,
                     is_async: true,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 71..74,
-                        node_index: AtomicNodeIndex(..),
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 74..76,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: NodeIndex(None),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -119,11 +117,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 78..81,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 78..81,
                                     },
                                 ),
@@ -134,11 +132,11 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 88..115,
                     subject: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 94..98,
                             id: Name("test"),
                             ctx: Load,
@@ -147,11 +145,11 @@ Module(
                     cases: [
                         MatchCase {
                             range: 104..115,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
+                                    node_index: NodeIndex(None),
                                     range: 109..110,
-                                    node_index: AtomicNodeIndex(..),
                                     pattern: None,
                                     name: None,
                                 },
@@ -160,11 +158,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 112..115,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 112..115,
                                             },
                                         ),
@@ -183,7 +181,7 @@ Module(
 
   |
 1 | async class Foo: ...
-  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'class'
+  |       ^^^^^ Syntax Error: Expected `def`, `with` or `for` to follow `async`, found `class`
 2 | async while test: ...
 3 | async x = 1
   |
@@ -192,7 +190,7 @@ Module(
   |
 1 | async class Foo: ...
 2 | async while test: ...
-  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'while'
+  |       ^^^^^ Syntax Error: Expected `def`, `with` or `for` to follow `async`, found `while`
 3 | async x = 1
 4 | async async def foo(): ...
   |
@@ -202,7 +200,7 @@ Module(
 1 | async class Foo: ...
 2 | async while test: ...
 3 | async x = 1
-  |       ^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found name
+  |       ^ Syntax Error: Expected `def`, `with` or `for` to follow `async`, found name
 4 | async async def foo(): ...
 5 | async match test:
   |
@@ -212,7 +210,7 @@ Module(
 2 | async while test: ...
 3 | async x = 1
 4 | async async def foo(): ...
-  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'async'
+  |       ^^^^^ Syntax Error: Expected `def`, `with` or `for` to follow `async`, found `async`
 5 | async match test:
 6 |     case _: ...
   |
@@ -222,6 +220,6 @@ Module(
 3 | async x = 1
 4 | async async def foo(): ...
 5 | async match test:
-  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'match'
+  |       ^^^^^ Syntax Error: Expected `def`, `with` or `for` to follow `async`, found `match`
 6 |     case _: ...
   |

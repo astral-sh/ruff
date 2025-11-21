@@ -8,7 +8,7 @@ A name reference to a never-defined symbol in a function is implicitly a global 
 x = 1
 
 def f():
-    reveal_type(x)  # revealed: Unknown | Literal[1]
+    reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Explicit global in function
@@ -18,7 +18,7 @@ x = 1
 
 def f():
     global x
-    reveal_type(x)  # revealed: Unknown | Literal[1]
+    reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Unassignable type in function
@@ -201,7 +201,7 @@ x = 42
 
 def f():
     global x
-    reveal_type(x)  # revealed: Unknown | Literal[42]
+    reveal_type(x)  # revealed: Literal[42]
     x = "56"
     reveal_type(x)  # revealed: Literal["56"]
 ```
@@ -269,6 +269,8 @@ If we try to access a variable in a class before it has been defined, the lookup
 global.
 
 ```py
+import secrets
+
 x: str = "a"
 
 def f(x: int, y: int):
@@ -286,4 +288,23 @@ def f(x: int, y: int):
         # error: [unresolved-reference]
         reveal_type(y)  # revealed: Unknown
         y = None
+
+    # Declarations count as definitions, even if there's no binding.
+    class F:
+        reveal_type(x)  # revealed: str
+        x: int
+        reveal_type(x)  # revealed: str
+
+    # Explicitly `nonlocal` variables don't count, even if they're bound.
+    class G:
+        nonlocal x
+        reveal_type(x)  # revealed: int
+        x = 42
+        reveal_type(x)  # revealed: Literal[42]
+
+    # Possibly-unbound variables get unioned with the fallback lookup.
+    class H:
+        if secrets.randbelow(2):
+            x = None
+        reveal_type(x)  # revealed: None | str
 ```

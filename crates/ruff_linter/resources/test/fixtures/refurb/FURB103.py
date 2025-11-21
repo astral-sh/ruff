@@ -145,3 +145,20 @@ with open("file.txt", "w") as f:
 with open("file.txt", "w") as f:
     for line in text:
         f.write(line)
+
+# See: https://github.com/astral-sh/ruff/issues/20785
+import json
+
+data = {"price": 100}
+
+with open("test.json", "wb") as f:
+    f.write(json.dumps(data, indent=4).encode("utf-8"))
+
+# See: https://github.com/astral-sh/ruff/issues/21381
+with open("tmp_path/pyproject.toml", "w") as f:
+    f.write(dedent(
+        """
+        [project]
+        other = 1.234
+        """,
+    ))

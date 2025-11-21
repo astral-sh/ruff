@@ -2,6 +2,7 @@
 
 import sys
 from typing import Final, NamedTuple, type_check_only
+from typing_extensions import disjoint_base
 
 if sys.platform != "win32":
     @type_check_only
@@ -11,10 +12,18 @@ if sys.platform != "win32":
         salt_chars: int
         total_size: int
 
-    class _Method(_MethodBase):
-        """Class representing a salt method per the Modular Crypt Format or the
-        legacy 2-character crypt method.
-        """
+    if sys.version_info >= (3, 12):
+        class _Method(_MethodBase):
+            """Class representing a salt method per the Modular Crypt Format or the
+            legacy 2-character crypt method.
+            """
+
+    else:
+        @disjoint_base
+        class _Method(_MethodBase):
+            """Class representing a salt method per the Modular Crypt Format or the
+            legacy 2-character crypt method.
+            """
 
     METHOD_CRYPT: Final[_Method]
     METHOD_MD5: Final[_Method]

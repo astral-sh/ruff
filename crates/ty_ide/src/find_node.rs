@@ -116,10 +116,10 @@ impl<'a> CoveringNode<'a> {
         Ok(self)
     }
 
-    /// Returns an iterator over the ancestor nodes, starting from the root
-    /// and ending with the covering node.
-    pub(crate) fn ancestors(&self) -> impl Iterator<Item = AnyNodeRef<'a>> + '_ {
-        self.nodes.iter().copied()
+    /// Returns an iterator over the ancestor nodes, starting with the node itself
+    /// and walking towards the root.
+    pub(crate) fn ancestors(&self) -> impl DoubleEndedIterator<Item = AnyNodeRef<'a>> + '_ {
+        self.nodes.iter().copied().rev()
     }
 
     /// Finds the index of the node that fully covers the range and

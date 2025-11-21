@@ -14,11 +14,17 @@ from importlib._bootstrap_external import (
     spec_from_file_location as spec_from_file_location,
 )
 from importlib.abc import Loader
-from typing_extensions import ParamSpec
+from types import TracebackType
+from typing import Literal
+from typing_extensions import ParamSpec, Self, deprecated
 
 _P = ParamSpec("_P")
 
 if sys.version_info < (3, 12):
+    @deprecated(
+        "Deprecated since Python 3.4; removed in Python 3.12. "
+        "`__name__`, `__package__` and `__loader__` are now set automatically."
+    )
     def module_for_loader(fxn: Callable[_P, types.ModuleType]) -> Callable[_P, types.ModuleType]:
         """Decorator to handle selecting the proper module for loaders.
 
@@ -38,6 +44,10 @@ if sys.version_info < (3, 12):
 
         """
 
+    @deprecated(
+        "Deprecated since Python 3.4; removed in Python 3.12. "
+        "`__name__`, `__package__` and `__loader__` are now set automatically."
+    )
     def set_loader(fxn: Callable[_P, types.ModuleType]) -> Callable[_P, types.ModuleType]:
         """Set __loader__ on the returned module.
 
@@ -45,6 +55,10 @@ if sys.version_info < (3, 12):
 
         """
 
+    @deprecated(
+        "Deprecated since Python 3.4; removed in Python 3.12. "
+        "`__name__`, `__package__` and `__loader__` are now set automatically."
+    )
     def set_package(fxn: Callable[_P, types.ModuleType]) -> Callable[_P, types.ModuleType]:
         """Set __package__ on the returned module.
 
@@ -86,6 +100,49 @@ class LazyLoader(Loader):
 
 def source_hash(source_bytes: ReadableBuffer) -> bytes:
     """Return the hash of *source_bytes* as used in hash-based pyc files."""
+
+if sys.version_info >= (3, 12):
+    class _incompatible_extension_module_restrictions:
+        """A context manager that can temporarily skip the compatibility check.
+
+        NOTE: This function is meant to accommodate an unusual case; one
+        which is likely to eventually go away.  There's is a pretty good
+        chance this is not what you were looking for.
+
+        WARNING: Using this function to disable the check can lead to
+        unexpected behavior and even crashes.  It should only be used during
+        extension module development.
+
+        If "disable_check" is True then the compatibility check will not
+        happen while the context manager is active.  Otherwise the check
+        *will* happen.
+
+        Normally, extensions that do not support multiple interpreters
+        may not be imported in a subinterpreter.  That implies modules
+        that do not implement multi-phase init or that explicitly of out.
+
+        Likewise for modules import in a subinterpreter with its own GIL
+        when the extension does not support a per-interpreter GIL.  This
+        implies the module does not have a Py_mod_multiple_interpreters slot
+        set to Py_MOD_PER_INTERPRETER_GIL_SUPPORTED.
+
+        In both cases, this context manager may be used to temporarily
+        disable the check for compatible extension modules.
+
+        You can get the same effect as this function by implementing the
+        basic interface of multi-phase init (PEP 489) and lying about
+        support for multiple interpreters (or per-interpreter GIL).
+        """
+
+        def __init__(self, *, disable_check: bool) -> None: ...
+        disable_check: bool
+        old: Literal[-1, 0, 1]  # exists only while entered
+        def __enter__(self) -> Self: ...
+        def __exit__(
+            self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None
+        ) -> None: ...
+        @property
+        def override(self) -> Literal[-1, 1]: ...  # undocumented
 
 if sys.version_info >= (3, 14):
     __all__ = [

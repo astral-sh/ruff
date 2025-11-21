@@ -21,8 +21,13 @@ def dump_traceback_later(timeout: float, repeat: bool = ..., file: FileDescripto
     or each timeout seconds if repeat is True. If exit is True, call _exit(1) which is not safe.
     """
 
-def enable(file: FileDescriptorLike = ..., all_threads: bool = ...) -> None:
-    """Enable the fault handler."""
+if sys.version_info >= (3, 14):
+    def enable(file: FileDescriptorLike = ..., all_threads: bool = ..., c_stack: bool = True) -> None:
+        """Enable the fault handler."""
+
+else:
+    def enable(file: FileDescriptorLike = ..., all_threads: bool = ...) -> None:
+        """Enable the fault handler."""
 
 def is_enabled() -> bool:
     """Check if the handler is enabled."""

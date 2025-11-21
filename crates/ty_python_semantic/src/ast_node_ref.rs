@@ -32,19 +32,27 @@ use ruff_text_size::Ranged;
 /// run on every AST change. All other queries only run when the expression's identity changes.
 #[derive(Clone)]
 pub struct AstNodeRef<T> {
-    /// A pointer to the [`ruff_db::parsed::ParsedModule`] that this node was created from.
-    module_ptr: *const (),
+    /// The index of the node in the AST.
+    index: NodeIndex,
 
     /// Debug information.
     #[cfg(debug_assertions)]
     kind: ruff_python_ast::NodeKind,
     #[cfg(debug_assertions)]
     range: ruff_text_size::TextRange,
-
-    /// The index of the node in the AST.
-    index: NodeIndex,
+    // Note that because the module address is not stored in release builds, `AstNodeRef`
+    // cannot implement `Eq`, as indices are only unique within a given instance of the
+    // AST.
+    #[cfg(debug_assertions)]
+    module_addr: usize,
 
     _node: PhantomData<T>,
+}
+
+impl<T> AstNodeRef<T> {
+    pub(crate) fn index(&self) -> NodeIndex {
+        self.index
+    }
 }
 
 impl<T> AstNodeRef<T>
@@ -63,7 +71,8 @@ where
 
         Self {
             index,
-            module_ptr: module_ref.module().as_ptr(),
+            #[cfg(debug_assertions)]
+            module_addr: module_ref.module().addr(),
             #[cfg(debug_assertions)]
             kind: AnyNodeRef::from(node).kind(),
             #[cfg(debug_assertions)]
@@ -76,16 +85,32 @@ where
     ///
     /// This method may panic or produce unspecified results if the provided module is from a
     /// different file or Salsa revision than the module to which the node belongs.
+    #[track_caller]
     pub fn node<'ast>(&self, module_ref: &'ast ParsedModuleRef) -> &'ast T {
-        debug_assert_eq!(module_ref.module().as_ptr(), self.module_ptr);
+        #[cfg(debug_assertions)]
+        assert_eq!(module_ref.module().addr(), self.module_addr);
 
-        // Note that the module pointer is guaranteed to be stable within the Salsa
-        // revision, so the file contents cannot have changed by the above assertion.
+        // The user guarantees that the module is from the same file and Salsa
+        // revision, so the file contents cannot have changed.
         module_ref
             .get_by_index(self.index)
             .try_into()
             .ok()
             .expect("AST indices should never change within the same revision")
+    }
+}
+
+#[expect(unsafe_code)]
+unsafe impl<T> salsa::Update for AstNodeRef<T> {
+    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
+        let old_ref = unsafe { &mut (*old_pointer) };
+
+        // The equality of an `AstNodeRef` depends on both the module address and the node index,
+        // but the former is not stored in release builds to save memory. As such, AST nodes
+        // are always considered change when the AST is reparsed, which is acceptable because
+        // any change to the AST is likely to invalidate most node indices anyways.
+        *old_ref = new_value;
+        true
     }
 }
 
@@ -113,26 +138,3 @@ where
         }
     }
 }
-
-#[expect(unsafe_code)]
-unsafe impl<T> salsa::Update for AstNodeRef<T> {
-    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        let old_ref = unsafe { &mut (*old_pointer) };
-
-        // Two nodes are guaranteed to be equal as long as they refer to the same node index
-        // within the same module. Note that the module pointer is guaranteed to be stable
-        // within the Salsa revision, so the file contents cannot have changed.
-        if old_ref.module_ptr == new_value.module_ptr && old_ref.index == new_value.index {
-            false
-        } else {
-            *old_ref = new_value;
-            true
-        }
-    }
-}
-
-// SAFETY: The `module_ptr` is only used for pointer equality and never accessed directly.
-#[expect(unsafe_code)]
-unsafe impl<T> Send for AstNodeRef<T> where T: Send {}
-#[expect(unsafe_code)]
-unsafe impl<T> Sync for AstNodeRef<T> where T: Sync {}

@@ -46,6 +46,7 @@ pub(crate) const TEST_RULES: &[Rule] = &[
     Rule::RedirectedFromTestRule,
     Rule::RedirectedToTestRule,
     Rule::RedirectedFromPrefixTestRule,
+    Rule::PanicyTestRule,
 ];
 
 pub(crate) trait TestRule {
@@ -68,6 +69,7 @@ pub(crate) trait TestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.0.0")]
 pub(crate) struct StableTestRule;
 
 impl Violation for StableTestRule {
@@ -101,6 +103,7 @@ impl TestRule for StableTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.0.0")]
 pub(crate) struct StableTestRuleSafeFix;
 
 impl Violation for StableTestRuleSafeFix {
@@ -139,6 +142,7 @@ impl TestRule for StableTestRuleSafeFix {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.0.0")]
 pub(crate) struct StableTestRuleUnsafeFix;
 
 impl Violation for StableTestRuleUnsafeFix {
@@ -180,6 +184,7 @@ impl TestRule for StableTestRuleUnsafeFix {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.0.0")]
 pub(crate) struct StableTestRuleDisplayOnlyFix;
 
 impl Violation for StableTestRuleDisplayOnlyFix {
@@ -224,6 +229,7 @@ impl TestRule for StableTestRuleDisplayOnlyFix {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.0.0")]
 pub(crate) struct PreviewTestRule;
 
 impl Violation for PreviewTestRule {
@@ -257,6 +263,7 @@ impl TestRule for PreviewTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(deprecated_since = "0.0.0")]
 pub(crate) struct DeprecatedTestRule;
 
 impl Violation for DeprecatedTestRule {
@@ -290,6 +297,7 @@ impl TestRule for DeprecatedTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(deprecated_since = "0.0.0")]
 pub(crate) struct AnotherDeprecatedTestRule;
 
 impl Violation for AnotherDeprecatedTestRule {
@@ -326,6 +334,7 @@ impl TestRule for AnotherDeprecatedTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(removed_since = "0.0.0")]
 pub(crate) struct RemovedTestRule;
 
 impl Violation for RemovedTestRule {
@@ -359,6 +368,7 @@ impl TestRule for RemovedTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(removed_since = "0.0.0")]
 pub(crate) struct AnotherRemovedTestRule;
 
 impl Violation for AnotherRemovedTestRule {
@@ -392,6 +402,7 @@ impl TestRule for AnotherRemovedTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(removed_since = "0.0.0")]
 pub(crate) struct RedirectedFromTestRule;
 
 impl Violation for RedirectedFromTestRule {
@@ -425,6 +436,7 @@ impl TestRule for RedirectedFromTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.0.0")]
 pub(crate) struct RedirectedToTestRule;
 
 impl Violation for RedirectedToTestRule {
@@ -458,6 +470,7 @@ impl TestRule for RedirectedToTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(removed_since = "0.0.0")]
 pub(crate) struct RedirectedFromPrefixTestRule;
 
 impl Violation for RedirectedFromPrefixTestRule {
@@ -474,6 +487,43 @@ impl TestRule for RedirectedFromPrefixTestRule {
         context.report_diagnostic(
             RedirectedFromPrefixTestRule,
             ruff_text_size::TextRange::default(),
+        );
+    }
+}
+
+/// # What it does
+/// Fake rule for testing panics.
+///
+/// # Why is this bad?
+/// Panics are bad.
+///
+/// # Example
+/// ```python
+/// foo
+/// ```
+///
+/// Use instead:
+/// ```python
+/// bar
+/// ```
+#[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.0.0")]
+pub(crate) struct PanicyTestRule;
+
+impl Violation for PanicyTestRule {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "If you see this, maybe panic!".to_string()
+    }
+}
+
+impl TestRule for PanicyTestRule {
+    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges, context: &LintContext) {
+        assert!(
+            !context.source_file().name().ends_with("panic.py"),
+            "This is a fake panic for testing."
         );
     }
 }

@@ -124,6 +124,9 @@ match obj:
 ## `return`, `yield`, `yield from`, and `await` outside function
 
 ```py
+class C:
+    def __await__(self): ...
+
 # error: [invalid-syntax] "`return` statement outside of a function"
 return
 
@@ -135,11 +138,11 @@ yield from []
 
 # error: [invalid-syntax] "`await` statement outside of a function"
 # error: [invalid-syntax] "`await` outside of an asynchronous function"
-await 1
+await C()
 
 def f():
     # error: [invalid-syntax] "`await` outside of an asynchronous function"
-    await 1
+    await C()
 ```
 
 Generators are evaluated lazily, so `await` is allowed, even outside of a function.
@@ -330,7 +333,8 @@ async def elements(n):
 
 def _():
     # error: [invalid-syntax] "`await` outside of an asynchronous function"
-    await 1
+    await elements(1)
+
     # error: [invalid-syntax] "`async for` outside of an asynchronous function"
     async for _ in elements(1):
         ...
@@ -349,4 +353,64 @@ x: int
 def f():
     x = 1
     global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
+```
+
+## `break` and `continue` outside a loop
+
+<!-- snapshot-diagnostics -->
+
+```py
+break  # error: [invalid-syntax]
+continue  # error: [invalid-syntax]
+
+for x in range(42):
+    break  # fine
+    continue  # fine
+
+    def _():
+        break  # error: [invalid-syntax]
+        continue  # error: [invalid-syntax]
+
+    class Fine:
+        # this is invalid syntax despite it being in an eager-nested scope!
+        break  # error: [invalid-syntax]
+        continue  # error: [invalid-syntax]
+```
+
+## name is parameter and global
+
+<!-- snapshot-diagnostics -->
+
+```py
+a = None
+
+def f(a):
+    global a  # error: [invalid-syntax]
+
+def g(a):
+    if True:
+        global a  # error: [invalid-syntax]
+
+def h(a):
+    def inner():
+        global a
+
+def i(a):
+    try:
+        global a  # error: [invalid-syntax]
+    except Exception:
+        pass
+
+def f(a):
+    a = 1
+    global a  # error: [invalid-syntax]
+
+def f(a):
+    a = 1
+    a = 2
+    global a  # error: [invalid-syntax]
+
+def f(a):
+    class Inner:
+        global a  # ok
 ```

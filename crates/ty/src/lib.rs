@@ -5,6 +5,7 @@ mod python_version;
 mod version;
 
 pub use args::Cli;
+use ty_project::metadata::settings::TerminalSettings;
 use ty_static::EnvVars;
 
 use std::fmt::Write;
@@ -14,14 +15,16 @@ use anyhow::Result;
 use std::sync::Mutex;
 
 use crate::args::{CheckCommand, Command, TerminalColor};
-use crate::logging::setup_tracing;
+use crate::logging::{VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 use anyhow::{Context, anyhow};
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
+};
 use ruff_db::files::File;
 use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
@@ -62,17 +65,16 @@ pub(crate) fn version() -> Result<()> {
 }
 
 fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
+    // Enabled ANSI colors on Windows 10.
+    #[cfg(windows)]
+    assert!(colored::control::set_virtual_terminal(true).is_ok());
+
     set_colored_override(args.color);
 
     let verbosity = args.verbosity.level();
     let _guard = setup_tracing(verbosity, args.color.unwrap_or_default())?;
 
-    let printer = Printer::default().with_verbosity(verbosity);
-
-    tracing::warn!(
-        "ty is pre-release software and not ready for production use. \
-            Expect to encounter bugs, missing features, and fatal errors.",
-    );
+    let printer = Printer::new(verbosity, args.no_progress);
 
     tracing::debug!("Version: {}", version::version());
 
@@ -129,6 +131,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     let mut db = ProjectDatabase::new(project_metadata, system)?;
 
+    db.project()
+        .set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
     if !check_paths.is_empty() {
         db.project().set_included_paths(&mut db, check_paths);
     }
@@ -156,7 +160,9 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     match std::env::var(EnvVars::TY_MEMORY_REPORT).as_deref() {
         Ok("short") => write!(stdout, "{}", db.salsa_memory_dump().display_short())?,
         Ok("mypy_primer") => write!(stdout, "{}", db.salsa_memory_dump().display_mypy_primer())?,
-        Ok("full") => write!(stdout, "{}", db.salsa_memory_dump().display_full())?,
+        Ok("full") => {
+            write!(stdout, "{}", db.salsa_memory_dump().display_full())?;
+        }
         Ok(other) => {
             tracing::warn!(
                 "Unknown value for `TY_MEMORY_REPORT`: `{other}`. Valid values are `short`, `mypy_primer`, and `full`."
@@ -188,6 +194,12 @@ pub enum ExitStatus {
     /// Internal ty error (panic, or any other error that isn't due to the user using the
     /// program incorrectly or transient environment errors).
     InternalError = 101,
+}
+
+impl ExitStatus {
+    pub const fn is_internal_error(self) -> bool {
+        matches!(self, ExitStatus::InternalError)
+    }
 }
 
 impl Termination for ExitStatus {
@@ -277,7 +289,7 @@ impl MainLoop {
 
                         match salsa::Cancelled::catch(|| {
                             db.check_with_reporter(&mut reporter);
-                            reporter.bar.finish();
+                            reporter.bar.finish_and_clear();
                             reporter.collector.into_sorted(&db)
                         }) {
                             Ok(result) => {
@@ -313,57 +325,54 @@ impl MainLoop {
                             return Ok(ExitStatus::Success);
                         }
 
+                        let is_human_readable = terminal_settings.output_format.is_human_readable();
+
                         if result.is_empty() {
-                            writeln!(
-                                self.printer.stream_for_success_summary(),
-                                "{}",
-                                "All checks passed!".green().bold()
-                            )?;
+                            if is_human_readable {
+                                writeln!(
+                                    self.printer.stream_for_success_summary(),
+                                    "{}",
+                                    "All checks passed!".green().bold()
+                                )?;
+                            }
 
                             if self.watcher.is_none() {
                                 return Ok(ExitStatus::Success);
                             }
                         } else {
-                            let mut max_severity = Severity::Info;
                             let diagnostics_count = result.len();
 
                             let mut stdout = self.printer.stream_for_details().lock();
-                            for diagnostic in result {
-                                // Only render diagnostics if they're going to be displayed, since doing
-                                // so is expensive.
-                                if stdout.is_enabled() {
-                                    write!(stdout, "{}", diagnostic.display(db, &display_config))?;
-                                }
+                            let exit_status =
+                                exit_status_from_diagnostics(&result, terminal_settings);
 
-                                max_severity = max_severity.max(diagnostic.severity());
+                            // Only render diagnostics if they're going to be displayed, since doing
+                            // so is expensive.
+                            if stdout.is_enabled() {
+                                write!(
+                                    stdout,
+                                    "{}",
+                                    DisplayDiagnostics::new(db, &display_config, &result)
+                                )?;
                             }
 
-                            writeln!(
-                                self.printer.stream_for_failure_summary(),
-                                "Found {} diagnostic{}",
-                                diagnostics_count,
-                                if diagnostics_count > 1 { "s" } else { "" }
-                            )?;
+                            if is_human_readable {
+                                writeln!(
+                                    self.printer.stream_for_failure_summary(),
+                                    "Found {} diagnostic{}",
+                                    diagnostics_count,
+                                    if diagnostics_count > 1 { "s" } else { "" }
+                                )?;
+                            }
 
-                            if max_severity.is_fatal() {
+                            if exit_status.is_internal_error() {
                                 tracing::warn!(
                                     "A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details."
                                 );
                             }
 
                             if self.watcher.is_none() {
-                                return Ok(match max_severity {
-                                    Severity::Info => ExitStatus::Success,
-                                    Severity::Warning => {
-                                        if terminal_settings.error_on_warning {
-                                            ExitStatus::Failure
-                                        } else {
-                                            ExitStatus::Success
-                                        }
-                                    }
-                                    Severity::Error => ExitStatus::Failure,
-                                    Severity::Fatal => ExitStatus::InternalError,
-                                });
+                                return Ok(exit_status);
                             }
                         }
                     } else {
@@ -393,6 +402,40 @@ impl MainLoop {
         }
 
         Ok(ExitStatus::Success)
+    }
+}
+
+fn exit_status_from_diagnostics(
+    diagnostics: &[Diagnostic],
+    terminal_settings: &TerminalSettings,
+) -> ExitStatus {
+    if diagnostics.is_empty() {
+        return ExitStatus::Success;
+    }
+
+    let mut max_severity = Severity::Info;
+    let mut io_error = false;
+
+    for diagnostic in diagnostics {
+        max_severity = max_severity.max(diagnostic.severity());
+        io_error = io_error || matches!(diagnostic.id(), DiagnosticId::Io);
+    }
+
+    if !max_severity.is_fatal() && io_error {
+        return ExitStatus::Error;
+    }
+
+    match max_severity {
+        Severity::Info => ExitStatus::Success,
+        Severity::Warning => {
+            if terminal_settings.error_on_warning {
+                ExitStatus::Failure
+            } else {
+                ExitStatus::Success
+            }
+        }
+        Severity::Error => ExitStatus::Failure,
+        Severity::Fatal => ExitStatus::InternalError,
     }
 }
 
@@ -436,12 +479,12 @@ impl ty_project::ProgressReporter for IndicatifReporter {
         self.bar.set_draw_target(self.printer.progress_target());
     }
 
-    fn report_checked_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]) {
+    fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
         self.collector.report_checked_file(db, file, diagnostics);
         self.bar.inc(1);
     }
 
-    fn report_diagnostics(&mut self, db: &dyn Db, diagnostics: Vec<Diagnostic>) {
+    fn report_diagnostics(&mut self, db: &ProjectDatabase, diagnostics: Vec<Diagnostic>) {
         self.collector.report_diagnostics(db, diagnostics);
     }
 }

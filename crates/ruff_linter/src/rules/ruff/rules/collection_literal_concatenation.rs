@@ -43,6 +43,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [PEP 448 – Additional Unpacking Generalizations](https://peps.python.org/pep-0448/)
 /// - [Python documentation: Sequence Types — `list`, `tuple`, `range`](https://docs.python.org/3/library/stdtypes.html#sequence-types-list-tuple-range)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.227")]
 pub(crate) struct CollectionLiteralConcatenation {
     expression: SourceCodeSnippet,
 }
@@ -78,7 +79,7 @@ fn make_splat_elts(
         value: Box::from(splat_element.clone()),
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let splat = node.into();
     if splat_at_left {
@@ -166,14 +167,14 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
             elts: new_elts,
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         }
         .into(),
         Type::Tuple => ast::ExprTuple {
             elts: new_elts,
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             parenthesized: true,
         }
         .into(),

@@ -39,6 +39,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// ## References
 /// - [Python documentation:`int.bit_count`](https://docs.python.org/3/library/stdtypes.html#int.bit_count)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct BitCount {
     existing: SourceCodeSnippet,
     replacement: SourceCodeSnippet,
@@ -187,7 +188,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
     let mut diagnostic = checker.report_diagnostic(
         BitCount {
             existing: SourceCodeSnippet::from_str(literal_text),
-            replacement: SourceCodeSnippet::new(replacement.to_string()),
+            replacement: SourceCodeSnippet::new(replacement.clone()),
         },
         call.range(),
     );

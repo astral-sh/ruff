@@ -2,6 +2,7 @@ from _typeshed import ReadableBuffer
 from codecs import _ReadableStream, _WritableStream
 from collections.abc import Iterable
 from typing import final, type_check_only
+from typing_extensions import disjoint_base
 
 # This class is not exposed. It calls itself _multibytecodec.MultibyteCodec.
 @final
@@ -10,6 +11,7 @@ class _MultibyteCodec:
     def decode(self, input: ReadableBuffer, errors: str | None = None) -> str: ...
     def encode(self, input: str, errors: str | None = None) -> bytes: ...
 
+@disjoint_base
 class MultibyteIncrementalDecoder:
     errors: str
     def __init__(self, errors: str = "strict") -> None: ...
@@ -18,6 +20,7 @@ class MultibyteIncrementalDecoder:
     def reset(self) -> None: ...
     def setstate(self, state: tuple[bytes, int], /) -> None: ...
 
+@disjoint_base
 class MultibyteIncrementalEncoder:
     errors: str
     def __init__(self, errors: str = "strict") -> None: ...
@@ -26,6 +29,7 @@ class MultibyteIncrementalEncoder:
     def reset(self) -> None: ...
     def setstate(self, state: int, /) -> None: ...
 
+@disjoint_base
 class MultibyteStreamReader:
     errors: str
     stream: _ReadableStream
@@ -35,6 +39,7 @@ class MultibyteStreamReader:
     def readlines(self, sizehintobj: int | None = None, /) -> list[str]: ...
     def reset(self) -> None: ...
 
+@disjoint_base
 class MultibyteStreamWriter:
     errors: str
     stream: _WritableStream

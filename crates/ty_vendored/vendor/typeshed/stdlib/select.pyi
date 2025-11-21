@@ -8,25 +8,25 @@ import sys
 from _typeshed import FileDescriptorLike
 from collections.abc import Iterable
 from types import TracebackType
-from typing import Any, ClassVar, final
-from typing_extensions import Self
+from typing import Any, ClassVar, Final, TypeVar, final
+from typing_extensions import Never, Self
 
 if sys.platform != "win32":
-    PIPE_BUF: int
-    POLLERR: int
-    POLLHUP: int
-    POLLIN: int
+    PIPE_BUF: Final[int]
+    POLLERR: Final[int]
+    POLLHUP: Final[int]
+    POLLIN: Final[int]
     if sys.platform == "linux":
-        POLLMSG: int
-    POLLNVAL: int
-    POLLOUT: int
-    POLLPRI: int
-    POLLRDBAND: int
+        POLLMSG: Final[int]
+    POLLNVAL: Final[int]
+    POLLOUT: Final[int]
+    POLLPRI: Final[int]
+    POLLRDBAND: Final[int]
     if sys.platform == "linux":
-        POLLRDHUP: int
-    POLLRDNORM: int
-    POLLWRBAND: int
-    POLLWRNORM: int
+        POLLRDHUP: Final[int]
+    POLLRDNORM: Final[int]
+    POLLWRBAND: Final[int]
+    POLLWRNORM: Final[int]
 
     # This is actually a function that returns an instance of a class.
     # The class is not accessible directly, and also calls itself select.poll.
@@ -43,9 +43,13 @@ if sys.platform != "win32":
         def unregister(self, fd: FileDescriptorLike, /) -> None: ...
         def poll(self, timeout: float | None = None, /) -> list[tuple[int, int]]: ...
 
+_R = TypeVar("_R", default=Never)
+_W = TypeVar("_W", default=Never)
+_X = TypeVar("_X", default=Never)
+
 def select(
-    rlist: Iterable[Any], wlist: Iterable[Any], xlist: Iterable[Any], timeout: float | None = None, /
-) -> tuple[list[Any], list[Any], list[Any]]:
+    rlist: Iterable[_R], wlist: Iterable[_W], xlist: Iterable[_X], timeout: float | None = None, /
+) -> tuple[list[_R], list[_W], list[_X]]:
     """Wait until one or more file descriptors are ready for some kind of I/O.
 
     The first three arguments are iterables of file descriptors to be waited for:
@@ -155,45 +159,45 @@ if sys.platform != "linux" and sys.platform != "win32":
         def fromfd(cls, fd: FileDescriptorLike, /) -> kqueue:
             """Create a kqueue object from a given control fd."""
 
-    KQ_EV_ADD: int
-    KQ_EV_CLEAR: int
-    KQ_EV_DELETE: int
-    KQ_EV_DISABLE: int
-    KQ_EV_ENABLE: int
-    KQ_EV_EOF: int
-    KQ_EV_ERROR: int
-    KQ_EV_FLAG1: int
-    KQ_EV_ONESHOT: int
-    KQ_EV_SYSFLAGS: int
-    KQ_FILTER_AIO: int
+    KQ_EV_ADD: Final[int]
+    KQ_EV_CLEAR: Final[int]
+    KQ_EV_DELETE: Final[int]
+    KQ_EV_DISABLE: Final[int]
+    KQ_EV_ENABLE: Final[int]
+    KQ_EV_EOF: Final[int]
+    KQ_EV_ERROR: Final[int]
+    KQ_EV_FLAG1: Final[int]
+    KQ_EV_ONESHOT: Final[int]
+    KQ_EV_SYSFLAGS: Final[int]
+    KQ_FILTER_AIO: Final[int]
     if sys.platform != "darwin":
-        KQ_FILTER_NETDEV: int
-    KQ_FILTER_PROC: int
-    KQ_FILTER_READ: int
-    KQ_FILTER_SIGNAL: int
-    KQ_FILTER_TIMER: int
-    KQ_FILTER_VNODE: int
-    KQ_FILTER_WRITE: int
-    KQ_NOTE_ATTRIB: int
-    KQ_NOTE_CHILD: int
-    KQ_NOTE_DELETE: int
-    KQ_NOTE_EXEC: int
-    KQ_NOTE_EXIT: int
-    KQ_NOTE_EXTEND: int
-    KQ_NOTE_FORK: int
-    KQ_NOTE_LINK: int
+        KQ_FILTER_NETDEV: Final[int]
+    KQ_FILTER_PROC: Final[int]
+    KQ_FILTER_READ: Final[int]
+    KQ_FILTER_SIGNAL: Final[int]
+    KQ_FILTER_TIMER: Final[int]
+    KQ_FILTER_VNODE: Final[int]
+    KQ_FILTER_WRITE: Final[int]
+    KQ_NOTE_ATTRIB: Final[int]
+    KQ_NOTE_CHILD: Final[int]
+    KQ_NOTE_DELETE: Final[int]
+    KQ_NOTE_EXEC: Final[int]
+    KQ_NOTE_EXIT: Final[int]
+    KQ_NOTE_EXTEND: Final[int]
+    KQ_NOTE_FORK: Final[int]
+    KQ_NOTE_LINK: Final[int]
     if sys.platform != "darwin":
-        KQ_NOTE_LINKDOWN: int
-        KQ_NOTE_LINKINV: int
-        KQ_NOTE_LINKUP: int
-    KQ_NOTE_LOWAT: int
-    KQ_NOTE_PCTRLMASK: int
-    KQ_NOTE_PDATAMASK: int
-    KQ_NOTE_RENAME: int
-    KQ_NOTE_REVOKE: int
-    KQ_NOTE_TRACK: int
-    KQ_NOTE_TRACKERR: int
-    KQ_NOTE_WRITE: int
+        KQ_NOTE_LINKDOWN: Final[int]
+        KQ_NOTE_LINKINV: Final[int]
+        KQ_NOTE_LINKUP: Final[int]
+    KQ_NOTE_LOWAT: Final[int]
+    KQ_NOTE_PCTRLMASK: Final[int]
+    KQ_NOTE_PDATAMASK: Final[int]
+    KQ_NOTE_RENAME: Final[int]
+    KQ_NOTE_REVOKE: Final[int]
+    KQ_NOTE_TRACK: Final[int]
+    KQ_NOTE_TRACKERR: Final[int]
+    KQ_NOTE_WRITE: Final[int]
 
 if sys.platform == "linux":
     @final
@@ -207,7 +211,7 @@ if sys.platform == "linux":
         the maximum number of monitored events.
         """
 
-        def __init__(self, sizehint: int = ..., flags: int = ...) -> None: ...
+        def __new__(self, sizehint: int = ..., flags: int = ...) -> Self: ...
         def __enter__(self) -> Self: ...
         def __exit__(
             self,
@@ -269,23 +273,23 @@ if sys.platform == "linux":
         def fromfd(cls, fd: FileDescriptorLike, /) -> epoll:
             """Create an epoll object from a given control fd."""
 
-    EPOLLERR: int
-    EPOLLEXCLUSIVE: int
-    EPOLLET: int
-    EPOLLHUP: int
-    EPOLLIN: int
-    EPOLLMSG: int
-    EPOLLONESHOT: int
-    EPOLLOUT: int
-    EPOLLPRI: int
-    EPOLLRDBAND: int
-    EPOLLRDHUP: int
-    EPOLLRDNORM: int
-    EPOLLWRBAND: int
-    EPOLLWRNORM: int
-    EPOLL_CLOEXEC: int
+    EPOLLERR: Final[int]
+    EPOLLEXCLUSIVE: Final[int]
+    EPOLLET: Final[int]
+    EPOLLHUP: Final[int]
+    EPOLLIN: Final[int]
+    EPOLLMSG: Final[int]
+    EPOLLONESHOT: Final[int]
+    EPOLLOUT: Final[int]
+    EPOLLPRI: Final[int]
+    EPOLLRDBAND: Final[int]
+    EPOLLRDHUP: Final[int]
+    EPOLLRDNORM: Final[int]
+    EPOLLWRBAND: Final[int]
+    EPOLLWRNORM: Final[int]
+    EPOLL_CLOEXEC: Final[int]
     if sys.version_info >= (3, 14):
-        EPOLLWAKEUP: int
+        EPOLLWAKEUP: Final[int]
 
 if sys.platform != "linux" and sys.platform != "darwin" and sys.platform != "win32":
     # Solaris only

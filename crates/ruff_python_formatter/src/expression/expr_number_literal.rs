@@ -62,7 +62,7 @@ impl NeedsParentheses for ExprNumberLiteral {
 }
 
 /// Returns the normalized integer string.
-fn normalize_integer(input: &str) -> Cow<str> {
+fn normalize_integer(input: &str) -> Cow<'_, str> {
     // The normalized string if `input` is not yet normalized.
     // `output` must remain empty if `input` is already normalized.
     let mut output = String::new();
@@ -107,7 +107,7 @@ fn normalize_integer(input: &str) -> Cow<str> {
 }
 
 /// Returns the normalized floating number string.
-fn normalize_floating_number(input: &str) -> Cow<str> {
+fn normalize_floating_number(input: &str) -> Cow<'_, str> {
     // The normalized string if `input` is not yet normalized.
     // `output` must remain empty if `input` is already normalized.
     let mut output = String::new();

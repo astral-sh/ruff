@@ -38,6 +38,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [PEP 706]: https://peps.python.org/pep-0706/#backporting-forward-compatibility
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct TarfileUnsafeMembers;
 
 impl Violation for TarfileUnsafeMembers {

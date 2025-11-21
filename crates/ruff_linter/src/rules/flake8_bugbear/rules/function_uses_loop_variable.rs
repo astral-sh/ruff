@@ -42,6 +42,7 @@ use crate::checkers::ast::Checker;
 /// - [The Hitchhiker's Guide to Python: Late Binding Closures](https://docs.python-guide.org/writing/gotchas/#late-binding-closures)
 /// - [Python documentation: `functools.partial`](https://docs.python.org/3/library/functools.html#functools.partial)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.139")]
 pub(crate) struct FunctionUsesLoopVariable {
     name: String,
 }

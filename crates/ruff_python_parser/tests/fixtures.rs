@@ -465,7 +465,7 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
 
 enum Scope {
     Module,
-    Function,
+    Function { is_async: bool },
     Comprehension { is_async: bool },
     Class,
 }
@@ -527,8 +527,20 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
         None
     }
 
-    fn in_async_context(&self) -> bool {
+    fn has_nonlocal_binding(&self, _name: &str) -> bool {
         true
+    }
+
+    fn in_async_context(&self) -> bool {
+        if let Some(scope) = self.scopes.iter().next_back() {
+            match scope {
+                Scope::Class | Scope::Module => false,
+                Scope::Comprehension { is_async } => *is_async,
+                Scope::Function { is_async } => *is_async,
+            }
+        } else {
+            false
+        }
     }
 
     fn in_sync_comprehension(&self) -> bool {
@@ -563,6 +575,14 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     fn in_generator_scope(&self) -> bool {
         true
     }
+
+    fn in_loop_context(&self) -> bool {
+        true
+    }
+
+    fn is_bound_parameter(&self, _name: &str) -> bool {
+        false
+    }
 }
 
 impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
@@ -589,8 +609,10 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                 self.visit_body(body);
                 self.scopes.pop().unwrap();
             }
-            ast::Stmt::FunctionDef(ast::StmtFunctionDef { .. }) => {
-                self.scopes.push(Scope::Function);
+            ast::Stmt::FunctionDef(ast::StmtFunctionDef { is_async, .. }) => {
+                self.scopes.push(Scope::Function {
+                    is_async: *is_async,
+                });
                 ast::visitor::walk_stmt(self, stmt);
                 self.scopes.pop().unwrap();
             }
@@ -604,7 +626,7 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
         self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
         match expr {
             ast::Expr::Lambda(_) => {
-                self.scopes.push(Scope::Function);
+                self.scopes.push(Scope::Function { is_async: false });
                 ast::visitor::walk_expr(self, expr);
                 self.scopes.pop().unwrap();
             }

@@ -7,20 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/mi
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..9,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..9,
                     value: Call(
                         ExprCall {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 0..9,
                             func: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 0..4,
                                     id: Name("call"),
                                     ctx: Load,
@@ -28,11 +28,11 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 4..9,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 args: [
                                     Name(
                                         ExprName {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 5..6,
                                             id: Name("x"),
                                             ctx: Load,
@@ -40,7 +40,7 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 7..8,
                                             id: Name("y"),
                                             ctx: Load,
@@ -61,5 +61,5 @@ Module(
 
   |
 1 | call(x y)
-  |        ^ Syntax Error: Expected ',', found name
+  |        ^ Syntax Error: Expected `,`, found name
   |

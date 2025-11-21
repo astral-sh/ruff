@@ -236,7 +236,7 @@ impl SystemPath {
     ///
     /// [`CurDir`]: camino::Utf8Component::CurDir
     #[inline]
-    pub fn components(&self) -> camino::Utf8Components {
+    pub fn components(&self) -> camino::Utf8Components<'_> {
         self.0.components()
     }
 
@@ -504,8 +504,8 @@ impl ToOwned for SystemPath {
 pub struct SystemPathBuf(#[cfg_attr(feature = "schemars", schemars(with = "String"))] Utf8PathBuf);
 
 impl get_size2::GetSize for SystemPathBuf {
-    fn get_heap_size(&self) -> usize {
-        self.0.capacity()
+    fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(&self, tracker: T) -> (usize, T) {
+        (self.0.capacity(), tracker)
     }
 }
 
@@ -723,10 +723,11 @@ impl ruff_cache::CacheKey for SystemPathBuf {
 
 /// A slice of a virtual path on [`System`](super::System) (akin to [`str`]).
 #[repr(transparent)]
+#[derive(Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct SystemVirtualPath(str);
 
 impl SystemVirtualPath {
-    pub fn new(path: &str) -> &SystemVirtualPath {
+    pub const fn new(path: &str) -> &SystemVirtualPath {
         // SAFETY: SystemVirtualPath is marked as #[repr(transparent)] so the conversion from a
         // *const str to a *const SystemVirtualPath is valid.
         unsafe { &*(path as *const str as *const SystemVirtualPath) }
@@ -762,13 +763,13 @@ impl SystemVirtualPath {
 }
 
 /// An owned, virtual path on [`System`](`super::System`) (akin to [`String`]).
-#[derive(Eq, PartialEq, Clone, Hash, PartialOrd, Ord)]
+#[derive(Eq, PartialEq, Clone, Hash, PartialOrd, Ord, get_size2::GetSize)]
 pub struct SystemVirtualPathBuf(String);
 
 impl SystemVirtualPathBuf {
     #[inline]
-    pub fn as_path(&self) -> &SystemVirtualPath {
-        SystemVirtualPath::new(&self.0)
+    pub const fn as_path(&self) -> &SystemVirtualPath {
+        SystemVirtualPath::new(self.0.as_str())
     }
 }
 
@@ -849,6 +850,12 @@ impl ruff_cache::CacheKey for SystemVirtualPath {
 impl ruff_cache::CacheKey for SystemVirtualPathBuf {
     fn cache_key(&self, hasher: &mut ruff_cache::CacheKeyHasher) {
         self.as_path().cache_key(hasher);
+    }
+}
+
+impl Borrow<SystemVirtualPath> for SystemVirtualPathBuf {
+    fn borrow(&self) -> &SystemVirtualPath {
+        self.as_path()
     }
 }
 

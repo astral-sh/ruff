@@ -71,7 +71,7 @@ from _hashlib import (
 )
 from _typeshed import ReadableBuffer
 from collections.abc import Callable, Set as AbstractSet
-from typing import Protocol
+from typing import Protocol, type_check_only
 
 if sys.version_info >= (3, 11):
     __all__ = (
@@ -126,9 +126,11 @@ algorithms_guaranteed: AbstractSet[str]
 algorithms_available: AbstractSet[str]
 
 if sys.version_info >= (3, 11):
+    @type_check_only
     class _BytesIOLike(Protocol):
         def getbuffer(self) -> ReadableBuffer: ...
 
+    @type_check_only
     class _FileDigestFileObj(Protocol):
         def readinto(self, buf: bytearray, /) -> int: ...
         def readable(self) -> bool: ...

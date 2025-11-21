@@ -42,6 +42,7 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-variable-names
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.77")]
 pub(crate) struct InvalidFunctionName {
     name: String,
 }

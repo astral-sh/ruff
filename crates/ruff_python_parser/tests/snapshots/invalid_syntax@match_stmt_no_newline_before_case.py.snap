@@ -7,16 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/match_stmt_no_newline
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..23,
         body: [
             Match(
                 StmtMatch {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..22,
                     subject: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 6..9,
                             id: Name("foo"),
                             ctx: Load,
@@ -25,11 +25,11 @@ Module(
                     cases: [
                         MatchCase {
                             range: 11..22,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
+                                    node_index: NodeIndex(None),
                                     range: 16..17,
-                                    node_index: AtomicNodeIndex(..),
                                     pattern: None,
                                     name: None,
                                 },
@@ -38,11 +38,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 19..22,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 19..22,
                                             },
                                         ),
@@ -61,7 +61,7 @@ Module(
 
   |
 1 | match foo: case _: ...
-  |            ^^^^ Syntax Error: Expected newline, found 'case'
+  |            ^^^^ Syntax Error: Expected newline, found `case`
   |
 
 

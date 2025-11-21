@@ -4,14 +4,26 @@ import sys
 from _typeshed import StrOrBytesPath
 from collections.abc import Iterator, Sequence
 from typing import AnyStr
+from typing_extensions import deprecated
 
 __all__ = ["escape", "glob", "iglob"]
 
 if sys.version_info >= (3, 13):
     __all__ += ["translate"]
 
-def glob0(dirname: AnyStr, pattern: AnyStr) -> list[AnyStr]: ...
-def glob1(dirname: AnyStr, pattern: AnyStr) -> list[AnyStr]: ...
+if sys.version_info >= (3, 10):
+    @deprecated(
+        "Deprecated since Python 3.10; will be removed in Python 3.15. Use `glob.glob()` with the *root_dir* argument instead."
+    )
+    def glob0(dirname: AnyStr, pattern: AnyStr) -> list[AnyStr]: ...
+    @deprecated(
+        "Deprecated since Python 3.10; will be removed in Python 3.15. Use `glob.glob()` with the *root_dir* argument instead."
+    )
+    def glob1(dirname: AnyStr, pattern: AnyStr) -> list[AnyStr]: ...
+
+else:
+    def glob0(dirname: AnyStr, pattern: AnyStr) -> list[AnyStr]: ...
+    def glob1(dirname: AnyStr, pattern: AnyStr) -> list[AnyStr]: ...
 
 if sys.version_info >= (3, 11):
     def glob(

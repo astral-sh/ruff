@@ -1,4 +1,4 @@
-use crate::symbols::{SymbolInfo, SymbolsOptions, symbols_for_file};
+use crate::symbols::{QueryPattern, SymbolInfo, symbols_for_file_global_only};
 use ruff_db::files::File;
 use ty_project::Db;
 
@@ -10,38 +10,44 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
         return Vec::new();
     }
 
-    let mut results = Vec::new();
     let project = db.project();
 
-    let options = SymbolsOptions {
-        hierarchical: false, // Workspace symbols are always flat
-        global_only: false,
-        query_string: Some(query.to_string()),
-    };
-
-    // Get all files in the project
+    let query = QueryPattern::new(query);
     let files = project.files(db);
+    let results = std::sync::Mutex::new(Vec::new());
+    {
+        let db = db.dyn_clone();
+        let files = &files;
+        let results = &results;
+        let query = &query;
 
-    // For each file, extract symbols and add them to results
-    for file in files.iter() {
-        let file_symbols = symbols_for_file(db, *file, &options);
-
-        for symbol in file_symbols {
-            results.push(WorkspaceSymbolInfo {
-                symbol,
-                file: *file,
-            });
-        }
+        rayon::scope(move |s| {
+            // For each file, extract symbols and add them to results
+            for file in files.iter() {
+                let db = db.dyn_clone();
+                s.spawn(move |_| {
+                    for (_, symbol) in symbols_for_file_global_only(&*db, *file).search(query) {
+                        // It seems like we could do better here than
+                        // locking `results` for every single symbol,
+                        // but this works pretty well as it is.
+                        results.lock().unwrap().push(WorkspaceSymbolInfo {
+                            symbol: symbol.to_owned(),
+                            file: *file,
+                        });
+                    }
+                });
+            }
+        });
     }
 
-    results
+    results.into_inner().unwrap()
 }
 
 /// A symbol found in the workspace, including the file it was found in.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkspaceSymbolInfo {
     /// The symbol information
-    pub symbol: SymbolInfo,
+    pub symbol: SymbolInfo<'static>,
     /// The file containing the symbol
     pub file: File,
 }

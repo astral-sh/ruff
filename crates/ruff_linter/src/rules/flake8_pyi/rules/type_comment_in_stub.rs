@@ -28,6 +28,7 @@ use crate::checkers::ast::LintContext;
 /// x: int = 1
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.254")]
 pub(crate) struct TypeCommentInStub;
 
 impl Violation for TypeCommentInStub {

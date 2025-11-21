@@ -35,6 +35,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `typing.Never`](https://docs.python.org/3/library/typing.html#typing.Never)
 /// - [Python documentation: `typing.NoReturn`](https://docs.python.org/3/library/typing.html#typing.NoReturn)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct NeverUnion {
     never_like: NeverLike,
     union_like: UnionLike,
@@ -164,12 +165,12 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                                         elts: rest,
                                         ctx: ast::ExprContext::Load,
                                         range: TextRange::default(),
-                                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                                         parenthesized: true,
                                     })),
                                     ctx: ast::ExprContext::Load,
                                     range: TextRange::default(),
-                                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                                 }))
                         },
                         expr.range(),

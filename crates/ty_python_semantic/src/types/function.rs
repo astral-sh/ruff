@@ -55,30 +55,35 @@ use bitflags::bitflags;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_text_size::Ranged;
 
 use crate::module_resolver::{KnownModule, file_to_module};
-use crate::place::{Boundness, Place, place_from_bindings};
+use crate::place::{Definedness, Place, place_from_bindings};
 use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::semantic_index;
+use crate::semantic_index::{FileScopeId, SemanticIndex, semantic_index};
 use crate::types::call::{Binding, CallArguments};
+use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
-    REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
+    INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
     report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
-use crate::types::generics::{GenericContext, walk_generic_context};
+use crate::types::display::DisplaySettings;
+use crate::types::generics::{GenericContext, InferableTypeVars};
+use crate::types::ide_support::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BoundMethodType, CallableType, ClassBase, ClassLiteral, ClassType, DeprecatedInstance,
-    DynamicType, KnownClass, Truthiness, Type, TypeMapping, TypeRelation, TypeTransformer,
-    TypeVarInstance, UnionBuilder, all_members, walk_type_mapping,
+    ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
+    ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
+    NormalizedVisitor, SpecialFormType, Truthiness, Type, TypeContext, TypeMapping, TypeRelation,
+    UnionBuilder, binding_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -94,7 +99,6 @@ pub(crate) struct FunctionSpans {
     pub(crate) name: Span,
     /// The span of the parameter list, including the opening and
     /// closing parentheses.
-    #[expect(dead_code)]
     pub(crate) parameters: Span,
     /// The span of the annotated return type, if present.
     pub(crate) return_type: Option<Span>,
@@ -117,8 +121,12 @@ bitflags! {
         const STATICMETHOD = 1 << 5;
         /// `@typing.override`
         const OVERRIDE = 1 << 6;
+        /// `@typing.type_check_only`
+        const TYPE_CHECK_ONLY = 1 << 7;
     }
 }
+
+impl get_size2::GetSize for FunctionDecorators {}
 
 impl FunctionDecorators {
     pub(super) fn from_decorator_type(db: &dyn Db, decorator_type: Type) -> Self {
@@ -129,6 +137,7 @@ impl FunctionDecorators {
                 Some(KnownFunction::AbstractMethod) => FunctionDecorators::ABSTRACT_METHOD,
                 Some(KnownFunction::Final) => FunctionDecorators::FINAL,
                 Some(KnownFunction::Override) => FunctionDecorators::OVERRIDE,
+                Some(KnownFunction::TypeCheckOnly) => FunctionDecorators::TYPE_CHECK_ONLY,
                 _ => FunctionDecorators::empty(),
             },
             Type::ClassLiteral(class) => match class.known(db) {
@@ -139,17 +148,6 @@ impl FunctionDecorators {
             _ => FunctionDecorators::empty(),
         }
     }
-
-    pub(super) fn from_decorator_types<'db>(
-        db: &'db dyn Db,
-        types: impl IntoIterator<Item = Type<'db>>,
-    ) -> Self {
-        types
-            .into_iter()
-            .fold(FunctionDecorators::empty(), |acc, ty| {
-                acc | FunctionDecorators::from_decorator_type(db, ty)
-            })
-    }
 }
 
 bitflags! {
@@ -157,8 +155,8 @@ bitflags! {
     /// arguments that were passed in. For the precise meaning of the fields, see [1].
     ///
     /// [1]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
-    pub struct DataclassTransformerParams: u8 {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, salsa::Update)]
+    pub struct DataclassTransformerFlags: u8 {
         const EQ_DEFAULT = 1 << 0;
         const ORDER_DEFAULT = 1 << 1;
         const KW_ONLY_DEFAULT = 1 << 2;
@@ -166,12 +164,35 @@ bitflags! {
     }
 }
 
-impl get_size2::GetSize for DataclassTransformerParams {}
+impl get_size2::GetSize for DataclassTransformerFlags {}
 
-impl Default for DataclassTransformerParams {
+impl Default for DataclassTransformerFlags {
     fn default() -> Self {
         Self::EQ_DEFAULT
     }
+}
+
+/// Metadata for a dataclass-transformer. Stored inside a `Type::DataclassTransformer(…)`
+/// instance that we use as the return type for `dataclass_transform(…)` calls.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct DataclassTransformerParams<'db> {
+    pub flags: DataclassTransformerFlags,
+
+    #[returns(deref)]
+    pub field_specifiers: Box<[Type<'db>]>,
+}
+
+impl get_size2::GetSize for DataclassTransformerParams<'_> {}
+
+/// Whether a function should implicitly be treated as a staticmethod based on its name.
+pub(crate) fn is_implicit_staticmethod(function_name: &str) -> bool {
+    matches!(function_name, "__new__")
+}
+
+/// Whether a function should implicitly be treated as a classmethod based on its name.
+pub(crate) fn is_implicit_classmethod(function_name: &str) -> bool {
+    matches!(function_name, "__init_subclass__" | "__class_getitem__")
 }
 
 /// Representation of a function definition in the AST: either a non-generic function, or a generic
@@ -184,7 +205,7 @@ impl Default for DataclassTransformerParams {
 /// Ordering is based on the function's id assigned by salsa and not on the function literal's
 /// values. The id may change between runs, or when the function literal was garbage collected and
 /// recreated.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct OverloadLiteral<'db> {
     /// Name of the function at definition.
@@ -205,7 +226,7 @@ pub struct OverloadLiteral<'db> {
 
     /// The arguments to `dataclass_transformer`, if this function was annotated
     /// with `@dataclass_transformer(...)`.
-    pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams>,
+    pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -216,7 +237,7 @@ impl<'db> OverloadLiteral<'db> {
     fn with_dataclass_transformer_params(
         self,
         db: &'db dyn Db,
-        params: DataclassTransformerParams,
+        params: DataclassTransformerParams<'db>,
     ) -> Self {
         Self::new(
             db,
@@ -243,6 +264,20 @@ impl<'db> OverloadLiteral<'db> {
         self.has_known_decorator(db, FunctionDecorators::OVERLOAD)
     }
 
+    /// Returns true if this overload is decorated with `@staticmethod`, or if it is implicitly a
+    /// staticmethod.
+    pub(crate) fn is_staticmethod(self, db: &dyn Db) -> bool {
+        self.has_known_decorator(db, FunctionDecorators::STATICMETHOD)
+            || is_implicit_staticmethod(self.name(db))
+    }
+
+    /// Returns true if this overload is decorated with `@classmethod`, or if it is implicitly a
+    /// classmethod.
+    pub(crate) fn is_classmethod(self, db: &dyn Db) -> bool {
+        self.has_known_decorator(db, FunctionDecorators::CLASSMETHOD)
+            || is_implicit_classmethod(self.name(db))
+    }
+
     fn node<'ast>(
         self,
         db: &dyn Db,
@@ -256,7 +291,7 @@ impl<'db> OverloadLiteral<'db> {
             the function is defined."
         );
 
-        self.body_scope(db).node(db).expect_function(module)
+        self.body_scope(db).node(db).expect_function().node(module)
     }
 
     /// Returns the [`FileRange`] of the function's name.
@@ -265,7 +300,8 @@ impl<'db> OverloadLiteral<'db> {
             self.file(db),
             self.body_scope(db)
                 .node(db)
-                .expect_function(module)
+                .expect_function()
+                .node(module)
                 .name
                 .range,
         )
@@ -281,9 +317,8 @@ impl<'db> OverloadLiteral<'db> {
     /// over-invalidation.
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
-        let module = parsed_module(db, self.file(db)).load(db);
         let index = semantic_index(db, body_scope.file(db));
-        index.expect_single_definition(body_scope.node(db).expect_function(&module))
+        index.expect_single_definition(body_scope.node(db).expect_function())
     }
 
     /// Returns the overload immediately before this one in the AST. Returns `None` if there is no
@@ -297,11 +332,12 @@ impl<'db> OverloadLiteral<'db> {
         let use_id = self
             .body_scope(db)
             .node(db)
-            .expect_function(&module)
+            .expect_function()
+            .node(&module)
             .name
             .scoped_use_id(db, scope);
 
-        let Place::Type(Type::FunctionLiteral(previous_type), Boundness::Bound) =
+        let Place::Defined(Type::FunctionLiteral(previous_type), _, Definedness::AlwaysDefined) =
             place_from_bindings(db, use_def.bindings_at_use(use_id))
         else {
             return None;
@@ -327,30 +363,113 @@ impl<'db> OverloadLiteral<'db> {
     /// calling query is not in the same file as this function is defined in, then this will create
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
-    pub(crate) fn signature(
-        self,
-        db: &'db dyn Db,
-        inherited_generic_context: Option<GenericContext<'db>>,
-    ) -> Signature<'db> {
+    pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
+        let mut signature = self.raw_signature(db);
+
         let scope = self.body_scope(db);
         let module = parsed_module(db, self.file(db)).load(db);
-        let function_stmt_node = scope.node(db).expect_function(&module);
-        let definition = self.definition(db);
-        let generic_context = function_stmt_node.type_params.as_ref().map(|type_params| {
-            let index = semantic_index(db, scope.file(db));
-            GenericContext::from_type_params(db, index, type_params)
-        });
-
+        let function_node = scope.node(db).expect_function().node(&module);
         let index = semantic_index(db, scope.file(db));
-        let is_generator = scope.file_scope_id(db).is_generator_function(index);
+        let file_scope_id = scope.file_scope_id(db);
+        let is_generator = file_scope_id.is_generator_function(index);
+
+        if function_node.is_async && !is_generator {
+            signature = signature.wrap_coroutine_return_type(db);
+        }
+
+        signature
+    }
+
+    /// Typed internally-visible "raw" signature for this function.
+    /// That is, the return types of async functions are not wrapped in `CoroutineType[...]`.
+    ///
+    /// ## Warning
+    ///
+    /// This uses the semantic index to find the definition of the function. This means that if the
+    /// calling query is not in the same file as this function is defined in, then this will create
+    /// a cross-module dependency directly on the full AST which will lead to cache
+    /// over-invalidation.
+    fn raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
+        /// `self` or `cls` can be implicitly positional-only if:
+        /// - It is a method AND
+        /// - No parameters in the method use PEP-570 syntax AND
+        /// - It is not a `@staticmethod` AND
+        /// - `self`/`cls` is not explicitly positional-only using the PEP-484 convention AND
+        /// - Either the next parameter after `self`/`cls` uses the PEP-484 convention,
+        ///   or the enclosing class is a `Protocol` class
+        fn has_implicitly_positional_only_first_param<'db>(
+            db: &'db dyn Db,
+            literal: OverloadLiteral<'db>,
+            node: &ast::StmtFunctionDef,
+            scope: FileScopeId,
+            index: &SemanticIndex,
+        ) -> bool {
+            let parameters = &node.parameters;
+
+            if !parameters.posonlyargs.is_empty() {
+                return false;
+            }
+
+            let Some(first_param) = parameters.args.first() else {
+                return false;
+            };
+
+            if first_param.uses_pep_484_positional_only_convention() {
+                return false;
+            }
+
+            if literal.is_staticmethod(db) {
+                return false;
+            }
+
+            let Some(class_definition) = index.class_definition_of_method(scope) else {
+                return false;
+            };
+
+            // `self` and `cls` are always positional-only if the next parameter uses the
+            // PEP-484 convention.
+            if parameters
+                .args
+                .get(1)
+                .is_some_and(ParameterWithDefault::uses_pep_484_positional_only_convention)
+            {
+                return true;
+            }
+
+            // If there isn't any parameter other than `self`/`cls`,
+            // or there is but it isn't using the PEP-484 convention,
+            // then `self`/`cls` are only implicitly positional-only if
+            // it is a protocol class.
+            let class_type = binding_type(db, class_definition);
+            class_type
+                .to_class_type(db)
+                .is_some_and(|class| class.is_protocol(db))
+        }
+
+        let scope = self.body_scope(db);
+        let module = parsed_module(db, self.file(db)).load(db);
+        let function_stmt_node = scope.node(db).expect_function().node(&module);
+        let definition = self.definition(db);
+        let index = semantic_index(db, scope.file(db));
+        let pep695_ctx = function_stmt_node.type_params.as_ref().map(|type_params| {
+            GenericContext::from_type_params(db, index, definition, type_params)
+        });
+        let file_scope_id = scope.file_scope_id(db);
+
+        let has_implicitly_positional_first_parameter = has_implicitly_positional_only_first_param(
+            db,
+            self,
+            function_stmt_node,
+            file_scope_id,
+            index,
+        );
 
         Signature::from_function(
             db,
-            generic_context,
-            inherited_generic_context,
+            pep695_ctx,
             definition,
             function_stmt_node,
-            is_generator,
+            has_implicitly_positional_first_parameter,
         )
     }
 
@@ -363,7 +482,7 @@ impl<'db> OverloadLiteral<'db> {
         let span = Span::from(function_scope.file(db));
         let node = function_scope.node(db);
         let module = parsed_module(db, self.file(db)).load(db);
-        let func_def = node.as_function(&module)?;
+        let func_def = node.as_function()?.node(&module);
         let range = parameter_index
             .and_then(|parameter_index| {
                 func_def
@@ -383,7 +502,7 @@ impl<'db> OverloadLiteral<'db> {
         let span = Span::from(function_scope.file(db));
         let node = function_scope.node(db);
         let module = parsed_module(db, self.file(db)).load(db);
-        let func_def = node.as_function(&module)?;
+        let func_def = node.as_function()?.node(&module);
         let return_type_range = func_def.returns.as_ref().map(|returns| returns.range());
         let mut signature = func_def.name.range.cover(func_def.parameters.range);
         if let Some(return_type_range) = return_type_range {
@@ -406,59 +525,25 @@ impl<'db> OverloadLiteral<'db> {
 /// Ordering is based on the function's id assigned by salsa and not on the function literal's
 /// values. The id may change between runs, or when the function literal was garbage collected and
 /// recreated.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct FunctionLiteral<'db> {
     pub(crate) last_definition: OverloadLiteral<'db>,
-
-    /// The inherited generic context, if this function is a constructor method (`__new__` or
-    /// `__init__`) being used to infer the specialization of its generic class. If any of the
-    /// method's overloads are themselves generic, this is in addition to those per-overload
-    /// generic contexts (which are created lazily in [`OverloadLiteral::signature`]).
-    ///
-    /// If the function is not a constructor method, this field will always be `None`.
-    ///
-    /// If the function is a constructor method, we will end up creating two `FunctionLiteral`
-    /// instances for it. The first is created in [`TypeInferenceBuilder`][infer] when we encounter
-    /// the function definition during type inference. At this point, we don't yet know if the
-    /// function is a constructor method, so we create a `FunctionLiteral` with `None` for this
-    /// field.
-    ///
-    /// If at some point we encounter a call expression, which invokes the containing class's
-    /// constructor, as will create a _new_ `FunctionLiteral` instance for the function, with this
-    /// field [updated][] to contain the containing class's generic context.
-    ///
-    /// [infer]: crate::types::infer::TypeInferenceBuilder::infer_function_definition
-    /// [updated]: crate::types::class::ClassLiteral::own_class_member
-    inherited_generic_context: Option<GenericContext<'db>>,
 }
 
-fn walk_function_literal<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    function: FunctionLiteral<'db>,
-    visitor: &mut V,
-) {
-    if let Some(context) = function.inherited_generic_context(db) {
-        walk_generic_context(db, context, visitor);
-    }
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for FunctionLiteral<'_> {}
+
+fn overloads_and_implementation_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: FunctionLiteral<'db>,
+) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
+    (Box::new([]), None)
 }
 
 #[salsa::tracked]
 impl<'db> FunctionLiteral<'db> {
-    fn with_inherited_generic_context(
-        self,
-        db: &'db dyn Db,
-        inherited_generic_context: GenericContext<'db>,
-    ) -> Self {
-        // A function cannot inherit more than one generic context from its containing class.
-        debug_assert!(self.inherited_generic_context(db).is_none());
-        Self::new(
-            db,
-            self.last_definition(db),
-            Some(inherited_generic_context),
-        )
-    }
-
     fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         // All of the overloads of a function literal should have the same name.
         self.last_definition(db).name(db)
@@ -499,7 +584,7 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition(db).spans(db)
     }
 
-    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size, cycle_initial=overloads_and_implementation_cycle_initial)]
     fn overloads_and_implementation(
         self,
         db: &'db dyn Db,
@@ -546,55 +631,64 @@ impl<'db> FunctionLiteral<'db> {
     /// calling query is not in the same file as this function is defined in, then this will create
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
-    fn signature<'a>(
-        self,
-        db: &'db dyn Db,
-        type_mappings: &'a [TypeMapping<'a, 'db>],
-    ) -> CallableSignature<'db>
-    where
-        'db: 'a,
-    {
+    fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         // We only include an implementation (i.e. a definition not decorated with `@overload`) if
         // it's the only definition.
-        let inherited_generic_context = self.inherited_generic_context(db);
         let (overloads, implementation) = self.overloads_and_implementation(db);
-        if let Some(implementation) = implementation {
-            if overloads.is_empty() {
-                return CallableSignature::single(type_mappings.iter().fold(
-                    implementation.signature(db, inherited_generic_context),
-                    |ty, mapping| ty.apply_type_mapping(db, mapping),
-                ));
-            }
+        if let Some(implementation) = implementation
+            && overloads.is_empty()
+        {
+            return CallableSignature::single(implementation.signature(db));
         }
 
-        CallableSignature::from_overloads(overloads.iter().map(|overload| {
-            type_mappings.iter().fold(
-                overload.signature(db, inherited_generic_context),
-                |ty, mapping| ty.apply_type_mapping(db, mapping),
-            )
-        }))
+        CallableSignature::from_overloads(overloads.iter().map(|overload| overload.signature(db)))
     }
 
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Self {
-        let context = self
-            .inherited_generic_context(db)
-            .map(|ctx| ctx.normalized_impl(db, visitor));
-        Self::new(db, self.last_definition(db), context)
+    /// Typed externally-visible signature of the last overload or implementation of this function.
+    ///
+    /// ## Warning
+    ///
+    /// This uses the semantic index to find the definition of the function. This means that if the
+    /// calling query is not in the same file as this function is defined in, then this will create
+    /// a cross-module dependency directly on the full AST which will lead to cache
+    /// over-invalidation.
+    fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
+        self.last_definition(db).signature(db)
+    }
+
+    /// Typed externally-visible "raw" signature of the last overload or implementation of this function.
+    ///
+    /// ## Warning
+    ///
+    /// This uses the semantic index to find the definition of the function. This means that if the
+    /// calling query is not in the same file as this function is defined in, then this will create
+    /// a cross-module dependency directly on the full AST which will lead to cache
+    /// over-invalidation.
+    fn last_definition_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
+        self.last_definition(db).raw_signature(db)
     }
 }
 
 /// Represents a function type, which might be a non-generic function, or a specialization of a
 /// generic function.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct FunctionType<'db> {
     pub(crate) literal: FunctionLiteral<'db>,
 
-    /// Type mappings that should be applied to the function's parameter and return types. This
-    /// might include specializations of enclosing generic contexts (e.g. for non-generic methods
-    /// of a specialized generic class).
-    #[returns(deref)]
-    type_mappings: Box<[TypeMapping<'db, 'db>]>,
+    /// Contains a potentially modified signature for this function literal, in case certain operations
+    /// (like type mappings) have been applied to it.
+    ///
+    /// See also: [`FunctionLiteral::updated_signature`].
+    #[returns(as_ref)]
+    updated_signature: Option<CallableSignature<'db>>,
+
+    /// Contains a potentially modified signature for the last overload or the implementation of this
+    /// function literal, in case certain operations (like type mappings) have been applied to it.
+    ///
+    /// See also: [`FunctionLiteral::last_definition_signature`].
+    #[returns(as_ref)]
+    updated_last_definition_signature: Option<Signature<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -603,11 +697,15 @@ impl get_size2::GetSize for FunctionType<'_> {}
 pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     function: FunctionType<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
-    walk_function_literal(db, function.literal(db), visitor);
-    for mapping in function.type_mappings(db) {
-        walk_type_mapping(db, mapping, visitor);
+    if let Some(callable_signature) = function.updated_signature(db) {
+        for signature in &callable_signature.overloads {
+            walk_signature(db, signature, visitor);
+        }
+    }
+    if let Some(signature) = function.updated_last_definition_signature(db) {
+        walk_signature(db, signature, visitor);
     }
 }
 
@@ -618,30 +716,46 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         inherited_generic_context: GenericContext<'db>,
     ) -> Self {
-        let literal = self
-            .literal(db)
+        let updated_signature = self
+            .signature(db)
             .with_inherited_generic_context(db, inherited_generic_context);
-        Self::new(db, literal, self.type_mappings(db))
+        let updated_last_definition_signature = self
+            .last_definition_signature(db)
+            .clone()
+            .with_inherited_generic_context(db, inherited_generic_context);
+        Self::new(
+            db,
+            self.literal(db),
+            Some(updated_signature),
+            Some(updated_last_definition_signature),
+        )
     }
 
-    pub(crate) fn with_type_mapping<'a>(
+    pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        let type_mappings: Box<[_]> = self
-            .type_mappings(db)
-            .iter()
-            .cloned()
-            .chain(std::iter::once(type_mapping.to_owned()))
-            .collect();
-        Self::new(db, self.literal(db), type_mappings)
+        let updated_signature =
+            self.signature(db)
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        let updated_last_definition_signature = self
+            .last_definition_signature(db)
+            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        Self::new(
+            db,
+            self.literal(db),
+            Some(updated_signature),
+            Some(updated_last_definition_signature),
+        )
     }
 
     pub(crate) fn with_dataclass_transformer_params(
         self,
         db: &'db dyn Db,
-        params: DataclassTransformerParams,
+        params: DataclassTransformerParams<'db>,
     ) -> Self {
         // A decorator only applies to the specific overload that it is attached to, not to all
         // previous overloads.
@@ -649,9 +763,8 @@ impl<'db> FunctionType<'db> {
         let last_definition = literal
             .last_definition(db)
             .with_dataclass_transformer_params(db, params);
-        let literal =
-            FunctionLiteral::new(db, last_definition, literal.inherited_generic_context(db));
-        Self::new(db, literal, self.type_mappings(db))
+        let literal = FunctionLiteral::new(db, last_definition);
+        Self::new(db, literal, None, None)
     }
 
     /// Returns the [`File`] in which this function is defined.
@@ -688,6 +801,20 @@ impl<'db> FunctionType<'db> {
     /// conditions.
     pub(crate) fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
         self.literal(db).has_known_decorator(db, decorator)
+    }
+
+    /// Returns true if this method is decorated with `@classmethod`, or if it is implicitly a
+    /// classmethod.
+    pub(crate) fn is_classmethod(self, db: &'db dyn Db) -> bool {
+        self.iter_overloads_and_implementation(db)
+            .any(|overload| overload.is_classmethod(db))
+    }
+
+    /// Returns true if this method is decorated with `@staticmethod`, or if it is implicitly a
+    /// static method.
+    pub(crate) fn is_staticmethod(self, db: &'db dyn Db) -> bool {
+        self.iter_overloads_and_implementation(db)
+            .any(|overload| overload.is_staticmethod(db))
     }
 
     /// If the implementation of this function is deprecated, returns the `@warnings.deprecated`.
@@ -790,14 +917,44 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(ref), cycle_initial=signature_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
-        self.literal(db).signature(db, self.type_mappings(db))
+        self.updated_signature(db)
+            .cloned()
+            .unwrap_or_else(|| self.literal(db).signature(db))
+    }
+
+    /// Typed externally-visible signature of the last overload or implementation of this function.
+    ///
+    /// ## Why is this a salsa query?
+    ///
+    /// This is a salsa query to short-circuit the invalidation
+    /// when the function's AST node changes.
+    ///
+    /// Were this not a salsa query, then the calling query
+    /// would depend on the function's AST and rerun for every change in that file.
+    #[salsa::tracked(
+        returns(ref), cycle_initial=last_definition_signature_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    pub(crate) fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
+        self.updated_last_definition_signature(db)
+            .cloned()
+            .unwrap_or_else(|| self.literal(db).last_definition_signature(db))
+    }
+
+    /// Typed externally-visible "raw" signature of the last overload or implementation of this function.
+    #[salsa::tracked(
+        returns(ref), cycle_initial=last_definition_signature_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    pub(crate) fn last_definition_raw_signature(self, db: &'db dyn Db) -> Signature<'db> {
+        self.literal(db).last_definition_raw_signature(db)
     }
 
     /// Convert the `FunctionType` into a [`CallableType`].
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(db, self.signature(db), false)
+        CallableType::new(db, self.signature(db), true)
     }
 
     /// Convert the `FunctionType` into a [`BoundMethodType`].
@@ -809,82 +966,92 @@ impl<'db> FunctionType<'db> {
         BoundMethodType::new(db, self, self_instance)
     }
 
-    pub(crate) fn has_relation_to(
+    pub(crate) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
-        relation: TypeRelation,
-    ) -> bool {
-        match relation {
-            TypeRelation::Subtyping => self.is_subtype_of(db, other),
-            TypeRelation::Assignability => self.is_assignable_to(db, other),
-        }
-    }
-
-    pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
+        inferable: InferableTypeVars<'_, 'db>,
+        relation: TypeRelation<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         // A function type is the subtype of itself, and not of any other function type. However,
         // our representation of a function type includes any specialization that should be applied
         // to the signature. Different specializations of the same function type are only subtypes
         // of each other if they result in subtype signatures.
-        if self.normalized(db) == other.normalized(db) {
-            return true;
+        if matches!(
+            relation,
+            TypeRelation::Subtyping | TypeRelation::Redundancy | TypeRelation::SubtypingAssuming(_)
+        ) && self.normalized(db) == other.normalized(db)
+        {
+            return ConstraintSet::from(true);
         }
+
         if self.literal(db) != other.literal(db) {
-            return false;
+            return ConstraintSet::from(false);
         }
+
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
-        self_signature.is_subtype_of(db, other_signature)
+        self_signature.has_relation_to_impl(
+            db,
+            other_signature,
+            inferable,
+            relation,
+            relation_visitor,
+            disjointness_visitor,
+        )
     }
 
-    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        // A function type is assignable to itself, and not to any other function type. However,
-        // our representation of a function type includes any specialization that should be applied
-        // to the signature. Different specializations of the same function type are only
-        // assignable to each other if they result in assignable signatures.
-        self.literal(db) == other.literal(db)
-            && self.signature(db).is_assignable_to(db, other.signature(db))
-    }
-
-    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        if self.normalized(db) == other.normalized(db) {
-            return true;
-        }
-        if self.literal(db) != other.literal(db) {
-            return false;
-        }
-        let self_signature = self.signature(db);
-        let other_signature = other.signature(db);
-        self_signature.is_equivalent_to(db, other_signature)
-    }
-
-    pub(crate) fn find_legacy_typevars(
+    pub(crate) fn is_equivalent_to_impl(
         self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        other: Self,
+        inferable: InferableTypeVars<'_, 'db>,
+        visitor: &IsEquivalentVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        if self.normalized(db) == other.normalized(db) {
+            return ConstraintSet::from(true);
+        }
+        if self.literal(db) != other.literal(db) {
+            return ConstraintSet::from(false);
+        }
+        let self_signature = self.signature(db);
+        let other_signature = other.signature(db);
+        self_signature.is_equivalent_to_impl(db, other_signature, inferable, visitor)
+    }
+
+    pub(crate) fn find_legacy_typevars_impl(
+        self,
+        db: &'db dyn Db,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         let signatures = self.signature(db);
         for signature in &signatures.overloads {
-            signature.find_legacy_typevars(db, typevars);
+            signature.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
 
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        let mut visitor = TypeTransformer::default();
-        self.normalized_impl(db, &mut visitor)
+        self.normalized_impl(db, &NormalizedVisitor::default())
     }
 
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
-        let mappings: Box<_> = self
-            .type_mappings(db)
-            .iter()
-            .map(|mapping| mapping.normalized_impl(db, visitor))
-            .collect();
-        Self::new(db, self.literal(db).normalized_impl(db, visitor), mappings)
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        let literal = self.literal(db);
+        let updated_signature = self
+            .updated_signature(db)
+            .map(|signature| signature.normalized_impl(db, visitor));
+        let updated_last_definition_signature = self
+            .updated_last_definition_signature(db)
+            .map(|signature| signature.normalized_impl(db, visitor));
+        Self::new(
+            db,
+            literal,
+            updated_signature,
+            updated_last_definition_signature,
+        )
     }
 }
 
@@ -898,18 +1065,17 @@ fn is_instance_truthiness<'db>(
     class: ClassLiteral<'db>,
 ) -> Truthiness {
     let is_instance = |ty: &Type<'_>| {
-        if let Type::NominalInstance(instance) = ty {
-            if instance
-                .class
+        if let Type::NominalInstance(instance) = ty
+            && instance
+                .class(db)
                 .iter_mro(db)
                 .filter_map(ClassBase::into_class)
                 .any(|c| match c {
                     ClassType::Generic(c) => c.origin(db) == class,
                     ClassType::NonGeneric(c) => c == class,
                 })
-            {
-                return true;
-            }
+        {
+            return true;
         }
         false
     };
@@ -937,28 +1103,30 @@ fn is_instance_truthiness<'db>(
 
         Type::NominalInstance(..) => always_true_if(is_instance(&ty)),
 
+        Type::NewTypeInstance(newtype) => always_true_if(is_instance(&Type::instance(
+            db,
+            newtype.base_class_type(db),
+        ))),
+
         Type::BooleanLiteral(..)
         | Type::BytesLiteral(..)
         | Type::IntLiteral(..)
         | Type::StringLiteral(..)
         | Type::LiteralString
         | Type::ModuleLiteral(..)
-        | Type::EnumLiteral(..) => always_true_if(
+        | Type::EnumLiteral(..)
+        | Type::FunctionLiteral(..) => always_true_if(
             ty.literal_fallback_instance(db)
                 .as_ref()
                 .is_some_and(is_instance),
         ),
 
-        Type::Tuple(..) => always_true_if(class.is_known(db, KnownClass::Tuple)),
-
-        Type::FunctionLiteral(..) => {
-            always_true_if(is_instance(&KnownClass::FunctionType.to_instance(db)))
-        }
-
         Type::ClassLiteral(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(db))),
 
+        Type::TypeAlias(alias) => is_instance_truthiness(db, alias.value_type(db), class),
+
         Type::BoundMethod(..)
-        | Type::MethodWrapper(..)
+        | Type::KnownBoundMethod(..)
         | Type::WrapperDescriptor(..)
         | Type::DataclassDecorator(..)
         | Type::DataclassTransformer(..)
@@ -984,26 +1152,34 @@ fn is_instance_truthiness<'db>(
     }
 }
 
-fn signature_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &CallableSignature<'db>,
-    _count: u32,
-    _function: FunctionType<'db>,
-) -> salsa::CycleRecoveryAction<CallableSignature<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
 fn signature_cycle_initial<'db>(
-    db: &'db dyn Db,
+    _db: &'db dyn Db,
+    _id: salsa::Id,
     _function: FunctionType<'db>,
 ) -> CallableSignature<'db> {
-    CallableSignature::single(Signature::bottom(db))
+    CallableSignature::single(Signature::bottom())
+}
+
+fn last_definition_signature_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _function: FunctionType<'db>,
+) -> Signature<'db> {
+    Signature::bottom()
 }
 
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
 /// have special behavior.
 #[derive(
-    Debug, Copy, Clone, PartialEq, Eq, Hash, strum_macros::EnumString, strum_macros::IntoStaticStr,
+    Debug,
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    strum_macros::EnumString,
+    strum_macros::IntoStaticStr,
+    get_size2::GetSize,
 )]
 #[strum(serialize_all = "snake_case")]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]
@@ -1028,12 +1204,14 @@ pub enum KnownFunction {
     DunderImport,
     /// `importlib.import_module`, which returns the submodule.
     ImportModule,
-
     /// `typing(_extensions).final`
     Final,
-
+    /// `typing(_extensions).disjoint_base`
+    DisjointBase,
     /// [`typing(_extensions).no_type_check`](https://typing.python.org/en/latest/spec/directives.html#no-type-check)
     NoTypeCheck,
+    /// `typing(_extensions).type_check_only`
+    TypeCheckOnly,
 
     /// `typing(_extensions).assert_type`
     AssertType,
@@ -1090,12 +1268,10 @@ pub enum KnownFunction {
     AllMembers,
     /// `ty_extensions.has_member`
     HasMember,
-    /// `ty_extensions.top_materialization`
-    TopMaterialization,
-    /// `ty_extensions.bottom_materialization`
-    BottomMaterialization,
     /// `ty_extensions.reveal_protocol_interface`
     RevealProtocolInterface,
+    /// `ty_extensions.reveal_mro`
+    RevealMro,
 }
 
 impl KnownFunction {
@@ -1118,7 +1294,7 @@ impl KnownFunction {
             .then_some(candidate)
     }
 
-    /// Return `true` if `self` is defined in `module` at runtime.
+    /// Return `true` if `self` is defined in `module`
     const fn check_module(self, module: KnownModule) -> bool {
         match self {
             Self::IsInstance
@@ -1138,6 +1314,7 @@ impl KnownFunction {
             | Self::GetProtocolMembers
             | Self::RuntimeCheckable
             | Self::DataclassTransform
+            | Self::DisjointBase
             | Self::NoTypeCheck => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
@@ -1154,16 +1331,17 @@ impl KnownFunction {
             | Self::IsSingleValued
             | Self::IsSingleton
             | Self::IsSubtypeOf
-            | Self::TopMaterialization
-            | Self::BottomMaterialization
             | Self::GenericContext
             | Self::DunderAllNames
             | Self::EnumMembers
             | Self::StaticAssert
             | Self::HasMember
             | Self::RevealProtocolInterface
+            | Self::RevealMro
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
+
+            Self::TypeCheckOnly => matches!(module, KnownModule::Typing),
         }
     }
 
@@ -1191,10 +1369,11 @@ impl KnownFunction {
                 {
                     let mut diag = builder.into_diagnostic("Revealed type");
                     let span = context.span(&call_expression.arguments.args[0]);
-                    diag.annotate(
-                        Annotation::primary(span)
-                            .message(format_args!("`{}`", revealed_type.display(db))),
-                    );
+                    diag.annotate(Annotation::primary(span).message(format_args!(
+                        "`{}`",
+                        revealed_type
+                            .display_with(db, DisplaySettings::default().preserve_long_unions())
+                    )));
                 }
             }
 
@@ -1235,6 +1414,12 @@ impl KnownFunction {
                         asserted_type = asserted_ty.display(db),
                         inferred_type = actual_ty.display(db),
                     ));
+
+                    diagnostic.set_concise_message(format_args!(
+                        "Type `{}` does not match asserted type `{}`",
+                        asserted_ty.display(db),
+                        actual_ty.display(db),
+                    ));
                 }
             }
 
@@ -1259,6 +1444,11 @@ impl KnownFunction {
                     diagnostic.info(format_args!(
                         "`Never` and `{inferred_type}` are not equivalent types",
                         inferred_type = actual_ty.display(db),
+                    ));
+
+                    diagnostic.set_concise_message(format_args!(
+                        "Type `{}` is not equivalent to `Never`",
+                        actual_ty.display(db),
                     ));
                 }
             }
@@ -1294,7 +1484,7 @@ impl KnownFunction {
                         return;
                     }
                     let mut diagnostic = if let Some(message) = message
-                        .and_then(Type::into_string_literal)
+                        .and_then(Type::as_string_literal)
                         .map(|s| s.value(db))
                     {
                         builder.into_diagnostic(format_args!("Static assertion error: {message}"))
@@ -1332,8 +1522,8 @@ impl KnownFunction {
                 let contains_unknown_or_todo =
                     |ty| matches!(ty, Type::Dynamic(dynamic) if dynamic != DynamicType::Any);
                 if source_type.is_equivalent_to(db, *casted_type)
-                    && !any_over_type(db, *source_type, &contains_unknown_or_todo)
-                    && !any_over_type(db, *casted_type, &contains_unknown_or_todo)
+                    && !any_over_type(db, *source_type, &contains_unknown_or_todo, true)
+                    && !any_over_type(db, *casted_type, &contains_unknown_or_todo, true)
                 {
                     if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
                         builder.into_diagnostic(format_args!(
@@ -1359,7 +1549,7 @@ impl KnownFunction {
                     return;
                 };
                 let Some(protocol_class) = param_type
-                    .into_class_literal()
+                    .to_class_type(db)
                     .and_then(|class| class.into_protocol_class(db))
                 else {
                     report_bad_argument_to_protocol_interface(
@@ -1381,26 +1571,211 @@ impl KnownFunction {
                 }
             }
 
+            KnownFunction::RevealMro => {
+                let [Some(param_type)] = parameter_types else {
+                    return;
+                };
+                let mut good_argument = true;
+                let classes = match param_type {
+                    Type::ClassLiteral(class) => vec![ClassType::NonGeneric(*class)],
+                    Type::GenericAlias(generic_alias) => vec![ClassType::Generic(*generic_alias)],
+                    Type::Union(union) => {
+                        let elements = union.elements(db);
+                        let mut classes = Vec::with_capacity(elements.len());
+                        for element in elements {
+                            match element {
+                                Type::ClassLiteral(class) => {
+                                    classes.push(ClassType::NonGeneric(*class));
+                                }
+                                Type::GenericAlias(generic_alias) => {
+                                    classes.push(ClassType::Generic(*generic_alias));
+                                }
+                                _ => {
+                                    good_argument = false;
+                                    break;
+                                }
+                            }
+                        }
+                        classes
+                    }
+                    _ => {
+                        good_argument = false;
+                        vec![]
+                    }
+                };
+                if !good_argument {
+                    let Some(builder) =
+                        context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
+                    else {
+                        return;
+                    };
+                    let mut diagnostic =
+                        builder.into_diagnostic("Invalid argument to `reveal_mro`");
+                    diagnostic.set_primary_message(format_args!(
+                        "Can only pass a class object, generic alias or a union thereof"
+                    ));
+                    return;
+                }
+                if let Some(builder) =
+                    context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
+                {
+                    let mut diag = builder.into_diagnostic("Revealed MRO");
+                    let span = context.span(&call_expression.arguments.args[0]);
+                    let mut message = String::new();
+                    for (i, class) in classes.iter().enumerate() {
+                        message.push('(');
+                        for class in class.iter_mro(db) {
+                            message.push_str(&class.display(db).to_string());
+                            // Omit the comma for the last element (which is always `object`)
+                            if class
+                                .into_class()
+                                .is_none_or(|base| !base.is_object(context.db()))
+                            {
+                                message.push_str(", ");
+                            }
+                        }
+                        // If the last element was also the first element
+                        // (i.e., it's a length-1 tuple -- which can only happen if we're revealing
+                        // the MRO for `object` itself), add a trailing comma so that it's still a
+                        // valid tuple display.
+                        if class.is_object(db) {
+                            message.push(',');
+                        }
+                        message.push(')');
+                        if i < classes.len() - 1 {
+                            message.push_str(" | ");
+                        }
+                    }
+                    diag.annotate(Annotation::primary(span).message(message));
+                }
+            }
+
             KnownFunction::IsInstance | KnownFunction::IsSubclass => {
-                let [Some(first_arg), Some(Type::ClassLiteral(class))] = parameter_types else {
+                let [Some(first_arg), Some(second_argument)] = parameter_types else {
                     return;
                 };
 
-                if let Some(protocol_class) = class.into_protocol_class(db) {
-                    if !protocol_class.is_runtime_checkable(db) {
-                        report_runtime_check_against_non_runtime_checkable_protocol(
-                            context,
-                            call_expression,
-                            protocol_class,
-                            self,
-                        );
-                    }
-                }
+                match second_argument {
+                    Type::ClassLiteral(class) => {
+                        if let Some(protocol_class) = class.into_protocol_class(db)
+                            && !protocol_class.is_runtime_checkable(db)
+                        {
+                            report_runtime_check_against_non_runtime_checkable_protocol(
+                                context,
+                                call_expression,
+                                protocol_class,
+                                self,
+                            );
+                        }
 
-                if self == KnownFunction::IsInstance {
-                    overload.set_return_type(
-                        is_instance_truthiness(db, *first_arg, *class).into_type(db),
-                    );
+                        if self == KnownFunction::IsInstance {
+                            overload.set_return_type(
+                                is_instance_truthiness(db, *first_arg, *class).into_type(db),
+                            );
+                        }
+                    }
+                    // The special-casing here is necessary because we recognise the symbol `typing.Any` as an
+                    // instance of `type` at runtime. Even once we understand typeshed's annotation for
+                    // `isinstance()`, we'd continue to accept calls such as `isinstance(x, typing.Any)` without
+                    // emitting a diagnostic if we didn't have this branch.
+                    Type::SpecialForm(SpecialFormType::Any)
+                        if self == KnownFunction::IsInstance =>
+                    {
+                        let Some(builder) =
+                            context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
+                        else {
+                            return;
+                        };
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "`typing.Any` cannot be used with `isinstance()`"
+                        ));
+                        diagnostic
+                            .set_primary_message("This call will raise `TypeError` at runtime");
+                    }
+
+                    Type::KnownInstance(KnownInstanceType::UnionType(_)) => {
+                        fn find_invalid_elements<'db>(
+                            db: &'db dyn Db,
+                            function: KnownFunction,
+                            ty: Type<'db>,
+                            invalid_elements: &mut Vec<Type<'db>>,
+                        ) {
+                            match ty {
+                                Type::ClassLiteral(_) => {}
+                                Type::NominalInstance(instance)
+                                    if instance.has_known_class(db, KnownClass::NoneType) => {}
+                                Type::SpecialForm(special_form)
+                                    if special_form.is_valid_isinstance_target() => {}
+                                // `Any` can be used in `issubclass()` calls but not `isinstance()` calls
+                                Type::SpecialForm(SpecialFormType::Any)
+                                    if function == KnownFunction::IsSubclass => {}
+                                Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
+                                    match instance.value_expression_types(db) {
+                                        Ok(value_expression_types) => {
+                                            for element in value_expression_types {
+                                                find_invalid_elements(
+                                                    db,
+                                                    function,
+                                                    element,
+                                                    invalid_elements,
+                                                );
+                                            }
+                                        }
+                                        Err(_) => {
+                                            invalid_elements.push(ty);
+                                        }
+                                    }
+                                }
+                                _ => invalid_elements.push(ty),
+                            }
+                        }
+
+                        let mut invalid_elements = vec![];
+                        find_invalid_elements(db, self, *second_argument, &mut invalid_elements);
+
+                        let Some((first_invalid_element, other_invalid_elements)) =
+                            invalid_elements.split_first()
+                        else {
+                            return;
+                        };
+
+                        let Some(builder) =
+                            context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
+                        else {
+                            return;
+                        };
+
+                        let function_name: &str = self.into();
+
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Invalid second argument to `{function_name}`"
+                        ));
+                        diagnostic.info(format_args!(
+                            "A `UnionType` instance can only be used as the second argument to \
+                            `{function_name}` if all elements are class objects"
+                        ));
+                        diagnostic.annotate(
+                            Annotation::secondary(context.span(&call_expression.arguments.args[1]))
+                                .message("This `UnionType` instance contains non-class elements"),
+                        );
+                        match other_invalid_elements {
+                            [] => diagnostic.info(format_args!(
+                                "Element `{}` in the union is not a class object",
+                                first_invalid_element.display(db)
+                            )),
+                            [single] => diagnostic.info(format_args!(
+                                "Elements `{}` and `{}` in the union are not class objects",
+                                first_invalid_element.display(db),
+                                single.display(db),
+                            )),
+                            _ => diagnostic.info(format_args!(
+                                "Element `{}` in the union, and {} more elements, are not class objects",
+                                first_invalid_element.display(db),
+                                other_invalid_elements.len(),
+                            ))
+                        }
+                    }
+                    _ => {}
                 }
             }
 
@@ -1433,7 +1808,6 @@ impl KnownFunction {
 
                 overload.set_return_type(Type::module_literal(db, file, module));
             }
-
             _ => {}
         }
     }
@@ -1479,7 +1853,10 @@ pub(crate) mod tests {
                 | KnownFunction::GetProtocolMembers
                 | KnownFunction::RuntimeCheckable
                 | KnownFunction::DataclassTransform
+                | KnownFunction::DisjointBase
                 | KnownFunction::NoTypeCheck => KnownModule::TypingExtensions,
+
+                KnownFunction::TypeCheckOnly => KnownModule::Typing,
 
                 KnownFunction::IsSingleton
                 | KnownFunction::IsSubtypeOf
@@ -1491,10 +1868,9 @@ pub(crate) mod tests {
                 | KnownFunction::IsSingleValued
                 | KnownFunction::IsAssignableTo
                 | KnownFunction::IsEquivalentTo
-                | KnownFunction::TopMaterialization
-                | KnownFunction::BottomMaterialization
                 | KnownFunction::HasMember
                 | KnownFunction::RevealProtocolInterface
+                | KnownFunction::RevealMro
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,

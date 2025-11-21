@@ -39,7 +39,7 @@ from _typeshed import (
 )
 from collections.abc import Iterable, Iterator
 from types import GenericAlias, TracebackType
-from typing import IO, Any, AnyStr, Generic, Literal, overload
+from typing import IO, Any, AnyStr, Final, Generic, Literal, overload
 from typing_extensions import Self, deprecated
 
 __all__ = [
@@ -59,7 +59,7 @@ __all__ = [
 ]
 
 # global variables
-TMP_MAX: int
+TMP_MAX: Final[int]
 tempdir: str | None
 template: str
 

@@ -11,7 +11,6 @@ use lsp_types::{
     Documentation, ParameterInformation, ParameterLabel, SignatureHelp, SignatureHelpParams,
     SignatureInformation, Url,
 };
-use ruff_db::source::{line_index, source_text};
 use ty_ide::signature_help;
 use ty_project::ProjectDatabase;
 
@@ -22,7 +21,7 @@ impl RequestHandler for SignatureHelpRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
-    fn document_url(params: &SignatureHelpParams) -> Cow<Url> {
+    fn document_url(params: &SignatureHelpParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
@@ -39,17 +38,18 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.file(db) else {
+        let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
 
-        let source = source_text(db, file);
-        let line_index = line_index(db, file);
-        let offset = params.text_document_position_params.position.to_text_size(
-            &source,
-            &line_index,
+        let Some(offset) = params.text_document_position_params.position.to_text_size(
+            db,
+            file,
+            snapshot.url(),
             snapshot.encoding(),
-        );
+        ) else {
+            return Ok(None);
+        };
 
         // Extract signature help capabilities from the client
         let resolved_capabilities = snapshot.resolved_client_capabilities();
@@ -126,7 +126,9 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
 
                 SignatureInformation {
                     label: sig.label,
-                    documentation: sig.documentation.map(Documentation::String),
+                    documentation: sig
+                        .documentation
+                        .map(|docstring| Documentation::String(docstring.render_plaintext())),
                     parameters: Some(parameters),
                     active_parameter,
                 }

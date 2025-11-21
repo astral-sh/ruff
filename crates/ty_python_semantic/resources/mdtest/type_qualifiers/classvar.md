@@ -9,6 +9,7 @@ For more details on the semantics of pure class variables, see [this test](../at
 ## Basic
 
 ```py
+import typing
 from typing import ClassVar, Annotated
 
 class C:
@@ -17,12 +18,14 @@ class C:
     c: ClassVar[Annotated[int, "the annotation for c"]] = 1
     d: ClassVar = 1
     e: "ClassVar[int]" = 1
+    f: typing.ClassVar = 1
 
 reveal_type(C.a)  # revealed: int
 reveal_type(C.b)  # revealed: int
 reveal_type(C.c)  # revealed: int
 reveal_type(C.d)  # revealed: Unknown | Literal[1]
 reveal_type(C.e)  # revealed: int
+reveal_type(C.f)  # revealed: Unknown | Literal[1]
 
 c = C()
 
@@ -36,6 +39,8 @@ c.c = 2
 c.d = 2
 # error: [invalid-attribute-access]
 c.e = 2
+# error: [invalid-attribute-access]
+c.f = 3
 ```
 
 ## From stubs
@@ -118,6 +123,7 @@ python-version = "3.12"
 
 ```py
 from typing import ClassVar
+from ty_extensions import reveal_mro
 
 # error: [invalid-type-form] "`ClassVar` annotations are only allowed in class-body scopes"
 x: ClassVar[int] = 1
@@ -150,8 +156,8 @@ def f[T](x: T) -> ClassVar[T]:
 class Foo(ClassVar[tuple[int]]): ...
 
 # TODO: Show `Unknown` instead of `@Todo` type in the MRO; or ignore `ClassVar` and show the MRO as if `ClassVar` was not there
-# revealed: tuple[<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>]
-reveal_type(Foo.__mro__)
+# revealed: (<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>)
+reveal_mro(Foo)
 ```
 
 [`typing.classvar`]: https://docs.python.org/3/library/typing.html#typing.ClassVar

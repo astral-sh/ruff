@@ -44,6 +44,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `any`](https://docs.python.org/3/library/functions.html#any)
 /// - [Python documentation: `all`](https://docs.python.org/3/library/functions.html#all)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.211")]
 pub(crate) struct ReimplementedBuiltin {
     replacement: String,
 }
@@ -115,7 +116,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
 
             let mut diagnostic = checker.report_diagnostic(
                 ReimplementedBuiltin {
-                    replacement: contents.to_string(),
+                    replacement: contents.clone(),
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
@@ -165,7 +166,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                             ops: Box::from([op]),
                             comparators: Box::from([comparator.clone()]),
                             range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                         };
                         node.into()
                     } else {
@@ -173,7 +174,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                             op: UnaryOp::Not,
                             operand: Box::new(loop_.test.clone()),
                             range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                         };
                         node.into()
                     }
@@ -182,7 +183,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                         op: UnaryOp::Not,
                         operand: Box::new(loop_.test.clone()),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     };
                     node.into()
                 }
@@ -211,7 +212,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
 
             let mut diagnostic = checker.report_diagnostic(
                 ReimplementedBuiltin {
-                    replacement: contents.to_string(),
+                    replacement: contents.clone(),
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
@@ -267,7 +268,7 @@ struct Terminal<'a> {
     stmt: &'a Stmt,
 }
 
-fn match_loop(stmt: &Stmt) -> Option<Loop> {
+fn match_loop(stmt: &Stmt) -> Option<Loop<'_>> {
     let Stmt::For(ast::StmtFor {
         body, target, iter, ..
     }) = stmt
@@ -324,7 +325,7 @@ fn match_loop(stmt: &Stmt) -> Option<Loop> {
 ///         return True
 /// return False
 /// ```
-fn match_else_return(stmt: &Stmt) -> Option<Terminal> {
+fn match_else_return(stmt: &Stmt) -> Option<Terminal<'_>> {
     let Stmt::For(ast::StmtFor { orelse, .. }) = stmt else {
         return None;
     };
@@ -406,17 +407,17 @@ fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
             ifs: vec![],
             is_async: false,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         }],
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         parenthesized: false,
     };
     let node1 = ast::ExprName {
         id,
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let node2 = ast::ExprCall {
         func: Box::new(node1.into()),
@@ -424,15 +425,15 @@ fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
             args: Box::from([node.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let node3 = ast::StmtReturn {
         value: Some(Box::new(node2.into())),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     generator.stmt(&node3.into())
 }

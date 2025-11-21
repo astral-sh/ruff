@@ -2,7 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::analyze::typing::Pep604Operator;
+use ruff_python_semantic::analyze::typing::{Pep604Operator, to_pep604_operator};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -54,6 +54,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct NonPEP604AnnotationUnion;
 
 impl Violation for NonPEP604AnnotationUnion {
@@ -110,6 +111,7 @@ impl Violation for NonPEP604AnnotationUnion {
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct NonPEP604AnnotationOptional;
 
 impl Violation for NonPEP604AnnotationOptional {
@@ -171,10 +173,22 @@ pub(crate) fn non_pep604_annotation(
                         // Invalid type annotation.
                     }
                     _ => {
+                        // Unwrap all nested Optional[...] and wrap once as `X | None`.
+                        let mut inner = slice;
+                        while let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = inner {
+                            if let Some(Pep604Operator::Optional) =
+                                to_pep604_operator(value, slice, checker.semantic())
+                            {
+                                inner = slice;
+                            } else {
+                                break;
+                            }
+                        }
+
                         diagnostic.set_fix(Fix::applicable_edit(
                             Edit::range_replacement(
                                 pad(
-                                    checker.generator().expr(&pep_604_optional(slice)),
+                                    checker.generator().expr(&pep_604_optional(inner)),
                                     expr.range(),
                                     checker.locator(),
                                 ),

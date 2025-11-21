@@ -114,7 +114,11 @@ def _(flag: bool):
 
     this_fails = ThisFails()
 
-    # error: [possibly-unbound-implicit-call]
+    # TODO: this would be a friendlier diagnostic if we propagated the error up the stack
+    # and transformed it into a `[not-subscriptable]` error with a subdiagnostic explaining
+    # that the cause of the error was a possibly missing `__getitem__` method
+    #
+    # error: [possibly-missing-implicit-call] "Method `__getitem__` of type `ThisFails` may be missing"
     reveal_type(this_fails[0])  # revealed: Unknown | str
 ```
 
@@ -190,7 +194,7 @@ class_with_descriptor_dunder = ClassWithDescriptorDunder()
 reveal_type(class_with_descriptor_dunder[0])  # revealed: str
 ```
 
-## Dunders can not be overwritten on instances
+## Dunders cannot be overwritten on instances
 
 If we attempt to overwrite a dunder method on an instance, it does not affect the behavior of
 implicit dunder calls:
@@ -201,7 +205,7 @@ class C:
         return str(key)
 
     def f(self):
-        # TODO: This should emit an `invalid-assignment` diagnostic once we understand the type of `self`
+        # error: [invalid-assignment] "Implicit shadowing of function `__getitem__`"
         self.__getitem__ = None
 
 # This is still fine, and simply calls the `__getitem__` method on the class
@@ -270,6 +274,11 @@ def _(flag: bool):
                 return str(key)
 
     c = C()
-    # error: [possibly-unbound-implicit-call]
+
+    # TODO: this would be a friendlier diagnostic if we propagated the error up the stack
+    # and transformed it into a `[not-subscriptable]` error with a subdiagnostic explaining
+    # that the cause of the error was a possibly missing `__getitem__` method
+    #
+    # error: [possibly-missing-implicit-call] "Method `__getitem__` of type `C` may be missing"
     reveal_type(c[0])  # revealed: str
 ```

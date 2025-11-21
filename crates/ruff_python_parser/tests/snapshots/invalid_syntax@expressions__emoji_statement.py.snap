@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/emoji_statem
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..5,
         body: [],
     },

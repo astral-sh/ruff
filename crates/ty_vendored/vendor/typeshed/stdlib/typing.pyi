@@ -25,7 +25,7 @@ import collections  # noqa: F401  # pyright: ignore[reportUnusedImport]
 import sys
 import typing_extensions
 from _collections_abc import dict_items, dict_keys, dict_values
-from _typeshed import IdentityFunction, ReadableBuffer, SupportsKeysAndGetItem
+from _typeshed import IdentityFunction, ReadableBuffer, SupportsGetItem, SupportsGetItemViewable, SupportsKeysAndGetItem, Viewable
 from abc import ABCMeta, abstractmethod
 from re import Match as Match, Pattern as Pattern
 from types import (
@@ -61,6 +61,7 @@ __all__ = [
     "AsyncIterator",
     "Awaitable",
     "BinaryIO",
+    "ByteString",
     "Callable",
     "ChainMap",
     "ClassVar",
@@ -129,9 +130,6 @@ __all__ = [
     "runtime_checkable",
 ]
 
-if sys.version_info < (3, 14):
-    __all__ += ["ByteString"]
-
 if sys.version_info >= (3, 14):
     __all__ += ["evaluate_forward_ref"]
 
@@ -179,6 +177,8 @@ class Any:
 
 class _Final:
     """Mixin to prohibit subclassing."""
+
+    __slots__ = ("__weakref__",)
 
 def final(f: _T) -> _T:
     """Decorator to indicate final methods and final classes.
@@ -310,15 +310,15 @@ class TypeVar:
             contravariant: bool = False,
         ) -> None: ...
     if sys.version_info >= (3, 10):
-        def __or__(self, right: Any) -> _SpecialForm:  # AnnotationForm
+        def __or__(self, right: Any, /) -> _SpecialForm:  # AnnotationForm
             """Return self|value."""
 
-        def __ror__(self, left: Any) -> _SpecialForm:  # AnnotationForm
+        def __ror__(self, left: Any, /) -> _SpecialForm:  # AnnotationForm
             """Return value|self."""
     if sys.version_info >= (3, 11):
-        def __typing_subst__(self, arg: Any) -> Any: ...
+        def __typing_subst__(self, arg: Any, /) -> Any: ...
     if sys.version_info >= (3, 13):
-        def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
+        def __typing_prepare_subst__(self, alias: Any, args: Any, /) -> tuple[Any, ...]: ...
         def has_default(self) -> bool: ...
     if sys.version_info >= (3, 14):
         @property
@@ -328,20 +328,16 @@ class TypeVar:
         @property
         def evaluate_default(self) -> EvaluateFunc | None: ...
 
-# Used for an undocumented mypy feature. Does not exist at runtime.
-# Obsolete, use _typeshed._type_checker_internals.promote instead.
-_promote = object()
-
 # N.B. Keep this definition in sync with typing_extensions._SpecialForm
 @final
 class _SpecialForm(_Final):
+    __slots__ = ("_name", "__doc__", "_getitem")
     def __getitem__(self, parameters: Any) -> object: ...
     if sys.version_info >= (3, 10):
         def __or__(self, other: Any) -> _SpecialForm: ...
         def __ror__(self, other: Any) -> _SpecialForm: ...
 
 Union: _SpecialForm
-Generic: _SpecialForm
 Protocol: _SpecialForm
 Callable: _SpecialForm
 Type: _SpecialForm
@@ -422,8 +418,8 @@ if sys.version_info >= (3, 11):
         def __iter__(self) -> Any:
             """Implement iter(self)."""
 
-        def __typing_subst__(self, arg: Never) -> Never: ...
-        def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
+        def __typing_subst__(self, arg: Never, /) -> Never: ...
+        def __typing_prepare_subst__(self, alias: Any, args: Any, /) -> tuple[Any, ...]: ...
         if sys.version_info >= (3, 14):
             @property
             def evaluate_default(self) -> EvaluateFunc | None: ...
@@ -452,7 +448,7 @@ if sys.version_info >= (3, 10):
         else:
             def __init__(self, origin: ParamSpec) -> None: ...
 
-        def __eq__(self, other: object) -> bool: ...
+        def __eq__(self, other: object, /) -> bool: ...
         __hash__: ClassVar[None]  # type: ignore[assignment]
 
     @final
@@ -478,7 +474,7 @@ if sys.version_info >= (3, 10):
         else:
             def __init__(self, origin: ParamSpec) -> None: ...
 
-        def __eq__(self, other: object) -> bool: ...
+        def __eq__(self, other: object, /) -> bool: ...
         __hash__: ClassVar[None]  # type: ignore[assignment]
 
     @final
@@ -598,13 +594,13 @@ if sys.version_info >= (3, 10):
         def kwargs(self) -> ParamSpecKwargs:
             """Represents keyword arguments."""
         if sys.version_info >= (3, 11):
-            def __typing_subst__(self, arg: Any) -> Any: ...
-            def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
+            def __typing_subst__(self, arg: Any, /) -> Any: ...
+            def __typing_prepare_subst__(self, alias: Any, args: Any, /) -> tuple[Any, ...]: ...
 
-        def __or__(self, right: Any) -> _SpecialForm:
+        def __or__(self, right: Any, /) -> _SpecialForm:
             """Return self|value."""
 
-        def __ror__(self, left: Any) -> _SpecialForm:
+        def __ror__(self, left: Any, /) -> _SpecialForm:
             """Return value|self."""
         if sys.version_info >= (3, 13):
             def has_default(self) -> bool: ...
@@ -738,6 +734,7 @@ def type_check_only(func_or_cls: _FT) -> _FT: ...
 
 # Type aliases and type constructors
 
+@type_check_only
 class _Alias:
     # Class for defining generic aliases for library types.
     def __getitem__(self, typeargs: Any) -> Any: ...
@@ -757,6 +754,20 @@ Annotated: _SpecialForm
 
 # Predefined type variables.
 AnyStr = TypeVar("AnyStr", str, bytes)  # noqa: Y001
+
+@type_check_only
+class _Generic:
+    if sys.version_info < (3, 12):
+        __slots__ = ()
+
+    if sys.version_info >= (3, 10):
+        @classmethod
+        def __class_getitem__(cls, args: TypeVar | ParamSpec | tuple[TypeVar | ParamSpec, ...]) -> _Final: ...
+    else:
+        @classmethod
+        def __class_getitem__(cls, args: TypeVar | tuple[TypeVar, ...]) -> _Final: ...
+
+Generic: type[_Generic]
 
 class _ProtocolMeta(ABCMeta):
     if sys.version_info >= (3, 12):
@@ -788,6 +799,7 @@ def runtime_checkable(cls: _TC) -> _TC:
 class SupportsInt(Protocol, metaclass=ABCMeta):
     """An ABC with one abstract method __int__."""
 
+    __slots__ = ()
     @abstractmethod
     def __int__(self) -> int: ...
 
@@ -795,6 +807,7 @@ class SupportsInt(Protocol, metaclass=ABCMeta):
 class SupportsFloat(Protocol, metaclass=ABCMeta):
     """An ABC with one abstract method __float__."""
 
+    __slots__ = ()
     @abstractmethod
     def __float__(self) -> float: ...
 
@@ -802,6 +815,7 @@ class SupportsFloat(Protocol, metaclass=ABCMeta):
 class SupportsComplex(Protocol, metaclass=ABCMeta):
     """An ABC with one abstract method __complex__."""
 
+    __slots__ = ()
     @abstractmethod
     def __complex__(self) -> complex: ...
 
@@ -809,6 +823,7 @@ class SupportsComplex(Protocol, metaclass=ABCMeta):
 class SupportsBytes(Protocol, metaclass=ABCMeta):
     """An ABC with one abstract method __bytes__."""
 
+    __slots__ = ()
     @abstractmethod
     def __bytes__(self) -> bytes: ...
 
@@ -816,6 +831,7 @@ class SupportsBytes(Protocol, metaclass=ABCMeta):
 class SupportsIndex(Protocol, metaclass=ABCMeta):
     """An ABC with one abstract method __index__."""
 
+    __slots__ = ()
     @abstractmethod
     def __index__(self) -> int: ...
 
@@ -823,6 +839,7 @@ class SupportsIndex(Protocol, metaclass=ABCMeta):
 class SupportsAbs(Protocol[_T_co]):
     """An ABC with one abstract method __abs__ that is covariant in its return type."""
 
+    __slots__ = ()
     @abstractmethod
     def __abs__(self) -> _T_co: ...
 
@@ -830,6 +847,7 @@ class SupportsAbs(Protocol[_T_co]):
 class SupportsRound(Protocol[_T_co]):
     """An ABC with one abstract method __round__ that is covariant in its return type."""
 
+    __slots__ = ()
     @overload
     @abstractmethod
     def __round__(self) -> int: ...
@@ -925,7 +943,7 @@ class Awaitable(Protocol[_T_co]):
     @abstractmethod
     def __await__(self) -> Generator[Any, Any, _T_co]: ...
 
-# Non-default variations to accommodate couroutines, and `AwaitableGenerator` having a 4th type parameter.
+# Non-default variations to accommodate coroutines, and `AwaitableGenerator` having a 4th type parameter.
 _SendT_nd_contra = TypeVar("_SendT_nd_contra", contravariant=True)
 _ReturnT_nd_co = TypeVar("_ReturnT_nd_co", covariant=True)
 
@@ -1180,14 +1198,15 @@ class MutableSet(AbstractSet[_T]):
     def __isub__(self, it: AbstractSet[Any]) -> typing_extensions.Self: ...
 
 class MappingView(Sized):
-    def __init__(self, mapping: Mapping[Any, Any]) -> None: ...  # undocumented
+    __slots__ = ("_mapping",)
+    def __init__(self, mapping: Sized) -> None: ...  # undocumented
     def __len__(self) -> int: ...
 
 class ItemsView(MappingView, AbstractSet[tuple[_KT_co, _VT_co]], Generic[_KT_co, _VT_co]):
-    def __init__(self, mapping: Mapping[_KT_co, _VT_co]) -> None: ...  # undocumented
+    def __init__(self, mapping: SupportsGetItemViewable[_KT_co, _VT_co]) -> None: ...  # undocumented
     def __and__(self, other: Iterable[Any]) -> set[tuple[_KT_co, _VT_co]]: ...
     def __rand__(self, other: Iterable[_T]) -> set[_T]: ...
-    def __contains__(self, item: object) -> bool: ...
+    def __contains__(self, item: tuple[object, object]) -> bool: ...  # type: ignore[override]
     def __iter__(self) -> Iterator[tuple[_KT_co, _VT_co]]: ...
     def __or__(self, other: Iterable[_T]) -> set[tuple[_KT_co, _VT_co] | _T]: ...
     def __ror__(self, other: Iterable[_T]) -> set[tuple[_KT_co, _VT_co] | _T]: ...
@@ -1197,7 +1216,7 @@ class ItemsView(MappingView, AbstractSet[tuple[_KT_co, _VT_co]], Generic[_KT_co,
     def __rxor__(self, other: Iterable[_T]) -> set[tuple[_KT_co, _VT_co] | _T]: ...
 
 class KeysView(MappingView, AbstractSet[_KT_co]):
-    def __init__(self, mapping: Mapping[_KT_co, Any]) -> None: ...  # undocumented
+    def __init__(self, mapping: Viewable[_KT_co]) -> None: ...  # undocumented
     def __and__(self, other: Iterable[Any]) -> set[_KT_co]: ...
     def __rand__(self, other: Iterable[_T]) -> set[_T]: ...
     def __contains__(self, key: object) -> bool: ...
@@ -1210,7 +1229,7 @@ class KeysView(MappingView, AbstractSet[_KT_co]):
     def __rxor__(self, other: Iterable[_T]) -> set[_KT_co | _T]: ...
 
 class ValuesView(MappingView, Collection[_VT_co]):
-    def __init__(self, mapping: Mapping[Any, _VT_co]) -> None: ...  # undocumented
+    def __init__(self, mapping: SupportsGetItemViewable[Any, _VT_co]) -> None: ...  # undocumented
     def __contains__(self, value: object) -> bool: ...
     def __iter__(self) -> Iterator[_VT_co]: ...
 
@@ -1318,13 +1337,13 @@ class MutableMapping(Mapping[_KT, _VT]):
         """
 
     @overload
-    def update(self: Mapping[str, _VT], m: SupportsKeysAndGetItem[str, _VT], /, **kwargs: _VT) -> None: ...
+    def update(self: SupportsGetItem[str, _VT], m: SupportsKeysAndGetItem[str, _VT], /, **kwargs: _VT) -> None: ...
     @overload
     def update(self, m: Iterable[tuple[_KT, _VT]], /) -> None: ...
     @overload
-    def update(self: Mapping[str, _VT], m: Iterable[tuple[str, _VT]], /, **kwargs: _VT) -> None: ...
+    def update(self: SupportsGetItem[str, _VT], m: Iterable[tuple[str, _VT]], /, **kwargs: _VT) -> None: ...
     @overload
-    def update(self: Mapping[str, _VT], **kwargs: _VT) -> None: ...
+    def update(self: SupportsGetItem[str, _VT], **kwargs: _VT) -> None: ...
 
 Text = str
 
@@ -1349,6 +1368,7 @@ class IO(Generic[AnyStr]):
     # At runtime these are all abstract properties,
     # but making them abstract in the stub is hugely disruptive, for not much gain.
     # See #8726
+    __slots__ = ()
     @property
     def mode(self) -> str: ...
     # Usually str, but may be bytes if a bytes path was passed to open(). See #10737.
@@ -1409,6 +1429,7 @@ class IO(Generic[AnyStr]):
 class BinaryIO(IO[bytes]):
     """Typed version of the return of open() in binary mode."""
 
+    __slots__ = ()
     @abstractmethod
     def __enter__(self) -> BinaryIO: ...
 
@@ -1416,6 +1437,7 @@ class TextIO(IO[str]):
     """Typed version of the return of open() in text mode."""
 
     # See comment regarding the @properties in the `IO` class
+    __slots__ = ()
     @property
     def buffer(self) -> BinaryIO: ...
     @property
@@ -1429,8 +1451,7 @@ class TextIO(IO[str]):
     @abstractmethod
     def __enter__(self) -> TextIO: ...
 
-if sys.version_info < (3, 14):
-    ByteString: typing_extensions.TypeAlias = bytes | bytearray | memoryview
+ByteString: typing_extensions.TypeAlias = bytes | bytearray | memoryview
 
 # Functions
 
@@ -1853,6 +1874,15 @@ else:
     class ForwardRef(_Final):
         """Internal wrapper to hold a forward reference."""
 
+        __slots__ = (
+            "__forward_arg__",
+            "__forward_code__",
+            "__forward_evaluated__",
+            "__forward_value__",
+            "__forward_is_argument__",
+            "__forward_is_class__",
+            "__forward_module__",
+        )
         __forward_arg__: str
         __forward_code__: CodeType
         __forward_evaluated__: bool
@@ -1929,6 +1959,15 @@ def _type_repr(obj: object) -> str:
     """
 
 if sys.version_info >= (3, 12):
+    _TypeParameter: typing_extensions.TypeAlias = (
+        TypeVar
+        | typing_extensions.TypeVar
+        | ParamSpec
+        | typing_extensions.ParamSpec
+        | TypeVarTuple
+        | typing_extensions.TypeVarTuple
+    )
+
     def override(method: _F, /) -> _F:
         """Indicate that a method is intended to override a method in a base class.
 
@@ -1981,11 +2020,11 @@ if sys.version_info >= (3, 12):
         See PEP 695 for more information.
         """
 
-        def __new__(cls, name: str, value: Any, *, type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = ()) -> Self: ...
+        def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
         @property
         def __value__(self) -> Any: ...  # AnnotationForm
         @property
-        def __type_params__(self) -> tuple[TypeVar | ParamSpec | TypeVarTuple, ...]: ...
+        def __type_params__(self) -> tuple[_TypeParameter, ...]: ...
         @property
         def __parameters__(self) -> tuple[Any, ...]: ...  # AnnotationForm
         @property
@@ -1993,13 +2032,13 @@ if sys.version_info >= (3, 12):
         # It's writable on types, but not on instances of TypeAliasType.
         @property
         def __module__(self) -> str | None: ...  # type: ignore[override]
-        def __getitem__(self, parameters: Any) -> GenericAlias:  # AnnotationForm
+        def __getitem__(self, parameters: Any, /) -> GenericAlias:  # AnnotationForm
             """Return self[key]."""
 
-        def __or__(self, right: Any) -> _SpecialForm:
+        def __or__(self, right: Any, /) -> _SpecialForm:
             """Return self|value."""
 
-        def __ror__(self, left: Any) -> _SpecialForm:
+        def __ror__(self, left: Any, /) -> _SpecialForm:
             """Return value|self."""
         if sys.version_info >= (3, 14):
             @property
@@ -2037,6 +2076,7 @@ if sys.version_info >= (3, 13):
         """
 
     @final
+    @type_check_only
     class _NoDefaultType: ...
 
     NoDefault: _NoDefaultType

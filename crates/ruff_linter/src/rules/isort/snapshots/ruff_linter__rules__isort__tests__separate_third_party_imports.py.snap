@@ -1,21 +1,20 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-separate_third_party_imports.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+I001 [*] Import block is un-sorted or un-formatted
+ --> separate_third_party_imports.py:1:1
   |
 1 | / import pandas as pd
 2 | | import sys
 3 | | import numpy as np
 4 | | import os
-  | |_________^ I001
+  | |_________^
   |
-  = help: Organize imports
-
-ℹ Safe fix
-1   |-import pandas as pd
-  1 |+import os
-2 2 | import sys
-  3 |+
-3 4 | import numpy as np
-4   |-import os
-  5 |+import pandas as pd
+help: Organize imports
+  - import pandas as pd
+1 + import os
+2 | import sys
+3 + 
+4 | import numpy as np
+  - import os
+5 + import pandas as pd

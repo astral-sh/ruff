@@ -9,15 +9,10 @@ use itertools::{Itertools, iterate};
 use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
-use ruff_db::diagnostic::{
-    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, SecondaryCode,
-};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, SecondaryCode};
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
-use ruff_linter::message::{
-    Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter, SarifEmitter,
-    TextEmitter,
-};
+use ruff_linter::message::{EmitterContext, render_diagnostics};
 use ruff_linter::notify_user;
 use ruff_linter::settings::flags::{self};
 use ruff_linter::settings::types::{OutputFormat, UnsafeFixes};
@@ -31,8 +26,6 @@ bitflags! {
         const SHOW_VIOLATIONS = 1 << 0;
         /// Whether to show a summary of the fixed violations when emitting diagnostics.
         const SHOW_FIX_SUMMARY = 1 << 1;
-        /// Whether to show a diff of each fixed violation when emitting diagnostics.
-        const SHOW_FIX_DIFF = 1 << 2;
     }
 }
 
@@ -229,92 +222,28 @@ impl Printer {
         let context = EmitterContext::new(&diagnostics.notebook_indexes);
         let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
-        match self.format {
-            OutputFormat::Json => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Json)
-                    .preview(preview);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::Rdjson => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Rdjson)
-                    .preview(preview);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::JsonLines => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::JsonLines)
-                    .preview(preview);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::Junit => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Junit)
-                    .preview(preview);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::Concise | OutputFormat::Full => {
-                TextEmitter::default()
-                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                    .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
-                    .with_show_source(self.format == OutputFormat::Full)
-                    .with_unsafe_fixes(self.unsafe_fixes)
-                    .with_preview(preview)
-                    .emit(writer, &diagnostics.inner, &context)?;
+        let config = DisplayDiagnosticConfig::default()
+            .preview(preview)
+            .hide_severity(true)
+            .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
+            .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
+            .with_fix_applicability(self.unsafe_fixes.required_applicability())
+            .show_fix_diff(preview);
 
-                if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
-                    if !diagnostics.fixed.is_empty() {
-                        writeln!(writer)?;
-                        print_fix_summary(writer, &diagnostics.fixed)?;
-                        writeln!(writer)?;
-                    }
+        render_diagnostics(writer, self.format, config, &context, &diagnostics.inner)?;
+
+        if matches!(
+            self.format,
+            OutputFormat::Full | OutputFormat::Concise | OutputFormat::Grouped
+        ) {
+            if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
+                if !diagnostics.fixed.is_empty() {
+                    writeln!(writer)?;
+                    print_fix_summary(writer, &diagnostics.fixed)?;
+                    writeln!(writer)?;
                 }
-
-                self.write_summary_text(writer, diagnostics)?;
             }
-            OutputFormat::Grouped => {
-                GroupedEmitter::default()
-                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                    .with_unsafe_fixes(self.unsafe_fixes)
-                    .emit(writer, &diagnostics.inner, &context)?;
-
-                if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
-                    if !diagnostics.fixed.is_empty() {
-                        writeln!(writer)?;
-                        print_fix_summary(writer, &diagnostics.fixed)?;
-                        writeln!(writer)?;
-                    }
-                }
-                self.write_summary_text(writer, diagnostics)?;
-            }
-            OutputFormat::Github => {
-                GithubEmitter.emit(writer, &diagnostics.inner, &context)?;
-            }
-            OutputFormat::Gitlab => {
-                GitlabEmitter::default().emit(writer, &diagnostics.inner, &context)?;
-            }
-            OutputFormat::Pylint => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Pylint)
-                    .preview(preview);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::Azure => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Azure)
-                    .preview(preview);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::Sarif => {
-                SarifEmitter.emit(writer, &diagnostics.inner, &context)?;
-            }
+            self.write_summary_text(writer, diagnostics)?;
         }
 
         writer.flush()?;
@@ -458,11 +387,19 @@ impl Printer {
             }
 
             let context = EmitterContext::new(&diagnostics.notebook_indexes);
-            TextEmitter::default()
+            let format = if preview {
+                self.format
+            } else {
+                OutputFormat::Concise
+            };
+            let config = DisplayDiagnosticConfig::default()
+                .preview(preview)
+                .hide_severity(true)
+                .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
                 .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                .with_show_source(preview)
-                .with_unsafe_fixes(self.unsafe_fixes)
-                .emit(writer, &diagnostics.inner, &context)?;
+                .with_fix_applicability(self.unsafe_fixes.required_applicability())
+                .show_fix_diff(preview);
+            render_diagnostics(writer, format, config, &context, &diagnostics.inner)?;
         }
         writer.flush()?;
 

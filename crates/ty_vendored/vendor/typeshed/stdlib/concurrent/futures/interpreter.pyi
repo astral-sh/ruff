@@ -1,12 +1,15 @@
 """Implements InterpreterPoolExecutor."""
 
 import sys
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from typing import Literal, Protocol, overload, type_check_only
+from typing import Any, Literal, Protocol, overload, type_check_only
 from typing_extensions import ParamSpec, Self, TypeAlias, TypeVar, TypeVarTuple, Unpack
 
 _Task: TypeAlias = tuple[bytes, Literal["function", "script"]]
+_Ts = TypeVarTuple("_Ts")
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
 
 @type_check_only
 class _TaskFunc(Protocol):
@@ -15,47 +18,26 @@ class _TaskFunc(Protocol):
     @overload
     def __call__(self, fn: str) -> tuple[bytes, Literal["script"]]: ...
 
-_Ts = TypeVarTuple("_Ts")
-_P = ParamSpec("_P")
-_R = TypeVar("_R")
-
-# A `type.simplenamespace` with `__name__` attribute.
-@type_check_only
-class _HasName(Protocol):
-    __name__: str
-
-# `_interpreters.exec` technically gives us a simple namespace.
-@type_check_only
-class _ExcInfo(Protocol):
-    formatted: str
-    msg: str
-    type: _HasName
-
 if sys.version_info >= (3, 14):
     from concurrent.futures.thread import BrokenThreadPool, WorkerContext as ThreadWorkerContext
+    from concurrent.interpreters import Interpreter, Queue
 
-    from _interpreters import InterpreterError
-
-    class ExecutionFailed(InterpreterError):
-        def __init__(self, excinfo: _ExcInfo) -> None: ...  #  type: ignore[override]
+    def do_call(results: Queue, func: Callable[..., _R], args: tuple[Any, ...], kwargs: dict[str, Any]) -> _R: ...
 
     class WorkerContext(ThreadWorkerContext):
-        # Parent class doesn't have `shared` argument,
-        @overload  #  type: ignore[override]
+        interp: Interpreter | None
+        results: Queue | None
+        @overload  # type: ignore[override]
         @classmethod
         def prepare(
-            cls, initializer: Callable[[Unpack[_Ts]], object], initargs: tuple[Unpack[_Ts]], shared: Mapping[str, object]
+            cls, initializer: Callable[[Unpack[_Ts]], object], initargs: tuple[Unpack[_Ts]]
         ) -> tuple[Callable[[], Self], _TaskFunc]: ...
-        @overload  #  type: ignore[override]
+        @overload
         @classmethod
-        def prepare(
-            cls, initializer: Callable[[], object], initargs: tuple[()], shared: Mapping[str, object]
-        ) -> tuple[Callable[[], Self], _TaskFunc]: ...
-        def __init__(
-            self, initdata: tuple[bytes, Literal["function", "script"]], shared: Mapping[str, object] | None = None
-        ) -> None: ...  #  type: ignore[override]
+        def prepare(cls, initializer: Callable[[], object], initargs: tuple[()]) -> tuple[Callable[[], Self], _TaskFunc]: ...
+        def __init__(self, initdata: _Task) -> None: ...
         def __del__(self) -> None: ...
-        def run(self, task: _Task) -> None: ...  #  type: ignore[override]
+        def run(self, task: _Task) -> None: ...  # type: ignore[override]
 
     class BrokenInterpreterPool(BrokenThreadPool):
         """
@@ -65,15 +47,15 @@ if sys.version_info >= (3, 14):
     class InterpreterPoolExecutor(ThreadPoolExecutor):
         BROKEN: type[BrokenInterpreterPool]
 
-        @overload  #  type: ignore[override]
+        @overload  # type: ignore[override]
         @classmethod
         def prepare_context(
-            cls, initializer: Callable[[], object], initargs: tuple[()], shared: Mapping[str, object]
+            cls, initializer: Callable[[], object], initargs: tuple[()]
         ) -> tuple[Callable[[], WorkerContext], _TaskFunc]: ...
-        @overload  #  type: ignore[override]
+        @overload
         @classmethod
         def prepare_context(
-            cls, initializer: Callable[[Unpack[_Ts]], object], initargs: tuple[Unpack[_Ts]], shared: Mapping[str, object]
+            cls, initializer: Callable[[Unpack[_Ts]], object], initargs: tuple[Unpack[_Ts]]
         ) -> tuple[Callable[[], WorkerContext], _TaskFunc]: ...
         @overload
         def __init__(
@@ -82,7 +64,6 @@ if sys.version_info >= (3, 14):
             thread_name_prefix: str = "",
             initializer: Callable[[], object] | None = None,
             initargs: tuple[()] = (),
-            shared: Mapping[str, object] | None = None,
         ) -> None:
             """Initializes a new InterpreterPoolExecutor instance.
 
@@ -103,7 +84,6 @@ if sys.version_info >= (3, 14):
             *,
             initializer: Callable[[Unpack[_Ts]], object],
             initargs: tuple[Unpack[_Ts]],
-            shared: Mapping[str, object] | None = None,
         ) -> None: ...
         @overload
         def __init__(
@@ -112,5 +92,4 @@ if sys.version_info >= (3, 14):
             thread_name_prefix: str,
             initializer: Callable[[Unpack[_Ts]], object],
             initargs: tuple[Unpack[_Ts]],
-            shared: Mapping[str, object] | None = None,
         ) -> None: ...

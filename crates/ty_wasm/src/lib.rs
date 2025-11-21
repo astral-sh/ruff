@@ -16,10 +16,10 @@ use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{
-    MarkupKind, RangedValue, document_highlights, goto_declaration, goto_definition,
-    goto_references, goto_type_definition, hover, inlay_hints,
+    InlayHintSettings, MarkupKind, RangedValue, document_highlights, goto_declaration,
+    goto_definition, goto_references, goto_type_definition, hover, inlay_hints,
 };
-use ty_ide::{NavigationTargets, signature_help};
+use ty_ide::{NavigationTarget, NavigationTargets, signature_help};
 use ty_project::metadata::options::Options;
 use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
@@ -415,13 +415,37 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let completions = ty_ide::completion(&self.db, file_id.file, offset);
+        let settings = ty_ide::CompletionSettings { auto_import: true };
+        let completions = ty_ide::completion(&self.db, &settings, file_id.file, offset);
 
         Ok(completions
             .into_iter()
-            .map(|completion| Completion {
-                kind: completion.kind(&self.db).map(CompletionKind::from),
-                name: completion.name.into(),
+            .map(|comp| {
+                let kind = comp.kind(&self.db).map(CompletionKind::from);
+                let type_display = comp.ty.map(|ty| ty.display(&self.db).to_string());
+                let import_edit = comp.import.as_ref().map(|edit| {
+                    let range = Range::from_text_range(
+                        edit.range(),
+                        &index,
+                        &source,
+                        self.position_encoding,
+                    );
+                    TextEdit {
+                        range,
+                        new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
+                    }
+                });
+                Completion {
+                    name: comp.name.into(),
+                    kind,
+                    detail: type_display,
+                    module_name: comp.module_name.map(ToString::to_string),
+                    insert_text: comp.insert.map(String::from),
+                    additional_text_edits: import_edit.map(|edit| vec![edit]),
+                    documentation: comp
+                        .documentation
+                        .map(|docstring| docstring.render_plaintext()),
+                }
             })
             .collect())
     }
@@ -435,18 +459,39 @@ impl Workspace {
             &self.db,
             file_id.file,
             range.to_text_range(&index, &source, self.position_encoding)?,
+            // TODO: Provide a way to configure this
+            &InlayHintSettings {
+                variable_types: true,
+                call_argument_names: true,
+            },
         );
 
         Ok(result
             .into_iter()
             .map(|hint| InlayHint {
-                markdown: hint.display(&self.db).to_string(),
+                label: hint
+                    .label
+                    .into_parts()
+                    .into_iter()
+                    .map(|part| InlayHintLabelPart {
+                        location: part.target().map(|target| {
+                            location_link_from_navigation_target(
+                                target,
+                                &self.db,
+                                self.position_encoding,
+                                None,
+                            )
+                        }),
+                        label: part.into_text(),
+                    })
+                    .collect(),
                 position: Position::from_text_size(
                     hint.position,
                     &index,
                     &source,
                     self.position_encoding,
                 ),
+                kind: hint.kind.into(),
             })
             .collect())
     }
@@ -527,7 +572,9 @@ impl Workspace {
 
                 SignatureInformation {
                     label: sig.label,
-                    documentation: sig.documentation,
+                    documentation: sig
+                        .documentation
+                        .map(|docstring| docstring.render_plaintext()),
                     parameters,
                     active_parameter: sig.active_parameter.and_then(|p| u32::try_from(p).ok()),
                 }
@@ -607,19 +654,8 @@ fn map_targets_to_links(
 
     targets
         .into_iter()
-        .map(|target| LocationLink {
-            path: target.file().path(db).to_string(),
-            full_range: Range::from_file_range(
-                db,
-                FileRange::new(target.file(), target.full_range()),
-                position_encoding,
-            ),
-            selection_range: Some(Range::from_file_range(
-                db,
-                FileRange::new(target.file(), target.focus_range()),
-                position_encoding,
-            )),
-            origin_selection_range: Some(source_range),
+        .map(|target| {
+            location_link_from_navigation_target(&target, db, position_encoding, Some(source_range))
         })
         .collect()
 }
@@ -873,6 +909,7 @@ impl From<PositionEncoding> for ruff_source_file::PositionEncoding {
 }
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct LocationLink {
     /// The target file path
     #[wasm_bindgen(getter_with_clone)]
@@ -884,6 +921,24 @@ pub struct LocationLink {
     pub selection_range: Option<Range>,
     /// The range of the origin.
     pub origin_selection_range: Option<Range>,
+}
+
+fn location_link_from_navigation_target(
+    target: &NavigationTarget,
+    db: &dyn Db,
+    position_encoding: PositionEncoding,
+    source_range: Option<Range>,
+) -> LocationLink {
+    LocationLink {
+        path: target.file().path(db).to_string(),
+        full_range: Range::from_file_range(db, target.full_file_range(), position_encoding),
+        selection_range: Some(Range::from_file_range(
+            db,
+            FileRange::new(target.file(), target.focus_range()),
+            position_encoding,
+        )),
+        origin_selection_range: source_range,
+    }
 }
 
 #[wasm_bindgen]
@@ -901,6 +956,16 @@ pub struct Completion {
     #[wasm_bindgen(getter_with_clone)]
     pub name: String,
     pub kind: Option<CompletionKind>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub insert_text: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub additional_text_edits: Option<Vec<TextEdit>>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub documentation: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub detail: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub module_name: Option<String>,
 }
 
 #[wasm_bindgen]
@@ -933,45 +998,80 @@ pub enum CompletionKind {
     TypeParameter,
 }
 
-impl From<ty_python_semantic::CompletionKind> for CompletionKind {
-    fn from(value: ty_python_semantic::CompletionKind) -> Self {
+impl From<ty_ide::CompletionKind> for CompletionKind {
+    fn from(value: ty_ide::CompletionKind) -> Self {
         match value {
-            ty_python_semantic::CompletionKind::Text => Self::Text,
-            ty_python_semantic::CompletionKind::Method => Self::Method,
-            ty_python_semantic::CompletionKind::Function => Self::Function,
-            ty_python_semantic::CompletionKind::Constructor => Self::Constructor,
-            ty_python_semantic::CompletionKind::Field => Self::Field,
-            ty_python_semantic::CompletionKind::Variable => Self::Variable,
-            ty_python_semantic::CompletionKind::Class => Self::Class,
-            ty_python_semantic::CompletionKind::Interface => Self::Interface,
-            ty_python_semantic::CompletionKind::Module => Self::Module,
-            ty_python_semantic::CompletionKind::Property => Self::Property,
-            ty_python_semantic::CompletionKind::Unit => Self::Unit,
-            ty_python_semantic::CompletionKind::Value => Self::Value,
-            ty_python_semantic::CompletionKind::Enum => Self::Enum,
-            ty_python_semantic::CompletionKind::Keyword => Self::Keyword,
-            ty_python_semantic::CompletionKind::Snippet => Self::Snippet,
-            ty_python_semantic::CompletionKind::Color => Self::Color,
-            ty_python_semantic::CompletionKind::File => Self::File,
-            ty_python_semantic::CompletionKind::Reference => Self::Reference,
-            ty_python_semantic::CompletionKind::Folder => Self::Folder,
-            ty_python_semantic::CompletionKind::EnumMember => Self::EnumMember,
-            ty_python_semantic::CompletionKind::Constant => Self::Constant,
-            ty_python_semantic::CompletionKind::Struct => Self::Struct,
-            ty_python_semantic::CompletionKind::Event => Self::Event,
-            ty_python_semantic::CompletionKind::Operator => Self::Operator,
-            ty_python_semantic::CompletionKind::TypeParameter => Self::TypeParameter,
+            ty_ide::CompletionKind::Text => Self::Text,
+            ty_ide::CompletionKind::Method => Self::Method,
+            ty_ide::CompletionKind::Function => Self::Function,
+            ty_ide::CompletionKind::Constructor => Self::Constructor,
+            ty_ide::CompletionKind::Field => Self::Field,
+            ty_ide::CompletionKind::Variable => Self::Variable,
+            ty_ide::CompletionKind::Class => Self::Class,
+            ty_ide::CompletionKind::Interface => Self::Interface,
+            ty_ide::CompletionKind::Module => Self::Module,
+            ty_ide::CompletionKind::Property => Self::Property,
+            ty_ide::CompletionKind::Unit => Self::Unit,
+            ty_ide::CompletionKind::Value => Self::Value,
+            ty_ide::CompletionKind::Enum => Self::Enum,
+            ty_ide::CompletionKind::Keyword => Self::Keyword,
+            ty_ide::CompletionKind::Snippet => Self::Snippet,
+            ty_ide::CompletionKind::Color => Self::Color,
+            ty_ide::CompletionKind::File => Self::File,
+            ty_ide::CompletionKind::Reference => Self::Reference,
+            ty_ide::CompletionKind::Folder => Self::Folder,
+            ty_ide::CompletionKind::EnumMember => Self::EnumMember,
+            ty_ide::CompletionKind::Constant => Self::Constant,
+            ty_ide::CompletionKind::Struct => Self::Struct,
+            ty_ide::CompletionKind::Event => Self::Event,
+            ty_ide::CompletionKind::Operator => Self::Operator,
+            ty_ide::CompletionKind::TypeParameter => Self::TypeParameter,
         }
     }
 }
 
 #[wasm_bindgen]
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextEdit {
+    pub range: Range,
+    #[wasm_bindgen(getter_with_clone)]
+    pub new_text: String,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+pub enum InlayHintKind {
+    Type,
+    Parameter,
+}
+
+impl From<ty_ide::InlayHintKind> for InlayHintKind {
+    fn from(kind: ty_ide::InlayHintKind) -> Self {
+        match kind {
+            ty_ide::InlayHintKind::Type => Self::Type,
+            ty_ide::InlayHintKind::CallArgumentName => Self::Parameter,
+        }
+    }
+}
+
+#[wasm_bindgen]
 pub struct InlayHint {
     #[wasm_bindgen(getter_with_clone)]
-    pub markdown: String,
+    pub label: Vec<InlayHintLabelPart>,
 
     pub position: Position,
+
+    pub kind: InlayHintKind,
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct InlayHintLabelPart {
+    #[wasm_bindgen(getter_with_clone)]
+    pub label: String,
+
+    #[wasm_bindgen(getter_with_clone)]
+    pub location: Option<LocationLink>,
 }
 
 #[wasm_bindgen]
@@ -1196,6 +1296,10 @@ impl System for WasmSystem {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+
+    fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
     }
 }
 

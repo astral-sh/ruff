@@ -59,6 +59,7 @@ use crate::{AlwaysFixableViolation, Fix};
 ///     return item
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct FastApiRedundantResponseModel;
 
 impl AlwaysFixableViolation for FastApiRedundantResponseModel {

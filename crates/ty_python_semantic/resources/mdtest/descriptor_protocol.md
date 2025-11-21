@@ -170,6 +170,7 @@ def f1(flag: bool):
             attr = DataDescriptor()
 
         def f(self):
+            # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `attr` on type `Self@f` with custom `__set__` method"
             self.attr = "normal"
 
     reveal_type(C1().attr)  # revealed: Unknown | Literal["data", "normal"]
@@ -351,7 +352,7 @@ reveal_type(C4.meta_attribute)  # revealed: Literal["value on metaclass"]
 reveal_type(C4.meta_non_data_descriptor)  # revealed: Literal["non-data"]
 ```
 
-When a metaclass data descriptor is possibly unbound, we union the result type of its `__get__`
+When a metaclass data descriptor is possibly missing, we union the result type of its `__get__`
 method with an underlying class level attribute, if present:
 
 ```py
@@ -365,7 +366,7 @@ def _(flag: bool):
         meta_data_descriptor1: Literal["value on class"] = "value on class"
 
     reveal_type(C5.meta_data_descriptor1)  # revealed: Literal["data", "value on class"]
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     reveal_type(C5.meta_data_descriptor2)  # revealed: Literal["data"]
 
     # TODO: We currently emit two diagnostics here, corresponding to the two states of `flag`. The diagnostics are not
@@ -375,11 +376,11 @@ def _(flag: bool):
     # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `meta_data_descriptor1` of type `Literal["value on class"]`"
     C5.meta_data_descriptor1 = None
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     C5.meta_data_descriptor2 = 1
 ```
 
-When a class-level attribute is possibly unbound, we union its (descriptor protocol) type with the
+When a class-level attribute is possibly missing, we union its (descriptor protocol) type with the
 metaclass attribute (unless it's a data descriptor, which always takes precedence):
 
 ```py
@@ -401,7 +402,7 @@ def _(flag: bool):
     reveal_type(C6.attribute1)  # revealed: Literal["data"]
     reveal_type(C6.attribute2)  # revealed: Literal["non-data", "value on class"]
     reveal_type(C6.attribute3)  # revealed: Literal["value on metaclass", "value on class"]
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-missing-attribute]
     reveal_type(C6.attribute4)  # revealed: Literal["value on class"]
 ```
 
@@ -431,6 +432,8 @@ def _(flag: bool):
     reveal_type(C7.union_of_class_data_descriptor_and_attribute)  # revealed: Literal["data", 2]
 
     C7.union_of_metaclass_attributes = 2 if flag else 1
+    # TODO: https://github.com/astral-sh/ty/issues/1163
+    # error: [invalid-assignment]
     C7.union_of_metaclass_data_descriptor_and_attribute = 2 if flag else 100
     C7.union_of_class_attributes = 2 if flag else 1
     C7.union_of_class_data_descriptor_and_attribute = 2 if flag else DataDescriptor()
@@ -522,6 +525,22 @@ c.name = None
 c.name = 42
 ```
 
+### Properties with no setters
+
+<!-- snapshot-diagnostics -->
+
+If a property has no setter, we emit a bespoke error message when a user attempts to set that
+attribute, since this is a common error.
+
+```py
+class DontAssignToMe:
+    @property
+    def immutable(self): ...
+
+# error: [invalid-assignment]
+DontAssignToMe().immutable = "the properties, they are a-changing"
+```
+
 ### Built-in `classmethod` descriptor
 
 Similarly to `property`, `classmethod` decorator creates an implicit descriptor that binds the first
@@ -569,13 +588,16 @@ that method calls work as expected. See [this test suite](./call/methods.md) for
 Here, we only demonstrate how `__get__` works on functions:
 
 ```py
+import types
 from inspect import getattr_static
+from ty_extensions import static_assert, is_subtype_of, TypeOf
 
 def f(x: object) -> str:
     return "a"
 
 reveal_type(f)  # revealed: def f(x: object) -> str
 reveal_type(f.__get__)  # revealed: <method-wrapper `__get__` of `f`>
+static_assert(is_subtype_of(TypeOf[f.__get__], types.MethodWrapperType))
 reveal_type(f.__get__(None, type(f)))  # revealed: def f(x: object) -> str
 reveal_type(f.__get__(None, type(f))(1))  # revealed: str
 
@@ -583,6 +605,7 @@ wrapper_descriptor = getattr_static(f, "__get__")
 
 reveal_type(wrapper_descriptor)  # revealed: <wrapper-descriptor `__get__` of `function` objects>
 reveal_type(wrapper_descriptor(f, None, type(f)))  # revealed: def f(x: object) -> str
+static_assert(is_subtype_of(TypeOf[wrapper_descriptor], types.WrapperDescriptorType))
 
 # Attribute access on the method-wrapper `f.__get__` falls back to `MethodWrapperType`:
 reveal_type(f.__get__.__hash__)  # revealed: bound method MethodWrapperType.__hash__() -> int
@@ -673,8 +696,16 @@ reveal_type(C().instance_access)  # revealed: str
 reveal_type(C.metaclass_access)  # revealed: bytes
 
 # TODO: These should emit a diagnostic
-reveal_type(C().class_object_access)  # revealed: TailoredForClassObjectAccess
-reveal_type(C.instance_access)  # revealed: TailoredForInstanceAccess
+#
+# However, we use the return-type of `__get__` as the inferred type anyway:
+# the way to specify that the descriptor object itself is returned when the
+# attribute is accessed on the instance or the class is by overloading `__get__`.
+#
+# Using the return type of `__get__` even for `__get__` calls that have invalid
+# arguments passed to them avoids false positives in situations where there are
+# `__get__` calls that we don't sufficiently understand.
+reveal_type(C().class_object_access)  # revealed: int
+reveal_type(C.instance_access)  # revealed: str
 ```
 
 ### Descriptors with incorrect `__get__` signature
@@ -689,10 +720,28 @@ class C:
     descriptor: Descriptor = Descriptor()
 
 # TODO: This should be an error
-reveal_type(C.descriptor)  # revealed: Descriptor
+reveal_type(C.descriptor)  # revealed: int
 
 # TODO: This should be an error
-reveal_type(C().descriptor)  # revealed: Descriptor
+reveal_type(C().descriptor)  # revealed: int
+```
+
+### "Descriptors" with non-callable `__get__` attributes
+
+If `__get__` is not callable at all, the interpreter will still attempt to call the method at
+runtime, and this will raise an exception. As such, even for `__get__ = None`, we still "attempt to
+call `__get__`" on the descriptor object (leading us to infer `Unknown`):
+
+```py
+class BrokenDescriptor:
+    __get__: None = None
+
+class Foo:
+    desc: BrokenDescriptor = BrokenDescriptor()
+
+# TODO: this raises `TypeError` at runtime due to the implicit call to `__get__`;
+# we should emit a diagnostic
+reveal_type(Foo().desc)  # revealed: Unknown
 ```
 
 ### Undeclared descriptor arguments
@@ -736,16 +785,16 @@ def _(flag: bool):
             non_data: NonDataDescriptor = NonDataDescriptor()
             data: DataDescriptor = DataDescriptor()
 
-    # error: [possibly-unbound-attribute] "Attribute `non_data` on type `<class 'PossiblyUnbound'>` is possibly unbound"
+    # error: [possibly-missing-attribute] "Attribute `non_data` may be missing on class `PossiblyUnbound`"
     reveal_type(PossiblyUnbound.non_data)  # revealed: int
 
-    # error: [possibly-unbound-attribute] "Attribute `non_data` on type `PossiblyUnbound` is possibly unbound"
+    # error: [possibly-missing-attribute] "Attribute `non_data` may be missing on object of type `PossiblyUnbound`"
     reveal_type(PossiblyUnbound().non_data)  # revealed: int
 
-    # error: [possibly-unbound-attribute] "Attribute `data` on type `<class 'PossiblyUnbound'>` is possibly unbound"
+    # error: [possibly-missing-attribute] "Attribute `data` may be missing on class `PossiblyUnbound`"
     reveal_type(PossiblyUnbound.data)  # revealed: int
 
-    # error: [possibly-unbound-attribute] "Attribute `data` on type `PossiblyUnbound` is possibly unbound"
+    # error: [possibly-missing-attribute] "Attribute `data` may be missing on object of type `PossiblyUnbound`"
     reveal_type(PossiblyUnbound().data)  # revealed: int
 ```
 

@@ -9,6 +9,18 @@ expression: initialization_result
       "openClose": true,
       "change": 2
     },
+    "notebookDocumentSync": {
+      "notebookSelector": [
+        {
+          "cells": [
+            {
+              "language": "python"
+            }
+          ]
+        }
+      ],
+      "save": false
+    },
     "selectionRangeProvider": true,
     "hoverProvider": true,
     "completionProvider": {
@@ -32,6 +44,12 @@ expression: initialization_result
     "documentSymbolProvider": true,
     "workspaceSymbolProvider": true,
     "declarationProvider": true,
+    "executeCommandProvider": {
+      "commands": [
+        "ty.printDebugInformation"
+      ],
+      "workDoneProgress": false
+    },
     "semanticTokensProvider": {
       "legend": {
         "tokenTypes": [

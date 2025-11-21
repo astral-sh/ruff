@@ -80,8 +80,8 @@ from _typeshed import StrPath
 from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 from tkinter import Canvas, Frame, Misc, PhotoImage, Scrollbar
-from typing import Any, ClassVar, Literal, TypedDict, overload
-from typing_extensions import Self, TypeAlias
+from typing import Any, ClassVar, Literal, TypedDict, overload, type_check_only
+from typing_extensions import Self, TypeAlias, deprecated, disjoint_base
 
 __all__ = [
     "ScrolledCanvas",
@@ -223,6 +223,7 @@ if sys.version_info < (3, 13):
 _Color: TypeAlias = str | tuple[float, float, float]
 _AnyColor: TypeAlias = Any
 
+@type_check_only
 class _PenState(TypedDict):
     shown: bool
     pendown: bool
@@ -239,33 +240,64 @@ class _PenState(TypedDict):
 _Speed: TypeAlias = str | float
 _PolygonCoords: TypeAlias = Sequence[tuple[float, float]]
 
-class Vec2D(tuple[float, float]):
-    """A 2 dimensional vector class, used as a helper class
-    for implementing turtle graphics.
-    May be useful for turtle graphics programs also.
-    Derived from tuple, so a vector is a tuple!
+if sys.version_info >= (3, 12):
+    class Vec2D(tuple[float, float]):
+        """A 2 dimensional vector class, used as a helper class
+        for implementing turtle graphics.
+        May be useful for turtle graphics programs also.
+        Derived from tuple, so a vector is a tuple!
 
-    Provides (for a, b vectors, k number):
-       a+b vector addition
-       a-b vector subtraction
-       a*b inner product
-       k*a and a*k multiplication with scalar
-       |a| absolute value of a
-       a.rotate(angle) rotation
-    """
+        Provides (for a, b vectors, k number):
+           a+b vector addition
+           a-b vector subtraction
+           a*b inner product
+           k*a and a*k multiplication with scalar
+           |a| absolute value of a
+           a.rotate(angle) rotation
+        """
 
-    def __new__(cls, x: float, y: float) -> Self: ...
-    def __add__(self, other: tuple[float, float]) -> Vec2D: ...  # type: ignore[override]
-    @overload  # type: ignore[override]
-    def __mul__(self, other: Vec2D) -> float: ...
-    @overload
-    def __mul__(self, other: float) -> Vec2D: ...
-    def __rmul__(self, other: float) -> Vec2D: ...  # type: ignore[override]
-    def __sub__(self, other: tuple[float, float]) -> Vec2D: ...
-    def __neg__(self) -> Vec2D: ...
-    def __abs__(self) -> float: ...
-    def rotate(self, angle: float) -> Vec2D:
-        """rotate self counterclockwise by angle"""
+        def __new__(cls, x: float, y: float) -> Self: ...
+        def __add__(self, other: tuple[float, float]) -> Vec2D: ...  # type: ignore[override]
+        @overload  # type: ignore[override]
+        def __mul__(self, other: Vec2D) -> float: ...
+        @overload
+        def __mul__(self, other: float) -> Vec2D: ...
+        def __rmul__(self, other: float) -> Vec2D: ...  # type: ignore[override]
+        def __sub__(self, other: tuple[float, float]) -> Vec2D: ...
+        def __neg__(self) -> Vec2D: ...
+        def __abs__(self) -> float: ...
+        def rotate(self, angle: float) -> Vec2D:
+            """rotate self counterclockwise by angle"""
+
+else:
+    @disjoint_base
+    class Vec2D(tuple[float, float]):
+        """A 2 dimensional vector class, used as a helper class
+        for implementing turtle graphics.
+        May be useful for turtle graphics programs also.
+        Derived from tuple, so a vector is a tuple!
+
+        Provides (for a, b vectors, k number):
+           a+b vector addition
+           a-b vector subtraction
+           a*b inner product
+           k*a and a*k multiplication with scalar
+           |a| absolute value of a
+           a.rotate(angle) rotation
+        """
+
+        def __new__(cls, x: float, y: float) -> Self: ...
+        def __add__(self, other: tuple[float, float]) -> Vec2D: ...  # type: ignore[override]
+        @overload  # type: ignore[override]
+        def __mul__(self, other: Vec2D) -> float: ...
+        @overload
+        def __mul__(self, other: float) -> Vec2D: ...
+        def __rmul__(self, other: float) -> Vec2D: ...  # type: ignore[override]
+        def __sub__(self, other: tuple[float, float]) -> Vec2D: ...
+        def __neg__(self) -> Vec2D: ...
+        def __abs__(self) -> float: ...
+        def rotate(self, angle: float) -> Vec2D:
+            """rotate self counterclockwise by angle"""
 
 # Does not actually inherit from Canvas, but dynamically gets all methods of Canvas
 class ScrolledCanvas(Canvas, Frame):  # type: ignore[misc]
@@ -367,7 +399,9 @@ class Shape:
     an image or a list constructed using the addcomponent method.
     """
 
-    def __init__(self, type_: str, data: _PolygonCoords | PhotoImage | None = None) -> None: ...
+    def __init__(
+        self, type_: Literal["polygon", "image", "compound"], data: _PolygonCoords | PhotoImage | None = None
+    ) -> None: ...
     def addcomponent(self, poly: _PolygonCoords, fill: _Color, outline: _Color | None = None) -> None:
         """Add component to a shape of type compound.
 
@@ -393,7 +427,9 @@ class TurtleScreen(TurtleScreenBase):
     which is Tkinter in this case.
     """
 
-    def __init__(self, cv: Canvas, mode: str = "standard", colormode: float = 1.0, delay: int = 10) -> None: ...
+    def __init__(
+        self, cv: Canvas, mode: Literal["standard", "logo", "world"] = "standard", colormode: float = 1.0, delay: int = 10
+    ) -> None: ...
     def clear(self) -> None:
         """Delete all drawings and all turtles from the TurtleScreen.
 
@@ -433,7 +469,7 @@ class TurtleScreen(TurtleScreenBase):
         """
 
     @overload
-    def mode(self, mode: str) -> None: ...
+    def mode(self, mode: Literal["standard", "logo", "world"]) -> None: ...
     def setworldcoordinates(self, llx: float, lly: float, urx: float, ury: float) -> None:
         """Set up a user defined coordinate-system.
 
@@ -633,7 +669,7 @@ class TurtleScreen(TurtleScreenBase):
         ['arrow', 'blank', 'circle', ... , 'turtle']
         """
 
-    def onclick(self, fun: Callable[[float, float], object], btn: int = 1, add: Any | None = None) -> None:
+    def onclick(self, fun: Callable[[float, float], object], btn: int = 1, add: bool | None = None) -> None:
         """Bind fun to mouse-click event on canvas.
 
         Arguments:
@@ -800,7 +836,7 @@ class TNavigator:
     DEFAULT_MODE: str
     DEFAULT_ANGLEOFFSET: int
     DEFAULT_ANGLEORIENT: int
-    def __init__(self, mode: str = "standard") -> None: ...
+    def __init__(self, mode: Literal["standard", "logo", "world"] = "standard") -> None: ...
     def reset(self) -> None:
         """reset turtle to its initial values
 
@@ -1182,7 +1218,7 @@ class TPen:
     Implements drawing properties.
     """
 
-    def __init__(self, resizemode: str = "noresize") -> None: ...
+    def __init__(self, resizemode: Literal["auto", "user", "noresize"] = "noresize") -> None: ...
     @overload
     def resizemode(self, rmode: None = None) -> str:
         """Set resizemode to one of the values: "auto", "user", "noresize".
@@ -1208,7 +1244,7 @@ class TPen:
         """
 
     @overload
-    def resizemode(self, rmode: str) -> None: ...
+    def resizemode(self, rmode: Literal["auto", "user", "noresize"]) -> None: ...
     @overload
     def pensize(self, width: None = None) -> int:
         """Set or return the line thickness.
@@ -1511,7 +1547,7 @@ class TPen:
         fillcolor: _Color = ...,
         pensize: int = ...,
         speed: int = ...,
-        resizemode: str = ...,
+        resizemode: Literal["auto", "user", "noresize"] = ...,
         stretchfactor: tuple[float, float] = ...,
         outline: int = ...,
         tilt: float = ...,
@@ -1725,6 +1761,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
 
         """
     if sys.version_info < (3, 13):
+        @deprecated("Deprecated since Python 3.1; removed in Python 3.13. Use `tiltangle()` instead.")
         def settiltangle(self, angle: float) -> None:
             """Rotate the turtleshape to point in the specified direction
 
@@ -1897,7 +1934,8 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.end_fill()
         """
 
-    def dot(self, size: int | None = None, *color: _Color) -> None:
+    @overload
+    def dot(self, size: int | _Color | None = None) -> None:
         """Draw a dot with diameter size, using color.
 
         Optional arguments:
@@ -1912,6 +1950,10 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.fd(50); turtle.dot(20, "blue"); turtle.fd(50)
         """
 
+    @overload
+    def dot(self, size: int | None, color: _Color, /) -> None: ...
+    @overload
+    def dot(self, size: int | None, r: float, g: float, b: float, /) -> None: ...
     def write(
         self, arg: object, move: bool = False, align: str = "left", font: tuple[str, int, str] = ("Arial", 8, "normal")
     ) -> None:
@@ -2286,7 +2328,7 @@ def mode(mode: None = None) -> str:
     """
 
 @overload
-def mode(mode: str) -> None: ...
+def mode(mode: Literal["standard", "logo", "world"]) -> None: ...
 def setworldcoordinates(llx: float, lly: float, urx: float, ury: float) -> None:
     """Set up a user defined coordinate-system.
 
@@ -2498,7 +2540,7 @@ def getshapes() -> list[str]:
     ['arrow', 'blank', 'circle', ... , 'turtle']
     """
 
-def onclick(fun: Callable[[float, float], object], btn: int = 1, add: Any | None = None) -> None:
+def onclick(fun: Callable[[float, float], object], btn: int = 1, add: bool | None = None) -> None:
     """Bind fun to mouse-click event on this turtle on canvas.
 
     Arguments:
@@ -3128,7 +3170,7 @@ def resizemode(rmode: None = None) -> str:
     """
 
 @overload
-def resizemode(rmode: str) -> None: ...
+def resizemode(rmode: Literal["auto", "user", "noresize"]) -> None: ...
 @overload
 def pensize(width: None = None) -> int:
     """Set or return the line thickness.
@@ -3425,7 +3467,7 @@ def pen(
     fillcolor: _Color = ...,
     pensize: int = ...,
     speed: int = ...,
-    resizemode: str = ...,
+    resizemode: Literal["auto", "user", "noresize"] = ...,
     stretchfactor: tuple[float, float] = ...,
     outline: int = ...,
     tilt: float = ...,
@@ -3619,6 +3661,7 @@ def get_shapepoly() -> _PolygonCoords | None:
     """
 
 if sys.version_info < (3, 13):
+    @deprecated("Deprecated since Python 3.1; removed in Python 3.13. Use `tiltangle()` instead.")
     def settiltangle(angle: float) -> None:
         """Rotate the turtleshape to point in the specified direction
 
@@ -3793,7 +3836,8 @@ def end_fill() -> None:
     >>> end_fill()
     """
 
-def dot(size: int | None = None, *color: _Color) -> None:
+@overload
+def dot(size: int | _Color | None = None) -> None:
     """Draw a dot with diameter size, using color.
 
     Optional arguments:
@@ -3808,6 +3852,10 @@ def dot(size: int | None = None, *color: _Color) -> None:
     >>> fd(50); dot(20, "blue"); fd(50)
     """
 
+@overload
+def dot(size: int | None, color: _Color, /) -> None: ...
+@overload
+def dot(size: int | None, r: float, g: float, b: float, /) -> None: ...
 def write(arg: object, move: bool = False, align: str = "left", font: tuple[str, int, str] = ("Arial", 8, "normal")) -> None:
     """Write text at the current turtle position.
 
@@ -3912,7 +3960,7 @@ def getturtle() -> Turtle:
 
 getpen = getturtle
 
-def onrelease(fun: Callable[[float, float], object], btn: int = 1, add: Any | None = None) -> None:
+def onrelease(fun: Callable[[float, float], object], btn: int = 1, add: bool | None = None) -> None:
     """Bind fun to mouse-button-release event on this turtle on canvas.
 
     Arguments:
@@ -3935,7 +3983,7 @@ def onrelease(fun: Callable[[float, float], object], btn: int = 1, add: Any | No
     transparent.
     """
 
-def ondrag(fun: Callable[[float, float], object], btn: int = 1, add: Any | None = None) -> None:
+def ondrag(fun: Callable[[float, float], object], btn: int = 1, add: bool | None = None) -> None:
     """Bind fun to mouse-move event on this turtle on canvas.
 
     Arguments:

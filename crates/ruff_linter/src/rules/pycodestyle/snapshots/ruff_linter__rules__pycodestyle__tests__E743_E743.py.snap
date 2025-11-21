@@ -1,25 +1,27 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
-E743.py:1:5: E743 Ambiguous function name: `l`
+E743 Ambiguous function name: `l`
+ --> E743.py:1:5
   |
 1 | def l():
-  |     ^ E743
+  |     ^
 2 |     pass
   |
 
-E743.py:5:5: E743 Ambiguous function name: `I`
+E743 Ambiguous function name: `I`
+ --> E743.py:5:5
   |
 5 | def I():
-  |     ^ E743
+  |     ^
 6 |     pass
   |
 
-E743.py:10:9: E743 Ambiguous function name: `O`
+E743 Ambiguous function name: `O`
+  --> E743.py:10:9
    |
  9 | class X:
 10 |     def O(self):
-   |         ^ E743
+   |         ^
 11 |         pass
    |

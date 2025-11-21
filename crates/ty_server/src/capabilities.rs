@@ -1,14 +1,17 @@
 use lsp_types::{
     ClientCapabilities, CompletionOptions, DeclarationCapability, DiagnosticOptions,
     DiagnosticServerCapabilities, HoverProviderCapability, InlayHintOptions,
-    InlayHintServerCapabilities, MarkupKind, OneOf, SelectionRangeProviderCapability,
-    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
-    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TypeDefinitionProviderCapability, WorkDoneProgressOptions,
+    InlayHintServerCapabilities, MarkupKind, NotebookCellSelector, NotebookSelector, OneOf,
+    RenameOptions, SelectionRangeProviderCapability, SemanticTokensFullOptions,
+    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
+    ServerCapabilities, SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TypeDefinitionProviderCapability, WorkDoneProgressOptions,
 };
 
 use crate::PositionEncoding;
+use crate::session::GlobalSettings;
+use lsp_types as types;
+use std::str::FromStr;
 
 bitflags::bitflags! {
     /// Represents the resolved client capabilities for the language server.
@@ -29,8 +32,51 @@ bitflags::bitflags! {
         const HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT = 1 << 10;
         const WORK_DONE_PROGRESS = 1 << 11;
         const FILE_WATCHER_SUPPORT = 1 << 12;
-        const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 13;
-        const WORKSPACE_CONFIGURATION = 1 << 14;
+        const RELATIVE_FILE_WATCHER_SUPPORT = 1 << 13;
+        const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 14;
+        const WORKSPACE_CONFIGURATION = 1 << 15;
+        const RENAME_DYNAMIC_REGISTRATION = 1 << 16;
+        const COMPLETION_ITEM_LABEL_DETAILS_SUPPORT = 1 << 17;
+    }
+}
+
+impl std::fmt::Display for ResolvedClientCapabilities {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut f = f.debug_list();
+        for (name, _) in self.iter_names() {
+            f.entry(&name);
+        }
+        f.finish()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum SupportedCommand {
+    Debug,
+}
+
+impl SupportedCommand {
+    /// Returns the identifier of the command.
+    const fn identifier(self) -> &'static str {
+        match self {
+            SupportedCommand::Debug => "ty.printDebugInformation",
+        }
+    }
+
+    /// Returns all the commands that the server currently supports.
+    const fn all() -> [SupportedCommand; 1] {
+        [SupportedCommand::Debug]
+    }
+}
+
+impl FromStr for SupportedCommand {
+    type Err = anyhow::Error;
+
+    fn from_str(name: &str) -> anyhow::Result<Self, Self::Err> {
+        Ok(match name {
+            "ty.printDebugInformation" => Self::Debug,
+            _ => return Err(anyhow::anyhow!("Invalid command `{name}`")),
+        })
     }
 }
 
@@ -105,9 +151,27 @@ impl ResolvedClientCapabilities {
         self.contains(Self::FILE_WATCHER_SUPPORT)
     }
 
+    /// Returns `true` if the client supports relative file watcher capabilities.
+    ///
+    /// This permits specifying a "base uri" that a glob is interpreted
+    /// relative to.
+    pub(crate) const fn supports_relative_file_watcher(self) -> bool {
+        self.contains(Self::RELATIVE_FILE_WATCHER_SUPPORT)
+    }
+
     /// Returns `true` if the client supports dynamic registration for diagnostic capabilities.
     pub(crate) const fn supports_diagnostic_dynamic_registration(self) -> bool {
         self.contains(Self::DIAGNOSTIC_DYNAMIC_REGISTRATION)
+    }
+
+    /// Returns `true` if the client supports dynamic registration for rename capabilities.
+    pub(crate) const fn supports_rename_dynamic_registration(self) -> bool {
+        self.contains(Self::RENAME_DYNAMIC_REGISTRATION)
+    }
+
+    /// Returns `true` if the client supports "label details" in completion items.
+    pub(crate) const fn supports_completion_item_label_details(self) -> bool {
+        self.contains(Self::COMPLETION_ITEM_LABEL_DETAILS_SUPPORT)
     }
 
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
@@ -137,11 +201,15 @@ impl ResolvedClientCapabilities {
             flags |= Self::INLAY_HINT_REFRESH;
         }
 
-        if workspace
-            .and_then(|workspace| workspace.did_change_watched_files?.dynamic_registration)
-            .unwrap_or_default()
+        if let Some(capabilities) =
+            workspace.and_then(|workspace| workspace.did_change_watched_files.as_ref())
         {
-            flags |= Self::FILE_WATCHER_SUPPORT;
+            if capabilities.dynamic_registration == Some(true) {
+                flags |= Self::FILE_WATCHER_SUPPORT;
+            }
+            if capabilities.relative_pattern_support == Some(true) {
+                flags |= Self::RELATIVE_FILE_WATCHER_SUPPORT;
+            }
         }
 
         if text_document.is_some_and(|text_document| text_document.diagnostic.is_some()) {
@@ -246,6 +314,13 @@ impl ResolvedClientCapabilities {
             flags |= Self::HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT;
         }
 
+        if text_document
+            .and_then(|text_document| text_document.rename.as_ref()?.dynamic_registration)
+            .unwrap_or_default()
+        {
+            flags |= Self::RENAME_DYNAMIC_REGISTRATION;
+        }
+
         if client_capabilities
             .window
             .as_ref()
@@ -255,13 +330,25 @@ impl ResolvedClientCapabilities {
             flags |= Self::WORK_DONE_PROGRESS;
         }
 
+        if text_document
+            .and_then(|text_document| text_document.completion.as_ref())
+            .and_then(|completion| completion.completion_item.as_ref())
+            .and_then(|completion_item| completion_item.label_details_support)
+            .unwrap_or_default()
+        {
+            flags |= Self::COMPLETION_ITEM_LABEL_DETAILS_SUPPORT;
+        }
+
         flags
     }
 }
 
+/// Creates the server capabilities based on the resolved client capabilities and resolved global
+/// settings from the initialization options.
 pub(crate) fn server_capabilities(
     position_encoding: PositionEncoding,
     resolved_client_capabilities: ResolvedClientCapabilities,
+    global_settings: &GlobalSettings,
 ) -> ServerCapabilities {
     let diagnostic_provider =
         if resolved_client_capabilities.supports_diagnostic_dynamic_registration() {
@@ -275,8 +362,29 @@ pub(crate) fn server_capabilities(
             ))
         };
 
+    let rename_provider = if resolved_client_capabilities.supports_rename_dynamic_registration() {
+        // If the client supports dynamic registration, we will register the rename capabilities
+        // dynamically based on the `ty.experimental.rename` setting.
+        None
+    } else {
+        // Otherwise, we check whether user has enabled rename support via the resolved settings
+        // from initialization options.
+        global_settings
+            .is_rename_enabled()
+            .then(|| OneOf::Right(server_rename_options()))
+    };
+
     ServerCapabilities {
         position_encoding: Some(position_encoding.into()),
+        execute_command_provider: Some(types::ExecuteCommandOptions {
+            commands: SupportedCommand::all()
+                .map(|command| command.identifier().to_string())
+                .to_vec(),
+            work_done_progress_options: WorkDoneProgressOptions {
+                work_done_progress: Some(false),
+            },
+        }),
+
         diagnostic_provider,
         text_document_sync: Some(TextDocumentSyncCapability::Options(
             TextDocumentSyncOptions {
@@ -289,6 +397,7 @@ pub(crate) fn server_capabilities(
         definition_provider: Some(OneOf::Left(true)),
         declaration_provider: Some(DeclarationCapability::Simple(true)),
         references_provider: Some(OneOf::Left(true)),
+        rename_provider,
         document_highlight_provider: Some(OneOf::Left(true)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         signature_help_provider: Some(SignatureHelpOptions {
@@ -323,6 +432,16 @@ pub(crate) fn server_capabilities(
         selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
         document_symbol_provider: Some(OneOf::Left(true)),
         workspace_symbol_provider: Some(OneOf::Left(true)),
+        notebook_document_sync: Some(OneOf::Left(lsp_types::NotebookDocumentSyncOptions {
+            save: Some(false),
+            notebook_selector: [NotebookSelector::ByCells {
+                notebook: None,
+                cells: vec![NotebookCellSelector {
+                    language: "python".to_string(),
+                }],
+            }]
+            .to_vec(),
+        })),
         ..Default::default()
     }
 }
@@ -338,5 +457,12 @@ pub(crate) fn server_diagnostic_options(workspace_diagnostics: bool) -> Diagnost
             // diagnostic mode.
             work_done_progress: Some(workspace_diagnostics),
         },
+    }
+}
+
+pub(crate) fn server_rename_options() -> RenameOptions {
+    RenameOptions {
+        prepare_provider: Some(true),
+        work_done_progress_options: WorkDoneProgressOptions::default(),
     }
 }

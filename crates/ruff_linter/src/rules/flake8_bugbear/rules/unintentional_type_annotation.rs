@@ -23,6 +23,7 @@ use crate::checkers::ast::Checker;
 /// a["b"] = 1
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.250")]
 pub(crate) struct UnintentionalTypeAnnotation;
 
 impl Violation for UnintentionalTypeAnnotation {

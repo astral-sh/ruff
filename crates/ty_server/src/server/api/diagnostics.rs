@@ -3,29 +3,29 @@ use std::hash::{DefaultHasher, Hash as _, Hasher as _};
 use lsp_types::notification::PublishDiagnostics;
 use lsp_types::{
     CodeDescription, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag,
-    NumberOrString, PublishDiagnosticsParams, Range, Url,
+    NumberOrString, PublishDiagnosticsParams, Url,
 };
 use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
-use ruff_db::files::FileRange;
-use ruff_db::source::{line_index, source_text};
+use ruff_db::files::{File, FileRange};
 use ruff_db::system::SystemPathBuf;
-use ty_project::{Db, ProjectDatabase};
+use ty_project::{Db as _, ProjectDatabase};
 
-use crate::document::{DocumentKey, FileRangeExt, ToRangeExt};
-use crate::session::DocumentSnapshot;
+use crate::Db;
+use crate::document::{FileRangeExt, ToRangeExt};
+use crate::session::DocumentHandle;
 use crate::session::client::Client;
 use crate::system::{AnySystemPath, file_to_url};
-use crate::{DocumentQuery, PositionEncoding, Session};
+use crate::{PositionEncoding, Session};
 
-pub(super) struct Diagnostics<'a> {
+pub(super) struct Diagnostics {
     items: Vec<ruff_db::diagnostic::Diagnostic>,
     encoding: PositionEncoding,
-    document: &'a DocumentQuery,
+    file_or_notebook: File,
 }
 
-impl Diagnostics<'_> {
+impl Diagnostics {
     /// Computes the result ID for `diagnostics`.
     ///
     /// Returns `None` if there are no diagnostics.
@@ -53,30 +53,27 @@ impl Diagnostics<'_> {
     }
 
     pub(super) fn to_lsp_diagnostics(&self, db: &ProjectDatabase) -> LspDiagnostics {
-        if let Some(notebook) = self.document.as_notebook() {
+        if let Some(notebook_document) = db.notebook_document(self.file_or_notebook) {
             let mut cell_diagnostics: FxHashMap<Url, Vec<Diagnostic>> = FxHashMap::default();
 
             // Populates all relevant URLs with an empty diagnostic list. This ensures that documents
             // without diagnostics still get updated.
-            for cell_url in notebook.cell_urls() {
+            for cell_url in notebook_document.cell_urls() {
                 cell_diagnostics.entry(cell_url.clone()).or_default();
             }
 
-            for (cell_index, diagnostic) in self.items.iter().map(|diagnostic| {
-                (
-                    // TODO: Use the cell index instead using `SourceKind`
-                    usize::default(),
-                    to_lsp_diagnostic(db, diagnostic, self.encoding),
-                )
-            }) {
-                let Some(cell_uri) = notebook.cell_uri_by_index(cell_index) else {
-                    tracing::warn!("Unable to find notebook cell at index {cell_index}");
+            for diagnostic in &self.items {
+                let (url, lsp_diagnostic) = to_lsp_diagnostic(db, diagnostic, self.encoding);
+
+                let Some(url) = url else {
+                    tracing::warn!("Unable to find notebook cell");
                     continue;
                 };
+
                 cell_diagnostics
-                    .entry(cell_uri.clone())
+                    .entry(url)
                     .or_default()
-                    .push(diagnostic);
+                    .push(lsp_diagnostic);
             }
 
             LspDiagnostics::NotebookDocument(cell_diagnostics)
@@ -84,7 +81,7 @@ impl Diagnostics<'_> {
             LspDiagnostics::TextDocument(
                 self.items
                     .iter()
-                    .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, self.encoding))
+                    .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, self.encoding).1)
                     .collect(),
             )
         }
@@ -115,52 +112,59 @@ impl LspDiagnostics {
     }
 }
 
-/// Clears the diagnostics for the document identified by `key`.
+pub(super) fn clear_diagnostics_if_needed(
+    document: &DocumentHandle,
+    session: &Session,
+    client: &Client,
+) {
+    if session.client_capabilities().supports_pull_diagnostics() && !document.is_cell_or_notebook()
+    {
+        return;
+    }
+
+    clear_diagnostics(document.url(), client);
+}
+
+/// Clears the diagnostics for the document identified by `uri`.
 ///
 /// This is done by notifying the client with an empty list of diagnostics for the document.
 /// For notebook cells, this clears diagnostics for the specific cell.
 /// For other document types, this clears diagnostics for the main document.
-pub(super) fn clear_diagnostics(key: &DocumentKey, client: &Client) {
-    let Some(uri) = key.to_url() else {
-        // If we can't convert to URL, we can't clear diagnostics
-        return;
-    };
-
+pub(super) fn clear_diagnostics(uri: &lsp_types::Url, client: &Client) {
     client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
-        uri,
+        uri: uri.clone(),
         diagnostics: vec![],
         version: None,
     });
 }
 
 /// Publishes the diagnostics for the given document snapshot using the [publish diagnostics
-/// notification].
+/// notification] .
 ///
-/// This function is a no-op if the client supports pull diagnostics.
+/// Unlike [`publish_diagnostics`], this function only publishes diagnostics if a client doesn't support
+/// pull diagnostics and `document` is not a notebook or cell (VS Code
+/// does not support pull diagnostics for notebooks or cells (as of 2025-11-12).
 ///
 /// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
-pub(super) fn publish_diagnostics(session: &Session, key: &DocumentKey, client: &Client) {
-    if session.client_capabilities().supports_pull_diagnostics() {
+pub(super) fn publish_diagnostics_if_needed(
+    document: &DocumentHandle,
+    session: &Session,
+    client: &Client,
+) {
+    if !document.is_cell_or_notebook() && session.client_capabilities().supports_pull_diagnostics()
+    {
         return;
     }
 
-    let Some(url) = key.to_url() else {
-        return;
-    };
+    publish_diagnostics(document, session, client);
+}
 
-    let snapshot = session.take_document_snapshot(url.clone());
+/// Publishes the diagnostics for the given document snapshot using the [publish diagnostics
+/// notification].
+pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, client: &Client) {
+    let db = session.project_db(document.notebook_or_file_path());
 
-    let document = match snapshot.document() {
-        Ok(document) => document,
-        Err(err) => {
-            tracing::debug!("Failed to resolve document for URL `{}`: {}", url, err);
-            return;
-        }
-    };
-
-    let db = session.project_db(key.path());
-
-    let Some(diagnostics) = compute_diagnostics(db, &snapshot) else {
+    let Some(diagnostics) = compute_diagnostics(db, document, session.position_encoding()) else {
         return;
     };
 
@@ -175,7 +179,7 @@ pub(super) fn publish_diagnostics(session: &Session, key: &DocumentKey, client: 
 
     match diagnostics.to_lsp_diagnostics(db) {
         LspDiagnostics::TextDocument(diagnostics) => {
-            publish_diagnostics_notification(url, diagnostics);
+            publish_diagnostics_notification(document.url().clone(), diagnostics);
         }
         LspDiagnostics::NotebookDocument(cell_diagnostics) => {
             for (cell_url, diagnostics) in cell_diagnostics {
@@ -245,7 +249,7 @@ pub(crate) fn publish_settings_diagnostics(
         // Convert diagnostics to LSP format
         let lsp_diagnostics = file_diagnostics
             .into_iter()
-            .map(|diagnostic| to_lsp_diagnostic(db, &diagnostic, session_encoding))
+            .map(|diagnostic| to_lsp_diagnostic(db, &diagnostic, session_encoding).1)
             .collect::<Vec<_>>();
 
         client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
@@ -256,20 +260,16 @@ pub(crate) fn publish_settings_diagnostics(
     }
 }
 
-pub(super) fn compute_diagnostics<'a>(
+pub(super) fn compute_diagnostics(
     db: &ProjectDatabase,
-    snapshot: &'a DocumentSnapshot,
-) -> Option<Diagnostics<'a>> {
-    let document = match snapshot.document() {
-        Ok(document) => document,
-        Err(err) => {
-            tracing::info!("Failed to resolve document for snapshot: {}", err);
-            return None;
-        }
-    };
-
-    let Some(file) = document.file(db) else {
-        tracing::info!("No file found for snapshot for `{}`", document.file_path());
+    document: &DocumentHandle,
+    encoding: PositionEncoding,
+) -> Option<Diagnostics> {
+    let Some(file) = document.notebook_or_file(db) else {
+        tracing::info!(
+            "No file found for snapshot for `{}`",
+            document.notebook_or_file_path()
+        );
         return None;
     };
 
@@ -277,8 +277,8 @@ pub(super) fn compute_diagnostics<'a>(
 
     Some(Diagnostics {
         items: diagnostics,
-        encoding: snapshot.encoding(),
-        document,
+        encoding,
+        file_or_notebook: file,
     })
 }
 
@@ -288,17 +288,18 @@ pub(super) fn to_lsp_diagnostic(
     db: &dyn Db,
     diagnostic: &ruff_db::diagnostic::Diagnostic,
     encoding: PositionEncoding,
-) -> Diagnostic {
-    let range = if let Some(span) = diagnostic.primary_span() {
+) -> (Option<lsp_types::Url>, Diagnostic) {
+    let location = diagnostic.primary_span().and_then(|span| {
         let file = span.expect_ty_file();
-        let index = line_index(db, file);
-        let source = source_text(db, file);
-
-        span.range()
-            .map(|range| range.to_lsp_range(&source, &index, encoding))
+        span.range()?
+            .to_lsp_range(db, file, encoding)
             .unwrap_or_default()
-    } else {
-        Range::default()
+            .to_location()
+    });
+
+    let (range, url) = match location {
+        Some(location) => (location.range, Some(location.uri)),
+        None => (lsp_types::Range::default(), None),
     };
 
     let severity = match diagnostic.severity() {
@@ -319,15 +320,11 @@ pub(super) fn to_lsp_diagnostic(
         })
         .filter(|mapped_tags| !mapped_tags.is_empty());
 
-    let code_description = diagnostic
-        .id()
-        .is_lint()
-        .then(|| {
-            Some(CodeDescription {
-                href: Url::parse(&format!("https://ty.dev/rules#{}", diagnostic.id())).ok()?,
-            })
-        })
-        .flatten();
+    let code_description = diagnostic.documentation_url().and_then(|url| {
+        let href = Url::parse(url).ok()?;
+
+        Some(CodeDescription { href })
+    });
 
     let mut related_information = Vec::new();
 
@@ -354,17 +351,20 @@ pub(super) fn to_lsp_diagnostic(
         );
     }
 
-    Diagnostic {
-        range,
-        severity: Some(severity),
-        tags,
-        code: Some(NumberOrString::String(diagnostic.id().to_string())),
-        code_description,
-        source: Some("ty".into()),
-        message: diagnostic.concise_message().to_string(),
-        related_information: Some(related_information),
-        data: None,
-    }
+    (
+        url,
+        Diagnostic {
+            range,
+            severity: Some(severity),
+            tags,
+            code: Some(NumberOrString::String(diagnostic.id().to_string())),
+            code_description,
+            source: Some("ty".into()),
+            message: diagnostic.concise_message().to_string(),
+            related_information: Some(related_information),
+            data: None,
+        },
+    )
 }
 
 /// Converts an [`Annotation`] to a [`DiagnosticRelatedInformation`].
@@ -377,7 +377,7 @@ fn annotation_to_related_information(
 
     let annotation_message = annotation.get_message()?;
     let range = FileRange::try_from(span).ok()?;
-    let location = range.to_location(db, encoding)?;
+    let location = range.to_lsp_range(db, encoding)?.into_location()?;
 
     Some(DiagnosticRelatedInformation {
         location,
@@ -395,7 +395,7 @@ fn sub_diagnostic_to_related_information(
 
     let span = primary_annotation.get_span();
     let range = FileRange::try_from(span).ok()?;
-    let location = range.to_location(db, encoding)?;
+    let location = range.to_lsp_range(db, encoding)?.into_location()?;
 
     Some(DiagnosticRelatedInformation {
         location,

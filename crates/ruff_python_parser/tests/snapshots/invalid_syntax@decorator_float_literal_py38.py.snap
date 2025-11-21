@@ -7,21 +7,21 @@ input_file: crates/ruff_python_parser/resources/inline/err/decorator_float_liter
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..66,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 45..65,
                     is_async: false,
                     decorator_list: [
                         Decorator {
                             range: 45..50,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             expression: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 46..50,
                                     value: Float(
                                         3.14,
@@ -33,14 +33,12 @@ Module(
                     name: Identifier {
                         id: Name("bar"),
                         range: 55..58,
-                        node_index: AtomicNodeIndex(..),
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 58..60,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: NodeIndex(None),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -51,11 +49,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 62..65,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 62..65,
                                     },
                                 ),

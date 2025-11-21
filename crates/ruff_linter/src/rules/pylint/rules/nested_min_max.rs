@@ -75,6 +75,7 @@ pub(crate) enum MinMax {
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.266")]
 pub(crate) struct NestedMinMax {
     func: MinMax,
 }
@@ -147,7 +148,7 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
                                 value: Box::new(arg.clone()),
                                 ctx: ast::ExprContext::Load,
                                 range: TextRange::default(),
-                                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                             });
                             new_args.push(new_arg);
                             continue;
@@ -204,10 +205,10 @@ pub(crate) fn nested_min_max(
                 args: collect_nested_args(min_max, args, checker.semantic()).into_boxed_slice(),
                 keywords: Box::from(keywords),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             checker.generator().expr(&flattened_expr),

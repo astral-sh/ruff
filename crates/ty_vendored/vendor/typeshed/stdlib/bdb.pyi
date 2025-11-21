@@ -255,13 +255,13 @@ class Bdb:
         If no breakpoints are set, return an empty list.
         """
 
-    def get_file_breaks(self, filename: str) -> list[Breakpoint]:
+    def get_file_breaks(self, filename: str) -> list[int]:
         """Return all lines with breakpoints for filename.
 
         If no breakpoints are set, return an empty list.
         """
 
-    def get_all_breaks(self) -> list[Breakpoint]:
+    def get_all_breaks(self) -> dict[str, list[int]]:
         """Return all breakpoints that are set."""
 
     def get_stack(self, f: FrameType | None, t: TracebackType | None) -> tuple[list[tuple[FrameType, int]], int]:

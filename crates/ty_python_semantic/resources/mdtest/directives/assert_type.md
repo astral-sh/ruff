@@ -10,6 +10,7 @@ from typing_extensions import assert_type
 def _(x: int):
     assert_type(x, int)  # fine
     assert_type(x, str)  # error: [type-assertion-failure]
+    assert_type(assert_type(x, int), int)
 ```
 
 ## Narrowing
@@ -40,11 +41,11 @@ from typing_extensions import assert_type
 
 # Subtype does not count
 def _(x: bool):
-    assert_type(x, int)  # error: [type-assertion-failure]
+    assert_type(x, int)  # error: [type-assertion-failure] "Type `int` does not match asserted type `bool`"
 
 def _(a: type[int], b: type[Any]):
-    assert_type(a, type[Any])  # error: [type-assertion-failure]
-    assert_type(b, type[int])  # error: [type-assertion-failure]
+    assert_type(a, type[Any])  # error: [type-assertion-failure] "Type `type[Any]` does not match asserted type `type[int]`"
+    assert_type(b, type[int])  # error: [type-assertion-failure] "Type `type[int]` does not match asserted type `type[Any]`"
 
 # The expression constructing the type is not taken into account
 def _(a: type[int]):

@@ -5,6 +5,7 @@ mod python_environment;
 mod rule_selection;
 
 use anyhow::Context as _;
+use insta::Settings;
 use insta::internals::SettingsBindDropGuard;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 use std::{
@@ -19,15 +20,14 @@ fn test_quiet_output() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", "x: int = 1")?;
 
     // By default, we emit an "all checks passed" message
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     // With `quiet`, the message is not displayed
     assert_cmd_snapshot!(case.command().arg("--quiet"), @r"
@@ -46,17 +46,18 @@ fn test_quiet_output() -> anyhow::Result<()> {
     exit_code: 1
     ----- stdout -----
     error[invalid-assignment]: Object of type `Literal["foo"]` is not assignable to `int`
-     --> test.py:1:1
+     --> test.py:1:4
       |
     1 | x: int = 'foo'
-      | ^
+      |    ---   ^^^^^ Incompatible value of type `Literal["foo"]`
+      |    |
+      |    Declared type
       |
     info: rule `invalid-assignment` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "#);
 
     // With `quiet`, the diagnostic is not displayed, just the summary message
@@ -98,17 +99,16 @@ fn test_run_in_sub_directory() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[invalid-syntax]
+    error[invalid-syntax]: Expected an expression
      --> <temp_dir>/test.py:1:2
       |
     1 | ~
-      |  ^ Expected an expression
+      |  ^
       |
 
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
     Ok(())
 }
@@ -120,17 +120,16 @@ fn test_include_hidden_files_by_default() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[invalid-syntax]
+    error[invalid-syntax]: Expected an expression
      --> .test.py:1:2
       |
     1 | ~
-      |  ^ Expected an expression
+      |  ^
       |
 
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
     Ok(())
 }
@@ -139,33 +138,31 @@ fn test_include_hidden_files_by_default() -> anyhow::Result<()> {
 fn test_respect_ignore_files() -> anyhow::Result<()> {
     // First test that the default option works correctly (the file is skipped)
     let case = CliTest::with_files([(".ignore", "test.py"), ("test.py", "~")])?;
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     WARN No python files found under the given path(s)
-    ");
+    "###);
 
     // Test that we can set to false via CLI
     assert_cmd_snapshot!(case.command().arg("--no-respect-ignore-files"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[invalid-syntax]
+    error[invalid-syntax]: Expected an expression
      --> test.py:1:2
       |
     1 | ~
-      |  ^ Expected an expression
+      |  ^
       |
 
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     // Test that we can set to false via config file
@@ -174,17 +171,16 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[invalid-syntax]
+    error[invalid-syntax]: Expected an expression
      --> test.py:1:2
       |
     1 | ~
-      |  ^ Expected an expression
+      |  ^
       |
 
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     // Ensure CLI takes precedence
@@ -193,17 +189,16 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[invalid-syntax]
+    error[invalid-syntax]: Expected an expression
      --> test.py:1:2
       |
     1 | ~
-      |  ^ Expected an expression
+      |  ^
       |
 
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
     Ok(())
 }
@@ -251,7 +246,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     ])?;
 
     // Make sure that the CLI fails when the `libs` directory is not in the search path.
-    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")), @r"
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -263,24 +258,25 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     3 |
     4 | stat = add(10, 15)
       |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
-    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")).arg("--extra-search-path").arg("../libs"), @r"
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")).arg("--extra-search-path").arg("../libs"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -326,15 +322,14 @@ fn paths_in_configuration_files_are_relative_to_the_project_root() -> anyhow::Re
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")), @r"
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -371,7 +366,7 @@ fn user_configuration() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(
         case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
-        @r"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -398,8 +393,7 @@ fn user_configuration() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "
+    "###
     );
 
     // The user-level configuration sets the severity for `unresolved-reference` to warn.
@@ -416,7 +410,7 @@ fn user_configuration() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(
         case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
-        @r"
+        @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -443,8 +437,7 @@ fn user_configuration() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "
+    "###
     );
 
     Ok(())
@@ -489,6 +482,9 @@ fn check_specific_paths() -> anyhow::Result<()> {
     3 |
     4 | print(z)
       |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -498,13 +494,15 @@ fn check_specific_paths() -> anyhow::Result<()> {
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
       |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "###
     );
 
@@ -512,7 +510,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     // We should no longer see any diagnostics related to `main.py`.
     assert_cmd_snapshot!(
         case.command().arg("project/tests").arg("project/other.py"),
-        @r"
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -524,6 +522,9 @@ fn check_specific_paths() -> anyhow::Result<()> {
     3 |
     4 | print(z)
       |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -533,14 +534,16 @@ fn check_specific_paths() -> anyhow::Result<()> {
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
       |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "
+    "###
     );
 
     Ok(())
@@ -561,7 +564,7 @@ fn check_non_existing_path() -> anyhow::Result<()> {
         case.command().arg("project/main.py").arg("project/tests"),
         @r"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
     error[io]: `<temp_dir>/project/main.py`: No such file or directory (os error 2)
 
@@ -570,7 +573,6 @@ fn check_non_existing_path() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     WARN No python files found under the given path(s)
     "
     );
@@ -588,7 +590,7 @@ fn concise_diagnostics() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--output-format=concise").arg("--warn").arg("unresolved-reference"), @r"
+    assert_cmd_snapshot!(case.command().arg("--output-format=concise").arg("--warn").arg("unresolved-reference"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -597,7 +599,94 @@ fn concise_diagnostics() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn gitlab_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        print(x)     # [unresolved-reference]
+        print(4[1])  # [non-subscriptable]
+        "#,
+    )?;
+
+    let mut settings = insta::Settings::clone_current();
+    settings.add_filter(r#"("fingerprint": ")[a-z0-9]+(",)"#, "$1[FINGERPRINT]$2");
+    let _s = settings.bind_to_scope();
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=gitlab").arg("--warn").arg("unresolved-reference")
+        .env("CI_PROJECT_DIR", case.project_dir), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    [
+      {
+        "check_name": "unresolved-reference",
+        "description": "unresolved-reference: Name `x` used when not defined",
+        "severity": "minor",
+        "fingerprint": "[FINGERPRINT]",
+        "location": {
+          "path": "test.py",
+          "positions": {
+            "begin": {
+              "line": 2,
+              "column": 7
+            },
+            "end": {
+              "line": 2,
+              "column": 8
+            }
+          }
+        }
+      },
+      {
+        "check_name": "non-subscriptable",
+        "description": "non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method",
+        "severity": "major",
+        "fingerprint": "[FINGERPRINT]",
+        "location": {
+          "path": "test.py",
+          "positions": {
+            "begin": {
+              "line": 3,
+              "column": 7
+            },
+            "end": {
+              "line": 3,
+              "column": 11
+            }
+          }
+        }
+      }
+    ]
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn github_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        print(x)     # [unresolved-reference]
+        print(4[1])  # [non-subscriptable]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=github").arg("--warn").arg("unresolved-reference"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined
+    ::error title=ty (non-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=11::test.py:3:7: non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+
+    ----- stderr -----
     ");
 
     Ok(())
@@ -623,7 +712,7 @@ fn concise_revealed_type() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--output-format=concise"), @r#"
+    assert_cmd_snapshot!(case.command().arg("--output-format=concise"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -631,8 +720,7 @@ fn concise_revealed_type() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "#);
+    "###);
 
     Ok(())
 }
@@ -652,7 +740,7 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
 
     let case = CliTest::with_file("test.py", &ruff_python_trivia::textwrap::dedent(&content))?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -668,16 +756,17 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
 
 pub(crate) struct CliTest {
     _temp_dir: TempDir,
-    _settings_scope: SettingsBindDropGuard,
+    settings: Settings,
+    settings_scope: Option<SettingsBindDropGuard>,
     project_dir: PathBuf,
+    ty_binary_path: PathBuf,
 }
 
 impl CliTest {
@@ -698,6 +787,8 @@ impl CliTest {
         let mut settings = insta::Settings::clone_current();
         settings.add_filter(&tempdir_filter(&project_dir), "<temp_dir>/");
         settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
+        // 0.003s
+        settings.add_filter(r"\d.\d\d\ds", "0.000s");
         settings.add_filter(
             r#"The system cannot find the file specified."#,
             "No such file or directory",
@@ -708,7 +799,9 @@ impl CliTest {
         Ok(Self {
             project_dir,
             _temp_dir: temp_dir,
-            _settings_scope: settings_scope,
+            settings,
+            settings_scope: Some(settings_scope),
+            ty_binary_path: get_cargo_bin("ty"),
         })
     }
 
@@ -735,6 +828,30 @@ impl CliTest {
         }
 
         Ok(())
+    }
+
+    /// Return [`Self`] with the ty binary copied to the specified path instead.
+    pub(crate) fn with_ty_at(mut self, dest_path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        let dest_path = dest_path.as_ref();
+        let dest_path = self.project_dir.join(dest_path);
+
+        Self::ensure_parent_directory(&dest_path)?;
+        std::fs::copy(&self.ty_binary_path, &dest_path)
+            .with_context(|| format!("Failed to copy ty binary to `{}`", dest_path.display()))?;
+
+        self.ty_binary_path = dest_path;
+        Ok(self)
+    }
+
+    /// Add a filter to the settings and rebind them.
+    pub(crate) fn with_filter(mut self, pattern: &str, replacement: &str) -> Self {
+        self.settings.add_filter(pattern, replacement);
+        // Drop the old scope before binding a new one, otherwise the old scope is dropped _after_
+        // binding and assigning the new one, restoring the settings to their state before the old
+        // scope was bound.
+        drop(self.settings_scope.take());
+        self.settings_scope = Some(self.settings.bind_to_scope());
+        self
     }
 
     fn ensure_parent_directory(path: &Path) -> anyhow::Result<()> {
@@ -782,7 +899,7 @@ impl CliTest {
     }
 
     pub(crate) fn command(&self) -> Command {
-        let mut command = Command::new(get_cargo_bin("ty"));
+        let mut command = Command::new(&self.ty_binary_path);
         command.current_dir(&self.project_dir).arg("check");
 
         // Unset all environment variables because they can affect test behavior.
@@ -794,4 +911,12 @@ impl CliTest {
 
 fn tempdir_filter(path: &Path) -> String {
     format!(r"{}\\?/?", regex::escape(path.to_str().unwrap()))
+}
+
+fn site_packages_filter(python_version: &str) -> String {
+    if cfg!(windows) {
+        "Lib/site-packages".to_string()
+    } else {
+        format!("lib/python{}/site-packages", regex::escape(python_version))
+    }
 }

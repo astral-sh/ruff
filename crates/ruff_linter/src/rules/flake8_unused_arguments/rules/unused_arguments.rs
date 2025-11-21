@@ -36,6 +36,7 @@ use crate::registry::Rule;
 /// ## Options
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.168")]
 pub(crate) struct UnusedFunctionArgument {
     name: String,
 }
@@ -76,6 +77,7 @@ impl Violation for UnusedFunctionArgument {
 /// ## Options
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.168")]
 pub(crate) struct UnusedMethodArgument {
     name: String,
 }
@@ -118,6 +120,7 @@ impl Violation for UnusedMethodArgument {
 /// ## Options
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.168")]
 pub(crate) struct UnusedClassMethodArgument {
     name: String,
 }
@@ -160,6 +163,7 @@ impl Violation for UnusedClassMethodArgument {
 /// ## Options
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.168")]
 pub(crate) struct UnusedStaticMethodArgument {
     name: String,
 }
@@ -199,6 +203,7 @@ impl Violation for UnusedStaticMethodArgument {
 /// ## Options
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.168")]
 pub(crate) struct UnusedLambdaArgument {
     name: String,
 }
@@ -223,7 +228,7 @@ enum Argumentable {
 
 impl Argumentable {
     fn check_for(self, checker: &Checker, name: String, range: TextRange) {
-        match self {
+        let mut diagnostic = match self {
             Self::Function => checker.report_diagnostic(UnusedFunctionArgument { name }, range),
             Self::Method => checker.report_diagnostic(UnusedMethodArgument { name }, range),
             Self::ClassMethod => {
@@ -234,6 +239,7 @@ impl Argumentable {
             }
             Self::Lambda => checker.report_diagnostic(UnusedLambdaArgument { name }, range),
         };
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
     }
 
     const fn rule_code(self) -> Rule {

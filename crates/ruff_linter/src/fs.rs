@@ -11,8 +11,7 @@ use crate::settings::types::CompiledPerFileIgnoreList;
 pub fn get_cwd() -> &'static Path {
     #[cfg(target_arch = "wasm32")]
     {
-        static CWD: std::sync::LazyLock<PathBuf> = std::sync::LazyLock::new(|| PathBuf::from("."));
-        &CWD
+        Path::new(".")
     }
     #[cfg(not(target_arch = "wasm32"))]
     path_absolutize::path_dedot::CWD.as_path()
@@ -57,14 +56,4 @@ pub fn relativize_path<P: AsRef<Path>>(path: P) -> String {
         return format!("{}", path.display());
     }
     format!("{}", path.display())
-}
-
-/// Convert an absolute path to be relative to the specified project root.
-pub fn relativize_path_to<P: AsRef<Path>, R: AsRef<Path>>(path: P, project_root: R) -> String {
-    format!(
-        "{}",
-        pathdiff::diff_paths(&path, project_root)
-            .expect("Could not diff paths")
-            .display()
-    )
 }

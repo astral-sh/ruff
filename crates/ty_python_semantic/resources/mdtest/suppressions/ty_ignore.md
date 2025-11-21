@@ -88,7 +88,7 @@ def test($):  # ty: ignore
 ```py
 a = 10
 # revealed: Literal[10]
-# error: [unknown-rule] "Unknown rule `revealed-type`"
+# error: [ignore-comment-unknown-rule] "Unknown rule `revealed-type`"
 reveal_type(a)  # ty: ignore[revealed-type]
 ```
 
@@ -127,7 +127,7 @@ a = 10 / 0  # ty: ignore[*-*]
 <!-- blacken-docs:off -->
 
 ```py
-a = 10 / 0  # ty: ignore[division-by-zero]      
+a = 10 / 0  # ty: ignore[division-by-zero]       
             #                               ^^^^^^ trailing whitespace
 ```
 
@@ -178,14 +178,51 @@ a = 4 / 0  # error: [division-by-zero]
 ## Unknown rule
 
 ```py
-# error: [unknown-rule] "Unknown rule `is-equal-14`"
-a = 10 + 4  # ty: ignore[is-equal-14]
+# error: [ignore-comment-unknown-rule] "Unknown rule `division-by-zer`. Did you mean `division-by-zero`?"
+a = 10 + 4  # ty: ignore[division-by-zer]
 ```
 
 ## Code with `lint:` prefix
 
 ```py
-# error:[unknown-rule] "Unknown rule `lint:division-by-zero`. Did you mean `division-by-zero`?"
+# error:[ignore-comment-unknown-rule] "Unknown rule `lint:division-by-zero`. Did you mean `division-by-zero`?"
 # error: [division-by-zero]
 a = 10 / 0  # ty: ignore[lint:division-by-zero]
+```
+
+## Suppression of specific diagnostics
+
+In this section, we make sure that specific diagnostics can be suppressed in various forms that
+users might expect to work.
+
+### Invalid assignment
+
+An invalid assignment can be suppressed in the following ways:
+
+```py
+# fmt: off
+
+x1: str = 1 + 2 + 3  # ty: ignore
+
+x2: str = (  # ty: ignore
+    1 + 2 + 3
+)
+
+x4: str = (
+    1 + 2 + 3
+)  # ty: ignore
+```
+
+It can *not* be suppressed by putting the `# ty: ignore` on the inner expression. The range targeted
+by the suppression comment needs to overlap with one of the boundaries of the value range (the outer
+parentheses in this case):
+
+```py
+# fmt: off
+
+# error: [invalid-assignment]
+x4: str = (
+    # error: [unused-ignore-comment]
+    1 + 2 + 3  # ty: ignore
+)
 ```

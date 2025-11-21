@@ -7,21 +7,21 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/with/unparent
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..249,
         body: [
             With(
                 StmtWith {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 86..102,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 91..95,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 91..95,
                                     id: Name("item"),
                                     ctx: Load,
@@ -33,7 +33,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 98..102,
                             },
                         ),
@@ -42,16 +42,16 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 103..124,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 108..117,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 108..112,
                                     id: Name("item"),
                                     ctx: Load,
@@ -60,7 +60,7 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 116..117,
                                         id: Name("x"),
                                         ctx: Store,
@@ -72,7 +72,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 120..124,
                             },
                         ),
@@ -81,20 +81,20 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 125..141,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 130..135,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             context_expr: Starred(
                                 ExprStarred {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 130..135,
                                     value: Name(
                                         ExprName {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 131..135,
                                             id: Name("item"),
                                             ctx: Load,
@@ -109,7 +109,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 137..141,
                             },
                         ),
@@ -118,20 +118,20 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 142..163,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 147..157,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             context_expr: Starred(
                                 ExprStarred {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 147..152,
                                     value: Name(
                                         ExprName {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 148..152,
                                             id: Name("item"),
                                             ctx: Load,
@@ -143,7 +143,7 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 156..157,
                                         id: Name("x"),
                                         ctx: Store,
@@ -155,7 +155,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 159..163,
                             },
                         ),
@@ -164,20 +164,20 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 164..193,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 169..175,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             context_expr: Starred(
                                 ExprStarred {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 169..175,
                                     value: Name(
                                         ExprName {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 170..175,
                                             id: Name("item1"),
                                             ctx: Load,
@@ -190,10 +190,10 @@ Module(
                         },
                         WithItem {
                             range: 177..187,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 177..182,
                                     id: Name("item2"),
                                     ctx: Load,
@@ -202,7 +202,7 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 186..187,
                                         id: Name("f"),
                                         ctx: Store,
@@ -214,7 +214,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 189..193,
                             },
                         ),
@@ -223,16 +223,16 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 194..223,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 199..209,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 199..204,
                                     id: Name("item1"),
                                     ctx: Load,
@@ -241,7 +241,7 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 208..209,
                                         id: Name("f"),
                                         ctx: Store,
@@ -251,14 +251,14 @@ Module(
                         },
                         WithItem {
                             range: 211..217,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             context_expr: Starred(
                                 ExprStarred {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 211..217,
                                     value: Name(
                                         ExprName {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 212..217,
                                             id: Name("item2"),
                                             ctx: Load,
@@ -273,7 +273,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 219..223,
                             },
                         ),
@@ -282,16 +282,16 @@ Module(
             ),
             With(
                 StmtWith {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 224..249,
                     is_async: false,
                     items: [
                         WithItem {
                             range: 229..233,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             context_expr: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 229..233,
                                     id: Name("item"),
                                     ctx: Load,
@@ -301,10 +301,10 @@ Module(
                         },
                         WithItem {
                             range: 237..243,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             context_expr: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 237..238,
                                     value: Int(
                                         0,
@@ -314,7 +314,7 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 242..243,
                                         id: Name("f"),
                                         ctx: Store,
@@ -326,7 +326,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 245..249,
                             },
                         ),
@@ -401,5 +401,5 @@ Module(
 7 | with *item1, item2 as f: pass
 8 | with item1 as f, *item2: pass
 9 | with item := 0 as f: pass
-  |           ^^ Syntax Error: Expected ',', found ':='
+  |           ^^ Syntax Error: Expected `,`, found `:=`
   |

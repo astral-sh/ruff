@@ -34,6 +34,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// y = (d and e) or f
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct ParenthesizeChainedOperators;
 
 impl AlwaysFixableViolation for ParenthesizeChainedOperators {

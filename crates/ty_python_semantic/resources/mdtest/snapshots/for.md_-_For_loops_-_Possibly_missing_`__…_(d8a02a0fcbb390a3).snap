@@ -1,0 +1,47 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - Possibly missing `__iter__` and possibly missing `__getitem__`
+mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class Iterator:
+ 2 |     def __next__(self) -> int:
+ 3 |         return 42
+ 4 | 
+ 5 | def _(flag1: bool, flag2: bool):
+ 6 |     class Iterable:
+ 7 |         if flag1:
+ 8 |             def __iter__(self) -> Iterator:
+ 9 |                 return Iterator()
+10 |         if flag2:
+11 |             def __getitem__(self, key: int) -> bytes:
+12 |                 return bytes()
+13 | 
+14 |     # error: [not-iterable]
+15 |     for x in Iterable():
+16 |         reveal_type(x)  # revealed: int | bytes
+```
+
+# Diagnostics
+
+```
+error[not-iterable]: Object of type `Iterable` may not be iterable
+  --> src/mdtest_snippet.py:15:14
+   |
+14 |     # error: [not-iterable]
+15 |     for x in Iterable():
+   |              ^^^^^^^^^^
+16 |         reveal_type(x)  # revealed: int | bytes
+   |
+info: It may not have an `__iter__` method or a `__getitem__` method
+info: rule `not-iterable` is enabled by default
+
+```

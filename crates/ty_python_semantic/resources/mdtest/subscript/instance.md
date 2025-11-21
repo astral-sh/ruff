@@ -2,10 +2,12 @@
 
 ## `__getitem__` unbound
 
+<!-- snapshot-diagnostics -->
+
 ```py
 class NotSubscriptable: ...
 
-a = NotSubscriptable()[0]  # error: "Cannot subscript object of type `NotSubscriptable` with no `__getitem__` method"
+a = NotSubscriptable()[0]  # error: [non-subscriptable]
 ```
 
 ## `__getitem__` not callable
@@ -14,7 +16,11 @@ a = NotSubscriptable()[0]  # error: "Cannot subscript object of type `NotSubscri
 class NotSubscriptable:
     __getitem__ = None
 
-# error: "Method `__getitem__` of type `Unknown | None` is possibly not callable on object of type `NotSubscriptable`"
+# TODO: this would be more user-friendly if the `call-non-callable` diagnostic was
+# transformed into a `not-subscriptable` diagnostic with a subdiagnostic explaining
+# that this was because `__getitem__` was possibly not callable
+#
+# error: [call-non-callable] "Method `__getitem__` of type `Unknown | None` may not be callable on object of type `NotSubscriptable`"
 a = NotSubscriptable()[0]
 ```
 
@@ -72,7 +78,7 @@ a[0] = 0
 class NoSetitem: ...
 
 a = NoSetitem()
-a[0] = 0  # error: "Cannot assign to object of type `NoSetitem` with no `__setitem__` method"
+a[0] = 0  # error: "Cannot assign to a subscript on an object of type `NoSetitem`"
 ```
 
 ## `__setitem__` not callable
@@ -82,7 +88,7 @@ class NoSetitem:
     __setitem__ = None
 
 a = NoSetitem()
-a[0] = 0  # error: "Method `__setitem__` of type `Unknown | None` is possibly not callable on object of type `NoSetitem`"
+a[0] = 0  # error: "Method `__setitem__` of type `Unknown | None` may not be callable on object of type `NoSetitem`"
 ```
 
 ## Valid `__setitem__` method
@@ -104,6 +110,6 @@ class Identity:
         pass
 
 a = Identity()
-# error: [invalid-assignment] "Method `__setitem__` of type `bound method Identity.__setitem__(index: int, value: int) -> None` cannot be called with a key of type `Literal["a"]` and a value of type `Literal[0]` on object of type `Identity`"
+# error: [invalid-assignment] "Invalid subscript assignment with key of type `Literal["a"]` and value of type `Literal[0]` on object of type `Identity`"
 a["a"] = 0
 ```

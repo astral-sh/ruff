@@ -44,6 +44,7 @@ use crate::checkers::ast::Checker;
 ///         raise CantBeNegative(x)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.236")]
 pub(crate) struct RaiseVanillaArgs;
 
 impl Violation for RaiseVanillaArgs {

@@ -26,6 +26,7 @@ use super::{LogicalLine, Whitespace};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct TabBeforeOperator;
 
 impl AlwaysFixableViolation for TabBeforeOperator {
@@ -58,6 +59,7 @@ impl AlwaysFixableViolation for TabBeforeOperator {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct MultipleSpacesBeforeOperator;
 
 impl AlwaysFixableViolation for MultipleSpacesBeforeOperator {
@@ -90,6 +92,7 @@ impl AlwaysFixableViolation for MultipleSpacesBeforeOperator {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct TabAfterOperator;
 
 impl AlwaysFixableViolation for TabAfterOperator {
@@ -122,6 +125,7 @@ impl AlwaysFixableViolation for TabAfterOperator {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct MultipleSpacesAfterOperator;
 
 impl AlwaysFixableViolation for MultipleSpacesAfterOperator {
@@ -152,6 +156,7 @@ impl AlwaysFixableViolation for MultipleSpacesAfterOperator {
 /// ```
 ///
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.281")]
 pub(crate) struct TabAfterComma;
 
 impl AlwaysFixableViolation for TabAfterComma {
@@ -182,6 +187,7 @@ impl AlwaysFixableViolation for TabAfterComma {
 /// a = 4, 5
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.281")]
 pub(crate) struct MultipleSpacesAfterComma;
 
 impl AlwaysFixableViolation for MultipleSpacesAfterComma {

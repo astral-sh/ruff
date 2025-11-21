@@ -2,7 +2,6 @@ use std::borrow::Cow;
 
 use lsp_types::request::{GotoDeclaration, GotoDeclarationParams};
 use lsp_types::{GotoDefinitionResponse, Url};
-use ruff_db::source::{line_index, source_text};
 use ty_ide::goto_declaration;
 use ty_project::ProjectDatabase;
 
@@ -20,7 +19,7 @@ impl RequestHandler for GotoDeclarationRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for GotoDeclarationRequestHandler {
-    fn document_url(params: &GotoDeclarationParams) -> Cow<Url> {
+    fn document_url(params: &GotoDeclarationParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
@@ -37,17 +36,18 @@ impl BackgroundDocumentRequestHandler for GotoDeclarationRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.file(db) else {
+        let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
 
-        let source = source_text(db, file);
-        let line_index = line_index(db, file);
-        let offset = params.text_document_position_params.position.to_text_size(
-            &source,
-            &line_index,
+        let Some(offset) = params.text_document_position_params.position.to_text_size(
+            db,
+            file,
+            snapshot.url(),
             snapshot.encoding(),
-        );
+        ) else {
+            return Ok(None);
+        };
 
         let Some(ranged) = goto_declaration(db, file, offset) else {
             return Ok(None);

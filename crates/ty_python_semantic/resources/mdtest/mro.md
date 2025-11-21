@@ -1,55 +1,74 @@
 # Method Resolution Order tests
 
-Tests that assert that we can infer the correct type for a class's `__mro__` attribute.
+Tests that assert that we can infer the correct MRO for a class.
 
-This attribute is rarely accessed directly at runtime. However, it's extremely important for *us* to
-know the precise possible values of a class's Method Resolution Order, or we won't be able to infer
-the correct type of attributes accessed from instances.
+It's extremely important for us to know the precise possible values of a class's Method Resolution
+Order, or we won't be able to infer the correct type of attributes accessed from instances.
 
 For documentation on method resolution orders, see:
 
 - <https://docs.python.org/3/glossary.html#term-method-resolution-order>
 - <https://docs.python.org/3/howto/mro.html#python-2-3-mro>
 
+At runtime, the MRO for a class can be inspected using the `__mro__` attribute. However, rather than
+special-casing inference of that attribute, we allow our inferred MRO of a class to be introspected
+using the `ty_extensions.reveal_mro` function. This is because the MRO ty infers for a class will
+often be different than a class's "real MRO" at runtime. This is often deliberate and desirable, but
+would be confusing to users. For example, typeshed pretends that builtin sequences such as `tuple`
+and `list` inherit from `collections.abc.Sequence`, resulting in a much longer inferred MRO for
+these classes than what they actually have at runtime. Other differences to "real MROs" at runtime
+include the facts that ty's inferred MRO will often include non-class elements, such as generic
+aliases, `Any` and `Unknown`.
+
 ## No bases
 
 ```py
+from ty_extensions import reveal_mro
+
 class C: ...
 
-reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'object'>]
+reveal_mro(C)  # revealed: (<class 'C'>, <class 'object'>)
 ```
 
 ## The special case: `object` itself
 
 ```py
-reveal_type(object.__mro__)  # revealed: tuple[<class 'object'>]
+from ty_extensions import reveal_mro
+
+reveal_mro(object)  # revealed: (<class 'object'>,)
 ```
 
 ## Explicit inheritance from `object`
 
 ```py
+from ty_extensions import reveal_mro
+
 class C(object): ...
 
-reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'object'>]
+reveal_mro(C)  # revealed: (<class 'C'>, <class 'object'>)
 ```
 
 ## Explicit inheritance from non-`object` single base
 
 ```py
+from ty_extensions import reveal_mro
+
 class A: ...
 class B(A): ...
 
-reveal_type(B.__mro__)  # revealed: tuple[<class 'B'>, <class 'A'>, <class 'object'>]
+reveal_mro(B)  # revealed: (<class 'B'>, <class 'A'>, <class 'object'>)
 ```
 
 ## Linearization of multiple bases
 
 ```py
+from ty_extensions import reveal_mro
+
 class A: ...
 class B: ...
 class C(A, B): ...
 
-reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'A'>, <class 'B'>, <class 'object'>]
+reveal_mro(C)  # revealed: (<class 'C'>, <class 'A'>, <class 'B'>, <class 'object'>)
 ```
 
 ## Complex diamond inheritance (1)
@@ -57,14 +76,16 @@ reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'A'>, <class 'B'>,
 This is "ex_2" from <https://docs.python.org/3/howto/mro.html#the-end>
 
 ```py
+from ty_extensions import reveal_mro
+
 class O: ...
 class X(O): ...
 class Y(O): ...
 class A(X, Y): ...
 class B(Y, X): ...
 
-reveal_type(A.__mro__)  # revealed: tuple[<class 'A'>, <class 'X'>, <class 'Y'>, <class 'O'>, <class 'object'>]
-reveal_type(B.__mro__)  # revealed: tuple[<class 'B'>, <class 'Y'>, <class 'X'>, <class 'O'>, <class 'object'>]
+reveal_mro(A)  # revealed: (<class 'A'>, <class 'X'>, <class 'Y'>, <class 'O'>, <class 'object'>)
+reveal_mro(B)  # revealed: (<class 'B'>, <class 'Y'>, <class 'X'>, <class 'O'>, <class 'object'>)
 ```
 
 ## Complex diamond inheritance (2)
@@ -72,6 +93,8 @@ reveal_type(B.__mro__)  # revealed: tuple[<class 'B'>, <class 'Y'>, <class 'X'>,
 This is "ex_5" from <https://docs.python.org/3/howto/mro.html#the-end>
 
 ```py
+from ty_extensions import reveal_mro
+
 class O: ...
 class F(O): ...
 class E(O): ...
@@ -80,12 +103,12 @@ class C(D, F): ...
 class B(D, E): ...
 class A(B, C): ...
 
-# revealed: tuple[<class 'C'>, <class 'D'>, <class 'F'>, <class 'O'>, <class 'object'>]
-reveal_type(C.__mro__)
-# revealed: tuple[<class 'B'>, <class 'D'>, <class 'E'>, <class 'O'>, <class 'object'>]
-reveal_type(B.__mro__)
-# revealed: tuple[<class 'A'>, <class 'B'>, <class 'C'>, <class 'D'>, <class 'E'>, <class 'F'>, <class 'O'>, <class 'object'>]
-reveal_type(A.__mro__)
+# revealed: (<class 'C'>, <class 'D'>, <class 'F'>, <class 'O'>, <class 'object'>)
+reveal_mro(C)
+# revealed: (<class 'B'>, <class 'D'>, <class 'E'>, <class 'O'>, <class 'object'>)
+reveal_mro(B)
+# revealed: (<class 'A'>, <class 'B'>, <class 'C'>, <class 'D'>, <class 'E'>, <class 'F'>, <class 'O'>, <class 'object'>)
+reveal_mro(A)
 ```
 
 ## Complex diamond inheritance (3)
@@ -93,6 +116,8 @@ reveal_type(A.__mro__)
 This is "ex_6" from <https://docs.python.org/3/howto/mro.html#the-end>
 
 ```py
+from ty_extensions import reveal_mro
+
 class O: ...
 class F(O): ...
 class E(O): ...
@@ -101,12 +126,12 @@ class C(D, F): ...
 class B(E, D): ...
 class A(B, C): ...
 
-# revealed: tuple[<class 'C'>, <class 'D'>, <class 'F'>, <class 'O'>, <class 'object'>]
-reveal_type(C.__mro__)
-# revealed: tuple[<class 'B'>, <class 'E'>, <class 'D'>, <class 'O'>, <class 'object'>]
-reveal_type(B.__mro__)
-# revealed: tuple[<class 'A'>, <class 'B'>, <class 'E'>, <class 'C'>, <class 'D'>, <class 'F'>, <class 'O'>, <class 'object'>]
-reveal_type(A.__mro__)
+# revealed: (<class 'C'>, <class 'D'>, <class 'F'>, <class 'O'>, <class 'object'>)
+reveal_mro(C)
+# revealed: (<class 'B'>, <class 'E'>, <class 'D'>, <class 'O'>, <class 'object'>)
+reveal_mro(B)
+# revealed: (<class 'A'>, <class 'B'>, <class 'E'>, <class 'C'>, <class 'D'>, <class 'F'>, <class 'O'>, <class 'object'>)
+reveal_mro(A)
 ```
 
 ## Complex diamond inheritance (4)
@@ -114,6 +139,8 @@ reveal_type(A.__mro__)
 This is "ex_9" from <https://docs.python.org/3/howto/mro.html#the-end>
 
 ```py
+from ty_extensions import reveal_mro
+
 class O: ...
 class A(O): ...
 class B(O): ...
@@ -125,19 +152,20 @@ class K2(D, B, E): ...
 class K3(D, A): ...
 class Z(K1, K2, K3): ...
 
-# revealed: tuple[<class 'K1'>, <class 'A'>, <class 'B'>, <class 'C'>, <class 'O'>, <class 'object'>]
-reveal_type(K1.__mro__)
-# revealed: tuple[<class 'K2'>, <class 'D'>, <class 'B'>, <class 'E'>, <class 'O'>, <class 'object'>]
-reveal_type(K2.__mro__)
-# revealed: tuple[<class 'K3'>, <class 'D'>, <class 'A'>, <class 'O'>, <class 'object'>]
-reveal_type(K3.__mro__)
-# revealed: tuple[<class 'Z'>, <class 'K1'>, <class 'K2'>, <class 'K3'>, <class 'D'>, <class 'A'>, <class 'B'>, <class 'C'>, <class 'E'>, <class 'O'>, <class 'object'>]
-reveal_type(Z.__mro__)
+# revealed: (<class 'K1'>, <class 'A'>, <class 'B'>, <class 'C'>, <class 'O'>, <class 'object'>)
+reveal_mro(K1)
+# revealed: (<class 'K2'>, <class 'D'>, <class 'B'>, <class 'E'>, <class 'O'>, <class 'object'>)
+reveal_mro(K2)
+# revealed: (<class 'K3'>, <class 'D'>, <class 'A'>, <class 'O'>, <class 'object'>)
+reveal_mro(K3)
+# revealed: (<class 'Z'>, <class 'K1'>, <class 'K2'>, <class 'K3'>, <class 'D'>, <class 'A'>, <class 'B'>, <class 'C'>, <class 'E'>, <class 'O'>, <class 'object'>)
+reveal_mro(Z)
 ```
 
 ## Inheritance from `Unknown`
 
 ```py
+from ty_extensions import reveal_mro
 from does_not_exist import DoesNotExist  # error: [unresolved-import]
 
 class A(DoesNotExist): ...
@@ -147,11 +175,11 @@ class D(A, B, C): ...
 class E(B, C): ...
 class F(E, A): ...
 
-reveal_type(A.__mro__)  # revealed: tuple[<class 'A'>, Unknown, <class 'object'>]
-reveal_type(D.__mro__)  # revealed: tuple[<class 'D'>, <class 'A'>, Unknown, <class 'B'>, <class 'C'>, <class 'object'>]
-reveal_type(E.__mro__)  # revealed: tuple[<class 'E'>, <class 'B'>, <class 'C'>, <class 'object'>]
-# revealed: tuple[<class 'F'>, <class 'E'>, <class 'B'>, <class 'C'>, <class 'A'>, Unknown, <class 'object'>]
-reveal_type(F.__mro__)
+reveal_mro(A)  # revealed: (<class 'A'>, Unknown, <class 'object'>)
+reveal_mro(D)  # revealed: (<class 'D'>, <class 'A'>, Unknown, <class 'B'>, <class 'C'>, <class 'object'>)
+reveal_mro(E)  # revealed: (<class 'E'>, <class 'B'>, <class 'C'>, <class 'object'>)
+# revealed: (<class 'F'>, <class 'E'>, <class 'B'>, <class 'C'>, <class 'A'>, Unknown, <class 'object'>)
+reveal_mro(F)
 ```
 
 ## Inheritance with intersections that include `Unknown`
@@ -160,6 +188,7 @@ An intersection that includes `Unknown` or `Any` is permitted as long as the int
 disjoint from `type`.
 
 ```py
+from ty_extensions import reveal_mro
 from does_not_exist import DoesNotExist  # error: [unresolved-import]
 
 reveal_type(DoesNotExist)  # revealed: Unknown
@@ -168,13 +197,13 @@ if hasattr(DoesNotExist, "__mro__"):
     reveal_type(DoesNotExist)  # revealed: Unknown & <Protocol with members '__mro__'>
 
     class Foo(DoesNotExist): ...  # no error!
-    reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+    reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 
 if not isinstance(DoesNotExist, type):
     reveal_type(DoesNotExist)  # revealed: Unknown & ~type
 
     class Foo(DoesNotExist): ...  # error: [unsupported-base]
-    reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+    reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 ```
 
 ## Inheritance from `type[Any]` and `type[Unknown]`
@@ -184,14 +213,14 @@ guarantee:
 
 ```py
 from typing import Any
-from ty_extensions import Unknown, Intersection
+from ty_extensions import Unknown, Intersection, reveal_mro
 
 def f(x: type[Any], y: Intersection[Unknown, type[Any]]):
     class Foo(x): ...
-    reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Any, <class 'object'>]
+    reveal_mro(Foo)  # revealed: (<class 'Foo'>, Any, <class 'object'>)
 
     class Bar(y): ...
-    reveal_type(Bar.__mro__)  # revealed: tuple[<class 'Bar'>, Unknown, <class 'object'>]
+    reveal_mro(Bar)  # revealed: (<class 'Bar'>, Unknown, <class 'object'>)
 ```
 
 ## `__bases__` lists that cause errors at runtime
@@ -200,14 +229,16 @@ If the class's `__bases__` cause an exception to be raised at runtime and theref
 creation to fail, we infer the class's `__mro__` as being `[<class>, Unknown, object]`:
 
 ```py
+from ty_extensions import reveal_mro
+
 # error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `Foo` with bases list `[<class 'object'>, <class 'int'>]`"
 class Foo(object, int): ...
 
-reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 
 class Bar(Foo): ...
 
-reveal_type(Bar.__mro__)  # revealed: tuple[<class 'Bar'>, <class 'Foo'>, Unknown, <class 'object'>]
+reveal_mro(Bar)  # revealed: (<class 'Bar'>, <class 'Foo'>, Unknown, <class 'object'>)
 
 # This is the `TypeError` at the bottom of "ex_2"
 # in the examples at <https://docs.python.org/3/howto/mro.html#the-end>
@@ -217,17 +248,17 @@ class Y(O): ...
 class A(X, Y): ...
 class B(Y, X): ...
 
-reveal_type(A.__mro__)  # revealed: tuple[<class 'A'>, <class 'X'>, <class 'Y'>, <class 'O'>, <class 'object'>]
-reveal_type(B.__mro__)  # revealed: tuple[<class 'B'>, <class 'Y'>, <class 'X'>, <class 'O'>, <class 'object'>]
+reveal_mro(A)  # revealed: (<class 'A'>, <class 'X'>, <class 'Y'>, <class 'O'>, <class 'object'>)
+reveal_mro(B)  # revealed: (<class 'B'>, <class 'Y'>, <class 'X'>, <class 'O'>, <class 'object'>)
 
 # error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `Z` with bases list `[<class 'A'>, <class 'B'>]`"
 class Z(A, B): ...
 
-reveal_type(Z.__mro__)  # revealed: tuple[<class 'Z'>, Unknown, <class 'object'>]
+reveal_mro(Z)  # revealed: (<class 'Z'>, Unknown, <class 'object'>)
 
 class AA(Z): ...
 
-reveal_type(AA.__mro__)  # revealed: tuple[<class 'AA'>, <class 'Z'>, Unknown, <class 'object'>]
+reveal_mro(AA)  # revealed: (<class 'AA'>, <class 'Z'>, Unknown, <class 'object'>)
 ```
 
 ## `__bases__` includes a `Union`
@@ -239,7 +270,7 @@ find a union type in a class's bases, we infer the class's `__mro__` as being
 `[<class>, Unknown, object]`, the same as for MROs that cause errors at runtime.
 
 ```py
-from typing_extensions import reveal_type
+from ty_extensions import reveal_mro
 
 def returns_bool() -> bool:
     return True
@@ -257,7 +288,21 @@ reveal_type(x)  # revealed: <class 'A'> | <class 'B'>
 # error: 11 [unsupported-base] "Unsupported class base with type `<class 'A'> | <class 'B'>`"
 class Foo(x): ...
 
-reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
+```
+
+## `UnionType` instances are now allowed as a base
+
+This is not legal:
+
+```py
+class A: ...
+class B: ...
+
+EitherOr = A | B
+
+# error: [invalid-base] "Invalid class base with type `types.UnionType`"
+class Foo(EitherOr): ...
 ```
 
 ## `__bases__` is a union of a dynamic type and valid bases
@@ -268,6 +313,7 @@ diagnostic, and we use the dynamic type as a base to prevent further downstream 
 
 ```py
 from typing import Any
+from ty_extensions import reveal_mro
 
 def _(flag: bool, any: Any):
     if flag:
@@ -276,12 +322,14 @@ def _(flag: bool, any: Any):
         class Base: ...
 
     class Foo(Base): ...
-    reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Any, <class 'object'>]
+    reveal_mro(Foo)  # revealed: (<class 'Foo'>, Any, <class 'object'>)
 ```
 
 ## `__bases__` includes multiple `Union`s
 
 ```py
+from ty_extensions import reveal_mro
+
 def returns_bool() -> bool:
     return True
 
@@ -307,12 +355,14 @@ reveal_type(y)  # revealed: <class 'C'> | <class 'D'>
 # error: 14 [unsupported-base] "Unsupported class base with type `<class 'C'> | <class 'D'>`"
 class Foo(x, y): ...
 
-reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 ```
 
 ## `__bases__` lists that cause errors... now with `Union`s
 
 ```py
+from ty_extensions import reveal_mro
+
 def returns_bool() -> bool:
     return True
 
@@ -328,11 +378,11 @@ else:
 # error: 21 [unsupported-base] "Unsupported class base with type `<class 'Y'> | <class 'object'>`"
 class PossibleError(foo, X): ...
 
-reveal_type(PossibleError.__mro__)  # revealed: tuple[<class 'PossibleError'>, Unknown, <class 'object'>]
+reveal_mro(PossibleError)  # revealed: (<class 'PossibleError'>, Unknown, <class 'object'>)
 
 class A(X, Y): ...
 
-reveal_type(A.__mro__)  # revealed: tuple[<class 'A'>, <class 'X'>, <class 'Y'>, <class 'O'>, <class 'object'>]
+reveal_mro(A)  # revealed: (<class 'A'>, <class 'X'>, <class 'Y'>, <class 'O'>, <class 'object'>)
 
 if returns_bool():
     class B(X, Y): ...
@@ -340,13 +390,13 @@ if returns_bool():
 else:
     class B(Y, X): ...
 
-# revealed: tuple[<class 'B'>, <class 'X'>, <class 'Y'>, <class 'O'>, <class 'object'>] | tuple[<class 'B'>, <class 'Y'>, <class 'X'>, <class 'O'>, <class 'object'>]
-reveal_type(B.__mro__)
+# revealed: (<class 'B'>, <class 'X'>, <class 'Y'>, <class 'O'>, <class 'object'>) | (<class 'B'>, <class 'Y'>, <class 'X'>, <class 'O'>, <class 'object'>)
+reveal_mro(B)
 
 # error: 12 [unsupported-base] "Unsupported class base with type `<class 'B'> | <class 'B'>`"
 class Z(A, B): ...
 
-reveal_type(Z.__mro__)  # revealed: tuple[<class 'Z'>, Unknown, <class 'object'>]
+reveal_mro(Z)  # revealed: (<class 'Z'>, Unknown, <class 'object'>)
 ```
 
 ## `__bases__` lists that include objects that are not instances of `type`
@@ -389,11 +439,11 @@ class BadSub2(Bad2()): ...  # error: [invalid-base]
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
+from ty_extensions import reveal_mro
 
 class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
 
-reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 
 class Spam: ...
 class Eggs: ...
@@ -415,12 +465,12 @@ class Ham(
 
 # fmt: on
 
-reveal_type(Ham.__mro__)  # revealed: tuple[<class 'Ham'>, Unknown, <class 'object'>]
+reveal_mro(Ham)  # revealed: (<class 'Ham'>, Unknown, <class 'object'>)
 
 class Mushrooms: ...
 class Omelette(Spam, Eggs, Mushrooms, Mushrooms): ...  # error: [duplicate-base]
 
-reveal_type(Omelette.__mro__)  # revealed: tuple[<class 'Omelette'>, Unknown, <class 'object'>]
+reveal_mro(Omelette)  # revealed: (<class 'Omelette'>, Unknown, <class 'object'>)
 
 # fmt: off
 
@@ -496,6 +546,7 @@ however, for gradual types this would break the
 the dynamic base can usually be materialised to a type that would lead to a resolvable MRO.
 
 ```py
+from ty_extensions import reveal_mro
 from unresolvable_module import UnknownBase1, UnknownBase2  # error: [unresolved-import]
 
 reveal_type(UnknownBase1)  # revealed: Unknown
@@ -504,7 +555,7 @@ reveal_type(UnknownBase2)  # revealed: Unknown
 # no error here -- we respect the gradual guarantee:
 class Foo(UnknownBase1, UnknownBase2): ...
 
-reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 ```
 
 However, if there are duplicate class elements, we do emit an error, even if there are also multiple
@@ -515,7 +566,7 @@ bases materialize to:
 # error: [duplicate-base] "Duplicate base class `Foo`"
 class Bar(UnknownBase1, Foo, UnknownBase2, Foo): ...
 
-reveal_type(Bar.__mro__)  # revealed: tuple[<class 'Bar'>, Unknown, <class 'object'>]
+reveal_mro(Bar)  # revealed: (<class 'Bar'>, Unknown, <class 'object'>)
 ```
 
 ## Unrelated objects inferred as `Any`/`Unknown` do not have special `__mro__` attributes
@@ -531,25 +582,26 @@ reveal_type(unknown_object.__mro__)  # revealed: Unknown
 
 ```py
 from typing import Generic, TypeVar, Iterator
+from ty_extensions import reveal_mro
 
 T = TypeVar("T")
 
 class peekable(Generic[T], Iterator[T]): ...
 
-# revealed: tuple[<class 'peekable[Unknown]'>, <class 'Iterator[T@peekable]'>, <class 'Iterable[T@peekable]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(peekable.__mro__)
+# revealed: (<class 'peekable[Unknown]'>, <class 'Iterator[T@peekable]'>, <class 'Iterable[T@peekable]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(peekable)
 
 class peekable2(Iterator[T], Generic[T]): ...
 
-# revealed: tuple[<class 'peekable2[Unknown]'>, <class 'Iterator[T@peekable2]'>, <class 'Iterable[T@peekable2]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(peekable2.__mro__)
+# revealed: (<class 'peekable2[Unknown]'>, <class 'Iterator[T@peekable2]'>, <class 'Iterable[T@peekable2]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(peekable2)
 
 class Base: ...
 class Intermediate(Base, Generic[T]): ...
 class Sub(Intermediate[T], Base): ...
 
-# revealed: tuple[<class 'Sub[Unknown]'>, <class 'Intermediate[T@Sub]'>, <class 'Base'>, typing.Generic, <class 'object'>]
-reveal_type(Sub.__mro__)
+# revealed: (<class 'Sub[Unknown]'>, <class 'Intermediate[T@Sub]'>, <class 'Base'>, typing.Generic, <class 'object'>)
+reveal_mro(Sub)
 ```
 
 ## Unresolvable MROs involving generics have the original bases reported in the error message, not the resolved bases
@@ -571,17 +623,19 @@ class Baz(Protocol[T], Foo, Bar[T]): ...  # error: [inconsistent-mro]
 These are invalid, but we need to be able to handle them gracefully without panicking.
 
 ```pyi
+from ty_extensions import reveal_mro
+
 class Foo(Foo): ...  # error: [cyclic-class-definition]
 
 reveal_type(Foo)  # revealed: <class 'Foo'>
-reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 
 class Bar: ...
 class Baz: ...
 class Boz(Bar, Baz, Boz): ...  # error: [cyclic-class-definition]
 
 reveal_type(Boz)  # revealed: <class 'Boz'>
-reveal_type(Boz.__mro__)  # revealed: tuple[<class 'Boz'>, Unknown, <class 'object'>]
+reveal_mro(Boz)  # revealed: (<class 'Boz'>, Unknown, <class 'object'>)
 ```
 
 ## Classes with indirect cycles in their MROs
@@ -589,31 +643,37 @@ reveal_type(Boz.__mro__)  # revealed: tuple[<class 'Boz'>, Unknown, <class 'obje
 These are similarly unlikely, but we still shouldn't crash:
 
 ```pyi
+from ty_extensions import reveal_mro
+
 class Foo(Bar): ...  # error: [cyclic-class-definition]
 class Bar(Baz): ...  # error: [cyclic-class-definition]
 class Baz(Foo): ...  # error: [cyclic-class-definition]
 
-reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
-reveal_type(Bar.__mro__)  # revealed: tuple[<class 'Bar'>, Unknown, <class 'object'>]
-reveal_type(Baz.__mro__)  # revealed: tuple[<class 'Baz'>, Unknown, <class 'object'>]
+reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
+reveal_mro(Bar)  # revealed: (<class 'Bar'>, Unknown, <class 'object'>)
+reveal_mro(Baz)  # revealed: (<class 'Baz'>, Unknown, <class 'object'>)
 ```
 
 ## Classes with cycles in their MROs, and multiple inheritance
 
 ```pyi
+from ty_extensions import reveal_mro
+
 class Spam: ...
 class Foo(Bar): ...  # error: [cyclic-class-definition]
 class Bar(Baz): ...  # error: [cyclic-class-definition]
 class Baz(Foo, Spam): ...  # error: [cyclic-class-definition]
 
-reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
-reveal_type(Bar.__mro__)  # revealed: tuple[<class 'Bar'>, Unknown, <class 'object'>]
-reveal_type(Baz.__mro__)  # revealed: tuple[<class 'Baz'>, Unknown, <class 'object'>]
+reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
+reveal_mro(Bar)  # revealed: (<class 'Bar'>, Unknown, <class 'object'>)
+reveal_mro(Baz)  # revealed: (<class 'Baz'>, Unknown, <class 'object'>)
 ```
 
 ## Classes with cycles in their MRO, and a sub-graph
 
 ```pyi
+from ty_extensions import reveal_mro
+
 class FooCycle(BarCycle): ...  # error: [cyclic-class-definition]
 class Foo: ...
 class BarCycle(FooCycle): ...  # error: [cyclic-class-definition]
@@ -624,10 +684,10 @@ class Bar(Foo): ...
 class Baz(Bar, BarCycle): ...
 class Spam(Baz): ...
 
-reveal_type(FooCycle.__mro__)  # revealed: tuple[<class 'FooCycle'>, Unknown, <class 'object'>]
-reveal_type(BarCycle.__mro__)  # revealed: tuple[<class 'BarCycle'>, Unknown, <class 'object'>]
-reveal_type(Baz.__mro__)  # revealed: tuple[<class 'Baz'>, Unknown, <class 'object'>]
-reveal_type(Spam.__mro__)  # revealed: tuple[<class 'Spam'>, Unknown, <class 'object'>]
+reveal_mro(FooCycle)  # revealed: (<class 'FooCycle'>, Unknown, <class 'object'>)
+reveal_mro(BarCycle)  # revealed: (<class 'BarCycle'>, Unknown, <class 'object'>)
+reveal_mro(Baz)  # revealed: (<class 'Baz'>, Unknown, <class 'object'>)
+reveal_mro(Spam)  # revealed: (<class 'Spam'>, Unknown, <class 'object'>)
 ```
 
 ## Other classes with possible cycles
@@ -638,20 +698,36 @@ python-version = "3.13"
 ```
 
 ```pyi
+from ty_extensions import reveal_mro
+
 class C(C.a): ...
 reveal_type(C.__class__)  # revealed: <class 'type'>
-reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, Unknown, <class 'object'>]
+reveal_mro(C)  # revealed: (<class 'C'>, Unknown, <class 'object'>)
 
 class D(D.a):
     a: D
 reveal_type(D.__class__)  # revealed: <class 'type'>
-reveal_type(D.__mro__)  # revealed: tuple[<class 'D'>, Unknown, <class 'object'>]
+reveal_mro(D)  # revealed: (<class 'D'>, Unknown, <class 'object'>)
 
 class E[T](E.a): ...
 reveal_type(E.__class__)  # revealed: <class 'type'>
-reveal_type(E.__mro__)  # revealed: tuple[<class 'E[Unknown]'>, Unknown, typing.Generic, <class 'object'>]
+reveal_mro(E)  # revealed: (<class 'E[Unknown]'>, Unknown, typing.Generic, <class 'object'>)
 
 class F[T](F(), F): ...  # error: [cyclic-class-definition]
 reveal_type(F.__class__)  # revealed: type[Unknown]
-reveal_type(F.__mro__)  # revealed: tuple[<class 'F[Unknown]'>, Unknown, <class 'object'>]
+reveal_mro(F)  # revealed: (<class 'F[Unknown]'>, Unknown, <class 'object'>)
+```
+
+## `builtins.NotImplemented`
+
+Typeshed tells us that `NotImplementedType` inherits from `Any`, but that causes more problems for
+us than it fixes. We override typeshed here so that we understand `NotImplementedType` as inheriting
+directly from `object` (as it does at runtime).
+
+```py
+import types
+from ty_extensions import reveal_mro
+
+reveal_mro(types.NotImplementedType)  # revealed: (<class 'NotImplementedType'>, <class 'object'>)
+reveal_mro(type(NotImplemented))  # revealed: (<class 'NotImplementedType'>, <class 'object'>)
 ```

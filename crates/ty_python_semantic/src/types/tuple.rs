@@ -16,20 +16,23 @@
 //! that adds that "collapse `Never`" behavior, whereas [`TupleSpec`] allows you to add any element
 //! types, including `Never`.)
 
-use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::hash::Hash;
 
 use itertools::{Either, EitherOrBoth, Itertools};
 
+use crate::semantic_index::definition::Definition;
+use crate::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::types::class::{ClassType, KnownClass};
-use crate::types::{SubclassOfType, Truthiness};
+use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::generics::InferableTypeVars;
 use crate::types::{
-    Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, TypeVarVariance,
-    UnionBuilder, UnionType, cyclic::PairVisitor,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
+    IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, Type, TypeMapping, TypeRelation,
+    UnionBuilder, UnionType,
 };
-use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
-use crate::{Db, FxOrderSet};
+use crate::types::{Truthiness, TypeContext};
+use crate::{Db, FxOrderSet, Program};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum TupleLength {
@@ -42,7 +45,7 @@ impl TupleLength {
         TupleLength::Variable(0, 0)
     }
 
-    pub(crate) fn is_variable(self) -> bool {
+    pub(crate) const fn is_variable(self) -> bool {
         matches!(self, TupleLength::Variable(_, _))
     }
 
@@ -124,7 +127,7 @@ impl TupleLength {
 /// # Ordering
 /// Ordering is based on the tuple's salsa-assigned id and not on its elements.
 /// The id may change between runs, or when the tuple was garbage collected and recreated.
-#[salsa::interned(debug, constructor=new_internal)]
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct TupleType<'db> {
     #[returns(ref)]
@@ -134,7 +137,7 @@ pub struct TupleType<'db> {
 pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     tuple: TupleType<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     for element in tuple.tuple(db).all_elements() {
         visitor.visit_type(db, *element);
@@ -144,50 +147,18 @@ pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for TupleType<'_> {}
 
-impl<'db> Type<'db> {
-    pub(crate) fn tuple(tuple: Option<TupleType<'db>>) -> Self {
-        let Some(tuple) = tuple else {
-            return Type::Never;
-        };
-        Self::Tuple(tuple)
-    }
-
-    pub(crate) fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Self {
-        Type::tuple(TupleType::homogeneous(db, element))
-    }
-
-    pub(crate) fn heterogeneous_tuple<I, T>(db: &'db dyn Db, elements: I) -> Self
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<Type<'db>>,
-    {
-        Type::tuple(TupleType::from_elements(
-            db,
-            elements.into_iter().map(Into::into),
-        ))
-    }
-
-    pub(crate) fn empty_tuple(db: &'db dyn Db) -> Self {
-        Type::Tuple(TupleType::empty(db))
-    }
-}
-
+#[salsa::tracked]
 impl<'db> TupleType<'db> {
-    pub(crate) fn new<T>(db: &'db dyn Db, tuple_key: T) -> Option<Self>
-    where
-        T: Borrow<TupleSpec<'db>> + Hash + salsa::plumbing::interned::Lookup<TupleSpec<'db>>,
-        TupleSpec<'db>: salsa::plumbing::interned::HashEqLike<T>,
-    {
+    pub(crate) fn new(db: &'db dyn Db, spec: &TupleSpec<'db>) -> Option<Self> {
         // If a fixed-length (i.e., mandatory) element of the tuple is `Never`, then it's not
         // possible to instantiate the tuple as a whole.
-        let tuple = tuple_key.borrow();
-        if tuple.fixed_elements().any(Type::is_never) {
+        if spec.fixed_elements().any(Type::is_never) {
             return None;
         }
 
         // If the variable-length portion is Never, it can only be instantiated with zero elements.
         // That means this isn't a variable-length tuple after all!
-        if let TupleSpec::Variable(tuple) = tuple {
+        if let TupleSpec::Variable(tuple) = spec {
             if tuple.variable.is_never() {
                 let tuple = TupleSpec::Fixed(FixedLengthTuple::from_elements(
                     tuple.prefix.iter().chain(&tuple.suffix).copied(),
@@ -196,19 +167,18 @@ impl<'db> TupleType<'db> {
             }
         }
 
-        Some(TupleType::new_internal(db, tuple_key))
+        Some(TupleType::new_internal(db, spec))
     }
 
     pub(crate) fn empty(db: &'db dyn Db) -> Self {
-        TupleType::new(db, TupleSpec::from(FixedLengthTuple::empty()))
-            .expect("TupleType::new() should always return `Some` for an empty `TupleSpec`")
+        TupleType::new_internal(db, TupleSpec::from(FixedLengthTuple::empty()))
     }
 
-    pub(crate) fn from_elements(
+    pub(crate) fn heterogeneous(
         db: &'db dyn Db,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<Self> {
-        TupleType::new(db, TupleSpec::from_elements(types))
+        TupleType::new(db, &TupleSpec::heterogeneous(types))
     }
 
     #[cfg(test)]
@@ -218,29 +188,33 @@ impl<'db> TupleType<'db> {
         variable: Type<'db>,
         suffix: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<Self> {
-        TupleType::new(db, VariableLengthTuple::mixed(prefix, variable, suffix))
+        TupleType::new(db, &VariableLengthTuple::mixed(prefix, variable, suffix))
     }
 
-    pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Option<Self> {
-        TupleType::new(db, TupleSpec::homogeneous(element))
+    pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Self {
+        match element {
+            Type::Never => TupleType::empty(db),
+            _ => TupleType::new_internal(db, TupleSpec::homogeneous(element)),
+        }
     }
 
-    pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
-        KnownClass::Tuple
+    // N.B. If this method is not Salsa-tracked, we take 10 minutes to check
+    // `static-frame` as part of a mypy_primer run! This is because it's called
+    // from `NominalInstanceType::class()`, which is a very hot method.
+    #[salsa::tracked(cycle_initial=to_class_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
+        let tuple_class = KnownClass::Tuple
             .try_to_class_literal(db)
-            .and_then(|class_literal| match class_literal.generic_context(db) {
-                None => Some(ClassType::NonGeneric(class_literal)),
-                Some(generic_context) if generic_context.variables(db).len() != 1 => None,
-                Some(generic_context) => Some(
-                    class_literal
-                        .apply_specialization(db, |_| generic_context.specialize_tuple(db, self)),
-                ),
-            })
-    }
+            .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
 
-    pub(crate) fn to_subclass_of(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        self.to_class_type(db)
-            .map(|class| SubclassOfType::from(db, class))
+        tuple_class.apply_specialization(db, |generic_context| {
+            if generic_context.variables(db).len() == 1 {
+                let element_type = self.tuple(db).homogeneous_element_type(db);
+                generic_context.specialize_tuple(db, element_type, self)
+            } else {
+                generic_context.default_specialization(db, Some(KnownClass::Tuple))
+            }
+        })
     }
 
     /// Return a normalized version of `self`.
@@ -250,62 +224,88 @@ impl<'db> TupleType<'db> {
     pub(crate) fn normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
-        TupleType::new(db, self.tuple(db).normalized_impl(db, visitor))
+        TupleType::new(db, &self.tuple(db).normalized_impl(db, visitor))
     }
 
-    pub(crate) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Option<Self> {
-        TupleType::new(db, self.tuple(db).materialize(db, variance))
-    }
-
-    pub(crate) fn apply_type_mapping<'a>(
+    pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Option<Self> {
-        TupleType::new(db, self.tuple(db).apply_type_mapping(db, type_mapping))
+        TupleType::new(
+            db,
+            &self
+                .tuple(db)
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+        )
     }
 
-    pub(crate) fn find_legacy_typevars(
+    pub(crate) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
-        self.tuple(db).find_legacy_typevars(db, typevars);
+        self.tuple(db)
+            .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
     }
 
-    pub(crate) fn has_relation_to(
+    pub(crate) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
-        relation: TypeRelation,
-    ) -> bool {
-        self.tuple(db)
-            .has_relation_to(db, other.tuple(db), relation)
+        inferable: InferableTypeVars<'_, 'db>,
+        relation: TypeRelation<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        self.tuple(db).has_relation_to_impl(
+            db,
+            other.tuple(db),
+            inferable,
+            relation,
+            relation_visitor,
+            disjointness_visitor,
+        )
     }
 
-    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.tuple(db).is_equivalent_to(db, other.tuple(db))
-    }
-
-    pub(crate) fn is_disjoint_from_impl(
+    pub(crate) fn is_equivalent_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
-        visitor: &mut PairVisitor<'db>,
-    ) -> bool {
+        inferable: InferableTypeVars<'_, 'db>,
+        visitor: &IsEquivalentVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         self.tuple(db)
-            .is_disjoint_from_impl(db, other.tuple(db), visitor)
+            .is_equivalent_to_impl(db, other.tuple(db), inferable, visitor)
     }
 
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         self.tuple(db).is_single_valued(db)
     }
+}
 
-    pub(crate) fn truthiness(self, db: &'db dyn Db) -> Truthiness {
-        self.tuple(db).truthiness()
-    }
+fn to_class_type_cycle_initial<'db>(
+    db: &'db dyn Db,
+    _id: salsa::Id,
+    self_: TupleType<'db>,
+) -> ClassType<'db> {
+    let tuple_class = KnownClass::Tuple
+        .try_to_class_literal(db)
+        .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
+
+    tuple_class.apply_specialization(db, |generic_context| {
+        if generic_context.variables(db).len() == 1 {
+            generic_context.specialize_tuple(db, Type::Never, self_)
+        } else {
+            generic_context.default_specialization(db, Some(KnownClass::Tuple))
+        }
+    })
 }
 
 /// A tuple spec describes the contents of a tuple type, which might be fixed- or variable-length.
@@ -319,16 +319,12 @@ pub(crate) type TupleSpec<'db> = Tuple<Type<'db>>;
 ///
 /// Our tuple representation can hold instances of any Rust type. For tuples containing Python
 /// types, use [`TupleSpec`], which defines some additional type-specific methods.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct FixedLengthTuple<T>(Vec<T>);
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+pub struct FixedLengthTuple<T>(Box<[T]>);
 
 impl<T> FixedLengthTuple<T> {
     fn empty() -> Self {
-        Self(Vec::new())
-    }
-
-    pub(crate) fn with_capacity(capacity: usize) -> Self {
-        Self(Vec::with_capacity(capacity))
+        Self(Box::default())
     }
 
     fn from_elements(elements: impl IntoIterator<Item = T>) -> Self {
@@ -355,31 +351,9 @@ impl<T> FixedLengthTuple<T> {
     pub(crate) fn len(&self) -> usize {
         self.0.len()
     }
-
-    fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
-    pub(crate) fn push(&mut self, element: T) {
-        self.0.push(element);
-    }
 }
 
 impl<'db> FixedLengthTuple<Type<'db>> {
-    fn concat(&self, other: &Tuple<Type<'db>>) -> Tuple<Type<'db>> {
-        match other {
-            TupleSpec::Fixed(other) => TupleSpec::Fixed(FixedLengthTuple::from_elements(
-                self.elements().chain(other.elements()).copied(),
-            )),
-
-            TupleSpec::Variable(other) => VariableLengthTuple::mixed(
-                self.elements().chain(other.prefix_elements()).copied(),
-                other.variable,
-                other.suffix_elements().copied(),
-            ),
-        }
-    }
-
     fn resize(
         &self,
         db: &'db dyn Db,
@@ -414,79 +388,156 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     }
 
     #[must_use]
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Self {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::from_elements(self.0.iter().map(|ty| ty.normalized_impl(db, visitor)))
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
-        Self::from_elements(self.0.iter().map(|ty| ty.materialize(db, variance)))
-    }
+    fn apply_type_mapping_impl<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let tcx_tuple = tcx
+            .annotation
+            .and_then(|annotation| annotation.known_specialization(db, KnownClass::Tuple))
+            .and_then(|specialization| {
+                specialization
+                    .tuple(db)
+                    .expect("the specialization of `KnownClass::Tuple` must have a tuple spec")
+                    .resize(db, TupleLength::Fixed(self.0.len()))
+                    .ok()
+            });
 
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+        let tcx_elements = match tcx_tuple.as_ref() {
+            None => Either::Right(std::iter::repeat(TypeContext::default())),
+            Some(tuple) => {
+                Either::Left(tuple.all_elements().map(|tcx| TypeContext::new(Some(*tcx))))
+            }
+        };
+
         Self::from_elements(
             self.0
                 .iter()
-                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+                .zip(tcx_elements)
+                .map(|(ty, tcx)| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
         )
     }
 
-    fn find_legacy_typevars(
+    fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for ty in &self.0 {
-            ty.find_legacy_typevars(db, typevars);
+            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
 
-    fn has_relation_to(
+    fn has_relation_to_impl(
         &self,
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
-        relation: TypeRelation,
-    ) -> bool {
+        inferable: InferableTypeVars<'_, 'db>,
+        relation: TypeRelation<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         match other {
             Tuple::Fixed(other) => {
-                self.0.len() == other.0.len()
-                    && (self.0.iter())
-                        .zip(&other.0)
-                        .all(|(self_ty, other_ty)| self_ty.has_relation_to(db, *other_ty, relation))
+                ConstraintSet::from(self.0.len() == other.0.len()).and(db, || {
+                    (self.0.iter().zip(&other.0)).when_all(db, |(self_ty, other_ty)| {
+                        self_ty.has_relation_to_impl(
+                            db,
+                            *other_ty,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
+                })
             }
 
             Tuple::Variable(other) => {
                 // This tuple must have enough elements to match up with the other tuple's prefix
                 // and suffix, and each of those elements must pairwise satisfy the relation.
+                let mut result = ConstraintSet::from(true);
                 let mut self_iter = self.0.iter();
                 for other_ty in &other.prefix {
                     let Some(self_ty) = self_iter.next() else {
-                        return false;
+                        return ConstraintSet::from(false);
                     };
-                    if !self_ty.has_relation_to(db, *other_ty, relation) {
-                        return false;
+                    let element_constraints = self_ty.has_relation_to_impl(
+                        db,
+                        *other_ty,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    );
+                    if result
+                        .intersect(db, element_constraints)
+                        .is_never_satisfied(db)
+                    {
+                        return result;
                     }
                 }
                 for other_ty in other.suffix.iter().rev() {
                     let Some(self_ty) = self_iter.next_back() else {
-                        return false;
+                        return ConstraintSet::from(false);
                     };
-                    if !self_ty.has_relation_to(db, *other_ty, relation) {
-                        return false;
+                    let element_constraints = self_ty.has_relation_to_impl(
+                        db,
+                        *other_ty,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    );
+                    if result
+                        .intersect(db, element_constraints)
+                        .is_never_satisfied(db)
+                    {
+                        return result;
                     }
                 }
 
                 // In addition, any remaining elements in this tuple must satisfy the
                 // variable-length portion of the other tuple.
-                self_iter.all(|self_ty| self_ty.has_relation_to(db, other.variable, relation))
+                result.and(db, || {
+                    self_iter.when_all(db, |self_ty| {
+                        self_ty.has_relation_to_impl(
+                            db,
+                            other.variable,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
+                })
             }
         }
     }
 
-    fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.0.len() == other.0.len()
-            && (self.0.iter())
+    fn is_equivalent_to_impl(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        inferable: InferableTypeVars<'_, 'db>,
+        visitor: &IsEquivalentVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        ConstraintSet::from(self.0.len() == other.0.len()).and(db, || {
+            (self.0.iter())
                 .zip(&other.0)
-                .all(|(self_ty, other_ty)| self_ty.is_equivalent_to(db, *other_ty))
+                .when_all(db, |(self_ty, other_ty)| {
+                    self_ty.is_equivalent_to_impl(db, *other_ty, inferable, visitor)
+                })
+        })
     }
 
     fn is_single_valued(&self, db: &'db dyn Db) -> bool {
@@ -494,24 +545,11 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     }
 }
 
-#[allow(unsafe_code)]
-unsafe impl<T> salsa::Update for FixedLengthTuple<T>
-where
-    T: salsa::Update,
-{
-    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        unsafe {
-            let old_value = &mut *old_pointer;
-            Vec::maybe_update(&raw mut old_value.0, new_value.0)
-        }
-    }
-}
-
 impl<'db> PyIndex<'db> for &FixedLengthTuple<Type<'db>> {
     type Item = Type<'db>;
 
     fn py_index(self, db: &'db dyn Db, index: i32) -> Result<Self::Item, OutOfBoundsError> {
-        self.0.as_slice().py_index(db, index).copied()
+        self.0.py_index(db, index).copied()
     }
 }
 
@@ -536,11 +574,11 @@ impl<'db> PySlice<'db> for FixedLengthTuple<Type<'db>> {
 ///
 /// Our tuple representation can hold instances of any Rust type. For tuples containing Python
 /// types, use [`TupleSpec`], which defines some additional type-specific methods.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub struct VariableLengthTuple<T> {
-    pub(crate) prefix: Vec<T>,
+    pub(crate) prefix: Box<[T]>,
     pub(crate) variable: T,
-    pub(crate) suffix: Vec<T>,
+    pub(crate) suffix: Box<[T]>,
 }
 
 impl<T> VariableLengthTuple<T> {
@@ -562,11 +600,15 @@ impl<T> VariableLengthTuple<T> {
         })
     }
 
-    fn prefix_elements(&self) -> impl DoubleEndedIterator<Item = &T> + ExactSizeIterator + '_ {
+    pub(crate) fn prefix_elements(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = &T> + ExactSizeIterator + '_ {
         self.prefix.iter()
     }
 
-    fn suffix_elements(&self) -> impl DoubleEndedIterator<Item = &T> + ExactSizeIterator + '_ {
+    pub(crate) fn suffix_elements(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = &T> + ExactSizeIterator + '_ {
         self.suffix.iter()
     }
 
@@ -588,10 +630,6 @@ impl<T> VariableLengthTuple<T> {
 
     fn len(&self) -> TupleLength {
         TupleLength::Variable(self.prefix.len(), self.suffix.len())
-    }
-
-    fn push(&mut self, element: T) {
-        self.suffix.push(element);
     }
 }
 
@@ -659,30 +697,6 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             .copied()
     }
 
-    fn concat(&self, db: &'db dyn Db, other: &Tuple<Type<'db>>) -> Tuple<Type<'db>> {
-        match other {
-            TupleSpec::Fixed(other) => VariableLengthTuple::mixed(
-                self.prefix_elements().copied(),
-                self.variable,
-                self.suffix_elements().chain(other.elements()).copied(),
-            ),
-
-            Tuple::Variable(other) => {
-                let variable = UnionType::from_elements(
-                    db,
-                    (self.suffix_elements().copied())
-                        .chain([self.variable, other.variable])
-                        .chain(other.prefix_elements().copied()),
-                );
-                VariableLengthTuple::mixed(
-                    self.prefix_elements().copied(),
-                    variable,
-                    other.suffix_elements().copied(),
-                )
-            }
-        }
-    }
-
     fn resize(
         &self,
         db: &'db dyn Db,
@@ -727,67 +741,68 @@ impl<'db> VariableLengthTuple<Type<'db>> {
     }
 
     #[must_use]
-    fn normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> TupleSpec<'db> {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> TupleSpec<'db> {
         let prefix = self
             .prenormalized_prefix_elements(db, None)
             .map(|ty| ty.normalized_impl(db, visitor))
-            .collect::<Vec<_>>();
+            .collect::<Box<_>>();
         let suffix = self
             .prenormalized_suffix_elements(db, None)
             .map(|ty| ty.normalized_impl(db, visitor))
-            .collect::<Vec<_>>();
+            .collect::<Box<_>>();
         let variable = self.variable.normalized_impl(db, visitor);
-        Self::mixed(prefix, variable, suffix)
+        TupleSpec::Variable(Self {
+            prefix,
+            variable,
+            suffix,
+        })
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> TupleSpec<'db> {
-        Self::mixed(
-            self.prefix.iter().map(|ty| ty.materialize(db, variance)),
-            self.variable.materialize(db, variance),
-            self.suffix.iter().map(|ty| ty.materialize(db, variance)),
-        )
-    }
-
-    fn apply_type_mapping<'a>(
+    fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> TupleSpec<'db> {
         Self::mixed(
             self.prefix
                 .iter()
-                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
-            self.variable.apply_type_mapping(db, type_mapping),
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+            self.variable
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             self.suffix
                 .iter()
-                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
         )
     }
 
-    fn find_legacy_typevars(
+    fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for ty in &self.prefix {
-            ty.find_legacy_typevars(db, typevars);
+            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
-        self.variable.find_legacy_typevars(db, typevars);
+        self.variable
+            .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         for ty in &self.suffix {
-            ty.find_legacy_typevars(db, typevars);
+            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
 
-    fn has_relation_to(
+    fn has_relation_to_impl(
         &self,
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
-        relation: TypeRelation,
-    ) -> bool {
+        inferable: InferableTypeVars<'_, 'db>,
+        relation: TypeRelation<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         match other {
             Tuple::Fixed(other) => {
                 // The `...` length specifier of a variable-length tuple type is interpreted
@@ -800,34 +815,56 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 // (or any other dynamic type), then the `...` is the _gradual choice_ of all
                 // possible lengths. This means that `tuple[Any, ...]` can match any tuple of any
                 // length.
-                if relation == TypeRelation::Subtyping || !matches!(self.variable, Type::Dynamic(_))
-                {
-                    return false;
+                if !relation.is_assignability() || !self.variable.is_dynamic() {
+                    return ConstraintSet::from(false);
                 }
 
                 // In addition, the other tuple must have enough elements to match up with this
                 // tuple's prefix and suffix, and each of those elements must pairwise satisfy the
                 // relation.
+                let mut result = ConstraintSet::from(true);
                 let mut other_iter = other.elements().copied();
                 for self_ty in self.prenormalized_prefix_elements(db, None) {
                     let Some(other_ty) = other_iter.next() else {
-                        return false;
+                        return ConstraintSet::from(false);
                     };
-                    if !self_ty.has_relation_to(db, other_ty, relation) {
-                        return false;
+                    let element_constraints = self_ty.has_relation_to_impl(
+                        db,
+                        other_ty,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    );
+                    if result
+                        .intersect(db, element_constraints)
+                        .is_never_satisfied(db)
+                    {
+                        return result;
                     }
                 }
                 let suffix: Vec<_> = self.prenormalized_suffix_elements(db, None).collect();
                 for self_ty in suffix.iter().rev() {
                     let Some(other_ty) = other_iter.next_back() else {
-                        return false;
+                        return ConstraintSet::from(false);
                     };
-                    if !self_ty.has_relation_to(db, other_ty, relation) {
-                        return false;
+                    let element_constraints = self_ty.has_relation_to_impl(
+                        db,
+                        other_ty,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    );
+                    if result
+                        .intersect(db, element_constraints)
+                        .is_never_satisfied(db)
+                    {
+                        return result;
                     }
                 }
 
-                true
+                result
             }
 
             Tuple::Variable(other) => {
@@ -845,26 +882,41 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 // The overlapping parts of the prefixes and suffixes must satisfy the relation.
                 // Any remaining parts must satisfy the relation with the other tuple's
                 // variable-length part.
-                if !self
-                    .prenormalized_prefix_elements(db, self_prenormalize_variable)
+                let mut result = ConstraintSet::from(true);
+                let pairwise = (self.prenormalized_prefix_elements(db, self_prenormalize_variable))
                     .zip_longest(
                         other.prenormalized_prefix_elements(db, other_prenormalize_variable),
-                    )
-                    .all(|pair| match pair {
-                        EitherOrBoth::Both(self_ty, other_ty) => {
-                            self_ty.has_relation_to(db, other_ty, relation)
-                        }
-                        EitherOrBoth::Left(self_ty) => {
-                            self_ty.has_relation_to(db, other.variable, relation)
-                        }
+                    );
+                for pair in pairwise {
+                    let pair_constraints = match pair {
+                        EitherOrBoth::Both(self_ty, other_ty) => self_ty.has_relation_to_impl(
+                            db,
+                            other_ty,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        ),
+                        EitherOrBoth::Left(self_ty) => self_ty.has_relation_to_impl(
+                            db,
+                            other.variable,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        ),
                         EitherOrBoth::Right(_) => {
                             // The rhs has a required element that the lhs is not guaranteed to
                             // provide.
-                            false
+                            return ConstraintSet::from(false);
                         }
-                    })
-                {
-                    return false;
+                    };
+                    if result
+                        .intersect(db, pair_constraints)
+                        .is_never_satisfied(db)
+                    {
+                        return result;
+                    }
                 }
 
                 let self_suffix: Vec<_> = self
@@ -873,60 +925,87 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 let other_suffix: Vec<_> = other
                     .prenormalized_suffix_elements(db, other_prenormalize_variable)
                     .collect();
-                if !(self_suffix.iter().rev())
-                    .zip_longest(other_suffix.iter().rev())
-                    .all(|pair| match pair {
-                        EitherOrBoth::Both(self_ty, other_ty) => {
-                            self_ty.has_relation_to(db, *other_ty, relation)
-                        }
-                        EitherOrBoth::Left(self_ty) => {
-                            self_ty.has_relation_to(db, other.variable, relation)
-                        }
+                let pairwise = (self_suffix.iter().rev()).zip_longest(other_suffix.iter().rev());
+                for pair in pairwise {
+                    let pair_constraints = match pair {
+                        EitherOrBoth::Both(self_ty, other_ty) => self_ty.has_relation_to_impl(
+                            db,
+                            *other_ty,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        ),
+                        EitherOrBoth::Left(self_ty) => self_ty.has_relation_to_impl(
+                            db,
+                            other.variable,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        ),
                         EitherOrBoth::Right(_) => {
                             // The rhs has a required element that the lhs is not guaranteed to
                             // provide.
-                            false
+                            return ConstraintSet::from(false);
                         }
-                    })
-                {
-                    return false;
+                    };
+                    if result
+                        .intersect(db, pair_constraints)
+                        .is_never_satisfied(db)
+                    {
+                        return result;
+                    }
                 }
 
                 // And lastly, the variable-length portions must satisfy the relation.
-                self.variable.has_relation_to(db, other.variable, relation)
+                result.and(db, || {
+                    self.variable.has_relation_to_impl(
+                        db,
+                        other.variable,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
             }
         }
     }
 
-    fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.variable.is_equivalent_to(db, other.variable)
-            && (self.prenormalized_prefix_elements(db, None))
-                .zip_longest(other.prenormalized_prefix_elements(db, None))
-                .all(|pair| match pair {
-                    EitherOrBoth::Both(self_ty, other_ty) => self_ty.is_equivalent_to(db, other_ty),
-                    EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => false,
-                })
-            && (self.prenormalized_suffix_elements(db, None))
-                .zip_longest(other.prenormalized_suffix_elements(db, None))
-                .all(|pair| match pair {
-                    EitherOrBoth::Both(self_ty, other_ty) => self_ty.is_equivalent_to(db, other_ty),
-                    EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => false,
-                })
-    }
-}
-
-#[allow(unsafe_code)]
-unsafe impl<T> salsa::Update for VariableLengthTuple<T>
-where
-    T: salsa::Update,
-{
-    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        let old_value = unsafe { &mut *old_pointer };
-        let mut changed = false;
-        changed |= unsafe { Vec::maybe_update(&raw mut old_value.prefix, new_value.prefix) };
-        changed |= unsafe { T::maybe_update(&raw mut old_value.variable, new_value.variable) };
-        changed |= unsafe { Vec::maybe_update(&raw mut old_value.suffix, new_value.suffix) };
-        changed
+    fn is_equivalent_to_impl(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        inferable: InferableTypeVars<'_, 'db>,
+        visitor: &IsEquivalentVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        self.variable
+            .is_equivalent_to_impl(db, other.variable, inferable, visitor)
+            .and(db, || {
+                (self.prenormalized_prefix_elements(db, None))
+                    .zip_longest(other.prenormalized_prefix_elements(db, None))
+                    .when_all(db, |pair| match pair {
+                        EitherOrBoth::Both(self_ty, other_ty) => {
+                            self_ty.is_equivalent_to_impl(db, other_ty, inferable, visitor)
+                        }
+                        EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => {
+                            ConstraintSet::from(false)
+                        }
+                    })
+            })
+            .and(db, || {
+                (self.prenormalized_suffix_elements(db, None))
+                    .zip_longest(other.prenormalized_suffix_elements(db, None))
+                    .when_all(db, |pair| match pair {
+                        EitherOrBoth::Both(self_ty, other_ty) => {
+                            self_ty.is_equivalent_to_impl(db, other_ty, inferable, visitor)
+                        }
+                        EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => {
+                            ConstraintSet::from(false)
+                        }
+                    })
+            })
     }
 }
 
@@ -978,7 +1057,7 @@ impl<'db> PyIndex<'db> for &VariableLengthTuple<Type<'db>> {
 ///
 /// Our tuple representation can hold instances of any Rust type. For tuples containing Python
 /// types, use [`TupleSpec`], which defines some additional type-specific methods.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub enum Tuple<T> {
     Fixed(FixedLengthTuple<T>),
     Variable(VariableLengthTuple<T>),
@@ -989,12 +1068,16 @@ impl<T> Tuple<T> {
         VariableLengthTuple::homogeneous(element)
     }
 
-    pub(crate) fn from_elements(elements: impl IntoIterator<Item = T>) -> Self {
+    pub(crate) fn heterogeneous(elements: impl IntoIterator<Item = T>) -> Self {
         FixedLengthTuple::from_elements(elements).into()
     }
 
-    pub(crate) fn with_capacity(capacity: usize) -> Self {
-        Tuple::Fixed(FixedLengthTuple::with_capacity(capacity))
+    /// Returns the variable-length element of this tuple, if it has one.
+    pub(crate) fn variable_element(&self) -> Option<&T> {
+        match self {
+            Tuple::Fixed(_) => None,
+            Tuple::Variable(tuple) => Some(&tuple.variable),
+        }
     }
 
     /// Returns an iterator of all of the fixed-length element types of this tuple.
@@ -1021,10 +1104,6 @@ impl<T> Tuple<T> {
         }
     }
 
-    pub(crate) const fn is_variadic(&self) -> bool {
-        matches!(self, Tuple::Variable(_))
-    }
-
     /// Returns the length of this tuple.
     pub(crate) fn len(&self) -> TupleLength {
         match self {
@@ -1043,33 +1122,11 @@ impl<T> Tuple<T> {
             _ => Truthiness::Ambiguous,
         }
     }
-
-    pub(crate) fn is_empty(&self) -> bool {
-        match self {
-            Tuple::Fixed(tuple) => tuple.is_empty(),
-            Tuple::Variable(_) => false,
-        }
-    }
-
-    pub(crate) fn push(&mut self, element: T) {
-        match self {
-            Tuple::Fixed(tuple) => tuple.push(element),
-            Tuple::Variable(tuple) => tuple.push(element),
-        }
-    }
 }
 
 impl<'db> Tuple<Type<'db>> {
     pub(crate) fn homogeneous_element_type(&self, db: &'db dyn Db) -> Type<'db> {
         UnionType::from_elements(db, self.all_elements())
-    }
-
-    /// Concatenates another tuple to the end of this tuple, returning a new tuple.
-    pub(crate) fn concat(&self, db: &'db dyn Db, other: &Self) -> Self {
-        match self {
-            Tuple::Fixed(tuple) => tuple.concat(other),
-            Tuple::Variable(tuple) => tuple.concat(db, other),
-        }
     }
 
     /// Resizes this tuple to a different length, if possible. If this tuple cannot satisfy the
@@ -1089,7 +1146,7 @@ impl<'db> Tuple<Type<'db>> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &NormalizedVisitor<'db>,
     ) -> Self {
         match self {
             Tuple::Fixed(tuple) => Tuple::Fixed(tuple.normalized_impl(db, visitor)),
@@ -1097,136 +1154,216 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    pub(crate) fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
-        match self {
-            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.materialize(db, variance)),
-            Tuple::Variable(tuple) => tuple.materialize(db, variance),
-        }
-    }
-
-    pub(crate) fn apply_type_mapping<'a>(
+    pub(crate) fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
-            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.apply_type_mapping(db, type_mapping)),
-            Tuple::Variable(tuple) => tuple.apply_type_mapping(db, type_mapping),
+            Tuple::Fixed(tuple) => {
+                Tuple::Fixed(tuple.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            }
+            Tuple::Variable(tuple) => tuple.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
         }
     }
 
-    fn find_legacy_typevars(
+    fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self {
-            Tuple::Fixed(tuple) => tuple.find_legacy_typevars(db, typevars),
-            Tuple::Variable(tuple) => tuple.find_legacy_typevars(db, typevars),
+            Tuple::Fixed(tuple) => {
+                tuple.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+            }
+            Tuple::Variable(tuple) => {
+                tuple.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+            }
         }
     }
 
-    fn has_relation_to(&self, db: &'db dyn Db, other: &Self, relation: TypeRelation) -> bool {
+    fn has_relation_to_impl(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        inferable: InferableTypeVars<'_, 'db>,
+        relation: TypeRelation<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         match self {
-            Tuple::Fixed(self_tuple) => self_tuple.has_relation_to(db, other, relation),
-            Tuple::Variable(self_tuple) => self_tuple.has_relation_to(db, other, relation),
+            Tuple::Fixed(self_tuple) => self_tuple.has_relation_to_impl(
+                db,
+                other,
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            ),
+            Tuple::Variable(self_tuple) => self_tuple.has_relation_to_impl(
+                db,
+                other,
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            ),
         }
     }
 
-    fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
+    fn is_equivalent_to_impl(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        inferable: InferableTypeVars<'_, 'db>,
+        visitor: &IsEquivalentVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         match (self, other) {
             (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
-                self_tuple.is_equivalent_to(db, other_tuple)
+                self_tuple.is_equivalent_to_impl(db, other_tuple, inferable, visitor)
             }
             (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => {
-                self_tuple.is_equivalent_to(db, other_tuple)
+                self_tuple.is_equivalent_to_impl(db, other_tuple, inferable, visitor)
             }
-            (Tuple::Fixed(_), Tuple::Variable(_)) | (Tuple::Variable(_), Tuple::Fixed(_)) => false,
+            (Tuple::Fixed(_), Tuple::Variable(_)) | (Tuple::Variable(_), Tuple::Fixed(_)) => {
+                ConstraintSet::from(false)
+            }
         }
     }
 
-    fn is_disjoint_from_impl(
-        &'db self,
+    pub(super) fn is_disjoint_from_impl(
+        &self,
         db: &'db dyn Db,
-        other: &'db Self,
-        visitor: &mut PairVisitor<'db>,
-    ) -> bool {
+        other: &Self,
+        inferable: InferableTypeVars<'_, 'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         // Two tuples with an incompatible number of required elements must always be disjoint.
         let (self_min, self_max) = self.len().size_hint();
         let (other_min, other_max) = other.len().size_hint();
         if self_max.is_some_and(|max| max < other_min) {
-            return true;
+            return ConstraintSet::from(true);
         }
         if other_max.is_some_and(|max| max < self_min) {
-            return true;
+            return ConstraintSet::from(true);
         }
 
         // If any of the required elements are pairwise disjoint, the tuples are disjoint as well.
         #[allow(clippy::items_after_statements)]
-        fn any_disjoint<'db>(
+        fn any_disjoint<'s, 'db>(
             db: &'db dyn Db,
-            a: impl IntoIterator<Item = &'db Type<'db>>,
-            b: impl IntoIterator<Item = &'db Type<'db>>,
-            visitor: &mut PairVisitor<'db>,
-        ) -> bool {
-            a.into_iter().zip(b).any(|(self_element, other_element)| {
-                self_element.is_disjoint_from_impl(db, *other_element, visitor)
+            a: impl IntoIterator<Item = &'s Type<'db>>,
+            b: impl IntoIterator<Item = &'s Type<'db>>,
+            inferable: InferableTypeVars<'_, 'db>,
+            disjointness_visitor: &IsDisjointVisitor<'db>,
+            relation_visitor: &HasRelationToVisitor<'db>,
+        ) -> ConstraintSet<'db>
+        where
+            'db: 's,
+        {
+            (a.into_iter().zip(b)).when_any(db, |(self_element, other_element)| {
+                self_element.is_disjoint_from_impl(
+                    db,
+                    *other_element,
+                    inferable,
+                    disjointness_visitor,
+                    relation_visitor,
+                )
             })
         }
 
         match (self, other) {
-            (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
-                if any_disjoint(db, self_tuple.elements(), other_tuple.elements(), visitor) {
-                    return true;
-                }
-            }
+            (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => any_disjoint(
+                db,
+                self_tuple.elements(),
+                other_tuple.elements(),
+                inferable,
+                disjointness_visitor,
+                relation_visitor,
+            ),
 
-            (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => {
-                if any_disjoint(
-                    db,
-                    self_tuple.prefix_elements(),
-                    other_tuple.prefix_elements(),
-                    visitor,
-                ) {
-                    return true;
-                }
-                if any_disjoint(
+            // Note that we don't compare the variable-length portions; two pure homogeneous tuples
+            // `tuple[A, ...]` and `tuple[B, ...]` can never be disjoint even if A and B are
+            // disjoint, because `tuple[()]` would be assignable to both.
+            (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => any_disjoint(
+                db,
+                self_tuple.prefix_elements(),
+                other_tuple.prefix_elements(),
+                inferable,
+                disjointness_visitor,
+                relation_visitor,
+            )
+            .or(db, || {
+                any_disjoint(
                     db,
                     self_tuple.suffix_elements().rev(),
                     other_tuple.suffix_elements().rev(),
-                    visitor,
-                ) {
-                    return true;
-                }
-            }
+                    inferable,
+                    disjointness_visitor,
+                    relation_visitor,
+                )
+            }),
 
             (Tuple::Fixed(fixed), Tuple::Variable(variable))
-            | (Tuple::Variable(variable), Tuple::Fixed(fixed)) => {
-                if any_disjoint(db, fixed.elements(), variable.prefix_elements(), visitor) {
-                    return true;
-                }
-                if any_disjoint(
+            | (Tuple::Variable(variable), Tuple::Fixed(fixed)) => any_disjoint(
+                db,
+                fixed.elements(),
+                variable.prefix_elements(),
+                inferable,
+                disjointness_visitor,
+                relation_visitor,
+            )
+            .or(db, || {
+                any_disjoint(
                     db,
                     fixed.elements().rev(),
                     variable.suffix_elements().rev(),
-                    visitor,
-                ) {
-                    return true;
-                }
-            }
+                    inferable,
+                    disjointness_visitor,
+                    relation_visitor,
+                )
+            }),
         }
-
-        // Two pure homogeneous tuples `tuple[A, ...]` and `tuple[B, ...]` can never be
-        // disjoint even if A and B are disjoint, because `tuple[()]` would be assignable to
-        // both.
-        false
     }
 
-    fn is_single_valued(&self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_single_valued(&self, db: &'db dyn Db) -> bool {
         match self {
             Tuple::Fixed(tuple) => tuple.is_single_valued(db),
             Tuple::Variable(_) => false,
         }
+    }
+
+    /// Return the `TupleSpec` for the singleton `sys.version_info`
+    pub(crate) fn version_info_spec(db: &'db dyn Db) -> TupleSpec<'db> {
+        let python_version = Program::get(db).python_version(db);
+        let int_instance_ty = KnownClass::Int.to_instance(db);
+
+        // TODO: just grab this type from typeshed (it's a `sys._ReleaseLevel` type alias there)
+        let release_level_ty = {
+            let elements: Box<[Type<'db>]> = ["alpha", "beta", "candidate", "final"]
+                .iter()
+                .map(|level| Type::string_literal(db, level))
+                .collect();
+
+            // For most unions, it's better to go via `UnionType::from_elements` or use `UnionBuilder`;
+            // those techniques ensure that union elements are deduplicated and unions are eagerly simplified
+            // into other types where necessary. Here, however, we know that there are no duplicates
+            // in this union, so it's probably more efficient to use `UnionType::new()` directly.
+            Type::Union(UnionType::new(db, elements))
+        };
+
+        TupleSpec::heterogeneous([
+            Type::IntLiteral(python_version.major.into()),
+            Type::IntLiteral(python_version.minor.into()),
+            int_instance_ty,
+            release_level_ty,
+            int_instance_ty,
+        ])
     }
 }
 
@@ -1239,28 +1376,6 @@ impl<T> From<FixedLengthTuple<T>> for Tuple<T> {
 impl<T> From<VariableLengthTuple<T>> for Tuple<T> {
     fn from(tuple: VariableLengthTuple<T>) -> Self {
         Tuple::Variable(tuple)
-    }
-}
-
-#[allow(unsafe_code)]
-unsafe impl<T> salsa::Update for Tuple<T>
-where
-    T: salsa::Update,
-{
-    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        let old_value = unsafe { &mut *old_pointer };
-        match (old_value, new_value) {
-            (Tuple::Fixed(old), Tuple::Fixed(new)) => unsafe {
-                FixedLengthTuple::maybe_update(old, new)
-            },
-            (Tuple::Variable(old), Tuple::Variable(new)) => unsafe {
-                VariableLengthTuple::maybe_update(old, new)
-            },
-            (old_value, new_value) => {
-                *old_value = new_value;
-                true
-            }
-        }
     }
 }
 
@@ -1381,4 +1496,174 @@ impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
 pub(crate) enum ResizeTupleError {
     TooFewValues,
     TooManyValues,
+}
+
+/// A builder for creating a new [`TupleSpec`]
+pub(crate) enum TupleSpecBuilder<'db> {
+    Fixed(Vec<Type<'db>>),
+    Variable {
+        prefix: Vec<Type<'db>>,
+        variable: Type<'db>,
+        suffix: Vec<Type<'db>>,
+    },
+}
+
+impl<'db> TupleSpecBuilder<'db> {
+    pub(crate) fn with_capacity(capacity: usize) -> Self {
+        TupleSpecBuilder::Fixed(Vec::with_capacity(capacity))
+    }
+
+    pub(crate) fn push(&mut self, element: Type<'db>) {
+        match self {
+            TupleSpecBuilder::Fixed(elements) => elements.push(element),
+            TupleSpecBuilder::Variable { suffix, .. } => suffix.push(element),
+        }
+    }
+
+    /// Concatenates another tuple to the end of this tuple, returning a new tuple.
+    pub(crate) fn concat(mut self, db: &'db dyn Db, other: &TupleSpec<'db>) -> Self {
+        match (&mut self, other) {
+            (TupleSpecBuilder::Fixed(left_tuple), TupleSpec::Fixed(right_tuple)) => {
+                left_tuple.extend_from_slice(&right_tuple.0);
+                self
+            }
+
+            (
+                TupleSpecBuilder::Fixed(left_tuple),
+                TupleSpec::Variable(VariableLengthTuple {
+                    prefix,
+                    variable,
+                    suffix,
+                }),
+            ) => {
+                left_tuple.extend_from_slice(prefix);
+                TupleSpecBuilder::Variable {
+                    prefix: std::mem::take(left_tuple),
+                    variable: *variable,
+                    suffix: suffix.to_vec(),
+                }
+            }
+
+            (
+                TupleSpecBuilder::Variable {
+                    prefix: _,
+                    variable: _,
+                    suffix,
+                },
+                TupleSpec::Fixed(right),
+            ) => {
+                suffix.extend_from_slice(&right.0);
+                self
+            }
+
+            (
+                TupleSpecBuilder::Variable {
+                    prefix: left_prefix,
+                    variable: left_variable,
+                    suffix: left_suffix,
+                },
+                TupleSpec::Variable(VariableLengthTuple {
+                    prefix: right_prefix,
+                    variable: right_variable,
+                    suffix: right_suffix,
+                }),
+            ) => {
+                let variable = UnionType::from_elements(
+                    db,
+                    left_suffix
+                        .iter()
+                        .chain([left_variable, right_variable])
+                        .chain(right_prefix),
+                );
+                TupleSpecBuilder::Variable {
+                    prefix: std::mem::take(left_prefix),
+                    variable,
+                    suffix: right_suffix.to_vec(),
+                }
+            }
+        }
+    }
+
+    fn all_elements(&self) -> impl Iterator<Item = &Type<'db>> {
+        match self {
+            TupleSpecBuilder::Fixed(elements) => Either::Left(elements.iter()),
+            TupleSpecBuilder::Variable {
+                prefix,
+                variable,
+                suffix,
+            } => Either::Right(prefix.iter().chain(std::iter::once(variable)).chain(suffix)),
+        }
+    }
+
+    /// Return a new tuple-spec builder that reflects the union of this tuple and another tuple.
+    ///
+    /// For example, if `self` is a tuple-spec builder for `tuple[Literal[42], str]` and `other` is a
+    /// tuple-spec for `tuple[Literal[56], str]`, the result will be a tuple-spec builder for
+    /// `tuple[Literal[42, 56], str]`.
+    ///
+    /// To keep things simple, we currently only attempt to preserve the "fixed-length-ness" of
+    /// a tuple spec if both `self` and `other` have the exact same length. For example,
+    /// if `self` is a tuple-spec builder for `tuple[int, str]` and `other` is a tuple-spec for
+    /// `tuple[int, str, bytes]`, the result will be a tuple-spec builder for
+    /// `tuple[int | str | bytes, ...]`. We could consider improving this in the future if real-world
+    /// use cases arise.
+    pub(crate) fn union(mut self, db: &'db dyn Db, other: &TupleSpec<'db>) -> Self {
+        match (&mut self, other) {
+            (TupleSpecBuilder::Fixed(our_elements), TupleSpec::Fixed(new_elements))
+                if our_elements.len() == new_elements.len() =>
+            {
+                for (existing, new) in our_elements.iter_mut().zip(new_elements.elements()) {
+                    *existing = UnionType::from_elements(db, [*existing, *new]);
+                }
+                self
+            }
+
+            // We *could* have a branch here where both `self` and `other` are mixed tuples
+            // with same-length prefixes and same-length suffixes. We *could* zip the two
+            // `prefix` vecs together, unioning each pair of elements to create a new `prefix`
+            // vec, and do the same for the `suffix` vecs. This would preserve the tuple specs
+            // of the union elements more closely. But it's hard to think of a test where this
+            // would actually lead to more precise inference, so it's probably not worth the
+            // complexity.
+            _ => {
+                let unioned =
+                    UnionType::from_elements(db, self.all_elements().chain(other.all_elements()));
+                TupleSpecBuilder::Variable {
+                    prefix: vec![],
+                    variable: unioned,
+                    suffix: vec![],
+                }
+            }
+        }
+    }
+
+    pub(super) fn build(self) -> TupleSpec<'db> {
+        match self {
+            TupleSpecBuilder::Fixed(elements) => {
+                TupleSpec::Fixed(FixedLengthTuple(elements.into_boxed_slice()))
+            }
+            TupleSpecBuilder::Variable {
+                prefix,
+                variable,
+                suffix,
+            } => TupleSpec::Variable(VariableLengthTuple {
+                prefix: prefix.into_boxed_slice(),
+                variable,
+                suffix: suffix.into_boxed_slice(),
+            }),
+        }
+    }
+}
+
+impl<'db> From<&TupleSpec<'db>> for TupleSpecBuilder<'db> {
+    fn from(tuple: &TupleSpec<'db>) -> Self {
+        match tuple {
+            TupleSpec::Fixed(fixed) => TupleSpecBuilder::Fixed(fixed.0.to_vec()),
+            TupleSpec::Variable(variable) => TupleSpecBuilder::Variable {
+                prefix: variable.prefix.to_vec(),
+                variable: variable.variable,
+                suffix: variable.suffix.to_vec(),
+            },
+        }
+    }
 }

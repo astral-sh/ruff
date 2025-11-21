@@ -54,6 +54,7 @@ impl From<YieldOutsideFunctionKind> for DeferralKeyword {
 ///
 /// [autoawait]: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.22")]
 pub(crate) struct YieldOutsideFunction {
     keyword: DeferralKeyword,
 }

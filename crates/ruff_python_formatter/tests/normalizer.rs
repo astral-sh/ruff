@@ -1,8 +1,5 @@
+use regex::Regex;
 use std::sync::LazyLock;
-use {
-    itertools::Either::{Left, Right},
-    regex::Regex,
-};
 
 use ruff_python_ast::{
     self as ast, BytesLiteralFlags, Expr, FStringFlags, FStringPart, InterpolatedStringElement,
@@ -46,18 +43,9 @@ impl Transformer for Normalizer {
     fn visit_stmt(&self, stmt: &mut Stmt) {
         if let Stmt::Delete(delete) = stmt {
             // Treat `del a, b` and `del (a, b)` equivalently.
-            delete.targets = delete
-                .targets
-                .clone()
-                .into_iter()
-                .flat_map(|target| {
-                    if let Expr::Tuple(tuple) = target {
-                        Left(tuple.elts.into_iter())
-                    } else {
-                        Right(std::iter::once(target))
-                    }
-                })
-                .collect();
+            if let [Expr::Tuple(tuple)] = delete.targets.as_slice() {
+                delete.targets = tuple.elts.clone();
+            }
         }
 
         transformer::walk_stmt(self, stmt);
@@ -82,7 +70,7 @@ impl Transformer for Normalizer {
                             value: Box::from(string.value.to_str()),
                             range: string.range,
                             flags: StringLiteralFlags::empty(),
-                            node_index: AtomicNodeIndex::dummy(),
+                            node_index: AtomicNodeIndex::NONE,
                         });
                     }
                 }
@@ -99,7 +87,7 @@ impl Transformer for Normalizer {
                             value: bytes.value.bytes().collect(),
                             range: bytes.range,
                             flags: BytesLiteralFlags::empty(),
-                            node_index: AtomicNodeIndex::dummy(),
+                            node_index: AtomicNodeIndex::NONE,
                         });
                     }
                 }
@@ -143,7 +131,7 @@ impl Transformer for Normalizer {
                                         InterpolatedStringLiteralElement {
                                             range,
                                             value: literal.into(),
-                                            node_index: AtomicNodeIndex::dummy(),
+                                            node_index: AtomicNodeIndex::NONE,
                                         },
                                     ));
                                 }
@@ -185,7 +173,7 @@ impl Transformer for Normalizer {
                             elements: collector.elements.into(),
                             range: fstring.range,
                             flags: FStringFlags::empty(),
-                            node_index: AtomicNodeIndex::dummy(),
+                            node_index: AtomicNodeIndex::NONE,
                         });
                     }
                 }

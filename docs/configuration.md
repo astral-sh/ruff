@@ -270,7 +270,7 @@ There are a few exceptions to these rules:
 1. If no config file is found in the filesystem hierarchy, Ruff will fall back to using
     a default configuration. If a user-specific configuration file exists
     at `${config_dir}/ruff/pyproject.toml`, that file will be used instead of the default
-    configuration, with `${config_dir}` being determined via [`etcetera`'s native strategy](https://docs.rs/etcetera/latest/etcetera/#native-strategy),
+    configuration, with `${config_dir}` being determined via [`etcetera`'s base strategy](https://docs.rs/etcetera/latest/etcetera/#native-strategy),
     and all relative paths being again resolved relative to the _current working directory_.
 1. Any config-file-supported settings that are provided on the command-line (e.g., via
     `--select`) will override the settings in _every_ resolved configuration file.
@@ -345,8 +345,9 @@ formatting `.pyi` files, but would continue to include them in linting:
 By default, Ruff will also skip any files that are omitted via `.ignore`, `.gitignore`,
 `.git/info/exclude`, and global `gitignore` files (see: [`respect-gitignore`](settings.md#respect-gitignore)).
 
-Files that are passed to `ruff` directly are always analyzed, regardless of the above criteria.
-For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
+Files that are passed to `ruff` directly are always analyzed, regardless of the above criteria, 
+unless [`force-exclude`](settings.md#force-exclude) is also enabled (via CLI or settings file).
+For example, without `force-exclude` enabled, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
 ### Default inclusions
 
@@ -618,8 +619,9 @@ Options:
           notebooks, use `--extension ipy:ipynb`
       --statistics
           Show counts for every rule with at least one violation
-      --add-noqa
-          Enable automatic additions of `noqa` directives to failing lines
+      --add-noqa[=<REASON>]
+          Enable automatic additions of `noqa` directives to failing lines.
+          Optionally provide a reason to append after the codes
       --show-files
           See the files Ruff will be run against with the current settings
       --show-settings
@@ -727,6 +729,11 @@ Options:
       --preview
           Enable preview mode; enables unstable formatting. Use `--no-preview`
           to disable
+      --output-format <OUTPUT_FORMAT>
+          Output serialization format for violations, when used with `--check`.
+          The default serialization format is "full" [env: RUFF_OUTPUT_FORMAT=]
+          [possible values: concise, full, json, json-lines, junit, grouped,
+          github, gitlab, pylint, rdjson, azure, sarif]
   -h, --help
           Print help (see more with '--help')
 

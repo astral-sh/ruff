@@ -30,6 +30,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `str.encode`](https://docs.python.org/3/library/stdtypes.html#str.encode)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct UnnecessaryEncodeUTF8 {
     reason: Reason,
 }
@@ -96,7 +97,7 @@ enum EncodingArg<'a> {
 
 /// Return the encoding argument to an `encode` call, if it can be determined to be a
 /// UTF-8-equivalent encoding.
-fn match_encoding_arg(arguments: &Arguments) -> Option<EncodingArg> {
+fn match_encoding_arg(arguments: &Arguments) -> Option<EncodingArg<'_>> {
     match (&*arguments.args, &*arguments.keywords) {
         // Ex `"".encode()`
         ([], []) => return Some(EncodingArg::Empty),

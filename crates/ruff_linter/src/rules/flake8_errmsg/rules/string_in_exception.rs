@@ -7,15 +7,11 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
-use crate::preview::is_raise_exception_byte_string_enabled;
 use crate::registry::Rule;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the use of string literals in exception constructors.
-///
-/// In [preview], this rule checks for byte string literals in
-/// exception constructors.
 ///
 /// ## Why is this bad?
 /// Python includes the `raise` in the default traceback (and formatters
@@ -51,9 +47,8 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     raise RuntimeError(msg)
 /// RuntimeError: 'Some value' is incorrect
 /// ```
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.183")]
 pub(crate) struct RawStringInException;
 
 impl Violation for RawStringInException {
@@ -109,6 +104,7 @@ impl Violation for RawStringInException {
 /// RuntimeError: 'Some value' is incorrect
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.183")]
 pub(crate) struct FStringInException;
 
 impl Violation for FStringInException {
@@ -165,6 +161,7 @@ impl Violation for FStringInException {
 /// RuntimeError: 'Some value' is incorrect
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.183")]
 pub(crate) struct DotFormatInException;
 
 impl Violation for DotFormatInException {
@@ -218,9 +215,7 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
             // Check for byte string literals.
             Expr::BytesLiteral(ast::ExprBytesLiteral { value: bytes, .. }) => {
                 if checker.settings().rules.enabled(Rule::RawStringInException) {
-                    if bytes.len() >= checker.settings().flake8_errmsg.max_string_length
-                        && is_raise_exception_byte_string_enabled(checker.settings())
-                    {
+                    if bytes.len() >= checker.settings().flake8_errmsg.max_string_length {
                         let mut diagnostic =
                             checker.report_diagnostic(RawStringInException, first.range());
                         if let Some(indentation) = whitespace::indentation(checker.source(), stmt) {

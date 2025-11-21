@@ -124,3 +124,19 @@ def fun_with_python_syntax():
             ...
 
     return Foo
+
+
+@dataclass
+class C:
+    def __post_init__(self, x: tuple[int, ...] = (
+        1,
+        2,
+    )) -> None:
+        self.x = x
+
+
+@dataclass
+class D:
+    def __post_init__(self, x: int = """
+    """) -> None:
+        self.x = x

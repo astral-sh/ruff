@@ -1,0 +1,48 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 2
+
+--- Added ---
+UP046 [*] Generic class `DefaultTypeVar` uses `Generic` subclass instead of type parameters
+   --> UP046_0.py:129:22
+    |
+129 | class DefaultTypeVar(Generic[V]):  # -> [V: str = Any]
+    |                      ^^^^^^^^^^
+130 |     var: V
+    |
+help: Use type parameters
+126 | V = TypeVar("V", default=Any, bound=str)
+127 | 
+128 | 
+    - class DefaultTypeVar(Generic[V]):  # -> [V: str = Any]
+129 + class DefaultTypeVar[V: str = Any]:  # -> [V: str = Any]
+130 |     var: V
+131 | 
+132 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+UP046 [*] Generic class `DefaultOnlyTypeVar` uses `Generic` subclass instead of type parameters
+   --> UP046_0.py:137:26
+    |
+137 | class DefaultOnlyTypeVar(Generic[W]):  # -> [W = int]
+    |                          ^^^^^^^^^^
+138 |     var: W
+    |
+help: Use type parameters
+134 | W = TypeVar("W", default=int)
+135 | 
+136 | 
+    - class DefaultOnlyTypeVar(Generic[W]):  # -> [W = int]
+137 + class DefaultOnlyTypeVar[W = int]:  # -> [W = int]
+138 |     var: W
+139 | 
+140 | 
+note: This is an unsafe fix and may change runtime behavior

@@ -36,7 +36,11 @@ reveal_type(tuple[int, *tuple[str, ...]]((1,)))  # revealed: tuple[int, *tuple[s
 reveal_type(().__class__())  # revealed: tuple[()]
 reveal_type((1, 2).__class__((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
 
-def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never]):
+class LiskovUncompliantIterable(Iterable[int]):
+    # TODO we should emit an error here about the Liskov violation
+    __iter__ = None
+
+def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never], bb: LiskovUncompliantIterable):
     reveal_type(tuple(x))  # revealed: tuple[int, ...]
     reveal_type(tuple(y))  # revealed: tuple[str, ...]
     reveal_type(tuple(z))  # revealed: tuple[Unknown, ...]
@@ -44,12 +48,16 @@ def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never]):
     # This is correct as the only inhabitants of `list[Never]` can be empty lists
     reveal_type(tuple(aa))  # revealed: tuple[()]
 
+    # `tuple[int, ...] would probably also be fine here since `LiskovUncompliantIterable`
+    # inherits from `Iterable[int]`. Ultimately all bets are off when the Liskov Principle is
+    # violated, though -- this test is really just to make sure we don't crash in this situation.
+    reveal_type(tuple(bb))  # revealed: tuple[Unknown, ...]
+
 reveal_type(tuple((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
 
-# TODO: should be `tuple[Literal[1], ...]`
-reveal_type(tuple([1]))  # revealed: tuple[Unknown, ...]
+reveal_type(tuple([1]))  # revealed: tuple[Unknown | int, ...]
 
-# error: [invalid-argument-type] "Argument is incorrect: Expected `tuple[int]`, found `list[Unknown]`"
+# error: [invalid-argument-type]
 reveal_type(tuple[int]([1]))  # revealed: tuple[int]
 
 # error: [invalid-argument-type] "Argument is incorrect: Expected `tuple[int, str]`, found `tuple[Literal[1]]`"
@@ -60,6 +68,10 @@ reveal_type((1,).__class__())  # revealed: tuple[Literal[1]]
 
 # error: [missing-argument] "No argument provided for required parameter `iterable`"
 reveal_type((1, 2).__class__())  # revealed: tuple[Literal[1], Literal[2]]
+
+def g(x: tuple[int, str] | tuple[bytes, bool], y: tuple[int, str] | tuple[bytes, bool, bytes]):
+    reveal_type(tuple(x))  # revealed: tuple[int, str] | tuple[bytes, bool]
+    reveal_type(tuple(y))  # revealed: tuple[int, str] | tuple[bytes, bool, bytes]
 ```
 
 ## Instantiating tuple subclasses
@@ -475,6 +487,48 @@ class NotAlwaysTruthyTuple(tuple[int]):
         return False
 
 t: tuple[int] = NotAlwaysTruthyTuple((1,))
+```
+
+## Unspecialized
+
+An unspecialized tuple is equivalent to `tuple[Any, ...]` and `tuple[Unknown, ...]`.
+
+```py
+from typing_extensions import Any, assert_type
+from ty_extensions import Unknown, is_equivalent_to, static_assert
+
+static_assert(is_equivalent_to(tuple[Any, ...], tuple[Unknown, ...]))
+
+def f(x: tuple, y: tuple[Unknown, ...]):
+    reveal_type(x)  # revealed: tuple[Unknown, ...]
+    assert_type(x, tuple[Any, ...])
+    assert_type(x, tuple[Unknown, ...])
+    reveal_type(y)  # revealed: tuple[Unknown, ...]
+    assert_type(y, tuple[Any, ...])
+    assert_type(y, tuple[Unknown, ...])
+```
+
+## Converting a `tuple` to another `Sequence` type
+
+For covariant types, such as `frozenset`, the ideal behaviour would be to not promote `Literal`
+types to their instance supertypes: doing so causes more false positives than it fixes:
+
+```py
+reveal_type(frozenset((1, 2, 3)))  # revealed: frozenset[Literal[1, 2, 3]]
+reveal_type(frozenset(((1, 2, 3),)))  # revealed: frozenset[tuple[Literal[1], Literal[2], Literal[3]]]
+```
+
+Literals are always promoted for invariant containers such as `list`, however, even though this can
+in some cases cause false positives:
+
+```py
+from typing import Literal
+
+reveal_type(list((1, 2, 3)))  # revealed: list[int]
+reveal_type(list(((1, 2, 3),)))  # revealed: list[tuple[int, int, int]]
+
+x: list[Literal[1, 2, 3]] = list((1, 2, 3))
+reveal_type(x)  # revealed: list[Literal[1, 2, 3]]
 ```
 
 [not a singleton type]: https://discuss.python.org/t/should-we-specify-in-the-language-reference-that-the-empty-tuple-is-a-singleton/67957

@@ -1,0 +1,32 @@
+---
+source: crates/ruff_linter/src/rules/flake8_builtins/mod.rs
+---
+--- Linter settings ---
+-linter.unresolved_target_version = 3.13
++linter.unresolved_target_version = 3.14
+
+--- Summary ---
+Removed: 2
+Added: 0
+
+--- Removed ---
+A003 Python builtin is shadowed by method `str` from line 14
+  --> A003.py:17:31
+   |
+15 |         pass
+16 |
+17 |     def method_usage(self) -> str:
+   |                               ^^^
+18 |         pass
+   |
+
+
+A003 Python builtin is shadowed by class attribute `id` from line 3
+  --> A003.py:20:34
+   |
+18 |         pass
+19 |
+20 |     def attribute_usage(self) -> id:
+   |                                  ^^
+21 |         pass
+   |

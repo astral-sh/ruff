@@ -1,126 +1,120 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E26.py:10:1: E265 [*] Block comment should start with `# `
+E265 [*] Block comment should start with `# `
+  --> E26.py:10:1
    |
  8 | x = y + 1  #:  Increment x
  9 | #: E265:1:1
 10 | #Block comment
-   | ^^^^^^^^^^^^^^ E265
+   | ^^^^^^^^^^^^^^
 11 | a = 1
 12 | #: E265:2:1
    |
-   = help: Format space
+help: Format space
+7  | #: E262:1:12
+8  | x = y + 1  #:  Increment x
+9  | #: E265:1:1
+   - #Block comment
+10 + # Block comment
+11 | a = 1
+12 | #: E265:2:1
+13 | m = 42
 
-ℹ Safe fix
-7  7  | #: E262:1:12
-8  8  | x = y + 1  #:  Increment x
-9  9  | #: E265:1:1
-10    |-#Block comment
-   10 |+# Block comment
-11 11 | a = 1
-12 12 | #: E265:2:1
-13 13 | m = 42
-
-E26.py:14:1: E265 [*] Block comment should start with `# `
+E265 [*] Block comment should start with `# `
+  --> E26.py:14:1
    |
 12 | #: E265:2:1
 13 | m = 42
 14 | #! This is important
-   | ^^^^^^^^^^^^^^^^^^^^ E265
+   | ^^^^^^^^^^^^^^^^^^^^
 15 | mx = 42 - 42
 16 | #: E266:3:5 E266:6:5
    |
-   = help: Format space
+help: Format space
+11 | a = 1
+12 | #: E265:2:1
+13 | m = 42
+   - #! This is important
+14 + # ! This is important
+15 | mx = 42 - 42
+16 | #: E266:3:5 E266:6:5
+17 | def how_it_feel(r):
 
-ℹ Safe fix
-11 11 | a = 1
-12 12 | #: E265:2:1
-13 13 | m = 42
-14    |-#! This is important
-   14 |+# ! This is important
-15 15 | mx = 42 - 42
-16 16 | #: E266:3:5 E266:6:5
-17 17 | def how_it_feel(r):
-
-E26.py:25:1: E265 [*] Block comment should start with `# `
+E265 [*] Block comment should start with `# `
+  --> E26.py:25:1
    |
 23 |     return
 24 | #: E265:1:1 E266:2:1
 25 | ##if DEBUG:
-   | ^^^^^^^^^^^ E265
+   | ^^^^^^^^^^^
 26 | ##    logging.error()
 27 | #: W291:1:42
    |
-   = help: Format space
+help: Format space
+22 |     ### Of course it is unused
+23 |     return
+24 | #: E265:1:1 E266:2:1
+   - ##if DEBUG:
+25 + # if DEBUG:
+26 | ##    logging.error()
+27 | #: W291:1:42
+28 | #########################################
 
-ℹ Safe fix
-22 22 |     ### Of course it is unused
-23 23 |     return
-24 24 | #: E265:1:1 E266:2:1
-25    |-##if DEBUG:
-   25 |+# if DEBUG:
-26 26 | ##    logging.error()
-27 27 | #: W291:1:42
-28 28 | #########################################
-
-E26.py:32:1: E265 [*] Block comment should start with `# `
+E265 [*] Block comment should start with `# `
+  --> E26.py:32:1
    |
 31 | #: Okay
 32 | #!/usr/bin/env python
-   | ^^^^^^^^^^^^^^^^^^^^^ E265
+   | ^^^^^^^^^^^^^^^^^^^^^
 33 |
 34 | pass  # an inline comment
    |
-   = help: Format space
+help: Format space
+29 | #:
+30 | 
+31 | #: Okay
+   - #!/usr/bin/env python
+32 + # !/usr/bin/env python
+33 | 
+34 | pass  # an inline comment
+35 | x = x + 1   # Increment x
 
-ℹ Safe fix
-29 29 | #:
-30 30 | 
-31 31 | #: Okay
-32    |-#!/usr/bin/env python
-   32 |+# !/usr/bin/env python
-33 33 | 
-34 34 | pass  # an inline comment
-35 35 | x = x + 1   # Increment x
-
-E26.py:73:1: E265 [*] Block comment should start with `# `
+E265 [*] Block comment should start with `# `
+  --> E26.py:73:1
    |
 71 | # F   Means test is failing (F)
 72 | # EF  Means test is giving error and Failing
 73 | #!   Means test is segfaulting
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E265
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 74 | # 8   Means test runs forever
    |
-   = help: Format space
+help: Format space
+70 | # E   Means test is giving error (E)
+71 | # F   Means test is failing (F)
+72 | # EF  Means test is giving error and Failing
+   - #!   Means test is segfaulting
+73 + # !   Means test is segfaulting
+74 | # 8   Means test runs forever
+75 | 
+76 | #: Colon prefix is okay
 
-ℹ Safe fix
-70 70 | # E   Means test is giving error (E)
-71 71 | # F   Means test is failing (F)
-72 72 | # EF  Means test is giving error and Failing
-73    |-#!   Means test is segfaulting
-   73 |+# !   Means test is segfaulting
-74 74 | # 8   Means test runs forever
-75 75 | 
-76 76 | #: Colon prefix is okay
-
-E26.py:78:1: E265 [*] Block comment should start with `# `
+E265 [*] Block comment should start with `# `
+  --> E26.py:78:1
    |
 76 | #: Colon prefix is okay
 77 |
 78 | ###This is a variable ###
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^ E265
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
 79 |
 80 | # We should strip the space, but preserve the hashes.
    |
-   = help: Format space
-
-ℹ Safe fix
-75 75 | 
-76 76 | #: Colon prefix is okay
-77 77 | 
-78    |-###This is a variable ###
-   78 |+# This is a variable ###
-79 79 | 
-80 80 | # We should strip the space, but preserve the hashes.
-81 81 | #: E266:1:3
+help: Format space
+75 | 
+76 | #: Colon prefix is okay
+77 | 
+   - ###This is a variable ###
+78 + # This is a variable ###
+79 | 
+80 | # We should strip the space, but preserve the hashes.
+81 | #: E266:1:3

@@ -46,6 +46,7 @@ use crate::rules::flake8_tidy_imports::settings::Strictness;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.169")]
 pub(crate) struct RelativeImports {
     strictness: Strictness,
 }
@@ -101,7 +102,7 @@ fn fix_banned_relative_import(
         names: names.clone(),
         level: 0,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let content = generator.stmt(&node.into());
     Some(Fix::unsafe_edit(Edit::range_replacement(

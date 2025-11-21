@@ -1,3 +1,8 @@
+#![warn(
+    clippy::disallowed_methods,
+    reason = "Prefer System trait methods over std methods"
+)]
+
 use crate::files::Files;
 use crate::system::System;
 use crate::vendored::VendoredFileSystem;
@@ -65,6 +70,10 @@ pub trait Db: salsa::Database {
 /// to process work in parallel. For example, to index a directory or checking the files of a project.
 /// ty can still spawn more threads for other tasks, e.g. to wait for a Ctrl+C signal or
 /// watching the files for changes.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "We don't have access to System here, but this is also only used by the CLI and the server which always run on a real system."
+)]
 pub fn max_parallelism() -> NonZeroUsize {
     std::env::var(EnvVars::TY_MAX_PARALLELISM)
         .or_else(|_| std::env::var(EnvVars::RAYON_NUM_THREADS))

@@ -222,7 +222,7 @@ impl FormatContext for IrFormatContext<'_> {
         &IrFormatOptions
     }
 
-    fn source_code(&self) -> SourceCode {
+    fn source_code(&self) -> SourceCode<'_> {
         self.source_code
     }
 }

@@ -37,6 +37,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `typing.Union`](https://docs.python.org/3/library/typing.html#typing.Union)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct DuplicateUnionMember {
     duplicate_name: String,
 }
@@ -187,7 +188,7 @@ fn generate_pep604_fix(
                     op: Operator::BitOr,
                     right: Box::new(right.clone()),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 }))
             } else {
                 Some(right.clone())
@@ -202,7 +203,7 @@ fn generate_pep604_fix(
 }
 
 static VIRTUAL_NONE_LITERAL: Expr = Expr::NoneLiteral(ExprNoneLiteral {
-    node_index: AtomicNodeIndex::dummy(),
+    node_index: AtomicNodeIndex::NONE,
     range: TextRange::new(TextSize::new(0), TextSize::new(0)),
 });
 

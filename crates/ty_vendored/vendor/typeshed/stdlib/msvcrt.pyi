@@ -9,10 +9,10 @@ if sys.platform == "win32":
     LK_NBLCK: Final = 2
     LK_RLCK: Final = 3
     LK_NBRLCK: Final = 4
-    SEM_FAILCRITICALERRORS: int
-    SEM_NOALIGNMENTFAULTEXCEPT: int
-    SEM_NOGPFAULTERRORBOX: int
-    SEM_NOOPENFILEERRORBOX: int
+    SEM_FAILCRITICALERRORS: Final = 0x0001
+    SEM_NOALIGNMENTFAULTEXCEPT: Final = 0x0004
+    SEM_NOGPFAULTERRORBOX: Final = 0x0002
+    SEM_NOOPENFILEERRORBOX: Final = 0x8000
     def locking(fd: int, mode: int, nbytes: int, /) -> None:
         """Lock part of a file based on file descriptor fd from the C runtime.
 

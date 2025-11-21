@@ -18,7 +18,9 @@ use ruff_python_ast::{
     self as ast, AnyNodeRef,
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
+use ruff_python_parser::Tokens;
 use ruff_text_size::{Ranged, TextRange};
+use ty_python_semantic::ImportAliasResolution;
 
 /// Mode for references search behavior
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,8 +29,10 @@ pub enum ReferencesMode {
     References,
     /// Find all references but skip the declaration
     ReferencesSkipDeclaration,
-    /// Find references for rename operations (behavior differs for imported symbols)
+    /// Find references for rename operations, limited to current file only
     Rename,
+    /// Find references for multi-file rename operations (searches across all files)
+    RenameMultiFile,
     /// Find references for document highlights (limits search to current file)
     DocumentHighlights,
 }
@@ -42,7 +46,11 @@ pub(crate) fn references(
     mode: ReferencesMode,
 ) -> Option<Vec<ReferenceTarget>> {
     // Get the definitions for the symbol at the cursor position
-    let target_definitions_nav = goto_target.get_definition_targets(file, db, None)?;
+
+    // When finding references, do not resolve any local aliases.
+    let target_definitions_nav = goto_target
+        .get_definition_targets(file, db, ImportAliasResolution::PreserveAliases)?
+        .definition_targets(db)?;
     let target_definitions: Vec<NavigationTarget> = target_definitions_nav.into_iter().collect();
 
     // Extract the target text from the goto target for fast comparison
@@ -60,7 +68,12 @@ pub(crate) fn references(
     );
 
     // Check if we should search across files based on the mode
-    let search_across_files = !matches!(mode, ReferencesMode::DocumentHighlights);
+    let search_across_files = matches!(
+        mode,
+        ReferencesMode::References
+            | ReferencesMode::ReferencesSkipDeclaration
+            | ReferencesMode::RenameMultiFile
+    );
 
     // Check if the symbol is potentially visible outside of this module
     if search_across_files && is_symbol_externally_visible(goto_target) {
@@ -115,6 +128,7 @@ fn references_for_file(
         target_definitions,
         references,
         mode,
+        tokens: module.tokens(),
         target_text,
         ancestors: Vec::new(),
     };
@@ -144,6 +158,7 @@ fn is_symbol_externally_visible(goto_target: &GotoTarget<'_>) -> bool {
 struct LocalReferencesFinder<'a> {
     db: &'a dyn Db,
     file: File,
+    tokens: &'a Tokens,
     target_definitions: &'a [NavigationTarget],
     references: &'a mut Vec<ReferenceTarget>,
     mode: ReferencesMode,
@@ -211,6 +226,17 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                     self.check_identifier_reference(rest_name);
                 }
             }
+            AnyNodeRef::Alias(alias) if self.should_include_declaration() => {
+                // Handle import alias declarations
+                if let Some(asname) = &alias.asname {
+                    self.check_identifier_reference(asname);
+                }
+                // Only check the original name if it matches our target text
+                // This is for cases where we're renaming the imported symbol name itself
+                if alias.name.id == self.target_text {
+                    self.check_identifier_reference(&alias.name);
+                }
+            }
             _ => {}
         }
 
@@ -231,6 +257,7 @@ impl LocalReferencesFinder<'_> {
             ReferencesMode::References
                 | ReferencesMode::DocumentHighlights
                 | ReferencesMode::Rename
+                | ReferencesMode::RenameMultiFile
         )
     }
 
@@ -258,14 +285,13 @@ impl LocalReferencesFinder<'_> {
         // where the identifier might be a multi-part module name.
         let offset = covering_node.node().start();
 
-        if let Some(goto_target) = GotoTarget::from_covering_node(covering_node, offset) {
-            // Use the range of the covering node (the identifier) rather than the goto target
-            // This ensures we highlight just the identifier, not the entire expression
-            let range = covering_node.node().range();
-
+        if let Some(goto_target) =
+            GotoTarget::from_covering_node(covering_node, offset, self.tokens)
+        {
             // Get the definitions for this goto target
-            if let Some(current_definitions_nav) =
-                goto_target.get_definition_targets(self.file, self.db, None)
+            if let Some(current_definitions_nav) = goto_target
+                .get_definition_targets(self.file, self.db, ImportAliasResolution::PreserveAliases)
+                .and_then(|definitions| definitions.declaration_targets(self.db))
             {
                 let current_definitions: Vec<NavigationTarget> =
                     current_definitions_nav.into_iter().collect();
@@ -273,7 +299,8 @@ impl LocalReferencesFinder<'_> {
                 if self.navigation_targets_match(&current_definitions) {
                     // Determine if this is a read or write reference
                     let kind = self.determine_reference_kind(covering_node);
-                    let target = ReferenceTarget::new(self.file, range, kind);
+                    let target =
+                        ReferenceTarget::new(self.file, covering_node.node().range(), kind);
                     self.references.push(target);
                 }
             }

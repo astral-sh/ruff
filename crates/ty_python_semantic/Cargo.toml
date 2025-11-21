@@ -32,7 +32,7 @@ camino = { workspace = true }
 colored = { workspace = true }
 compact_str = { workspace = true }
 drop_bomb = { workspace = true }
-get-size2 = { workspace = true }
+get-size2 = { workspace = true, features = ["indexmap"]}
 indexmap = { workspace = true }
 itertools = { workspace = true }
 ordermap = { workspace = true }
@@ -43,6 +43,7 @@ rustc-hash = { workspace = true }
 hashbrown = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 smallvec = { workspace = true }
 static_assertions = { workspace = true }
 test-case = { workspace = true }
@@ -62,12 +63,15 @@ ty_vendored = { workspace = true }
 anyhow = { workspace = true }
 dir-test = { workspace = true }
 glob = { workspace = true }
+indoc = { workspace = true }
 insta = { workspace = true }
+pretty_assertions = { workspace = true }
 tempfile = { workspace = true }
 quickcheck = { version = "1.0.3", default-features = false }
 quickcheck_macros = { version = "1.0.0" }
 
 [features]
+schemars = ["dep:schemars", "dep:serde_json"]
 serde = ["ruff_db/serde", "dep:serde", "ruff_python_ast/serde"]
 testing = []
 

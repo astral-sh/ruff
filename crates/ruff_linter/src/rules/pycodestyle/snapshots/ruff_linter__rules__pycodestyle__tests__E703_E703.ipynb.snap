@@ -1,45 +1,42 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
-E703.ipynb:5:2: E703 [*] Statement ends with an unnecessary semicolon
+E703 [*] Statement ends with an unnecessary semicolon
+ --> E703.ipynb:5:2
   |
 3 | x;
 4 | # Only skip the last expression
 5 | x;  # E703
-  |  ^ E703
+  |  ^
 6 | x;
 7 | # Nested expressions isn't relevant
   |
-  = help: Remove unnecessary semicolon
+help: Remove unnecessary semicolon
+2 | # Simple case
+3 | x;
+4 | # Only skip the last expression
+  - x;  # E703
+5 + x  # E703
+6 | x;
+7 | # Nested expressions isn't relevant
+8 | if True:
 
-ℹ Safe fix
-2 2 | # Simple case
-3 3 | x;
-4 4 | # Only skip the last expression
-5   |-x;  # E703
-  5 |+x  # E703
-6 6 | x;
-7 7 | # Nested expressions isn't relevant
-8 8 | if True:
-
-E703.ipynb:9:6: E703 [*] Statement ends with an unnecessary semicolon
+E703 [*] Statement ends with an unnecessary semicolon
+  --> E703.ipynb:9:6
    |
  7 | # Nested expressions isn't relevant
  8 | if True:
  9 |     x;
-   |      ^ E703
+   |      ^
 10 | # Semicolons with multiple expressions
 11 | x; x;
    |
-   = help: Remove unnecessary semicolon
-
-ℹ Safe fix
-6  6  | x;
-7  7  | # Nested expressions isn't relevant
-8  8  | if True:
-9     |-    x;
-   9  |+    x
-10 10 | # Semicolons with multiple expressions
-11 11 | x; x;
-12 12 | # Comments, newlines and whitespace
+help: Remove unnecessary semicolon
+6  | x;
+7  | # Nested expressions isn't relevant
+8  | if True:
+   -     x;
+9  +     x
+10 | # Semicolons with multiple expressions
+11 | x; x;
+12 | # Comments, newlines and whitespace

@@ -37,7 +37,7 @@ impl VendoredPath {
         self.0.as_std_path()
     }
 
-    pub fn components(&self) -> Utf8Components {
+    pub fn components(&self) -> Utf8Components<'_> {
         self.0.components()
     }
 
@@ -92,8 +92,8 @@ impl ToOwned for VendoredPath {
 pub struct VendoredPathBuf(Utf8PathBuf);
 
 impl get_size2::GetSize for VendoredPathBuf {
-    fn get_heap_size(&self) -> usize {
-        self.0.capacity()
+    fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(&self, tracker: T) -> (usize, T) {
+        (self.0.capacity(), tracker)
     }
 }
 

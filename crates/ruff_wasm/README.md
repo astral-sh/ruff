@@ -19,7 +19,7 @@ There are multiple versions for the different wasm-pack targets. See [here](http
 This example uses the wasm-pack web target and is known to work with Vite.
 
 ```ts
-import init, { Workspace, type Diagnostic } from '@astral-sh/ruff-api';
+import init, { Workspace, type Diagnostic, PositionEncoding } from '@astral-sh/ruff-wasm-web';
 
 const exampleDocument = `print('hello'); print("world")`
 
@@ -42,7 +42,7 @@ const workspace = new Workspace({
       'F'
     ],
   },
-});
+}, PositionEncoding.UTF16);
 
 // Will contain 1 diagnostic code for E702: Multiple statements on one line
 const diagnostics: Diagnostic[] = workspace.check(exampleDocument);

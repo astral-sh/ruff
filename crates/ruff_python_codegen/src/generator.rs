@@ -3,6 +3,7 @@
 use std::fmt::Write;
 use std::ops::Deref;
 
+use ruff_python_ast::str::Quote;
 use ruff_python_ast::{
     self as ast, Alias, AnyStringFlags, ArgOrKeyword, BoolOp, BytesLiteralFlags, CmpOp,
     Comprehension, ConversionFlag, DebugText, ExceptHandler, Expr, Identifier, MatchCase, Operator,
@@ -16,6 +17,7 @@ use ruff_source_file::LineEnding;
 use super::stylist::{Indentation, Stylist};
 
 mod precedence {
+    pub(crate) const MIN: u8 = 0;
     pub(crate) const NAMED_EXPR: u8 = 1;
     pub(crate) const ASSIGN: u8 = 3;
     pub(crate) const ANN_ASSIGN: u8 = 5;
@@ -62,11 +64,36 @@ mod precedence {
     pub(crate) const MAX: u8 = 63;
 }
 
+#[derive(Default)]
+pub enum Mode {
+    /// Ruff's default unparsing behaviour.
+    #[default]
+    Default,
+    /// Emits same output as [`ast.unparse`](https://docs.python.org/3/library/ast.html#ast.unparse).
+    AstUnparse,
+}
+
+impl Mode {
+    /// Quote style to use.
+    ///
+    /// - [`Default`](`Mode::Default`): Output of `[AnyStringFlags.quote_style`].
+    /// - [`AstUnparse`](`Mode::AstUnparse`): Always return [`Quote::Single`].
+    #[must_use]
+    fn quote_style(&self, flags: impl StringFlags) -> Quote {
+        match self {
+            Self::Default => flags.quote_style(),
+            Self::AstUnparse => Quote::Single,
+        }
+    }
+}
+
 pub struct Generator<'a> {
     /// The indentation style to use.
     indent: &'a Indentation,
     /// The line ending to use.
     line_ending: LineEnding,
+    /// Unparsed code style. See [`Mode`] for more info.
+    mode: Mode,
     buffer: String,
     indent_depth: usize,
     num_newlines: usize,
@@ -78,6 +105,7 @@ impl<'a> From<&'a Stylist<'a>> for Generator<'a> {
         Self {
             indent: stylist.indentation(),
             line_ending: stylist.line_ending(),
+            mode: Mode::default(),
             buffer: String::new(),
             indent_depth: 0,
             num_newlines: 0,
@@ -92,12 +120,20 @@ impl<'a> Generator<'a> {
             // Style preferences.
             indent,
             line_ending,
+            mode: Mode::Default,
             // Internal state.
             buffer: String::new(),
             indent_depth: 0,
             num_newlines: 0,
             initial: true,
         }
+    }
+
+    /// Sets the mode for code unparsing.
+    #[must_use]
+    pub fn with_mode(mut self, mode: Mode) -> Self {
+        self.mode = mode;
+        self
     }
 
     /// Generate source code from a [`Stmt`].
@@ -158,7 +194,8 @@ impl<'a> Generator<'a> {
                 return;
             }
         }
-        let escape = AsciiEscape::with_preferred_quote(s, flags.quote_style());
+        let quote_style = self.mode.quote_style(flags);
+        let escape = AsciiEscape::with_preferred_quote(s, quote_style);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
@@ -176,7 +213,9 @@ impl<'a> Generator<'a> {
             return;
         }
         self.p(flags.prefix().as_str());
-        let escape = UnicodeEscape::with_preferred_quote(s, flags.quote_style());
+
+        let quote_style = self.mode.quote_style(flags);
+        let escape = UnicodeEscape::with_preferred_quote(s, quote_style);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
@@ -1285,7 +1324,11 @@ impl<'a> Generator<'a> {
                 if tuple.is_empty() {
                     self.p("()");
                 } else {
-                    group_if!(precedence::TUPLE, {
+                    let lvl = match self.mode {
+                        Mode::Default => precedence::TUPLE,
+                        Mode::AstUnparse => precedence::MIN,
+                    };
+                    group_if!(lvl, {
                         let mut first = true;
                         for item in tuple {
                             self.p_delim(&mut first, ", ");
@@ -1506,7 +1549,9 @@ impl<'a> Generator<'a> {
             self.buffer += &s;
             return;
         }
-        let escape = UnicodeEscape::with_preferred_quote(&s, flags.quote_style());
+
+        let quote_style = self.mode.quote_style(flags);
+        let escape = UnicodeEscape::with_preferred_quote(&s, quote_style);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
@@ -1531,6 +1576,9 @@ impl<'a> Generator<'a> {
         flags: AnyStringFlags,
     ) {
         self.p(flags.prefix().as_str());
+
+        let quote_style = self.mode.quote_style(flags);
+        let flags = flags.with_quote_style(quote_style);
         self.p(flags.quote_str());
         self.unparse_interpolated_string_body(values, flags);
         self.p(flags.quote_str());
@@ -1569,7 +1617,7 @@ mod tests {
 
     use crate::stylist::Indentation;
 
-    use super::Generator;
+    use super::{Generator, Mode as UnparseMode};
 
     fn round_trip(contents: &str) -> String {
         let indentation = Indentation::default();
@@ -1580,15 +1628,16 @@ mod tests {
         generator.generate()
     }
 
-    /// Like [`round_trip`] but configure the [`Generator`] with the requested `indentation` and
-    /// `line_ending` settings.
+    /// Like [`round_trip`] but configure the [`Generator`] with the requested
+    /// `indentation`, `line_ending` and `unparse_mode` settings.
     fn round_trip_with(
         indentation: &Indentation,
         line_ending: LineEnding,
+        unparse_mode: UnparseMode,
         contents: &str,
     ) -> String {
         let module = parse_module(contents).unwrap();
-        let mut generator = Generator::new(indentation, line_ending);
+        let mut generator = Generator::new(indentation, line_ending).with_mode(unparse_mode);
         generator.unparse_suite(module.suite());
         generator.generate()
     }
@@ -1788,6 +1837,7 @@ except* Exception as e:
 type Y = str"
         );
         assert_eq!(round_trip(r"x = (1, 2, 3)"), r"x = 1, 2, 3");
+        assert_eq!(round_trip(r"x = (1, (2, 3))"), r"x = 1, (2, 3)");
         assert_eq!(round_trip(r"-(1) + ~(2) + +(3)"), r"-1 + ~2 + +3");
         assert_round_trip!(
             r"def f():
@@ -1871,10 +1921,10 @@ class Foo:
     }
 
     /// test all of the valid string literal prefix and quote combinations from
-    /// https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
+    /// <https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals>
     ///
     /// Note that the numeric ids on the input/output and quote fields prevent name conflicts from
-    /// the test_matrix but are otherwise unnecessary
+    /// the `test_matrix` but are otherwise unnecessary
     #[test_case::test_matrix(
         [
             ("r", "r", 0),
@@ -1974,6 +2024,7 @@ if True:
             round_trip_with(
                 &Indentation::new("    ".to_string()),
                 LineEnding::default(),
+                UnparseMode::Default,
                 r"
 if True:
   pass
@@ -1991,6 +2042,7 @@ if True:
             round_trip_with(
                 &Indentation::new("  ".to_string()),
                 LineEnding::default(),
+                UnparseMode::Default,
                 r"
 if True:
   pass
@@ -2008,6 +2060,7 @@ if True:
             round_trip_with(
                 &Indentation::new("\t".to_string()),
                 LineEnding::default(),
+                UnparseMode::Default,
                 r"
 if True:
   pass
@@ -2029,6 +2082,7 @@ if True:
             round_trip_with(
                 &Indentation::default(),
                 LineEnding::Lf,
+                UnparseMode::Default,
                 "if True:\n    print(42)",
             ),
             "if True:\n    print(42)",
@@ -2038,6 +2092,7 @@ if True:
             round_trip_with(
                 &Indentation::default(),
                 LineEnding::CrLf,
+                UnparseMode::Default,
                 "if True:\n    print(42)",
             ),
             "if True:\r\n    print(42)",
@@ -2047,9 +2102,42 @@ if True:
             round_trip_with(
                 &Indentation::default(),
                 LineEnding::Cr,
+                UnparseMode::Default,
                 "if True:\n    print(42)",
             ),
             "if True:\r    print(42)",
         );
+    }
+
+    #[test_case::test_case(r#""'hello'""#, r#""'hello'""# ; "basic str ignored")]
+    #[test_case::test_case(r#"b"'hello'""#, r#"b"'hello'""# ; "basic bytes ignored")]
+    #[test_case::test_case(r#""hello""#, "'hello'" ; "basic str single")]
+    #[test_case::test_case(r#"b"hello""#, "b'hello'" ; "basic bytes single")]
+    #[test_case::test_case("'hello'", "'hello'"  ; "remain str single")]
+    #[test_case::test_case(r#"x: list["str"]"#, "x: list['str']" ; "type ann single")]
+    #[test_case::test_case(r#"f"hello""#, "f'hello'" ; "basic fstring single")]
+    fn ast_unparse_quote(inp: &str, out: &str) {
+        let got = round_trip_with(
+            &Indentation::default(),
+            LineEnding::default(),
+            UnparseMode::AstUnparse,
+            inp,
+        );
+        assert_eq!(got, out);
+    }
+
+    #[test_case::test_case("a,", "(a,)" ; "basic single")]
+    #[test_case::test_case("a, b", "(a, b)" ; "basic multi")]
+    #[test_case::test_case("x = a,", "x = (a,)" ; "basic assign single")]
+    #[test_case::test_case("x = a, b", "x = (a, b)" ; "basic assign multi")]
+    #[test_case::test_case("a, (b, c)", "(a, (b, c))" ; "nested")]
+    fn ast_tuple_parentheses(inp: &str, out: &str) {
+        let got = round_trip_with(
+            &Indentation::default(),
+            LineEnding::default(),
+            UnparseMode::AstUnparse,
+            inp,
+        );
+        assert_eq!(got, out);
     }
 }

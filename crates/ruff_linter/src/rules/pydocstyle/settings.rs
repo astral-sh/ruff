@@ -98,11 +98,11 @@ impl Settings {
         self.convention
     }
 
-    pub fn ignore_decorators(&self) -> DecoratorIterator {
+    pub fn ignore_decorators(&self) -> DecoratorIterator<'_> {
         DecoratorIterator::new(&self.ignore_decorators)
     }
 
-    pub fn property_decorators(&self) -> DecoratorIterator {
+    pub fn property_decorators(&self) -> DecoratorIterator<'_> {
         DecoratorIterator::new(&self.property_decorators)
     }
 

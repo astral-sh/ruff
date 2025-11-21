@@ -173,6 +173,11 @@ def _(d: Any):
 
 ## Narrowing
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from typing import Any
 from typing_extensions import TypeGuard, TypeIs
@@ -276,7 +281,7 @@ def _(x: Foo | Bar, flag: bool) -> None:
 The `TypeIs` type remains effective across generic boundaries:
 
 ```py
-from typing_extensions import TypeVar, reveal_type
+from typing_extensions import TypeVar
 
 T = TypeVar("T")
 
@@ -293,6 +298,38 @@ def _(a: Foo):
 
     if g(f(a)):
         reveal_type(a)  # revealed: Foo & Bar
+```
+
+For generics, we transform the argument passed into `TypeIs[]` from `X` to `Top[X]`. This helps
+especially when using various functions from typeshed that are annotated as returning
+`TypeIs[SomeCovariantGeneric[Any]]` to avoid false positives in other type checkers. For ty's
+purposes, it would usually lead to more intuitive results if `object` was used as the specialization
+for a covariant generic inside the `TypeIs` special form, but this is mitigated by our implicit
+transformation from `TypeIs[SomeCovariantGeneric[Any]]` to `TypeIs[Top[SomeCovariantGeneric[Any]]]`
+(which just simplifies to `TypeIs[SomeCovariantGeneric[object]]`).
+
+```py
+class Unrelated: ...
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def is_instance_of_covariant(arg: object) -> TypeIs[Covariant[Any]]:
+    return isinstance(arg, Covariant)
+
+def needs_instance_of_unrelated(arg: Unrelated):
+    pass
+
+def _(x: Unrelated | Covariant[int]):
+    if is_instance_of_covariant(x):
+        raise RuntimeError("oh no")
+
+    reveal_type(x)  # revealed: Unrelated & ~Covariant[object]
+
+    # We would emit a false-positive diagnostic here if we didn't implicitly transform
+    # `TypeIs[Covariant[Any]]` to `TypeIs[Covariant[object]]`
+    needs_instance_of_unrelated(x)
 ```
 
 ## `TypeGuard` special cases

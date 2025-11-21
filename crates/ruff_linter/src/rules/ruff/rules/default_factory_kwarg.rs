@@ -51,6 +51,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// defaultdict(list)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct DefaultFactoryKwarg {
     default_factory: SourceCodeSnippet,
 }
@@ -123,7 +124,8 @@ fn is_non_callable_value(value: &Expr) -> bool {
             | Expr::SetComp(_)
             | Expr::DictComp(_)
             | Expr::Generator(_)
-            | Expr::FString(_))
+            | Expr::FString(_)
+            | Expr::TString(_))
 }
 
 /// Generate an [`Expr`] to replace `defaultdict(default_factory=callable)` with

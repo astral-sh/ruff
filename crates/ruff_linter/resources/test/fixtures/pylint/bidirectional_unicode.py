@@ -5,6 +5,9 @@ print("שלום‬")
 example = "x‏" * 100  #    "‏x" is assigned
 
 # E2502
+another = "x؜" * 50  #    "؜x" is assigned
+
+# E2502
 if access_level != "none‮⁦":  # Check if admin ⁩⁦' and access_level != 'user
     print("You are an admin.")
 

@@ -255,6 +255,10 @@ impl ty_python_semantic::Db for CorpusDb {
     fn lint_registry(&self) -> &LintRegistry {
         default_lint_registry()
     }
+
+    fn verbose(&self) -> bool {
+        false
+    }
 }
 
 #[salsa::db]

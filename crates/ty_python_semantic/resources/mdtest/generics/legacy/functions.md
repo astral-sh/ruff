@@ -77,7 +77,7 @@ from typing import Protocol, TypeVar
 T = TypeVar("T")
 
 class CanIndex(Protocol[T]):
-    def __getitem__(self, index: int) -> T: ...
+    def __getitem__(self, index: int, /) -> T: ...
 
 class ExplicitlyImplements(CanIndex[T]): ...
 
@@ -181,7 +181,6 @@ reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
 
 ```py
 from typing import TypeVar
-from typing_extensions import reveal_type
 
 T = TypeVar("T", bound=int)
 
@@ -200,7 +199,6 @@ reveal_type(f("string"))  # revealed: Unknown
 
 ```py
 from typing import TypeVar
-from typing_extensions import reveal_type
 
 T = TypeVar("T", int, None)
 
@@ -323,6 +321,9 @@ def union_param(x: T | None) -> T:
 reveal_type(union_param("a"))  # revealed: Literal["a"]
 reveal_type(union_param(1))  # revealed: Literal[1]
 reveal_type(union_param(None))  # revealed: Unknown
+
+def _(x: int | None):
+    reveal_type(union_param(x))  # revealed: int
 ```
 
 ```py
@@ -366,6 +367,31 @@ reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
 reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 ```
 
+## Passing generic functions to generic functions
+
+```py
+from typing import Callable, TypeVar
+
+A = TypeVar("A")
+B = TypeVar("B")
+T = TypeVar("T")
+
+def invoke(fn: Callable[[A], B], value: A) -> B:
+    return fn(value)
+
+def identity(x: T) -> T:
+    return x
+
+def head(xs: list[T]) -> T:
+    return xs[0]
+
+# TODO: this should be `Literal[1]`
+reveal_type(invoke(identity, 1))  # revealed: Unknown
+
+# TODO: this should be `Unknown | int`
+reveal_type(invoke(head, [1, 2, 3]))  # revealed: Unknown
+```
+
 ## Opaque decorators don't affect typevar binding
 
 Inside the body of a generic function, we should be able to see that the typevars bound by that
@@ -394,4 +420,153 @@ def decorated(t: T) -> None:
 def decorated(t: T) -> None:
     # error: [redundant-cast]
     reveal_type(cast(T, t))  # revealed: T@decorated
+```
+
+## Solving TypeVars with upper bounds in unions
+
+```py
+from typing import Generic, TypeVar
+
+class A: ...
+
+T = TypeVar("T", bound=A)
+
+class B(Generic[T]):
+    x: T
+
+def f(c: T | None):
+    return None
+
+def g(b: B[T]):
+    return f(b.x)  # Fine
+```
+
+## Constrained TypeVar in a union
+
+This is a regression test for an issue that surfaced in the primer report of an early version of
+<https://github.com/astral-sh/ruff/pull/19811>, where we failed to solve the `TypeVar` here due to
+the fact that it only appears in the function's type annotations as part of a union:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", str, bytes)
+
+def NamedTemporaryFile(suffix: T | None, prefix: T | None) -> None:
+    return None
+
+def f(x: str):
+    NamedTemporaryFile(prefix=x, suffix=".tar.gz")  # Fine
+```
+
+## Nested functions see typevars bound in outer function
+
+```py
+from typing import TypeVar, overload
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+def outer(t: T) -> None:
+    def inner(t: T) -> None: ...
+
+    inner(t)
+
+@overload
+def overloaded_outer() -> None: ...
+@overload
+def overloaded_outer(t: T) -> None: ...
+def overloaded_outer(t: T | None = None) -> None:
+    def inner(t: T) -> None: ...
+
+    if t is not None:
+        inner(t)
+
+def outer(t: T) -> None:
+    def inner(inner_t: T, s: S) -> tuple[T, S]:
+        return inner_t, s
+    reveal_type(inner(t, 1))  # revealed: tuple[T@outer, Literal[1]]
+
+    inner("wrong", 1)  # error: [invalid-argument-type]
+```
+
+## Unpacking a TypeVar
+
+We can infer precise heterogeneous types from the result of an unpacking operation applied to a type
+variable if the type variable's upper bound is a type with a precise tuple spec:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple, Final, TypeVar, Generic
+
+T = TypeVar("T", bound=tuple[int, str])
+
+def f(x: T) -> T:
+    a, b = x
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: str
+    return x
+
+@dataclass
+class Team(Generic[T]):
+    employees: list[T]
+
+def x(team: Team[T]) -> Team[T]:
+    age, name = team.employees[0]
+    reveal_type(age)  # revealed: int
+    reveal_type(name)  # revealed: str
+    return team
+
+class Age(int): ...
+class Name(str): ...
+
+class Employee(NamedTuple):
+    age: Age
+    name: Name
+
+EMPLOYEES: Final = (Employee(name=Name("alice"), age=Age(42)),)
+team = Team(employees=list(EMPLOYEES))
+reveal_type(team.employees)  # revealed: list[Employee]
+age, name = team.employees[0]
+reveal_type(age)  # revealed: Age
+reveal_type(name)  # revealed: Name
+```
+
+## `~T` is never assignable to `T`
+
+```py
+from typing import TypeVar
+from ty_extensions import Not
+
+T = TypeVar("T")
+
+def f(x: T, y: Not[T]) -> T:
+    x = y  # error: [invalid-assignment]
+    y = x  # error: [invalid-assignment]
+    return x
+```
+
+## Prefer exact matches for constrained typevars
+
+```py
+from typing import TypeVar
+
+class Base: ...
+class Sub(Base): ...
+
+# We solve to `Sub`, regardless of the order of constraints.
+T = TypeVar("T", Base, Sub)
+T2 = TypeVar("T2", Sub, Base)
+
+def f(x: T) -> list[T]:
+    return [x]
+
+def f2(x: T2) -> list[T2]:
+    return [x]
+
+x: list[Sub] = f(Sub())
+reveal_type(x)  # revealed: list[Sub]
+
+y: list[Sub] = f2(Sub())
+reveal_type(y)  # revealed: list[Sub]
 ```

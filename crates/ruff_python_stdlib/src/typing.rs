@@ -354,20 +354,6 @@ pub fn as_pep_585_generic(module: &str, member: &str) -> Option<ModuleMember> {
     }
 }
 
-/// Given a typing member, returns `true` if a generic equivalent exists in the Python standard
-/// library (e.g., `list` for `typing.List`), as introduced by [PEP 585].
-///
-/// [PEP 585]: https://peps.python.org/pep-0585/
-pub fn has_pep_585_generic(module: &str, member: &str) -> bool {
-    // Constructed by taking every pattern from `as_pep_585_generic`, removing all but
-    // the last element in each pattern, and de-duplicating the values.
-    matches!(
-        (module, member),
-        ("", "dict" | "frozenset" | "list" | "set" | "tuple" | "type")
-            | ("collections", "deque" | "defaultdict")
-    )
-}
-
 /// Returns the expected return type for a magic method.
 ///
 /// See: <https://github.com/JelleZijlstra/autotyping/blob/0adba5ba0eee33c1de4ad9d0c79acfd737321dd9/autotyping/autotyping.py#L69-L91>

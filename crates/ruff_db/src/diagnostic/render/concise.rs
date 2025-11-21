@@ -1,6 +1,6 @@
 use crate::diagnostic::{
     Diagnostic, DisplayDiagnosticConfig, Severity,
-    stylesheet::{DiagnosticStylesheet, fmt_styled},
+    stylesheet::{DiagnosticStylesheet, fmt_styled, fmt_with_hyperlink},
 };
 
 use super::FileResolver;
@@ -62,26 +62,35 @@ impl<'a> ConciseRenderer<'a> {
                 }
                 write!(f, "{sep} ")?;
             }
+
             if self.config.hide_severity {
                 if let Some(code) = diag.secondary_code() {
                     write!(
                         f,
                         "{code} ",
-                        code = fmt_styled(code, stylesheet.secondary_code)
+                        code = fmt_styled(
+                            fmt_with_hyperlink(&code, diag.documentation_url(), &stylesheet),
+                            stylesheet.secondary_code
+                        )
                     )?;
                 } else {
                     write!(
                         f,
                         "{id}: ",
-                        id = fmt_styled(diag.inner.id.as_str(), stylesheet.secondary_code)
+                        id = fmt_styled(
+                            fmt_with_hyperlink(
+                                &diag.inner.id,
+                                diag.documentation_url(),
+                                &stylesheet
+                            ),
+                            stylesheet.secondary_code
+                        )
                     )?;
                 }
                 if self.config.show_fix_status {
-                    if let Some(fix) = diag.fix() {
-                        // Do not display an indicator for inapplicable fixes
-                        if fix.applies(self.config.fix_applicability) {
-                            write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
-                        }
+                    // Do not display an indicator for inapplicable fixes
+                    if diag.has_applicable_fix(self.config) {
+                        write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
                     }
                 }
             } else {
@@ -95,7 +104,10 @@ impl<'a> ConciseRenderer<'a> {
                     f,
                     "{severity}[{id}] ",
                     severity = fmt_styled(severity, severity_style),
-                    id = fmt_styled(diag.id(), stylesheet.emphasis)
+                    id = fmt_styled(
+                        fmt_with_hyperlink(&diag.id(), diag.documentation_url(), &stylesheet),
+                        stylesheet.emphasis
+                    )
                 )?;
             }
 

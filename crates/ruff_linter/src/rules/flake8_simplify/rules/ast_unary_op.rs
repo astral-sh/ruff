@@ -33,6 +33,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.213")]
 pub(crate) struct NegateEqualOp {
     left: String,
     right: String,
@@ -75,6 +76,7 @@ impl AlwaysFixableViolation for NegateEqualOp {
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.213")]
 pub(crate) struct NegateNotEqualOp {
     left: String,
     right: String,
@@ -112,6 +114,7 @@ impl AlwaysFixableViolation for NegateNotEqualOp {
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.213")]
 pub(crate) struct DoubleNegation {
     expr: String,
 }
@@ -186,7 +189,7 @@ pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp
         ops: Box::from([CmpOp::NotEq]),
         comparators: comparators.clone(),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(&node.into()),
@@ -242,7 +245,7 @@ pub(crate) fn negation_with_not_equal_op(
         ops: Box::from([CmpOp::Eq]),
         comparators: comparators.clone(),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(&node.into()),
@@ -284,7 +287,7 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
             id: Name::new_static("bool"),
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         };
         let node1 = ast::ExprCall {
             func: Box::new(node.into()),
@@ -292,10 +295,10 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
                 args: Box::from([*operand.clone()]),
                 keywords: Box::from([]),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         };
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             checker.generator().expr(&node1.into()),

@@ -30,7 +30,7 @@ fn generate_inline_tests() -> Result<()> {
     test_files += install_tests(&tests.err, "crates/ruff_python_parser/resources/inline/err")?;
 
     if !test_files.is_empty() {
-        anyhow::bail!("{}", test_files);
+        anyhow::bail!("{test_files}");
     }
 
     Ok(())

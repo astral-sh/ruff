@@ -59,6 +59,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// [PEP 586](https://peps.python.org/pep-0586/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct UnnecessaryNestedLiteral;
 
 impl Violation for UnnecessaryNestedLiteral {
@@ -116,14 +117,14 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'
                 Expr::Tuple(ExprTuple {
                     elts: nodes.into_iter().cloned().collect(),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     ctx: ExprContext::Load,
                     parenthesized: false,
                 })
             }),
             value: subscript.value.clone(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,
         });
         let fix = Fix::applicable_edit(

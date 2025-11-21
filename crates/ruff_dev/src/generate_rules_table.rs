@@ -32,20 +32,24 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
     table_out.push('\n');
     for rule in rules {
         let status_token = match rule.group() {
-            RuleGroup::Removed => {
+            RuleGroup::Removed { since } => {
                 format!(
-                    "<span {SYMBOL_STYLE} title='Rule has been removed'>{REMOVED_SYMBOL}</span>"
+                    "<span {SYMBOL_STYLE} title='Rule was removed in {since}'>{REMOVED_SYMBOL}</span>"
                 )
             }
-            RuleGroup::Deprecated => {
+            RuleGroup::Deprecated { since } => {
                 format!(
-                    "<span {SYMBOL_STYLE} title='Rule has been deprecated'>{WARNING_SYMBOL}</span>"
+                    "<span {SYMBOL_STYLE} title='Rule has been deprecated since {since}'>{WARNING_SYMBOL}</span>"
                 )
             }
-            RuleGroup::Preview => {
-                format!("<span {SYMBOL_STYLE} title='Rule is in preview'>{PREVIEW_SYMBOL}</span>")
+            RuleGroup::Preview { since } => {
+                format!(
+                    "<span {SYMBOL_STYLE} title='Rule has been in preview since {since}'>{PREVIEW_SYMBOL}</span>"
+                )
             }
-            RuleGroup::Stable => format!("<span {SYMBOL_STYLE}></span>"),
+            RuleGroup::Stable { since } => {
+                format!("<span {SYMBOL_STYLE} title='Rule has been stable since {since}'></span>")
+            }
         };
 
         let fix_token = match rule.fixable() {

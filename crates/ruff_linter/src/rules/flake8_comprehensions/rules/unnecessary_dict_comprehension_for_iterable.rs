@@ -49,6 +49,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `dict.fromkeys`](https://docs.python.org/3/library/stdtypes.html#dict.fromkeys)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct UnnecessaryDictComprehensionForIterable {
     is_value_none_literal: bool,
 }
@@ -93,6 +94,12 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
 
     // Don't suggest `dict.keys` if the target is not the same as the key.
     if ComparableExpr::from(&generator.target) != ComparableExpr::from(dict_comp.key.as_ref()) {
+        return;
+    }
+
+    // Don't suggest `dict.fromkeys` if the target contains side-effecting expressions
+    // (attributes, subscripts, or slices).
+    if contains_side_effecting_sub_expression(&generator.target) {
         return;
     }
 
@@ -203,17 +210,26 @@ fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -
         },
         keywords: Box::from([]),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     Expr::Call(ExprCall {
         func: Box::new(Expr::Name(ExprName {
             id: "dict.fromkeys".into(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })),
         arguments: args,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+    })
+}
+
+fn contains_side_effecting_sub_expression(target: &Expr) -> bool {
+    any_over_expr(target, &|expr| {
+        matches!(
+            expr,
+            Expr::Attribute(_) | Expr::Subscript(_) | Expr::Slice(_)
+        )
     })
 }

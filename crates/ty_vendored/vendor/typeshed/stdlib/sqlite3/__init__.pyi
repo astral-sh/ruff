@@ -97,7 +97,7 @@ from sqlite3.dbapi2 import (
 )
 from types import TracebackType
 from typing import Any, Literal, Protocol, SupportsIndex, TypeVar, final, overload, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing_extensions import Self, TypeAlias, disjoint_base
 
 if sys.version_info < (3, 14):
     from sqlite3.dbapi2 import version_info as version_info
@@ -257,22 +257,26 @@ _Parameters: TypeAlias = SupportsLenAndGetItem[_AdaptedInputData] | Mapping[str,
 # Controls the legacy transaction handling mode of sqlite3.
 _IsolationLevel: TypeAlias = Literal["DEFERRED", "EXCLUSIVE", "IMMEDIATE"] | None
 
+@type_check_only
 class _AnyParamWindowAggregateClass(Protocol):
     def step(self, *args: Any) -> object: ...
     def inverse(self, *args: Any) -> object: ...
     def value(self) -> _SqliteData: ...
     def finalize(self) -> _SqliteData: ...
 
+@type_check_only
 class _WindowAggregateClass(Protocol):
     step: Callable[..., object]
     inverse: Callable[..., object]
     def value(self) -> _SqliteData: ...
     def finalize(self) -> _SqliteData: ...
 
+@type_check_only
 class _AggregateProtocol(Protocol):
     def step(self, value: int, /) -> object: ...
     def finalize(self) -> int: ...
 
+@type_check_only
 class _SingleParamWindowAggregateClass(Protocol):
     def step(self, param: Any, /) -> object: ...
     def inverse(self, param: Any, /) -> object: ...
@@ -298,6 +302,7 @@ class OperationalError(DatabaseError): ...
 class ProgrammingError(DatabaseError): ...
 class Warning(Exception): ...
 
+@disjoint_base
 class Connection:
     """SQLite database connection object."""
 
@@ -606,6 +611,7 @@ class Connection:
         If there was any exception, a rollback takes place; otherwise we commit.
         """
 
+@disjoint_base
 class Cursor:
     """SQLite database cursor class."""
 
@@ -665,6 +671,7 @@ class PrepareProtocol:
 
     def __init__(self, *args: object, **kwargs: object) -> None: ...
 
+@disjoint_base
 class Row(Sequence[Any]):
     def __new__(cls, cursor: Cursor, data: tuple[Any, ...], /) -> Self: ...
     def keys(self) -> list[str]:

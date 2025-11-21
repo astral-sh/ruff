@@ -51,6 +51,7 @@ use crate::rules::flake8_bugbear::helpers::at_last_top_level_expression_in_cell;
 ///     _ = obj.attribute
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.100")]
 pub(crate) struct UselessExpression {
     kind: Kind,
 }

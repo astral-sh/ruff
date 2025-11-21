@@ -60,9 +60,9 @@ class ZstdCompressor:
     CONTINUE: Final = 0
     FLUSH_BLOCK: Final = 1
     FLUSH_FRAME: Final = 2
-    def __init__(
-        self, level: int | None = None, options: Mapping[int, int] | None = None, zstd_dict: ZstdDict | None = None
-    ) -> None: ...
+    def __new__(
+        cls, level: int | None = None, options: Mapping[int, int] | None = None, zstd_dict: ZstdDict | None = None
+    ) -> Self: ...
     def compress(
         self, /, data: ReadableBuffer, mode: _ZstdCompressorContinue | _ZstdCompressorFlushBlock | _ZstdCompressorFlushFrame = 0
     ) -> bytes:
@@ -126,7 +126,7 @@ class ZstdDecompressor:
     function instead.
     """
 
-    def __init__(self, zstd_dict: ZstdDict | None = None, options: Mapping[int, int] | None = None) -> None: ...
+    def __new__(cls, zstd_dict: ZstdDict | None = None, options: Mapping[int, int] | None = None) -> Self: ...
     def decompress(self, /, data: ReadableBuffer, max_length: int = -1) -> bytes:
         """Decompress *data*, returning uncompressed bytes if possible, or b'' otherwise.
 
@@ -188,7 +188,7 @@ class ZstdDict:
     by multiple ZstdCompressor or ZstdDecompressor objects.
     """
 
-    def __init__(self, dict_content: bytes, /, *, is_raw: bool = False) -> None: ...
+    def __new__(cls, dict_content: bytes, /, *, is_raw: bool = False) -> Self: ...
     def __len__(self, /) -> int:
         """Return len(self)."""
 
@@ -217,7 +217,7 @@ class ZstdDict:
         1. Prefix is compatible with long distance matching, while dictionary is not.
         2. It only works for the first frame, then the compressor/decompressor will
            return to no prefix state.
-        3. When decompressing, must use the same prefix as when compressing."
+        3. When decompressing, must use the same prefix as when compressing.
         """
 
     @property
@@ -239,11 +239,13 @@ class ZstdDict:
 
     @property
     def dict_id(self) -> int:
-        """the Zstandard dictionary, an int between 0 and 2**32.
+        """The Zstandard dictionary, an int between 0 and 2**32.
 
-        A non-zero value represents an ordinary Zstandard dictionary, conforming to the standardised format.
+        A non-zero value represents an ordinary Zstandard dictionary,
+        conforming to the standardised format.
 
-        The special value '0' means a 'raw content' dictionary,without any restrictions on format or content.
+        A value of zero indicates a 'raw content' dictionary,
+        without any restrictions on format or content.
         """
 
 class ZstdError(Exception):

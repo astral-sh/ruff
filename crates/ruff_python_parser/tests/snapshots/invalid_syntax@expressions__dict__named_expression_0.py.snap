@@ -7,27 +7,27 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/named_e
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..84,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 55..77,
                     value: Dict(
                         ExprDict {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 55..77,
                             items: [
                                 DictItem {
                                     key: Some(
                                         Named(
                                             ExprNamed {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 56..62,
                                                 target: Name(
                                                     ExprName {
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         range: 56..57,
                                                         id: Name("x"),
                                                         ctx: Store,
@@ -35,7 +35,7 @@ Module(
                                                 ),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         range: 61..62,
                                                         value: Int(
                                                             1,
@@ -47,7 +47,7 @@ Module(
                                     ),
                                     value: Name(
                                         ExprName {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 64..65,
                                             id: Name("y"),
                                             ctx: Load,
@@ -58,7 +58,7 @@ Module(
                                     key: Some(
                                         Name(
                                             ExprName {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 67..68,
                                                 id: Name("z"),
                                                 ctx: Load,
@@ -67,7 +67,7 @@ Module(
                                     ),
                                     value: Name(
                                         ExprName {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 68..68,
                                             id: Name(""),
                                             ctx: Invalid,
@@ -78,7 +78,7 @@ Module(
                                     key: Some(
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 72..73,
                                                 value: Int(
                                                     2,
@@ -88,7 +88,7 @@ Module(
                                     ),
                                     value: Name(
                                         ExprName {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 75..76,
                                             id: Name("a"),
                                             ctx: Load,
@@ -102,15 +102,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 79..84,
                     value: BinOp(
                         ExprBinOp {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 79..84,
                             left: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 79..80,
                                     id: Name("x"),
                                     ctx: Load,
@@ -119,7 +119,7 @@ Module(
                             op: Add,
                             right: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 83..84,
                                     id: Name("y"),
                                     ctx: Load,
@@ -149,7 +149,7 @@ Module(
 1 | # Unparenthesized named expression not allowed in key
 2 |
 3 | {x := 1: y, z := 2: a}
-  |               ^^ Syntax Error: Expected ':', found ':='
+  |               ^^ Syntax Error: Expected `:`, found `:=`
 4 |
 5 | x + y
   |

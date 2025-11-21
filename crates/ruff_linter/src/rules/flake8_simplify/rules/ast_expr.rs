@@ -41,6 +41,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.218")]
 pub(crate) struct UncapitalizedEnvironmentVariables {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,
@@ -91,6 +92,7 @@ impl Violation for UncapitalizedEnvironmentVariables {
 /// ## References
 /// - [Python documentation: `dict.get`](https://docs.python.org/3/library/stdtypes.html#dict.get)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.261")]
 pub(crate) struct DictGetWithNoneDefault {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,
@@ -232,7 +234,7 @@ fn check_os_environ_subscript(checker: &Checker, expr: &Expr) {
             }
         }),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let new_env_var = node.into();
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
@@ -264,8 +266,10 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
     let Some(key) = args.first() else {
         return;
     };
-    if !(key.is_literal_expr() || key.is_name_expr()) {
-        return;
+    if !crate::preview::is_sim910_expanded_key_support_enabled(checker.settings()) {
+        if !(key.is_literal_expr() || key.is_name_expr()) {
+            return;
+        }
     }
     let Some(default) = args.get(1) else {
         return;

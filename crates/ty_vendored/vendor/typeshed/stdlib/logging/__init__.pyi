@@ -16,7 +16,7 @@ from re import Pattern
 from string import Template
 from time import struct_time
 from types import FrameType, GenericAlias, TracebackType
-from typing import Any, ClassVar, Final, Generic, Literal, Protocol, TextIO, TypeVar, overload
+from typing import Any, ClassVar, Final, Generic, Literal, Protocol, TextIO, TypeVar, overload, type_check_only
 from typing_extensions import Self, TypeAlias, deprecated
 
 __all__ = [
@@ -76,11 +76,13 @@ _Level: TypeAlias = int | str
 _FormatStyle: TypeAlias = Literal["%", "{", "$"]
 
 if sys.version_info >= (3, 12):
+    @type_check_only
     class _SupportsFilter(Protocol):
         def filter(self, record: LogRecord, /) -> bool | LogRecord: ...
 
     _FilterType: TypeAlias = Filter | Callable[[LogRecord], bool | LogRecord] | _SupportsFilter
 else:
+    @type_check_only
     class _SupportsFilter(Protocol):
         def filter(self, record: LogRecord, /) -> bool: ...
 
@@ -312,7 +314,7 @@ class Logger(Filterer):
         logger.warning("Houston, we have a %s", "bit of a problem", exc_info=True)
         """
 
-    @deprecated("Deprecated; use warning() instead.")
+    @deprecated("Deprecated since Python 3.3. Use `Logger.warning()` instead.")
     def warn(
         self,
         msg: object,
@@ -1003,7 +1005,7 @@ class LoggerAdapter(Generic[_L]):
         Delegate a warning call to the underlying logger.
         """
 
-    @deprecated("Deprecated; use warning() instead.")
+    @deprecated("Deprecated since Python 3.3. Use `LoggerAdapter.warning()` instead.")
     def warn(
         self,
         msg: object,
@@ -1187,7 +1189,7 @@ def warning(
     format.
     """
 
-@deprecated("Deprecated; use warning() instead.")
+@deprecated("Deprecated since Python 3.3. Use `warning()` instead.")
 def warn(
     msg: object,
     *args: object,
@@ -1546,4 +1548,4 @@ class StringTemplateStyle(PercentStyle):  # undocumented
 
 _STYLES: Final[dict[str, tuple[PercentStyle, str]]]
 
-BASIC_FORMAT: Final[str]
+BASIC_FORMAT: Final = "%(levelname)s:%(name)s:%(message)s"

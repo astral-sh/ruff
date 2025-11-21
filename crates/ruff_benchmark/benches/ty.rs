@@ -444,15 +444,12 @@ fn benchmark_complex_constrained_attributes_2(criterion: &mut Criterion) {
     criterion.bench_function("ty_micro[complex_constrained_attributes_2]", |b| {
         b.iter_batched_ref(
             || {
-                // This is is similar to the case above, but now the attributes are actually defined.
+                // This is similar to the case above, but now the attributes are actually defined.
                 // https://github.com/astral-sh/ty/issues/711
                 setup_micro_case(
                     r#"
                     class C:
                         def f(self: "C"):
-                            self.a = ""
-                            self.b = ""
-
                             if isinstance(self.a, str):
                                 return
 
@@ -466,6 +463,56 @@ fn benchmark_complex_constrained_attributes_2(criterion: &mut Criterion) {
                                 return
                             if isinstance(self.b, str):
                                 return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+
+                            self.a = ""
+                            self.b = ""
+                    "#,
+                )
+            },
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_complex_constrained_attributes_3(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_micro[complex_constrained_attributes_3]", |b| {
+        b.iter_batched_ref(
+            || {
+                // This is a regression test for https://github.com/astral-sh/ty/issues/758
+                setup_micro_case(
+                    r#"
+                    class GridOut:
+                        def __init__(self: "GridOut") -> None:
+                            self._buffer = b""
+
+                        def _read_size_or_line(self: "GridOut", size: int = -1):
+                            if size > self._position:
+                                size = self._position
+                                pass
+                            if size == 0:
+                                return bytes()
+
+                            while size > 0:
+                                if self._buffer:
+                                    buf = self._buffer
+                                    self._buffer = b""
+                                else:
+                                    buf = b""
+
+                                if len(buf) > size:
+                                    self._buffer = buf
+                                    self._position -= len(self._buffer)
                     "#,
                 )
             },
@@ -552,7 +599,7 @@ impl<'a> ProjectBenchmark<'a> {
             self.project
                 .check_paths()
                 .iter()
-                .map(|path| path.to_path_buf())
+                .map(|path| SystemPathBuf::from(*path))
                 .collect(),
         );
 
@@ -598,8 +645,8 @@ fn hydra(criterion: &mut Criterion) {
             name: "hydra-zen",
             repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
             commit: "dd2b50a9614c6f8c46c5866f283c8f7e7a960aa8",
-            paths: vec![SystemPath::new("src")],
-            dependencies: vec!["pydantic", "beartype", "hydra-core"],
+            paths: &["src"],
+            dependencies: &["pydantic", "beartype", "hydra-core"],
             max_dep_date: "2025-06-17",
             python_version: PythonVersion::PY313,
         },
@@ -615,12 +662,12 @@ fn attrs(criterion: &mut Criterion) {
             name: "attrs",
             repository: "https://github.com/python-attrs/attrs",
             commit: "a6ae894aad9bc09edc7cdad8c416898784ceec9b",
-            paths: vec![SystemPath::new("src")],
-            dependencies: vec![],
+            paths: &["src"],
+            dependencies: &[],
             max_dep_date: "2025-06-17",
             python_version: PythonVersion::PY313,
         },
-        100,
+        120,
     );
 
     bench_project(&benchmark, criterion);
@@ -632,12 +679,12 @@ fn anyio(criterion: &mut Criterion) {
             name: "anyio",
             repository: "https://github.com/agronholm/anyio",
             commit: "561d81270a12f7c6bbafb5bc5fad99a2a13f96be",
-            paths: vec![SystemPath::new("src")],
-            dependencies: vec![],
+            paths: &["src"],
+            dependencies: &[],
             max_dep_date: "2025-06-17",
             python_version: PythonVersion::PY313,
         },
-        100,
+        150,
     );
 
     bench_project(&benchmark, criterion);
@@ -649,8 +696,8 @@ fn datetype(criterion: &mut Criterion) {
             name: "DateType",
             repository: "https://github.com/glyph/DateType",
             commit: "57c9c93cf2468069f72945fc04bf27b64100dad8",
-            paths: vec![SystemPath::new("src")],
-            dependencies: vec![],
+            paths: &["src"],
+            dependencies: &[],
             max_dep_date: "2025-07-04",
             python_version: PythonVersion::PY313,
         },
@@ -668,6 +715,7 @@ criterion_group!(
     benchmark_tuple_implicit_instance_attributes,
     benchmark_complex_constrained_attributes_1,
     benchmark_complex_constrained_attributes_2,
+    benchmark_complex_constrained_attributes_3,
     benchmark_many_enum_members,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);

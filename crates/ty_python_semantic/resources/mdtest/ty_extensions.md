@@ -91,7 +91,7 @@ The `Unknown` type is a special type that we use to represent actually unknown t
 annotation), as opposed to `Any` which represents an explicitly unknown type.
 
 ```py
-from ty_extensions import Unknown, static_assert, is_assignable_to
+from ty_extensions import Unknown, static_assert, is_assignable_to, reveal_mro
 
 static_assert(is_assignable_to(Unknown, int))
 static_assert(is_assignable_to(int, Unknown))
@@ -99,7 +99,7 @@ static_assert(is_assignable_to(int, Unknown))
 def explicit_unknown(x: Unknown, y: tuple[str, Unknown], z: Unknown = 1) -> None:
     reveal_type(x)  # revealed: Unknown
     reveal_type(y)  # revealed: tuple[str, Unknown]
-    reveal_type(z)  # revealed: Unknown | Literal[1]
+    reveal_type(z)  # revealed: Unknown
 ```
 
 `Unknown` can be subclassed, just like `Any`:
@@ -107,8 +107,8 @@ def explicit_unknown(x: Unknown, y: tuple[str, Unknown], z: Unknown = 1) -> None
 ```py
 class C(Unknown): ...
 
-# revealed: tuple[<class 'C'>, Unknown, <class 'object'>]
-reveal_type(C.__mro__)
+# revealed: (<class 'C'>, Unknown, <class 'object'>)
+reveal_mro(C)
 
 # error: "Special form `ty_extensions.Unknown` expected no type parameter"
 u: Unknown[str]
@@ -390,7 +390,7 @@ static_assert(not is_single_valued(Literal["a"] | Literal["b"]))
 
 We use `TypeOf` to get the inferred type of an expression. This is useful when we want to refer to
 it in a type expression. For example, if we want to make sure that the class literal type `str` is a
-subtype of `type[str]`, we can not use `is_subtype_of(str, type[str])`, as that would test if the
+subtype of `type[str]`, we cannot use `is_subtype_of(str, type[str])`, as that would test if the
 type `str` itself is a subtype of `type[str]`. Instead, we can use `TypeOf[str]` to get the type of
 the expression `str`:
 
@@ -398,7 +398,7 @@ the expression `str`:
 from ty_extensions import TypeOf, is_subtype_of, static_assert
 
 # This is incorrect and therefore fails with ...
-# error: "Static assertion error: argument evaluates to `False`"
+# error: "Static assertion error: argument of type `ty_extensions.ConstraintSet[never]` is statically known to be falsy"
 static_assert(is_subtype_of(str, type[str]))
 
 # Correct, returns True:
@@ -469,6 +469,8 @@ c4: CallableTypeOf[()]
 Using it in annotation to reveal the signature of the callable object:
 
 ```py
+from typing_extensions import Self
+
 class Foo:
     def __init__(self, x: int) -> None:
         pass
@@ -476,19 +478,29 @@ class Foo:
     def __call__(self, x: int) -> str:
         return "foo"
 
+    def returns_self(self, x: int) -> Self:
+        return self
+
+    @classmethod
+    def class_method(cls, x: int) -> Self:
+        return cls(x)
+
 def _(
     c1: CallableTypeOf[f1],
     c2: CallableTypeOf[f2],
     c3: CallableTypeOf[f3],
     c4: CallableTypeOf[Foo],
     c5: CallableTypeOf[Foo(42).__call__],
+    c6: CallableTypeOf[Foo(42).returns_self],
+    c7: CallableTypeOf[Foo.class_method],
+    c8: CallableTypeOf[Foo(42)],
 ) -> None:
     reveal_type(c1)  # revealed: () -> Unknown
     reveal_type(c2)  # revealed: () -> int
     reveal_type(c3)  # revealed: (x: int, y: str) -> None
-
-    # TODO: should be `(x: int) -> Foo`
-    reveal_type(c4)  # revealed: (...) -> Foo
-
+    reveal_type(c4)  # revealed: (x: int) -> Foo
     reveal_type(c5)  #  revealed: (x: int) -> str
+    reveal_type(c6)  # revealed: (x: int) -> Foo
+    reveal_type(c7)  # revealed: (x: int) -> Foo
+    reveal_type(c8)  # revealed: (x: int) -> str
 ```

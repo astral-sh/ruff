@@ -229,4 +229,20 @@ mod tests {
         assert_diagnostics!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn shadowed_builtins() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_annotations/shadowed_builtins.py"),
+            &LinterSettings::for_rules(vec![
+                Rule::MissingReturnTypeUndocumentedPublicFunction,
+                Rule::MissingReturnTypePrivateFunction,
+                Rule::MissingReturnTypeSpecialMethod,
+                Rule::MissingReturnTypeStaticMethod,
+                Rule::MissingReturnTypeClassMethod,
+            ]),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
 }

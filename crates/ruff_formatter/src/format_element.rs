@@ -197,7 +197,7 @@ pub const LINE_TERMINATORS: [char; 3] = ['\r', LINE_SEPARATOR, PARAGRAPH_SEPARAT
 
 /// Replace the line terminators matching the provided list with "\n"
 /// since its the only line break type supported by the printer
-pub fn normalize_newlines<const N: usize>(text: &str, terminators: [char; N]) -> Cow<str> {
+pub fn normalize_newlines<const N: usize>(text: &str, terminators: [char; N]) -> Cow<'_, str> {
     let mut result = String::new();
     let mut last_end = 0;
 
@@ -487,7 +487,7 @@ pub trait FormatElements {
 /// Represents the width by adding 1 to the actual width so that the width can be represented by a [`NonZeroU32`],
 /// allowing [`TextWidth`] or [`Option<Width>`] fit in 4 bytes rather than 8.
 ///
-/// This means that 2^32 can not be precisely represented and instead has the same value as 2^32-1.
+/// This means that 2^32 cannot be precisely represented and instead has the same value as 2^32-1.
 /// This imprecision shouldn't matter in practice because either text are longer than any configured line width
 /// and thus, the text should break.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

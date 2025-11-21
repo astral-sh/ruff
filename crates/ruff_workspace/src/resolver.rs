@@ -427,7 +427,7 @@ impl From<ConfigurationOrigin> for Relativity {
     }
 }
 
-/// Find all Python (`.py`, `.pyi` and `.ipynb` files) in a set of paths.
+/// Find all Python (`.py`, `.pyi`, `.pyw`, and `.ipynb` files) in a set of paths.
 pub fn python_files_in_path<'a>(
     paths: &[PathBuf],
     pyproject_config: &'a PyprojectConfig,
@@ -480,6 +480,11 @@ pub fn python_files_in_path<'a>(
         .ok_or_else(|| anyhow!("Expected at least one path to search for Python files"))?;
     // Create the `WalkBuilder`.
     let mut builder = WalkBuilder::new(first_path);
+
+    if let Ok(cwd) = std::env::current_dir() {
+        builder.current_dir(cwd);
+    }
+
     for path in rest_paths {
         builder.add(path);
     }
@@ -523,8 +528,40 @@ impl<'config> WalkPythonFilesState<'config> {
         let (files, error) = self.merged.into_inner().unwrap();
         error?;
 
-        Ok((files, self.resolver.into_inner().unwrap()))
+        let deduplicated_files = deduplicate_files(files);
+
+        Ok((deduplicated_files, self.resolver.into_inner().unwrap()))
     }
+}
+
+/// Deduplicate files by path, prioritizing `Root` files over `Nested` files.
+///
+/// When the same path appears both as a directly specified input (`Root`)
+/// and via directory traversal (`Nested`), keep the `Root` entry and drop
+/// the `Nested` entry.
+///
+/// Dropping the root entry means that the explicitly passed path may be
+/// unintentionally ignored, since it is treated as nested and can be excluded
+/// despite being requested.
+///
+/// Concretely, with `lint.exclude = ["foo.py"]` and `ruff check . foo.py`,
+/// we must keep `Root(foo.py)` and drop `Nested(foo.py)` so `foo.py` is
+/// linted as the user requested.
+fn deduplicate_files(mut files: ResolvedFiles) -> ResolvedFiles {
+    // Sort by path; for identical paths, prefer Root over Nested; place errors after files
+    files.sort_by(|a, b| match (a, b) {
+        (Ok(a_file), Ok(b_file)) => a_file.cmp(b_file),
+        (Ok(_), Err(_)) => Ordering::Less,
+        (Err(_), Ok(_)) => Ordering::Greater,
+        (Err(_), Err(_)) => Ordering::Equal,
+    });
+
+    files.dedup_by(|a, b| match (a, b) {
+        (Ok(a_file), Ok(b_file)) => a_file.path() == b_file.path(),
+        _ => false,
+    });
+
+    files
 }
 
 struct PythonFilesVisitorBuilder<'s, 'config> {
@@ -682,7 +719,7 @@ impl Drop for PythonFilesVisitor<'_, '_> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub enum ResolvedFile {
     /// File explicitly passed to the CLI
     Root(PathBuf),
@@ -712,18 +749,6 @@ impl ResolvedFile {
 
     pub fn is_root(&self) -> bool {
         matches!(self, ResolvedFile::Root(_))
-    }
-}
-
-impl PartialOrd for ResolvedFile {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for ResolvedFile {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.path().cmp(other.path())
     }
 }
 

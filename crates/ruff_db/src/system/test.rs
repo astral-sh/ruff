@@ -146,6 +146,10 @@ impl System for TestSystem {
     fn case_sensitivity(&self) -> CaseSensitivity {
         self.system().case_sensitivity()
     }
+
+    fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
+    }
 }
 
 impl Default for TestSystem {
@@ -393,6 +397,13 @@ impl System for InMemorySystem {
 
     fn case_sensitivity(&self) -> CaseSensitivity {
         CaseSensitivity::CaseSensitive
+    }
+
+    fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(Self {
+            user_config_directory: Mutex::new(self.user_config_directory.lock().unwrap().clone()),
+            memory_fs: self.memory_fs.clone(),
+        })
     }
 }
 

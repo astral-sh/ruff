@@ -1,0 +1,117 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: unknown_argument.md - Unknown argument diagnostics
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unknown_argument.md
+---
+
+# Python source files
+
+## module.py
+
+```
+1 | def f(a, b, c=42): ...
+2 | def g(a, b): ...
+3 | 
+4 | class Foo:
+5 |     def method(self, a, b): ...
+```
+
+## main.py
+
+```
+ 1 | from module import f, g, Foo
+ 2 | 
+ 3 | f(a=1, b=2, c=3, d=42)  # error: [unknown-argument]
+ 4 | 
+ 5 | def coinflip() -> bool:
+ 6 |     return True
+ 7 | 
+ 8 | h = f if coinflip() else g
+ 9 | 
+10 | # error: [unknown-argument]
+11 | # error: [unknown-argument]
+12 | h(a=1, b=2, d=42)
+13 | 
+14 | Foo().method(a=1, b=2, c=3)  # error: [unknown-argument]
+```
+
+# Diagnostics
+
+```
+error[unknown-argument]: Argument `d` does not match any known parameter of function `f`
+ --> src/main.py:3:18
+  |
+1 | from module import f, g, Foo
+2 |
+3 | f(a=1, b=2, c=3, d=42)  # error: [unknown-argument]
+  |                  ^^^^
+4 |
+5 | def coinflip() -> bool:
+  |
+info: Function signature here
+ --> src/module.py:1:5
+  |
+1 | def f(a, b, c=42): ...
+  |     ^^^^^^^^^^^^^
+2 | def g(a, b): ...
+  |
+info: rule `unknown-argument` is enabled by default
+
+```
+
+```
+error[unknown-argument]: Argument `d` does not match any known parameter of function `f`
+  --> src/main.py:12:13
+   |
+10 | # error: [unknown-argument]
+11 | # error: [unknown-argument]
+12 | h(a=1, b=2, d=42)
+   |             ^^^^
+13 |
+14 | Foo().method(a=1, b=2, c=3)  # error: [unknown-argument]
+   |
+info: Union variant `def f(a, b, c=Literal[42]) -> Unknown` is incompatible with this call site
+info: Attempted to call union type `(def f(a, b, c=Literal[42]) -> Unknown) | (def g(a, b) -> Unknown)`
+info: rule `unknown-argument` is enabled by default
+
+```
+
+```
+error[unknown-argument]: Argument `d` does not match any known parameter of function `g`
+  --> src/main.py:12:13
+   |
+10 | # error: [unknown-argument]
+11 | # error: [unknown-argument]
+12 | h(a=1, b=2, d=42)
+   |             ^^^^
+13 |
+14 | Foo().method(a=1, b=2, c=3)  # error: [unknown-argument]
+   |
+info: Union variant `def g(a, b) -> Unknown` is incompatible with this call site
+info: Attempted to call union type `(def f(a, b, c=Literal[42]) -> Unknown) | (def g(a, b) -> Unknown)`
+info: rule `unknown-argument` is enabled by default
+
+```
+
+```
+error[unknown-argument]: Argument `c` does not match any known parameter of bound method `method`
+  --> src/main.py:14:24
+   |
+12 | h(a=1, b=2, d=42)
+13 |
+14 | Foo().method(a=1, b=2, c=3)  # error: [unknown-argument]
+   |                        ^^^
+   |
+info: Method signature here
+ --> src/module.py:5:9
+  |
+4 | class Foo:
+5 |     def method(self, a, b): ...
+  |         ^^^^^^^^^^^^^^^^^^
+  |
+info: rule `unknown-argument` is enabled by default
+
+```

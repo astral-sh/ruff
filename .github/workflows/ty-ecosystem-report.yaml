@@ -19,21 +19,24 @@ env:
 jobs:
   ty-ecosystem-report:
     name: Create ecosystem report
-    runs-on: depot-ubuntu-22.04-32
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           path: ruff
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc # v6.4.3
+        uses: astral-sh/setup-uv@5a7eac68fb9809dea845d802897dc5c723910fa3 # v7.1.3
+        with:
+          enable-cache: true # zizmor: ignore[cache-poisoning] acceptable risk for CloudFlare pages artifact
 
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
         with:
           workspaces: "ruff"
+          lookup-only: false # zizmor: ignore[cache-poisoning] acceptable risk for CloudFlare pages artifact
 
       - name: Install Rust toolchain
         run: rustup show
@@ -49,12 +52,13 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@27dd66d9e397d986ef9c631119ee09556eab8af9"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@e26ebfb78d372b8b091e1cb1d6fc522e135474c1"
 
           ecosystem-analyzer \
             --verbose \
             --repository ruff \
             analyze \
+            --profile=profiling \
             --projects ruff/crates/ty_python_semantic/resources/primer/good.txt \
             --output ecosystem-diagnostics.json
 
@@ -62,7 +66,7 @@ jobs:
 
           ecosystem-analyzer \
             generate-report \
-            --max-diagnostics-per-project=1200 \
+            --max-diagnostics-per-project=1000 \
             ecosystem-diagnostics.json \
             --output dist/index.html
 

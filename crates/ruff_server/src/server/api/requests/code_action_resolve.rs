@@ -21,7 +21,7 @@ impl super::RequestHandler for CodeActionResolve {
 }
 
 impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
-    fn document_url(params: &types::CodeAction) -> Cow<types::Url> {
+    fn document_url(params: &types::CodeAction) -> Cow<'_, types::Url> {
         let uri: lsp_types::Url = serde_json::from_value(params.data.clone().unwrap_or_default())
             .expect("code actions should have a URI in their data fields");
         Cow::Owned(uri)

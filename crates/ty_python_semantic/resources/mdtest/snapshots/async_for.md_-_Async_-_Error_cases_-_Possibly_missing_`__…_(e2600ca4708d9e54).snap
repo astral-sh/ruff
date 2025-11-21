@@ -1,0 +1,44 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: async_for.md - Async - Error cases - Possibly missing `__anext__` method
+mdtest path: crates/ty_python_semantic/resources/mdtest/loops/async_for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | async def foo(flag: bool):
+ 2 |     class PossiblyUnboundAnext:
+ 3 |         if flag:
+ 4 |             async def __anext__(self) -> int:
+ 5 |                 return 42
+ 6 | 
+ 7 |     class AsyncIterable:
+ 8 |         def __aiter__(self) -> PossiblyUnboundAnext:
+ 9 |             return PossiblyUnboundAnext()
+10 | 
+11 |     # error: [not-iterable] "Object of type `AsyncIterable` may not be async-iterable"
+12 |     async for x in AsyncIterable():
+13 |         reveal_type(x)  # revealed: int
+```
+
+# Diagnostics
+
+```
+error[not-iterable]: Object of type `AsyncIterable` may not be async-iterable
+  --> src/mdtest_snippet.py:12:20
+   |
+11 |     # error: [not-iterable] "Object of type `AsyncIterable` may not be async-iterable"
+12 |     async for x in AsyncIterable():
+   |                    ^^^^^^^^^^^^^^^
+13 |         reveal_type(x)  # revealed: int
+   |
+info: Its `__aiter__` method returns an object of type `PossiblyUnboundAnext`, which may not have a `__anext__` method
+info: rule `not-iterable` is enabled by default
+
+```

@@ -24,17 +24,15 @@ use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
-use crate::message::create_syntax_error_diagnostic;
 use crate::noqa::add_noqa;
 use crate::package::PackageRoot;
-use crate::preview::is_py314_support_enabled;
 use crate::registry::Rule;
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TEST_RULES, TestRule};
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::source_kind::SourceKind;
-use crate::{Locator, directives, fs, warn_user_once};
+use crate::{Locator, directives, fs};
 
 pub(crate) mod float;
 
@@ -44,44 +42,15 @@ pub struct LinterResult {
     /// Flag indicating that the parsed source code does not contain any
     /// [`ParseError`]s
     has_valid_syntax: bool,
-    /// Flag indicating that the parsed source code does not contain any [`ParseError`]s,
-    /// [`UnsupportedSyntaxError`]s, or [`SemanticSyntaxError`]s.
-    has_no_syntax_errors: bool,
 }
 
 impl LinterResult {
-    /// Returns `true` if the parsed source code contains any [`ParseError`]s *or*
-    /// [`UnsupportedSyntaxError`]s.
-    ///
-    /// See [`LinterResult::has_invalid_syntax`] for a version specific to [`ParseError`]s.
-    pub fn has_syntax_errors(&self) -> bool {
-        !self.has_no_syntax_errors()
-    }
-
-    /// Returns `true` if the parsed source code does not contain any [`ParseError`]s *or*
-    /// [`UnsupportedSyntaxError`]s.
-    ///
-    /// See [`LinterResult::has_valid_syntax`] for a version specific to [`ParseError`]s.
-    pub fn has_no_syntax_errors(&self) -> bool {
-        self.has_valid_syntax() && self.has_no_syntax_errors
-    }
-
-    /// Returns `true` if the parsed source code is valid i.e., it has no [`ParseError`]s.
-    ///
-    /// Note that this does not include version-related [`UnsupportedSyntaxError`]s.
-    ///
-    /// See [`LinterResult::has_no_syntax_errors`] for a version that takes these into account.
-    pub fn has_valid_syntax(&self) -> bool {
-        self.has_valid_syntax
-    }
-
     /// Returns `true` if the parsed source code is invalid i.e., it has [`ParseError`]s.
     ///
-    /// Note that this does not include version-related [`UnsupportedSyntaxError`]s.
-    ///
-    /// See [`LinterResult::has_no_syntax_errors`] for a version that takes these into account.
+    /// Note that this does not include version-related [`UnsupportedSyntaxError`]s or
+    /// [`SemanticSyntaxError`]s.
     pub fn has_invalid_syntax(&self) -> bool {
-        !self.has_valid_syntax()
+        !self.has_valid_syntax
     }
 }
 
@@ -348,6 +317,9 @@ pub fn check_path(
                         &context,
                     );
                 }
+                Rule::PanicyTestRule => {
+                    test_rules::PanicyTestRule::diagnostic(locator, comment_ranges, &context);
+                }
                 _ => unreachable!("All test rules must have an implementation"),
             }
         }
@@ -405,6 +377,7 @@ pub fn add_noqa_to_path(
     source_kind: &SourceKind,
     source_type: PySourceType,
     settings: &LinterSettings,
+    reason: Option<&str>,
 ) -> Result<usize> {
     // Parse once.
     let target_version = settings.resolve_target_version(path);
@@ -453,6 +426,7 @@ pub fn add_noqa_to_path(
         &settings.external,
         &directives.noqa_line_for,
         stylist.line_ending(),
+        reason,
     )
 }
 
@@ -467,14 +441,6 @@ pub fn lint_only(
     source: ParseSource,
 ) -> LinterResult {
     let target_version = settings.resolve_target_version(path);
-
-    if matches!(target_version, TargetVersion(Some(PythonVersion::PY314)))
-        && !is_py314_support_enabled(settings)
-    {
-        warn_user_once!(
-            "Support for Python 3.14 is in preview and may undergo breaking changes. Enable `preview` to remove this warning."
-        );
-    }
 
     let parsed = source.into_parsed(source_kind, source_type, target_version.parser_version());
 
@@ -513,7 +479,6 @@ pub fn lint_only(
 
     LinterResult {
         has_valid_syntax: parsed.has_valid_syntax(),
-        has_no_syntax_errors: !diagnostics.iter().any(Diagnostic::is_invalid_syntax),
         diagnostics,
     }
 }
@@ -532,21 +497,20 @@ fn diagnostics_to_messages(
     parse_errors
         .iter()
         .map(|parse_error| {
-            create_syntax_error_diagnostic(source_file.clone(), &parse_error.error, parse_error)
+            Diagnostic::invalid_syntax(source_file.clone(), &parse_error.error, parse_error)
         })
         .chain(unsupported_syntax_errors.iter().map(|syntax_error| {
-            create_syntax_error_diagnostic(source_file.clone(), syntax_error, syntax_error)
+            Diagnostic::invalid_syntax(source_file.clone(), syntax_error, syntax_error)
         }))
         .chain(
             semantic_syntax_errors
                 .iter()
-                .map(|error| create_syntax_error_diagnostic(source_file.clone(), error, error)),
+                .map(|error| Diagnostic::invalid_syntax(source_file.clone(), error, error)),
         )
         .chain(diagnostics.into_iter().map(|mut diagnostic| {
-            let noqa_offset = directives
-                .noqa_line_for
-                .resolve(diagnostic.expect_range().start());
-            diagnostic.set_noqa_offset(noqa_offset);
+            if let Some(range) = diagnostic.range() {
+                diagnostic.set_noqa_offset(directives.noqa_line_for.resolve(range.start()));
+            }
             diagnostic
         }))
         .collect()
@@ -578,14 +542,6 @@ pub fn lint_fix<'a>(
     let mut has_no_syntax_errors = false;
 
     let target_version = settings.resolve_target_version(path);
-
-    if matches!(target_version, TargetVersion(Some(PythonVersion::PY314)))
-        && !is_py314_support_enabled(settings)
-    {
-        warn_user_once!(
-            "Support for Python 3.14 is in preview and may undergo breaking changes. Enable `preview` to remove this warning."
-        );
-    }
 
     // Continuously fix until the source code stabilizes.
     loop {
@@ -670,7 +626,6 @@ pub fn lint_fix<'a>(
             result: LinterResult {
                 diagnostics,
                 has_valid_syntax,
-                has_no_syntax_errors,
             },
             transformed,
             fixed,
@@ -966,17 +921,6 @@ mod tests {
         Ok(())
     }
 
-    /// Wrapper around `test_contents_syntax_errors` for testing a snippet of code instead of a
-    /// file.
-    fn test_snippet_syntax_errors(contents: &str, settings: &LinterSettings) -> Vec<Diagnostic> {
-        let contents = dedent(contents);
-        test_contents_syntax_errors(
-            &SourceKind::Python(contents.to_string()),
-            Path::new("<filename>"),
-            settings,
-        )
-    }
-
     /// A custom test runner that prints syntax errors in addition to other diagnostics. Adapted
     /// from `flakes` in pyflakes/mod.rs.
     fn test_contents_syntax_errors(
@@ -1014,214 +958,43 @@ mod tests {
             &parsed,
             target_version,
         );
-        diagnostics.sort_by_key(|diagnostic| diagnostic.expect_range().start());
+        diagnostics.sort_by(Diagnostic::ruff_start_ordering);
         diagnostics
     }
 
     #[test_case(
-        "async_in_sync_error_on_310",
-        "async def f(): return [[x async for x in foo(n)] for n in range(3)]",
-        PythonVersion::PY310,
-        "AsyncComprehensionOutsideAsyncFunction"
+        Path::new("async_comprehension_outside_async_function.py"),
+        PythonVersion::PY311
     )]
     #[test_case(
-        "async_in_sync_okay_on_311",
-        "async def f(): return [[x async for x in foo(n)] for n in range(3)]",
-        PythonVersion::PY311,
-        "AsyncComprehensionOutsideAsyncFunction"
+        Path::new("async_comprehension_outside_async_function.py"),
+        PythonVersion::PY310
     )]
-    #[test_case(
-        "async_in_sync_okay_on_310",
-        "async def test(): return [[x async for x in elements(n)] async for n in range(3)]",
-        PythonVersion::PY310,
-        "AsyncComprehensionOutsideAsyncFunction"
-    )]
-    #[test_case(
-        "deferred_function_body",
-        "
-		async def f(): [x for x in foo()] and [x async for x in foo()]
-		async def f():
-			def g(): ...
-			[x async for x in foo()]
-		",
-        PythonVersion::PY310,
-        "AsyncComprehensionOutsideAsyncFunction"
-    )]
-    #[test_case(
-        "async_in_sync_false_positive",
-        "[x async for x in y]",
-        PythonVersion::PY310,
-        "AsyncComprehensionOutsideAsyncFunction"
-    )]
-    #[test_case(
-        "rebound_comprehension",
-        "[x:= 2 for x in range(2)]",
-        PythonVersion::PY310,
-        "ReboundComprehensionVariable"
-    )]
-    #[test_case(
-        "duplicate_type_param",
-        "class C[T, T]: pass",
-        PythonVersion::PY312,
-        "DuplicateTypeParameter"
-    )]
-    #[test_case(
-        "multiple_case_assignment",
-        "
-        match x:
-            case [a, a]:
-                pass
-            case _:
-                pass
-        ",
-        PythonVersion::PY310,
-        "MultipleCaseAssignment"
-    )]
-    #[test_case(
-        "duplicate_match_key",
-        "
-        match x:
-            case {'key': 1, 'key': 2}:
-                pass
-        ",
-        PythonVersion::PY310,
-        "DuplicateMatchKey"
-    )]
-    #[test_case(
-        "duplicate_match_class_attribute",
-        "
-        match x:
-            case Point(x=1, x=2):
-                pass
-        ",
-        PythonVersion::PY310,
-        "DuplicateMatchClassAttribute"
-    )]
-    #[test_case(
-        "invalid_star_expression",
-        "
-        def func():
-            return *x
-        ",
-        PythonVersion::PY310,
-        "InvalidStarExpression"
-    )]
-    #[test_case(
-        "invalid_star_expression_for",
-        "
-        for *x in range(10):
-            pass
-        ",
-        PythonVersion::PY310,
-        "InvalidStarExpression"
-    )]
-    #[test_case(
-        "invalid_star_expression_yield",
-        "
-        def func():
-            yield *x
-        ",
-        PythonVersion::PY310,
-        "InvalidStarExpression"
-    )]
-    #[test_case(
-        "irrefutable_case_pattern_wildcard",
-        "
-        match value:
-            case _:
-                pass
-            case 1:
-                pass
-        ",
-        PythonVersion::PY310,
-        "IrrefutableCasePattern"
-    )]
-    #[test_case(
-        "irrefutable_case_pattern_capture",
-        "
-        match value:
-            case irrefutable:
-                pass
-            case 1:
-                pass
-        ",
-        PythonVersion::PY310,
-        "IrrefutableCasePattern"
-    )]
-    #[test_case(
-        "single_starred_assignment",
-        "*a = [1, 2, 3, 4]",
-        PythonVersion::PY310,
-        "SingleStarredAssignment"
-    )]
-    #[test_case(
-        "write_to_debug",
-        "
-        __debug__ = False
-        ",
-        PythonVersion::PY310,
-        "WriteToDebug"
-    )]
-    #[test_case(
-        "write_to_debug_in_function_param",
-        "
-        def process(__debug__):
-            pass
-        ",
-        PythonVersion::PY310,
-        "WriteToDebug"
-    )]
-    #[test_case(
-        "write_to_debug_class_type_param",
-        "
-        class Generic[__debug__]:
-            pass
-        ",
-        PythonVersion::PY312,
-        "WriteToDebug"
-    )]
-    #[test_case(
-        "invalid_expression_yield_in_type_param",
-        "
-        type X[T: (yield 1)] = int
-        ",
-        PythonVersion::PY312,
-        "InvalidExpression"
-    )]
-    #[test_case(
-        "invalid_expression_yield_in_type_alias",
-        "
-        type Y = (yield 1)
-        ",
-        PythonVersion::PY312,
-        "InvalidExpression"
-    )]
-    #[test_case(
-        "invalid_expression_walrus_in_return_annotation",
-        "
-        def f[T](x: int) -> (y := 3): return x
-        ",
-        PythonVersion::PY312,
-        "InvalidExpression"
-    )]
-    #[test_case(
-        "invalid_expression_yield_from_in_base_class",
-        "
-        class C[T]((yield from [object])):
-            pass
-        ",
-        PythonVersion::PY312,
-        "InvalidExpression"
-    )]
-    fn test_semantic_errors(
-        name: &str,
-        contents: &str,
-        python_version: PythonVersion,
-        error_type: &str,
-    ) {
-        let snapshot = format!("semantic_syntax_error_{error_type}_{name}_{python_version}");
-        let diagnostics = test_snippet_syntax_errors(
-            contents,
+    #[test_case(Path::new("rebound_comprehension.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("duplicate_type_parameter.py"), PythonVersion::PY312)]
+    #[test_case(Path::new("multiple_case_assignment.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("duplicate_match_key.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("duplicate_match_class_attribute.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("invalid_star_expression.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("irrefutable_case_pattern.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("single_starred_assignment.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("write_to_debug.py"), PythonVersion::PY312)]
+    #[test_case(Path::new("write_to_debug.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("invalid_expression.py"), PythonVersion::PY312)]
+    #[test_case(Path::new("global_parameter.py"), PythonVersion::PY310)]
+    fn test_semantic_errors(path: &Path, python_version: PythonVersion) -> Result<()> {
+        let snapshot = format!(
+            "semantic_syntax_error_{}_{}",
+            path.to_string_lossy(),
+            python_version
+        );
+        let path = Path::new("resources/test/fixtures/semantic_errors").join(path);
+        let contents = std::fs::read_to_string(&path)?;
+        let source_kind = SourceKind::Python(contents);
+
+        let diagnostics = test_contents_syntax_errors(
+            &source_kind,
+            &path,
             &LinterSettings {
                 rules: settings::rule_table::RuleTable::empty(),
                 unresolved_target_version: python_version.into(),
@@ -1229,7 +1002,11 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_diagnostics!(snapshot, diagnostics);
+        insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+                assert_diagnostics!(format!("{snapshot}"), diagnostics);
+        });
+
+        Ok(())
     }
 
     #[test_case(PythonVersion::PY310)]
@@ -1262,6 +1039,10 @@ mod tests {
     )]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async_function.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("async_comprehension.py"))]
+    #[test_case(
+        Rule::YieldFromInAsyncFunction,
+        Path::new("yield_from_in_async_function.py")
+    )]
     fn test_syntax_errors(rule: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
         let path = Path::new("resources/test/fixtures/syntax_errors").join(path);

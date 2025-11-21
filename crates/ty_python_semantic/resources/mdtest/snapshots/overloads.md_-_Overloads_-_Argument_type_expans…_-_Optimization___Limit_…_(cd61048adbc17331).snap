@@ -1,0 +1,138 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: overloads.md - Overloads - Argument type expansion - Optimization: Limit expansion size
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/overloads.md
+---
+
+# Python source files
+
+## overloaded.pyi
+
+```
+ 1 | from typing import overload
+ 2 | 
+ 3 | class A: ...
+ 4 | class B: ...
+ 5 | class C: ...
+ 6 | 
+ 7 | @overload
+ 8 | def f() -> None: ...
+ 9 | @overload
+10 | def f(**kwargs: int) -> C: ...
+11 | @overload
+12 | def f(x: A, /, **kwargs: int) -> A: ...
+13 | @overload
+14 | def f(x: B, /, **kwargs: int) -> B: ...
+```
+
+## mdtest_snippet.py
+
+```
+ 1 | from overloaded import A, B, f
+ 2 | from typing_extensions import reveal_type
+ 3 | 
+ 4 | def _(a: int | None):
+ 5 |     reveal_type(
+ 6 |         # error: [no-matching-overload]
+ 7 |         # revealed: Unknown
+ 8 |         f(
+ 9 |             A(),
+10 |             a1=a,
+11 |             a2=a,
+12 |             a3=a,
+13 |             a4=a,
+14 |             a5=a,
+15 |             a6=a,
+16 |             a7=a,
+17 |             a8=a,
+18 |             a9=a,
+19 |             a10=a,
+20 |             a11=a,
+21 |             a12=a,
+22 |             a13=a,
+23 |             a14=a,
+24 |             a15=a,
+25 |             a16=a,
+26 |             a17=a,
+27 |             a18=a,
+28 |             a19=a,
+29 |             a20=a,
+30 |             a21=a,
+31 |             a22=a,
+32 |             a23=a,
+33 |             a24=a,
+34 |             a25=a,
+35 |             a26=a,
+36 |             a27=a,
+37 |             a28=a,
+38 |             a29=a,
+39 |             a30=a,
+40 |         )
+41 |     )
+```
+
+# Diagnostics
+
+```
+error[no-matching-overload]: No overload of function `f` matches arguments
+  --> src/mdtest_snippet.py:8:9
+   |
+ 6 |           # error: [no-matching-overload]
+ 7 |           # revealed: Unknown
+ 8 | /         f(
+ 9 | |             A(),
+10 | |             a1=a,
+11 | |             a2=a,
+12 | |             a3=a,
+13 | |             a4=a,
+14 | |             a5=a,
+15 | |             a6=a,
+16 | |             a7=a,
+17 | |             a8=a,
+18 | |             a9=a,
+19 | |             a10=a,
+20 | |             a11=a,
+21 | |             a12=a,
+22 | |             a13=a,
+23 | |             a14=a,
+24 | |             a15=a,
+25 | |             a16=a,
+26 | |             a17=a,
+27 | |             a18=a,
+28 | |             a19=a,
+29 | |             a20=a,
+30 | |             a21=a,
+31 | |             a22=a,
+32 | |             a23=a,
+33 | |             a24=a,
+34 | |             a25=a,
+35 | |             a26=a,
+36 | |             a27=a,
+37 | |             a28=a,
+38 | |             a29=a,
+39 | |             a30=a,
+40 | |         )
+   | |_________^
+41 |       )
+   |
+info: Limit of argument type expansion reached at argument 10
+info: First overload defined here
+  --> src/overloaded.pyi:8:5
+   |
+ 7 | @overload
+ 8 | def f() -> None: ...
+   |     ^^^^^^^^^^^
+ 9 | @overload
+10 | def f(**kwargs: int) -> C: ...
+   |
+info: Possible overloads for function `f`:
+info:   () -> None
+info:   (**kwargs: int) -> C
+info:   (x: A, /, **kwargs: int) -> A
+info:   (x: B, /, **kwargs: int) -> B
+info: rule `no-matching-overload` is enabled by default
+
+```

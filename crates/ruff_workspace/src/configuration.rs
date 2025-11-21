@@ -55,7 +55,8 @@ use crate::options::{
     PydoclintOptions, PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
 };
 use crate::settings::{
-    EXCLUDE, FileResolverSettings, FormatterSettings, INCLUDE, LineEnding, Settings,
+    EXCLUDE, FileResolverSettings, FormatterSettings, INCLUDE, INCLUDE_PREVIEW, LineEnding,
+    Settings,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -158,9 +159,7 @@ impl Configuration {
                 .expect("RUFF_PKG_VERSION is not a valid PEP 440 version specifier");
             if !required_version.contains(&ruff_pkg_version) {
                 return Err(anyhow!(
-                    "Required version `{}` does not match the running version `{}`",
-                    required_version,
-                    RUFF_PKG_VERSION
+                    "Required version `{required_version}` does not match the running version `{RUFF_PKG_VERSION}`"
                 ));
             }
         }
@@ -233,6 +232,9 @@ impl Configuration {
             include_dependencies: analyze
                 .include_dependencies
                 .unwrap_or(analyze_defaults.include_dependencies),
+            type_checking_imports: analyze
+                .type_checking_imports
+                .unwrap_or(analyze_defaults.type_checking_imports),
         };
 
         let lint = self.lint;
@@ -257,12 +259,6 @@ impl Configuration {
         conflicting_import_settings(&isort, &flake8_import_conventions)?;
 
         let future_annotations = lint.future_annotations.unwrap_or_default();
-        if lint_preview.is_disabled() && future_annotations {
-            warn_user_once!(
-                "The `lint.future-annotations` setting will have no effect \
-                    because `preview` is disabled"
-            );
-        }
 
         Ok(Settings {
             cache_dir: self
@@ -282,9 +278,14 @@ impl Configuration {
                 extend_exclude: FilePatternSet::try_from_iter(self.extend_exclude)?,
                 extend_include: FilePatternSet::try_from_iter(self.extend_include)?,
                 force_exclude: self.force_exclude.unwrap_or(false),
-                include: FilePatternSet::try_from_iter(
-                    self.include.unwrap_or_else(|| INCLUDE.to_vec()),
-                )?,
+                include: match global_preview {
+                    PreviewMode::Disabled => FilePatternSet::try_from_iter(
+                        self.include.unwrap_or_else(|| INCLUDE.to_vec()),
+                    )?,
+                    PreviewMode::Enabled => FilePatternSet::try_from_iter(
+                        self.include.unwrap_or_else(|| INCLUDE_PREVIEW.to_vec()),
+                    )?,
+                },
                 respect_gitignore: self.respect_gitignore.unwrap_or(true),
                 project_root: project_root.to_path_buf(),
             },
@@ -1279,6 +1280,7 @@ pub struct AnalyzeConfiguration {
     pub detect_string_imports: Option<bool>,
     pub string_imports_min_dots: Option<usize>,
     pub include_dependencies: Option<BTreeMap<PathBuf, (PathBuf, Vec<String>)>>,
+    pub type_checking_imports: Option<bool>,
 }
 
 impl AnalyzeConfiguration {
@@ -1305,6 +1307,7 @@ impl AnalyzeConfiguration {
                     })
                     .collect::<BTreeMap<_, _>>()
             }),
+            type_checking_imports: options.type_checking_imports,
         })
     }
 
@@ -1319,6 +1322,7 @@ impl AnalyzeConfiguration {
                 .string_imports_min_dots
                 .or(config.string_imports_min_dots),
             include_dependencies: self.include_dependencies.or(config.include_dependencies),
+            type_checking_imports: self.type_checking_imports.or(config.type_checking_imports),
         }
     }
 }

@@ -34,7 +34,7 @@ task_group()
 setup()
 from airflow.decorators import teardown
 from airflow.io.path import ObjectStoragePath
-from airflow.io.storage import attach
+from airflow.io.store import attach
 from airflow.models import DAG as DAGFromModel
 from airflow.models import (
     Connection,
@@ -70,7 +70,50 @@ from airflow.timetables.datasets import DatasetOrTimeSchedule
 from airflow.utils.dag_parsing_context import get_parsing_context
 
 # airflow.timetables.datasets
-DatasetOrTimeSchedule()
+DatasetOrTimeSchedule(datasets=[])
 
 # airflow.utils.dag_parsing_context
 get_parsing_context()
+
+from airflow.decorators.base import (
+    DecoratedMappedOperator,
+    DecoratedOperator,
+    TaskDecorator,
+    get_unique_task_id,
+    task_decorator_factory,
+)
+
+# airflow.decorators.base
+DecoratedMappedOperator()
+DecoratedOperator()
+TaskDecorator()
+get_unique_task_id()
+task_decorator_factory()
+
+
+from airflow.models import DagParam, Param, ParamsDict
+
+# airflow.models
+Param()
+DagParam()
+ParamsDict()
+
+
+from airflow.models.param import DagParam, Param, ParamsDict
+
+# airflow.models.param
+Param()
+DagParam()
+ParamsDict()
+
+
+from airflow.sensors.base import (
+    BaseSensorOperator,
+    PokeReturnValue,
+    poke_mode_only,
+)
+
+# airflow.sensors.base
+BaseSensorOperator()
+PokeReturnValue()
+poke_mode_only()

@@ -31,6 +31,7 @@ use rustc_hash::FxHashMap;
 /// import bar
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.171")]
 pub(crate) struct RedefinedWhileUnused {
     pub name: String,
     pub row: SourceRow,
@@ -183,13 +184,22 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
     // Create diagnostics for each statement.
     for (source, entries) in &redefinitions {
         for (shadowed, binding) in entries {
+            let name = binding.name(checker.source());
             let mut diagnostic = checker.report_diagnostic(
                 RedefinedWhileUnused {
-                    name: binding.name(checker.source()).to_string(),
+                    name: name.to_string(),
                     row: checker.compute_source_row(shadowed.start()),
                 },
                 binding.range(),
             );
+            diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
+
+            diagnostic.secondary_annotation(
+                format_args!("previous definition of `{name}` here"),
+                shadowed,
+            );
+
+            diagnostic.set_primary_message(format_args!("`{name}` redefined here"));
 
             if let Some(range) = binding.parent_range(checker.semantic()) {
                 diagnostic.set_parent(range.start());

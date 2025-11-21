@@ -11,6 +11,11 @@ use crate::generated::ExprName;
 #[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
 #[cfg_attr(feature = "salsa", derive(salsa::Update))]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+#[cfg_attr(
+    feature = "schemars",
+    derive(schemars::JsonSchema),
+    schemars(with = "String")
+)]
 pub struct Name(compact_str::CompactString);
 
 impl Name {
@@ -36,11 +41,22 @@ impl Name {
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
+
+    pub fn push_str(&mut self, s: &str) {
+        self.0.push_str(s);
+    }
 }
 
 impl Debug for Name {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Name({:?})", self.as_str())
+    }
+}
+
+impl std::fmt::Write for Name {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        self.0.push_str(s);
+        Ok(())
     }
 }
 
@@ -187,35 +203,6 @@ impl PartialEq<Name> for &String {
     #[inline]
     fn eq(&self, other: &Name) -> bool {
         other == self
-    }
-}
-
-#[cfg(feature = "schemars")]
-impl schemars::JsonSchema for Name {
-    fn is_referenceable() -> bool {
-        String::is_referenceable()
-    }
-
-    fn schema_name() -> String {
-        String::schema_name()
-    }
-
-    fn schema_id() -> std::borrow::Cow<'static, str> {
-        String::schema_id()
-    }
-
-    fn json_schema(generator: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
-        String::json_schema(generator)
-    }
-
-    fn _schemars_private_non_optional_json_schema(
-        generator: &mut schemars::r#gen::SchemaGenerator,
-    ) -> schemars::schema::Schema {
-        String::_schemars_private_non_optional_json_schema(generator)
-    }
-
-    fn _schemars_private_is_option() -> bool {
-        String::_schemars_private_is_option()
     }
 }
 

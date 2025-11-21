@@ -262,6 +262,7 @@ python-version = "3.12"
 
 ```py
 from typing import Final, ClassVar, Annotated
+from ty_extensions import reveal_mro
 
 LEGAL_A: Final[int] = 1
 LEGAL_B: Final = 1
@@ -299,8 +300,8 @@ def f[T](x: T) -> Final[T]:
 class Foo(Final[tuple[int]]): ...
 
 # TODO: Show `Unknown` instead of `@Todo` type in the MRO; or ignore `Final` and show the MRO as if `Final` was not there
-# revealed: tuple[<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>]
-reveal_type(Foo.__mro__)
+# revealed: (<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>)
+reveal_mro(Foo)
 ```
 
 ### Attribute assignment outside `__init__`
@@ -386,11 +387,140 @@ class C:
     # TODO: This should be an error
     NO_ASSIGNMENT_B: Final[int]
 
-    # This is okay. `DEFINED_IN_INIT` is defined in `__init__`.
     DEFINED_IN_INIT: Final[int]
 
     def __init__(self):
         self.DEFINED_IN_INIT = 1
+```
+
+## Final attributes with Self annotation in `__init__`
+
+Issue #1409: Final instance attributes should be assignable in `__init__` even when using `Self`
+type annotation.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Final, Self
+
+class ClassA:
+    ID4: Final[int]  # OK because initialized in __init__
+
+    def __init__(self: Self):
+        self.ID4 = 1  # Should be OK
+
+    def other_method(self: Self):
+        # error: [invalid-assignment] "Cannot assign to final attribute `ID4` on type `Self@other_method`"
+        self.ID4 = 2  # Should still error outside __init__
+
+class ClassB:
+    ID5: Final[int]
+
+    def __init__(self):  # Without Self annotation
+        self.ID5 = 1  # Should also be OK
+
+reveal_type(ClassA().ID4)  # revealed: int
+reveal_type(ClassB().ID5)  # revealed: int
+```
+
+## Reassignment to Final in `__init__`
+
+Per PEP 591 and the typing conformance suite, Final attributes can be assigned in `__init__`.
+Multiple assignments within `__init__` are allowed (matching mypy and pyright behavior). However,
+assignment in `__init__` is not allowed if the attribute already has a value at class level.
+
+```py
+from typing import Final
+
+# Case 1: Declared in class, assigned once in __init__ - ALLOWED
+class DeclaredAssignedInInit:
+    attr1: Final[int]
+
+    def __init__(self):
+        self.attr1 = 1  # OK: First and only assignment
+
+# Case 2: Declared and assigned in class body - ALLOWED (no __init__ assignment)
+class DeclaredAndAssignedInClass:
+    attr2: Final[int] = 10
+
+# Case 3: Reassignment when already assigned in class body
+class ReassignmentFromClass:
+    attr3: Final[int] = 10
+
+    def __init__(self):
+        # error: [invalid-assignment]
+        self.attr3 = 20  # Error: already assigned in class body
+
+# Case 4: Multiple assignments within __init__ itself
+# Per conformance suite and PEP 591, all assignments in __init__ are allowed
+class MultipleAssignmentsInInit:
+    attr4: Final[int]
+
+    def __init__(self):
+        self.attr4 = 1  # OK: Assignment in __init__
+        self.attr4 = 2  # OK: Multiple assignments in __init__ are allowed
+
+class ConditionalAssignment:
+    X: Final[int]
+
+    def __init__(self, cond: bool):
+        if cond:
+            self.X = 42  # OK: Assignment in __init__
+        else:
+            self.X = 56  # OK: Multiple assignments in __init__ are allowed
+
+# Case 5: Declaration and assignment in __init__ - ALLOWED
+class DeclareAndAssignInInit:
+    def __init__(self):
+        self.attr5: Final[int] = 1  # OK: Declare and assign in __init__
+
+# Case 6: Assignment outside __init__ should still fail
+class AssignmentOutsideInit:
+    attr6: Final[int]
+
+    def other_method(self):
+        # error: [invalid-assignment] "Cannot assign to final attribute `attr6`"
+        self.attr6 = 1  # Error: Not in __init__
+```
+
+## Final assignment restrictions in `__init__`
+
+`__init__` can only assign Final attributes on the class it's defining, and only to the first
+parameter (`self`).
+
+```py
+from typing import Final
+
+class C:
+    x: Final[int] = 100
+
+# Assignment from standalone function (even named __init__)
+def _(c: C):
+    # error: [invalid-assignment] "Cannot assign to final attribute `x`"
+    c.x = 1  # Error: Not in C.__init__
+
+def __init__(c: C):
+    # error: [invalid-assignment] "Cannot assign to final attribute `x`"
+    c.x = 1  # Error: Not a method
+
+# Assignment from another class's __init__
+class A:
+    def __init__(self, c: C):
+        # error: [invalid-assignment] "Cannot assign to final attribute `x`"
+        c.x = 1  # Error: Not C's __init__
+
+# Assignment to non-self parameter in __init__
+class D:
+    y: Final[int]
+
+    def __init__(self, other: "D"):
+        self.y = 1  # OK: Assigning to self
+        # TODO: Should error - assigning to non-self parameter
+        # Requires tracking which parameter the base expression refers to
+        other.y = 2
 ```
 
 ## Full diagnostics

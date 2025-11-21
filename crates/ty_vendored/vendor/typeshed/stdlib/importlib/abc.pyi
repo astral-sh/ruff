@@ -69,6 +69,7 @@ else:
         def exec_module(self, module: types.ModuleType) -> None: ...
 
 if sys.version_info < (3, 12):
+    @deprecated("Deprecated since Python 3.3; removed in Python 3.12. Use `MetaPathFinder` or `PathEntryFinder` instead.")
     class Finder(metaclass=ABCMeta):
         """Legacy abstract base class for import finders.
 
@@ -80,12 +81,15 @@ if sys.version_info < (3, 12):
         Deprecated since Python 3.3
         """
 
-@deprecated("Deprecated as of Python 3.7: Use importlib.resources.abc.TraversableResources instead.")
+@deprecated("Deprecated since Python 3.7. Use `importlib.resources.abc.TraversableResources` instead.")
 class ResourceLoader(Loader):
     """Abstract base class for loaders which can return data from their
-    back-end storage.
+    back-end storage to facilitate reading data to perform an import.
 
     This ABC represents one of the optional protocols specified by PEP 302.
+
+    For directly loading resources, use TraversableResources instead. This class
+    primarily exists for backwards compatibility with other ABCs in this module.
 
     """
 
@@ -132,7 +136,7 @@ class InspectLoader(Loader):
 
     @staticmethod
     def source_to_code(
-        data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive, path: ReadableBuffer | StrPath = "<string>"
+        data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive, path: bytes | StrPath = "<string>"
     ) -> types.CodeType:
         """Compile 'data' into a code object.
 
@@ -172,7 +176,7 @@ class SourceLoader(_bootstrap_external.SourceLoader, ResourceLoader, ExecutionLo
 
     """
 
-    @deprecated("Deprecated as of Python 3.3: Use importlib.resources.abc.SourceLoader.path_stats instead.")
+    @deprecated("Deprecated since Python 3.3. Use `importlib.resources.abc.SourceLoader.path_stats` instead.")
     def path_mtime(self, path: str) -> float:
         """Return the (int) modification time for the path (str)."""
 
@@ -204,6 +208,7 @@ if sys.version_info >= (3, 10):
         """Abstract base class for import finders on sys.meta_path."""
 
         if sys.version_info < (3, 12):
+            @deprecated("Deprecated since Python 3.4; removed in Python 3.12. Use `MetaPathFinder.find_spec()` instead.")
             def find_module(self, fullname: str, path: Sequence[str] | None) -> Loader | None:
                 """Return a loader for the module.
 
@@ -229,6 +234,7 @@ if sys.version_info >= (3, 10):
         """Abstract base class for path entry finders used by PathFinder."""
 
         if sys.version_info < (3, 12):
+            @deprecated("Deprecated since Python 3.4; removed in Python 3.12. Use `PathEntryFinder.find_spec()` instead.")
             def find_module(self, fullname: str) -> Loader | None:
                 """Try to find a loader for the specified module by delegating to
                 self.find_loader().
@@ -237,6 +243,7 @@ if sys.version_info >= (3, 10):
 
                 """
 
+            @deprecated("Deprecated since Python 3.4; removed in Python 3.12. Use `find_spec()` instead.")
             def find_loader(self, fullname: str) -> tuple[Loader | None, Sequence[str]]:
                 """Return (loader, namespace portion) for the path entry.
 
@@ -335,10 +342,10 @@ class FileLoader(_bootstrap_external.FileLoader, ResourceLoader, ExecutionLoader
     def get_data(self, path: str) -> bytes:
         """Return the data from path as raw bytes."""
 
-    def get_filename(self, name: str | None = None) -> str:
+    def get_filename(self, fullname: str | None = None) -> str:
         """Return the path to the source file as found by the finder."""
 
-    def load_module(self, name: str | None = None) -> types.ModuleType:
+    def load_module(self, fullname: str | None = None) -> types.ModuleType:
         """Load a module from a file.
 
         This method is deprecated.  Use exec_module() instead.

@@ -17,6 +17,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/directives/assert_type.m
 3 | def _(x: int):
 4 |     assert_type(x, int)  # fine
 5 |     assert_type(x, str)  # error: [type-assertion-failure]
+6 |     assert_type(assert_type(x, int), int)
 ```
 
 # Diagnostics
@@ -31,6 +32,7 @@ error[type-assertion-failure]: Argument does not have asserted type `str`
   |     ^^^^^^^^^^^^-^^^^^^
   |                 |
   |                 Inferred type of argument is `int`
+6 |     assert_type(assert_type(x, int), int)
   |
 info: `str` and `int` are not equivalent types
 info: rule `type-assertion-failure` is enabled by default

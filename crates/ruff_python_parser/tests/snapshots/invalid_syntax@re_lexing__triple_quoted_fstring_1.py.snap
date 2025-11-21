@@ -7,38 +7,38 @@ input_file: crates/ruff_python_parser/resources/invalid/re_lexing/triple_quoted_
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..198,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 166..178,
                     value: FString(
                         ExprFString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 166..178,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 166..178,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 170..176,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         value: "hello ",
                                                     },
                                                 ),
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 176..178,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: AtomicNodeIndex(..),
+                                                                node_index: NodeIndex(None),
                                                                 range: 177..178,
                                                                 id: Name("x"),
                                                                 ctx: Load,
@@ -54,6 +54,7 @@ Module(
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: true,
+                                                unclosed: true,
                                             },
                                         },
                                     ),
@@ -82,7 +83,7 @@ Module(
   |
 5 | f"""hello {x # comment    
 6 | y = 1
-  | ^ Syntax Error: f-string: expecting '}'
+  | ^ Syntax Error: f-string: expecting `}`
   |
 
 
@@ -92,7 +93,7 @@ Module(
 5 |   f"""hello {x # comment    
   |  ___________________________^
 6 | | y = 1
-  | |_____^ Syntax Error: Expected FStringEnd, found Unknown
+  | |_____^ Syntax Error: Expected FStringEnd, found FStringMiddle
   |
 
 

@@ -39,7 +39,7 @@ from re import Pattern
 from socket import socket
 from ssl import SSLContext
 from types import TracebackType
-from typing import Any, Protocol, overload
+from typing import Any, Final, Protocol, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 
 __all__ = [
@@ -62,12 +62,12 @@ __all__ = [
 _Reply: TypeAlias = tuple[int, bytes]
 _SendErrs: TypeAlias = dict[str, _Reply]
 
-SMTP_PORT: int
-SMTP_SSL_PORT: int
-CRLF: str
-bCRLF: bytes
+SMTP_PORT: Final = 25
+SMTP_SSL_PORT: Final = 465
+CRLF: Final[str]
+bCRLF: Final[bytes]
 
-OLDSTYLE_AUTH: Pattern[str]
+OLDSTYLE_AUTH: Final[Pattern[str]]
 
 class SMTPException(OSError):
     """Base class for all exceptions raised by this module."""
@@ -154,6 +154,7 @@ def quotedata(data: str) -> str:
     internet CRLF end-of-line.
     """
 
+@type_check_only
 class _AuthObject(Protocol):
     @overload
     def __call__(self, challenge: None = None, /) -> str | None: ...
@@ -589,7 +590,7 @@ class SMTP_SSL(SMTP):
             context: SSLContext | None = None,
         ) -> None: ...
 
-LMTP_PORT: int
+LMTP_PORT: Final = 2003
 
 class LMTP(SMTP):
     """LMTP - Local Mail Transfer Protocol

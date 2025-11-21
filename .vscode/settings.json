@@ -3,4 +3,7 @@
         "--all-features"
     ],
     "rust-analyzer.check.command": "clippy",
+    "search.exclude": {
+        "**/*.snap": true
+    }
 }

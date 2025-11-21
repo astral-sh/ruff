@@ -24,28 +24,28 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
-  CONFORMANCE_SUITE_COMMIT: d4f39b27a4a47aac8b6d4019e1b0b5b3156fabdc
+  CONFORMANCE_SUITE_COMMIT: 9f6d8ced7cd1c8d92687a4e9c96d7716452e471e
 
 jobs:
   typing_conformance:
     name: Compute diagnostic diff
-    runs-on: depot-ubuntu-22.04-32
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           path: ruff
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: python/typing
           ref: ${{ env.CONFORMANCE_SUITE_COMMIT }}
           path: typing
           persist-credentials: false
 
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
         with:
           workspaces: "ruff"
 
@@ -54,6 +54,9 @@ jobs:
 
       - name: Compute diagnostic diff
         shell: bash
+        env:
+          # TODO: Remove this once we fixed the remaining panics in the conformance suite.
+          TY_MAX_PARALLELISM: 1
         run: |
           RUFF_DIR="$GITHUB_WORKSPACE/ruff"
 
@@ -63,15 +66,15 @@ jobs:
 
             echo "new commit"
             git rev-list --format=%s --max-count=1 "$GITHUB_SHA"
-            cargo build --release --bin ty
-            mv target/release/ty ty-new
+            cargo build --bin ty
+            mv target/debug/ty ty-new
 
             MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
             git checkout -b old_commit "$MERGE_BASE"
             echo "old commit (merge base)"
             git rev-list --format=%s --max-count=1 old_commit
-            cargo build --release --bin ty
-            mv target/release/ty ty-old
+            cargo build --bin ty
+            mv target/debug/ty ty-old
           )
 
           (
@@ -91,21 +94,18 @@ jobs:
             touch typing_conformance_diagnostics.diff
           fi
 
-          echo ${{ github.event.number }} > pr-number
           echo "${CONFORMANCE_SUITE_COMMIT}" > conformance-suite-commit
 
+      # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
+      # Make sure to update the bot if you rename the artifact.
       - name: Upload diff
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: typing_conformance_diagnostics_diff
           path: typing_conformance_diagnostics.diff
 
-      - name: Upload pr-number
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: pr-number
-          path: pr-number
-
+      # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
+      # Make sure to update the bot if you rename the artifact.
       - name: Upload conformance suite commit
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

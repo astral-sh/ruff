@@ -39,6 +39,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ## Options
 /// - `lint.isort.required-imports`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.218")]
 pub(crate) struct MissingRequiredImport(pub String);
 
 impl AlwaysFixableViolation for MissingRequiredImport {
@@ -125,7 +126,8 @@ fn add_required_import(
         TextRange::default(),
     );
     diagnostic.set_fix(Fix::safe_edit(
-        Importer::new(parsed, locator, stylist).add_import(required_import, TextSize::default()),
+        Importer::new(parsed, locator.contents(), stylist)
+            .add_import(required_import, TextSize::default()),
     ));
 }
 

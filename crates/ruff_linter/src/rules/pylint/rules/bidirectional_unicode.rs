@@ -3,7 +3,7 @@ use ruff_source_file::Line;
 
 use crate::{Violation, checkers::ast::LintContext};
 
-const BIDI_UNICODE: [char; 10] = [
+const BIDI_UNICODE: [char; 11] = [
     '\u{202A}', //{LEFT-TO-RIGHT EMBEDDING}
     '\u{202B}', //{RIGHT-TO-LEFT EMBEDDING}
     '\u{202C}', //{POP DIRECTIONAL FORMATTING}
@@ -17,6 +17,7 @@ const BIDI_UNICODE: [char; 10] = [
     // https://peps.python.org/pep-0672/
     // so the list above might not be complete
     '\u{200F}', //{RIGHT-TO-LEFT MARK}
+    '\u{061C}', //{ARABIC LETTER MARK}
                 // We don't use
                 //   "\u200E" # \n{LEFT-TO-RIGHT MARK}
                 // as this is the default for latin files and can't be used
@@ -49,6 +50,7 @@ const BIDI_UNICODE: [char; 10] = [
 /// ## References
 /// - [PEP 672: Bidirectional Marks, Embeddings, Overrides and Isolates](https://peps.python.org/pep-0672/#bidirectional-marks-embeddings-overrides-and-isolates)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.244")]
 pub(crate) struct BidirectionalUnicode;
 
 impl Violation for BidirectionalUnicode {

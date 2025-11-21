@@ -6,4 +6,6 @@ See the relevant header files in /usr/include/mach-o
 And also Apple's documentation.
 """
 
-__version__: str
+from typing import Final
+
+__version__: Final[str]
