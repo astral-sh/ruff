@@ -149,14 +149,39 @@ fn documentation_trim(docs: &str) -> String {
     output
 }
 
-/// Given a cleaned up docstring, render it to markdown.
+/// Given a presumed reStructuredText docstring, render it to GitHub Flavored Markdown.
 ///
-/// This is by no means perfect but it handles a lot of common formats well.
+/// This function assumes the input has had its whitespace normalized by `documentation_trim`,
+/// so leading whitespace is always a space, and newlines are always `\n`.
 ///
-/// This code currently assumes docstrings are reStructuredText with significant
-/// line-breaks and indentation. Some constructs like *italic*, **bold**, and `inline code`
-/// are shared between the two formats. Other things like _italic_ are only markdown
-/// and should be escaped.
+/// The general approach here is:
+///
+/// * Preserve the docstring verbatim by default, ensuring indent/linewraps are preserved
+/// * Escape problematic things where necessary (bare `__dunder__` => `\_\_dunder\_\_`)
+/// * Introduce code fences where appropriate
+///
+/// The first rule is significant in ensuring various docstring idioms render clearly.
+/// In particular ensuring things like this are faithfully rendered:
+///
+/// ```text
+/// param1 -- a good parameter
+/// param2 -- another good parameter
+///           with longer docs
+/// ```
+///
+/// If we didn't go out of our way to preserve the indentation and line-breaks, markdown would
+/// constantly render inputs like that into abominations like:
+///
+/// ```html
+/// <p>
+/// param1 -- a good parameter param2 -- another good parameter
+/// </p>
+///
+/// <code>
+/// with longer docs
+/// </code>
+/// ```
+
 fn render_markdown(docstring: &str) -> String {
     // TODO: there is a convention that `singletick` is for items that can
     // be looked up in-scope while ``multitick`` is for opaque inline code.
@@ -178,6 +203,7 @@ fn render_markdown(docstring: &str) -> String {
         // First thing's first, add a newline to start the new line
         if !first_line {
             // If we're not in a codeblock, add trailing space to the line to authentically wrap it
+            // (Lines ending with two spaces tell markdown to preserve a linebreak)
             if !in_any_code {
                 output.push_str("  ");
             }
@@ -188,6 +214,8 @@ fn render_markdown(docstring: &str) -> String {
         }
 
         // If we're in a literal block and we find a non-empty dedented line, end the block
+        // TODO: we should remove all the trailing blank lines
+        // (Just pop all trailing `\n` from `output`?)
         if in_literal && line_indent < block_indent && !line.is_empty() {
             in_literal = false;
             in_any_code = false;
@@ -196,13 +224,16 @@ fn render_markdown(docstring: &str) -> String {
         }
 
         // We previously entered a literal block and we just found our first non-blank line
-        // So now we're actually in the litreal
+        // So now we're actually in the literal block
         if starting_literal && !line.is_empty() {
             starting_literal = false;
             in_literal = true;
             in_any_code = true;
             block_indent = line_indent;
+            // TODO: I hope people don't have literal blocks about markdown code fence syntax
             // TODO: should we not be this aggressive? Let it autodetect?
+            // TODO: respect `.. code-block::` directives:
+            // <https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block>
             output.push_str("\n```python\n");
         }
 
@@ -235,6 +266,7 @@ fn render_markdown(docstring: &str) -> String {
 
         // Add this line's indentation.
         // We could subtract the block_indent here but in practice it's uglier
+        // TODO: should we not do this if the `line.is_empty()`? When would it matter?
         for _ in 0..line_indent {
             // If we're not in a codeblock use non-breaking spaces to preserve the indent
             if !in_any_code {
@@ -245,9 +277,71 @@ fn render_markdown(docstring: &str) -> String {
         }
 
         if !in_any_code {
-            // This is plain text, apply some escapes for reST that don't map to markdown:
-            // * underscores aren't used for italics/bold in reST (don't mess up __dunders__)
-            output.push_str(&line.replace('_', "\\_"));
+            // This line is plain text, so we need to escape things that are inert in reST
+            // but active syntax in markdown... but not if it's inside `inline code`.
+            // Inline-code syntax is shared by reST and markdown which is really convenient
+            // except we need to find and parse it anyway to do this escaping properly! :(
+            // For now we assume `inline code` does not span a line (I'm not even sure if can).
+            //
+            // Things that need to be escaped: underscores
+            //
+            // e.g. we want __init__ => \_\_init\_\_ but `__init__` => `__init__`
+            let escape = |input: &str| input.replace('_', "\\_");
+
+            let mut in_inline_code = false;
+            let mut first_chunk = true;
+            let mut opening_tick_count = 0;
+            let mut current_tick_count = 0;
+            for chunk in line.split('`') {
+                // First chunk is definitionally not in inline-code and so always plaintext
+                if first_chunk {
+                    first_chunk = false;
+                    output.push_str(&escape(chunk));
+                    continue;
+                }
+                // Not in first chunk, emit the ` between the last chunk and this one
+                output.push('`');
+                current_tick_count += 1;
+
+                // If we're in an inline block and have enough close-ticks to terminate it, do so.
+                // TODO: we parse ``hello```there` as (hello)(there) which probably isn't correct
+                // (definitely not for markdown) but it's close enough for horse grenades in this
+                // MVP impl. Notably we're verbatime emitting all the `'s so as long as reST and
+                // markdown agree we're *fine*. The accuracy of this parsing only affects the
+                // accuracy of where we apply escaping (so we need to misparse and see escapables
+                // for any of this to matter).
+                if opening_tick_count > 0 && current_tick_count >= opening_tick_count {
+                    opening_tick_count = 0;
+                    current_tick_count = 0;
+                    in_inline_code = false;
+                }
+
+                // If this chunk is completely empty we're just in a run of ticks, continue
+                if chunk.is_empty() {
+                    continue;
+                }
+
+                // Ok the chunk is non-empty, our run of ticks is complete
+                if in_inline_code {
+                    // The previous check for >= open_tick_count didn't trip, so these can't close
+                    // and these ticks will be verbatim rendered in the content
+                    current_tick_count = 0;
+                } else if current_tick_count > 0 {
+                    // Ok we're now in inline code
+                    opening_tick_count = current_tick_count;
+                    current_tick_count = 0;
+                    in_inline_code = true;
+                }
+
+                // Finally include the content either escaped or not
+                if in_inline_code {
+                    output.push_str(chunk);
+                } else {
+                    output.push_str(&escape(chunk));
+                }
+            }
+            // NOTE: explicitly not "flushing" the ticks here.
+            // We respect however the user closed their inline code.
         } else if line.is_empty() {
             if in_doctest {
                 // This is the end of a doctest
@@ -612,23 +706,71 @@ mod tests {
     #[test]
     fn dunder_escape() {
         let docstring = r#"
-        Here _this_ and ___that__ and should be escaped.
-        But *this* and **that** should be untouched.
-        As should `this` and ``that``.
+        Here _this_ and ___that__ should be escaped
+        Here *this* and **that** should be untouched
+        Here `this` and ``that`` should be untouched
+
+        Here `_this_` and ``__that__`` should be untouched
+        Here `_this_` ``__that__`` should be untouched
+        `_this_too_should_be_untouched_`
+
+        Here `_this_```__that__`` should be untouched but this_is_escaped
+        Here ``_this_```__that__` should be untouched but this_is_escaped
+
+        Here `_this_ and _that_ should be escaped (but isn't)
+        Here _this_ and _that_` should be escaped
+        `Here _this_ and _that_ should be escaped (but isn't)
+        Here _this_ and _that_ should be escaped`
+
+        Here ```_is_``__a__`_balanced_``_mess_```
+        Here ```_is_`````__a__``_random_````_mess__````
+        ```_is_`````__a__``_random_````_mess__````
         "#;
 
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_plaintext(), @r"
-        Here _this_ and ___that__ and should be escaped.
-        But *this* and **that** should be untouched.
-        As should `this` and ``that``.
+        Here _this_ and ___that__ should be escaped
+        Here *this* and **that** should be untouched
+        Here `this` and ``that`` should be untouched
+
+        Here `_this_` and ``__that__`` should be untouched
+        Here `_this_` ``__that__`` should be untouched
+        `_this_too_should_be_untouched_`
+
+        Here `_this_```__that__`` should be untouched but this_is_escaped
+        Here ``_this_```__that__` should be untouched but this_is_escaped
+
+        Here `_this_ and _that_ should be escaped (but isn't)
+        Here _this_ and _that_` should be escaped
+        `Here _this_ and _that_ should be escaped (but isn't)
+        Here _this_ and _that_ should be escaped`
+
+        Here ```_is_``__a__`_balanced_``_mess_```
+        Here ```_is_`````__a__``_random_````_mess__````
+        ```_is_`````__a__``_random_````_mess__````
         ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
-        Here \_this\_ and \_\_\_that\_\_ and should be escaped.  
-        But *this* and **that** should be untouched.  
-        As should `this` and ``that``.
+        Here \_this\_ and \_\_\_that\_\_ should be escaped  
+        Here *this* and **that** should be untouched  
+        Here `this` and ``that`` should be untouched  
+          
+        Here `_this_` and ``__that__`` should be untouched  
+        Here `_this_` ``__that__`` should be untouched  
+        `_this_too_should_be_untouched_`  
+          
+        Here `_this_```__that__`` should be untouched but this\_is\_escaped  
+        Here ``_this_```__that__` should be untouched but this\_is\_escaped  
+          
+        Here `_this_ and _that_ should be escaped (but isn't)  
+        Here \_this\_ and \_that\_` should be escaped  
+        `Here _this_ and _that_ should be escaped (but isn't)  
+        Here \_this\_ and \_that\_ should be escaped`  
+          
+        Here ```_is_``__a__`_balanced_``_mess_```  
+        Here ```_is_`````__a__``\_random\_````_mess__````  
+        ```_is_`````__a__``\_random\_````_mess__````
         ");
     }
 
