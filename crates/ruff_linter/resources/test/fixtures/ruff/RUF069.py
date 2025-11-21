@@ -1,75 +1,70 @@
-"""
-Should emit:
-RUF066 - on lines 12, 23, 48
-"""
-
 import abc
 import typing
 
 
-class User:
+class User:  # Test normal class properties
     @property
-    def name(self):  # No return
+    def name(self):  # ERROR: No return
         f"{self.first_name} {self.last_name}"
 
     @property
-    def age(self):
+    def age(self):  # OK: Returning something
         return 100
 
-    def method(self):
+    def method(self):  # OK: Not a property
         x = 1
 
     @property
-    def nested(self):  # No return
+    def nested(self):  # ERROR: Property itself doesn't return
         def inner():
             return 0
 
     @property
-    def stub(self): ...
+    def stub(self): ...  # OK: A stub; doesn't return anything
 
 
-class UserMeta(metaclass=abc.ABCMeta):
+class UserMeta(metaclass=abc.ABCMeta):  # Test properies inside of an ABC class
     @property
     @abc.abstractmethod
-    def abstr_prop1(self): ...
+    def abstr_prop1(self): ...  # OK: Abstract methods doesn't need to return anything
 
     @property
     @abc.abstractmethod
-    def abstr_prop2(self):
+    def abstr_prop2(self):  # OK: Abstract methods doesn't need to return anything
         """
         A cool docstring
         """
 
     @property
-    def prop1(self):
+    def prop1(self):  # OK: Returning a value
         return 1
 
     @property
-    def prop2(self):  # No return
+    def prop2(self):  # ERROR: Not returning something (even when we are inside an ABC)
         50
 
-    def method(self):
+    def method(self):  # OK: Not a property
         x = 1
 
 
-def func():
+def func():  # OK: Not a property
     x = 1
 
 
-class Prot(typing.Protocol):
+class Proto(typing.Protocol):  # Tests for a Protocol class
     @property
-    def prop1(self) -> int: ...
+    def prop1(self) -> int: ...  # OK: A stub property
 
 
-class File:
+class File:  # Extra tests for things like yield/yield from/raise
     @property
-    def stream1(self):
+    def stream1(self):  # OK: Yields something
         yield
 
     @property
-    def stream2(self):
+    def stream2(self):  # OK: Yields from something
         yield from self.stream1
 
     @property
-    def children(self):
+    def children(self):  # OK: Raises
         raise ValueError("File does not have children")

@@ -2,40 +2,40 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
 RUF069 name is an unnecessary property
-  --> RUF069.py:11:5
+  --> RUF069.py:6:5
    |
-10 |   class User:
-11 | /     @property
-12 | |     def name(self):  # No return
-13 | |         f"{self.first_name} {self.last_name}"
+ 5 |   class User:  # Test normal class properties
+ 6 | /     @property
+ 7 | |     def name(self):  # ERROR: No return
+ 8 | |         f"{self.first_name} {self.last_name}"
    | |_____________________________________________^
-14 |
-15 |       @property
+ 9 |
+10 |       @property
    |
 
 RUF069 nested is an unnecessary property
-  --> RUF069.py:22:5
+  --> RUF069.py:17:5
    |
-20 |           x = 1
-21 |
-22 | /     @property
-23 | |     def nested(self):  # No return
-24 | |         def inner():
-25 | |             return 0
+15 |           x = 1
+16 |
+17 | /     @property
+18 | |     def nested(self):  # ERROR: Property itself doesn't return
+19 | |         def inner():
+20 | |             return 0
    | |____________________^
-26 |
-27 |       @property
+21 |
+22 |       @property
    |
 
 RUF069 prop2 is an unnecessary property
-  --> RUF069.py:47:5
+  --> RUF069.py:42:5
    |
-45 |           return 1
-46 |
-47 | /     @property
-48 | |     def prop2(self):  # No return
-49 | |         50
+40 |           return 1
+41 |
+42 | /     @property
+43 | |     def prop2(self):  # ERROR: Not returning something (even when we are inside an ABC)
+44 | |         50
    | |__________^
-50 |
-51 |       def method(self):
+45 |
+46 |       def method(self):  # OK: Not a property
    |
