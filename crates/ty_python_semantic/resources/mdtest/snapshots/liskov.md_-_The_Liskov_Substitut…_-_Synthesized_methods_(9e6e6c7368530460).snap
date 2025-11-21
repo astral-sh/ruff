@@ -1,0 +1,107 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: liskov.md - The Liskov Substitution Principle - Synthesized methods
+mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
+---
+
+# Python source files
+
+## mdtest_snippet.pyi
+
+```
+ 1 | from dataclasses import dataclass
+ 2 | from typing import NamedTuple
+ 3 | 
+ 4 | @dataclass(order=True)
+ 5 | class Foo:
+ 6 |     x: int
+ 7 | 
+ 8 | class Bar(Foo):
+ 9 |     def __lt__(self, other: Bar) -> bool: ...  # error: [invalid-method-override]
+10 | 
+11 | # TODO: specifying `order=True` on the subclass means that a `__lt__` method is
+12 | # generated that is incompatible with the generated `__lt__` method on the superclass.
+13 | # We could consider detecting this and emitting a diagnostic, though maybe it shouldn't
+14 | # be `invalid-method-override` since we'd emit it on the class definition rather than
+15 | # on any method definition. Note also that no other type checker complains about this
+16 | # as of 2025-11-21.
+17 | @dataclass(order=True)
+18 | class Bar2(Foo):
+19 |     y: str
+20 | 
+21 | # TODO: Although this class does not override any methods of `Foo`, it nonetheless
+22 | # arguably violates the Liskov Substitution Principle. Instances of `Bar3` cannot be
+23 | # substituted wherever an instance of `Foo` is expected, because the generated
+24 | # `__lt__` method on `Foo` raises an error unless the r.h.s. and `l.h.s.` have exactly
+25 | # the same `__class__` (it does not permit instances of `Foo` to be compared with
+26 | # instances of subclasses of `Foo`). We could therefore consider treating all
+27 | # `order=True` dataclasses as implicitly `@final` in order to enforce Liskov soundness.
+28 | # Note that no other type checker catches this error as of 2025-11-21.
+29 | class Bar3(Foo): ...
+30 | 
+31 | class Eggs:
+32 |     def __lt__(self, other: Eggs) -> bool: ...
+33 | 
+34 | # TODO: the generated `Ham.__lt__` method here incompatibly overrides `Eggs.__lt__`.
+35 | # We could consider emitting a diagnostic here. As of 2025-11-21, mypy reports a
+36 | # diagnostic here but pyright and pyrefly do not.
+37 | @dataclass(order=True)
+38 | class Ham(Eggs):
+39 |     x: int
+40 | 
+41 | class Baz(NamedTuple):
+42 |     x: int
+43 | 
+44 | class Spam(Baz):
+45 |     def _asdict(self) -> tuple[int, ...]: ...  # error: [invalid-method-override]
+```
+
+# Diagnostics
+
+```
+error[invalid-method-override]: Invalid override of method `__lt__`
+  --> src/mdtest_snippet.pyi:9:9
+   |
+ 8 | class Bar(Foo):
+ 9 |     def __lt__(self, other: Bar) -> bool: ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Foo.__lt__`
+10 |
+11 | # TODO: specifying `order=True` on the subclass means that a `__lt__` method is
+   |
+info: This violates the Liskov Substitution Principle
+info: `Foo.__lt__` is a generated method created because `Foo` is a dataclass
+ --> src/mdtest_snippet.pyi:5:7
+  |
+4 | @dataclass(order=True)
+5 | class Foo:
+  |       ^^^ Definition of `Foo`
+6 |     x: int
+  |
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `_asdict`
+  --> src/mdtest_snippet.pyi:45:9
+   |
+44 | class Spam(Baz):
+45 |     def _asdict(self) -> tuple[int, ...]: ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Baz._asdict`
+   |
+info: This violates the Liskov Substitution Principle
+info: `Baz._asdict` is a generated method created because `Baz` inherits from `typing.NamedTuple`
+  --> src/mdtest_snippet.pyi:41:7
+   |
+39 |     x: int
+40 |
+41 | class Baz(NamedTuple):
+   |       ^^^^^^^^^^^^^^^ Definition of `Baz`
+42 |     x: int
+   |
+info: rule `invalid-method-override` is enabled by default
+
+```

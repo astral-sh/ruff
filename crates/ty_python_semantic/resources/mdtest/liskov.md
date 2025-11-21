@@ -455,7 +455,17 @@ class Bad:
         return self.x == other.x
 ```
 
-## Bad override of a synthesized method
+## Synthesized methods
+
+`NamedTuple` classes and dataclasses both have methods generated at runtime that do not have
+source-code definitions. There are several scenarios to consider here:
+
+1. A synthesized method on a superclass is overridden by a "normal" (not synthesized) method on a
+    subclass
+1. A "normal" method on a superclass is overridden by a synthesized method on a subclass
+1. A synthesized method on a superclass is overridden by a synthesized method on a subclass
+1. No methods are overridden, but the Liskov Substitution Principle is arguably violated anyway
+    because a generated method on a superclass is incompatible with subclassing(!)
 
 <!-- snapshot-diagnostics -->
 
@@ -469,6 +479,36 @@ class Foo:
 
 class Bar(Foo):
     def __lt__(self, other: Bar) -> bool: ...  # error: [invalid-method-override]
+
+# TODO: specifying `order=True` on the subclass means that a `__lt__` method is
+# generated that is incompatible with the generated `__lt__` method on the superclass.
+# We could consider detecting this and emitting a diagnostic, though maybe it shouldn't
+# be `invalid-method-override` since we'd emit it on the class definition rather than
+# on any method definition. Note also that no other type checker complains about this
+# as of 2025-11-21.
+@dataclass(order=True)
+class Bar2(Foo):
+    y: str
+
+# TODO: Although this class does not override any methods of `Foo`, it nonetheless
+# arguably violates the Liskov Substitution Principle. Instances of `Bar3` cannot be
+# substituted wherever an instance of `Foo` is expected, because the generated
+# `__lt__` method on `Foo` raises an error unless the r.h.s. and `l.h.s.` have exactly
+# the same `__class__` (it does not permit instances of `Foo` to be compared with
+# instances of subclasses of `Foo`). We could therefore consider treating all
+# `order=True` dataclasses as implicitly `@final` in order to enforce Liskov soundness.
+# Note that no other type checker catches this error as of 2025-11-21.
+class Bar3(Foo): ...
+
+class Eggs:
+    def __lt__(self, other: Eggs) -> bool: ...
+
+# TODO: the generated `Ham.__lt__` method here incompatibly overrides `Eggs.__lt__`.
+# We could consider emitting a diagnostic here. As of 2025-11-21, mypy reports a
+# diagnostic here but pyright and pyrefly do not.
+@dataclass(order=True)
+class Ham(Eggs):
+    x: int
 
 class Baz(NamedTuple):
     x: int
