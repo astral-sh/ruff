@@ -1533,7 +1533,7 @@ impl<'db> Type<'db> {
 
     #[must_use]
     pub(crate) fn recursive_type_normalized(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
-        cycle.head_ids.clone().fold(self, |ty, id| {
+        cycle.head_ids().fold(self, |ty, id| {
             let visitor = NormalizedVisitor::new(Type::divergent(id));
             ty.recursive_type_normalized_impl(db, Type::divergent(id), false, &visitor)
                 .unwrap_or(Type::divergent(id))
