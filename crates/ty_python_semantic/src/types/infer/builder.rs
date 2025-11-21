@@ -5799,9 +5799,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
         let mut diagnostic = builder.into_diagnostic(format_args!(
-            "Cannot resolve imported module `{}{}`",
-            ".".repeat(level as usize),
-            module.unwrap_or_default()
+            "Cannot resolve imported module `{}`",
+            format_import_from_module(level, module)
         ));
 
         if level == 0 {
@@ -5831,6 +5830,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         break;
                     }
                 }
+            }
+        } else {
+            if let Some(better_level) = (0..level).rev().find(|reduced_level| {
+                let Ok(module_name) = ModuleName::from_identifier_parts(
+                    self.db(),
+                    self.file(),
+                    module,
+                    *reduced_level,
+                ) else {
+                    return false;
+                };
+                resolve_module(self.db(), &module_name).is_some()
+            }) {
+                diagnostic
+                    .help("The module can be resolved if the number of leading dots is reduced");
+                diagnostic.help(format_args!(
+                    "Did you mean `{}`?",
+                    format_import_from_module(better_level, module)
+                ));
+                diagnostic.set_concise_message(format_args!(
+                    "Cannot resolve imported module `{}` - did you mean `{}`?",
+                    format_import_from_module(level, module),
+                    format_import_from_module(better_level, module)
+                ));
             }
         }
 
@@ -6026,8 +6049,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             Err(ModuleNameResolutionError::TooManyDots) => {
                 tracing::debug!(
-                    "Relative module resolution `{}` failed: too many leading dots \
-                    (try adjusting configured search paths?)",
+                    "Relative module resolution `{}` failed: too many leading dots",
                     format_import_from_module(*level, module),
                 );
                 self.report_unresolved_import(
