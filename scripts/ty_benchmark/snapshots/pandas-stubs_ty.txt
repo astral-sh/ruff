@@ -1,8 +1,9 @@
+pandas-stubs/_typing.pyi:861:25: error[invalid-argument-type] Argument to class `ndarray` is incorrect: Expected `tuple[int, ...]`, found `typing.TypeVar`
 pandas-stubs/_typing.pyi:861:44: error[invalid-argument-type] Argument to class `dtype` is incorrect: Expected `generic[Any]`, found `typing.TypeVar`
 pandas-stubs/_typing.pyi:865:48: error[invalid-argument-type] Argument to class `dtype` is incorrect: Expected `generic[Any]`, found `typing.TypeVar`
 pandas-stubs/_typing.pyi:877:53: error[invalid-argument-type] Argument to class `dtype` is incorrect: Expected `generic[Any]`, found `typing.TypeVar`
 pandas-stubs/core/series.pyi:338:57: error[invalid-argument-type] Argument to class `IndexOpsMixin` is incorrect: Expected `str | bytes | int | ... omitted 12 union elements`, found `typing.TypeVar`
 pandas-stubs/io/excel/_base.pyi:16:6: error[unresolved-import] Cannot resolve imported module `openpyxl.workbook.workbook`
 pandas-stubs/io/excel/_base.pyi:20:6: error[unresolved-import] Cannot resolve imported module `xlrd.book`
-Found 6 diagnostics
+Found 7 diagnostics
 WARN Ignoring the `tool.ty` section in `<CWD>/pyproject.toml` because `<CWD>/ty.toml` takes precedence.

@@ -95,11 +95,6 @@ class Project(NamedTuple):
 # [mypy-primer](https://github.com/hauntsaninja/mypy_primer/blob/0ea6cc614b3e91084059b9a3acc58f94c066a211/mypy_primer/projects.py#L71).
 # May require frequent updating, especially the dependencies list
 ALL: Final = [
-    # As of Nov 19th 2025:
-    # MyPy: 0
-    # Pyright: 40
-    # ty: 27
-    # Pyrefly: 44
     Project(
         name="black",
         repository="https://github.com/psf/black",
@@ -118,11 +113,6 @@ ALL: Final = [
             "d",
         ],
     ),
-    # As of Nov 19th 2025:
-    # MyPy: 941
-    # Pyright: 210
-    # ty: 260
-    # Pyrefly: 652
     Project(
         name="discord.py",
         repository="https://github.com/Rapptz/discord.py.git",
@@ -139,12 +129,6 @@ ALL: Final = [
     #
     # Pyrefly reports significantely more diagnostics than ty and, unlike ty, has partial pydantic support.
     # Both could be the reason why Pyrefly is slower than ty (it's notable that it's mainly slower because it has a much higher system time)
-    #
-    # As of Nov 19th 2025:
-    # mypy: 12
-    # ty: 4'661
-    # Pyrefly: 37'610
-    # Pyright: 19'186
     Project(
         name="homeassistant",
         repository="https://github.com/home-assistant/core.git",
@@ -158,11 +142,6 @@ ALL: Final = [
             "requirements.txt",
         ],
     ),
-    # As of Nov 19th 2025:
-    # mypy: 0
-    # ty: 19
-    # Pyrefly: 18
-    # Pyright: 24
     Project(
         name="isort",
         repository="https://github.com/pycqa/isort",
@@ -171,11 +150,6 @@ ALL: Final = [
         include=["isort"],
         install_arguments=["types-colorama", "colorama"],
     ),
-    # As of Nov 19th 2025:
-    # mypy: 6 (all unused-ignore)
-    # ty: 22
-    # Pyrefly: 65
-    # Pyright: 44
     Project(
         name="jinja",
         repository="https://github.com/pallets/jinja",
@@ -184,11 +158,6 @@ ALL: Final = [
         include=["src"],
         install_arguments=["-r", "pyproject.toml"],
     ),
-    # As of Nov 19th 2025:
-    # mypy: 0
-    # ty: 784
-    # Pyrefly: 1'602
-    # Pyright: 2'180
     Project(
         name="pandas",
         repository="https://github.com/pandas-dev/pandas",
@@ -201,11 +170,6 @@ ALL: Final = [
             "requirements-dev.txt",
         ],
     ),
-    # As of Nov 19th 2025:
-    # mypy: 0
-    # ty: 4
-    # Pyrefly: 0
-    # Pyright: 0
     Project(
         name="pandas-stubs",
         repository="https://github.com/pandas-dev/pandas-stubs",
@@ -228,12 +192,6 @@ ALL: Final = [
             "scipy-stubs >=1.15.3.0",
         ],
     ),
-    # Requires the pydantic mypy plugin
-    # As of Nov 19th 2025:
-    # mypy: 1
-    # ty: 119
-    # Pyrefly: 159
-    # Pyright: 174
     Project(
         name="prefect",
         repository="https://github.com/PrefectHQ/prefect.git",
@@ -253,12 +211,6 @@ ALL: Final = [
             "dev",
         ],
     ),
-    # Requires sympy-mypy plugin.
-    # As of Nov 19th 2025:
-    # mypy: 16'623
-    # ty: 23'231
-    # Pyrefly: 15,877
-    # Pyright: 19'684
     Project(
         name="pytorch",
         repository="https://github.com/pytorch/pytorch.git",

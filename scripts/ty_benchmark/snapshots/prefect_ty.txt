@@ -9,13 +9,17 @@ src/prefect/events/cli/automations.py:297:64: warning[possibly-missing-attribute
 src/prefect/events/cli/automations.py:359:44: error[invalid-argument-type] Argument to bound method `delete_automation` is incorrect: Expected `UUID`, found `str & ~AlwaysFalsy`
 src/prefect/events/cli/automations.py:429:33: error[invalid-argument-type] Argument to function `loads` is incorrect: Expected `bytes | bytearray | memoryview[int] | str`, found `str | None`
 src/prefect/events/clients.py:389:23: warning[possibly-missing-attribute] Attribute `send` may be missing on object of type `ClientConnection | None`
+src/prefect/events/clients.py:600:13: error[invalid-argument-type] Argument is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/events/clients.py:601:13: error[invalid-argument-type] Argument is incorrect: Expected `DateTime`, found `datetime`
 src/prefect/events/clients.py:642:50: warning[possibly-missing-attribute] Attribute `recv` may be missing on object of type `ClientConnection | None`
 src/prefect/events/related.py:100:17: error[invalid-argument-type] Argument to function `_get_and_cache_related_object` is incorrect: Expected `(UUID | str, /) -> Awaitable[ObjectBaseModel | None]`, found `bound method PrefectClient.read_flow_run(flow_run_id: UUID) -> CoroutineType[Any, Any, FlowRun]`
 src/prefect/events/related.py:123:21: error[invalid-argument-type] Argument to function `_get_and_cache_related_object` is incorrect: Expected `(UUID | str, /) -> Awaitable[ObjectBaseModel | None]`, found `bound method PrefectClient.read_flow(flow_id: UUID) -> CoroutineType[Any, Any, Flow]`
 src/prefect/events/related.py:142:25: error[invalid-argument-type] Argument to function `_get_and_cache_related_object` is incorrect: Expected `(UUID | str, /) -> Awaitable[ObjectBaseModel | None]`, found `bound method PrefectClient.read_work_queue(id: UUID) -> CoroutineType[Any, Any, WorkQueue]`
 src/prefect/events/related.py:153:25: error[invalid-argument-type] Argument to function `_get_and_cache_related_object` is incorrect: Expected `(UUID | str, /) -> Awaitable[ObjectBaseModel | None]`, found `bound method PrefectClient.read_work_pool(work_pool_name: str) -> CoroutineType[Any, Any, WorkPool]`
 src/prefect/events/related.py:182:25: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Iterable[Unknown]`, found `object`
+src/prefect/events/related.py:212:5: error[invalid-assignment] Invalid subscript assignment with key of type `str` and value of type `tuple[dict[str, str | ObjectBaseModel | None] | dict[Unknown | str, Unknown | str | ObjectBaseModel | None], datetime]` on object of type `dict[str, tuple[dict[str, str | ObjectBaseModel | None], DateTime]]`
 src/prefect/events/schemas/automations.py:86:23: error[call-non-callable] Object of type `object` is not callable
+src/prefect/events/utilities.py:96:27: error[invalid-argument-type] Argument is incorrect: Expected `DateTime`, found `Any | dict[str, Any] | None`
 src/prefect/events/utilities.py:96:27: error[invalid-argument-type] Argument is incorrect: Expected `str`, found `Any | dict[str, Any] | None`
 src/prefect/events/utilities.py:96:27: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `Any | dict[str, Any] | None`
 src/prefect/events/utilities.py:96:27: error[invalid-argument-type] Argument is incorrect: Expected `list[RelatedResource]`, found `Any | dict[str, Any] | None`
@@ -51,6 +55,9 @@ src/prefect/server/models/deployments.py:593:12: error[unresolved-attribute] Obj
 src/prefect/server/models/deployments.py:1041:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
 src/prefect/server/models/deployments.py:1066:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
 src/prefect/server/models/deployments.py:1093:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/deployments.py:1146:25: error[invalid-argument-type] Argument to function `deployment_status_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/deployments.py:1199:29: error[invalid-argument-type] Argument to function `deployment_status_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/events.py:52:9: error[invalid-argument-type] Argument is incorrect: Expected `DateTime`, found `datetime`
 src/prefect/server/models/events.py:54:9: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `dict[Unknown | str, Unknown | str | None]`
 src/prefect/server/models/events.py:69:9: error[invalid-argument-type] Argument is incorrect: Expected `list[RelatedResource]`, found `list[dict[str, str]]`
 src/prefect/server/models/events.py:82:9: error[invalid-argument-type] Argument is incorrect: Expected `UUID`, found `UUID | None`
@@ -73,6 +80,7 @@ src/prefect/server/models/saved_searches.py:146:12: error[unresolved-attribute] 
 src/prefect/server/models/task_run_states.py:74:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
 src/prefect/server/models/task_runs.py:176:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
 src/prefect/server/models/task_runs.py:462:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/task_workers.py:71:13: error[invalid-argument-type] Argument is incorrect: Expected `DateTime`, found `datetime`
 src/prefect/server/models/variables.py:123:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
 src/prefect/server/models/variables.py:140:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
 src/prefect/server/models/variables.py:154:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
@@ -110,6 +118,9 @@ src/prefect/server/models/work_queues.py:421:13: error[invalid-argument-type] Ar
 src/prefect/server/models/work_queues.py:422:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterState | None`, found `dict[str, dict[str, list[Unknown | StateType]]]`
 src/prefect/server/models/work_queues.py:423:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterNextScheduledStartTime | None`, found `dict[str, datetime | None]`
 src/prefect/server/models/work_queues.py:491:54: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterStateName | None`, found `dict[Unknown | str, Unknown | list[Unknown | str]]`
+src/prefect/server/models/work_queues.py:571:17: error[invalid-argument-type] Argument to function `work_queue_status_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/work_queues.py:609:17: error[invalid-argument-type] Argument to function `work_queue_status_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/work_queues.py:628:13: error[invalid-argument-type] Argument to function `work_queue_status_event` is incorrect: Expected `DateTime`, found `datetime`
 src/prefect/server/models/workers.py:253:15: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
 src/prefect/server/models/workers.py:289:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
 src/prefect/server/models/workers.py:626:15: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
@@ -117,4 +128,4 @@ src/prefect/server/models/workers.py:672:12: error[unresolved-attribute] Module 
 src/prefect/server/models/workers.py:755:9: error[invalid-assignment] Invalid subscript assignment with key of type `Literal["heartbeat_interval_seconds"]` and value of type `int` on object of type `dict[str, datetime | WorkerStatus]`
 src/prefect/server/models/workers.py:770:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
 src/prefect/server/models/workers.py:799:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-Found 119 diagnostics
+Found 130 diagnostics

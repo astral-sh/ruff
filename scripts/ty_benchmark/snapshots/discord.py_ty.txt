@@ -1,7 +1,6 @@
 discord/abc.py:1057:16: error[invalid-return-type] Return type does not match returned value: expected `Self@_clone_impl`, found `GuildChannel`
 discord/abc.py:2091:9: error[invalid-parameter-default] Default value of type `<class 'VoiceClient'>` is not assignable to annotated parameter type `(Client, Connectable, /) -> T@connect`
 discord/app_commands/checks.py:190:16: error[invalid-return-type] Return type does not match returned value: expected `Self@copy`, found `Cooldown`
-discord/app_commands/commands.py:112:64: error[non-subscriptable] Cannot subscript object of type `<class 'Coroutine[Any, Any, typing.TypeVar]'>` with no `__class_getitem__` method
 discord/app_commands/commands.py:140:63: error[invalid-argument-type] Argument to class `Choice` is incorrect: Expected `str | int | float`, found `typing.TypeVar`
 discord/app_commands/commands.py:141:55: error[invalid-argument-type] Argument to class `Choice` is incorrect: Expected `str | int | float`, found `typing.TypeVar`
 discord/app_commands/commands.py:372:37: error[unresolved-attribute] Object of type `(...) -> Any` has no attribute `__qualname__`
@@ -53,16 +52,17 @@ discord/asset.py:525:16: error[invalid-return-type] Return type does not match r
 discord/asset.py:525:31: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `ConnectionState[Client] | _WebhookState`, found `Any | None | ConnectionState[Client] | _WebhookState`
 discord/audit_logs.py:550:56: error[invalid-argument-type] Argument to bound method `from_data` is incorrect: Expected `int`, found `None | Unknown | int`
 discord/audit_logs.py:551:55: error[invalid-argument-type] Argument to bound method `from_data` is incorrect: Expected `int`, found `None | Unknown | int`
-discord/automod.py:164:49: error[invalid-key] Invalid key for TypedDict `_AutoModerationActionMetadataCustomMessage`: Unknown key "duration_seconds"
-discord/automod.py:164:49: error[invalid-key] Invalid key for TypedDict `_AutoModerationActionMetadataAlert`: Unknown key "duration_seconds"
+discord/automod.py:164:49: error[invalid-key] Unknown key "duration_seconds" for TypedDict `_AutoModerationActionMetadataCustomMessage`: Unknown key "duration_seconds"
+discord/automod.py:164:49: error[invalid-key] Unknown key "duration_seconds" for TypedDict `_AutoModerationActionMetadataAlert`: Unknown key "duration_seconds"
 discord/automod.py:165:52: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `int | float`, found `str | int`
-discord/automod.py:167:47: error[invalid-key] Invalid key for TypedDict `_AutoModerationActionMetadataCustomMessage`: Unknown key "channel_id"
-discord/automod.py:167:47: error[invalid-key] Invalid key for TypedDict `_AutoModerationActionMetadataTimeout`: Unknown key "channel_id"
-discord/automod.py:398:9: error[invalid-assignment] Object of type `dict[Unknown | str, Unknown | str | dict[str, Any] | ... omitted 4 union elements]` is not assignable to `_AutoModerationRuleKeyword | _AutoModerationRuleKeywordPreset | _AutoModerationRuleOther`
+discord/automod.py:167:47: error[invalid-key] Unknown key "channel_id" for TypedDict `_AutoModerationActionMetadataCustomMessage`: Unknown key "channel_id"
+discord/automod.py:167:47: error[invalid-key] Unknown key "channel_id" for TypedDict `_AutoModerationActionMetadataTimeout`: Unknown key "channel_id"
 discord/automod.py:538:16: error[invalid-return-type] Return type does not match returned value: expected `Self@edit`, found `AutoModRule`
 discord/backoff.py:63:42: error[invalid-parameter-default] Default value of type `Literal[False]` is not assignable to annotated parameter type `T@ExponentialBackoff`
 discord/channel.py:3234:40: error[missing-argument] No argument provided for required parameter `data` of function `store_user`
+discord/channel.py:3234:57: error[invalid-argument-type] Argument to function `store_user` is incorrect: Argument type `PartialUser` does not satisfy upper bound `ConnectionState[ClientT@ConnectionState]` of type variable `Self`
 discord/channel.py:3409:40: error[missing-argument] No argument provided for required parameter `data` of function `store_user`
+discord/channel.py:3409:63: error[invalid-argument-type] Argument to function `store_user` is incorrect: Argument type `PartialUser` does not satisfy upper bound `ConnectionState[ClientT@ConnectionState]` of type variable `Self`
 discord/client.py:723:59: error[invalid-argument-type] Argument to bound method `from_client` is incorrect: Expected `bool`, found `Unknown | int | None`
 discord/client.py:723:59: error[invalid-argument-type] Argument to bound method `from_client` is incorrect: Expected `URL | None`, found `Unknown | int | None`
 discord/client.py:723:59: error[invalid-argument-type] Argument to bound method `from_client` is incorrect: Expected `str | None`, found `Unknown | int | None`
@@ -73,6 +73,19 @@ discord/client.py:2058:23: error[unresolved-attribute] Object of type `CoroT@eve
 discord/client.py:2059:71: error[unresolved-attribute] Object of type `CoroT@event` has no attribute `__name__`
 discord/components.py:86:9: error[invalid-type-form] Variable of type `Literal["TextDisplay"]` is not allowed in a type expression
 discord/components.py:787:29: error[invalid-type-form] Variable of type `Literal["TextDisplay"]` is not allowed in a type expression
+discord/components.py:1326:27: error[invalid-argument-type] Invalid argument to key "components" with declared type `list[ActionRow | TextComponent | MediaGalleryComponent | ... omitted 5 union elements]` on TypedDict `ContainerComponent`: value of type `list[ButtonComponent | SelectMenu | TextInput | ... omitted 11 union elements]`
+discord/components.py:1458:26: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `ActionRow`, found `ButtonComponent | SelectMenu | TextInput | ... omitted 10 union elements`
+discord/components.py:1460:23: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `ButtonComponent`, found `ButtonComponent | SelectMenu | TextInput | ... omitted 10 union elements`
+discord/components.py:1462:26: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `TextInput`, found `ButtonComponent | SelectMenu | TextInput | ... omitted 10 union elements`
+discord/components.py:1466:33: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `SectionComponent`, found `ButtonComponent | SelectMenu | TextInput | ... omitted 10 union elements`
+discord/components.py:1468:28: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `TextComponent`, found `ButtonComponent | SelectMenu | TextInput | ... omitted 10 union elements`
+discord/components.py:1470:35: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `ThumbnailComponent`, found `ButtonComponent | SelectMenu | TextInput | ... omitted 10 union elements`
+discord/components.py:1472:38: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `MediaGalleryComponent`, found `ButtonComponent | SelectMenu | TextInput | ... omitted 10 union elements`
+discord/components.py:1474:30: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `FileComponent`, found `ButtonComponent | SelectMenu | TextInput | ... omitted 10 union elements`
+discord/components.py:1476:35: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `SeparatorComponent`, found `ButtonComponent | SelectMenu | TextInput | ... omitted 10 union elements`
+discord/components.py:1478:26: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `ContainerComponent`, found `ButtonComponent | SelectMenu | TextInput | ... omitted 10 union elements`
+discord/components.py:1480:31: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `LabelComponent`, found `ButtonComponent | SelectMenu | TextInput | ... omitted 10 union elements`
+discord/components.py:1482:36: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `FileUploadComponent`, found `ButtonComponent | SelectMenu | TextInput | ... omitted 10 union elements`
 discord/emoji.py:131:42: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `ConnectionState[Client]`, found `Any | None | ConnectionState[Client]`
 discord/emoji.py:186:16: warning[possibly-missing-attribute] Attribute `_get_guild` may be missing on object of type `Any | None | ConnectionState[Client]`
 discord/emoji.py:225:30: warning[possibly-missing-attribute] Attribute `application_id` may be missing on object of type `Any | None | ConnectionState[Client]`
@@ -83,8 +96,10 @@ discord/emoji.py:287:26: warning[possibly-missing-attribute] Attribute `http` ma
 discord/emoji.py:292:54: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `ConnectionState[Client]`, found `Any | None | ConnectionState[Client]`
 discord/emoji.py:294:22: warning[possibly-missing-attribute] Attribute `http` may be missing on object of type `Any | None | ConnectionState[Client]`
 discord/errors.py:30:10: error[unresolved-import] Cannot resolve imported module `requests`
-discord/ext/commands/_types.py:46:26: error[non-subscriptable] Cannot subscript object of type `<class 'Coroutine[Any, Any, typing.TypeVar]'>` with no `__class_getitem__` method
+discord/ext/commands/bot.py:89:33: error[invalid-type-form] Invalid subscript of object of type `GenericAlias` in type expression
 discord/ext/commands/bot.py:177:9: error[invalid-parameter-default] Default value of type `_DefaultRepr` is not assignable to annotated parameter type `HelpCommand | None`
+discord/ext/commands/bot.py:655:16: error[unresolved-attribute] Object of type `(...) -> @Todo` has no attribute `__name__`
+discord/ext/commands/bot.py:681:16: error[unresolved-attribute] Object of type `(...) -> @Todo` has no attribute `__name__`
 discord/ext/commands/bot.py:1546:13: error[invalid-parameter-default] Default value of type `_DefaultRepr` is not assignable to annotated parameter type `HelpCommand | None`
 discord/ext/commands/cog.py:268:5: error[unresolved-attribute] Unresolved attribute `__cog_special_method__` on type `FuncT@_cog_special_method`.
 discord/ext/commands/cog.py:288:28: error[invalid-argument-type] Argument to class `Command` is incorrect: Expected `Cog | None`, found `typing.Self`
@@ -98,7 +113,7 @@ discord/ext/commands/converter.py:402:39: error[invalid-argument-type] Argument 
 discord/ext/commands/converter.py:1211:89: warning[possibly-missing-attribute] Attribute `name` may be missing on object of type `Parameter | None`
 discord/ext/commands/converter.py:1241:13: error[invalid-assignment] Not enough values to unpack: Expected 3
 discord/ext/commands/cooldowns.py:251:16: error[invalid-return-type] Return type does not match returned value: expected `Self@copy`, found `MaxConcurrency`
-discord/ext/commands/core.py:141:13: error[invalid-assignment] Object of type `object` is not assignable to `(...) -> Any`
+discord/ext/commands/core.py:141:24: error[invalid-assignment] Object of type `object` is not assignable to `(...) -> Any`
 discord/ext/commands/core.py:433:38: error[unresolved-attribute] Object of type `(...) -> @Todo` has no attribute `__name__`
 discord/ext/commands/core.py:462:22: error[unresolved-attribute] Object of type `(...) -> @Todo` has no attribute `__commands_checks__`
 discord/ext/commands/core.py:470:24: error[unresolved-attribute] Object of type `(...) -> @Todo` has no attribute `__commands_cooldown__`
@@ -116,12 +131,27 @@ discord/ext/commands/core.py:941:23: error[invalid-argument-type] Argument to bo
 discord/ext/commands/core.py:1312:58: warning[possibly-missing-attribute] Attribute `cog_check` may be missing on object of type `CogT@Command & ~None`
 discord/ext/commands/core.py:1552:22: error[no-matching-overload] No overload of function `command` matches arguments
 discord/ext/commands/core.py:1609:22: error[no-matching-overload] No overload of function `group` matches arguments
-discord/ext/commands/core.py:1949:9: error[unresolved-attribute] Unresolved attribute `predicate` on type `def decorator(func: Command[Any, @Todo, Any] | @Todo) -> Command[Any, @Todo, Any] | @Todo`.
-discord/ext/commands/core.py:1956:9: error[unresolved-attribute] Unresolved attribute `predicate` on type `def decorator(func: Command[Any, @Todo, Any] | @Todo) -> Command[Any, @Todo, Any] | @Todo`.
-discord/ext/commands/core.py:2373:9: error[unresolved-attribute] Unresolved attribute `predicate` on type `def decorator(func: Command[Unknown, Unknown, Unknown] | @Todo) -> Command[Unknown, Unknown, Unknown] | @Todo`.
-discord/ext/commands/core.py:2380:9: error[unresolved-attribute] Unresolved attribute `predicate` on type `def decorator(func: Command[Unknown, Unknown, Unknown] | @Todo) -> Command[Unknown, Unknown, Unknown] | @Todo`.
-discord/ext/commands/core.py:2448:9: error[unresolved-attribute] Unresolved attribute `predicate` on type `def decorator(func: Command[Unknown, Unknown, Unknown] | @Todo) -> Command[Unknown, Unknown, Unknown] | @Todo`.
-discord/ext/commands/core.py:2455:9: error[unresolved-attribute] Unresolved attribute `predicate` on type `def decorator(func: Command[Unknown, Unknown, Unknown] | @Todo) -> Command[Unknown, Unknown, Unknown] | @Todo`.
+discord/ext/commands/core.py:1942:17: error[invalid-assignment] Object of type `list[Unknown]` is not assignable to attribute `__commands_checks__` on type `((...) -> @Todo) & ~Top[Command[Unknown, object, Unknown]] & ~<Protocol with members '__commands_checks__'>`
+discord/ext/commands/core.py:1944:13: error[unresolved-attribute] Object of type `((...) -> @Todo) & ~Top[Command[Unknown, object, Unknown]]` has no attribute `__commands_checks__`
+discord/ext/commands/core.py:1949:9: error[unresolved-attribute] Unresolved attribute `predicate` on type `def decorator(func: Command[Any, @Todo, Any] | ((...) -> @Todo)) -> Command[Any, @Todo, Any] | ((...) -> @Todo)`.
+discord/ext/commands/core.py:1956:9: error[unresolved-attribute] Unresolved attribute `predicate` on type `def decorator(func: Command[Any, @Todo, Any] | ((...) -> @Todo)) -> Command[Any, @Todo, Any] | ((...) -> @Todo)`.
+discord/ext/commands/core.py:2358:32: error[invalid-argument-type] Argument to bound method `append` is incorrect: Expected `Never`, found `def predicate[BotT](ctx: Context[BotT@predicate]) -> bool`
+discord/ext/commands/core.py:2365:17: error[invalid-assignment] Object of type `list[Unknown]` is not assignable to attribute `__commands_checks__` on type `((...) -> @Todo) & ~Top[Command[Unknown, object, Unknown]] & ~<Protocol with members '__commands_checks__'>`
+discord/ext/commands/core.py:2367:13: error[unresolved-attribute] Object of type `((...) -> @Todo) & ~Top[Command[Unknown, object, Unknown]]` has no attribute `__commands_checks__`
+discord/ext/commands/core.py:2368:13: error[invalid-assignment] Object of type `Literal[True]` is not assignable to attribute `__discord_app_commands_guild_only__` on type `((...) -> @Todo) & ~Top[Command[Unknown, object, Unknown]]`
+discord/ext/commands/core.py:2373:9: error[unresolved-attribute] Unresolved attribute `predicate` on type `def decorator(func: Command[Unknown, Unknown, Unknown] | ((...) -> @Todo)) -> Command[Unknown, Unknown, Unknown] | ((...) -> @Todo)`.
+discord/ext/commands/core.py:2380:9: error[unresolved-attribute] Unresolved attribute `predicate` on type `def decorator(func: Command[Unknown, Unknown, Unknown] | ((...) -> @Todo)) -> Command[Unknown, Unknown, Unknown] | ((...) -> @Todo)`.
+discord/ext/commands/core.py:2433:32: error[invalid-argument-type] Argument to bound method `append` is incorrect: Expected `Never`, found `def predicate[BotT](ctx: Context[BotT@predicate]) -> bool`
+discord/ext/commands/core.py:2440:17: error[invalid-assignment] Object of type `list[Unknown]` is not assignable to attribute `__commands_checks__` on type `((...) -> @Todo) & ~Top[Command[Unknown, object, Unknown]] & ~<Protocol with members '__commands_checks__'>`
+discord/ext/commands/core.py:2442:13: error[unresolved-attribute] Object of type `((...) -> @Todo) & ~Top[Command[Unknown, object, Unknown]]` has no attribute `__commands_checks__`
+discord/ext/commands/core.py:2443:13: error[invalid-assignment] Object of type `Literal[True]` is not assignable to attribute `__discord_app_commands_is_nsfw__` on type `((...) -> @Todo) & ~Top[Command[Unknown, object, Unknown]]`
+discord/ext/commands/core.py:2448:9: error[unresolved-attribute] Unresolved attribute `predicate` on type `def decorator(func: Command[Unknown, Unknown, Unknown] | ((...) -> @Todo)) -> Command[Unknown, Unknown, Unknown] | ((...) -> @Todo)`.
+discord/ext/commands/core.py:2455:9: error[unresolved-attribute] Unresolved attribute `predicate` on type `def decorator(func: Command[Unknown, Unknown, Unknown] | ((...) -> @Todo)) -> Command[Unknown, Unknown, Unknown] | ((...) -> @Todo)`.
+discord/ext/commands/core.py:2499:13: error[invalid-assignment] Object of type `CooldownMapping[Unknown]` is not assignable to attribute `__commands_cooldown__` on type `((...) -> @Todo) & ~Top[Command[Unknown, object, Unknown]]`
+discord/ext/commands/core.py:2547:13: error[invalid-assignment] Object of type `DynamicCooldownMapping[Unknown]` is not assignable to attribute `__commands_cooldown__` on type `((...) -> @Todo) & ~Top[Command[Unknown, object, Unknown]]`
+discord/ext/commands/core.py:2582:13: error[invalid-assignment] Object of type `MaxConcurrency` is not assignable to attribute `__commands_max_concurrency__` on type `((...) -> @Todo) & ~Top[Command[Unknown, object, Unknown]]`
+discord/ext/commands/core.py:2634:13: error[invalid-assignment] Object of type `@Todo` is not assignable to attribute `__before_invoke__` on type `((...) -> @Todo) & ~Top[Command[Unknown, object, Unknown]]`
+discord/ext/commands/core.py:2657:13: error[invalid-assignment] Object of type `@Todo` is not assignable to attribute `__after_invoke__` on type `((...) -> @Todo) & ~Top[Command[Unknown, object, Unknown]]`
 discord/ext/commands/help.py:248:5: error[unresolved-attribute] Unresolved attribute `__help_command_not_overridden__` on type `FuncT@_not_overridden`.
 discord/ext/commands/help.py:309:9: error[invalid-assignment] Implicit shadowing of function `get_commands`
 discord/ext/commands/help.py:310:9: error[invalid-assignment] Implicit shadowing of function `walk_commands`
@@ -142,8 +172,13 @@ discord/ext/commands/parameters.py:279:9: error[invalid-parameter-default] Defau
 discord/ext/commands/parameters.py:280:9: error[invalid-parameter-default] Default value of type `<class '_empty'>` is not assignable to annotated parameter type `str`
 discord/ext/commands/view.py:151:53: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `str`, found `Unknown | str | None`
 discord/ext/commands/view.py:162:57: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `str`, found `Unknown | str | None`
+discord/ext/tasks/__init__.py:174:49: error[unresolved-attribute] Object of type `LF@Loop` has no attribute `__qualname__`
+discord/ext/tasks/__init__.py:237:29: error[unresolved-attribute] Object of type `LF@Loop` has no attribute `__qualname__`
+discord/ext/tasks/__init__.py:256:25: error[unresolved-attribute] Object of type `LF@Loop` has no attribute `__qualname__`
 discord/ext/tasks/__init__.py:304:9: error[invalid-assignment] Implicit shadowing of function `_error`
-discord/file.py:106:9: error[invalid-assignment] Object of type `() -> Unknown` is not assignable to attribute `close` on type `BufferedIOBase | @Todo`
+discord/ext/tasks/__init__.py:305:22: error[unresolved-attribute] Object of type `LF@Loop` has no attribute `__name__`
+discord/ext/tasks/__init__.py:552:75: error[unresolved-attribute] Object of type `LF@Loop` has no attribute `__name__`
+discord/file.py:106:9: error[invalid-assignment] Implicit shadowing of function `close`
 discord/file.py:160:9: error[invalid-assignment] Implicit shadowing of function `close`
 discord/gateway.py:137:48: error[parameter-already-assigned] Multiple values provided for parameter `name` of bound method `__init__`
 discord/gateway.py:466:13: error[invalid-assignment] Cannot assign to a subscript on an object of type `int`
@@ -153,6 +188,7 @@ discord/gateway.py:506:26: error[invalid-argument-type] Argument to bound method
 discord/gateway.py:735:13: error[invalid-assignment] Cannot assign to a subscript on an object of type `int`
 discord/gateway.py:738:13: error[invalid-assignment] Cannot assign to a subscript on an object of type `int`
 discord/gateway.py:741:13: error[invalid-assignment] Cannot assign to a subscript on an object of type `int`
+discord/guild.py:1961:13: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `ForumChannel | MediaChannel`, found `TextChannel | NewsChannel | VoiceChannel | ... omitted 5 union elements`
 discord/http.py:566:53: error[invalid-argument-type] Argument to bound method `ws_connect` is incorrect: Expected `str`, found `Unknown | BasicAuth | None | ... omitted 4 union elements`
 discord/http.py:566:53: error[invalid-argument-type] Argument to bound method `ws_connect` is incorrect: Expected `Iterable[str]`, found `Unknown | BasicAuth | None | ... omitted 4 union elements`
 discord/http.py:566:53: error[invalid-argument-type] Argument to bound method `ws_connect` is incorrect: Expected `int | float`, found `Unknown | BasicAuth | None | ... omitted 4 union elements`
@@ -176,10 +212,12 @@ discord/http.py:566:53: error[invalid-argument-type] Argument to bound method `w
 discord/http.py:640:20: error[invalid-context-manager] Object of type `Ratelimit` cannot be used with `async with` because it does not correctly implement `__aexit__`
 discord/interactions.py:229:58: error[invalid-argument-type] Argument to bound method `_from_value` is incorrect: Expected `Sequence[Literal[0, 1, 2]]`, found `list[Unknown | int]`
 discord/interactions.py:250:13: error[invalid-assignment] Object of type `(Guild & ~AlwaysTruthy) | VoiceChannel | StageChannel | ... omitted 5 union elements` is not assignable to attribute `channel` of type `VoiceChannel | StageChannel | TextChannel | ... omitted 6 union elements`
+discord/interactions.py:256:92: error[invalid-argument-type] Argument to bound method `format_map` is incorrect: Expected `_FormatMapMapping`, found `TextChannel | NewsChannel | VoiceChannel | ... omitted 7 union elements`
 discord/interactions.py:307:16: error[invalid-return-type] Return type does not match returned value: expected `Guild | None`, found `(ConnectionState[ClientT@Interaction] & ~AlwaysTruthy & ~AlwaysFalsy) | (Guild & ~AlwaysFalsy) | Any | None`
 discord/interactions.py:744:21: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `ConnectionState[Client]`, found `_InteractionMessageState`
 discord/interactions.py:1401:16: error[missing-argument] No argument provided for required parameter `data` of function `store_user`
 discord/member.py:319:28: error[missing-argument] No argument provided for required parameter `data` of function `store_user`
+discord/member.py:319:45: error[invalid-argument-type] Argument to function `store_user` is incorrect: Argument type `User` does not satisfy upper bound `ConnectionState[ClientT@ConnectionState]` of type variable `Self`
 discord/member.py:980:91: warning[deprecated] The function `utcnow` is deprecated: Use timezone-aware objects to represent datetimes in UTC; e.g. by calling .now(datetime.timezone.utc)
 discord/member.py:1041:61: warning[deprecated] The function `utcnow` is deprecated: Use timezone-aware objects to represent datetimes in UTC; e.g. by calling .now(datetime.timezone.utc)
 discord/mentions.py:90:9: error[invalid-parameter-default] Default value of type `_FakeBool` is not assignable to annotated parameter type `bool`
@@ -187,16 +225,19 @@ discord/mentions.py:91:9: error[invalid-parameter-default] Default value of type
 discord/mentions.py:92:9: error[invalid-parameter-default] Default value of type `_FakeBool` is not assignable to annotated parameter type `bool | Sequence[Snowflake]`
 discord/mentions.py:93:9: error[invalid-parameter-default] Default value of type `_FakeBool` is not assignable to annotated parameter type `bool`
 discord/message.py:713:16: error[invalid-return-type] Return type does not match returned value: expected `Message | None`, found `(ConnectionState[Client] & ~AlwaysTruthy) | None | Message`
-discord/message.py:2404:30: error[invalid-key] TypedDict `Message` can only be subscripted with string literal keys, got key of type `str`
+discord/message.py:2404:30: error[invalid-key] TypedDict `Message` can only be subscripted with a string literal key, got key of type `str`
 discord/message.py:2455:23: error[missing-argument] No argument provided for required parameter `data` of function `store_user`
+discord/message.py:2455:46: error[invalid-argument-type] Argument to function `store_user` is incorrect: Argument type `User` does not satisfy upper bound `ConnectionState[ClientT@ConnectionState]` of type variable `Self`
 discord/message.py:2481:30: error[missing-argument] No argument provided for required parameter `data` of function `store_user`
+discord/message.py:2481:47: error[invalid-argument-type] Argument to function `store_user` is incorrect: Argument type `UserWithMember` does not satisfy upper bound `ConnectionState[ClientT@ConnectionState]` of type variable `Self`
 discord/opus.py:141:48: error[unresolved-attribute] Object of type `(...) -> Unknown` has no attribute `__name__`
 discord/opus.py:149:48: error[unresolved-attribute] Object of type `(...) -> Unknown` has no attribute `__name__`
 discord/poll.py:592:16: error[invalid-return-type] Return type does not match returned value: expected `Self@copy`, found `Poll`
-discord/presences.py:60:9: error[invalid-assignment] Object of type `(ClientStatus & ~AlwaysFalsy) | dict[Unknown, Unknown]` is not assignable to `ClientStatus`
-discord/role.py:450:9: error[invalid-assignment] Object of type `list[dict[Unknown | str, Unknown] | Unknown]` is not assignable to `list[RolePositionUpdate]`
-discord/role.py:700:9: error[invalid-assignment] Object of type `list[dict[Unknown | str, Unknown | int] | Unknown]` is not assignable to `list[RolePositionUpdate]`
+discord/presences.py:60:16: error[invalid-assignment] Object of type `(ClientStatus & ~AlwaysFalsy) | dict[Unknown, Unknown]` is not assignable to `ClientStatus`
+discord/role.py:450:45: error[invalid-assignment] Object of type `list[dict[Unknown | str, Unknown] | Unknown]` is not assignable to `list[RolePositionUpdate]`
+discord/role.py:700:45: error[invalid-assignment] Object of type `list[dict[Unknown | str, Unknown | int] | Unknown]` is not assignable to `list[RolePositionUpdate]`
 discord/scheduled_event.py:150:40: error[missing-argument] No argument provided for required parameter `data` of function `store_user`
+discord/scheduled_event.py:150:63: error[invalid-argument-type] Argument to function `store_user` is incorrect: Argument type `User & ~AlwaysFalsy` does not satisfy upper bound `ConnectionState[ClientT@ConnectionState]` of type variable `Self`
 discord/scheduled_event.py:663:22: error[missing-argument] No argument provided for required parameter `data` of function `store_user`
 discord/soundboard.py:232:20: warning[possibly-missing-attribute] Attribute `get_user` may be missing on object of type `Any | None | ConnectionState[Client]`
 discord/soundboard.py:233:21: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `ConnectionState[Client]`, found `Any | None | ConnectionState[Client]`
@@ -205,32 +246,35 @@ discord/soundboard.py:302:50: error[invalid-argument-type] Argument to bound met
 discord/soundboard.py:325:15: warning[possibly-missing-attribute] Attribute `http` may be missing on object of type `Any | None | ConnectionState[Client]`
 discord/state.py:263:13: error[invalid-assignment] Implicit shadowing of function `store_user`
 discord/state.py:551:16: error[invalid-return-type] Return type does not match returned value: expected `tuple[VoiceChannel | StageChannel | ForumChannel | ... omitted 5 union elements, Guild | None]`, found `tuple[(Unknown & ~AlwaysFalsy) | (Guild & ~AlwaysTruthy & ~AlwaysFalsy) | (VoiceChannel & ~AlwaysFalsy) | ... omitted 6 union elements, Guild | None]`
-discord/state.py:822:31: error[invalid-key] Invalid key for TypedDict `PingInteraction`: Unknown key "data"
-discord/state.py:823:36: error[invalid-key] Invalid key for TypedDict `ChatInputApplicationCommandInteractionData`: Unknown key "custom_id"
-discord/state.py:823:36: error[invalid-key] Invalid key for TypedDict `UserApplicationCommandInteractionData`: Unknown key "custom_id"
-discord/state.py:823:36: error[invalid-key] Invalid key for TypedDict `MessageApplicationCommandInteractionData`: Unknown key "custom_id"
-discord/state.py:824:41: error[invalid-key] Invalid key for TypedDict `ChatInputApplicationCommandInteractionData`: Unknown key "component_type"
-discord/state.py:824:41: error[invalid-key] Invalid key for TypedDict `UserApplicationCommandInteractionData`: Unknown key "component_type"
-discord/state.py:824:41: error[invalid-key] Invalid key for TypedDict `MessageApplicationCommandInteractionData`: Unknown key "component_type"
-discord/state.py:824:41: error[invalid-key] Invalid key for TypedDict `ModalSubmitInteractionData`: Unknown key "component_type"
-discord/state.py:828:31: error[invalid-key] Invalid key for TypedDict `PingInteraction`: Unknown key "data"
-discord/state.py:829:36: error[invalid-key] Invalid key for TypedDict `ChatInputApplicationCommandInteractionData`: Unknown key "custom_id"
-discord/state.py:829:36: error[invalid-key] Invalid key for TypedDict `UserApplicationCommandInteractionData`: Unknown key "custom_id"
-discord/state.py:829:36: error[invalid-key] Invalid key for TypedDict `MessageApplicationCommandInteractionData`: Unknown key "custom_id"
-discord/state.py:830:37: error[invalid-key] Invalid key for TypedDict `ChatInputApplicationCommandInteractionData`: Unknown key "components"
-discord/state.py:830:37: error[invalid-key] Invalid key for TypedDict `UserApplicationCommandInteractionData`: Unknown key "components"
-discord/state.py:830:37: error[invalid-key] Invalid key for TypedDict `MessageApplicationCommandInteractionData`: Unknown key "components"
-discord/state.py:830:37: error[invalid-key] Invalid key for TypedDict `ButtonMessageComponentInteractionData`: Unknown key "components"
-discord/state.py:830:37: error[invalid-key] Invalid key for TypedDict `SelectMessageComponentInteractionData`: Unknown key "components"
+discord/state.py:822:31: error[invalid-key] Unknown key "data" for TypedDict `PingInteraction`: Unknown key "data"
+discord/state.py:823:36: error[invalid-key] Unknown key "custom_id" for TypedDict `ChatInputApplicationCommandInteractionData`: Unknown key "custom_id"
+discord/state.py:823:36: error[invalid-key] Unknown key "custom_id" for TypedDict `UserApplicationCommandInteractionData`: Unknown key "custom_id"
+discord/state.py:823:36: error[invalid-key] Unknown key "custom_id" for TypedDict `MessageApplicationCommandInteractionData`: Unknown key "custom_id"
+discord/state.py:824:41: error[invalid-key] Unknown key "component_type" for TypedDict `ChatInputApplicationCommandInteractionData`: Unknown key "component_type"
+discord/state.py:824:41: error[invalid-key] Unknown key "component_type" for TypedDict `UserApplicationCommandInteractionData`: Unknown key "component_type"
+discord/state.py:824:41: error[invalid-key] Unknown key "component_type" for TypedDict `MessageApplicationCommandInteractionData`: Unknown key "component_type"
+discord/state.py:824:41: error[invalid-key] Unknown key "component_type" for TypedDict `ModalSubmitInteractionData`: Unknown key "component_type"
+discord/state.py:828:31: error[invalid-key] Unknown key "data" for TypedDict `PingInteraction`: Unknown key "data"
+discord/state.py:829:36: error[invalid-key] Unknown key "custom_id" for TypedDict `ChatInputApplicationCommandInteractionData`: Unknown key "custom_id"
+discord/state.py:829:36: error[invalid-key] Unknown key "custom_id" for TypedDict `UserApplicationCommandInteractionData`: Unknown key "custom_id"
+discord/state.py:829:36: error[invalid-key] Unknown key "custom_id" for TypedDict `MessageApplicationCommandInteractionData`: Unknown key "custom_id"
+discord/state.py:830:37: error[invalid-key] Unknown key "components" for TypedDict `ChatInputApplicationCommandInteractionData`: Unknown key "components"
+discord/state.py:830:37: error[invalid-key] Unknown key "components" for TypedDict `UserApplicationCommandInteractionData`: Unknown key "components"
+discord/state.py:830:37: error[invalid-key] Unknown key "components" for TypedDict `MessageApplicationCommandInteractionData`: Unknown key "components"
+discord/state.py:830:37: error[invalid-key] Unknown key "components" for TypedDict `ButtonMessageComponentInteractionData`: Unknown key "components"
+discord/state.py:830:37: error[invalid-key] Unknown key "components" for TypedDict `SelectMessageComponentInteractionData`: Unknown key "components"
 discord/state.py:832:81: error[invalid-argument-type] Argument to bound method `dispatch_modal` is incorrect: Expected `ResolvedData`, found `Unknown | ResolvedData | dict[Unknown, Unknown]`
 discord/state.py:1121:16: error[missing-argument] No argument provided for required parameter `data` of function `store_user`
+discord/state.py:1121:32: error[invalid-argument-type] Argument to function `store_user` is incorrect: Argument type `User` does not satisfy upper bound `ConnectionState[ClientT@ConnectionState]` of type variable `Self`
 discord/state.py:1388:20: error[missing-argument] No argument provided for required parameter `data` of function `store_user`
+discord/state.py:1388:36: error[invalid-argument-type] Argument to function `store_user` is incorrect: Argument type `User` does not satisfy upper bound `ConnectionState[ClientT@ConnectionState]` of type variable `Self`
 discord/sticker.py:230:38: warning[possibly-missing-attribute] Attribute `http` may be missing on object of type `Any | None | ConnectionState[Client]`
 discord/sticker.py:232:20: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `ConnectionState[Client]`, found `Any | None | ConnectionState[Client]`
 discord/sticker.py:369:22: warning[possibly-missing-attribute] Attribute `http` may be missing on object of type `Any | None | ConnectionState[Client]`
 discord/sticker.py:370:28: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `ConnectionState[Client]`, found `Any | None | ConnectionState[Client]`
 discord/sticker.py:420:37: error[missing-argument] No argument provided for required parameter `data` of function `store_user`
 discord/sticker.py:420:37: warning[possibly-missing-attribute] Attribute `store_user` may be missing on object of type `Any | None | ConnectionState[Client]`
+discord/sticker.py:420:60: error[invalid-argument-type] Argument to function `store_user` is incorrect: Argument type `User & ~AlwaysFalsy` does not satisfy upper bound `ConnectionState[ClientT@ConnectionState]` of type variable `Self`
 discord/sticker.py:434:16: warning[possibly-missing-attribute] Attribute `_get_guild` may be missing on object of type `Any | None | ConnectionState[Client]`
 discord/sticker.py:489:43: warning[possibly-missing-attribute] Attribute `http` may be missing on object of type `Any | None | ConnectionState[Client]`
 discord/sticker.py:490:29: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `ConnectionState[Client]`, found `Any | None | ConnectionState[Client]`
@@ -252,10 +296,11 @@ discord/utils.py:1348:5: error[invalid-parameter-default] Default value of type 
 discord/utils.py:1349:5: error[invalid-parameter-default] Default value of type `_MissingSentinel` is not assignable to annotated parameter type `Formatter`
 discord/utils.py:1350:5: error[invalid-parameter-default] Default value of type `_MissingSentinel` is not assignable to annotated parameter type `int`
 discord/webhook/async_.py:751:20: error[missing-argument] No argument provided for required parameter `data` of function `store_user`
+discord/webhook/async_.py:751:44: error[invalid-argument-type] Argument to function `store_user` is incorrect: Argument type `User | PartialUser` does not satisfy upper bound `ConnectionState[ClientT@ConnectionState]` of type variable `Self`
 discord/webhook/async_.py:1042:16: error[invalid-return-type] Return type does not match returned value: expected `Guild | None`, found `(ConnectionState[Client] & ~AlwaysTruthy) | (_WebhookState & ~AlwaysTruthy) | Guild | None`
 discord/webhook/sync.py:81:14: error[unresolved-import] Cannot resolve imported module `requests`
 discord/webhook/sync.py:652:16: error[unresolved-import] Cannot resolve imported module `requests`
 discord/webhook/sync.py:695:16: error[unresolved-import] Cannot resolve imported module `requests`
 discord/welcome_screen.py:104:33: warning[possibly-missing-attribute] Attribute `name` may be missing on object of type `(Unknown & _EmojiTag) | PartialEmoji | Emoji | (str & _EmojiTag)`
 discord/welcome_screen.py:217:16: error[invalid-return-type] Return type does not match returned value: expected `Self@edit`, found `WelcomeScreen`
-Found 260 diagnostics
+Found 305 diagnostics
