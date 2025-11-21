@@ -4,8 +4,8 @@ use crate::types::generics::Specialization;
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
-    MaterializationKind, MroError, MroIterator, NormalizedVisitor, RecursiveTypeNormalizedVisitor,
-    SpecialFormType, Type, TypeContext, TypeMapping, todo_type,
+    MaterializationKind, MroError, MroIterator, NormalizedVisitor, SpecialFormType, Type,
+    TypeContext, TypeMapping, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -46,12 +46,16 @@ impl<'db> ClassBase<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &RecursiveTypeNormalizedVisitor<'db>,
-    ) -> Self {
+        div: Type<'db>,
+        nested: bool,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Option<Self> {
         match self {
-            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.recursive_type_normalized()),
-            Self::Class(class) => Self::Class(class.recursive_type_normalized_impl(db, visitor)),
-            Self::Protocol | Self::Generic | Self::TypedDict => self,
+            Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
+            Self::Class(class) => Some(Self::Class(
+                class.recursive_type_normalized_impl(db, div, nested, visitor)?,
+            )),
+            Self::Protocol | Self::Generic | Self::TypedDict => Some(self),
         }
     }
 

@@ -82,8 +82,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
-    NormalizedVisitor, RecursiveTypeNormalizedVisitor, SpecialFormType, Truthiness, Type,
-    TypeContext, TypeMapping, TypeRelation, UnionBuilder, binding_type, todo_type, walk_signature,
+    NormalizedVisitor, SpecialFormType, Truthiness, Type, TypeContext, TypeMapping, TypeRelation,
+    UnionBuilder, binding_type, todo_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -1057,21 +1057,29 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &RecursiveTypeNormalizedVisitor<'db>,
-    ) -> Self {
+        div: Type<'db>,
+        nested: bool,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Option<Self> {
         let literal = self.literal(db);
-        let updated_signature = self
-            .updated_signature(db)
-            .map(|signature| signature.recursive_type_normalized_impl(db, visitor));
-        let updated_last_definition_signature = self
-            .updated_last_definition_signature(db)
-            .map(|signature| signature.recursive_type_normalized_impl(db, visitor));
-        Self::new(
+        let updated_signature = match self.updated_signature(db) {
+            Some(signature) => {
+                Some(signature.recursive_type_normalized_impl(db, div, nested, visitor)?)
+            }
+            None => None,
+        };
+        let updated_last_definition_signature = match self.updated_last_definition_signature(db) {
+            Some(signature) => {
+                Some(signature.recursive_type_normalized_impl(db, div, nested, visitor)?)
+            }
+            None => None,
+        };
+        Some(Self::new(
             db,
             literal,
             updated_signature,
             updated_last_definition_signature,
-        )
+        ))
     }
 }
 

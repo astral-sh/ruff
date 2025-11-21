@@ -11,15 +11,18 @@ from types import UnionType
 RecursiveTuple: TypeAlias = tuple[int | "RecursiveTuple", str]
 
 def _(rec: RecursiveTuple):
-    reveal_type(rec)  # revealed: tuple[Divergent, str]
+    # TODO should be `RecursiveTuple`
+    reveal_type(rec)  # revealed: Divergent
 
 RecursiveHomogeneousTuple: TypeAlias = tuple[int | "RecursiveHomogeneousTuple", ...]
 
 def _(rec: RecursiveHomogeneousTuple):
-    reveal_type(rec)  # revealed: tuple[Divergent, ...]
+    # TODO should be `RecursiveHomogeneousTuple`
+    reveal_type(rec)  # revealed: tuple[Divergent, ...] | Divergent
 
 ClassInfo: TypeAlias = type | UnionType | tuple["ClassInfo", ...]
-reveal_type(ClassInfo)  # revealed: types.UnionType
+# TODO should be `types.UnionType`
+reveal_type(ClassInfo)  # revealed: types.UnionType | types.UnionType
 
 def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
     reveal_type(classinfo)  # revealed: type | UnionType | tuple[Divergent, ...]

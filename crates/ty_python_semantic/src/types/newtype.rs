@@ -141,11 +141,11 @@ impl<'db> NewType<'db> {
     /// Create a new `NewType` by mapping the underlying `ClassType`. This descends through any
     /// number of nested `NewType` layers and rebuilds the whole chain. In the rare case of cyclic
     /// `NewType`s with no underlying `ClassType`, this has no effect and does not call `f`.
-    pub(crate) fn map_base_class_type(
+    pub(crate) fn try_map_base_class_type(
         self,
         db: &'db dyn Db,
-        f: impl FnOnce(ClassType<'db>) -> ClassType<'db>,
-    ) -> Self {
+        f: impl FnOnce(ClassType<'db>) -> Option<ClassType<'db>>,
+    ) -> Option<Self> {
         // Modifying the base class type requires unwrapping and re-wrapping however many base
         // newtypes there are between here and there. Normally recursion would be natural for this,
         // but the bases iterator does cycle detection, and I think using that with a stack is a
@@ -162,7 +162,7 @@ impl<'db> NewType<'db> {
                 // We've reached the `ClassType`.
                 NewTypeBase::ClassType(base_class_type) => {
                     // Call `f`.
-                    let mut mapped_base = NewTypeBase::ClassType(f(base_class_type));
+                    let mut mapped_base = NewTypeBase::ClassType(f(base_class_type)?);
                     // Re-wrap the mapped base class in however many newtypes we unwrapped.
                     for inner_newtype in inner_newtype_stack.into_iter().rev() {
                         mapped_base = NewTypeBase::NewType(NewType::new(
@@ -172,18 +172,27 @@ impl<'db> NewType<'db> {
                             Some(mapped_base),
                         ));
                     }
-                    return NewType::new(
+                    return Some(NewType::new(
                         db,
                         self.name(db).clone(),
                         self.definition(db),
                         Some(mapped_base),
-                    );
+                    ));
                 }
             }
         }
         // If we get here, there is no `ClassType` (because this newtype is cyclic), and we don't
         // call `f` at all.
-        self
+        Some(self)
+    }
+
+    pub(crate) fn map_base_class_type(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(ClassType<'db>) -> ClassType<'db>,
+    ) -> Self {
+        self.try_map_base_class_type(db, |class_type| Some(f(class_type)))
+            .unwrap()
     }
 }
 

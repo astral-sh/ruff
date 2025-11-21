@@ -58,10 +58,6 @@ pub struct CycleDetector<Tag, T, R> {
     /// sort-of defeat the point of a cache if we did!)
     cache: RefCell<FxHashMap<T, R>>,
 
-    /// The nesting level of the `visit` method.
-    /// This is necessary for normalizing recursive types.
-    level: RefCell<usize>,
-
     fallback: R,
 
     _tag: PhantomData<Tag>,
@@ -72,13 +68,12 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
         CycleDetector {
             seen: RefCell::new(FxIndexSet::default()),
             cache: RefCell::new(FxHashMap::default()),
-            level: RefCell::new(0),
             fallback,
             _tag: PhantomData,
         }
     }
 
-    fn visit_impl(&self, shift_level: bool, item: T, func: impl FnOnce() -> R) -> R {
+    pub fn visit(&self, item: T, func: impl FnOnce() -> R) -> R {
         if let Some(val) = self.cache.borrow().get(&item) {
             return val.clone();
         }
@@ -88,37 +83,28 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
             return self.fallback.clone();
         }
 
-        if shift_level {
-            *self.level.borrow_mut() += 1;
-        }
         let ret = func();
-        if shift_level {
-            *self.level.borrow_mut() -= 1;
-        }
         self.seen.borrow_mut().pop();
         self.cache.borrow_mut().insert(item, ret.clone());
 
         ret
     }
 
-    pub fn visit(&self, item: T, func: impl FnOnce() -> R) -> R {
-        self.visit_impl(true, item, func)
-    }
+    pub fn try_visit(&self, item: T, func: impl FnOnce() -> Option<R>) -> Option<R> {
+        if let Some(val) = self.cache.borrow().get(&item) {
+            return Some(val.clone());
+        }
 
-    pub(crate) fn visit_no_shift(&self, item: T, func: impl FnOnce() -> R) -> R {
-        self.visit_impl(false, item, func)
-    }
+        // We hit a cycle
+        if !self.seen.borrow_mut().insert(item.clone()) {
+            return Some(self.fallback.clone());
+        }
 
-    pub(crate) fn level(&self) -> usize {
-        *self.level.borrow()
-    }
+        let ret = func()?;
+        self.seen.borrow_mut().pop();
+        self.cache.borrow_mut().insert(item, ret.clone());
 
-    pub(crate) fn inc_level(&self) {
-        *self.level.borrow_mut() += 1;
-    }
-
-    pub(crate) fn dec_level(&self) {
-        *self.level.borrow_mut() -= 1;
+        Some(ret)
     }
 }
 

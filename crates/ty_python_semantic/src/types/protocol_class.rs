@@ -6,7 +6,7 @@ use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
-use crate::types::{RecursiveTypeNormalizedVisitor, TypeContext};
+use crate::types::TypeContext;
 use crate::{
     Db, FxOrderSet,
     place::{Definedness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
@@ -148,9 +148,14 @@ impl<'db> ProtocolClass<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &RecursiveTypeNormalizedVisitor<'db>,
-    ) -> Self {
-        Self(self.0.recursive_type_normalized_impl(db, visitor))
+        div: Type<'db>,
+        nested: bool,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Option<Self> {
+        Some(Self(
+            self.0
+                .recursive_type_normalized_impl(db, div, nested, visitor)?,
+        ))
     }
 }
 
@@ -376,20 +381,22 @@ impl<'db> ProtocolInterface<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &crate::types::RecursiveTypeNormalizedVisitor<'db>,
-    ) -> Self {
-        Self::new(
+        div: Type<'db>,
+        nested: bool,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Option<Self> {
+        Some(Self::new(
             db,
             self.inner(db)
                 .iter()
                 .map(|(name, data)| {
-                    (
+                    Some((
                         name.clone(),
-                        data.recursive_type_normalized_impl(db, visitor),
-                    )
+                        data.recursive_type_normalized_impl(db, div, nested, visitor)?,
+                    ))
                 })
-                .collect::<BTreeMap<_, _>>(),
-        )
+                .collect::<Option<BTreeMap<_, _>>>()?,
+        ))
     }
 
     pub(super) fn specialized_and_normalized<'a>(
@@ -486,22 +493,28 @@ impl<'db> ProtocolMemberData<'db> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        visitor: &crate::types::RecursiveTypeNormalizedVisitor<'db>,
-    ) -> Self {
-        Self {
+        div: Type<'db>,
+        nested: bool,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Option<Self> {
+        Some(Self {
             kind: match &self.kind {
-                ProtocolMemberKind::Method(callable) => {
-                    ProtocolMemberKind::Method(callable.recursive_type_normalized_impl(db, visitor))
-                }
-                ProtocolMemberKind::Property(property) => ProtocolMemberKind::Property(
-                    property.recursive_type_normalized_impl(db, visitor),
+                ProtocolMemberKind::Method(callable) => ProtocolMemberKind::Method(
+                    callable.recursive_type_normalized_impl(db, div, nested, visitor)?,
                 ),
-                ProtocolMemberKind::Other(ty) => {
-                    ProtocolMemberKind::Other(ty.recursive_type_normalized_impl(db, visitor))
-                }
+                ProtocolMemberKind::Property(property) => ProtocolMemberKind::Property(
+                    property.recursive_type_normalized_impl(db, div, nested, visitor)?,
+                ),
+                ProtocolMemberKind::Other(ty) if nested => ProtocolMemberKind::Other(
+                    ty.recursive_type_normalized_impl(db, div, true, visitor)?,
+                ),
+                ProtocolMemberKind::Other(ty) => ProtocolMemberKind::Other(
+                    ty.recursive_type_normalized_impl(db, div, true, visitor)
+                        .unwrap_or(div),
+                ),
             },
             qualifiers: self.qualifiers,
-        }
+        })
     }
 
     fn apply_type_mapping_impl<'a>(

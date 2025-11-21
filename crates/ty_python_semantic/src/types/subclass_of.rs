@@ -7,8 +7,8 @@ use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, KnownClass,
-    MaterializationKind, MemberLookupPolicy, NormalizedVisitor, RecursiveTypeNormalizedVisitor,
-    SpecialFormType, Type, TypeContext, TypeMapping, TypeRelation,
+    MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type, TypeContext,
+    TypeMapping, TypeRelation,
 };
 use crate::{Db, FxOrderSet};
 
@@ -197,11 +197,15 @@ impl<'db> SubclassOfType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &RecursiveTypeNormalizedVisitor<'db>,
-    ) -> Self {
-        Self {
-            subclass_of: self.subclass_of.recursive_type_normalized_impl(db, visitor),
-        }
+        div: Type<'db>,
+        nested: bool,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Option<Self> {
+        Some(Self {
+            subclass_of: self
+                .subclass_of
+                .recursive_type_normalized_impl(db, div, nested, visitor)?,
+        })
     }
 
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
@@ -280,11 +284,15 @@ impl<'db> SubclassOfInner<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &RecursiveTypeNormalizedVisitor<'db>,
-    ) -> Self {
+        div: Type<'db>,
+        nested: bool,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Option<Self> {
         match self {
-            Self::Class(class) => Self::Class(class.recursive_type_normalized_impl(db, visitor)),
-            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.recursive_type_normalized()),
+            Self::Class(class) => Some(Self::Class(
+                class.recursive_type_normalized_impl(db, div, nested, visitor)?,
+            )),
+            Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
         }
     }
 

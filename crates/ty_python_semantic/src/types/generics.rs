@@ -19,10 +19,9 @@ use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
-    RecursiveTypeNormalizedVisitor, Type, TypeContext, TypeMapping, TypeRelation,
-    TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
-    UnionType, declaration_type, walk_bound_type_var_type,
+    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeContext,
+    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance,
+    TypeVarKind, TypeVarVariance, UnionType, declaration_type, walk_bound_type_var_type,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -624,14 +623,11 @@ impl<'db> GenericContext<'db> {
 
     pub(super) fn recursive_type_normalized_impl(
         self,
-        db: &'db dyn Db,
-        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+        _db: &'db dyn Db,
+        _div: Type<'db>,
+        _visitor: &NormalizedVisitor<'db>,
     ) -> Self {
-        let variables = self
-            .variables(db)
-            .map(|bound_typevar| bound_typevar.recursive_type_normalized_impl(db, visitor));
-
-        Self::from_typevar_instances(db, variables)
+        self
     }
 
     fn heap_size(
@@ -1085,26 +1081,38 @@ impl<'db> Specialization<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &RecursiveTypeNormalizedVisitor<'db>,
-    ) -> Self {
-        let types: Box<[_]> = self
-            .types(db)
-            .iter()
-            .map(|ty| ty.recursive_type_normalized_impl(db, visitor))
-            .collect();
-        let tuple_inner = self
-            .tuple_inner(db)
-            .map(|tuple| tuple.recursive_type_normalized_impl(db, visitor));
+        div: Type<'db>,
+        nested: bool,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Option<Self> {
+        let types = if nested {
+            self.types(db)
+                .iter()
+                .map(|ty| ty.recursive_type_normalized_impl(db, div, true, visitor))
+                .collect::<Option<Box<[_]>>>()?
+        } else {
+            self.types(db)
+                .iter()
+                .map(|ty| {
+                    ty.recursive_type_normalized_impl(db, div, true, visitor)
+                        .unwrap_or(div)
+                })
+                .collect::<Box<[_]>>()
+        };
+        let tuple_inner = match self.tuple_inner(db) {
+            Some(tuple) => Some(tuple.recursive_type_normalized_impl(db, div, true, visitor)?),
+            None => None,
+        };
         let context = self
             .generic_context(db)
-            .recursive_type_normalized_impl(db, visitor);
-        Self::new(
+            .recursive_type_normalized_impl(db, div, visitor);
+        Some(Self::new(
             db,
             context,
             types,
             self.materialization_kind(db),
             tuple_inner,
-        )
+        ))
     }
 
     pub(super) fn materialize_impl(
