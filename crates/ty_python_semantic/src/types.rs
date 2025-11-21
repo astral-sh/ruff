@@ -7147,6 +7147,15 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
+        // If we are binding `typing.Self`, and this type is what we are binding `Self` to, return
+        // early. This is not just an optimization, it also prevents us from infinitely expanding
+        // the type, if it's something that can contain a `Self` reference.
+        if let TypeMapping::BindSelf(self_type) = type_mapping
+            && self == *self_type
+        {
+            return self;
+        }
+
         match self {
             Type::TypeVar(bound_typevar) => match type_mapping {
                 TypeMapping::Specialization(specialization) => {
