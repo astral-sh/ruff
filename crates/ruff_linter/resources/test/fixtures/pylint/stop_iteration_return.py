@@ -148,3 +148,7 @@ def foo():
     class C:
         raise StopIteration  # Should trigger
     yield C
+
+# https://github.com/astral-sh/ruff/pull/21177#discussion_r2539702728
+def foo():
+    raise StopIteration((yield 1))  # Should trigger

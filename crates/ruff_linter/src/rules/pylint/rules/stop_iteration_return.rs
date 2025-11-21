@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     self as ast,
+    helpers::map_callable,
     visitor::{Visitor, walk_expr, walk_stmt},
 };
 use ruff_text_size::Ranged;
@@ -59,9 +60,7 @@ pub(crate) fn stop_iteration_return(checker: &Checker, function_def: &ast::StmtF
         stop_iteration_raises: Vec::new(),
     };
 
-    for stmt in &function_def.body {
-        analyzer.visit_stmt(stmt);
-    }
+    analyzer.visit_body(&function_def.body);
 
     if analyzer.has_yield {
         for raise_stmt in analyzer.stop_iteration_raises {
@@ -80,9 +79,13 @@ impl<'a> Visitor<'a> for GeneratorAnalyzer<'a, '_> {
     fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
         match stmt {
             ast::Stmt::FunctionDef(_) => {}
-            ast::Stmt::Raise(stmt_raise) => {
-                if is_stop_iteration_raise(stmt_raise, self.checker) {
-                    self.stop_iteration_raises.push(stmt_raise);
+            ast::Stmt::Raise(raise @ ast::StmtRaise { exc: Some(exc), .. }) => {
+                if self
+                    .checker
+                    .semantic()
+                    .match_builtin_expr(map_callable(exc), "StopIteration")
+                {
+                    self.stop_iteration_raises.push(raise);
                 }
                 walk_stmt(self, stmt);
             }
@@ -99,18 +102,5 @@ impl<'a> Visitor<'a> for GeneratorAnalyzer<'a, '_> {
             }
             _ => walk_expr(self, expr),
         }
-    }
-}
-
-fn is_stop_iteration_raise(stmt_raise: &ast::StmtRaise, checker: &Checker) -> bool {
-    let Some(exc) = &stmt_raise.exc else {
-        return false;
-    };
-
-    match exc.as_ref() {
-        ast::Expr::Call(ast::ExprCall { func, .. }) => {
-            checker.semantic().match_builtin_expr(func, "StopIteration")
-        }
-        expr => checker.semantic().match_builtin_expr(expr, "StopIteration"),
     }
 }
