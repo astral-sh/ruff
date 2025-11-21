@@ -127,13 +127,8 @@ fn is_dict_key_tuple_with_two_elements(binding: &Binding, semantic: &SemanticMod
 
     if is_empty {
         // For empty dicts, check type annotation
-        // If there's an annotation indicating tuple keys, suppress the fix (return true)
-        // Otherwise, allow the fix (return false)
-        if let Some(annotation) = annotation {
-            return is_annotation_dict_with_tuple_keys(annotation, semantic);
-        }
-        // No annotation - allow the fix
-        return false;
+        return annotation
+            .is_some_and(|annotation| is_annotation_dict_with_tuple_keys(annotation, semantic));
     }
 
     // For non-empty dicts, check if all keys are 2-tuples
