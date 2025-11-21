@@ -2198,20 +2198,18 @@ impl<'db> Type<'db> {
                     )
                 }),
 
-            (_, Type::Callable(_)) => relation_visitor.visit((self, target, relation), || {
-                self.try_upcast_to_callable(db)
-                    .into_type(db)
-                    .when_some_and(|callable| {
-                        callable.has_relation_to_impl(
-                            db,
-                            target,
-                            inferable,
-                            relation,
-                            relation_visitor,
-                            disjointness_visitor,
-                        )
-                    })
-            }),
+            (_, Type::Callable(other_callable)) => {
+                relation_visitor.visit((self, target, relation), || {
+                    self.try_upcast_to_callable(db).has_relation_to_impl(
+                        db,
+                        other_callable,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
+            }
 
             (_, Type::ProtocolInstance(protocol)) => {
                 relation_visitor.visit((self, target, relation), || {
@@ -4109,7 +4107,7 @@ impl<'db> Type<'db> {
                     Some((self, AttributeKind::NormalOrNonDataDescriptor))
                 } else {
                     Some((
-                        Type::Callable(callable.bind_self(db)),
+                        Type::Callable(callable.bind_self(db, None)),
                         AttributeKind::NormalOrNonDataDescriptor,
                     ))
                 };
@@ -11002,8 +11000,16 @@ impl<'db> CallableType<'db> {
         Self::single(db, Signature::unknown())
     }
 
-    pub(crate) fn bind_self(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(db, self.signatures(db).bind_self(db, None), false)
+    pub(crate) fn bind_self(
+        self,
+        db: &'db dyn Db,
+        self_type: Option<Type<'db>>,
+    ) -> CallableType<'db> {
+        CallableType::new(db, self.signatures(db).bind_self(db, self_type), false)
+    }
+
+    pub(crate) fn apply_self(self, db: &'db dyn Db, self_type: Type<'db>) -> CallableType<'db> {
+        CallableType::new(db, self.signatures(db).apply_self(db, self_type), false)
     }
 
     /// Create a callable type which represents a fully-static "bottom" callable.
@@ -11138,6 +11144,34 @@ impl<'db> CallableTypes<'db> {
                 slice.iter().copied().map(Type::Callable),
             )),
         }
+    }
+
+    pub(crate) fn map(self, mut f: impl FnMut(CallableType<'db>) -> CallableType<'db>) -> Self {
+        Self::from_elements(self.0.iter().map(|element| f(*element)))
+    }
+
+    pub(crate) fn has_relation_to_impl(
+        self,
+        db: &'db dyn Db,
+        other: CallableType<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        relation: TypeRelation<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        if self.is_empty() {
+            return ConstraintSet::from(false);
+        }
+        self.0.iter().when_all(db, |element| {
+            element.has_relation_to_impl(
+                db,
+                other,
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            )
+        })
     }
 }
 
