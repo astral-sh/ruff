@@ -89,6 +89,23 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
 
         ret
     }
+
+    pub fn try_visit(&self, item: T, func: impl FnOnce() -> Option<R>) -> Option<R> {
+        if let Some(val) = self.cache.borrow().get(&item) {
+            return Some(val.clone());
+        }
+
+        // We hit a cycle
+        if !self.seen.borrow_mut().insert(item.clone()) {
+            return Some(self.fallback.clone());
+        }
+
+        let ret = func()?;
+        self.seen.borrow_mut().pop();
+        self.cache.borrow_mut().insert(item, ret.clone());
+
+        Some(ret)
+    }
 }
 
 impl<Tag, T: Hash + Eq + Clone, R: Default + Clone> Default for CycleDetector<Tag, T, R> {

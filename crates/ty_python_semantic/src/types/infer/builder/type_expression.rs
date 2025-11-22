@@ -6,14 +6,14 @@ use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NON_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_callable,
 };
-use crate::types::signatures::Signature;
+use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     CallableType, DynamicType, IntersectionBuilder, KnownClass, KnownInstanceType,
-    LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType, Type,
-    TypeAliasType, TypeContext, TypeIsType, UnionBuilder, UnionType, todo_type,
+    LintDiagnosticGuard, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext,
+    TypeIsType, UnionBuilder, UnionType, todo_type,
 };
 
 /// Type expressions
@@ -33,13 +33,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             DeferredExpressionState::InStringAnnotation(_) | DeferredExpressionState::Deferred => {}
         }
-        let mut ty = self.infer_type_expression_no_store(expression);
-        self.deferred_state = previous_deferred_state;
 
-        let divergent = Type::divergent(Some(self.scope()));
-        if ty.has_divergent_type(self.db(), divergent) {
-            ty = divergent;
-        }
+        let ty = self.infer_type_expression_no_store(expression);
+        self.deferred_state = previous_deferred_state;
         self.store_expression_type(expression, ty);
         ty
     }
@@ -605,7 +601,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             // TODO: emit a diagnostic
                         }
                     } else {
-                        element_types.push(element_ty.fallback_to_divergent(self.db()));
+                        element_types.push(element_ty);
                     }
                 }
 

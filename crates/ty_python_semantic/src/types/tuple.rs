@@ -229,6 +229,20 @@ impl<'db> TupleType<'db> {
         TupleType::new(db, &self.tuple(db).normalized_impl(db, visitor))
     }
 
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Option<Self> {
+        Some(Self::new_internal(
+            db,
+            self.tuple(db)
+                .recursive_type_normalized_impl(db, div, nested, visitor)?,
+        ))
+    }
+
     pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -292,7 +306,7 @@ impl<'db> TupleType<'db> {
 
 fn to_class_type_cycle_initial<'db>(
     db: &'db dyn Db,
-    _id: salsa::Id,
+    id: salsa::Id,
     self_: TupleType<'db>,
 ) -> ClassType<'db> {
     let tuple_class = KnownClass::Tuple
@@ -301,7 +315,7 @@ fn to_class_type_cycle_initial<'db>(
 
     tuple_class.apply_specialization(db, |generic_context| {
         if generic_context.variables(db).len() == 1 {
-            generic_context.specialize_tuple(db, Type::Never, self_)
+            generic_context.specialize_tuple(db, Type::divergent(id), self_)
         } else {
             generic_context.default_specialization(db, Some(KnownClass::Tuple))
         }
@@ -390,6 +404,33 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     #[must_use]
     fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::from_elements(self.0.iter().map(|ty| ty.normalized_impl(db, visitor)))
+    }
+
+    fn recursive_type_normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Option<Self> {
+        if nested {
+            Some(Self::from_elements(
+                self.0
+                    .iter()
+                    .map(|ty| ty.recursive_type_normalized_impl(db, div, true, visitor))
+                    .collect::<Option<Box<[_]>>>()?,
+            ))
+        } else {
+            Some(Self::from_elements(
+                self.0
+                    .iter()
+                    .map(|ty| {
+                        ty.recursive_type_normalized_impl(db, div, true, visitor)
+                            .unwrap_or(div)
+                    })
+                    .collect::<Box<[_]>>(),
+            ))
+        }
     }
 
     fn apply_type_mapping_impl<'a>(
@@ -752,6 +793,56 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             .collect::<Box<_>>();
         let variable = self.variable.normalized_impl(db, visitor);
         TupleSpec::Variable(Self {
+            prefix,
+            variable,
+            suffix,
+        })
+    }
+
+    fn recursive_type_normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Option<Self> {
+        let prefix = if nested {
+            self.prefix
+                .iter()
+                .map(|ty| ty.recursive_type_normalized_impl(db, div, true, visitor))
+                .collect::<Option<Box<_>>>()?
+        } else {
+            self.prefix
+                .iter()
+                .map(|ty| {
+                    ty.recursive_type_normalized_impl(db, div, true, visitor)
+                        .unwrap_or(div)
+                })
+                .collect::<Box<_>>()
+        };
+        let suffix = if nested {
+            self.suffix
+                .iter()
+                .map(|ty| ty.recursive_type_normalized_impl(db, div, true, visitor))
+                .collect::<Option<Box<_>>>()?
+        } else {
+            self.suffix
+                .iter()
+                .map(|ty| {
+                    ty.recursive_type_normalized_impl(db, div, true, visitor)
+                        .unwrap_or(div)
+                })
+                .collect::<Box<_>>()
+        };
+        let variable = if nested {
+            self.variable
+                .recursive_type_normalized_impl(db, div, true, visitor)?
+        } else {
+            self.variable
+                .recursive_type_normalized_impl(db, div, true, visitor)
+                .unwrap_or(div)
+        };
+        Some(Self {
             prefix,
             variable,
             suffix,
@@ -1151,6 +1242,23 @@ impl<'db> Tuple<Type<'db>> {
         match self {
             Tuple::Fixed(tuple) => Tuple::Fixed(tuple.normalized_impl(db, visitor)),
             Tuple::Variable(tuple) => tuple.normalized_impl(db, visitor),
+        }
+    }
+
+    pub(super) fn recursive_type_normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Option<Self> {
+        match self {
+            Tuple::Fixed(tuple) => Some(Tuple::Fixed(
+                tuple.recursive_type_normalized_impl(db, div, nested, visitor)?,
+            )),
+            Tuple::Variable(tuple) => Some(Tuple::Variable(
+                tuple.recursive_type_normalized_impl(db, div, nested, visitor)?,
+            )),
         }
     }
 

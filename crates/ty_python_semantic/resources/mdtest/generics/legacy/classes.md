@@ -756,6 +756,8 @@ from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 
+# TODO: no error "Unsupported class base with type `<class 'list[Derived[T@Derived]]'> | <class 'list[@Todo]'>`"
+# error: [unsupported-base]
 class Derived(list[Derived[T]], Generic[T]): ...
 ```
 
