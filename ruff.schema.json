@@ -273,6 +273,18 @@
       ],
       "deprecated": true
     },
+    "flake8-commas": {
+      "description": "Options for the `flake8-commas` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8CommasOptions"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "deprecated": true
+    },
     "flake8-comprehensions": {
       "description": "Options for the `flake8-comprehensions` plugin.",
       "anyOf": [
@@ -1093,6 +1105,20 @@
         },
         "strict-checking": {
           "description": "Compare module names instead of full module paths.\n\nUsed by [`A005` - `stdlib-module-shadowing`](https://docs.astral.sh/ruff/rules/stdlib-module-shadowing/).",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8CommasOptions": {
+      "description": "Options for the `flake8-commas` plugin.",
+      "type": "object",
+      "properties": {
+        "allow-single-arg-function-calls": {
+          "description": "Don't require trailing comma in function calls with a single argument.",
           "type": [
             "boolean",
             "null"
@@ -2139,6 +2165,17 @@
           "anyOf": [
             {
               "$ref": "#/definitions/Flake8BuiltinsOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-commas": {
+          "description": "Options for the `flake8-commas` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8CommasOptions"
             },
             {
               "type": "null"

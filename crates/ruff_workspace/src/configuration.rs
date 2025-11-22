@@ -46,7 +46,7 @@ use ruff_python_formatter::{
 
 use crate::options::{
     AnalyzeOptions, Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BooleanTrapOptions,
-    Flake8BugbearOptions, Flake8BuiltinsOptions, Flake8ComprehensionsOptions,
+    Flake8BugbearOptions, Flake8BuiltinsOptions, Flake8CommasOptions, Flake8ComprehensionsOptions,
     Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
     Flake8ImplicitStrConcatOptions, Flake8ImportConventionsOptions, Flake8PytestStyleOptions,
     Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
@@ -357,6 +357,10 @@ impl Configuration {
                     .flake8_builtins
                     .map(Flake8BuiltinsOptions::into_settings)
                     .unwrap_or_default(),
+                flake8_commas: lint
+                    .flake8_commas
+                    .map(Flake8CommasOptions::into_settings)
+                    .unwrap_or_default(),
                 flake8_comprehensions: lint
                     .flake8_comprehensions
                     .map(Flake8ComprehensionsOptions::into_settings)
@@ -660,6 +664,7 @@ pub struct LintConfiguration {
     pub flake8_boolean_trap: Option<Flake8BooleanTrapOptions>,
     pub flake8_bugbear: Option<Flake8BugbearOptions>,
     pub flake8_builtins: Option<Flake8BuiltinsOptions>,
+    pub flake8_commas: Option<Flake8CommasOptions>,
     pub flake8_comprehensions: Option<Flake8ComprehensionsOptions>,
     pub flake8_copyright: Option<Flake8CopyrightOptions>,
     pub flake8_errmsg: Option<Flake8ErrMsgOptions>,
@@ -777,6 +782,7 @@ impl LintConfiguration {
             flake8_boolean_trap: options.common.flake8_boolean_trap,
             flake8_bugbear: options.common.flake8_bugbear,
             flake8_builtins: options.common.flake8_builtins,
+            flake8_commas: options.common.flake8_commas,
             flake8_comprehensions: options.common.flake8_comprehensions,
             flake8_copyright: options.common.flake8_copyright,
             flake8_errmsg: options.common.flake8_errmsg,
@@ -1164,6 +1170,7 @@ impl LintConfiguration {
             flake8_boolean_trap: self.flake8_boolean_trap.combine(config.flake8_boolean_trap),
             flake8_bugbear: self.flake8_bugbear.combine(config.flake8_bugbear),
             flake8_builtins: self.flake8_builtins.combine(config.flake8_builtins),
+            flake8_commas: self.flake8_commas.combine(config.flake8_commas),
             flake8_comprehensions: self
                 .flake8_comprehensions
                 .combine(config.flake8_comprehensions),
@@ -1392,6 +1399,7 @@ fn warn_about_deprecated_top_level_lint_options(
         flake8_boolean_trap,
         flake8_bugbear,
         flake8_builtins,
+        flake8_commas,
         flake8_comprehensions,
         flake8_copyright,
         flake8_errmsg,
@@ -1507,6 +1515,10 @@ fn warn_about_deprecated_top_level_lint_options(
 
     if flake8_builtins.is_some() {
         used_options.push("flake8-builtins");
+    }
+
+    if flake8_commas.is_some() {
+        used_options.push("flake8-commas");
     }
 
     if flake8_comprehensions.is_some() {

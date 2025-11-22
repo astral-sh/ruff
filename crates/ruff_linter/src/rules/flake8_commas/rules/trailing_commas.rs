@@ -382,6 +382,14 @@ fn check_token(
         return;
     }
 
+    // Is it allowed to have a function call with a single argument without a trailing comma?
+    if lint_context.settings().flake8_commas.allow_single_arg_function_calls
+       && prev.ty == TokenType::NonLogicalNewline
+       && context.ty == ContextType::CallArguments
+       && context.num_commas == 0 {
+        return;
+    }
+
     // Comma is required if:
     // - It is allowed,
     // - Followed by a newline,
