@@ -3,6 +3,7 @@ use crate::references::{ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
 use ruff_db::files::File;
 use ruff_text_size::TextSize;
+use ty_python_semantic::SemanticModel;
 
 /// Find all document highlights for a symbol at the given position.
 /// Document highlights are limited to the current file only.
@@ -13,9 +14,10 @@ pub fn document_highlights(
 ) -> Option<Vec<ReferenceTarget>> {
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
+    let model = SemanticModel::new(db, file);
 
     // Get the definitions for the symbol at the cursor position
-    let goto_target = find_goto_target(&module, offset)?;
+    let goto_target = find_goto_target(&model, &module, offset)?;
 
     // Use DocumentHighlights mode which limits search to current file only
     references(db, file, &goto_target, ReferencesMode::DocumentHighlights)

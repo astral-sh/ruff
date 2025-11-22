@@ -122,10 +122,10 @@ fn references_for_file(
 ) {
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
+    let model = SemanticModel::new(db, file);
 
     let mut finder = LocalReferencesFinder {
-        db,
-        file,
+        model: &model,
         target_definitions,
         references,
         mode,
@@ -157,8 +157,7 @@ fn is_symbol_externally_visible(goto_target: &GotoTarget<'_>) -> bool {
 
 /// AST visitor to find all references to a specific symbol by comparing semantic definitions
 struct LocalReferencesFinder<'a> {
-    db: &'a dyn Db,
-    file: File,
+    model: &'a SemanticModel<'a>,
     tokens: &'a Tokens,
     target_definitions: &'a [NavigationTarget],
     references: &'a mut Vec<ReferenceTarget>,
@@ -227,6 +226,22 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                     self.check_identifier_reference(rest_name);
                 }
             }
+            AnyNodeRef::ExprStringLiteral(string_expr) if self.should_include_declaration() => {
+                // Highlight the sub-AST of a string annotation
+                if let Some((sub_ast, sub_model)) = self.model.enter_string_annotation(string_expr)
+                {
+                    let mut sub_finder = LocalReferencesFinder {
+                        model: &sub_model,
+                        target_definitions: self.target_definitions,
+                        references: self.references,
+                        mode: self.mode,
+                        tokens: sub_ast.tokens(),
+                        target_text: self.target_text,
+                        ancestors: Vec::new(),
+                    };
+                    sub_finder.visit_expr(sub_ast.expr());
+                }
+            }
             AnyNodeRef::Alias(alias) if self.should_include_declaration() => {
                 // Handle import alias declarations
                 if let Some(asname) = &alias.asname {
@@ -285,15 +300,13 @@ impl LocalReferencesFinder<'_> {
         // the node is fine here. Offsets matter only for import statements
         // where the identifier might be a multi-part module name.
         let offset = covering_node.node().start();
-
         if let Some(goto_target) =
-            GotoTarget::from_covering_node(covering_node, offset, self.tokens)
+            GotoTarget::from_covering_node(self.model, covering_node, offset, self.tokens)
         {
             // Get the definitions for this goto target
-            let model = SemanticModel::new(self.db, self.file);
             if let Some(current_definitions_nav) = goto_target
-                .get_definition_targets(&model, ImportAliasResolution::PreserveAliases)
-                .and_then(|definitions| definitions.declaration_targets(self.db))
+                .get_definition_targets(self.model, ImportAliasResolution::PreserveAliases)
+                .and_then(|definitions| definitions.declaration_targets(self.model.db()))
             {
                 let current_definitions: Vec<NavigationTarget> =
                     current_definitions_nav.into_iter().collect();
@@ -302,7 +315,7 @@ impl LocalReferencesFinder<'_> {
                     // Determine if this is a read or write reference
                     let kind = self.determine_reference_kind(covering_node);
                     let target =
-                        ReferenceTarget::new(self.file, covering_node.node().range(), kind);
+                        ReferenceTarget::new(self.model.file(), covering_node.node().range(), kind);
                     self.references.push(target);
                 }
             }

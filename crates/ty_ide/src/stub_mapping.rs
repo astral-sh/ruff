@@ -11,12 +11,12 @@ use crate::cached_vendored_root;
 /// other language server providers (like hover, completion, and signature help) to find
 /// docstrings for functions that resolve to stubs.
 pub(crate) struct StubMapper<'db> {
-    db: &'db dyn crate::Db,
+    db: &'db dyn ty_python_semantic::Db,
     cached_vendored_root: Option<SystemPathBuf>,
 }
 
 impl<'db> StubMapper<'db> {
-    pub(crate) fn new(db: &'db dyn crate::Db) -> Self {
+    pub(crate) fn new(db: &'db dyn ty_python_semantic::Db) -> Self {
         let cached_vendored_root = cached_vendored_root(db);
         Self {
             db,

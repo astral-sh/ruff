@@ -373,6 +373,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> TypeAndQualifiers<'db> {
         match parse_string_annotation(&self.context, string) {
             Some(parsed) => {
+                self.string_annotations
+                    .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
                 // String annotations are always evaluated in the deferred context.
                 self.infer_annotation_expression(
                     parsed.expr(),
