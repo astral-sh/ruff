@@ -1,6 +1,7 @@
 use compact_str::{CompactString, ToCompactString};
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
+use ruff_db::parsed::parsed_module;
 
 use std::borrow::Cow;
 use std::time::Duration;
@@ -40,7 +41,7 @@ use crate::place::{
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::{imported_modules, place_table, semantic_index};
+use crate::semantic_index::{ImportKind, imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
@@ -12241,12 +12242,22 @@ impl<'db> ModuleLiteralType<'db> {
     ///
     /// We instead prefer handling most other import effects as definitions in the scope of
     /// the current file (i.e. [`crate::semantic_index::definition::ImportFromDefinitionNodeRef`]).
-    fn available_submodule_attributes(&self, db: &'db dyn Db) -> impl Iterator<Item = Name> {
+    fn available_submodule_attributes(
+        &self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = (Name, ImportKind)> {
         self.importing_file(db)
             .into_iter()
             .flat_map(|file| imported_modules(db, file))
-            .filter_map(|submodule_name| submodule_name.relative_to(self.module(db).name(db)))
-            .filter_map(|relative_submodule| relative_submodule.components().next().map(Name::from))
+            .filter_map(|(submodule_name, kind)| {
+                Some((submodule_name.relative_to(self.module(db).name(db))?, kind))
+            })
+            .filter_map(|(relative_submodule, kind)| {
+                relative_submodule
+                    .components()
+                    .next()
+                    .map(|module| (Name::from(module), *kind))
+            })
     }
 
     fn resolve_submodule(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
@@ -12290,19 +12301,27 @@ impl<'db> ModuleLiteralType<'db> {
                 .member(db, "__dict__");
         }
 
-        // If the file that originally imported the module has also imported a submodule
-        // named `name`, then the result is (usually) that submodule, even if the module
-        // also defines a (non-module) symbol with that name.
-        //
-        // Note that technically, either the submodule or the non-module symbol could take
-        // priority, depending on the ordering of when the submodule is loaded relative to
-        // the parent module's `__init__.py` file being evaluated. That said, we have
-        // chosen to always have the submodule take priority. (This matches pyright's
-        // current behavior, but is the opposite of mypy's current behavior.)
-        if self.available_submodule_attributes(db).contains(name) {
-            if let Some(submodule) = self.resolve_submodule(db, name) {
-                return Place::bound(submodule).into();
-            }
+        let mut submodule_type = None;
+
+        let available_submodule_kind = self
+            .available_submodule_attributes(db)
+            .find_map(|(attr, kind)| (attr == name).then_some(kind));
+
+        if available_submodule_kind.is_some() {
+            submodule_type = self.resolve_submodule(db, name);
+        }
+
+        // if we're in a module `foo` and `foo` contains `import a.b`,
+        // and the package `a` has a submodule `b`, we assume that the
+        // attribute access `a.b` inside `foo` will resolve to the submodule
+        // `a.b` *even if* `a/__init__.py` also defines a symbol `b` (e.g. `b = 42`).
+        // This is a heuristic, but it's almost certainly what will actually happen
+        // at runtime. However, if `foo` only contains `from a.b import <something>,
+        // we prioritise the `b` attribute in `a/__init__.py` over the submodule `a.b`.
+        if available_submodule_kind == Some(ImportKind::Import)
+            && let Some(submodule) = submodule_type
+        {
+            return Place::bound(submodule).into();
         }
 
         let place_and_qualifiers = self
@@ -12311,12 +12330,16 @@ impl<'db> ModuleLiteralType<'db> {
             .map(|file| imported_symbol(db, file, name, None))
             .unwrap_or_default();
 
-        // If the normal lookup failed, try to call the module's `__getattr__` function
-        if place_and_qualifiers.place.is_undefined() {
-            return self.try_module_getattr(db, name);
+        if !place_and_qualifiers.is_undefined() {
+            return place_and_qualifiers;
         }
 
-        place_and_qualifiers
+        if let Some(submodule) = submodule_type {
+            return Place::bound(submodule).into();
+        }
+
+        // If the normal lookup failed, try to call the module's `__getattr__` function
+        self.try_module_getattr(db, name)
     }
 }
 
