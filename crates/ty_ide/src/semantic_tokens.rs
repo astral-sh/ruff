@@ -187,9 +187,9 @@ impl Deref for SemanticTokens {
 /// Pass None to get tokens for the entire file.
 pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> SemanticTokens {
     let parsed = parsed_module(db, file).load(db);
-    let semantic_model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, file);
 
-    let mut visitor = SemanticTokenVisitor::new(&semantic_model, range);
+    let mut visitor = SemanticTokenVisitor::new(&model, range);
     visitor.visit_body(parsed.suite());
 
     SemanticTokens::new(visitor.tokens)
@@ -197,7 +197,7 @@ pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> Sem
 
 /// AST visitor that collects semantic tokens.
 struct SemanticTokenVisitor<'db> {
-    semantic_model: &'db SemanticModel<'db>,
+    model: &'db SemanticModel<'db>,
     tokens: Vec<SemanticToken>,
     in_class_scope: bool,
     in_type_annotation: bool,
@@ -206,9 +206,9 @@ struct SemanticTokenVisitor<'db> {
 }
 
 impl<'db> SemanticTokenVisitor<'db> {
-    fn new(semantic_model: &'db SemanticModel<'db>, range_filter: Option<TextRange>) -> Self {
+    fn new(model: &'db SemanticModel<'db>, range_filter: Option<TextRange>) -> Self {
         Self {
-            semantic_model,
+            model,
             tokens: Vec::new(),
             in_class_scope: false,
             in_target_creating_definition: false,
@@ -259,7 +259,7 @@ impl<'db> SemanticTokenVisitor<'db> {
 
     fn classify_name(&self, name: &ast::ExprName) -> (SemanticTokenType, SemanticTokenModifier) {
         // First try to classify the token based on its definition kind.
-        let definition = definition_for_name(self.semantic_model, name);
+        let definition = definition_for_name(self.model, name);
 
         if let Some(definition) = definition {
             let name_str = name.id.as_str();
@@ -269,7 +269,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         }
 
         // Fall back to type-based classification.
-        let ty = name.inferred_type(self.semantic_model);
+        let ty = name.inferred_type(self.model);
         let name_str = name.id.as_str();
         self.classify_from_type_and_name_str(ty, name_str)
     }
@@ -280,7 +280,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         name_str: &str,
     ) -> Option<(SemanticTokenType, SemanticTokenModifier)> {
         let mut modifiers = SemanticTokenModifier::empty();
-        let db = self.semantic_model.db();
+        let db = self.model.db();
         let model = SemanticModel::new(db, definition.file(db));
 
         match definition.kind(db) {
@@ -706,12 +706,12 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 for alias in &import.names {
                     if let Some(asname) = &alias.asname {
                         // For aliased imports (from X import Y as Z), classify Z based on what Y is
-                        let ty = alias.inferred_type(self.semantic_model);
+                        let ty = alias.inferred_type(self.model);
                         let (token_type, modifiers) = self.classify_from_alias_type(ty, asname);
                         self.add_token(asname, token_type, modifiers);
                     } else {
                         // For direct imports (from X import Y), use semantic classification
-                        let ty = alias.inferred_type(self.semantic_model);
+                        let ty = alias.inferred_type(self.model);
                         let (token_type, modifiers) =
                             self.classify_from_alias_type(ty, &alias.name);
                         self.add_token(&alias.name, token_type, modifiers);
@@ -831,7 +831,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 self.visit_expr(&attr.value);
 
                 // Then add token for the attribute name (e.g., 'path' in 'os.path')
-                let ty = expr.inferred_type(self.semantic_model);
+                let ty = expr.inferred_type(self.model);
                 let (token_type, modifiers) =
                     Self::classify_from_type_for_attribute(ty, &attr.attr);
                 self.add_token(&attr.attr, token_type, modifiers);
@@ -877,8 +877,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
             }
             ast::Expr::StringLiteral(string_expr) => {
                 // Highlight the sub-AST of a string annotation
-                if let Some((sub_ast, sub_model)) =
-                    self.semantic_model.enter_string_annotation(string_expr)
+                if let Some((sub_ast, sub_model)) = self.model.enter_string_annotation(string_expr)
                 {
                     let mut sub_visitor = SemanticTokenVisitor::new(&sub_model, None);
                     sub_visitor.visit_expr(sub_ast.expr());

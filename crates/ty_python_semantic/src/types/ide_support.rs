@@ -512,10 +512,10 @@ pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Member<'db>
 /// Returns the first definition kind that is reachable for this name in its scope.
 /// This is useful for IDE features like semantic tokens.
 pub fn definition_for_name<'db>(
-    semantic_model: &SemanticModel<'db>,
+    model: &SemanticModel<'db>,
     name: &ast::ExprName,
 ) -> Option<Definition<'db>> {
-    let definitions = definitions_for_name(semantic_model, name);
+    let definitions = definitions_for_name(model, name);
 
     // Find the first valid definition and return its kind
     for declaration in definitions {
@@ -530,16 +530,16 @@ pub fn definition_for_name<'db>(
 /// Returns all definitions for a name. If any definitions are imports, they
 /// are resolved (recursively) to the original definitions or module files.
 pub fn definitions_for_name<'db>(
-    semantic_model: &SemanticModel<'db>,
+    model: &SemanticModel<'db>,
     name: &ast::ExprName,
 ) -> Vec<ResolvedDefinition<'db>> {
-    let db = semantic_model.db();
-    let file = semantic_model.file();
+    let db = model.db();
+    let file = model.file();
     let index = semantic_index(db, file);
     let name_str = name.id.as_str();
 
     // Get the scope for this name expression
-    let Some(file_scope) = semantic_model.scope(name.into()) else {
+    let Some(file_scope) = model.scope(name.into()) else {
         return vec![];
     };
 
