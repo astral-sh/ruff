@@ -702,10 +702,32 @@ impl<'db> PlaceAndQualifiers<'db> {
             (Place::Defined(prev_ty, _, _), Place::Defined(ty, origin, definedness)) => {
                 Place::Defined(ty.cycle_normalized(db, prev_ty, cycle), origin, definedness)
             }
-            (_, Place::Defined(ty, origin, definedness)) => {
-                Place::Defined(ty.recursive_type_normalized(db, cycle), origin, definedness)
+            // If a `Place` in the current cycle is `Defined` but `Undefined` in the previous cycle,
+            // that means that its definedness depends on the truthiness of the previous cycle value.
+            // In this case, the definedness of the current cycle `Place` is set to `PossiblyUndefined`.
+            // Actually, this branch is unreachable. We evaluate the truthiness of non-definitely-bound places as Ambiguous (see #19579),
+            // so convergence is guaranteed without resorting to this handling.
+            // However, the handling described above may reduce the exactness of reachability analysis,
+            // so it may be better to remove it. In that case, this branch is necessary.
+            (Place::Undefined, Place::Defined(ty, origin, _definedness)) => Place::Defined(
+                ty.recursive_type_normalized(db, cycle),
+                origin,
+                Definedness::PossiblyUndefined,
+            ),
+            // If a `Place` that was `Defined(Divergent)` in the previous cycle is actually found to be unreachable in the current cycle,
+            // it is set to `Undefined` (because the cycle initial value does not include meaningful reachability information).
+            (Place::Defined(ty, origin, _definedness), Place::Undefined) => {
+                if cycle.head_ids().any(|id| ty == Type::divergent(id)) {
+                    Place::Undefined
+                } else {
+                    Place::Defined(
+                        ty.recursive_type_normalized(db, cycle),
+                        origin,
+                        Definedness::PossiblyUndefined,
+                    )
+                }
             }
-            (_, Place::Undefined) => Place::Undefined,
+            (Place::Undefined, Place::Undefined) => Place::Undefined,
         };
         PlaceAndQualifiers {
             place,
