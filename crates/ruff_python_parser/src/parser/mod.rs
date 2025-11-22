@@ -1115,7 +1115,12 @@ impl RecoveryContextKind {
                     TokenKind::Colon => Some(ListTerminatorKind::ErrorRecovery),
                     _ => None,
                 },
-                WithItemKind::Unparenthesized | WithItemKind::ParenthesizedExpression => p
+                WithItemKind::Unparenthesized => matches!(
+                    p.current_token_kind(),
+                    TokenKind::Colon | TokenKind::Newline
+                )
+                .then_some(ListTerminatorKind::Regular),
+                WithItemKind::ParenthesizedExpression => p
                     .at(TokenKind::Colon)
                     .then_some(ListTerminatorKind::Regular),
             },
