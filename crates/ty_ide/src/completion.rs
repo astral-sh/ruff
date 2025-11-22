@@ -1341,7 +1341,18 @@ fn is_in_definition_place(
 /// E.g. naming a parameter, type parameter, or `for` <name>).
 fn is_in_variable_binding(parsed: &ParsedModuleRef, offset: TextSize, typed: Option<&str>) -> bool {
     let range = if let Some(typed) = typed {
-        let start = offset.saturating_sub(typed.text_len());
+        let tokens = tokens_start_before(parsed.tokens(), offset);
+        // `typed` contains the entire token even if the cursor sits in the
+        // middle of it (pa<CURSOR>ram). To correctly suggest completions
+        // based on the cursor's current position, we must only consider
+        // the characters in the token that are left of the cursor.
+        // E.g. we should only count "pa" if the state is "pa<CUSROR>ram".
+        let typed_len = typed
+            .text_len()
+            .min(tokens.last().map_or(typed.text_len(), |token| {
+                offset.saturating_sub(token.start())
+            }));
+        let start = offset.saturating_sub(typed_len);
         TextRange::new(start, offset)
     } else {
         TextRange::empty(offset)
