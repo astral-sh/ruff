@@ -31,6 +31,10 @@ impl<'db> SemanticModel<'db> {
         self.db
     }
 
+    pub fn file(&self) -> File {
+        self.file
+    }
+
     pub fn file_path(&self) -> &FilePath {
         self.file.path(self.db)
     }
@@ -70,8 +74,17 @@ impl<'db> SemanticModel<'db> {
         members
     }
 
-    pub fn resolve_module(&self, module_name: &ModuleName) -> Option<Module<'_>> {
-        resolve_module(self.db, module_name)
+    /// Resolve the given import made in this file to a Type
+    pub fn resolve_module_type(&self, module: Option<&str>, level: u32) -> Option<Type<'db>> {
+        let module = self.resolve_module(module, level)?;
+        Some(Type::module_literal(self.db, self.file, module))
+    }
+
+    /// Resolve the given import made in this file to a Module
+    pub fn resolve_module(&self, module: Option<&str>, level: u32) -> Option<Module<'db>> {
+        let module_name =
+            ModuleName::from_identifier_parts(self.db, self.file, module, level).ok()?;
+        resolve_module(self.db, &module_name)
     }
 
     /// Returns completions for symbols available in a `import <CURSOR>` context.
