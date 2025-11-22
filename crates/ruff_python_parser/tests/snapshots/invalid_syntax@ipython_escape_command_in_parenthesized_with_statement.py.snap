@@ -1,0 +1,66 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/ipython_escape_command_in_parenthesized_with_statement.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..56,
+        body: [
+            With(
+                StmtWith {
+                    node_index: NodeIndex(None),
+                    range: 37..55,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 43..44,
+                            node_index: NodeIndex(None),
+                            context_expr: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 43..44,
+                                    id: Name("a"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                        WithItem {
+                            range: 47..48,
+                            node_index: NodeIndex(None),
+                            context_expr: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 47..48,
+                                    id: Name("b"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        Pass(
+                            StmtPass {
+                                node_index: NodeIndex(None),
+                                range: 51..55,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: {"mode": "ipython"}
+2 | with (a, ?b): pass
+  |          ^ Syntax Error: Expected `,`, found `?`
+  |

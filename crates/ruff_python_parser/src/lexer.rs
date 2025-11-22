@@ -405,8 +405,7 @@ impl<'src> Lexer<'src> {
                     && self.nesting == 0 =>
             {
                 // SAFETY: Safe because `c` has been matched against one of the possible escape command token
-                // In expression context, we don't allow Help kind conversion even if the command ends with `?`
-                self.lex_ipython_escape_command(IpyEscapeKind::try_from(c).unwrap(), true)
+                self.lex_ipython_escape_command(IpyEscapeKind::try_from(c).unwrap())
             }
 
             c @ ('%' | '!' | '?' | '/' | ';' | ',')
@@ -420,8 +419,7 @@ impl<'src> Lexer<'src> {
                     IpyEscapeKind::try_from(c).unwrap()
                 };
 
-                // Not in expression context, so Help kind conversion is allowed
-                self.lex_ipython_escape_command(kind, false)
+                self.lex_ipython_escape_command(kind)
             }
 
             '?' if self.mode == Mode::Ipython => TokenKind::Question,
@@ -1234,15 +1232,7 @@ impl<'src> Lexer<'src> {
     }
 
     /// Lex a single IPython escape command.
-    ///
-    /// `in_expression_context` indicates whether we're in an expression context (after `=`).
-    /// In expression contexts, only `%` (Magic) and `!` (Shell) escape commands are allowed,
-    /// so we don't convert to Help kind even if the command ends with `?`.
-    fn lex_ipython_escape_command(
-        &mut self,
-        escape_kind: IpyEscapeKind,
-        in_expression_context: bool,
-    ) -> TokenKind {
+    fn lex_ipython_escape_command(&mut self, escape_kind: IpyEscapeKind) -> TokenKind {
         let mut value = String::new();
 
         loop {
@@ -1302,17 +1292,11 @@ impl<'src> Lexer<'src> {
                     // is not recognized as a help end escape command. So, `%?` and `? ??` are
                     // `IpyEscapeKind::Magic` and `IpyEscapeKind::Help` because of the initial `%` and `??`
                     // tokens.
-                    //
-                    // Additionally, in expression contexts (after `=`), we don't allow Help kind
-                    // conversion even if the command ends with `?`. Only `%` (Magic) and `!` (Shell)
-                    // escape commands are allowed as expressions.
-                    if in_expression_context
-                        || question_count > 2
+                    if question_count > 2
                         || value.chars().last().is_none_or(is_python_whitespace)
                         || !matches!(self.cursor.first(), '\n' | '\r' | EOF_CHAR)
                     {
-                        // Not a help end escape command (or in expression context where Help is not allowed),
-                        // so continue with the lexing.
+                        // Not a help end escape command, so continue with the lexing.
                         value.reserve(question_count as usize);
                         for _ in 0..question_count {
                             value.push('?');

@@ -2767,14 +2767,7 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at a `IpyEscapeCommand` token.
-    ///
-    /// # Note
-    ///
-    /// The lexer ensures that only `%` (Magic) and `!` (Shell) escape commands are emitted
-    /// in expression contexts (after `=`). It prevents Help kind conversion even if the command
-    /// ends with `?`. However, Help escape commands can still be lexed at the start of logical
-    /// lines (e.g., `?b` in `with a,?b`) and may then be parsed as expressions. This check
-    /// ensures we report an error instead of panicking in such cases.
+    /// If the escape command kind is not `%` or `!`.
     fn parse_ipython_escape_command_expression(&mut self) -> ast::ExprIpyEscapeCommand {
         let start = self.node_start();
 
@@ -2784,27 +2777,17 @@ impl<'src> Parser<'src> {
             unreachable!()
         };
 
+        if !matches!(kind, IpyEscapeKind::Magic | IpyEscapeKind::Shell) {
+            // This should never occur as the lexer won't allow it.
+            unreachable!("IPython escape command expression is only allowed for % and !");
+        }
+
         let command = ast::ExprIpyEscapeCommand {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
             kind,
             value,
         };
-
-        // test_err ipython_help_escape_command_as_expression
-        // # parse_options: {"mode": "ipython"}
-        // with a,?b: pass
-        if !matches!(kind, IpyEscapeKind::Magic | IpyEscapeKind::Shell) {
-            // IPython escape commands like `?` (Help) are not allowed in expression contexts.
-            // Only `%` (Magic) and `!` (Shell) escape commands can be used as expressions.
-            // The lexer should prevent this, but we check here as a defensive measure.
-            self.add_error(
-                ParseErrorType::OtherError(format!(
-                    "IPython escape command expression is only allowed for % and !, found {kind:?}"
-                )),
-                &command,
-            );
-        }
 
         if self.options.mode != Mode::Ipython {
             self.add_error(ParseErrorType::UnexpectedIpythonEscapeCommand, &command);

@@ -2203,13 +2203,6 @@ impl<'src> Parser<'src> {
                 )
             }
         } else {
-            // test_err ipython_escape_command_in_with_statement
-            // # parse_options: {"mode": "ipython"}
-            // with a,?b
-            //     pass
-            // with a,?b
-            //     x = 1
-            //     y = 2
             self.parse_comma_separated_list_into_vec(
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized),
                 |p| p.parse_with_item(WithItemParsingState::Regular).item,
