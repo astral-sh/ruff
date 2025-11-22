@@ -2449,6 +2449,30 @@ class ManyCycles:
         reveal_type(self.x5)  # revealed: Unknown | int
         reveal_type(self.x6)  # revealed: Unknown | int
         reveal_type(self.x7)  # revealed: Unknown | int
+
+class ManyCycles2:
+    def __init__(self: "ManyCycles2"):
+        self.x1 = [0]
+        self.x2 = [1]
+        self.x3 = [1]
+
+    def f1(self: "ManyCycles2"):
+        # TODO: should be Unknown | list[int | Divergent]
+        reveal_type(self.x3)  # revealed: Unknown | list[Unknown | int] | list[Divergent] | list[Divergent]
+
+        self.x1 = [self.x2] + [self.x3]
+        self.x2 = [self.x1] + [self.x3]
+        self.x3 = [self.x1] + [self.x2]
+
+    def f2(self: "ManyCycles2"):
+        self.x1 = self.x2 + self.x3
+        self.x2 = self.x1 + self.x3
+        self.x3 = self.x1 + self.x2
+
+    def f3(self: "ManyCycles2"):
+        self.x1 = self.x2 + self.x3
+        self.x2 = self.x1 + self.x3
+        self.x3 = self.x1 + self.x2
 ```
 
 This case additionally tests our union/intersection simplification logic:
