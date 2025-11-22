@@ -511,6 +511,54 @@ pub(crate) fn has_skip_comment(trailing_comments: &[SourceComment], source: &str
     })
 }
 
+pub(crate) struct SuppressedNodeRanges(Vec<TextRange>);
+
+impl<'a> SuppressedNodeRanges {
+    pub(crate) fn from_comments(comments: &Comments<'a>, source: &'a str) -> Self {
+        let map = &comments.clone().data.comments;
+
+        let mut ranges = map
+            .keys()
+            .copied()
+            .filter_map(|key| suppressed_range(key.node(), map.trailing(&key), source))
+            .collect::<Vec<_>>();
+
+        ranges.sort_by_key(ruff_text_size::Ranged::start);
+
+        Self(ranges)
+    }
+
+    pub(crate) fn contains(&self, node: AnyNodeRef<'_>) -> bool {
+        let target = node.range();
+        self.0
+            .binary_search_by(|range| {
+                if range.eq(&target) {
+                    std::cmp::Ordering::Equal
+                } else if range.start() < target.start() {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Greater
+                }
+            })
+            .is_ok()
+    }
+}
+
+fn suppressed_range<'a>(
+    node: AnyNodeRef<'a>,
+    trailing_comments: &[SourceComment],
+    source: &'a str,
+) -> Option<TextRange> {
+    if has_skip_comment(trailing_comments, source) {
+        let end = node.end();
+        let start = node.start();
+
+        Some(TextRange::new(start, end))
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;

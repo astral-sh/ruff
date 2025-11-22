@@ -1,11 +1,10 @@
 use ruff_formatter::write;
 use ruff_python_ast::StmtTypeAlias;
 
-use crate::comments::SourceComment;
+use crate::prelude::*;
 use crate::statement::stmt_assign::{
     AnyAssignmentOperator, AnyBeforeOperator, FormatStatementsLastExpression,
 };
-use crate::{has_skip_comment, prelude::*};
 
 #[derive(Default)]
 pub struct FormatStmtTypeAlias;
@@ -42,12 +41,7 @@ impl FormatNodeRule<StmtTypeAlias> for FormatStmtTypeAlias {
             ]
         )
     }
-
-    fn is_suppressed(
-        &self,
-        trailing_comments: &[SourceComment],
-        context: &PyFormatContext,
-    ) -> bool {
-        has_skip_comment(trailing_comments, context.source())
+    fn is_suppressed(&self, node: &StmtTypeAlias, context: &PyFormatContext) -> bool {
+        context.is_suppressed(node.into())
     }
 }

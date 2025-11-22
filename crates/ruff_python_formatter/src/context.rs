@@ -2,17 +2,19 @@ use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 
 use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::str::Quote;
 use ruff_python_parser::Tokens;
 
 use crate::PyFormatOptions;
-use crate::comments::Comments;
+use crate::comments::{Comments, SuppressedNodeRanges};
 use crate::other::interpolated_string::InterpolatedStringContext;
 
 pub struct PyFormatContext<'a> {
     options: PyFormatOptions,
     contents: &'a str,
     comments: Comments<'a>,
+    suppressed_nodes: SuppressedNodeRanges,
     tokens: &'a Tokens,
     node_level: NodeLevel,
     indent_level: IndentLevel,
@@ -34,12 +36,14 @@ impl<'a> PyFormatContext<'a> {
         options: PyFormatOptions,
         contents: &'a str,
         comments: Comments<'a>,
+        suppressed_nodes: SuppressedNodeRanges,
         tokens: &'a Tokens,
     ) -> Self {
         Self {
             options,
             contents,
             comments,
+            suppressed_nodes,
             tokens,
             node_level: NodeLevel::TopLevel(TopLevelStatementPosition::Other),
             indent_level: IndentLevel::new(0),
@@ -111,6 +115,11 @@ impl<'a> PyFormatContext<'a> {
     /// Returns `true` if preview mode is enabled.
     pub(crate) const fn is_preview(&self) -> bool {
         self.options.preview().is_enabled()
+    }
+
+    /// Returns `true` if node is suppressed via skip comment.
+    pub(crate) fn is_suppressed(&self, node: AnyNodeRef<'_>) -> bool {
+        self.suppressed_nodes.contains(node)
     }
 }
 
