@@ -174,6 +174,39 @@ def _(x: Foo[int], y: Bar[str], z: list[bytes]):
     reveal_type(type(z))  # revealed: type[list[bytes]]
 ```
 
+## Checking generic `type[]` types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C[T]:
+    pass
+
+class D[T]:
+    pass
+
+var: type[C[int]] = C[int]
+var: type[C[int]] = D[int]  # error: [invalid-assignment] "Object of type `<class 'D[int]'>` is not assignable to `type[C[int]]`"
+```
+
+However, generic `Protocol` classes are still TODO:
+
+```py
+from typing import Protocol
+
+class Proto[U](Protocol):
+    def some_method(self): ...
+
+# TODO: should be error: [invalid-assignment]
+var: type[Proto[int]] = C[int]
+
+def _(p: type[Proto[int]]):
+    reveal_type(p)  # revealed: type[@Todo(type[T] for protocols)]
+```
+
 ## `@final` classes
 
 `type[]` types are eagerly converted to class-literal types if a class decorated with `@final` is
