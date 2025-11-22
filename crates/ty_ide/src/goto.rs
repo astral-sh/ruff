@@ -245,7 +245,7 @@ impl<'db> DefinitionsOrTargets<'db> {
     /// In this case it basically returns exactly what was found.
     pub(crate) fn declaration_targets(
         self,
-        db: &'db dyn crate::Db,
+        db: &'db dyn ty_python_semantic::Db,
     ) -> Option<crate::NavigationTargets> {
         match self {
             DefinitionsOrTargets::Definitions(definitions) => {
@@ -261,7 +261,7 @@ impl<'db> DefinitionsOrTargets<'db> {
     /// if the definition we have is found in a stub file.
     pub(crate) fn definition_targets(
         self,
-        db: &'db dyn crate::Db,
+        db: &'db dyn ty_python_semantic::Db,
     ) -> Option<crate::NavigationTargets> {
         match self {
             DefinitionsOrTargets::Definitions(definitions) => {
@@ -917,7 +917,7 @@ impl Ranged for GotoTarget<'_> {
 
 /// Converts a collection of `ResolvedDefinition` items into `NavigationTarget` items.
 fn convert_resolved_definitions_to_targets(
-    db: &dyn crate::Db,
+    db: &dyn ty_python_semantic::Db,
     definitions: Vec<ty_python_semantic::ResolvedDefinition<'_>>,
 ) -> Vec<crate::NavigationTarget> {
     definitions
@@ -978,7 +978,7 @@ fn definitions_for_callable<'db>(
 
 /// Shared helper to map and convert resolved definitions into navigation targets.
 fn definitions_to_navigation_targets<'db>(
-    db: &dyn crate::Db,
+    db: &dyn ty_python_semantic::Db,
     stub_mapper: Option<&StubMapper<'db>>,
     mut definitions: Vec<ty_python_semantic::ResolvedDefinition<'db>>,
 ) -> Option<crate::NavigationTargets> {

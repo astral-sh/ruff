@@ -351,13 +351,14 @@ class DataProcessor:
         );
 
         assert_snapshot!(test.rename("MyNewClass"), @r#"
-        info[rename]: Rename symbol (found 1 locations)
-         --> main.py:4:7
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:2:5
           |
         2 | a: "MyClass" = 1
+          |     ^^^^^^^
         3 |
         4 | class MyClass:
-          |       ^^^^^^^
+          |       -------
         5 |     """some docs"""
           |
         "#);
@@ -375,13 +376,14 @@ class DataProcessor:
         );
 
         assert_snapshot!(test.rename("MyNewClass"), @r#"
-        info[rename]: Rename symbol (found 1 locations)
-         --> main.py:4:7
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:2:12
           |
         2 | a: "None | MyClass" = 1
+          |            ^^^^^^^
         3 |
         4 | class MyClass:
-          |       ^^^^^^^
+          |       -------
         5 |     """some docs"""
           |
         "#);
@@ -413,13 +415,14 @@ class DataProcessor:
         );
 
         assert_snapshot!(test.rename("MyNewClass"), @r#"
-        info[rename]: Rename symbol (found 1 locations)
-         --> main.py:4:7
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:2:12
           |
         2 | a: "None | MyClass" = 1
+          |            ^^^^^^^
         3 |
         4 | class MyClass:
-          |       ^^^^^^^
+          |       -------
         5 |     """some docs"""
           |
         "#);
@@ -465,13 +468,14 @@ class DataProcessor:
         );
 
         assert_snapshot!(test.rename("MyNewClass"), @r#"
-        info[rename]: Rename symbol (found 1 locations)
-         --> main.py:4:7
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:2:5
           |
         2 | a: "MyClass | No" = 1
+          |     ^^^^^^^
         3 |
         4 | class MyClass:
-          |       ^^^^^^^
+          |       -------
         5 |     """some docs"""
           |
         "#);
