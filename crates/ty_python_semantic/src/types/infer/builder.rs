@@ -9077,10 +9077,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 let diagnostic = match value_type {
-                    Type::ModuleLiteral(module) => builder.into_diagnostic(format_args!(
-                        "Module `{}` has no member `{attr_name}`",
-                        module.module(db).name(db),
-                    )),
+                    Type::ModuleLiteral(module) => {
+                        let module = module.module(db);
+                        let module_name = module.name(db);
+                        if module.kind(db).is_package()
+                            && let Some(relative_submodule) = ModuleName::new(attr_name)
+                        {
+                            let mut maybe_submodule_name = module_name.clone();
+                            maybe_submodule_name.extend(&relative_submodule);
+                            if resolve_module(db, &maybe_submodule_name).is_some() {
+                                let mut diag = builder.into_diagnostic(format_args!(
+                                    "Submodule `{attr_name}` may not be available as an attribute \
+                                    on module `{module_name}`"
+                                ));
+                                diag.help(format_args!(
+                                    "Consider explicitly importing `{maybe_submodule_name}`"
+                                ));
+                                return fallback();
+                            }
+                        }
+
+                        builder.into_diagnostic(format_args!(
+                            "Module `{module_name}` has no member `{attr_name}`",
+                        ))
+                    }
                     Type::ClassLiteral(class) => builder.into_diagnostic(format_args!(
                         "Class `{}` has no attribute `{attr_name}`",
                         class.name(db),
