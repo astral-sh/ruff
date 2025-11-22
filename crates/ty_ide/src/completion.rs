@@ -1341,7 +1341,18 @@ fn is_in_definition_place(
 /// E.g. naming a parameter, type parameter, or `for` <name>).
 fn is_in_variable_binding(parsed: &ParsedModuleRef, offset: TextSize, typed: Option<&str>) -> bool {
     let range = if let Some(typed) = typed {
-        let start = offset.saturating_sub(typed.text_len());
+        let tokens = tokens_start_before(parsed.tokens(), offset);
+        // `typed` contains the entire token even if the cursor sits in the
+        // middle of it (pa<CURSOR>ram). To correctly suggest completions
+        // based on the cursor's current position, we must only consider
+        // the characters in the token that are left of the cursor.
+        // E.g. we should only count "pa" if the state is "pa<CUSROR>ram".
+        let typed_len = typed
+            .text_len()
+            .min(tokens.last().map_or(typed.text_len(), |token| {
+                offset.saturating_sub(token.start())
+            }));
+        let start = offset.saturating_sub(typed_len);
         TextRange::new(start, offset)
     } else {
         TextRange::empty(offset)
@@ -1354,6 +1365,24 @@ fn is_in_variable_binding(parsed: &ParsedModuleRef, offset: TextSize, typed: Opt
             type_param.name.range.contains_range(range)
         }
         ast::AnyNodeRef::StmtFor(stmt_for) => stmt_for.target.range().contains_range(range),
+        // The AST does not produce `ast::AnyNodeRef::Parameter` nodes for keywords
+        // or otherwise invalid syntax. Rather they are captured in a
+        // `ast::AnyNodeRef::Parameters` node as "empty space". To ensure
+        // we still suppress suggestions even when the syntax is technically
+        // invalid we extract the token under the cursor and check if it makes
+        // up that "empty space" inside the Parameters Node. If it does, we know
+        // that we are still binding variables, just that the current state is
+        // syntatically invalid. Hence we suppress autocomplete suggestons
+        // also in those cases.
+        ast::AnyNodeRef::Parameters(params) => {
+            if !params.range.contains_range(range) {
+                return false;
+            }
+            params
+                .iter()
+                .map(|param| param.range())
+                .all(|r| !r.contains_range(range))
+        }
         _ => false,
     })
 }
@@ -5255,6 +5284,45 @@ for foo, bar<CURSOR>
         let builder = completion_test_builder(
             "\
 def foo(p<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn no_completions_in_function_param_keyword() {
+        let builder = completion_test_builder(
+            "\
+def foo(in<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn no_completions_in_function_param_multi_keyword() {
+        let builder = completion_test_builder(
+            "\
+def foo(param, in<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn no_completions_in_function_param_multi_keyword_middle() {
+        let builder = completion_test_builder(
+            "\
+def foo(param, in<CURSOR>, param_two
 ",
         );
         assert_snapshot!(
