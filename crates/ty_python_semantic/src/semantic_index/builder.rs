@@ -47,7 +47,7 @@ use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
-use crate::semantic_index::{ExpressionsScopeMap, SemanticIndex, VisibleAncestorsIter};
+use crate::semantic_index::{ExpressionsScopeMap, ImportKind, SemanticIndex, VisibleAncestorsIter};
 use crate::semantic_model::HasTrackedScope;
 use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
@@ -110,7 +110,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scopes_by_expression: ExpressionsScopeMapBuilder,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
-    imported_modules: FxHashSet<ModuleName>,
+    imported_modules: FxHashMap<ModuleName, ImportKind>,
     seen_submodule_imports: FxHashSet<String>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
@@ -150,7 +150,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             expressions_by_node: FxHashMap::default(),
 
             seen_submodule_imports: FxHashSet::default(),
-            imported_modules: FxHashSet::default(),
+            imported_modules: FxHashMap::default(),
             generator_functions: FxHashSet::default(),
 
             enclosing_snapshots: FxHashMap::default(),
@@ -1474,7 +1474,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // Mark the imported module, and all of its parents, as being imported in this
                     // file.
                     if let Some(module_name) = ModuleName::new(&alias.name) {
-                        self.imported_modules.extend(module_name.ancestors());
+                        self.imported_modules.extend(
+                            module_name
+                                .ancestors()
+                                .zip(std::iter::repeat(ImportKind::Import)),
+                        );
                     }
 
                     let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {

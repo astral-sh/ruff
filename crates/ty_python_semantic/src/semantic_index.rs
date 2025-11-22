@@ -79,7 +79,10 @@ pub(crate) fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<Plac
 /// See [`ModuleLiteralType::available_submodule_attributes`] for discussion
 /// of why this analysis is intentionally limited.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSet<ModuleName>> {
+pub(crate) fn imported_modules<'db>(
+    db: &'db dyn Db,
+    file: File,
+) -> Arc<FxHashMap<ModuleName, ImportKind>> {
     semantic_index(db, file).imported_modules.clone()
 }
 
@@ -246,7 +249,7 @@ pub(crate) struct SemanticIndex<'db> {
     ast_ids: IndexVec<FileScopeId, AstIds>,
 
     /// The set of modules that are imported anywhere within this file.
-    imported_modules: Arc<FxHashSet<ModuleName>>,
+    imported_modules: Arc<FxHashMap<ModuleName, ImportKind>>,
 
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
@@ -581,6 +584,12 @@ impl<'db> SemanticIndex<'db> {
     pub(crate) fn semantic_syntax_errors(&self) -> &[SemanticSyntaxError] {
         &self.semantic_syntax_errors
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
+pub(crate) enum ImportKind {
+    Import,
+    ImportFrom,
 }
 
 pub(crate) struct AncestorsIter<'a> {
