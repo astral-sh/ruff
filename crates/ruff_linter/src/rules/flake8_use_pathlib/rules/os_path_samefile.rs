@@ -79,5 +79,6 @@ pub(crate) fn os_path_samefile(checker: &Checker, call: &ExprCall, segments: &[&
         "f2",
         fix_enabled,
         OsPathSamefile,
+        None,
     );
 }
