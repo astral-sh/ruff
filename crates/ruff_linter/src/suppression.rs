@@ -248,7 +248,7 @@ enum ParseErrorKind {
     CommentWithoutHash,
 
     #[error("unknown ruff directive")]
-    UnknownDirective,
+    UnknownAction,
 
     #[error("missing suppression codes")]
     MissingCodes,
@@ -351,8 +351,11 @@ impl<'src> SuppressionParser<'src> {
         } else if self.cursor.as_str().starts_with("enable") {
             self.cursor.skip_bytes("enable".len());
             Ok(SuppressionAction::Enable)
+        } else if self.cursor.as_str().starts_with("noqa") {
+            // file-level "noqa" variant, ignore for now
+            self.error(ParseErrorKind::NotASuppression)
         } else {
-            self.error(ParseErrorKind::UnknownDirective)
+            self.error(ParseErrorKind::UnknownAction)
         }
     }
 
@@ -443,6 +446,8 @@ mod tests {
     #[test]
     fn suppressions_from_tokens() {
         let source = "
+# ruff: noqa  # ignored
+
 # comment here
 print('hello')  # ruff: disable[phi]  # trailing
 
@@ -471,89 +476,89 @@ def bar():
             valid: [
                 Suppression {
                     code: "beta",
-                    range: 104..232,
+                    range: 129..257,
                     comments: [
                         SuppressionComment {
-                            range: 104..131,
+                            range: 129..156,
                             indent: Some(
                                 "    ",
                             ),
                             action: Disable,
                             codes: [
-                                120..124,
-                                125..130,
+                                145..149,
+                                150..155,
                             ],
-                            reason: 131..131,
+                            reason: 156..156,
                         },
                         SuppressionComment {
-                            range: 206..232,
+                            range: 231..257,
                             indent: Some(
                                 "    ",
                             ),
                             action: Enable,
                             codes: [
-                                221..225,
-                                226..231,
+                                246..250,
+                                251..256,
                             ],
-                            reason: 232..232,
+                            reason: 257..257,
                         },
                     ],
                 },
                 Suppression {
                     code: "gamma",
-                    range: 104..232,
+                    range: 129..257,
                     comments: [
                         SuppressionComment {
-                            range: 104..131,
+                            range: 129..156,
                             indent: Some(
                                 "    ",
                             ),
                             action: Disable,
                             codes: [
-                                120..124,
-                                125..130,
+                                145..149,
+                                150..155,
                             ],
-                            reason: 131..131,
+                            reason: 156..156,
                         },
                         SuppressionComment {
-                            range: 206..232,
+                            range: 231..257,
                             indent: Some(
                                 "    ",
                             ),
                             action: Enable,
                             codes: [
-                                221..225,
-                                226..231,
+                                246..250,
+                                251..256,
                             ],
-                            reason: 232..232,
+                            reason: 257..257,
                         },
                     ],
                 },
                 Suppression {
                     code: "alpha",
-                    range: 66..254,
+                    range: 91..279,
                     comments: [
                         SuppressionComment {
-                            range: 66..88,
+                            range: 91..113,
                             indent: Some(
                                 "",
                             ),
                             action: Disable,
                             codes: [
-                                82..87,
+                                107..112,
                             ],
-                            reason: 88..88,
+                            reason: 113..113,
                         },
                         SuppressionComment {
-                            range: 233..254,
+                            range: 258..279,
                             indent: Some(
                                 "",
                             ),
                             action: Enable,
                             codes: [
-                                248..253,
+                                273..278,
                             ],
-                            reason: 254..254,
+                            reason: 279..279,
                         },
                     ],
                 },
@@ -562,62 +567,62 @@ def bar():
                 InvalidSuppression {
                     kind: Trailing,
                     comment: SuppressionComment {
-                        range: 32..64,
+                        range: 57..89,
                         indent: None,
                         action: Disable,
                         codes: [
-                            48..51,
+                            73..76,
                         ],
-                        reason: 54..64,
+                        reason: 79..89,
                     },
                 },
                 InvalidSuppression {
                     kind: Unmatched,
                     comment: SuppressionComment {
-                        range: 153..188,
+                        range: 178..213,
                         indent: Some(
                             "        ",
                         ),
                         action: Disable,
                         codes: [
-                            169..174,
+                            194..199,
                         ],
-                        reason: 177..188,
+                        reason: 202..213,
                     },
                 },
                 InvalidSuppression {
                     kind: Indentation,
                     comment: SuppressionComment {
-                        range: 347..384,
+                        range: 372..409,
                         indent: Some(
                             "",
                         ),
                         action: Enable,
                         codes: [
-                            362..366,
+                            387..391,
                         ],
-                        reason: 369..384,
+                        reason: 394..409,
                     },
                 },
                 InvalidSuppression {
                     kind: Unmatched,
                     comment: SuppressionComment {
-                        range: 303..337,
+                        range: 328..362,
                         indent: Some(
                             "    ",
                         ),
                         action: Disable,
                         codes: [
-                            319..323,
+                            344..348,
                         ],
-                        reason: 326..337,
+                        reason: 351..362,
                     },
                 },
             ],
             errors: [
                 ParseError {
                     kind: MissingCodes,
-                    range: 273..287,
+                    range: 298..312,
                 },
             ],
         }
@@ -656,7 +661,7 @@ def bar():
             @r"
         Err(
             ParseError {
-                kind: UnknownDirective,
+                kind: UnknownAction,
                 range: 8..15,
             },
         )
