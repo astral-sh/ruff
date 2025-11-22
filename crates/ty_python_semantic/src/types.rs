@@ -12892,10 +12892,14 @@ impl<'db> UnionType<'db> {
         for ty in self.elements(db) {
             if nested {
                 // list[T | Divergent] => list[Divergent]
-                builder = builder.add(ty.recursive_type_normalized_impl(db, div, nested, visitor)?);
+                let ty = ty.recursive_type_normalized_impl(db, div, nested, visitor)?;
+                if ty == div {
+                    return Some(ty);
+                }
+                builder = builder.add(ty);
                 empty = false;
             } else {
-                // `Divergent` in a union type does not mean true divergence.
+                // `Divergent` in a union type does not mean true divergence, so we skip it if not nested.
                 // e.g. T | Divergent == T | (T | (T | (T | ...))) == T
                 if ty == &div {
                     continue;

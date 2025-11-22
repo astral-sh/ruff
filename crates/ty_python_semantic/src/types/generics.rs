@@ -1100,7 +1100,7 @@ impl<'db> Specialization<'db> {
                 .collect::<Box<[_]>>()
         };
         let tuple_inner = match self.tuple_inner(db) {
-            Some(tuple) => Some(tuple.recursive_type_normalized_impl(db, div, true, visitor)?),
+            Some(tuple) => Some(tuple.recursive_type_normalized_impl(db, div, nested, visitor)?),
             None => None,
         };
         let context = self

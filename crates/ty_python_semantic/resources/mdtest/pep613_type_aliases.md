@@ -150,20 +150,20 @@ from types import UnionType
 RecursiveTuple: TypeAlias = tuple[int | "RecursiveTuple", str]
 
 def _(rec: RecursiveTuple):
-    # TODO should be `RecursiveTuple`
-    reveal_type(rec)  # revealed: Divergent
+    # TODO should be `tuple[int | RecursiveTuple, str]`
+    reveal_type(rec)  # revealed: tuple[Divergent, str]
 
 RecursiveHomogeneousTuple: TypeAlias = tuple[int | "RecursiveHomogeneousTuple", ...]
 
 def _(rec: RecursiveHomogeneousTuple):
-    # TODO should be `RecursiveHomogeneousTuple`
-    reveal_type(rec)  # revealed: tuple[Divergent, ...] | Divergent
+    # TODO should be `tuple[int | RecursiveHomogeneousTuple, ...]`
+    reveal_type(rec)  # revealed: tuple[Divergent, ...]
 
 ClassInfo: TypeAlias = type | UnionType | tuple["ClassInfo", ...]
-# TODO should be `types.UnionType`
-reveal_type(ClassInfo)  # revealed: types.UnionType | types.UnionType
+reveal_type(ClassInfo)  # revealed: types.UnionType
 
 def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
+    # TODO should be `type | UnionType | tuple[ClassInfo, ...]`
     reveal_type(classinfo)  # revealed: type | UnionType | tuple[Divergent, ...]
     return isinstance(obj, classinfo)
 
