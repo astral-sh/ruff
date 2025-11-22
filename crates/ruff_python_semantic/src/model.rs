@@ -475,9 +475,19 @@ impl<'a> SemanticModel<'a> {
                     // The `name` in `print(name)` should be treated as unresolved, but the `name` in
                     // `name: str` should be treated as used.
                     //
-                    // Stub files are an exception. In a stub file, it _is_ considered valid to
-                    // resolve to a type annotation.
-                    BindingKind::Annotation if !self.in_stub_file() => continue,
+                    // There are two exceptions to this rule:
+                    // 1. Stub files. In a stub file, it _is_ considered valid to resolve to a
+                    //    type annotation.
+                    // 2. Bare annotations inside functions. Per PEP 526, these create local
+                    //    variables.
+                    BindingKind::Annotation
+                        if !self.in_stub_file()
+                            && !self.scopes[self.bindings[binding_id].scope]
+                                .kind
+                                .is_function() =>
+                    {
+                        continue;
+                    }
 
                     // If it's a deletion, don't treat it as resolved, since the name is now
                     // unbound. For example, given:
