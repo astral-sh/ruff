@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing::is_dict;
@@ -108,15 +108,77 @@ fn is_dict_key_tuple_with_two_elements(binding: &Binding, semantic: &SemanticMod
         return false;
     };
 
-    let Stmt::Assign(assign_stmt) = statement else {
+    let (value, annotation) = match statement {
+        Stmt::Assign(assign_stmt) => (assign_stmt.value.as_ref(), None),
+        Stmt::AnnAssign(ast::StmtAnnAssign {
+            value: Some(value),
+            annotation,
+            ..
+        }) => (value.as_ref(), Some(annotation.as_ref())),
+        _ => return false,
+    };
+
+    let Expr::Dict(dict_expr) = value else {
         return false;
     };
 
-    let Expr::Dict(dict_expr) = &*assign_stmt.value else {
-        return false;
-    };
+    // Check if dict is empty
+    let is_empty = dict_expr.is_empty();
 
+    if is_empty {
+        // For empty dicts, check type annotation
+        return annotation
+            .is_some_and(|annotation| is_annotation_dict_with_tuple_keys(annotation, semantic));
+    }
+
+    // For non-empty dicts, check if all keys are 2-tuples
     dict_expr
         .iter_keys()
         .all(|key| matches!(key, Some(Expr::Tuple(tuple)) if tuple.len() == 2))
+}
+
+/// Returns true if the annotation is `dict[tuple[T1, T2], ...]` where tuple has exactly 2 elements.
+fn is_annotation_dict_with_tuple_keys(annotation: &Expr, semantic: &SemanticModel) -> bool {
+    // Check if it's a subscript: dict[...]
+    let Expr::Subscript(subscript) = annotation else {
+        return false;
+    };
+
+    // Check if it's dict or typing.Dict
+    if !semantic.match_builtin_expr(subscript.value.as_ref(), "dict")
+        && !semantic.match_typing_expr(subscript.value.as_ref(), "Dict")
+    {
+        return false;
+    }
+
+    // Extract the slice (should be a tuple: (key_type, value_type))
+    let Expr::Tuple(tuple) = subscript.slice.as_ref() else {
+        return false;
+    };
+
+    // dict[K, V] format - check if K is tuple with 2 elements
+    if let [key, _value] = tuple.elts.as_slice() {
+        return is_tuple_type_with_two_elements(key, semantic);
+    }
+
+    false
+}
+
+/// Returns true if the expression represents a tuple type with exactly 2 elements.
+fn is_tuple_type_with_two_elements(expr: &Expr, semantic: &SemanticModel) -> bool {
+    // Handle tuple[...] subscript
+    if let Expr::Subscript(subscript) = expr {
+        // Check if it's tuple or typing.Tuple
+        if semantic.match_builtin_expr(subscript.value.as_ref(), "tuple")
+            || semantic.match_typing_expr(subscript.value.as_ref(), "Tuple")
+        {
+            // Check the slice - tuple[T1, T2]
+            if let Expr::Tuple(tuple_slice) = subscript.slice.as_ref() {
+                return tuple_slice.elts.len() == 2;
+            }
+            return false;
+        }
+    }
+
+    false
 }

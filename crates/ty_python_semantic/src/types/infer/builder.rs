@@ -5799,10 +5799,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
         let mut diagnostic = builder.into_diagnostic(format_args!(
-            "Cannot resolve imported module `{}{}`",
-            ".".repeat(level as usize),
-            module.unwrap_or_default()
+            "Cannot resolve imported module `{}`",
+            format_import_from_module(level, module)
         ));
+
         if level == 0 {
             if let Some(module_name) = module.and_then(ModuleName::new) {
                 let program = Program::get(self.db());
@@ -5831,39 +5831,63 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
-
-            // Add search paths information to the diagnostic
-            // Use the same search paths function that is used in actual module resolution
-            let verbose = self.db().verbose();
-            let search_paths = search_paths(self.db(), ModuleResolveMode::StubsAllowed);
-
-            diagnostic.info(format_args!(
-                "Searched in the following paths during module resolution:"
-            ));
-
-            let mut search_paths = search_paths.enumerate();
-
-            while let Some((index, path)) = search_paths.next() {
-                if index > 4 && !verbose {
-                    let more = search_paths.count() + 1;
-                    diagnostic.info(format_args!(
-                        "  ... and {more} more paths. Run with `-v` to see all paths."
-                    ));
-                    break;
-                }
-                diagnostic.info(format_args!(
-                    "  {}. {} ({})",
-                    index + 1,
-                    path,
-                    path.describe_kind()
+        } else {
+            if let Some(better_level) = (0..level).rev().find(|reduced_level| {
+                let Ok(module_name) = ModuleName::from_identifier_parts(
+                    self.db(),
+                    self.file(),
+                    module,
+                    *reduced_level,
+                ) else {
+                    return false;
+                };
+                resolve_module(self.db(), &module_name).is_some()
+            }) {
+                diagnostic
+                    .help("The module can be resolved if the number of leading dots is reduced");
+                diagnostic.help(format_args!(
+                    "Did you mean `{}`?",
+                    format_import_from_module(better_level, module)
+                ));
+                diagnostic.set_concise_message(format_args!(
+                    "Cannot resolve imported module `{}` - did you mean `{}`?",
+                    format_import_from_module(level, module),
+                    format_import_from_module(better_level, module)
                 ));
             }
-
-            diagnostic.info(
-                "make sure your Python environment is properly configured: \
-                https://docs.astral.sh/ty/modules/#python-environment",
-            );
         }
+
+        // Add search paths information to the diagnostic
+        // Use the same search paths function that is used in actual module resolution
+        let verbose = self.db().verbose();
+        let search_paths = search_paths(self.db(), ModuleResolveMode::StubsAllowed);
+
+        diagnostic.info(format_args!(
+            "Searched in the following paths during module resolution:"
+        ));
+
+        let mut search_paths = search_paths.enumerate();
+
+        while let Some((index, path)) = search_paths.next() {
+            if index > 4 && !verbose {
+                let more = search_paths.count() + 1;
+                diagnostic.info(format_args!(
+                    "  ... and {more} more paths. Run with `-v` to see all paths."
+                ));
+                break;
+            }
+            diagnostic.info(format_args!(
+                "  {}. {} ({})",
+                index + 1,
+                path,
+                path.describe_kind()
+            ));
+        }
+
+        diagnostic.info(
+            "make sure your Python environment is properly configured: \
+                https://docs.astral.sh/ty/modules/#python-environment",
+        );
     }
 
     fn infer_import_definition(
@@ -6038,7 +6062,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             Err(ModuleNameResolutionError::UnknownCurrentModule) => {
                 tracing::debug!(
-                    "Relative module resolution `{}` failed; could not resolve file `{}` to a module",
+                    "Relative module resolution `{}` failed: could not resolve file `{}` to a module \
+                    (try adjusting configured search paths?)",
                     format_import_from_module(*level, module),
                     self.file().path(self.db())
                 );
@@ -8987,7 +9012,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assigned_type = Some(ty);
             }
         }
-        let fallback_place = value_type.member(db, &attr.id);
+        let mut fallback_place = value_type.member(db, &attr.id);
         // Exclude non-definitely-bound places for purposes of reachability
         // analysis. We currently do not perform boundness analysis for implicit
         // instance attributes, so we exclude them here as well.
@@ -8999,91 +9024,98 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.all_definitely_bound = false;
         }
 
-        let resolved_type =
-            fallback_place.map_type(|ty| {
+        fallback_place = fallback_place.map_type(|ty| {
             self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
-        }).unwrap_with_diagnostic(|lookup_error| match lookup_error {
-                LookupError::Undefined(_) => {
-                    let report_unresolved_attribute = self.is_reachable(attribute);
+        });
 
-                    if report_unresolved_attribute {
-                        let bound_on_instance = match value_type {
-                            Type::ClassLiteral(class) => {
-                                !class.instance_member(db, None, attr).is_undefined()
-                            }
-                            Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
-                                match subclass_of.subclass_of() {
-                                    SubclassOfInner::Class(class) => {
-                                        !class.instance_member(db, attr).is_undefined()
-                                    }
-                                    SubclassOfInner::Dynamic(_) => unreachable!(
-                                        "Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"
-                                    ),
-                                }
-                            }
-                            _ => false,
-                        };
+        let attr_name = &attr.id;
 
-                        if let Some(builder) = self
-                            .context
-                            .report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
-                        {
-                            if bound_on_instance {
-                                builder.into_diagnostic(
-                                    format_args!(
-                                        "Attribute `{}` can only be accessed on instances, \
-                                        not on the class object `{}` itself.",
-                                        attr.id,
-                                        value_type.display(db)
-                                    ),
-                                );
-                            } else {
-                                let diagnostic = match value_type {
-                                    Type::ModuleLiteral(module) => builder.into_diagnostic(format_args!(
-                                        "Module `{}` has no member `{}`",
-                                        module.module(db).name(db),
-                                        &attr.id
-                                    )),
-                                    Type::ClassLiteral(class) => builder.into_diagnostic(format_args!(
-                                        "Class `{}` has no attribute `{}`",
-                                        class.name(db),
-                                        &attr.id
-                                    )),
-                                    Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
-                                        "Class `{}` has no attribute `{}`",
-                                        alias.display(db),
-                                        &attr.id
-                                    )),
-                                    Type::FunctionLiteral(function) => builder.into_diagnostic(format_args!(
-                                        "Function `{}` has no attribute `{}`",
-                                        function.name(db),
-                                        &attr.id
-                                    )),
-                                    _ => builder.into_diagnostic(format_args!(
-                                        "Object of type `{}` has no attribute `{}`",
-                                        value_type.display(db),
-                                        &attr.id
-                                    )),
-                                };
-                                hint_if_stdlib_attribute_exists_on_other_versions(db, diagnostic, &value_type, attr);
+        let resolved_type = fallback_place.unwrap_with_diagnostic(|lookup_err| match lookup_err {
+            LookupError::Undefined(_) => {
+                let fallback = || {
+                    TypeAndQualifiers::new(
+                        Type::unknown(),
+                        TypeOrigin::Inferred,
+                        TypeQualifiers::empty(),
+                    )
+                };
+
+                if !self.is_reachable(attribute) {
+                    return fallback();
+                }
+
+                let bound_on_instance = match value_type {
+                    Type::ClassLiteral(class) => {
+                        !class.instance_member(db, None, attr).is_undefined()
+                    }
+                    Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
+                        match subclass_of.subclass_of() {
+                            SubclassOfInner::Class(class) => {
+                                !class.instance_member(db, attr).is_undefined()
                             }
+                            SubclassOfInner::Dynamic(_) => unreachable!(
+                                "Attribute lookup on a dynamic `SubclassOf` type \
+                                    should always return a bound symbol"
+                            ),
                         }
                     }
+                    _ => false,
+                };
 
-                    TypeAndQualifiers::new(Type::unknown(), TypeOrigin::Inferred, TypeQualifiers::empty())
-                }
-                LookupError::PossiblyUndefined(type_when_bound) => {
-                    report_possibly_missing_attribute(
-                        &self.context,
-                        attribute,
-                        &attr.id,
-                        value_type,
-                    );
+                let Some(builder) = self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
+                else {
+                    return fallback();
+                };
 
-                    type_when_bound
+                if bound_on_instance {
+                    builder.into_diagnostic(format_args!(
+                        "Attribute `{attr_name}` can only be accessed on instances, \
+                            not on the class object `{}` itself.",
+                        value_type.display(db)
+                    ));
+                    return fallback();
                 }
-            })
-            .inner_type();
+
+                let diagnostic = match value_type {
+                    Type::ModuleLiteral(module) => builder.into_diagnostic(format_args!(
+                        "Module `{}` has no member `{attr_name}`",
+                        module.module(db).name(db),
+                    )),
+                    Type::ClassLiteral(class) => builder.into_diagnostic(format_args!(
+                        "Class `{}` has no attribute `{attr_name}`",
+                        class.name(db),
+                    )),
+                    Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
+                        "Class `{}` has no attribute `{attr_name}`",
+                        alias.display(db),
+                    )),
+                    Type::FunctionLiteral(function) => builder.into_diagnostic(format_args!(
+                        "Function `{}` has no attribute `{attr_name}`",
+                        function.name(db),
+                    )),
+                    _ => builder.into_diagnostic(format_args!(
+                        "Object of type `{}` has no attribute `{attr_name}`",
+                        value_type.display(db),
+                    )),
+                };
+
+                hint_if_stdlib_attribute_exists_on_other_versions(
+                    db,
+                    diagnostic,
+                    &value_type,
+                    attr_name,
+                );
+
+                fallback()
+            }
+            LookupError::PossiblyUndefined(type_when_bound) => {
+                report_possibly_missing_attribute(&self.context, attribute, &attr.id, value_type);
+
+                type_when_bound
+            }
+        });
+
+        let resolved_type = resolved_type.inner_type();
 
         self.check_deprecated(attr, resolved_type);
 

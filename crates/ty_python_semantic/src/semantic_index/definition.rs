@@ -702,7 +702,7 @@ impl DefinitionKind<'_> {
         match self {
             DefinitionKind::Import(import) => import.is_reexported(),
             DefinitionKind::ImportFrom(import) => import.is_reexported(),
-            DefinitionKind::ImportFromSubmodule(_) => false,
+            DefinitionKind::ImportFromSubmodule(_) => true,
             _ => true,
         }
     }

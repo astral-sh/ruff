@@ -97,7 +97,8 @@ mod tests {
     #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048_1.py"))]
     #[test_case(Rule::DataclassEnum, Path::new("RUF049.py"))]
     #[test_case(Rule::IfKeyInDictDel, Path::new("RUF051.py"))]
-    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"))]
+    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052_0.py"))]
+    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052_1.py"))]
     #[test_case(Rule::ClassWithMixedTypeVars, Path::new("RUF053.py"))]
     #[test_case(Rule::FalsyDictGetFallback, Path::new("RUF056.py"))]
     #[test_case(Rule::UnnecessaryRound, Path::new("RUF057.py"))]
@@ -622,8 +623,8 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"), r"^_+", 1)]
-    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"), r"", 2)]
+    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052_0.py"), r"^_+", 1)]
+    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052_0.py"), r"", 2)]
     fn custom_regexp_preset(
         rule_code: Rule,
         path: &Path,
