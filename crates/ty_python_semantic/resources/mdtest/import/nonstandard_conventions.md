@@ -214,8 +214,8 @@ reveal_type(mypackage.imported.X)  # revealed: Unknown
 
 ## Relative `from` Import of Nested Submodule in `__init__`
 
-`from .submodule import nested` in an `__init__.pyi` does not re-export `mypackage.submodule`,
-`mypackage.submodule.nested`, or `nested`.
+`from .submodule import nested` in an `__init__.pyi` does re-export `mypackage.submodule`, but not
+`mypackage.submodule.nested` or `nested`.
 
 ### In Stub
 
@@ -241,11 +241,10 @@ X: int = 42
 ```py
 import mypackage
 
-# error: "has no member `submodule`"
-reveal_type(mypackage.submodule)  # revealed: Unknown
-# error: "has no member `submodule`"
+reveal_type(mypackage.submodule)  # revealed: <module 'mypackage.submodule'>
+# error: "has no member `nested`"
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
-# error: "has no member `submodule`"
+# error: "has no member `nested`"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
 # error: "has no member `nested`"
 reveal_type(mypackage.nested)  # revealed: Unknown
@@ -318,12 +317,10 @@ X: int = 42
 ```py
 import mypackage
 
-# TODO: this could work and would be nice to have
-# error: "has no member `submodule`"
-reveal_type(mypackage.submodule)  # revealed: Unknown
-# error: "has no member `submodule`"
+reveal_type(mypackage.submodule)  # revealed: <module 'mypackage.submodule'>
+# error: "has no member `nested`"
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
-# error: "has no member `submodule`"
+# error: "has no member `nested`"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
 # error: "has no member `nested`"
 reveal_type(mypackage.nested)  # revealed: Unknown
@@ -623,8 +620,7 @@ X: int = 42
 ```py
 import mypackage
 
-# error: "no member `imported`"
-reveal_type(mypackage.imported.X)  # revealed: Unknown
+reveal_type(mypackage.imported.X)  # revealed: int
 ```
 
 ### In Non-Stub
