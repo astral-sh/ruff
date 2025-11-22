@@ -725,6 +725,15 @@ cls = MyClass
 
         assert_snapshot!(test.references(), @r#"
         info[references]: Reference 1
+         --> main.py:2:5
+          |
+        2 | a: "MyClass" = 1
+          |     ^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+
+        info[references]: Reference 2
          --> main.py:4:7
           |
         2 | a: "MyClass" = 1
@@ -749,6 +758,15 @@ cls = MyClass
 
         assert_snapshot!(test.references(), @r#"
         info[references]: Reference 1
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+
+        info[references]: Reference 2
          --> main.py:4:7
           |
         2 | a: "None | MyClass" = 1
@@ -787,6 +805,15 @@ cls = MyClass
 
         assert_snapshot!(test.references(), @r#"
         info[references]: Reference 1
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+
+        info[references]: Reference 2
          --> main.py:4:7
           |
         2 | a: "None | MyClass" = 1
@@ -839,6 +866,15 @@ cls = MyClass
 
         assert_snapshot!(test.references(), @r#"
         info[references]: Reference 1
+         --> main.py:2:5
+          |
+        2 | a: "MyClass | No" = 1
+          |     ^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+
+        info[references]: Reference 2
          --> main.py:4:7
           |
         2 | a: "MyClass | No" = 1
