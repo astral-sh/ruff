@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF069 name is an unnecessary property
+RUF069 name is a property without a `return` statement
   --> RUF069.py:6:5
    |
  5 |   class User:  # Test normal class properties
@@ -13,7 +13,7 @@ RUF069 name is an unnecessary property
 10 |       @property
    |
 
-RUF069 nested is an unnecessary property
+RUF069 nested is a property without a `return` statement
   --> RUF069.py:17:5
    |
 15 |           x = 1
@@ -27,7 +27,7 @@ RUF069 nested is an unnecessary property
 22 |       @property
    |
 
-RUF069 prop2 is an unnecessary property
+RUF069 prop2 is a property without a `return` statement
   --> RUF069.py:42:5
    |
 40 |           return 1

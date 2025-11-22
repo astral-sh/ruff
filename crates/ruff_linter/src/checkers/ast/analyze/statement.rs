@@ -347,8 +347,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::InvalidArgumentName) {
                 pep8_naming::rules::invalid_argument_name_function(checker, function_def);
             }
-            if checker.is_rule_enabled(Rule::UnnecessaryProperty) {
-                ruff::rules::unnecessary_property(checker, function_def);
+            if checker.is_rule_enabled(Rule::PropertyWithoutReturn) {
+                ruff::rules::property_without_return(checker, function_def);
             }
         }
         Stmt::Return(_) => {
