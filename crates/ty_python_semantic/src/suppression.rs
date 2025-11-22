@@ -297,10 +297,10 @@ impl<'a> CheckSuppressionsContext<'a> {
         };
 
         let id = DiagnosticId::Lint(lint.name());
-        let mut diag = Diagnostic::new(id, severity, "");
+        let mut diag = Diagnostic::new(id, severity, message);
         diag.set_documentation_url(Some(lint.documentation_url()));
         let span = Span::from(self.file).with_range(range);
-        diag.annotate(Annotation::primary(span).message(message));
+        diag.annotate(Annotation::primary(span));
         self.diagnostics.push(diag);
     }
 }
