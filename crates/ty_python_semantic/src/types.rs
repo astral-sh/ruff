@@ -13244,13 +13244,9 @@ impl<'db> ModuleLiteralType<'db> {
             .into_iter()
             .flat_map(|file| imported_modules(db, file))
             .filter_map(|(submodule_name, kind)| {
-                Some((submodule_name.relative_to(self.module(db).name(db))?, kind))
-            })
-            .filter_map(|(relative_submodule, kind)| {
-                relative_submodule
-                    .components()
-                    .next()
-                    .map(|module| (Name::from(module), *kind))
+                let relative_name = submodule_name.relative_to(self.module(db).name(db))?;
+                let available_attribute = relative_name.components().next()?;
+                Some((Name::from(available_attribute), *kind))
             })
     }
 

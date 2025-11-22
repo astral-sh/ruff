@@ -1555,11 +1555,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                 );
                             }
                         } else {
-                            self.imported_modules.extend(
-                                module_name
-                                    .ancestors()
-                                    .zip(std::iter::repeat(ImportKind::ImportFrom)),
-                            );
+                            for name in module_name.ancestors() {
+                                self.imported_modules
+                                    .entry(name)
+                                    .or_insert(ImportKind::ImportFrom);
+                            }
                         }
                     }
                 }
