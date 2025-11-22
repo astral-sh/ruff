@@ -1,10 +1,9 @@
 use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, setup_db};
-use crate::place::symbol;
-use crate::place::{ConsideredDefinitions, Place, global_symbol};
+use crate::place::global_symbol;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
+use crate::types::tests::get_symbol;
 use crate::types::{KnownClass, KnownInstanceType, check_types};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, system_path_to_file};
@@ -12,31 +11,6 @@ use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 
 use super::*;
-
-#[track_caller]
-fn get_symbol<'db>(
-    db: &'db TestDb,
-    file_name: &str,
-    scopes: &[&str],
-    symbol_name: &str,
-) -> Place<'db> {
-    let file = system_path_to_file(db, file_name).expect("file to exist");
-    let module = parsed_module(db, file).load(db);
-    let index = semantic_index(db, file);
-    let mut file_scope_id = FileScopeId::global();
-    let mut scope = file_scope_id.to_scope_id(db, file);
-    for expected_scope_name in scopes {
-        file_scope_id = index
-            .child_scopes(file_scope_id)
-            .next()
-            .unwrap_or_else(|| panic!("scope of {expected_scope_name}"))
-            .0;
-        scope = file_scope_id.to_scope_id(db, file);
-        assert_eq!(scope.name(db, &module), *expected_scope_name);
-    }
-
-    symbol(db, scope, symbol_name, ConsideredDefinitions::EndOfScope).place
-}
 
 #[track_caller]
 fn assert_diagnostic_messages(diagnostics: &[Diagnostic], expected: &[&str]) {
