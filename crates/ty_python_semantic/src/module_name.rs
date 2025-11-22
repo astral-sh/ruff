@@ -318,7 +318,7 @@ impl ModuleName {
         db: &dyn Db,
         importing_file: File,
     ) -> Result<Self, ModuleNameResolutionError> {
-        Self::from_identifier_parts(db, importing_file, None, 1)
+        relative_module_name(db, importing_file, None, NonZeroU32::new(1).unwrap())
     }
 }
 
