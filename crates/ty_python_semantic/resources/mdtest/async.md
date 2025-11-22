@@ -79,9 +79,8 @@ async def main():
         task("B"),
     )
 
-    # TODO: these should be `int`
-    reveal_type(a)  # revealed: Unknown
-    reveal_type(b)  # revealed: Unknown
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: int
 ```
 
 ## Under the hood
