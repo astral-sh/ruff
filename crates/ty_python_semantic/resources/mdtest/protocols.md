@@ -2112,8 +2112,7 @@ static_assert(not is_assignable_to(NominalLegacy, UsesSelf))
 static_assert(not is_assignable_to(NominalWithSelf, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalWithSelf, LegacyFunctionScoped))
 static_assert(is_assignable_to(NominalWithSelf, UsesSelf))
-# TODO: should pass
-static_assert(is_subtype_of(NominalWithSelf, UsesSelf))  # error: [static-assert-error]
+static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
 
 # TODO: these should pass
 static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))  # error: [static-assert-error]
