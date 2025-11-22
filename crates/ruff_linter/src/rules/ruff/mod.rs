@@ -4,6 +4,7 @@ mod helpers;
 pub(crate) mod rules;
 pub mod settings;
 pub(crate) mod typing;
+pub(crate) use helpers::is_final_annotation;
 
 #[cfg(test)]
 mod tests {

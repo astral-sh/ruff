@@ -5,7 +5,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::rules::{
     flake8_import_conventions, flake8_pyi, flake8_pytest_style, flake8_return,
-    flake8_type_checking, pyflakes, pylint, pyupgrade, refurb, ruff,
+    flake8_type_checking, immutability, pyflakes, pylint, pyupgrade, refurb, ruff,
 };
 
 /// Run lint rules over the [`Binding`]s.
@@ -25,6 +25,7 @@ pub(crate) fn bindings(checker: &Checker) {
         Rule::ForLoopWrites,
         Rule::CustomTypeVarForSelf,
         Rule::PrivateTypeParameter,
+        Rule::SingleAssignmentMissingFinal,
         Rule::UnnecessaryAssign,
     ]) {
         return;
@@ -90,6 +91,11 @@ pub(crate) fn bindings(checker: &Checker) {
         }
         if checker.is_rule_enabled(Rule::UsedDummyVariable) {
             ruff::rules::used_dummy_variable(checker, binding, binding_id);
+        }
+        if checker.is_rule_enabled(Rule::SingleAssignmentMissingFinal) {
+            immutability::single_assignment_missing_final::single_assignment_missing_final(
+                checker, binding, binding_id,
+            );
         }
         if checker.is_rule_enabled(Rule::AssignmentInAssert) {
             ruff::rules::assignment_in_assert(checker, binding);
