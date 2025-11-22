@@ -340,6 +340,158 @@ class DataProcessor:
     }
 
     #[test]
+    fn rename_string_annotation1() {
+        let test = cursor_test(
+            r#"
+        a: "MyCla<CURSOR>ss" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.rename("MyNewClass"), @r#"
+        info[rename]: Rename symbol (found 1 locations)
+         --> main.py:4:7
+          |
+        2 | a: "MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       ^^^^^^^
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_string_annotation2() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyCl<CURSOR>ass" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.rename("MyNewClass"), @r#"
+        info[rename]: Rename symbol (found 1 locations)
+         --> main.py:4:7
+          |
+        2 | a: "None | MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       ^^^^^^^
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_string_annotation3() {
+        let test = cursor_test(
+            r#"
+        a: "None |<CURSOR> MyClass" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.rename("MyNewClass"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_string_annotation4() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyClass<CURSOR>" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.rename("MyNewClass"), @r#"
+        info[rename]: Rename symbol (found 1 locations)
+         --> main.py:4:7
+          |
+        2 | a: "None | MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       ^^^^^^^
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_string_annotation5() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyClass"<CURSOR> = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.rename("MyNewClass"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_string_annotation_dangling1() {
+        let test = cursor_test(
+            r#"
+        a: "MyCl<CURSOR>ass |" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.rename("MyNewClass"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_string_annotation_dangling2() {
+        let test = cursor_test(
+            r#"
+        a: "MyCl<CURSOR>ass | No" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.rename("MyNewClass"), @r#"
+        info[rename]: Rename symbol (found 1 locations)
+         --> main.py:4:7
+          |
+        2 | a: "MyClass | No" = 1
+        3 |
+        4 | class MyClass:
+          |       ^^^^^^^
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_string_annotation_dangling3() {
+        let test = cursor_test(
+            r#"
+        a: "MyClass | N<CURSOR>o" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.rename("MyNewClass"), @"Cannot rename");
+    }
+
+    #[test]
     fn test_cannot_rename_import_module_component() {
         // Test that we cannot rename parts of module names in import statements
         let test = cursor_test(

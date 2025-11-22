@@ -745,6 +745,226 @@ mod tests {
     }
 
     #[test]
+    fn goto_type_string_annotation1() {
+        let test = cursor_test(
+            r#"
+        a: "MyCla<CURSOR>ss" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+         --> main.py:4:7
+          |
+        2 | a: "MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       ^^^^^^^
+        5 |     """some docs"""
+          |
+        info: Source
+         --> main.py:2:5
+          |
+        2 | a: "MyClass" = 1
+          |     ^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation2() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyCl<CURSOR>ass" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_type_string_annotation3() {
+        let test = cursor_test(
+            r#"
+        a: "None |<CURSOR> MyClass" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+         --> main.py:4:7
+          |
+        2 | a: "None | MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       ^^^^^^^
+        5 |     """some docs"""
+          |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: "None | MyClass" = 1
+          |    ^^^^^^^^^^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+
+        info[goto-type-definition]: Type definition
+           --> stdlib/types.pyi:950:11
+            |
+        948 | if sys.version_info >= (3, 10):
+        949 |     @final
+        950 |     class NoneType:
+            |           ^^^^^^^^
+        951 |         """The type of the None singleton."""
+            |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: "None | MyClass" = 1
+          |    ^^^^^^^^^^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation4() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyClass<CURSOR>" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_type_string_annotation5() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyClass"<CURSOR> = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+         --> main.py:4:7
+          |
+        2 | a: "None | MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       ^^^^^^^
+        5 |     """some docs"""
+          |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: "None | MyClass" = 1
+          |    ^^^^^^^^^^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+
+        info[goto-type-definition]: Type definition
+           --> stdlib/types.pyi:950:11
+            |
+        948 | if sys.version_info >= (3, 10):
+        949 |     @final
+        950 |     class NoneType:
+            |           ^^^^^^^^
+        951 |         """The type of the None singleton."""
+            |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: "None | MyClass" = 1
+          |    ^^^^^^^^^^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_dangling1() {
+        let test = cursor_test(
+            r#"
+        a: "MyCl<CURSOR>ass |" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+          --> stdlib/ty_extensions.pyi:20:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+           | ^^^^^^^
+        21 | AlwaysTruthy = object()
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: "MyClass |" = 1
+          |    ^^^^^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_dangling2() {
+        let test = cursor_test(
+            r#"
+        a: "MyCl<CURSOR>ass | No" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_type_string_annotation_dangling3() {
+        let test = cursor_test(
+            r#"
+        a: "MyClass | N<CURSOR>o" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
     fn goto_type_on_keyword_argument() {
         let test = cursor_test(
             r#"
