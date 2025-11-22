@@ -2436,6 +2436,7 @@ pub(super) fn report_possibly_missing_attribute(
 pub(super) fn report_invalid_exception_tuple_caught<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     node: &'ast ast::ExprTuple,
+    node_type: Type<'db>,
     invalid_tuple_nodes: impl IntoIterator<Item = (&'ast ast::Expr, Type<'db>)>,
 ) {
     let Some(builder) = context.report_lint(&INVALID_EXCEPTION_CAUGHT, node) else {
@@ -2443,6 +2444,10 @@ pub(super) fn report_invalid_exception_tuple_caught<'db, 'ast>(
     };
 
     let mut diagnostic = builder.into_diagnostic("Invalid tuple caught in an exception handler");
+    diagnostic.set_concise_message(format_args!(
+        "Cannot catch object of type `{}` in an exception handler",
+        node_type.display(context.db())
+    ));
 
     for (sub_node, ty) in invalid_tuple_nodes {
         let span = context.span(sub_node);
