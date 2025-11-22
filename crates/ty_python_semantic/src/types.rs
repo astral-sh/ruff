@@ -7166,17 +7166,70 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => match type_mapping {
-                TypeMapping::BindLegacyTypevars(binding_context) => {
-                    Type::TypeVar(BoundTypeVarInstance::new(db, typevar, *binding_context))
+            Type::KnownInstance(known_instance) => match known_instance {
+                KnownInstanceType::TypeVar(typevar) => {
+                    match type_mapping {
+                        TypeMapping::BindLegacyTypevars(binding_context) => {
+                            Type::TypeVar(BoundTypeVarInstance::new(db, typevar, *binding_context))
+                        }
+                        TypeMapping::Specialization(_) |
+                        TypeMapping::PartialSpecialization(_) |
+                        TypeMapping::PromoteLiterals(_) |
+                        TypeMapping::BindSelf(_) |
+                        TypeMapping::ReplaceSelf { .. } |
+                        TypeMapping::Materialize(_) |
+                        TypeMapping::ReplaceParameterDefaults => self,
+                    }
                 }
-                TypeMapping::Specialization(_) |
-                TypeMapping::PartialSpecialization(_) |
-                TypeMapping::PromoteLiterals(_) |
-                TypeMapping::BindSelf(_) |
-                TypeMapping::ReplaceSelf { .. } |
-                TypeMapping::Materialize(_) |
-                TypeMapping::ReplaceParameterDefaults => self,
+                KnownInstanceType::UnionType(instance) => {
+                    if let Ok(union_type) = instance.union_type(db) {
+                        Type::KnownInstance(KnownInstanceType::UnionType(
+                            UnionTypeInstance::new(
+                                db,
+                                instance._value_expr_types(db),
+                                Ok(union_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                            )
+                        )))
+                    } else {
+                        self
+                    }
+                },
+                KnownInstanceType::Annotated(ty) => {
+                    Type::KnownInstance(KnownInstanceType::Annotated(
+                        InternedType::new(
+                            db,
+                            ty.inner(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                        )
+                    ))
+                },
+                KnownInstanceType::Callable(callable_type) => {
+                    Type::KnownInstance(KnownInstanceType::Callable(
+                        callable_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    ))
+                },
+                KnownInstanceType::TypeGenericAlias(ty) => {
+                    Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
+                        InternedType::new(
+                            db,
+                            ty.inner(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                        )
+                    ))
+                },
+
+                KnownInstanceType::SubscriptedProtocol(_) |
+                KnownInstanceType::SubscriptedGeneric(_) |
+                KnownInstanceType::TypeAliasType(_) |
+                KnownInstanceType::Deprecated(_) |
+                KnownInstanceType::Field(_) |
+                KnownInstanceType::ConstraintSet(_) |
+                KnownInstanceType::GenericContext(_) |
+                KnownInstanceType::Specialization(_) |
+                KnownInstanceType::Literal(_) |
+                KnownInstanceType::LiteralStringAlias(_) |
+                KnownInstanceType::NewType(_) => {
+                    // TODO: ?
+                    self
+                },
             }
 
             Type::FunctionLiteral(function) => {
@@ -7197,6 +7250,8 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance) => {
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             },
+
+            Type::NewTypeInstance(_) if matches!(type_mapping, TypeMapping::BindLegacyTypevars(_)) => self,
 
             Type::NewTypeInstance(newtype) => visitor.visit(self, || {
                 Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
@@ -7276,6 +7331,8 @@ impl<'db> Type<'db> {
             // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
             Type::TypeIs(type_is) => type_is.with_type(db, type_is.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
 
+            Type::TypeAlias(_) if matches!(type_mapping, TypeMapping::BindLegacyTypevars(_)) => self,
+
             Type::TypeAlias(alias) => {
                 // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is performed without `visitor` inheritance.
                 // In the case of recursive type aliases, this leads to infinite recursion.
@@ -7337,8 +7394,7 @@ impl<'db> Type<'db> {
             // some other generic context's specialization is applied to it.
             | Type::ClassLiteral(_)
             | Type::BoundSuper(_)
-            | Type::SpecialForm(_)
-            | Type::KnownInstance(_) => self,
+            | Type::SpecialForm(_) => self,
         }
     }
 
@@ -7475,6 +7531,44 @@ impl<'db> Type<'db> {
                 });
             }
 
+            Type::KnownInstance(known_instance) => match known_instance {
+                KnownInstanceType::UnionType(instance) => {
+                    if let Ok(union_type) = instance.union_type(db) {
+                        union_type.find_legacy_typevars_impl(
+                            db,
+                            binding_context,
+                            typevars,
+                            visitor,
+                        );
+                    }
+                }
+                KnownInstanceType::Annotated(ty) => {
+                    ty.inner(db)
+                        .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                }
+                KnownInstanceType::Callable(callable_type) => {
+                    callable_type.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                }
+                KnownInstanceType::TypeGenericAlias(ty) => {
+                    ty.inner(db)
+                        .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                }
+                KnownInstanceType::SubscriptedProtocol(_)
+                | KnownInstanceType::SubscriptedGeneric(_)
+                | KnownInstanceType::TypeVar(_)
+                | KnownInstanceType::TypeAliasType(_)
+                | KnownInstanceType::Deprecated(_)
+                | KnownInstanceType::Field(_)
+                | KnownInstanceType::ConstraintSet(_)
+                | KnownInstanceType::GenericContext(_)
+                | KnownInstanceType::Specialization(_)
+                | KnownInstanceType::Literal(_)
+                | KnownInstanceType::LiteralStringAlias(_)
+                | KnownInstanceType::NewType(_) => {
+                    // TODO?
+                }
+            },
+
             Type::Dynamic(_)
             | Type::Never
             | Type::AlwaysTruthy
@@ -7502,7 +7596,6 @@ impl<'db> Type<'db> {
             | Type::EnumLiteral(_)
             | Type::BoundSuper(_)
             | Type::SpecialForm(_)
-            | Type::KnownInstance(_)
             | Type::TypedDict(_) => {}
         }
     }
