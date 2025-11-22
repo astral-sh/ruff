@@ -1322,14 +1322,29 @@ impl Truthiness {
                             && arguments.keywords.is_empty()
                         {
                             // Ex) `list([1, 2, 3])`
-                            // For tuple(generator), we can't determine statically if the result will
-                            // be empty or not, so return Unknown. The generator itself is truthy, but
-                            // tuple(empty_generator) is falsy. ListComp and SetComp are handled by
-                            // recursing into Self::from_expr below, which returns Unknown for them.
-                            if argument.is_generator_expr() {
-                                Self::Unknown
-                            } else {
-                                Self::from_expr(argument, is_builtin)
+                            // Return Unknown for types with definite truthiness that might result
+                            // in empty iterables or will raise a type error. Explicitly list types
+                            // we recurse for (types without definite truthiness or where Self::from_expr
+                            // correctly handles the truthiness).
+                            match argument {
+                                // Return Unknown for types with definite truthiness that might result
+                                // in empty iterables or will raise a type error:
+                                // - Non-iterable types (numbers, booleans, None, etc.) raise TypeError
+                                // - String types: can't reliably determine truthiness of tuple("") from ""
+                                //   (tuple("") creates empty tuple, but tuple("a") creates non-empty tuple)
+                                // - Lambda/Generator: always truthy but might result in empty iterables
+                                Expr::NumberLiteral(_)
+                                | Expr::BooleanLiteral(_)
+                                | Expr::NoneLiteral(_)
+                                | Expr::EllipsisLiteral(_)
+                                | Expr::StringLiteral(_)
+                                | Expr::TString(_)
+                                | Expr::FString(_)
+                                | Expr::BytesLiteral(_)
+                                | Expr::Lambda(_)
+                                | Expr::Generator(_) => Self::Unknown,
+                                // Recurse for all other types - collections, comprehensions, variables, etc.
+                                _ => Self::from_expr(argument, is_builtin),
                             }
                         } else {
                             Self::Unknown
