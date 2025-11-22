@@ -501,7 +501,7 @@ export interface InitializedPlayground {
 
 // Run once during startup. Initializes monaco, loads the wasm file, and restores the previous editor state.
 async function startPlayground(): Promise<InitializedPlayground> {
-  const ty = await import("../ty_wasm");
+  const ty = await import("ty_wasm");
   await ty.default();
   const version = ty.version();
   const monaco = await loader.init();
