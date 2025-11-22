@@ -133,12 +133,18 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     builder.finish()
 }
 
-pub(crate) fn check_suppressions(db: &dyn Db, file: File, diagnostics: &mut TypeCheckDiagnostics) {
+pub(crate) fn check_suppressions(
+    db: &dyn Db,
+    file: File,
+    diagnostics: TypeCheckDiagnostics,
+) -> Vec<Diagnostic> {
     let mut context = CheckSuppressionsContext::new(db, file, diagnostics);
 
     check_unknown_rule(&mut context);
     check_invalid_suppression(&mut context);
     check_unused_suppressions(&mut context);
+
+    context.diagnostics.into_diagnostics()
 }
 
 /// Checks for `ty: ignore` comments that reference unknown rules.
@@ -249,11 +255,11 @@ struct CheckSuppressionsContext<'a> {
     db: &'a dyn Db,
     file: File,
     suppressions: &'a Suppressions,
-    diagnostics: &'a mut TypeCheckDiagnostics,
+    diagnostics: TypeCheckDiagnostics,
 }
 
 impl<'a> CheckSuppressionsContext<'a> {
-    fn new(db: &'a dyn Db, file: File, diagnostics: &'a mut TypeCheckDiagnostics) -> Self {
+    fn new(db: &'a dyn Db, file: File, diagnostics: TypeCheckDiagnostics) -> Self {
         let suppressions = suppressions(db, file);
         Self {
             db,
