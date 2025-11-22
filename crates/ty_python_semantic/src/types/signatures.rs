@@ -29,9 +29,10 @@ use crate::types::generics::{
 };
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind,
-    NormalizedVisitor, TypeContext, TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassLiteral,
+    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
+    KnownClass, MaterializationKind, NormalizedVisitor, ParamSpecAttrKind, TypeContext,
+    TypeMapping, TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -150,6 +151,10 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
+    pub(crate) fn as_slice(&self) -> &[Signature<'db>] {
+        &self.overloads
+    }
+
     pub(crate) fn with_inherited_generic_context(
         &self,
         db: &'db dyn Db,
@@ -181,6 +186,16 @@ impl<'db> CallableSignature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        if let TypeMapping::Specialization(specialization) = type_mapping
+            && let [self_signature] = self.overloads.as_slice()
+            && let ParametersKind::ParamSpec(typevar) = self_signature.parameters.kind
+            && let Some(Type::Callable(callable)) = specialization.get(db, typevar)
+        {
+            return Self::from_overloads(callable.signatures(db).iter().map(|signature| {
+                Signature::new(signature.parameters.clone(), self_signature.return_ty)
+            }));
+        }
+
         Self::from_overloads(
             self.overloads
                 .iter()
@@ -529,11 +544,12 @@ impl<'db> Signature<'db> {
             // Discard the definition when normalizing, so that two equivalent signatures
             // with different `Definition`s share the same Salsa ID when normalized
             definition: None,
-            parameters: self
-                .parameters
-                .iter()
-                .map(|param| param.normalized_impl(db, visitor))
-                .collect(),
+            parameters: Parameters::new(
+                db,
+                self.parameters
+                    .iter()
+                    .map(|param| param.normalized_impl(db, visitor)),
+            ),
             return_ty: self
                 .return_ty
                 .map(|return_ty| return_ty.normalized_impl(db, visitor)),
@@ -603,7 +619,7 @@ impl<'db> Signature<'db> {
             parameters.next();
         }
 
-        let mut parameters = Parameters::new(parameters);
+        let mut parameters = Parameters::new(db, parameters);
         let mut return_ty = self.return_ty;
         if let Some(self_type) = self_type {
             parameters = parameters.apply_type_mapping_impl(
@@ -915,6 +931,49 @@ impl<'db> Signature<'db> {
         // any other parameter list, but not a subtype or supertype of any other parameter list.
         if self.parameters.is_gradual() || other.parameters.is_gradual() {
             return ConstraintSet::from(relation.is_assignability());
+        }
+
+        match (self.parameters.kind(), other.parameters.kind()) {
+            (ParametersKind::ParamSpec(self_typevar), ParametersKind::ParamSpec(other_typevar)) => {
+                return if self_typevar.is_same_typevar_as(db, other_typevar) {
+                    ConstraintSet::from(true)
+                } else {
+                    ConstraintSet::constrain_typevar(
+                        db,
+                        self_typevar,
+                        Type::TypeVar(other_typevar),
+                        Type::TypeVar(other_typevar),
+                        relation,
+                    )
+                };
+            }
+            (ParametersKind::ParamSpec(typevar), _) => {
+                let paramspec_value = CallableType::paramspec_value(
+                    db,
+                    Signature::new(other.parameters.clone(), None),
+                );
+                return ConstraintSet::constrain_typevar(
+                    db,
+                    typevar,
+                    paramspec_value,
+                    paramspec_value,
+                    relation,
+                );
+            }
+            (_, ParametersKind::ParamSpec(typevar)) => {
+                let paramspec_value = CallableType::paramspec_value(
+                    db,
+                    Signature::new(self.parameters.clone(), None),
+                );
+                return ConstraintSet::constrain_typevar(
+                    db,
+                    typevar,
+                    paramspec_value,
+                    paramspec_value,
+                    relation,
+                );
+            }
+            _ => {}
         }
 
         let mut parameters = ParametersZip {
@@ -1235,15 +1294,18 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) struct Parameters<'db> {
-    // TODO: use SmallVec here once invariance bug is fixed
-    value: Vec<Parameter<'db>>,
+// TODO: the spec also allows signatures like `Concatenate[int, ...]` or `Concatenate[int, P]`,
+// which have some number of required positional-only parameters followed by a gradual form or a
+// `ParamSpec`. Our representation will need some adjustments to represent that.
 
-    /// Whether this parameter list represents a gradual form using `...` as the only parameter.
-    ///
-    /// If this is `true`, the `value` will still contain the variadic and keyword-variadic
-    /// parameters.
+/// The kind of parameter list represented.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) enum ParametersKind<'db> {
+    /// A standard parameter list.
+    #[default]
+    Standard,
+
+    /// Represents a gradual parameter list using `...` as the only parameter.
     ///
     /// Per [the typing specification], any signature with a variadic and a keyword-variadic
     /// argument, both annotated (explicitly or implicitly) as `Any` or `Unknown`, is considered
@@ -1254,32 +1316,66 @@ pub(crate) struct Parameters<'db> {
     ///
     /// Note: This flag can also result from invalid forms of `Callable` annotations.
     ///
-    /// TODO: the spec also allows signatures like `Concatenate[int, ...]`, which have some number
-    /// of required positional parameters followed by a gradual form. Our representation will need
-    /// some adjustments to represent that.
+    /// [the typing specification]: https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable
+    Gradual,
+
+    /// Represents a parameter list containing a `ParamSpec` as the only parameter.
     ///
-    ///   [the typing specification]: https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable
-    is_gradual: bool,
+    /// Note that this is distinct from a parameter list _containing_ a `ParamSpec` which is
+    /// considered a standard parameter list that just contains a `ParamSpec`.
+    ParamSpec(BoundTypeVarInstance<'db>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) struct Parameters<'db> {
+    // TODO: use SmallVec here once invariance bug is fixed
+    value: Vec<Parameter<'db>>,
+    kind: ParametersKind<'db>,
 }
 
 impl<'db> Parameters<'db> {
-    pub(crate) fn new(parameters: impl IntoIterator<Item = Parameter<'db>>) -> Self {
+    /// Create a new parameter list from an iterator of parameters.
+    ///
+    /// The kind of the parameter list is determined based on the provided parameters.
+    /// Specifically, if the parameters is made up of `*args` and `**kwargs` only, it checks
+    /// their annotated types to determine if they represent a gradual form or a `ParamSpec`.
+    pub(crate) fn new(
+        db: &'db dyn Db,
+        parameters: impl IntoIterator<Item = Parameter<'db>>,
+    ) -> Self {
         let value: Vec<Parameter<'db>> = parameters.into_iter().collect();
-        let is_gradual = value.len() == 2
-            && value
-                .iter()
-                .any(|p| p.is_variadic() && p.annotated_type().is_none_or(|ty| ty.is_dynamic()))
-            && value.iter().any(|p| {
-                p.is_keyword_variadic() && p.annotated_type().is_none_or(|ty| ty.is_dynamic())
-            });
-        Self { value, is_gradual }
+        let mut kind = ParametersKind::Standard;
+        if let [p1, p2] = value.as_slice()
+            && p1.is_variadic()
+            && p2.is_keyword_variadic()
+        {
+            match (p1.annotated_type(), p2.annotated_type()) {
+                (None | Some(Type::Dynamic(_)), None | Some(Type::Dynamic(_))) => {
+                    kind = ParametersKind::Gradual;
+                }
+                (Some(Type::TypeVar(args_typevar)), Some(Type::TypeVar(kwargs_typevar))) => {
+                    if let (Some(ParamSpecAttrKind::Args), Some(ParamSpecAttrKind::Kwargs)) = (
+                        args_typevar.paramspec_attr(db),
+                        kwargs_typevar.paramspec_attr(db),
+                    ) {
+                        let typevar = args_typevar.without_paramspec_attr(db);
+                        if typevar.is_same_typevar_as(db, kwargs_typevar.without_paramspec_attr(db))
+                        {
+                            kind = ParametersKind::ParamSpec(typevar);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        Self { value, kind }
     }
 
     /// Create an empty parameter list.
     pub(crate) fn empty() -> Self {
         Self {
             value: Vec::new(),
-            is_gradual: false,
+            kind: ParametersKind::Standard,
         }
     }
 
@@ -1287,8 +1383,12 @@ impl<'db> Parameters<'db> {
         self.value.as_slice()
     }
 
+    pub(crate) const fn kind(&self) -> ParametersKind<'db> {
+        self.kind
+    }
+
     pub(crate) const fn is_gradual(&self) -> bool {
-        self.is_gradual
+        matches!(self.kind, ParametersKind::Gradual)
     }
 
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
@@ -1300,7 +1400,7 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(todo_type!("todo signature **kwargs")),
             ],
-            is_gradual: true,
+            kind: ParametersKind::Gradual,
         }
     }
 
@@ -1317,7 +1417,21 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Any)),
             ],
-            is_gradual: true,
+            kind: ParametersKind::Gradual,
+        }
+    }
+
+    pub(crate) fn paramspec(db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Self {
+        Self {
+            value: vec![
+                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::TypeVar(
+                    typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
+                )),
+                Parameter::keyword_variadic(Name::new_static("kwargs")).with_annotated_type(
+                    Type::TypeVar(typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs)),
+                ),
+            ],
+            kind: ParametersKind::ParamSpec(typevar),
         }
     }
 
@@ -1335,7 +1449,7 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
             ],
-            is_gradual: true,
+            kind: ParametersKind::Gradual,
         }
     }
 
@@ -1347,7 +1461,7 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::object()),
             ],
-            is_gradual: false,
+            kind: ParametersKind::Standard,
         }
     }
 
@@ -1517,6 +1631,7 @@ impl<'db> Parameters<'db> {
         });
 
         Self::new(
+            db,
             positional_only
                 .into_iter()
                 .chain(positional_or_keyword)
@@ -1537,13 +1652,13 @@ impl<'db> Parameters<'db> {
             // Note that we've already flipped the materialization in Signature.apply_type_mapping_impl(),
             // so the "top" materialization here is the bottom materialization of the whole Signature.
             // It might make sense to flip the materialization here instead.
-            TypeMapping::Materialize(MaterializationKind::Top) if self.is_gradual => {
+            TypeMapping::Materialize(MaterializationKind::Top) if self.is_gradual() => {
                 Parameters::object()
             }
             // TODO: This is wrong, the empty Parameters is not a subtype of all materializations.
             // The bottom materialization is not currently representable and implementing it
             // properly requires extending the Parameters struct.
-            TypeMapping::Materialize(MaterializationKind::Bottom) if self.is_gradual => {
+            TypeMapping::Materialize(MaterializationKind::Bottom) if self.is_gradual() => {
                 Parameters::empty()
             }
             _ => Self {
@@ -1552,7 +1667,7 @@ impl<'db> Parameters<'db> {
                     .iter()
                     .map(|param| param.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
                     .collect(),
-                is_gradual: self.is_gradual,
+                kind: self.kind,
             },
         }
     }
@@ -1631,12 +1746,6 @@ impl<'db, 'a> IntoIterator for &'a Parameters<'db> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.value.iter()
-    }
-}
-
-impl<'db> FromIterator<Parameter<'db>> for Parameters<'db> {
-    fn from_iter<T: IntoIterator<Item = Parameter<'db>>>(iter: T) -> Self {
-        Self::new(iter)
     }
 }
 

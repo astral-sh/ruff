@@ -2,18 +2,20 @@ use itertools::Either;
 use ruff_python_ast as ast;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
+use crate::semantic_index::semantic_index;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NON_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_callable,
 };
+use crate::types::generics::bind_typevar;
 use crate::types::signatures::Signature;
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
-use crate::types::visitor::any_over_type;
 use crate::types::{
-    CallableType, DynamicType, IntersectionBuilder, KnownClass, KnownInstanceType,
-    LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType, Type,
-    TypeAliasType, TypeContext, TypeIsType, UnionBuilder, UnionType, todo_type,
+    BindingContext, BoundTypeVarInstance, CallableType, DynamicType, IntersectionBuilder,
+    KnownClass, KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType,
+    SubclassOfType, Type, TypeAliasType, TypeContext, TypeIsType, UnionBuilder, UnionType,
+    todo_type,
 };
 
 /// Type expressions
@@ -1570,9 +1572,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // TODO: `Unpack`
                     Parameters::todo()
                 } else {
-                    Parameters::new(parameter_types.iter().map(|param_type| {
-                        Parameter::positional_only(None).with_annotated_type(*param_type)
-                    }))
+                    Parameters::new(
+                        self.db(),
+                        parameter_types.iter().map(|param_type| {
+                            Parameter::positional_only(None).with_annotated_type(*param_type)
+                        }),
+                    )
                 });
             }
             ast::Expr::Subscript(subscript) => {
@@ -1588,21 +1593,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // `Callable[]`.
                     return None;
                 }
-                if any_over_type(
-                    self.db(),
-                    self.infer_name_load(name),
-                    &|ty| match ty {
-                        Type::KnownInstance(known_instance) => {
-                            known_instance.class(self.db()) == KnownClass::ParamSpec
-                        }
-                        Type::NominalInstance(nominal) => {
-                            nominal.has_known_class(self.db(), KnownClass::ParamSpec)
-                        }
-                        _ => false,
-                    },
-                    true,
-                ) {
-                    return Some(Parameters::todo());
+                let name_ty = self.infer_name_load(name);
+                if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = name_ty
+                    && typevar.is_paramspec(self.db())
+                {
+                    let index = semantic_index(self.db(), self.scope().file(self.db()));
+                    let bound_typevar = bind_typevar(
+                        self.db(),
+                        index,
+                        self.scope().file_scope_id(self.db()),
+                        self.typevar_binding_context,
+                        typevar,
+                    )
+                    .unwrap_or_else(|| {
+                        BoundTypeVarInstance::new(
+                            self.db(),
+                            typevar,
+                            BindingContext::Synthetic,
+                            None,
+                        )
+                    });
+                    return Some(Parameters::paramspec(self.db(), bound_typevar));
                 }
             }
             _ => {}

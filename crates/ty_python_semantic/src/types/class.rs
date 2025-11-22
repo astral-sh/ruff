@@ -31,12 +31,12 @@ use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, DATACLASS_FLAGS,
-    DataclassFlags, DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType,
-    ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
-    StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation, TypedDictParams,
-    UnionBuilder, VarianceInferable, declaration_type, determine_upper_bound,
+    ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, CallableTypeKind,
+    DATACLASS_FLAGS, DataclassFlags, DataclassParams, DeprecatedInstance,
+    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
+    KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor,
+    PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation,
+    TypedDictParams, UnionBuilder, VarianceInferable, declaration_type, determine_upper_bound,
     exceeds_max_specialization_depth, infer_definition_types,
 };
 use crate::{
@@ -748,13 +748,14 @@ impl<'db> ClassType<'db> {
         name: &str,
     ) -> Member<'db> {
         fn synthesize_getitem_overload_signature<'db>(
+            db: &'db dyn Db,
             index_annotation: Type<'db>,
             return_annotation: Type<'db>,
         ) -> Signature<'db> {
             let self_parameter = Parameter::positional_only(Some(Name::new_static("self")));
             let index_parameter = Parameter::positional_only(Some(Name::new_static("index")))
                 .with_annotated_type(index_annotation);
-            let parameters = Parameters::new([self_parameter, index_parameter]);
+            let parameters = Parameters::new(db, [self_parameter, index_parameter]);
             Signature::new(parameters, Some(return_annotation))
         }
 
@@ -785,9 +786,11 @@ impl<'db> ClassType<'db> {
                     .map(Type::IntLiteral)
                     .unwrap_or_else(|| KnownClass::Int.to_instance(db));
 
-                let parameters =
-                    Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))
-                        .with_annotated_type(Type::instance(db, self))]);
+                let parameters = Parameters::new(
+                    db,
+                    [Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(Type::instance(db, self))],
+                );
 
                 let synthesized_dunder_method =
                     CallableType::function_like(db, Signature::new(parameters, Some(return_type)));
@@ -915,6 +918,7 @@ impl<'db> ClassType<'db> {
                                 );
 
                                 Some(synthesize_getitem_overload_signature(
+                                    db,
                                     index_annotation,
                                     return_type,
                                 ))
@@ -932,19 +936,24 @@ impl<'db> ClassType<'db> {
                         //    __getitem__(self, index: slice[Any, Any, Any], /) -> tuple[str | float | bytes, ...]
                         //
                         overload_signatures.push(synthesize_getitem_overload_signature(
+                            db,
                             KnownClass::SupportsIndex.to_instance(db),
                             all_elements_unioned,
                         ));
 
                         overload_signatures.push(synthesize_getitem_overload_signature(
+                            db,
                             KnownClass::Slice.to_instance(db),
                             Type::homogeneous_tuple(db, all_elements_unioned),
                         ));
 
                         let getitem_signature =
                             CallableSignature::from_overloads(overload_signatures);
-                        let getitem_type =
-                            Type::Callable(CallableType::new(db, getitem_signature, true));
+                        let getitem_type = Type::Callable(CallableType::new(
+                            db,
+                            getitem_signature,
+                            CallableTypeKind::FunctionLike,
+                        ));
                         Member::definitely_declared(getitem_type)
                     })
                     .unwrap_or_else(fallback_member_lookup)
@@ -1006,11 +1015,14 @@ impl<'db> ClassType<'db> {
                         iterable_parameter.with_default_type(Type::empty_tuple(db));
                 }
 
-                let parameters = Parameters::new([
-                    Parameter::positional_only(Some(Name::new_static("self")))
-                        .with_annotated_type(SubclassOfType::from(db, self)),
-                    iterable_parameter,
-                ]);
+                let parameters = Parameters::new(
+                    db,
+                    [
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(SubclassOfType::from(db, self)),
+                        iterable_parameter,
+                    ],
+                );
 
                 let synthesized_dunder = CallableType::function_like(
                     db,
@@ -1100,7 +1112,7 @@ impl<'db> ClassType<'db> {
             let dunder_new_bound_method = Type::Callable(CallableType::new(
                 db,
                 dunder_new_signature.bind_self(db, Some(instance_ty)),
-                true,
+                CallableTypeKind::FunctionLike,
             ));
 
             if returns_non_subclass {
@@ -1150,7 +1162,7 @@ impl<'db> ClassType<'db> {
                     Some(Type::Callable(CallableType::new(
                         db,
                         synthesized_dunder_init_signature,
-                        true,
+                        CallableTypeKind::FunctionLike,
                     )))
                 } else {
                     None
@@ -1965,9 +1977,11 @@ impl<'db> ClassLiteral<'db> {
     ) -> PlaceAndQualifiers<'db> {
         fn into_function_like_callable<'d>(db: &'d dyn Db, ty: Type<'d>) -> Type<'d> {
             match ty {
-                Type::Callable(callable_ty) => {
-                    Type::Callable(CallableType::new(db, callable_ty.signatures(db), true))
-                }
+                Type::Callable(callable_ty) => Type::Callable(CallableType::new(
+                    db,
+                    callable_ty.signatures(db),
+                    CallableTypeKind::FunctionLike,
+                )),
                 Type::Union(union) => {
                     union.map(db, |element| into_function_like_callable(db, *element))
                 }
@@ -2152,7 +2166,10 @@ impl<'db> ClassLiteral<'db> {
                 .get(name)
             {
                 let property_getter_signature = Signature::new(
-                    Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))]),
+                    Parameters::new(
+                        db,
+                        [Parameter::positional_only(Some(Name::new_static("self")))],
+                    ),
                     Some(field.declared_ty),
                 );
                 let property_getter = CallableType::single(db, property_getter_signature);
@@ -2364,10 +2381,10 @@ impl<'db> ClassLiteral<'db> {
             let signature = match name {
                 "__new__" | "__init__" => Signature::new_generic(
                     inherited_generic_context.or_else(|| self.inherited_generic_context(db)),
-                    Parameters::new(parameters),
+                    Parameters::new(db, parameters),
                     return_ty,
                 ),
-                _ => Signature::new(Parameters::new(parameters), return_ty),
+                _ => Signature::new(Parameters::new(db, parameters), return_ty),
             };
             Some(CallableType::function_like(db, signature))
         };
@@ -2394,14 +2411,17 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 let signature = Signature::new(
-                    Parameters::new([
-                        Parameter::positional_or_keyword(Name::new_static("self"))
-                            // TODO: could be `Self`.
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_or_keyword(Name::new_static("other"))
-                            // TODO: could be `Self`.
-                            .with_annotated_type(instance_ty),
-                    ]),
+                    Parameters::new(
+                        db,
+                        [
+                            Parameter::positional_or_keyword(Name::new_static("self"))
+                                // TODO: could be `Self`.
+                                .with_annotated_type(instance_ty),
+                            Parameter::positional_or_keyword(Name::new_static("other"))
+                                // TODO: could be `Self`.
+                                .with_annotated_type(instance_ty),
+                        ],
+                    ),
                     Some(KnownClass::Bool.to_instance(db)),
                 );
 
@@ -2414,10 +2434,11 @@ impl<'db> ClassLiteral<'db> {
 
                 if unsafe_hash || (frozen && eq) {
                     let signature = Signature::new(
-                        Parameters::new([Parameter::positional_or_keyword(Name::new_static(
-                            "self",
-                        ))
-                        .with_annotated_type(instance_ty)]),
+                        Parameters::new(
+                            db,
+                            [Parameter::positional_or_keyword(Name::new_static("self"))
+                                .with_annotated_type(instance_ty)],
+                        ),
                         Some(KnownClass::Int.to_instance(db)),
                     );
 
@@ -2499,12 +2520,15 @@ impl<'db> ClassLiteral<'db> {
             (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
                 if has_dataclass_param(DataclassFlags::FROZEN) {
                     let signature = Signature::new(
-                        Parameters::new([
-                            Parameter::positional_or_keyword(Name::new_static("self"))
-                                .with_annotated_type(instance_ty),
-                            Parameter::positional_or_keyword(Name::new_static("name")),
-                            Parameter::positional_or_keyword(Name::new_static("value")),
-                        ]),
+                        Parameters::new(
+                            db,
+                            [
+                                Parameter::positional_or_keyword(Name::new_static("self"))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_or_keyword(Name::new_static("name")),
+                                Parameter::positional_or_keyword(Name::new_static("value")),
+                            ],
+                        ),
                         Some(Type::Never),
                     );
 
@@ -2539,17 +2563,20 @@ impl<'db> ClassLiteral<'db> {
                     return Some(Type::Callable(CallableType::new(
                         db,
                         CallableSignature::single(Signature::new(
-                            Parameters::new([
-                                Parameter::positional_only(Some(Name::new_static("self")))
-                                    .with_annotated_type(instance_ty),
-                                Parameter::positional_only(Some(Name::new_static("key")))
-                                    .with_annotated_type(Type::Never),
-                                Parameter::positional_only(Some(Name::new_static("value")))
-                                    .with_annotated_type(Type::any()),
-                            ]),
+                            Parameters::new(
+                                db,
+                                [
+                                    Parameter::positional_only(Some(Name::new_static("self")))
+                                        .with_annotated_type(instance_ty),
+                                    Parameter::positional_only(Some(Name::new_static("key")))
+                                        .with_annotated_type(Type::Never),
+                                    Parameter::positional_only(Some(Name::new_static("value")))
+                                        .with_annotated_type(Type::any()),
+                                ],
+                            ),
                             Some(Type::none(db)),
                         )),
-                        true,
+                        CallableTypeKind::FunctionLike,
                     )));
                 }
 
@@ -2557,14 +2584,17 @@ impl<'db> ClassLiteral<'db> {
                     let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
 
                     Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("self")))
-                                .with_annotated_type(instance_ty),
-                            Parameter::positional_only(Some(Name::new_static("key")))
-                                .with_annotated_type(key_type),
-                            Parameter::positional_only(Some(Name::new_static("value")))
-                                .with_annotated_type(field.declared_ty),
-                        ]),
+                        Parameters::new(
+                            db,
+                            [
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(key_type),
+                                Parameter::positional_only(Some(Name::new_static("value")))
+                                    .with_annotated_type(field.declared_ty),
+                            ],
+                        ),
                         Some(Type::none(db)),
                     )
                 });
@@ -2572,7 +2602,7 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "__getitem__") => {
@@ -2583,12 +2613,15 @@ impl<'db> ClassLiteral<'db> {
                     let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
 
                     Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("self")))
-                                .with_annotated_type(instance_ty),
-                            Parameter::positional_only(Some(Name::new_static("key")))
-                                .with_annotated_type(key_type),
-                        ]),
+                        Parameters::new(
+                            db,
+                            [
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(key_type),
+                            ],
+                        ),
                         Some(field.declared_ty),
                     )
                 });
@@ -2596,7 +2629,7 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "get") => {
@@ -2615,12 +2648,15 @@ impl<'db> ClassLiteral<'db> {
                         // once the generics solver takes default arguments into account.
 
                         let get_sig = Signature::new(
-                            Parameters::new([
-                                Parameter::positional_only(Some(Name::new_static("self")))
-                                    .with_annotated_type(instance_ty),
-                                Parameter::positional_only(Some(Name::new_static("key")))
-                                    .with_annotated_type(key_type),
-                            ]),
+                            Parameters::new(
+                                db,
+                                [
+                                    Parameter::positional_only(Some(Name::new_static("self")))
+                                        .with_annotated_type(instance_ty),
+                                    Parameter::positional_only(Some(Name::new_static("key")))
+                                        .with_annotated_type(key_type),
+                                ],
+                            ),
                             Some(if field.is_required() {
                                 field.declared_ty
                             } else {
@@ -2633,14 +2669,17 @@ impl<'db> ClassLiteral<'db> {
 
                         let get_with_default_sig = Signature::new_generic(
                             Some(GenericContext::from_typevar_instances(db, [t_default])),
-                            Parameters::new([
-                                Parameter::positional_only(Some(Name::new_static("self")))
-                                    .with_annotated_type(instance_ty),
-                                Parameter::positional_only(Some(Name::new_static("key")))
-                                    .with_annotated_type(key_type),
-                                Parameter::positional_only(Some(Name::new_static("default")))
-                                    .with_annotated_type(Type::TypeVar(t_default)),
-                            ]),
+                            Parameters::new(
+                                db,
+                                [
+                                    Parameter::positional_only(Some(Name::new_static("self")))
+                                        .with_annotated_type(instance_ty),
+                                    Parameter::positional_only(Some(Name::new_static("key")))
+                                        .with_annotated_type(key_type),
+                                    Parameter::positional_only(Some(Name::new_static("default")))
+                                        .with_annotated_type(Type::TypeVar(t_default)),
+                                ],
+                            ),
                             Some(if field.is_required() {
                                 field.declared_ty
                             } else {
@@ -2656,12 +2695,15 @@ impl<'db> ClassLiteral<'db> {
                     // Fallback overloads for unknown keys
                     .chain(std::iter::once({
                         Signature::new(
-                            Parameters::new([
-                                Parameter::positional_only(Some(Name::new_static("self")))
-                                    .with_annotated_type(instance_ty),
-                                Parameter::positional_only(Some(Name::new_static("key")))
-                                    .with_annotated_type(KnownClass::Str.to_instance(db)),
-                            ]),
+                            Parameters::new(
+                                db,
+                                [
+                                    Parameter::positional_only(Some(Name::new_static("self")))
+                                        .with_annotated_type(instance_ty),
+                                    Parameter::positional_only(Some(Name::new_static("key")))
+                                        .with_annotated_type(KnownClass::Str.to_instance(db)),
+                                ],
+                            ),
                             Some(UnionType::from_elements(
                                 db,
                                 [Type::unknown(), Type::none(db)],
@@ -2674,14 +2716,17 @@ impl<'db> ClassLiteral<'db> {
 
                         Signature::new_generic(
                             Some(GenericContext::from_typevar_instances(db, [t_default])),
-                            Parameters::new([
-                                Parameter::positional_only(Some(Name::new_static("self")))
-                                    .with_annotated_type(instance_ty),
-                                Parameter::positional_only(Some(Name::new_static("key")))
-                                    .with_annotated_type(KnownClass::Str.to_instance(db)),
-                                Parameter::positional_only(Some(Name::new_static("default")))
-                                    .with_annotated_type(Type::TypeVar(t_default)),
-                            ]),
+                            Parameters::new(
+                                db,
+                                [
+                                    Parameter::positional_only(Some(Name::new_static("self")))
+                                        .with_annotated_type(instance_ty),
+                                    Parameter::positional_only(Some(Name::new_static("key")))
+                                        .with_annotated_type(KnownClass::Str.to_instance(db)),
+                                    Parameter::positional_only(Some(Name::new_static("default")))
+                                        .with_annotated_type(Type::TypeVar(t_default)),
+                                ],
+                            ),
                             Some(UnionType::from_elements(
                                 db,
                                 [Type::unknown(), Type::TypeVar(t_default)],
@@ -2692,7 +2737,7 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "pop") => {
@@ -2711,12 +2756,15 @@ impl<'db> ClassLiteral<'db> {
 
                         // `.pop()` without default
                         let pop_sig = Signature::new(
-                            Parameters::new([
-                                Parameter::positional_only(Some(Name::new_static("self")))
-                                    .with_annotated_type(instance_ty),
-                                Parameter::positional_only(Some(Name::new_static("key")))
-                                    .with_annotated_type(key_type),
-                            ]),
+                            Parameters::new(
+                                db,
+                                [
+                                    Parameter::positional_only(Some(Name::new_static("self")))
+                                        .with_annotated_type(instance_ty),
+                                    Parameter::positional_only(Some(Name::new_static("key")))
+                                        .with_annotated_type(key_type),
+                                ],
+                            ),
                             Some(field.declared_ty),
                         );
 
@@ -2726,14 +2774,17 @@ impl<'db> ClassLiteral<'db> {
 
                         let pop_with_default_sig = Signature::new_generic(
                             Some(GenericContext::from_typevar_instances(db, [t_default])),
-                            Parameters::new([
-                                Parameter::positional_only(Some(Name::new_static("self")))
-                                    .with_annotated_type(instance_ty),
-                                Parameter::positional_only(Some(Name::new_static("key")))
-                                    .with_annotated_type(key_type),
-                                Parameter::positional_only(Some(Name::new_static("default")))
-                                    .with_annotated_type(Type::TypeVar(t_default)),
-                            ]),
+                            Parameters::new(
+                                db,
+                                [
+                                    Parameter::positional_only(Some(Name::new_static("self")))
+                                        .with_annotated_type(instance_ty),
+                                    Parameter::positional_only(Some(Name::new_static("key")))
+                                        .with_annotated_type(key_type),
+                                    Parameter::positional_only(Some(Name::new_static("default")))
+                                        .with_annotated_type(Type::TypeVar(t_default)),
+                                ],
+                            ),
                             Some(UnionType::from_elements(
                                 db,
                                 [field.declared_ty, Type::TypeVar(t_default)],
@@ -2746,7 +2797,7 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "setdefault") => {
@@ -2756,14 +2807,17 @@ impl<'db> ClassLiteral<'db> {
 
                     // `setdefault` always returns the field type
                     Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("self")))
-                                .with_annotated_type(instance_ty),
-                            Parameter::positional_only(Some(Name::new_static("key")))
-                                .with_annotated_type(key_type),
-                            Parameter::positional_only(Some(Name::new_static("default")))
-                                .with_annotated_type(field.declared_ty),
-                        ]),
+                        Parameters::new(
+                            db,
+                            [
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(key_type),
+                                Parameter::positional_only(Some(Name::new_static("default")))
+                                    .with_annotated_type(field.declared_ty),
+                            ],
+                        ),
                         Some(field.declared_ty),
                     )
                 });
@@ -2771,18 +2825,21 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "update") => {
                 // TODO: synthesize a set of overloads with precise types
                 let signature = Signature::new(
-                    Parameters::new([
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty),
-                        Parameter::variadic(Name::new_static("args")),
-                        Parameter::keyword_variadic(Name::new_static("kwargs")),
-                    ]),
+                    Parameters::new(
+                        db,
+                        [
+                            Parameter::positional_only(Some(Name::new_static("self")))
+                                .with_annotated_type(instance_ty),
+                            Parameter::variadic(Name::new_static("args")),
+                            Parameter::keyword_variadic(Name::new_static("kwargs")),
+                        ],
+                    ),
                     Some(Type::none(db)),
                 );
 

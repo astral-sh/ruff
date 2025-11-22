@@ -3,6 +3,7 @@
 //! [signatures][crate::types::signatures], we have to handle the fact that the callable might be a
 //! union of types, each of which might contain multiple overloads.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt;
 
@@ -33,7 +34,7 @@ use crate::types::generics::{
     InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
 };
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
-use crate::types::tuple::{TupleLength, TupleType};
+use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, ClassLiteral, DATACLASS_FLAGS, DataclassFlags,
     DataclassParams, FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType,
@@ -2558,20 +2559,40 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument: Argument<'a>,
         argument_type: Option<Type<'db>>,
     ) -> Result<(), ()> {
-        // TODO: `Type::iterate` internally handles unions, but in a lossy way.
-        // It might be superior here to manually map over the union and call `try_iterate`
-        // on each element, similar to the way that `unpacker.rs` does in the `unpack_inner` method.
-        // It might be a bit of a refactor, though.
-        // See <https://github.com/astral-sh/ruff/pull/20377#issuecomment-3401380305>
-        // for more details. --Alex
-        let tuple = argument_type.map(|ty| ty.iterate(db));
-        let (mut argument_types, length, variable_element) = match tuple.as_ref() {
-            Some(tuple) => (
+        enum VariadicArgumentType<'db> {
+            ParamSpec(Type<'db>),
+            Other(Cow<'db, TupleSpec<'db>>),
+            None,
+        }
+
+        let variadic_type = match argument_type {
+            Some(paramspec @ Type::TypeVar(typevar)) if typevar.is_paramspec(db) => {
+                VariadicArgumentType::ParamSpec(paramspec)
+            }
+            Some(ty) => {
+                // TODO: `Type::iterate` internally handles unions, but in a lossy way.
+                // It might be superior here to manually map over the union and call `try_iterate`
+                // on each element, similar to the way that `unpacker.rs` does in the `unpack_inner` method.
+                // It might be a bit of a refactor, though.
+                // See <https://github.com/astral-sh/ruff/pull/20377#issuecomment-3401380305>
+                // for more details. --Alex
+                VariadicArgumentType::Other(ty.iterate(db))
+            }
+            None => VariadicArgumentType::None,
+        };
+
+        let (mut argument_types, length, variable_element) = match &variadic_type {
+            VariadicArgumentType::ParamSpec(paramspec) => (
+                Either::Right(std::iter::empty()),
+                TupleLength::unknown(),
+                Some(*paramspec),
+            ),
+            VariadicArgumentType::Other(tuple) => (
                 Either::Left(tuple.all_elements().copied()),
                 tuple.len(),
                 tuple.variable_element().copied(),
             ),
-            None => (
+            VariadicArgumentType::None => (
                 Either::Right(std::iter::empty()),
                 TupleLength::unknown(),
                 None,
@@ -2646,19 +2667,25 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 );
             }
         } else {
-            let value_type = match argument_type.map(|ty| {
-                ty.member_lookup_with_policy(
-                    db,
-                    Name::new_static("__getitem__"),
-                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                )
-                .place
-            }) {
-                Some(Place::Defined(keys_method, _, Definedness::AlwaysDefined)) => keys_method
-                    .try_call(db, &CallArguments::positional([Type::unknown()]))
-                    .ok()
-                    .map_or_else(Type::unknown, |bindings| bindings.return_type(db)),
-                _ => Type::unknown(),
+            let value_type = match argument_type {
+                Some(paramspec @ Type::TypeVar(typevar)) if typevar.is_paramspec(db) => paramspec,
+                Some(ty) => {
+                    match ty
+                        .member_lookup_with_policy(
+                            db,
+                            Name::new_static("__getitem__"),
+                            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        )
+                        .place
+                    {
+                        Place::Defined(keys_method, _, Definedness::AlwaysDefined) => keys_method
+                            .try_call(db, &CallArguments::positional([Type::unknown()]))
+                            .ok()
+                            .map_or_else(Type::unknown, |bindings| bindings.return_type(db)),
+                        _ => Type::unknown(),
+                    }
+                }
+                None => Type::unknown(),
             };
 
             for (parameter_index, parameter) in self.parameters.iter().enumerate() {
@@ -3076,67 +3103,73 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 );
             }
         } else {
-            // TODO: Instead of calling the `keys` and `__getitem__` methods, we should instead
-            // get the constraints which satisfies the `SupportsKeysAndGetItem` protocol i.e., the
-            // key and value type.
-            let key_type = match argument_type
-                .member_lookup_with_policy(
-                    self.db,
-                    Name::new_static("keys"),
-                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                )
-                .place
+            let value_type = if let Type::TypeVar(typevar) = argument_type
+                && typevar.is_paramspec(self.db)
             {
-                Place::Defined(keys_method, _, Definedness::AlwaysDefined) => keys_method
-                    .try_call(self.db, &CallArguments::none())
-                    .ok()
-                    .and_then(|bindings| {
-                        Some(
-                            bindings
-                                .return_type(self.db)
-                                .try_iterate(self.db)
-                                .ok()?
-                                .homogeneous_element_type(self.db),
-                        )
-                    }),
-                _ => None,
-            };
+                argument_type
+            } else {
+                // TODO: Instead of calling the `keys` and `__getitem__` methods, we should
+                // instead get the constraints which satisfies the `SupportsKeysAndGetItem`
+                // protocol i.e., the key and value type.
+                let key_type = match argument_type
+                    .member_lookup_with_policy(
+                        self.db,
+                        Name::new_static("keys"),
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    )
+                    .place
+                {
+                    Place::Defined(keys_method, _, Definedness::AlwaysDefined) => keys_method
+                        .try_call(self.db, &CallArguments::none())
+                        .ok()
+                        .and_then(|bindings| {
+                            Some(
+                                bindings
+                                    .return_type(self.db)
+                                    .try_iterate(self.db)
+                                    .ok()?
+                                    .homogeneous_element_type(self.db),
+                            )
+                        }),
+                    _ => None,
+                };
 
-            let Some(key_type) = key_type else {
-                self.errors.push(BindingError::KeywordsNotAMapping {
-                    argument_index: adjusted_argument_index,
-                    provided_ty: argument_type,
-                });
-                return;
-            };
+                let Some(key_type) = key_type else {
+                    self.errors.push(BindingError::KeywordsNotAMapping {
+                        argument_index: adjusted_argument_index,
+                        provided_ty: argument_type,
+                    });
+                    return;
+                };
 
-            if !key_type
-                .when_assignable_to(
-                    self.db,
-                    KnownClass::Str.to_instance(self.db),
-                    self.inferable_typevars,
-                )
-                .is_always_satisfied(self.db)
-            {
-                self.errors.push(BindingError::InvalidKeyType {
-                    argument_index: adjusted_argument_index,
-                    provided_ty: key_type,
-                });
-            }
+                if !key_type
+                    .when_assignable_to(
+                        self.db,
+                        KnownClass::Str.to_instance(self.db),
+                        self.inferable_typevars,
+                    )
+                    .is_always_satisfied(self.db)
+                {
+                    self.errors.push(BindingError::InvalidKeyType {
+                        argument_index: adjusted_argument_index,
+                        provided_ty: key_type,
+                    });
+                }
 
-            let value_type = match argument_type
-                .member_lookup_with_policy(
-                    self.db,
-                    Name::new_static("__getitem__"),
-                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                )
-                .place
-            {
-                Place::Defined(keys_method, _, Definedness::AlwaysDefined) => keys_method
-                    .try_call(self.db, &CallArguments::positional([Type::unknown()]))
-                    .ok()
-                    .map_or_else(Type::unknown, |bindings| bindings.return_type(self.db)),
-                _ => Type::unknown(),
+                match argument_type
+                    .member_lookup_with_policy(
+                        self.db,
+                        Name::new_static("__getitem__"),
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    )
+                    .place
+                {
+                    Place::Defined(keys_method, _, Definedness::AlwaysDefined) => keys_method
+                        .try_call(self.db, &CallArguments::positional([Type::unknown()]))
+                        .ok()
+                        .map_or_else(Type::unknown, |bindings| bindings.return_type(self.db)),
+                    _ => Type::unknown(),
+                }
             };
 
             for (argument_type, parameter_index) in

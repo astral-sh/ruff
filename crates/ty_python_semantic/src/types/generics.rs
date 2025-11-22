@@ -13,15 +13,16 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSet;
 use crate::types::instance::{Protocol, ProtocolInstanceType};
-use crate::types::signatures::{Parameter, Parameters, Signature};
+use crate::types::signatures::{Parameter, Parameters, ParametersKind, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral,
-    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeContext,
-    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance,
-    TypeVarKind, TypeVarVariance, UnionType, declaration_type, walk_bound_type_var_type,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
+    ClassLiteral, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
+    IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
+    Type, TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, declaration_type,
+    walk_bound_type_var_type,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -64,7 +65,7 @@ pub(crate) fn bind_typevar<'db>(
             if outer.kind().is_class() {
                 if let NodeWithScopeKind::Function(function) = inner.node() {
                     let definition = index.expect_single_definition(function);
-                    return Some(typevar.with_binding_context(db, definition));
+                    return Some(typevar.as_bound_type_var_instance(db, definition));
                 }
             }
         }
@@ -73,7 +74,7 @@ pub(crate) fn bind_typevar<'db>(
         .find_map(|enclosing_context| enclosing_context.binds_typevar(db, typevar))
         .or_else(|| {
             typevar_binding_context.map(|typevar_binding_context| {
-                typevar.with_binding_context(db, typevar_binding_context)
+                typevar.as_bound_type_var_instance(db, typevar_binding_context)
             })
         })
 }
@@ -332,10 +333,18 @@ impl<'db> GenericContext<'db> {
                 else {
                     return None;
                 };
-                Some(typevar.with_binding_context(db, binding_context))
+                Some(typevar.as_bound_type_var_instance(db, binding_context))
             }
-            // TODO: Support these!
-            ast::TypeParam::ParamSpec(_) => None,
+            ast::TypeParam::ParamSpec(node) => {
+                let definition = index.expect_single_definition(node);
+                let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
+                    declaration_type(db, definition).inner_type()
+                else {
+                    return None;
+                };
+                Some(typevar.as_bound_type_var_instance(db, binding_context))
+            }
+            // TODO: Support this!
             ast::TypeParam::TypeVarTuple(_) => None,
         }
     }
@@ -413,6 +422,7 @@ impl<'db> GenericContext<'db> {
 
     pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
         let parameters = Parameters::new(
+            db,
             self.variables(db)
                 .map(|typevar| Self::parameter_from_typevar(db, typevar)),
         );
@@ -1644,6 +1654,39 @@ impl<'db> SpecializationBuilder<'db> {
                         }
                         return Ok(());
                     }
+                }
+            }
+
+            (Type::Callable(formal_callable), Type::Callable(actual_callable)) => {
+                // We're only interested in a formal callable of the form `Callable[P, ...]` for
+                // now where `P` is a `ParamSpec`.
+                let [signature] = formal_callable.signatures(self.db).as_slice() else {
+                    return Ok(());
+                };
+                let formal_parameters = signature.parameters();
+                let ParametersKind::ParamSpec(typevar) = formal_parameters.kind() else {
+                    return Ok(());
+                };
+                self.add_type_mapping(
+                    typevar,
+                    CallableType::overloaded_paramspec_value(
+                        self.db,
+                        actual_callable
+                            .signatures(self.db)
+                            .iter()
+                            .map(|signature| Signature::new(signature.parameters().clone(), None)),
+                    ),
+                    polarity,
+                    &mut f,
+                );
+            }
+
+            (
+                Type::Callable(_),
+                Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::KnownBoundMethod(_),
+            ) => {
+                if let Some(actual_callable) = actual.try_upcast_to_callable(self.db) {
+                    self.infer_map_impl(formal, actual_callable, polarity, &mut f)?;
                 }
             }
 

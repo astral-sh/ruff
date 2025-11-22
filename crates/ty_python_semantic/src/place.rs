@@ -1452,6 +1452,7 @@ mod implicit_globals {
             "__annotate__" if Program::get(db).python_version(db) >= PythonVersion::PY314 => {
                 let signature = Signature::new(
                     Parameters::new(
+                        db,
                         [Parameter::positional_only(Some(Name::new_static("format")))
                             .with_annotated_type(KnownClass::Int.to_instance(db))],
                     ),
