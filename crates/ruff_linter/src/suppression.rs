@@ -64,6 +64,25 @@ pub(crate) struct Suppression {
     comments: SmallVec<[SuppressionComment; 2]>,
 }
 
+#[derive(Clone, Debug)]
+pub(crate) enum InvalidSuppressionKind {
+    /// Trailing suppression not supported
+    Trailing,
+
+    /// No matching enable or disable suppression found
+    Unmatched,
+
+    /// Suppression does not match surrounding indentation
+    Indentation,
+}
+
+#[allow(unused)]
+#[derive(Clone, Debug)]
+pub(crate) struct InvalidSuppression {
+    kind: InvalidSuppressionKind,
+    comment: SuppressionComment,
+}
+
 #[allow(unused)]
 #[derive(Debug)]
 pub(crate) struct Suppressions {
@@ -71,7 +90,7 @@ pub(crate) struct Suppressions {
     valid: Vec<Suppression>,
 
     /// Invalid suppression comments
-    invalid: Vec<SuppressionComment>,
+    invalid: Vec<InvalidSuppression>,
 
     /// Parse errors from suppression comments
     errors: Vec<ParseError>,
@@ -89,7 +108,7 @@ pub(crate) struct SuppressionsBuilder<'a> {
     source: &'a str,
 
     valid: Vec<Suppression>,
-    invalid: Vec<SuppressionComment>,
+    invalid: Vec<InvalidSuppression>,
     errors: Vec<ParseError>,
 
     pending: Vec<SuppressionComment>,
@@ -140,8 +159,10 @@ impl<'a> SuppressionsBuilder<'a> {
                 self.pending.remove(other_index);
                 self.pending.remove(comment_index);
             } else {
-                self.invalid
-                    .push(self.pending.remove(comment_index).clone());
+                self.invalid.push(InvalidSuppression {
+                    kind: InvalidSuppressionKind::Unmatched,
+                    comment: self.pending.remove(comment_index).clone(),
+                });
             }
         }
     }
@@ -169,7 +190,10 @@ impl<'a> SuppressionsBuilder<'a> {
                         Ok(comment) => {
                             let Some(indent) = &comment.indent else {
                                 // trailing suppressions are not supported
-                                self.invalid.push(comment);
+                                self.invalid.push(InvalidSuppression {
+                                    kind: InvalidSuppressionKind::Trailing,
+                                    comment,
+                                });
                                 continue;
                             };
 
@@ -186,7 +210,10 @@ impl<'a> SuppressionsBuilder<'a> {
                                 self.pending.push(comment);
                             } else {
                                 // weirdly indented? ¯\_(ツ)_/¯
-                                self.invalid.push(comment);
+                                self.invalid.push(InvalidSuppression {
+                                    kind: InvalidSuppressionKind::Indentation,
+                                    comment,
+                                });
                             }
                         }
                         Err(ParseError {
@@ -417,19 +444,22 @@ mod tests {
     fn suppressions_from_tokens() {
         let source = "
 # comment here
-print('hello')
+print('hello')  # ruff: disable[phi]  # trailing
 
 # ruff: disable[alpha]
 def foo():
-    # ruff: disable[beta]
+    # ruff: disable[beta,gamma]
     if True:
-        # ruff: disable[gamma]  # unmatched!
+        # ruff: disable[delta]  # unmatched
         pass
-    # ruff: enable[beta]
+    # ruff: enable[beta,gamma]
 # ruff: enable[alpha]
 
 # ruff: disable  # parse error!
 def bar():
+    # ruff: disable[zeta]  # unmatched
+    pass
+# ruff: enable[zeta]  # underindented
     pass
 ";
         let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
@@ -441,78 +471,153 @@ def bar():
             valid: [
                 Suppression {
                     code: "beta",
-                    range: 70..187,
+                    range: 104..232,
                     comments: [
                         SuppressionComment {
-                            range: 70..91,
+                            range: 104..131,
                             indent: Some(
                                 "    ",
                             ),
                             action: Disable,
                             codes: [
-                                86..90,
+                                120..124,
+                                125..130,
                             ],
-                            reason: 91..91,
+                            reason: 131..131,
                         },
                         SuppressionComment {
-                            range: 167..187,
+                            range: 206..232,
                             indent: Some(
                                 "    ",
                             ),
                             action: Enable,
                             codes: [
-                                182..186,
+                                221..225,
+                                226..231,
                             ],
-                            reason: 187..187,
+                            reason: 232..232,
+                        },
+                    ],
+                },
+                Suppression {
+                    code: "gamma",
+                    range: 104..232,
+                    comments: [
+                        SuppressionComment {
+                            range: 104..131,
+                            indent: Some(
+                                "    ",
+                            ),
+                            action: Disable,
+                            codes: [
+                                120..124,
+                                125..130,
+                            ],
+                            reason: 131..131,
+                        },
+                        SuppressionComment {
+                            range: 206..232,
+                            indent: Some(
+                                "    ",
+                            ),
+                            action: Enable,
+                            codes: [
+                                221..225,
+                                226..231,
+                            ],
+                            reason: 232..232,
                         },
                     ],
                 },
                 Suppression {
                     code: "alpha",
-                    range: 32..209,
+                    range: 66..254,
                     comments: [
                         SuppressionComment {
-                            range: 32..54,
+                            range: 66..88,
                             indent: Some(
                                 "",
                             ),
                             action: Disable,
                             codes: [
-                                48..53,
+                                82..87,
                             ],
-                            reason: 54..54,
+                            reason: 88..88,
                         },
                         SuppressionComment {
-                            range: 188..209,
+                            range: 233..254,
                             indent: Some(
                                 "",
                             ),
                             action: Enable,
                             codes: [
-                                203..208,
+                                248..253,
                             ],
-                            reason: 209..209,
+                            reason: 254..254,
                         },
                     ],
                 },
             ],
             invalid: [
-                SuppressionComment {
-                    range: 113..149,
-                    indent: Some(
-                        "        ",
-                    ),
-                    action: Disable,
-                    codes: [
-                        129..134,
-                    ],
-                    reason: 137..149,
+                InvalidSuppression {
+                    kind: Trailing,
+                    comment: SuppressionComment {
+                        range: 32..64,
+                        indent: None,
+                        action: Disable,
+                        codes: [
+                            48..51,
+                        ],
+                        reason: 54..64,
+                    },
+                },
+                InvalidSuppression {
+                    kind: Unmatched,
+                    comment: SuppressionComment {
+                        range: 153..188,
+                        indent: Some(
+                            "        ",
+                        ),
+                        action: Disable,
+                        codes: [
+                            169..174,
+                        ],
+                        reason: 177..188,
+                    },
+                },
+                InvalidSuppression {
+                    kind: Indentation,
+                    comment: SuppressionComment {
+                        range: 347..384,
+                        indent: Some(
+                            "",
+                        ),
+                        action: Enable,
+                        codes: [
+                            362..366,
+                        ],
+                        reason: 369..384,
+                    },
+                },
+                InvalidSuppression {
+                    kind: Unmatched,
+                    comment: SuppressionComment {
+                        range: 303..337,
+                        indent: Some(
+                            "    ",
+                        ),
+                        action: Disable,
+                        codes: [
+                            319..323,
+                        ],
+                        reason: 326..337,
+                    },
                 },
             ],
             errors: [
                 ParseError {
                     kind: MissingCodes,
-                    range: 228..242,
+                    range: 273..287,
                 },
             ],
         }
