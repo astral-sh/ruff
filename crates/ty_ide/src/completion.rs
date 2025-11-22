@@ -1315,7 +1315,8 @@ fn find_typed_text(
     if last.end() < offset || last.range().is_empty() {
         return None;
     }
-    Some(source[last.range()].to_string())
+    let range = TextRange::new(last.start(), offset);
+    Some(source[range].to_string())
 }
 
 /// Whether the last token is in a place where we should not provide completions.
@@ -1630,6 +1631,21 @@ mod tests {
         with
         yield
         ",
+        );
+    }
+
+    #[test]
+    fn inside_token() {
+        let test = completion_test_builder(
+            "\
+foo_bar_baz = 1
+x = foo<CURSOR>bad
+",
+        );
+
+        assert_snapshot!(
+            test.skip_builtins().build().snapshot(),
+            @"foo_bar_baz",
         );
     }
 
