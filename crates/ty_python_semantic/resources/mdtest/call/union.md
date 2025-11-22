@@ -277,6 +277,6 @@ def _(flag: bool):
     x = f({"x": 1})
     reveal_type(x)  # revealed: int
 
-    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `T`, found `dict[Unknown | str, Unknown | int]`"
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `T`, found `dict[str, int] & dict[Unknown | str, Unknown | int]`"
     f({"y": 1})
 ```
