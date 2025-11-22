@@ -2683,6 +2683,39 @@ reveal_type(datetime.UTC)  # revealed: Unknown
 reveal_type(datetime.fakenotreal)  # revealed: Unknown
 ```
 
+## Unimported submodule incorrectly accessed as attribute
+
+We give special diagnostics for this common case too:
+
+<!-- snapshot-diagnostics -->
+
+`foo/__init__.py`:
+
+```py
+```
+
+`foo/bar.py`:
+
+```py
+```
+
+`baz/bar.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import foo
+import baz
+
+# error: [unresolved-attribute]
+reveal_type(foo.bar)  # revealed: Unknown
+# error: [unresolved-attribute]
+reveal_type(baz.bar)  # revealed: Unknown
+```
+
 ## References
 
 Some of the tests in the *Class and instance variables* section draw inspiration from
