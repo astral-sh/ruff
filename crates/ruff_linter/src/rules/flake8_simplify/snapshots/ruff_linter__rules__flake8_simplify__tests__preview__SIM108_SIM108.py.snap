@@ -387,3 +387,105 @@ help: Replace `if`-`else`-block with `var = "str" if cond else f'{first}-{second
 209 | 
 210 | # SIM108 - annotated assignment in if block
 note: This is an unsafe fix and may change runtime behavior
+
+SIM108 [*] Use ternary operator `y: int = 1 if x else 2` instead of `if`-`else`-block
+   --> SIM108.py:215:5
+    |
+213 |   # SIM108 - annotated assignment in if block
+214 |   def f(x: object) -> int:
+215 | /     if x:
+216 | |         y: int = 1
+217 | |     else:
+218 | |         y = 2
+    | |_____________^
+219 |       return y
+    |
+help: Replace `if`-`else`-block with `y: int = 1 if x else 2`
+212 | 
+213 | # SIM108 - annotated assignment in if block
+214 | def f(x: object) -> int:
+    -     if x:
+    -         y: int = 1
+    -     else:
+    -         y = 2
+215 +     y: int = 1 if x else 2
+216 |     return y
+217 | 
+218 | 
+note: This is an unsafe fix and may change runtime behavior
+
+SIM108 [*] Use ternary operator `first_job_row: str | None = None if not first_records else first_records.pop(0)` instead of `if`-`else`-block
+   --> SIM108.py:251:5
+    |
+249 |   # SIM108 - annotated assignment with Optional/Union type
+250 |   def f(first_records: list[str] | None):
+251 | /     if not first_records:
+252 | |         first_job_row: str | None = None
+253 | |     else:
+254 | |         first_job_row = first_records.pop(0)
+    | |____________________________________________^
+255 |       return first_job_row
+    |
+help: Replace `if`-`else`-block with `first_job_row: str | None = None if not first_records else first_records.pop(0)`
+248 | 
+249 | # SIM108 - annotated assignment with Optional/Union type
+250 | def f(first_records: list[str] | None):
+    -     if not first_records:
+    -         first_job_row: str | None = None
+    -     else:
+    -         first_job_row = first_records.pop(0)
+251 +     first_job_row: str | None = None if not first_records else first_records.pop(0)
+252 |     return first_job_row
+253 | 
+254 | 
+note: This is an unsafe fix and may change runtime behavior
+
+SIM108 [*] Use ternary operator `outputs: list[str] = [] if args.output is None else list(args.output)` instead of `if`-`else`-block
+   --> SIM108.py:260:5
+    |
+258 |   # SIM108 - annotated assignment with list type
+259 |   def f(args):
+260 | /     if args.output is None:
+261 | |         outputs: list[str] = []
+262 | |     else:
+263 | |         outputs = list(args.output)
+    | |___________________________________^
+264 |       return outputs
+    |
+help: Replace `if`-`else`-block with `outputs: list[str] = [] if args.output is None else list(args.output)`
+257 | 
+258 | # SIM108 - annotated assignment with list type
+259 | def f(args):
+    -     if args.output is None:
+    -         outputs: list[str] = []
+    -     else:
+    -         outputs = list(args.output)
+260 +     outputs: list[str] = [] if args.output is None else list(args.output)
+261 |     return outputs
+262 | 
+263 | 
+note: This is an unsafe fix and may change runtime behavior
+
+SIM108 [*] Use ternary operator `stream_name: str | None = stream.name if stream else None` instead of `if`-`else`-block
+   --> SIM108.py:269:5
+    |
+267 |   # SIM108 - annotated assignment with Optional type and attribute access
+268 |   def f(stream):
+269 | /     if stream:
+270 | |         stream_name: str | None = stream.name
+271 | |     else:
+272 | |         stream_name = None
+    | |__________________________^
+273 |       return stream_name
+    |
+help: Replace `if`-`else`-block with `stream_name: str | None = stream.name if stream else None`
+266 | 
+267 | # SIM108 - annotated assignment with Optional type and attribute access
+268 | def f(stream):
+    -     if stream:
+    -         stream_name: str | None = stream.name
+    -     else:
+    -         stream_name = None
+269 +     stream_name: str | None = stream.name if stream else None
+270 |     return stream_name
+note: This is an unsafe fix and may change runtime behavior
