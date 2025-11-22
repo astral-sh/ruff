@@ -34,7 +34,7 @@ use crate::{FixAvailability, Violation};
 ///         return f"{self.first_name} {self.last_name}"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.6")]
+#[violation_metadata(preview_since = "0.14.7")]
 pub(crate) struct UnnecessaryProperty {
     name: String,
 }
