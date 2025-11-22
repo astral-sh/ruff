@@ -67,7 +67,7 @@ impl<'db> Module<'db> {
     }
 
     /// Does this module represent the given known module?
-    pub(crate) fn is_known(self, db: &'db dyn Database, known_module: KnownModule) -> bool {
+    pub fn is_known(self, db: &'db dyn Database, known_module: KnownModule) -> bool {
         self.known(db) == Some(known_module)
     }
 

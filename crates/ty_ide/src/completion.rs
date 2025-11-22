@@ -10,8 +10,8 @@ use ruff_python_codegen::Stylist;
 use ruff_python_parser::{Token, TokenAt, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ty_python_semantic::{
-    Completion as SemanticCompletion, ModuleName, NameKind, SemanticModel,
-    types::{CycleDetector, Type},
+    Completion as SemanticCompletion, KnownModule, ModuleName, NameKind, SemanticModel,
+    types::{CycleDetector, KnownClass, Type},
 };
 
 use crate::docstring::Docstring;
@@ -81,6 +81,11 @@ impl<'db> Completions<'db> {
     /// Always adds the given completion to this collection.
     fn force_add(&mut self, completion: Completion<'db>) {
         self.items.push(completion);
+    }
+
+    /// Removes any completion that doesn't satisfy the given predicate.
+    fn retain(&mut self, predicate: impl FnMut(&Completion<'_>) -> bool) {
+        self.items.retain(predicate);
     }
 }
 
@@ -364,6 +369,14 @@ pub fn completion<'db>(
         }
     }
 
+    if is_raising_exception(tokens) {
+        let type_base_exception = KnownClass::BaseException.to_subclass_of(db);
+        completions.retain(|c| {
+            let Some(ty) = c.ty else { return true };
+            ty.is_assignable_to(db, type_base_exception)
+        });
+    }
+
     completions.into_completions()
 }
 
@@ -427,7 +440,8 @@ fn add_unimported_completions<'db>(
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
 
     for symbol in all_symbols(db, &completions.query) {
-        if symbol.module.file(db) == Some(file) {
+        if symbol.module.file(db) == Some(file) || symbol.module.is_known(db, KnownModule::Builtins)
+        {
             continue;
         }
 
@@ -1356,6 +1370,30 @@ fn is_in_variable_binding(parsed: &ParsedModuleRef, offset: TextSize, typed: Opt
         ast::AnyNodeRef::StmtFor(stmt_for) => stmt_for.target.range().contains_range(range),
         _ => false,
     })
+}
+
+/// Returns true when the cursor is after a `raise` keyword.
+fn is_raising_exception(tokens: &[Token]) -> bool {
+    /// The maximum number of tokens we're willing to
+    /// look-behind to find a `raise` keyword.
+    const LIMIT: usize = 10;
+
+    // This only looks for things like `raise foo.bar.baz.qu<CURSOR>`.
+    // Technically, any kind of expression is allowed after `raise`.
+    // But we may not always wanted to treat it specially. So we're
+    // rather conservative about what we consider "raising an
+    // exception" to be for the purposes of completions. The failure
+    // mode here is that we may wind up suggesting things that
+    // shouldn't be raised. The benefit is that when this heuristic
+    // does work, we won't suggest things that shouldn't be raised.
+    for token in tokens.iter().rev().take(LIMIT) {
+        match token.kind() {
+            TokenKind::Name | TokenKind::Dot => continue,
+            TokenKind::Raise => return true,
+            _ => return false,
+        }
+    }
+    false
 }
 
 /// Order completions according to the following rules:
