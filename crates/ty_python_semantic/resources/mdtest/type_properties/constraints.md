@@ -66,12 +66,15 @@ def _[T]() -> None:
     reveal_type(ConstraintSet.range(Base, T, object))
 ```
 
-And a range constraint with _both_ a lower bound of `Never` and an upper bound of `object` does not
-constrain the typevar at all.
+And a range constraint with a lower bound of `Never` and an upper bound of `object` allows the
+typevar to take on any type. We treat this differently than the `always` constraint set. During
+specialization inference, that allows us to distinguish between not constraining a typevar (and
+therefore falling back on its default specialization) and explicitly constraining it to any subtype
+of `object`.
 
 ```py
 def _[T]() -> None:
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(T@_ = *)]
     reveal_type(ConstraintSet.range(Never, T, object))
 ```
 
@@ -156,7 +159,7 @@ cannot be satisfied at all.
 
 ```py
 def _[T]() -> None:
-    # revealed: ty_extensions.ConstraintSet[never]
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ *)]
     reveal_type(~ConstraintSet.range(Never, T, object))
 ```
 
@@ -654,7 +657,7 @@ def _[T]() -> None:
     reveal_type(~ConstraintSet.range(Never, T, Base))
     # revealed: ty_extensions.ConstraintSet[¬(Sub ≤ T@_)]
     reveal_type(~ConstraintSet.range(Sub, T, object))
-    # revealed: ty_extensions.ConstraintSet[never]
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ *)]
     reveal_type(~ConstraintSet.range(Never, T, object))
 ```
 
@@ -811,7 +814,7 @@ def f[T]():
     # "domain", which maps valid inputs to `true` and invalid inputs to `false`. This means that two
     # constraint sets that are both always satisfied will not be identical if they have different
     # domains!
-    always = ConstraintSet.range(Never, T, object)
+    always = ConstraintSet.always()
     # revealed: ty_extensions.ConstraintSet[always]
     reveal_type(always)
     static_assert(always)
@@ -846,11 +849,11 @@ from typing import Never
 from ty_extensions import ConstraintSet
 
 def same_typevar[T]():
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(T@same_typevar = *)]
     reveal_type(ConstraintSet.range(Never, T, T))
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(T@same_typevar = *)]
     reveal_type(ConstraintSet.range(T, T, object))
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(T@same_typevar = *)]
     reveal_type(ConstraintSet.range(T, T, T))
 ```
 
@@ -862,11 +865,11 @@ as shown above.)
 from ty_extensions import Intersection
 
 def same_typevar[T]():
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(T@same_typevar = *)]
     reveal_type(ConstraintSet.range(Never, T, T | None))
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(T@same_typevar = *)]
     reveal_type(ConstraintSet.range(Intersection[T, None], T, object))
-    # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(T@same_typevar = *)]
     reveal_type(ConstraintSet.range(Intersection[T, None], T, T | None))
 ```
 
@@ -877,8 +880,8 @@ constraint set can never be satisfied, since every type is disjoint with its neg
 from ty_extensions import Not
 
 def same_typevar[T]():
-    # revealed: ty_extensions.ConstraintSet[never]
+    # revealed: ty_extensions.ConstraintSet[(T@same_typevar ≠ *)]
     reveal_type(ConstraintSet.range(Intersection[Not[T], None], T, object))
-    # revealed: ty_extensions.ConstraintSet[never]
+    # revealed: ty_extensions.ConstraintSet[(T@same_typevar ≠ *)]
     reveal_type(ConstraintSet.range(Not[T], T, object))
 ```
