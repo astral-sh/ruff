@@ -1517,33 +1517,46 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // that `x` can be freely overwritten, and that we don't assume that an import
                 // in one function is visible in another function.
                 let mut is_self_import = false;
-                if self.file.is_package(self.db)
-                    && let Ok(module_name) = ModuleName::from_identifier_parts(
-                        self.db,
-                        self.file,
-                        node.module.as_deref(),
-                        node.level,
-                    )
-                    && let Ok(thispackage) = ModuleName::package_for_file(self.db, self.file)
-                {
+                let is_package = self.file.is_package(self.db);
+                let this_package = ModuleName::package_for_file(self.db, self.file);
+
+                if let Ok(module_name) = ModuleName::from_identifier_parts(
+                    self.db,
+                    self.file,
+                    node.module.as_deref(),
+                    node.level,
+                ) {
                     // Record whether this is equivalent to `from . import ...`
-                    is_self_import = module_name == thispackage;
+                    if is_package && let Ok(thispackage) = this_package.as_ref() {
+                        is_self_import = &module_name == thispackage;
+                    }
 
-                    if node.module.is_some()
-                        && let Some(relative_submodule) = module_name.relative_to(&thispackage)
-                        && let Some(direct_submodule) = relative_submodule.components().next()
-                        && !self.seen_submodule_imports.contains(direct_submodule)
-                        && self.current_scope().is_global()
-                    {
-                        self.seen_submodule_imports
-                            .insert(direct_submodule.to_owned());
+                    if self.current_scope().is_global() && node.module.is_some() {
+                        if let Ok(thispackage) = this_package
+                            && let Some(relative_submodule) = module_name.relative_to(&thispackage)
+                        {
+                            if is_package
+                                && let Some(direct_submodule) =
+                                    relative_submodule.components().next()
+                                && !self.seen_submodule_imports.contains(direct_submodule)
+                            {
+                                self.seen_submodule_imports
+                                    .insert(direct_submodule.to_owned());
 
-                        let direct_submodule_name = Name::new(direct_submodule);
-                        let symbol = self.add_symbol(direct_submodule_name);
-                        self.add_definition(
-                            symbol.into(),
-                            ImportFromSubmoduleDefinitionNodeRef { node },
-                        );
+                                let direct_submodule_name = Name::new(direct_submodule);
+                                let symbol = self.add_symbol(direct_submodule_name);
+                                self.add_definition(
+                                    symbol.into(),
+                                    ImportFromSubmoduleDefinitionNodeRef { node },
+                                );
+                            }
+                        } else {
+                            self.imported_modules.extend(
+                                module_name
+                                    .ancestors()
+                                    .zip(std::iter::repeat(ImportKind::ImportFrom)),
+                            );
+                        }
                     }
                 }
 
