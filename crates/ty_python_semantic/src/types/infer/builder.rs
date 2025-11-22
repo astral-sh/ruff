@@ -3053,7 +3053,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .iter()
                         .map(|(index, ty)| (&tuple.elts[*index], **ty));
 
-                    report_invalid_exception_tuple_caught(&self.context, tuple, invalid_elements);
+                    report_invalid_exception_tuple_caught(
+                        &self.context,
+                        tuple,
+                        node_ty,
+                        invalid_elements,
+                    );
                 } else {
                     report_invalid_exception_caught(&self.context, node, node_ty);
                 }
