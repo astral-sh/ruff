@@ -100,7 +100,7 @@ fn infer_method_information<'db>(
         .inner_type()
     {
         Type::ClassLiteral(class_literal) => {
-            (class_literal, class_literal.generic_context(db).is_ok())
+            (class_literal, class_literal.generic_context(db).is_some())
         }
         Type::GenericAlias(alias) => (alias.origin(db), true),
         _ => return None,

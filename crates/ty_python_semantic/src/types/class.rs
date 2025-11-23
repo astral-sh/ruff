@@ -32,12 +32,11 @@ use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, DATACLASS_FLAGS,
-    DataclassFlags, DataclassParams, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
+    DataclassFlags, DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType,
     ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
     StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation, TypedDictParams,
-    UnionBuilder, VarianceInferable, binding_type, class_base_type, declaration_type,
-    determine_upper_bound,
+    UnionBuilder, VarianceInferable, binding_type, declaration_type, determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -1416,21 +1415,13 @@ pub struct ClassLiteral<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ClassLiteral<'_> {}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) enum GenericContextError {
-    NonGeneric,
-    /// A legacy generic class has cyclic base classes (this only occurs in stub files).
-    /// This is more of a temporary error caused by a technical issue than a fundamental error.
-    Cyclic,
-}
-
 #[allow(clippy::unnecessary_wraps)]
 fn generic_context_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,
     _self: ClassLiteral<'db>,
-) -> Result<GenericContext<'db>, GenericContextError> {
-    Err(GenericContextError::Cyclic)
+) -> Option<GenericContext<'db>> {
+    None
 }
 
 #[salsa::tracked]
@@ -1444,14 +1435,11 @@ impl<'db> ClassLiteral<'db> {
         self.is_known(db, KnownClass::Tuple)
     }
 
-    pub(crate) fn generic_context(
-        self,
-        db: &'db dyn Db,
-    ) -> Result<GenericContext<'db>, GenericContextError> {
+    pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         // Several typeshed definitions examine `sys.version_info`. To break cycles, we hard-code
         // the knowledge that this class is not generic.
         if self.is_known(db, KnownClass::VersionInfo) {
-            return Err(GenericContextError::NonGeneric);
+            return None;
         }
 
         // We've already verified that the class literal does not contain both a PEP-695 generic
@@ -1461,61 +1449,37 @@ impl<'db> ClassLiteral<'db> {
         // `typing.Generic`), and also an implicit one (by inheriting from other generic classes,
         // specialized by typevars), the explicit one takes precedence.
         self.pep695_generic_context(db)
-            .or_else(|_| self.legacy_generic_context(db))
-            .or_else(|_| self.inherited_legacy_generic_context(db))
+            .or_else(|| self.legacy_generic_context(db))
+            .or_else(|| self.inherited_legacy_generic_context(db))
     }
 
     pub(crate) fn has_pep_695_type_params(self, db: &'db dyn Db) -> bool {
-        self.pep695_generic_context(db).is_ok()
+        self.pep695_generic_context(db).is_some()
     }
 
     #[salsa::tracked(cycle_initial=generic_context_cycle_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
-    pub(crate) fn pep695_generic_context(
-        self,
-        db: &'db dyn Db,
-    ) -> Result<GenericContext<'db>, GenericContextError> {
+    pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
         let file = scope.file(db);
         let parsed = parsed_module(db, file).load(db);
         let class_def_node = scope.node(db).expect_class().node(&parsed);
-        class_def_node
-            .type_params
-            .as_ref()
-            .ok_or(GenericContextError::NonGeneric)
-            .map(|type_params| {
-                let index = semantic_index(db, scope.file(db));
-                let definition = index.expect_single_definition(class_def_node);
-                GenericContext::from_type_params(db, index, definition, type_params)
-            })
+        class_def_node.type_params.as_ref().map(|type_params| {
+            let index = semantic_index(db, scope.file(db));
+            let definition = index.expect_single_definition(class_def_node);
+            GenericContext::from_type_params(db, index, definition, type_params)
+        })
     }
 
-    pub(crate) fn legacy_generic_context(
-        self,
-        db: &'db dyn Db,
-    ) -> Result<GenericContext<'db>, GenericContextError> {
-        let mut has_divergent = false;
-        for base in self.explicit_bases(db) {
-            match base {
-                Type::KnownInstance(
-                    KnownInstanceType::SubscriptedGeneric(generic_context)
-                    | KnownInstanceType::SubscriptedProtocol(generic_context),
-                ) => {
-                    return Ok(*generic_context);
-                }
-                Type::Dynamic(DynamicType::Divergent(_)) => {
-                    has_divergent = true;
-                }
-                _ => {}
-            }
-        }
-
-        if has_divergent {
-            Err(GenericContextError::Cyclic)
-        } else {
-            Err(GenericContextError::NonGeneric)
-        }
+    pub(crate) fn legacy_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        self.explicit_bases(db).iter().find_map(|base| match base {
+            Type::KnownInstance(
+                KnownInstanceType::SubscriptedGeneric(generic_context)
+                | KnownInstanceType::SubscriptedProtocol(generic_context),
+            ) => Some(*generic_context),
+            _ => None,
+        })
     }
 
     #[salsa::tracked(cycle_initial=generic_context_cycle_initial,
@@ -1524,26 +1488,14 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn inherited_legacy_generic_context(
         self,
         db: &'db dyn Db,
-    ) -> Result<GenericContext<'db>, GenericContextError> {
-        let mut has_divergent = false;
-        let mut aliases = vec![];
-        for base in self.explicit_bases(db) {
-            match base {
-                Type::GenericAlias(_) => {
-                    aliases.push(*base);
-                }
-                Type::Dynamic(DynamicType::Divergent(_)) => {
-                    has_divergent = true;
-                }
-                _ => {}
-            }
-        }
-        GenericContext::from_base_classes(db, self.definition(db), aliases.into_iter()).ok_or(
-            if has_divergent {
-                GenericContextError::Cyclic
-            } else {
-                GenericContextError::NonGeneric
-            },
+    ) -> Option<GenericContext<'db>> {
+        GenericContext::from_base_classes(
+            db,
+            self.definition(db),
+            self.explicit_bases(db)
+                .iter()
+                .copied()
+                .filter(|ty| matches!(ty, Type::GenericAlias(_))),
         )
     }
 
@@ -1580,7 +1532,7 @@ impl<'db> ClassLiteral<'db> {
         }
 
         let visitor = CollectTypeVars::default();
-        if let Ok(generic_context) = self.generic_context(db) {
+        if let Some(generic_context) = self.generic_context(db) {
             walk_generic_context(db, generic_context, &visitor);
         }
         for base in self.explicit_bases(db) {
@@ -1590,10 +1542,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns the generic context that should be inherited by any constructor methods of this class.
-    fn inherited_generic_context(
-        self,
-        db: &'db dyn Db,
-    ) -> Result<GenericContext<'db>, GenericContextError> {
+    fn inherited_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         self.generic_context(db)
     }
 
@@ -1623,8 +1572,8 @@ impl<'db> ClassLiteral<'db> {
         f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
     ) -> ClassType<'db> {
         match self.generic_context(db) {
-            Err(_) => ClassType::NonGeneric(self),
-            Ok(generic_context) => {
+            None => ClassType::NonGeneric(self),
+            Some(generic_context) => {
                 let specialization = f(generic_context);
 
                 ClassType::Generic(GenericAlias::new(db, self, specialization))
@@ -1707,14 +1656,14 @@ impl<'db> ClassLiteral<'db> {
                 .expect("sys.version_info tuple spec should always be a valid tuple");
 
             Box::new([
-                class_base_type(db, class_definition, &class_stmt.bases()[0]),
+                definition_expression_type(db, class_definition, &class_stmt.bases()[0]),
                 Type::from(tuple_type.to_class_type(db)),
             ])
         } else {
             class_stmt
                 .bases()
                 .iter()
-                .map(|base_node| class_base_type(db, class_definition, base_node))
+                .map(|base_node| definition_expression_type(db, class_definition, base_node))
                 .collect()
         }
     }
@@ -2149,7 +2098,7 @@ impl<'db> ClassLiteral<'db> {
                         lookup_error.or_fall_back_to(
                             db,
                             class
-                                .own_class_member(db, self.inherited_generic_context(db).ok(), name)
+                                .own_class_member(db, self.inherited_generic_context(db), name)
                                 .inner,
                         )
                     });
@@ -2461,7 +2410,7 @@ impl<'db> ClassLiteral<'db> {
 
             let signature = match name {
                 "__new__" | "__init__" => Signature::new_generic(
-                    inherited_generic_context.or_else(|| self.inherited_generic_context(db).ok()),
+                    inherited_generic_context.or_else(|| self.inherited_generic_context(db)),
                     Parameters::new(parameters),
                     return_ty,
                 ),
@@ -2566,7 +2515,7 @@ impl<'db> ClassLiteral<'db> {
                 KnownClass::NamedTupleFallback
                     .to_class_literal(db)
                     .as_class_literal()?
-                    .own_class_member(db, self.inherited_generic_context(db).ok(), None, name)
+                    .own_class_member(db, self.inherited_generic_context(db), None, name)
                     .ignore_possibly_undefined()
                     .map(|ty| {
                         ty.apply_type_mapping(
@@ -3768,7 +3717,7 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         let typevar_in_generic_context = self
             .generic_context(db)
-            .is_ok_and(|generic_context| generic_context.variables(db).contains(&typevar));
+            .is_some_and(|generic_context| generic_context.variables(db).contains(&typevar));
 
         if !typevar_in_generic_context {
             return TypeVarVariance::Bivariant;
@@ -4808,7 +4757,7 @@ impl KnownClass {
         let Type::ClassLiteral(class_literal) = self.to_class_literal(db) else {
             return None;
         };
-        let generic_context = class_literal.generic_context(db).ok()?;
+        let generic_context = class_literal.generic_context(db)?;
 
         let types = specialization.into_iter().collect::<Box<[_]>>();
         if types.len() != generic_context.len(db) {
@@ -5690,12 +5639,7 @@ enum SlotsKind {
 impl SlotsKind {
     fn from(db: &dyn Db, base: ClassLiteral) -> Self {
         let Place::Defined(slots_ty, _, bound) = base
-            .own_class_member(
-                db,
-                base.inherited_generic_context(db).ok(),
-                None,
-                "__slots__",
-            )
+            .own_class_member(db, base.inherited_generic_context(db), None, "__slots__")
             .inner
             .place
         else {

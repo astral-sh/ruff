@@ -883,7 +883,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // (6) If the class is generic, verify that its generic context does not violate any of
             // the typevar scoping rules.
-            if let (Ok(legacy), Ok(inherited)) = (
+            if let (Some(legacy), Some(inherited)) = (
                 class.legacy_generic_context(self.db()),
                 class.inherited_legacy_generic_context(self.db()),
             ) {
@@ -7236,7 +7236,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let tcx = tcx.map(|annotation| {
             let inferable = KnownClass::Tuple
                 .try_to_class_literal(self.db())
-                .and_then(|class| class.generic_context(self.db()).ok())
+                .and_then(|class| class.generic_context(self.db()))
                 .map(|generic_context| generic_context.inferable_typevars(self.db()))
                 .unwrap_or(InferableTypeVars::None);
             annotation.filter_disjoint_elements(
@@ -7401,7 +7401,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Extract the type variable `T` from `list[T]` in typeshed.
         let elt_tys = |collection_class: KnownClass| {
             let class_literal = collection_class.try_to_class_literal(self.db())?;
-            let generic_context = class_literal.generic_context(self.db()).ok()?;
+            let generic_context = class_literal.generic_context(self.db())?;
             Some((
                 class_literal,
                 generic_context,
@@ -10869,7 +10869,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ));
                 }
 
-                if let Ok(generic_context) = class.generic_context(self.db()) {
+                if let Some(generic_context) = class.generic_context(self.db()) {
                     return self.infer_explicit_class_specialization(
                         subscript,
                         value_ty,
@@ -11568,7 +11568,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return KnownClass::GenericAlias.to_instance(db);
                 }
 
-                if class.generic_context(db).is_ok() {
+                if class.generic_context(db).is_some() {
                     // TODO: specialize the generic class using these explicit type
                     // variable assignments. This branch is only encountered when an
                     // explicit class specialization appears inside of some other subscript

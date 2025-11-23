@@ -196,28 +196,6 @@ fn definition_expression_type<'db>(
     }
 }
 
-/// Infer the base type of a class definition.
-/// TODO: currently, we cannot infer the generic context for recursive generic classes (in stub files) in the first query cycle,
-/// which results in the Todo type being mixed into the base type.
-/// This function is a workaround until proper handling of recursive generic classes is implemented.
-fn class_base_type<'db>(
-    db: &'db dyn Db,
-    class_definition: Definition<'db>,
-    base_node: &ast::Expr,
-) -> Type<'db> {
-    match definition_expression_type(db, class_definition, base_node) {
-        Type::Union(union) => union.filter(db, |elem| {
-            !any_over_type(
-                db,
-                *elem,
-                &|ty| ty == todo_type!("specialized generic class with cyclic bases"),
-                false,
-            )
-        }),
-        other => other,
-    }
-}
-
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 pub(crate) type ApplyTypeMappingVisitor<'db> = TypeTransformer<'db, TypeMapping<'db, 'db>>;
 
@@ -5908,7 +5886,7 @@ impl<'db> Type<'db> {
                 _ => Binding::single(
                     self,
                     Signature::new_generic(
-                        class.generic_context(db).ok(),
+                        class.generic_context(db),
                         Parameters::gradual_form(),
                         self.to_instance(db),
                     ),
@@ -6602,7 +6580,7 @@ impl<'db> Type<'db> {
         // generic typevars to itself.
         let (generic_origin, generic_context, self_type) = match self {
             Type::ClassLiteral(class) => match class.generic_context(db) {
-                Ok(generic_context) => (
+                Some(generic_context) => (
                     Some(class),
                     Some(generic_context),
                     // It is important that identity_specialization specializes the class with
