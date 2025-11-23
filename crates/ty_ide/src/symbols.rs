@@ -67,6 +67,16 @@ impl QueryPattern {
             symbol_name.contains(&self.original)
         }
     }
+
+    /// Returns true when it is known that this pattern will return `true` for
+    /// all inputs given to `QueryPattern::is_match_symbol_name`.
+    ///
+    /// This will never return `true` incorrectly, but it may return `false`
+    /// incorrectly. That is, it's possible that this query will match all
+    /// inputs but this still returns `false`.
+    pub fn will_match_everything(&self) -> bool {
+        self.re.is_none()
+    }
 }
 
 impl From<&str> for QueryPattern {

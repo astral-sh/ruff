@@ -426,7 +426,7 @@ mod tests {
 
     use crate::NavigationTarget;
     use crate::tests::IntoDiagnostic;
-    use insta::assert_snapshot;
+    use insta::{assert_snapshot, internals::SettingsBindDropGuard};
     use ruff_db::{
         diagnostic::{
             Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
@@ -473,13 +473,26 @@ mod tests {
 
         let file = system_path_to_file(&db, "main.py").expect("newly written file to existing");
 
-        InlayHintTest { db, file, range }
+        let mut insta_settings = insta::Settings::clone_current();
+        insta_settings.add_filter(r#"\\(\w\w|\.|")"#, "/$1");
+        // Filter out TODO types because they are different between debug and release builds.
+        insta_settings.add_filter(r"@Todo\(.+\)", "@Todo");
+
+        let insta_settings_guard = insta_settings.bind_to_scope();
+
+        InlayHintTest {
+            db,
+            file,
+            range,
+            _insta_settings_guard: insta_settings_guard,
+        }
     }
 
     pub(super) struct InlayHintTest {
         pub(super) db: ty_project::TestDb,
         pub(super) file: File,
         pub(super) range: TextRange,
+        _insta_settings_guard: SettingsBindDropGuard,
     }
 
     impl InlayHintTest {
@@ -570,10 +583,7 @@ mod tests {
                 write!(buf, "{}", diag.display(&self.db, &config)).unwrap();
             }
 
-            // Windows path normalization for typeshed references
-            // "hey why is \x08 getting clobbered to /x08?"
-            // no it's not I don't know what you're talking about
-            buf.replace('\\', "/")
+            buf
         }
     }
 
@@ -1830,7 +1840,7 @@ mod tests {
         f = 'there'
         g = f"{e} {f}"
         h = t"wow %d"
-        i = b'\x00'
+        i = b'/x00'
         j = +1
         k = -1.0
         "#);
@@ -1863,7 +1873,7 @@ mod tests {
         f = ('the', 're')
         g = (f"{ft}", f"{ft}")
         h = (t"wow %d", t"wow %d")
-        i = (b'\x01', b'\x02')
+        i = (b'/x01', b'/x02')
         j = (+1, +2.0)
         k = (-1, -2.0)
         "#);
@@ -1896,7 +1906,7 @@ mod tests {
         f1, f2 = ('the', 're')
         g1, g2 = (f"{ft}", f"{ft}")
         h1, h2 = (t"wow %d", t"wow %d")
-        i1, i2 = (b'\x01', b'\x02')
+        i1, i2 = (b'/x01', b'/x02')
         j1, j2 = (+1, +2.0)
         k1, k2 = (-1, -2.0)
         "#);
@@ -1929,7 +1939,7 @@ mod tests {
         f1, f2 = 'the', 're'
         g1, g2 = f"{ft}", f"{ft}"
         h1, h2 = t"wow %d", t"wow %d"
-        i1, i2 = b'\x01', b'\x02'
+        i1, i2 = b'/x01', b'/x02'
         j1, j2 = +1, +2.0
         k1, k2 = -1, -2.0
         "#);
@@ -1962,7 +1972,7 @@ mod tests {
         f[: list[Unknown | str]] = ['the', 're']
         g[: list[Unknown | str]] = [f"{ft}", f"{ft}"]
         h[: list[Unknown | Template]] = [t"wow %d", t"wow %d"]
-        i[: list[Unknown | bytes]] = [b'\x01', b'\x02']
+        i[: list[Unknown | bytes]] = [b'/x01', b'/x02']
         j[: list[Unknown | int | float]] = [+1, +2.0]
         k[: list[Unknown | int | float]] = [-1, -2.0]
 

@@ -187,6 +187,11 @@ impl<'a, 'b, 'db> TypeWriter<'a, 'b, 'db> {
         }
     }
 
+    /// Convenience for `with_detail(TypeDetail::Type(ty))`
+    fn with_type<'c>(&'c mut self, ty: Type<'db>) -> TypeDetailGuard<'a, 'b, 'c, 'db> {
+        self.with_detail(TypeDetail::Type(ty))
+    }
+
     fn join<'c>(&'c mut self, separator: &'static str) -> Join<'a, 'b, 'c, 'db> {
         Join {
             fmt: self,
@@ -470,10 +475,8 @@ impl<'db> FmtDetailed<'db> for DisplayType<'db> {
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
             | Type::EnumLiteral(_) => {
-                f.with_detail(TypeDetail::Type(Type::SpecialForm(
-                    SpecialFormType::Literal,
-                )))
-                .write_str("Literal")?;
+                f.with_type(Type::SpecialForm(SpecialFormType::Literal))
+                    .write_str("Literal")?;
                 f.write_char('[')?;
                 representation.fmt_detailed(f)?;
                 f.write_str("]")
@@ -514,16 +517,14 @@ struct ClassDisplay<'db> {
 impl<'db> FmtDetailed<'db> for ClassDisplay<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let qualification_level = self.settings.qualified.get(&**self.class.name(self.db));
-        let detail = TypeDetail::Type(Type::ClassLiteral(self.class));
+
+        let ty = Type::ClassLiteral(self.class);
         if qualification_level.is_some() {
-            write!(
-                f.with_detail(detail),
-                "{}",
-                self.class.qualified_name(self.db)
-            )?;
+            write!(f.with_type(ty), "{}", self.class.qualified_name(self.db))?;
         } else {
-            write!(f.with_detail(detail), "{}", self.class.name(self.db))?;
+            write!(f.with_type(ty), "{}", self.class.name(self.db))?;
         }
+
         if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
             let file = self.class.file(self.db);
             let path = file.path(self.db);
@@ -568,14 +569,14 @@ impl Display for DisplayRepresentation<'_> {
 impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         match self.ty {
-            Type::Dynamic(dynamic) => write!(f.with_detail(TypeDetail::Type(self.ty)), "{dynamic}"),
-            Type::Never => f.with_detail(TypeDetail::Type(self.ty)).write_str("Never"),
+            Type::Dynamic(dynamic) => write!(f.with_type(self.ty), "{dynamic}"),
+            Type::Never => f.with_type(self.ty).write_str("Never"),
             Type::NominalInstance(instance) => {
                 let class = instance.class(self.db);
 
                 match (class, class.known(self.db)) {
-                    (_, Some(KnownClass::NoneType)) => f.with_detail(TypeDetail::Type(self.ty)).write_str("None"),
-                    (_, Some(KnownClass::NoDefaultType)) => f.with_detail(TypeDetail::Type(self.ty)).write_str("NoDefault"),
+                    (_, Some(KnownClass::NoneType)) => f.with_type(self.ty).write_str("None"),
+                    (_, Some(KnownClass::NoDefaultType)) => f.with_type(self.ty).write_str("NoDefault"),
                     (ClassType::Generic(alias), Some(KnownClass::Tuple)) => alias
                         .specialization(self.db)
                         .tuple(self.db)
@@ -599,10 +600,8 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 },
                 Protocol::Synthesized(synthetic) => {
                     f.write_char('<')?;
-                    f.with_detail(TypeDetail::Type(Type::SpecialForm(
-                        SpecialFormType::Protocol,
-                    )))
-                    .write_str("Protocol")?;
+                    f.with_type(Type::SpecialForm(SpecialFormType::Protocol))
+                        .write_str("Protocol")?;
                     f.write_str(" with members ")?;
                     let interface = synthetic.interface();
                     let member_list = interface.members(self.db);
@@ -617,18 +616,16 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     f.write_char('>')
                 }
             },
-            Type::PropertyInstance(_) => f
-                .with_detail(TypeDetail::Type(self.ty))
-                .write_str("property"),
+            Type::PropertyInstance(_) => f.with_type(self.ty).write_str("property"),
             Type::ModuleLiteral(module) => {
                 write!(
-                    f.with_detail(TypeDetail::Type(self.ty)),
+                    f.with_type(self.ty),
                     "<module '{}'>",
                     module.module(self.db).name(self.db)
                 )
             }
             Type::ClassLiteral(class) => {
-                let mut f = f.with_detail(TypeDetail::Type(self.ty));
+                let mut f = f.with_type(self.ty);
                 f.write_str("<class '")?;
                 class
                     .display_with(self.db, self.settings.clone())
@@ -636,7 +633,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.write_str("'>")
             }
             Type::GenericAlias(generic) => {
-                let mut f = f.with_detail(TypeDetail::Type(self.ty));
+                let mut f = f.with_type(self.ty);
                 f.write_str("<class '")?;
                 generic
                     .display_with(self.db, self.settings.clone())
@@ -645,7 +642,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             }
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
-                    f.with_detail(TypeDetail::Type(KnownClass::Type.to_class_literal(self.db)))
+                    f.with_type(KnownClass::Type.to_class_literal(self.db))
                         .write_str("type")?;
                     f.write_char('[')?;
                     class
@@ -654,7 +651,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     f.write_char(']')
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
-                    f.with_detail(TypeDetail::Type(KnownClass::Type.to_class_literal(self.db)))
+                    f.with_type(KnownClass::Type.to_class_literal(self.db))
                         .write_str("type")?;
                     f.write_char('[')?;
                     alias
@@ -663,24 +660,19 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     f.write_char(']')
                 }
                 SubclassOfInner::Dynamic(dynamic) => {
-                    f.with_detail(TypeDetail::Type(KnownClass::Type.to_class_literal(self.db)))
+                    f.with_type(KnownClass::Type.to_class_literal(self.db))
                         .write_str("type")?;
                     f.write_char('[')?;
-                    write!(
-                        f.with_detail(TypeDetail::Type(Type::Dynamic(dynamic))),
-                        "{dynamic}"
-                    )?;
+                    write!(f.with_type(Type::Dynamic(dynamic)), "{dynamic}")?;
                     f.write_char(']')
                 }
             },
             Type::SpecialForm(special_form) => {
-                write!(f.with_detail(TypeDetail::Type(self.ty)), "{special_form}")
+                write!(f.with_type(self.ty), "{special_form}")
             }
-            Type::KnownInstance(known_instance) => write!(
-                f.with_detail(TypeDetail::Type(self.ty)),
-                "{}",
-                known_instance.repr(self.db)
-            ),
+            Type::KnownInstance(known_instance) => {
+                write!(f.with_type(self.ty), "{}", known_instance.repr(self.db))
+            }
             Type::FunctionLiteral(function) => function
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
@@ -705,8 +697,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                             .display_with(self.db, self.settings.singleline())
                             .fmt_detailed(f)?;
                         f.write_char('.')?;
-                        f.with_detail(TypeDetail::Type(self.ty))
-                            .write_str(function.name(self.db))?;
+                        f.with_type(self.ty).write_str(function.name(self.db))?;
                         type_parameters.fmt_detailed(f)?;
                         signature
                             .bind_self(self.db, Some(typing_self_ty))
@@ -761,9 +752,6 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_)) => {
                 f.write_str("<method-wrapper `startswith` of `str` object>")
             }
-            Type::KnownBoundMethod(KnownBoundMethodType::PathOpen) => {
-                f.write_str("bound method `Path.open`")
-            }
             Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetRange) => {
                 f.write_str("bound method `ConstraintSet.range`")
             }
@@ -805,13 +793,14 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::Intersection(intersection) => intersection
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
-            Type::IntLiteral(n) => write!(f.with_detail(TypeDetail::Type(self.ty)), "{n}"),
-            Type::BooleanLiteral(boolean) => f
-                .with_detail(TypeDetail::Type(self.ty))
-                .write_str(if boolean { "True" } else { "False" }),
+            Type::IntLiteral(n) => write!(f.with_type(self.ty), "{n}"),
+            Type::BooleanLiteral(boolean) => {
+                f.with_type(self.ty)
+                    .write_str(if boolean { "True" } else { "False" })
+            }
             Type::StringLiteral(string) => {
                 write!(
-                    f.with_detail(TypeDetail::Type(self.ty)),
+                    f.with_type(self.ty),
                     "{}",
                     string.display_with(self.db, self.settings.clone())
                 )
@@ -821,14 +810,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             // inlay hint, but that seems less useful than the definition of `str` for a variable that is
             // inferred as an *inhabitant* of `LiteralString` (since that variable will just be a string
             // at runtime)
-            Type::LiteralString => f
-                .with_detail(TypeDetail::Type(self.ty))
-                .write_str("LiteralString"),
+            Type::LiteralString => f.with_type(self.ty).write_str("LiteralString"),
             Type::BytesLiteral(bytes) => {
                 let escape = AsciiEscape::with_preferred_quote(bytes.value(self.db), Quote::Double);
 
                 write!(
-                    f.with_detail(TypeDetail::Type(self.ty)),
+                    f.with_type(self.ty),
                     "{}",
                     escape.bytes_repr(TripleQuotes::No)
                 )
@@ -843,12 +830,8 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::TypeVar(bound_typevar) => {
                 write!(f, "{}", bound_typevar.identity(self.db).display(self.db))
             }
-            Type::AlwaysTruthy => f
-                .with_detail(TypeDetail::Type(self.ty))
-                .write_str("AlwaysTruthy"),
-            Type::AlwaysFalsy => f
-                .with_detail(TypeDetail::Type(self.ty))
-                .write_str("AlwaysFalsy"),
+            Type::AlwaysTruthy => f.with_type(self.ty).write_str("AlwaysTruthy"),
+            Type::AlwaysFalsy => f.with_type(self.ty).write_str("AlwaysFalsy"),
             Type::BoundSuper(bound_super) => {
                 f.write_str("<super: ")?;
                 Type::from(bound_super.pivot_class(self.db))
@@ -861,7 +844,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.write_str(">")
             }
             Type::TypeIs(type_is) => {
-                f.with_detail(TypeDetail::Type(Type::SpecialForm(SpecialFormType::TypeIs)))
+                f.with_type(Type::SpecialForm(SpecialFormType::TypeIs))
                     .write_str("TypeIs")?;
                 f.write_char('[')?;
                 type_is
@@ -889,9 +872,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .fmt_detailed(f),
                 }
             }
-            Type::NewTypeInstance(newtype) => f
-                .with_detail(TypeDetail::Type(self.ty))
-                .write_str(newtype.name(self.db)),
+            Type::NewTypeInstance(newtype) => f.with_type(self.ty).write_str(newtype.name(self.db)),
         }
     }
 }
@@ -942,10 +923,8 @@ pub(crate) struct DisplayTuple<'a, 'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        f.with_detail(TypeDetail::Type(
-            KnownClass::Tuple.to_class_literal(self.db),
-        ))
-        .write_str("tuple")?;
+        f.with_type(KnownClass::Tuple.to_class_literal(self.db))
+            .write_str("tuple")?;
         f.write_char('[')?;
         match self.tuple {
             TupleSpec::Fixed(tuple) => {
@@ -984,10 +963,8 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                 if !tuple.prefix.is_empty() || !tuple.suffix.is_empty() {
                     f.write_char('*')?;
                     // Might as well link the type again here too
-                    f.with_detail(TypeDetail::Type(
-                        KnownClass::Tuple.to_class_literal(self.db),
-                    ))
-                    .write_str("tuple")?;
+                    f.with_type(KnownClass::Tuple.to_class_literal(self.db))
+                        .write_str("tuple")?;
                     f.write_char('[')?;
                 }
                 tuple
@@ -1178,8 +1155,7 @@ impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'db> {
                 Some(_) => "]",
             };
             if let Some((name, form)) = prefix_details {
-                f.with_detail(TypeDetail::Type(Type::SpecialForm(form)))
-                    .write_str(name)?;
+                f.with_type(Type::SpecialForm(form)).write_str(name)?;
                 f.write_char('[')?;
             }
             self.origin
@@ -1850,10 +1826,8 @@ const LITERAL_POLICY: TruncationPolicy = TruncationPolicy {
 
 impl<'db> FmtDetailed<'db> for DisplayLiteralGroup<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        f.with_detail(TypeDetail::Type(Type::SpecialForm(
-            SpecialFormType::Literal,
-        )))
-        .write_str("Literal")?;
+        f.with_type(Type::SpecialForm(SpecialFormType::Literal))
+            .write_str("Literal")?;
         f.write_char('[')?;
 
         let total_entries = self.literals.len();

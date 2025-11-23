@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.14.6
+
+Released on 2025-11-21.
+
+### Preview features
+
+- \[`flake8-bandit`\] Support new PySNMP API paths (`S508`, `S509`) ([#21374](https://github.com/astral-sh/ruff/pull/21374))
+
+### Bug fixes
+
+- Adjust own-line comment placement between branches ([#21185](https://github.com/astral-sh/ruff/pull/21185))
+- Avoid syntax error when formatting attribute expressions with outer parentheses, parenthesized value, and trailing comment on value ([#20418](https://github.com/astral-sh/ruff/pull/20418))
+- Fix panic when formatting comments in unary expressions ([#21501](https://github.com/astral-sh/ruff/pull/21501))
+- Respect `fmt: skip` for compound statements on a single line ([#20633](https://github.com/astral-sh/ruff/pull/20633))
+- \[`refurb`\] Fix `FURB103` autofix ([#21454](https://github.com/astral-sh/ruff/pull/21454))
+- \[`ruff`\] Fix false positive for complex conversion specifiers in `logging-eager-conversion` (`RUF065`) ([#21464](https://github.com/astral-sh/ruff/pull/21464))
+
+### Rule changes
+
+- \[`ruff`\] Avoid false positive on `ClassVar` reassignment (`RUF012`) ([#21478](https://github.com/astral-sh/ruff/pull/21478))
+
+### CLI
+
+- Render hyperlinks for lint errors ([#21514](https://github.com/astral-sh/ruff/pull/21514))
+- Add a `ruff analyze` option to skip over imports in `TYPE_CHECKING` blocks ([#21472](https://github.com/astral-sh/ruff/pull/21472))
+
+### Documentation
+
+- Limit `eglot-format` hook to eglot-managed Python buffers ([#21459](https://github.com/astral-sh/ruff/pull/21459))
+- Mention `force-exclude` in "Configuration > Python file discovery" ([#21500](https://github.com/astral-sh/ruff/pull/21500))
+
+### Contributors
+
+- [@ntBre](https://github.com/ntBre)
+- [@dylwil3](https://github.com/dylwil3)
+- [@gauthsvenkat](https://github.com/gauthsvenkat)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@thamer](https://github.com/thamer)
+- [@Ruchir28](https://github.com/Ruchir28)
+- [@thejcannon](https://github.com/thejcannon)
+- [@danparizher](https://github.com/danparizher)
+- [@chirizxc](https://github.com/chirizxc)
+
 ## 0.14.5
 
 Released on 2025-11-13.

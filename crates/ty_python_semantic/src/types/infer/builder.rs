@@ -3057,7 +3057,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .iter()
                         .map(|(index, ty)| (&tuple.elts[*index], **ty));
 
-                    report_invalid_exception_tuple_caught(&self.context, tuple, invalid_elements);
+                    report_invalid_exception_tuple_caught(
+                        &self.context,
+                        tuple,
+                        node_ty,
+                        invalid_elements,
+                    );
                 } else {
                     report_invalid_exception_caught(&self.context, node, node_ty);
                 }
@@ -5411,7 +5416,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target = assignment.target(self.module());
         let value = assignment.value(self.module());
 
-        let mut declared = self.infer_annotation_expression(
+        let mut declared = self.infer_annotation_expression_allow_pep_613(
             annotation,
             DeferredExpressionState::from(self.defer_annotations()),
         );
@@ -5463,6 +5468,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             declared.inner = Type::BooleanLiteral(true);
         }
 
+        // Check if this is a PEP 613 `TypeAlias`. (This must come below the SpecialForm handling
+        // immediately below, since that can overwrite the type to be `TypeAlias`.)
+        let is_pep_613_type_alias = declared.inner_type().is_typealias_special_form();
+
         // Handle various singletons.
         if let Some(name_expr) = target.as_name_expr() {
             if let Some(special_form) =
@@ -5508,20 +5517,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // We defer the r.h.s. of PEP-613 `TypeAlias` assignments in stub files.
-            let declared_type = declared.inner_type();
             let previous_deferred_state = self.deferred_state;
 
-            if matches!(
-                declared_type,
-                Type::SpecialForm(SpecialFormType::TypeAlias)
-                    | Type::Dynamic(DynamicType::TodoTypeAlias)
-            ) && self.in_stub()
-            {
+            if is_pep_613_type_alias && self.in_stub() {
                 self.deferred_state = DeferredExpressionState::Deferred;
             }
 
-            let inferred_ty = self
-                .infer_maybe_standalone_expression(value, TypeContext::new(Some(declared_type)));
+            let inferred_ty = self.infer_maybe_standalone_expression(
+                value,
+                TypeContext::new(Some(declared.inner_type())),
+            );
 
             self.deferred_state = previous_deferred_state;
 
@@ -5538,17 +5543,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 inferred_ty
             };
 
-            self.add_declaration_with_binding(
-                target.into(),
-                definition,
-                &DeclaredAndInferredType::MightBeDifferent {
-                    declared_ty: declared,
-                    inferred_ty,
-                },
-            );
+            if is_pep_613_type_alias {
+                self.add_declaration_with_binding(
+                    target.into(),
+                    definition,
+                    &DeclaredAndInferredType::AreTheSame(TypeAndQualifiers::declared(inferred_ty)),
+                );
+            } else {
+                self.add_declaration_with_binding(
+                    target.into(),
+                    definition,
+                    &DeclaredAndInferredType::MightBeDifferent {
+                        declared_ty: declared,
+                        inferred_ty,
+                    },
+                );
+            }
 
             self.store_expression_type(target, inferred_ty);
         } else {
+            if is_pep_613_type_alias {
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, annotation) {
+                    builder.into_diagnostic(
+                        "`TypeAlias` must be assigned a value in annotated assignments",
+                    );
+                }
+                declared.inner = Type::unknown();
+            }
             if self.in_stub() {
                 self.add_declaration_with_binding(
                     target.into(),
@@ -5787,10 +5808,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
         let mut diagnostic = builder.into_diagnostic(format_args!(
-            "Cannot resolve imported module `{}{}`",
-            ".".repeat(level as usize),
-            module.unwrap_or_default()
+            "Cannot resolve imported module `{}`",
+            format_import_from_module(level, module)
         ));
+
         if level == 0 {
             if let Some(module_name) = module.and_then(ModuleName::new) {
                 let program = Program::get(self.db());
@@ -5819,39 +5840,63 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
-
-            // Add search paths information to the diagnostic
-            // Use the same search paths function that is used in actual module resolution
-            let verbose = self.db().verbose();
-            let search_paths = search_paths(self.db(), ModuleResolveMode::StubsAllowed);
-
-            diagnostic.info(format_args!(
-                "Searched in the following paths during module resolution:"
-            ));
-
-            let mut search_paths = search_paths.enumerate();
-
-            while let Some((index, path)) = search_paths.next() {
-                if index > 4 && !verbose {
-                    let more = search_paths.count() + 1;
-                    diagnostic.info(format_args!(
-                        "  ... and {more} more paths. Run with `-v` to see all paths."
-                    ));
-                    break;
-                }
-                diagnostic.info(format_args!(
-                    "  {}. {} ({})",
-                    index + 1,
-                    path,
-                    path.describe_kind()
+        } else {
+            if let Some(better_level) = (0..level).rev().find(|reduced_level| {
+                let Ok(module_name) = ModuleName::from_identifier_parts(
+                    self.db(),
+                    self.file(),
+                    module,
+                    *reduced_level,
+                ) else {
+                    return false;
+                };
+                resolve_module(self.db(), &module_name).is_some()
+            }) {
+                diagnostic
+                    .help("The module can be resolved if the number of leading dots is reduced");
+                diagnostic.help(format_args!(
+                    "Did you mean `{}`?",
+                    format_import_from_module(better_level, module)
+                ));
+                diagnostic.set_concise_message(format_args!(
+                    "Cannot resolve imported module `{}` - did you mean `{}`?",
+                    format_import_from_module(level, module),
+                    format_import_from_module(better_level, module)
                 ));
             }
-
-            diagnostic.info(
-                "make sure your Python environment is properly configured: \
-                https://docs.astral.sh/ty/modules/#python-environment",
-            );
         }
+
+        // Add search paths information to the diagnostic
+        // Use the same search paths function that is used in actual module resolution
+        let verbose = self.db().verbose();
+        let search_paths = search_paths(self.db(), ModuleResolveMode::StubsAllowed);
+
+        diagnostic.info(format_args!(
+            "Searched in the following paths during module resolution:"
+        ));
+
+        let mut search_paths = search_paths.enumerate();
+
+        while let Some((index, path)) = search_paths.next() {
+            if index > 4 && !verbose {
+                let more = search_paths.count() + 1;
+                diagnostic.info(format_args!(
+                    "  ... and {more} more paths. Run with `-v` to see all paths."
+                ));
+                break;
+            }
+            diagnostic.info(format_args!(
+                "  {}. {} ({})",
+                index + 1,
+                path,
+                path.describe_kind()
+            ));
+        }
+
+        diagnostic.info(
+            "make sure your Python environment is properly configured: \
+                https://docs.astral.sh/ty/modules/#python-environment",
+        );
     }
 
     fn infer_import_definition(
@@ -6026,7 +6071,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             Err(ModuleNameResolutionError::UnknownCurrentModule) => {
                 tracing::debug!(
-                    "Relative module resolution `{}` failed; could not resolve file `{}` to a module",
+                    "Relative module resolution `{}` failed: could not resolve file `{}` to a module \
+                    (try adjusting configured search paths?)",
                     format_import_from_module(*level, module),
                     self.file().path(self.db())
                 );
@@ -6898,7 +6944,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }) => Type::none(self.db()),
             ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
             ast::Expr::BooleanLiteral(literal) => self.infer_boolean_literal_expression(literal),
-            ast::Expr::StringLiteral(literal) => self.infer_string_literal_expression(literal),
+            ast::Expr::StringLiteral(literal) => self.infer_string_literal_expression(literal, tcx),
             ast::Expr::BytesLiteral(bytes_literal) => {
                 self.infer_bytes_literal_expression(bytes_literal)
             }
@@ -6920,7 +6966,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::Name(name) => self.infer_name_expression(name),
             ast::Expr::Attribute(attribute) => self.infer_attribute_expression(attribute),
             ast::Expr::UnaryOp(unary_op) => self.infer_unary_expression(unary_op),
-            ast::Expr::BinOp(binary) => self.infer_binary_expression(binary),
+            ast::Expr::BinOp(binary) => self.infer_binary_expression(binary, tcx),
             ast::Expr::BoolOp(bool_op) => self.infer_boolean_expression(bool_op),
             ast::Expr::Compare(compare) => self.infer_compare_expression(compare),
             ast::Expr::Subscript(subscript) => self.infer_subscript_expression(subscript),
@@ -7015,7 +7061,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Type::BooleanLiteral(*value)
     }
 
-    fn infer_string_literal_expression(&mut self, literal: &ast::ExprStringLiteral) -> Type<'db> {
+    fn infer_string_literal_expression(
+        &mut self,
+        literal: &ast::ExprStringLiteral,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        if tcx.is_typealias() {
+            let aliased_type = self.infer_string_type_expression(literal);
+            return Type::KnownInstance(KnownInstanceType::LiteralStringAlias(InternedType::new(
+                self.db(),
+                aliased_type,
+            )));
+        }
         if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
             Type::string_literal(self.db(), literal.value.to_str())
         } else {
@@ -8964,7 +9021,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assigned_type = Some(ty);
             }
         }
-        let fallback_place = value_type.member(db, &attr.id);
+        let mut fallback_place = value_type.member(db, &attr.id);
         // Exclude non-definitely-bound places for purposes of reachability
         // analysis. We currently do not perform boundness analysis for implicit
         // instance attributes, so we exclude them here as well.
@@ -8976,91 +9033,118 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.all_definitely_bound = false;
         }
 
-        let resolved_type =
-            fallback_place.map_type(|ty| {
+        fallback_place = fallback_place.map_type(|ty| {
             self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
-        }).unwrap_with_diagnostic(|lookup_error| match lookup_error {
-                LookupError::Undefined(_) => {
-                    let report_unresolved_attribute = self.is_reachable(attribute);
+        });
 
-                    if report_unresolved_attribute {
-                        let bound_on_instance = match value_type {
-                            Type::ClassLiteral(class) => {
-                                !class.instance_member(db, None, attr).is_undefined()
-                            }
-                            Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
-                                match subclass_of.subclass_of() {
-                                    SubclassOfInner::Class(class) => {
-                                        !class.instance_member(db, attr).is_undefined()
-                                    }
-                                    SubclassOfInner::Dynamic(_) => unreachable!(
-                                        "Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"
-                                    ),
-                                }
-                            }
-                            _ => false,
-                        };
+        let attr_name = &attr.id;
 
-                        if let Some(builder) = self
-                            .context
-                            .report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
-                        {
-                            if bound_on_instance {
-                                builder.into_diagnostic(
-                                    format_args!(
-                                        "Attribute `{}` can only be accessed on instances, \
-                                        not on the class object `{}` itself.",
-                                        attr.id,
-                                        value_type.display(db)
-                                    ),
-                                );
-                            } else {
-                                let diagnostic = match value_type {
-                                    Type::ModuleLiteral(module) => builder.into_diagnostic(format_args!(
-                                        "Module `{}` has no member `{}`",
-                                        module.module(db).name(db),
-                                        &attr.id
-                                    )),
-                                    Type::ClassLiteral(class) => builder.into_diagnostic(format_args!(
-                                        "Class `{}` has no attribute `{}`",
-                                        class.name(db),
-                                        &attr.id
-                                    )),
-                                    Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
-                                        "Class `{}` has no attribute `{}`",
-                                        alias.display(db),
-                                        &attr.id
-                                    )),
-                                    Type::FunctionLiteral(function) => builder.into_diagnostic(format_args!(
-                                        "Function `{}` has no attribute `{}`",
-                                        function.name(db),
-                                        &attr.id
-                                    )),
-                                    _ => builder.into_diagnostic(format_args!(
-                                        "Object of type `{}` has no attribute `{}`",
-                                        value_type.display(db),
-                                        &attr.id
-                                    )),
-                                };
-                                hint_if_stdlib_attribute_exists_on_other_versions(db, diagnostic, &value_type, attr);
+        let resolved_type = fallback_place.unwrap_with_diagnostic(|lookup_err| match lookup_err {
+            LookupError::Undefined(_) => {
+                let fallback = || {
+                    TypeAndQualifiers::new(
+                        Type::unknown(),
+                        TypeOrigin::Inferred,
+                        TypeQualifiers::empty(),
+                    )
+                };
+
+                if !self.is_reachable(attribute) {
+                    return fallback();
+                }
+
+                let bound_on_instance = match value_type {
+                    Type::ClassLiteral(class) => {
+                        !class.instance_member(db, None, attr).is_undefined()
+                    }
+                    Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
+                        match subclass_of.subclass_of() {
+                            SubclassOfInner::Class(class) => {
+                                !class.instance_member(db, attr).is_undefined()
                             }
+                            SubclassOfInner::Dynamic(_) => unreachable!(
+                                "Attribute lookup on a dynamic `SubclassOf` type \
+                                    should always return a bound symbol"
+                            ),
                         }
                     }
+                    _ => false,
+                };
 
-                    TypeAndQualifiers::new(Type::unknown(), TypeOrigin::Inferred, TypeQualifiers::empty())
-                }
-                LookupError::PossiblyUndefined(type_when_bound) => {
-                    report_possibly_missing_attribute(
-                        &self.context,
-                        attribute,
-                        &attr.id,
-                        value_type,
-                    );
+                let Some(builder) = self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
+                else {
+                    return fallback();
+                };
 
-                    type_when_bound
+                if bound_on_instance {
+                    builder.into_diagnostic(format_args!(
+                        "Attribute `{attr_name}` can only be accessed on instances, \
+                            not on the class object `{}` itself.",
+                        value_type.display(db)
+                    ));
+                    return fallback();
                 }
-            })
-            .inner_type();
+
+                let diagnostic = match value_type {
+                    Type::ModuleLiteral(module) => {
+                        let module = module.module(db);
+                        let module_name = module.name(db);
+                        if module.kind(db).is_package()
+                            && let Some(relative_submodule) = ModuleName::new(attr_name)
+                        {
+                            let mut maybe_submodule_name = module_name.clone();
+                            maybe_submodule_name.extend(&relative_submodule);
+                            if resolve_module(db, &maybe_submodule_name).is_some() {
+                                let mut diag = builder.into_diagnostic(format_args!(
+                                    "Submodule `{attr_name}` may not be available as an attribute \
+                                    on module `{module_name}`"
+                                ));
+                                diag.help(format_args!(
+                                    "Consider explicitly importing `{maybe_submodule_name}`"
+                                ));
+                                return fallback();
+                            }
+                        }
+
+                        builder.into_diagnostic(format_args!(
+                            "Module `{module_name}` has no member `{attr_name}`",
+                        ))
+                    }
+                    Type::ClassLiteral(class) => builder.into_diagnostic(format_args!(
+                        "Class `{}` has no attribute `{attr_name}`",
+                        class.name(db),
+                    )),
+                    Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
+                        "Class `{}` has no attribute `{attr_name}`",
+                        alias.display(db),
+                    )),
+                    Type::FunctionLiteral(function) => builder.into_diagnostic(format_args!(
+                        "Function `{}` has no attribute `{attr_name}`",
+                        function.name(db),
+                    )),
+                    _ => builder.into_diagnostic(format_args!(
+                        "Object of type `{}` has no attribute `{attr_name}`",
+                        value_type.display(db),
+                    )),
+                };
+
+                hint_if_stdlib_attribute_exists_on_other_versions(
+                    db,
+                    diagnostic,
+                    &value_type,
+                    attr_name,
+                );
+
+                fallback()
+            }
+            LookupError::PossiblyUndefined(type_when_bound) => {
+                report_possibly_missing_attribute(&self.context, attribute, &attr.id, value_type);
+
+                type_when_bound
+            }
+        });
+
+        let resolved_type = resolved_type.inner_type();
 
         self.check_deprecated(attr, resolved_type);
 
@@ -9216,7 +9300,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_binary_expression(&mut self, binary: &ast::ExprBinOp) -> Type<'db> {
+    fn infer_binary_expression(
+        &mut self,
+        binary: &ast::ExprBinOp,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        if tcx.is_typealias() {
+            return self.infer_pep_604_union_type_alias(binary, tcx);
+        }
+
         let ast::ExprBinOp {
             left,
             op,
@@ -9252,6 +9344,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 Type::unknown()
             })
+    }
+
+    fn infer_pep_604_union_type_alias(
+        &mut self,
+        node: &ast::ExprBinOp,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        let ast::ExprBinOp {
+            left,
+            op,
+            right,
+            range: _,
+            node_index: _,
+        } = node;
+
+        if *op != ast::Operator::BitOr {
+            // TODO diagnostic?
+            return Type::unknown();
+        }
+
+        let left_ty = self.infer_expression(left, tcx);
+        let right_ty = self.infer_expression(right, tcx);
+
+        // TODO this is overly aggressive; if the operands' `__or__` does not actually return a
+        // `UnionType` at runtime, we should ideally not infer one here. But this is unlikely to be
+        // a problem in practice: it would require someone having an explicitly annotated
+        // `TypeAlias`, which uses `X | Y` syntax, where the returned type is not actually a union.
+        // And attempting to enforce this more tightly showed a lot of potential false positives in
+        // the ecosystem.
+        if left_ty.is_equivalent_to(self.db(), right_ty) {
+            left_ty
+        } else {
+            UnionTypeInstance::from_value_expression_types(
+                self.db(),
+                [left_ty, right_ty],
+                self.scope(),
+                self.typevar_binding_context,
+            )
+        }
     }
 
     fn infer_binary_expression_type(
@@ -9329,20 +9460,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
 
-            (
-                todo @ Type::Dynamic(
-                    DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoTypeAlias,
-                ),
-                _,
-                _,
-            )
-            | (
-                _,
-                todo @ Type::Dynamic(
-                    DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoTypeAlias,
-                ),
-                _,
-            ) => Some(todo),
+            (todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::TodoUnpack), _, _)
+            | (_, todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::TodoUnpack), _) => {
+                Some(todo)
+            }
 
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 

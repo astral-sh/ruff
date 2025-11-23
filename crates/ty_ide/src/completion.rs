@@ -8,7 +8,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{Token, TokenAt, TokenKind, Tokens};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ty_python_semantic::{
     Completion as SemanticCompletion, ModuleName, NameKind, SemanticModel,
     types::{CycleDetector, Type},
@@ -20,6 +20,91 @@ use crate::goto::DefinitionsOrTargets;
 use crate::importer::{ImportRequest, Importer};
 use crate::symbols::QueryPattern;
 use crate::{Db, all_symbols};
+
+/// A collection of completions built up from various sources.
+#[derive(Clone)]
+struct Completions<'db> {
+    db: &'db dyn Db,
+    items: Vec<Completion<'db>>,
+    query: QueryPattern,
+}
+
+impl<'db> Completions<'db> {
+    /// Create a new empty collection of completions.
+    ///
+    /// The given typed text should correspond to what we believe
+    /// the user has typed as part of the next symbol they are writing.
+    /// This collection will treat it as a query when present, and only
+    /// add completions that match it.
+    fn new(db: &'db dyn Db, typed: Option<&str>) -> Completions<'db> {
+        let query = typed
+            .map(QueryPattern::new)
+            .unwrap_or_else(QueryPattern::matches_all_symbols);
+        Completions {
+            db,
+            items: vec![],
+            query,
+        }
+    }
+
+    /// Convert this collection into a simple
+    /// sequence of completions.
+    fn into_completions(mut self) -> Vec<Completion<'db>> {
+        self.items.sort_by(compare_suggestions);
+        self.items
+            .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
+        self.items
+    }
+
+    /// Attempts to adds the given completion to this collection.
+    ///
+    /// When added, `true` is returned.
+    ///
+    /// This might not add the completion for a variety of reasons.
+    /// For example, if the symbol name does not match this collection's
+    /// query.
+    fn try_add(&mut self, completion: Completion<'db>) -> bool {
+        if !self.query.is_match_symbol_name(completion.name.as_str()) {
+            return false;
+        }
+        self.force_add(completion);
+        true
+    }
+
+    /// Attempts to adds the given semantic completion to this collection.
+    ///
+    /// When added, `true` is returned.
+    fn try_add_semantic(&mut self, completion: SemanticCompletion<'db>) -> bool {
+        self.try_add(Completion::from_semantic_completion(self.db, completion))
+    }
+
+    /// Always adds the given completion to this collection.
+    fn force_add(&mut self, completion: Completion<'db>) {
+        self.items.push(completion);
+    }
+}
+
+impl<'db> Extend<SemanticCompletion<'db>> for Completions<'db> {
+    fn extend<T>(&mut self, it: T)
+    where
+        T: IntoIterator<Item = SemanticCompletion<'db>>,
+    {
+        for c in it {
+            self.try_add_semantic(c);
+        }
+    }
+}
+
+impl<'db> Extend<Completion<'db>> for Completions<'db> {
+    fn extend<T>(&mut self, it: T)
+    where
+        T: IntoIterator<Item = Completion<'db>>,
+    {
+        for c in it {
+            self.try_add(c);
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Completion<'db> {
@@ -244,68 +329,42 @@ pub fn completion<'db>(
     let tokens = tokens_start_before(parsed.tokens(), offset);
     let typed = find_typed_text(db, file, &parsed, offset);
 
-    if is_in_no_completions_place(db, file, tokens, typed.as_deref()) {
+    if is_in_no_completions_place(db, file, &parsed, offset, tokens, typed.as_deref()) {
         return vec![];
     }
-    if let Some(completions) = only_keyword_completion(tokens, typed.as_deref()) {
-        return vec![completions];
+
+    let mut completions = Completions::new(db, typed.as_deref());
+
+    if let Some(import) = ImportStatement::detect(db, file, &parsed, tokens, typed.as_deref()) {
+        import.add_completions(db, file, &mut completions);
+    } else {
+        let Some(target_token) = CompletionTargetTokens::find(&parsed, offset) else {
+            return vec![];
+        };
+        let Some(target) = target_token.ast(&parsed, offset) else {
+            return vec![];
+        };
+
+        let model = SemanticModel::new(db, file);
+        let (semantic_completions, scoped) = match target {
+            CompletionTargetAst::ObjectDot { expr } => (model.attribute_completions(expr), None),
+            CompletionTargetAst::Scoped(scoped) => {
+                (model.scoped_completions(scoped.node), Some(scoped))
+            }
+        };
+
+        completions.extend(semantic_completions);
+        if scoped.is_some() {
+            add_keyword_completions(db, &mut completions);
+        }
+        if settings.auto_import {
+            if let Some(scoped) = scoped {
+                add_unimported_completions(db, file, &parsed, scoped, &mut completions);
+            }
+        }
     }
 
-    let typed_query = typed
-        .as_deref()
-        .map(QueryPattern::new)
-        .unwrap_or_else(QueryPattern::matches_all_symbols);
-
-    let Some(target_token) = CompletionTargetTokens::find(&parsed, offset) else {
-        return vec![];
-    };
-    let Some(target) = target_token.ast(&parsed, offset) else {
-        return vec![];
-    };
-
-    let model = SemanticModel::new(db, file);
-    let (semantic_completions, scoped) = match target {
-        CompletionTargetAst::ObjectDot { expr } => (model.attribute_completions(expr), None),
-        CompletionTargetAst::ObjectDotInImport { import, name } => {
-            (model.import_submodule_completions(import, name), None)
-        }
-        CompletionTargetAst::ObjectDotInImportFrom { import } => {
-            (model.from_import_submodule_completions(import), None)
-        }
-        CompletionTargetAst::ImportFrom { import, name } => {
-            (model.from_import_completions(import, name), None)
-        }
-        CompletionTargetAst::Import { .. } | CompletionTargetAst::ImportViaFrom { .. } => {
-            (model.import_completions(), None)
-        }
-        CompletionTargetAst::Scoped(scoped) => {
-            (model.scoped_completions(scoped.node), Some(scoped))
-        }
-    };
-    let mut completions: Vec<Completion<'_>> = semantic_completions
-        .into_iter()
-        .filter(|c| typed_query.is_match_symbol_name(c.name.as_str()))
-        .map(|c| Completion::from_semantic_completion(db, c))
-        .collect();
-
-    if scoped.is_some() {
-        add_keyword_completions(db, &typed_query, &mut completions);
-    }
-    if settings.auto_import {
-        if let Some(scoped) = scoped {
-            add_unimported_completions(
-                db,
-                file,
-                &parsed,
-                scoped,
-                typed.as_deref(),
-                &mut completions,
-            );
-        }
-    }
-    completions.sort_by(compare_suggestions);
-    completions.dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
-    completions
+    completions.into_completions()
 }
 
 /// Adds completions derived from keywords.
@@ -313,21 +372,14 @@ pub fn completion<'db>(
 /// This should generally only be used when offering "scoped" completions.
 /// This will include keywords corresponding to Python values (like `None`)
 /// and general language keywords (like `raise`).
-fn add_keyword_completions<'db>(
-    db: &'db dyn Db,
-    query: &QueryPattern,
-    completions: &mut Vec<Completion<'db>>,
-) {
+fn add_keyword_completions<'db>(db: &'db dyn Db, completions: &mut Completions<'db>) {
     let keyword_values = [
         ("None", Type::none(db)),
         ("True", Type::BooleanLiteral(true)),
         ("False", Type::BooleanLiteral(false)),
     ];
     for (name, ty) in keyword_values {
-        if !query.is_match_symbol_name(name) {
-            continue;
-        }
-        completions.push(Completion::value_keyword(name, ty));
+        completions.try_add(Completion::value_keyword(name, ty));
     }
 
     // Note that we specifically omit the `type` keyword here, since
@@ -343,25 +395,8 @@ fn add_keyword_completions<'db>(
         "yield", "case", "match",
     ];
     for name in keywords {
-        if !query.is_match_symbol_name(name) {
-            continue;
-        }
-        completions.push(Completion::keyword(name));
+        completions.try_add(Completion::keyword(name));
     }
-}
-
-/// When the tokens indicate that the last token should be precisely one
-/// possible keyword, we provide a single completion for it.
-///
-/// `typed` should be the text that we think the user has typed so far.
-fn only_keyword_completion<'db>(tokens: &[Token], typed: Option<&str>) -> Option<Completion<'db>> {
-    if is_import_from_incomplete(tokens, typed) {
-        return Some(Completion::keyword("import"));
-    }
-    if is_import_alias_incomplete(tokens, typed) {
-        return Some(Completion::keyword("as"));
-    }
-    None
 }
 
 /// Adds completions not in scope.
@@ -376,18 +411,22 @@ fn add_unimported_completions<'db>(
     file: File,
     parsed: &ParsedModuleRef,
     scoped: ScopedTarget<'_>,
-    typed: Option<&str>,
-    completions: &mut Vec<Completion<'db>>,
+    completions: &mut Completions<'db>,
 ) {
-    let Some(typed) = typed else {
+    // This is redundant since `all_symbols` will also bail
+    // when the query can match everything. But we bail here
+    // to avoid building an `Importer` and other plausibly
+    // costly work when we know we won't use it.
+    if completions.query.will_match_everything() {
         return;
-    };
+    }
+
     let source = source_text(db, file);
     let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
     let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
 
-    for symbol in all_symbols(db, typed) {
+    for symbol in all_symbols(db, &completions.query) {
         if symbol.module.file(db) == Some(file) {
             continue;
         }
@@ -399,7 +438,9 @@ fn add_unimported_completions<'db>(
         // "fine," but it might mean that we import a symbol from the
         // "wrong" module.
         let import_action = importer.import(request, &members);
-        completions.push(Completion {
+        // N.B. We use `add` here because `all_symbols` already
+        // takes our query into account.
+        completions.force_add(Completion {
             name: ast::name::Name::new(&symbol.symbol.name),
             insert: Some(import_action.symbol_text().into()),
             ty: None,
@@ -438,27 +479,8 @@ enum CompletionTargetTokens<'t> {
         /// completions for. But we could use it for other things,
         /// like only returning completions that start with a prefix
         /// corresponding to this token.
-        attribute: Option<&'t Token>,
-    },
-    /// A `from module import attribute` token form was found, where
-    /// `attribute` may be empty.
-    ImportFrom {
-        /// The module being imported from.
-        module: &'t Token,
-    },
-    /// A `import module` token form was found, where `module` may be
-    /// empty.
-    Import {
-        /// The token corresponding to the `import` keyword.
-        import: &'t Token,
-        /// The token closest to the cursor.
-        ///
-        /// This is currently unused, but we should use this
-        /// eventually to remove completions that aren't a
-        /// prefix of what has already been typed. (We are
-        /// currently relying on the LSP client to do this.)
         #[expect(dead_code)]
-        module: &'t Token,
+        attribute: Option<&'t Token>,
     },
     /// A token was found under the cursor, but it didn't
     /// match any of our anticipated token patterns.
@@ -500,10 +522,6 @@ impl<'t> CompletionTargetTokens<'t> {
                     object,
                     attribute: Some(attribute),
                 }
-            } else if let Some(module) = import_from_tokens(before) {
-                CompletionTargetTokens::ImportFrom { module }
-            } else if let Some((import, module)) = import_tokens(before) {
-                CompletionTargetTokens::Import { import, module }
             } else if let Some([_]) = token_suffix_by_kinds(before, [TokenKind::Float]) {
                 // If we're writing a `float`, then we should
                 // specifically not offer completions. This wouldn't
@@ -539,7 +557,7 @@ impl<'t> CompletionTargetTokens<'t> {
         offset: TextSize,
     ) -> Option<CompletionTargetAst<'t>> {
         match *self {
-            CompletionTargetTokens::PossibleObjectDot { object, attribute } => {
+            CompletionTargetTokens::PossibleObjectDot { object, .. } => {
                 let covering_node = covering_node(parsed.syntax().into(), object.range())
                     .find_last(|node| {
                         // We require that the end of the node range not
@@ -565,44 +583,6 @@ impl<'t> CompletionTargetTokens<'t> {
                     ast::AnyNodeRef::ExprAttribute(expr) => {
                         Some(CompletionTargetAst::ObjectDot { expr })
                     }
-                    ast::AnyNodeRef::StmtImport(import) => {
-                        let range = attribute
-                            .map(Ranged::range)
-                            .unwrap_or_else(|| object.range());
-                        // Find the name that overlaps with the
-                        // token we identified for the attribute.
-                        let name = import
-                            .names
-                            .iter()
-                            .position(|alias| alias.range().contains_range(range))?;
-                        Some(CompletionTargetAst::ObjectDotInImport { import, name })
-                    }
-                    ast::AnyNodeRef::StmtImportFrom(import) => {
-                        Some(CompletionTargetAst::ObjectDotInImportFrom { import })
-                    }
-                    _ => None,
-                }
-            }
-            CompletionTargetTokens::ImportFrom { module, .. } => {
-                let covering_node = covering_node(parsed.syntax().into(), module.range())
-                    .find_first(|node| node.is_stmt_import_from())
-                    .ok()?;
-                let ast::AnyNodeRef::StmtImportFrom(import) = covering_node.node() else {
-                    return None;
-                };
-                Some(CompletionTargetAst::ImportFrom { import, name: None })
-            }
-            CompletionTargetTokens::Import { import, .. } => {
-                let covering_node = covering_node(parsed.syntax().into(), import.range())
-                    .find_first(|node| node.is_stmt_import() || node.is_stmt_import_from())
-                    .ok()?;
-                match covering_node.node() {
-                    ast::AnyNodeRef::StmtImport(import) => {
-                        Some(CompletionTargetAst::Import { import, name: None })
-                    }
-                    ast::AnyNodeRef::StmtImportFrom(import) => {
-                        Some(CompletionTargetAst::ImportViaFrom { import })
-                    }
                     _ => None,
                 }
             }
@@ -627,45 +607,6 @@ enum CompletionTargetAst<'t> {
     /// A `object.attribute` scenario, where we want to
     /// list attributes on `object` for completions.
     ObjectDot { expr: &'t ast::ExprAttribute },
-    /// A `import module.submodule` scenario, where we only want to
-    /// list submodules for completions.
-    ObjectDotInImport {
-        /// The import statement.
-        import: &'t ast::StmtImport,
-        /// An index into `import.names`. The index is guaranteed to be
-        /// valid.
-        name: usize,
-    },
-    /// A `from module.submodule` scenario, where we only want to list
-    /// submodules for completions.
-    ObjectDotInImportFrom { import: &'t ast::StmtImportFrom },
-    /// A `from module import attribute` scenario, where we want to
-    /// list attributes on `module` for completions.
-    ImportFrom {
-        /// The import statement.
-        import: &'t ast::StmtImportFrom,
-        /// An index into `import.names` if relevant. When this is
-        /// set, the index is guaranteed to be valid.
-        name: Option<usize>,
-    },
-    /// A `import module` scenario, where we want to
-    /// list available modules for completions.
-    Import {
-        /// The import statement.
-        #[expect(dead_code)]
-        import: &'t ast::StmtImport,
-        /// An index into `import.names` if relevant. When this is
-        /// set, the index is guaranteed to be valid.
-        #[expect(dead_code)]
-        name: Option<usize>,
-    },
-    /// A `from module` scenario, where we want to
-    /// list available modules for completions.
-    ImportViaFrom {
-        /// The import statement.
-        #[expect(dead_code)]
-        import: &'t ast::StmtImportFrom,
-    },
     /// A scoped scenario, where we want to list all items available in
     /// the most narrow scope containing the giving AST node.
     Scoped(ScopedTarget<'t>),
@@ -676,6 +617,577 @@ struct ScopedTarget<'t> {
     /// The node with the smallest range that fully covers
     /// the token under the cursor.
     node: ast::AnyNodeRef<'t>,
+}
+
+/// A representation of the completion context for a possibly incomplete import
+/// statement.
+#[derive(Clone, Debug)]
+enum ImportStatement<'a> {
+    FromImport(FromImport<'a>),
+    Import(Import<'a>),
+    Incomplete(IncompleteImport),
+}
+
+/// A representation of the completion context for a possibly incomplete
+/// `from ... import ...` statement.
+#[derive(Clone, Debug)]
+struct FromImport<'a> {
+    ast: &'a ast::StmtImportFrom,
+    kind: FromImportKind,
+}
+
+/// The kind of completions to offer for a `from import` statement.
+///
+/// This is either something like `from col<CURSOR>`, where we should
+/// offer module completions, or `from collections.<CURSOR>`, where
+/// we should offer submodule completions or
+/// `from collections import default<CURSOR>` where we should offer
+/// submodule/attribute completions.
+#[derive(Clone, Debug)]
+enum FromImportKind {
+    Module,
+    Submodule {
+        parent: ModuleName,
+    },
+    Relative {
+        parent: ModuleName,
+        /// When `true`, an `import` keyword is allowed next.
+        /// For example, `from ...<CURSOR>` should offer `import`
+        /// but also submodule completions.
+        import_keyword_allowed: bool,
+    },
+    Attribute,
+}
+
+/// A representation of the completion context for a possibly incomplete
+/// `import ...` statement.
+#[derive(Clone, Debug)]
+struct Import<'a> {
+    #[expect(dead_code)]
+    ast: &'a ast::StmtImport,
+    kind: ImportKind,
+}
+
+/// The kind of completions to offer for an `import` statement.
+///
+/// This is either something like `import col<CURSOR>`, where we should
+/// offer module completions, or `import collections.<CURSOR>`, where
+/// we should offer submodule completions.
+#[derive(Clone, Debug)]
+enum ImportKind {
+    Module,
+    Submodule { parent: ModuleName },
+}
+
+/// Occurs when we detect that an import statement
+/// is likely incomplete by virtue of a missing or
+/// in-progress `as` or `import` keyword.
+#[derive(Clone, Debug)]
+enum IncompleteImport {
+    As,
+    Import,
+}
+
+impl<'a> ImportStatement<'a> {
+    /// The number of tokens we're willing to consume backwards from
+    /// the cursor's position until we give up looking for an import
+    /// statement. The state machine below has lots of opportunities
+    /// to bail way earlier than this, but if there's, e.g., a long
+    /// list of name tokens for something that isn't an import, then we
+    /// could end up doing a lot of wasted work here. Probably humans
+    /// aren't often working with single import statements over 1,000
+    /// tokens long.
+    ///
+    /// The other thing to consider here is that, by the time we get to
+    /// this point, ty has already done some work proportional to the
+    /// length of `tokens` anyway. The unit of work we do below is very
+    /// small.
+    const LIMIT: usize = 1_000;
+
+    /// Attempts to detect an import statement in reverse starting at
+    /// the end of `tokens`. That is, `tokens` should correspond to the
+    /// sequence of tokens up to the end user's cursor. `typed` should
+    /// correspond to the text the user has typed, which is usually,
+    /// but not always, the text corresponding to the last token in
+    /// `tokens`.
+    fn detect(
+        db: &'a dyn Db,
+        file: File,
+        parsed: &'a ParsedModuleRef,
+        tokens: &'a [Token],
+        typed: Option<&str>,
+    ) -> Option<ImportStatement<'a>> {
+        use TokenKind as TK;
+
+        // This state machine moves backwards through the token stream,
+        // starting at where the user's cursor is and ending when
+        // either a `from` token is found, or a token that cannot
+        // possibly appear in an import statement at a particular
+        // position is found.
+        //
+        // To understand this state machine, it's recommended to become
+        // familiar with the grammar for Python import statements:
+        // https://docs.python.org/3/reference/grammar.html
+
+        /// The current state of the parser below.
+        #[derive(Clone, Copy, Debug)]
+        enum S {
+            /// Our initial state.
+            Start,
+            /// We just saw an `import` token.
+            Import,
+            /// We just saw a first "name" token. That is,
+            /// a name-like token that appears just before
+            /// the end user's cursor.
+            ///
+            /// This isn't just limited to `TokenKind::Name`.
+            /// This also includes keywords and things like
+            /// "unknown" tokens that can stand in for names
+            /// at times.
+            FirstName,
+            /// A name seen immediately after the first name. This
+            /// indicates we have an incomplete import statement like
+            /// `import foo a<CURSOR>` or `from foo imp<CURSOR>`. But
+            /// we mush on.
+            AdjacentName,
+
+            /// A state where we expect to see the start of or
+            /// continuation of a list of names following `import`.
+            /// In the [grammar], this is either `dotted_as_names`
+            /// or `import_from_as_names`.
+            ///
+            /// [grammar]: https://docs.python.org/3/reference/grammar.html
+            NameList,
+            /// Occurs after seeing a name-like token at the end
+            /// of a name list. This could be an alias, a dotted
+            /// name or a non-dotted name.
+            NameListNameOrAlias,
+            /// Occurs when we've seen an `as` in a list of names.
+            As,
+            /// Occurs when we see a name-like token after an `as`
+            /// keyword.
+            AsName,
+
+            /// Occurs when we see a `.` between name-like tokens
+            /// after an `as` keyword. This implies we must parse
+            /// a `from` statement, since an `as` in a `from` can
+            /// never alias a dotted name.
+            AsDottedNameDot,
+            /// Occurs when we see a name-like token after a
+            /// `.name as`.
+            AsDottedName,
+            /// Occurs when we see a comma right before `a.b as foo`.
+            AsDottedNameComma,
+            /// Occurs before `, a.b as foo`. In this state, we can
+            /// see either a non-dotted alias or a dotted name.
+            AsDottedNameOrAlias,
+            /// Occurs before `bar, a.b as foo`. In this state, we can
+            /// see a `.`, `as`, or `import`.
+            AsDottedNameOrAliasName,
+
+            /// Occurs when we've seen a dot right before the cursor
+            /// or after the first name-like token. That is, `.name`.
+            /// This could be from `import module.name` or `from ..name
+            /// import blah`.
+            InitialDot,
+            /// Occurs when we see `foo.bar<CURSOR>`. When we enter
+            /// this state, it means we must be in an `import`
+            /// statement, since `from foo.bar` is always invalid.
+            InitialDotName,
+            /// Occurs when we see `.foo.bar<CURSOR>`. This lets us
+            /// continue consuming a dotted name.
+            InitialDottedName,
+
+            // When the states below occur, we are locked into
+            // recognizing a `from ... import ...` statement.
+            /// Occurs when we've seen an ellipsis right before the
+            /// cursor or after the first name-like token. That is,
+            /// `...name`. This must be from a
+            /// `from ...name import blah` statement.
+            FromEllipsisName,
+            /// A state for consuming `.` and `...` in a `from` import
+            /// statement. We enter this after seeing a `.` or a `...`
+            /// right after an `import` statement or a `...` right
+            /// before the end user's cursor. Either way, we have to
+            /// consume only dots at this point until we find a `from`
+            /// token.
+            FromDots,
+            /// Occurs when we've seen an `import` followed by a name-like
+            /// token. i.e., `from name import` or `from ...name import`.
+            FromDottedName,
+            /// Occurs when we've seen an `import` followed by a
+            /// name-like token with a dot. i.e., `from .name import`
+            /// or `from ..name import`.
+            FromDottedNameDot,
+            /// A `*` was just seen, which must mean the import is of
+            /// the form `from module import *`.
+            FromStar,
+            /// A left parenthesis was just seen.
+            FromLpar,
+
+            // Below are terminal states. Once we reach one
+            // of these, the state machine ends.
+            /// We just saw a `from` token. We never have any
+            /// outgoing transitions from this.
+            From,
+            /// This is like `import`, but used in a context
+            /// where we know we're in an import statement and
+            /// specifically *not* a `from ... import ...`
+            /// statement.
+            ImportFinal,
+        }
+
+        let mut state = S::Start;
+        // The token immediate before (or at) the cursor.
+        let last = tokens.last()?;
+        // A token corresponding to `import`, if found.
+        let mut import: Option<&Token> = None;
+        // A token corresponding to `from`, if found.
+        let mut from: Option<&Token> = None;
+        // Whether an initial dot was found right before the cursor,
+        // or right before the name at the cursor.
+        let mut initial_dot = false;
+        // An incomplete import statement was found.
+        // Usually either `from foo imp<CURSOR>`
+        // or `import foo a<CURSOR>`.
+        let mut incomplete_as_or_import = false;
+        for token in tokens.iter().rev().take(Self::LIMIT) {
+            if token.kind().is_trivia() {
+                continue;
+            }
+            state = match (state, token.kind()) {
+                // These cases handle our "initial" condition.
+                // Basically, this is what detects how to drop us into
+                // the full state machine below for parsing any kind of
+                // import statement. There are also some cases we try
+                // to detect here that indicate the user is probably
+                // typing an `import` or `as` token. In effect, we
+                // try to pluck off the initial name-like token that
+                // represents where the cursor likely is. And then
+                // we move on to try and detect the type of import
+                // statement that we're dealing with.
+                // (S::Start, TK::Newline) => S::Start,
+                (S::Start, TK::Star) => S::FromStar,
+                (S::Start, TK::Name) if typed.is_none() => S::AdjacentName,
+                (S::Start, TK::Name) => S::FirstName,
+                (S::Start | S::FirstName | S::AdjacentName, TK::Import) => S::Import,
+                (S::Start | S::FirstName | S::AdjacentName, TK::Lpar) => S::FromLpar,
+                (S::Start | S::FirstName | S::AdjacentName, TK::Comma) => S::NameList,
+                (S::Start | S::FirstName | S::AdjacentName, TK::Dot) => S::InitialDot,
+                (S::Start | S::FirstName | S::AdjacentName, TK::Ellipsis) => S::FromEllipsisName,
+                (S::Start | S::FirstName, TK::As) => S::As,
+                (S::Start | S::AdjacentName, TK::From) => S::From,
+                (S::FirstName, TK::From) => S::From,
+                (S::FirstName, TK::Name) => S::AdjacentName,
+
+                // This handles the case where we see `.name`. Here,
+                // we could be in `from .name`, `from ..name`, `from
+                // ...name`, `from foo.name`, `import foo.name`,
+                // `import bar, foo.name` and so on.
+                (S::InitialDot, TK::Dot | TK::Ellipsis) => S::FromDots,
+                (S::InitialDot, TK::Name) => S::InitialDotName,
+                (S::InitialDot, TK::From) => S::From,
+                (S::InitialDotName, TK::Dot) => S::InitialDottedName,
+                (S::InitialDotName, TK::Ellipsis) => S::FromDots,
+                (S::InitialDotName, TK::As) => S::AsDottedNameDot,
+                (S::InitialDotName, TK::Comma) => S::AsDottedNameOrAlias,
+                (S::InitialDotName, TK::Import) => S::ImportFinal,
+                (S::InitialDotName, TK::From) => S::From,
+                (S::InitialDottedName, TK::Dot | TK::Ellipsis) => S::FromDots,
+                (S::InitialDottedName, TK::Name) => S::InitialDotName,
+                (S::InitialDottedName, TK::From) => S::From,
+
+                // This state machine parses `dotted_as_names` or
+                // `import_from_as_names`. It has a carve out for when
+                // it finds a dot, which indicates it must parse only
+                // `dotted_as_names`.
+                (S::NameList, TK::Name | TK::Unknown) => S::NameListNameOrAlias,
+                (S::NameList, TK::Lpar) => S::FromLpar,
+                (S::NameListNameOrAlias, TK::As) => S::As,
+                (S::NameListNameOrAlias, TK::Comma) => S::NameList,
+                (S::NameListNameOrAlias, TK::Import) => S::Import,
+                (S::NameListNameOrAlias, TK::Lpar) => S::FromLpar,
+                (S::NameListNameOrAlias, TK::Unknown) => S::NameListNameOrAlias,
+                // This pops us out of generic name-list parsing
+                // and puts us firmly into `dotted_as_names` in
+                // the grammar.
+                (S::NameListNameOrAlias, TK::Dot) => S::AsDottedNameDot,
+
+                // This identifies aliasing via `as`. The main trick
+                // here is that if we see a `.`, then we move to a
+                // different set of states since we know we must be in
+                // an `import` statement. Without a `.` though, we
+                // could be in an `import` or a `from`. For example,
+                // `import numpy as np` or
+                // `from collections import defaultdict as dd`.
+                (S::As, TK::Name) => S::AsName,
+                (S::AsName, TK::Dot) => S::AsDottedNameDot,
+                (S::AsName, TK::Import) => S::Import,
+                (S::AsName, TK::Comma) => S::NameList,
+
+                // This is the mini state machine for handling
+                // `dotted_as_names`. We enter it when we see
+                // `foo.bar as baz`. We therefore know this must
+                // be an `import` statement and not a `from import`
+                // statement.
+                (S::AsDottedName, TK::Dot) => S::AsDottedNameDot,
+                (S::AsDottedName, TK::Comma) => S::AsDottedNameComma,
+                (S::AsDottedName, TK::Import) => S::ImportFinal,
+                (S::AsDottedNameDot, TK::Name) => S::AsDottedName,
+                (S::AsDottedNameComma, TK::Name) => S::AsDottedNameOrAlias,
+                (S::AsDottedNameOrAlias, TK::Name) => S::AsDottedNameOrAliasName,
+                (S::AsDottedNameOrAlias, TK::Dot) => S::AsDottedNameDot,
+                (S::AsDottedNameOrAliasName, TK::Dot | TK::As) => S::AsDottedNameDot,
+                (S::AsDottedNameOrAliasName, TK::Import) => S::ImportFinal,
+
+                // A `*` and `(` immediately constrains what we're allowed to see.
+                // We can jump right to expecting an `import` keyword.
+                (S::FromStar | S::FromLpar, TK::Import) => S::Import,
+
+                // The transitions below handle everything from `from`
+                // to `import`. Basically, once we see an `import`
+                // token or otherwise know we're parsing the module
+                // section of a `from` import statement, we end up in
+                // one of the transitions below.
+                (S::Import, TK::Dot | TK::Ellipsis) => S::FromDots,
+                (S::Import, TK::Name | TK::Unknown) => S::FromDottedName,
+                (S::FromDottedName, TK::Dot) => S::FromDottedNameDot,
+                (S::FromDottedName, TK::Ellipsis) => S::FromDots,
+                (S::FromDottedNameDot, TK::Name) => S::FromDottedName,
+                (S::FromDottedNameDot, TK::Dot | TK::Ellipsis) => S::FromDots,
+                (S::FromEllipsisName | S::FromDots, TK::Dot | TK::Ellipsis) => S::FromDots,
+                (
+                    S::FromEllipsisName | S::FromDots | S::FromDottedName | S::FromDottedNameDot,
+                    TK::From,
+                ) => S::From,
+
+                _ => break,
+            };
+            // If we transition into a few different special
+            // states, we record the token.
+            match state {
+                S::Import | S::ImportFinal => {
+                    import = Some(token);
+                }
+                S::From => {
+                    from = Some(token);
+                }
+                S::AdjacentName => {
+                    // We've seen two adjacent name-like tokens
+                    // right before the cursor. At this point,
+                    // we continue on to try to recognize a nearly
+                    // valid import statement, and to figure out
+                    // what kinds of completions we should offer
+                    // (if any).
+                    incomplete_as_or_import = true;
+                }
+                S::InitialDot | S::FromEllipsisName => {
+                    initial_dot = true;
+                }
+                _ => {}
+            }
+        }
+
+        // Now find a possibly dotted name up to where the current
+        // cursor is. This could be an item inside a module, a module
+        // name, a submodule name or even a relative module. The
+        // point is that it is the thing that the end user is trying
+        // to complete.
+        let source = source_text(db, file);
+        let mut to_complete = String::new();
+        let end = last.range().end();
+        let mut start = end;
+        for token in tokens.iter().rev().take(Self::LIMIT) {
+            match token.kind() {
+                TK::Name | TK::Dot | TK::Ellipsis => {
+                    start = token.range().start();
+                }
+                _ => break,
+            }
+        }
+        to_complete.push_str(&source[TextRange::new(start, end)]);
+
+        // If the typed text corresponds precisely to a keyword,
+        // then as a special case, consider it "incomplete" for that
+        // keyword. This occurs when the cursor is immediately at the
+        // end of `import` or `as`, e.g., `import<CURSOR>`. So we
+        // should provide it as a completion so that the end user can
+        // confirm it as-is. We special case this because a complete
+        // `import` or `as` gets special recognition as a special token
+        // kind, and it isn't worth complicating the state machine
+        // above to account for this.
+        //
+        // We also handle the more general "incomplete" cases here too.
+        // Basically, `incomplete_as_or_import` is set to `true` when
+        // we detect an "adjacent" name in an import statement. Some
+        // examples:
+        //
+        //     from foo <CURSOR>
+        //     from foo imp<CURSOR>
+        //     from foo import bar <CURSOR>
+        //     from foo import bar a<CURSOR>
+        //     import foo <CURSOR>
+        //     import foo a<CURSOR>
+        //
+        // Since there is a very limited number of cases, we can
+        // suggest `import` when an `import` token isn't present. And
+        // `as` when an `import` token *is* present. Notably, `as` can
+        // only appear after an `import` keyword!
+        if typed == Some("import") || (incomplete_as_or_import && import.is_none()) {
+            return Some(ImportStatement::Incomplete(IncompleteImport::Import));
+        } else if typed == Some("as") || (incomplete_as_or_import && import.is_some()) {
+            return Some(ImportStatement::Incomplete(IncompleteImport::As));
+        }
+        match (from, import) {
+            (None, None) => None,
+            (None, Some(import)) => {
+                let ast = find_ast_for_import(parsed, import)?;
+                // If we found a dot near the cursor, then this
+                // must be a request for submodule completions.
+                let kind = if initial_dot {
+                    let (parent, _) = to_complete.rsplit_once('.')?;
+                    let module_name = ModuleName::new(parent)?;
+                    ImportKind::Submodule {
+                        parent: module_name,
+                    }
+                } else {
+                    ImportKind::Module
+                };
+                Some(ImportStatement::Import(Import { ast, kind }))
+            }
+            (Some(from), import) => {
+                let ast = find_ast_for_from_import(parsed, from)?;
+                // If we saw an `import` keyword, then that means the
+                // cursor must be *after* the `import`. And thus we
+                // only ever need to offer completions for importable
+                // elements from the module being imported.
+                let kind = if import.is_some() {
+                    FromImportKind::Attribute
+                } else if !initial_dot {
+                    FromImportKind::Module
+                } else {
+                    let to_complete_without_leading_dots = to_complete.trim_start_matches('.');
+
+                    // When there aren't any leading dots to trim, then we
+                    // have a regular absolute import. Otherwise, it's relative.
+                    if to_complete == to_complete_without_leading_dots {
+                        let (parent, _) = to_complete.rsplit_once('.')?;
+                        let parent = ModuleName::new(parent)?;
+                        FromImportKind::Submodule { parent }
+                    } else {
+                        let all_dots = to_complete.chars().all(|c| c == '.');
+                        // We should suggest `import` in `from ...<CURSOR>`
+                        // and `from ...imp<CURSOR>`.
+                        let import_keyword_allowed =
+                            all_dots || !to_complete_without_leading_dots.contains('.');
+                        let parent = if all_dots {
+                            ModuleName::from_import_statement(db, file, ast).ok()?
+                        } else {
+                            // We know `to_complete` is not all dots.
+                            // But that it starts with a dot.
+                            // So we must have one of `..foo`, `..foo.`
+                            // or `..foo.bar`. We drop the leading dots,
+                            // since those are captured by `ast.level`.
+                            // From there, we can treat it like a normal
+                            // module name. We want to list submodule
+                            // completions, so we pop off the last element
+                            // if there are any remaining dots.
+                            let parent = to_complete_without_leading_dots
+                                .rsplit_once('.')
+                                .map(|(parent, _)| parent);
+                            ModuleName::from_identifier_parts(db, file, parent, ast.level).ok()?
+                        };
+                        FromImportKind::Relative {
+                            parent,
+                            import_keyword_allowed,
+                        }
+                    }
+                };
+                Some(ImportStatement::FromImport(FromImport { ast, kind }))
+            }
+        }
+    }
+
+    /// Add completions, if any and if appropriate, based on the detected
+    /// import statement.
+    fn add_completions<'db>(
+        &self,
+        db: &'db dyn Db,
+        file: File,
+        completions: &mut Completions<'db>,
+    ) {
+        let model = SemanticModel::new(db, file);
+        match *self {
+            ImportStatement::Import(Import { ref kind, .. }) => match *kind {
+                ImportKind::Module => {
+                    completions.extend(model.import_completions());
+                }
+                ImportKind::Submodule { ref parent } => {
+                    completions.extend(model.import_submodule_completions_for_name(parent));
+                }
+            },
+            ImportStatement::FromImport(FromImport { ast, ref kind }) => match *kind {
+                FromImportKind::Module => {
+                    completions.extend(model.import_completions());
+                }
+                FromImportKind::Submodule { ref parent } => {
+                    completions.extend(model.import_submodule_completions_for_name(parent));
+                }
+                FromImportKind::Relative {
+                    ref parent,
+                    import_keyword_allowed,
+                } => {
+                    completions.extend(model.import_submodule_completions_for_name(parent));
+                    if import_keyword_allowed {
+                        completions.try_add(Completion::keyword("import"));
+                    }
+                }
+                FromImportKind::Attribute => {
+                    completions.extend(model.from_import_completions(ast));
+                }
+            },
+            ImportStatement::Incomplete(IncompleteImport::As) => {
+                completions.try_add(Completion::keyword("as"));
+            }
+            ImportStatement::Incomplete(IncompleteImport::Import) => {
+                completions.try_add(Completion::keyword("import"));
+            }
+        }
+    }
+}
+
+/// Finds the AST node, if available, corresponding to the given `from`
+/// token.
+///
+/// This always returns `None` when the `token` is not a `from` token.
+fn find_ast_for_from_import<'p>(
+    parsed: &'p ParsedModuleRef,
+    token: &Token,
+) -> Option<&'p ast::StmtImportFrom> {
+    let covering_node = covering_node(parsed.syntax().into(), token.range())
+        .find_first(|node| node.is_stmt_import_from())
+        .ok()?;
+    let ast::AnyNodeRef::StmtImportFrom(from_import) = covering_node.node() else {
+        return None;
+    };
+    Some(from_import)
+}
+
+/// Finds the AST node, if available, corresponding to the given `import`
+/// token.
+///
+/// This always returns `None` when the `token` is not a `import` token.
+fn find_ast_for_import<'p>(
+    parsed: &'p ParsedModuleRef,
+    token: &Token,
+) -> Option<&'p ast::StmtImport> {
+    let covering_node = covering_node(parsed.syntax().into(), token.range())
+        .find_first(|node| node.is_stmt_import())
+        .ok()?;
+    let ast::AnyNodeRef::StmtImport(import) = covering_node.node() else {
+        return None;
+    };
+    Some(import)
 }
 
 /// Returns a slice of tokens that all start before the given
@@ -719,262 +1231,13 @@ fn token_suffix_by_kinds<const N: usize>(
     }))
 }
 
-/// Looks for the start of a `from module import <CURSOR>` statement.
-///
-/// If found, one arbitrary token forming `module` is returned.
-fn import_from_tokens(tokens: &[Token]) -> Option<&Token> {
-    use TokenKind as TK;
-
-    /// The number of tokens we're willing to consume backwards from
-    /// the cursor's position until we give up looking for a `from
-    /// module import <CURSOR>` pattern. The state machine below has
-    /// lots of opportunities to bail way earlier than this, but if
-    /// there's, e.g., a long list of name tokens for something that
-    /// isn't an import, then we could end up doing a lot of wasted
-    /// work here. Probably humans aren't often working with single
-    /// import statements over 1,000 tokens long.
-    ///
-    /// The other thing to consider here is that, by the time we get to
-    /// this point, ty has already done some work proportional to the
-    /// length of `tokens` anyway. The unit of work we do below is very
-    /// small.
-    const LIMIT: usize = 1_000;
-
-    /// A state used to "parse" the tokens preceding the user's cursor,
-    /// in reverse, to detect a "from import" statement.
-    enum S {
-        Start,
-        Names,
-        Module,
-    }
-
-    let mut state = S::Start;
-    let mut module_token: Option<&Token> = None;
-    // Move backward through the tokens until we get to
-    // the `from` token.
-    for token in tokens.iter().rev().take(LIMIT) {
-        state = match (state, token.kind()) {
-            // It's okay to pop off a newline token here initially,
-            // since it may occur when the name being imported is
-            // empty.
-            (S::Start, TK::Newline) => S::Names,
-            // Munch through tokens that can make up an alias.
-            // N.B. We could also consider taking any token here
-            // *except* some limited set of tokens (like `Newline`).
-            // That might work well if it turns out that listing
-            // all possible allowable tokens is too brittle.
-            (
-                S::Start | S::Names,
-                TK::Name
-                | TK::Comma
-                | TK::As
-                | TK::Case
-                | TK::Match
-                | TK::Type
-                | TK::Star
-                | TK::Lpar
-                | TK::Rpar
-                | TK::NonLogicalNewline
-                // It's not totally clear the conditions under
-                // which this occurs (I haven't read our tokenizer),
-                // but it appears in code like this, where this is
-                // the entire file contents:
-                //
-                //     from sys import (
-                //         abiflags,
-                //         <CURSOR>
-                //
-                // It seems harmless to just allow this "unknown"
-                // token here to make the above work.
-                | TK::Unknown,
-            ) => S::Names,
-            (S::Start | S::Names, TK::Import) => S::Module,
-            // Munch through tokens that can make up a module.
-            (
-                S::Module,
-                TK::Name | TK::Dot | TK::Ellipsis | TK::Case | TK::Match | TK::Type | TK::Unknown,
-            ) => {
-                // It's okay if there are multiple module
-                // tokens here. Just taking the last one
-                // (which is the one appearing first in
-                // the source code) is fine. We only need
-                // this to find the corresponding AST node,
-                // so any of the tokens should work fine.
-                module_token = Some(token);
-                S::Module
-            }
-            (S::Module, TK::From) => return module_token,
-            _ => return None,
-        };
-    }
-    None
-}
-
-/// Looks for the start of a `import <CURSOR>` statement.
-///
-/// This also handles cases like `import foo, c<CURSOR>, bar`.
-///
-/// If found, a token corresponding to the `import` or `from` keyword
-/// and the closest point of the `<CURSOR>` is returned.
-///
-/// It is assumed that callers will call `from_import_tokens` first to
-/// try and recognize a `from ... import ...` statement before using
-/// this.
-fn import_tokens(tokens: &[Token]) -> Option<(&Token, &Token)> {
-    use TokenKind as TK;
-
-    /// A look-back limit, in order to bound work.
-    ///
-    /// See `LIMIT` in `import_from_tokens` for more context.
-    const LIMIT: usize = 1_000;
-
-    /// A state used to "parse" the tokens preceding the user's cursor,
-    /// in reverse, to detect a `import` statement.
-    enum S {
-        Start,
-        Names,
-    }
-
-    let mut state = S::Start;
-    let module_token = tokens.last()?;
-    // Move backward through the tokens until we get to
-    // the `import` token.
-    for token in tokens.iter().rev().take(LIMIT) {
-        state = match (state, token.kind()) {
-            // It's okay to pop off a newline token here initially,
-            // since it may occur when the name being imported is
-            // empty.
-            (S::Start, TK::Newline) => S::Names,
-            // Munch through tokens that can make up an alias.
-            (S::Start | S::Names, TK::Name | TK::Comma | TK::As | TK::Unknown) => S::Names,
-            (S::Start | S::Names, TK::Import | TK::From) => {
-                return Some((token, module_token));
-            }
-            _ => return None,
-        };
-    }
-    None
-}
-
-/// Looks for the start of a `from module <CURSOR>` statement.
-///
-/// If found, `true` is returned.
-///
-/// `typed` should be the text that we think the user has typed so far.
-fn is_import_from_incomplete(tokens: &[Token], typed: Option<&str>) -> bool {
-    // N.B. The implementation here is very similar to
-    // `from_import_tokens`. The main difference is that
-    // we're just looking for whether we should suggest
-    // the `import` keyword. So this is a little simpler.
-
-    use TokenKind as TK;
-
-    const LIMIT: usize = 1_000;
-
-    /// A state used to "parse" the tokens preceding the user's cursor,
-    /// in reverse, to detect a "from import" statement.
-    enum S {
-        Start,
-        ImportKeyword,
-        ModulePossiblyDotted,
-        ModuleOnlyDotted,
-    }
-
-    let mut state = S::Start;
-    if typed.is_none() {
-        state = S::ImportKeyword;
-    }
-    // Move backward through the tokens until we get to
-    // the `from` token.
-    for token in tokens.iter().rev().take(LIMIT) {
-        state = match (state, token.kind()) {
-            // Match an incomplete `import` keyword.
-            //
-            // It's okay to pop off a newline token here initially,
-            // since it may occur before the user starts typing
-            // `import` but after the module name.
-            (S::Start, TK::Newline | TK::Name | TK::Import) => S::ImportKeyword,
-            // We are a bit more careful with how we parse the module
-            // here than in `from_import_tokens`. In particular, we
-            // want to make sure we don't incorrectly suggest `import`
-            // for `from os.i<CURSOR>`. If we aren't careful, then
-            // `i` could be considered an incomplete `import` keyword
-            // and `os.` is the module. But of course, ending with a
-            // `.` (unless the entire module is dots) is invalid.
-            (S::ImportKeyword, TK::Dot | TK::Ellipsis) => S::ModuleOnlyDotted,
-            (S::ImportKeyword, TK::Name | TK::Case | TK::Match | TK::Type | TK::Unknown) => {
-                S::ModulePossiblyDotted
-            }
-            (S::ModuleOnlyDotted, TK::Dot | TK::Ellipsis) => S::ModuleOnlyDotted,
-            (
-                S::ModulePossiblyDotted,
-                TK::Name | TK::Dot | TK::Ellipsis | TK::Case | TK::Match | TK::Type | TK::Unknown,
-            ) => S::ModulePossiblyDotted,
-            (S::ModulePossiblyDotted | S::ModuleOnlyDotted, TK::From) => return true,
-            _ => return false,
-        };
-    }
-    false
-}
-
-/// Detects `import <name> <CURSOR>` statements with a potentially incomplete
-/// `as` clause.
-///
-/// Note that this works for `from <module> import <name> <CURSOR>` as well.
-///
-/// If found, `true` is returned.
-fn is_import_alias_incomplete(tokens: &[Token], typed: Option<&str>) -> bool {
-    use TokenKind as TK;
-
-    const LIMIT: usize = 1_000;
-
-    /// A state used to "parse" the tokens preceding the user's cursor,
-    /// in reverse, to detect a "import <name> as" statement.
-    enum S {
-        Start,
-        As,
-        Name,
-    }
-
-    if typed.is_none() {
-        return false;
-    }
-
-    let mut state = S::Start;
-    for token in tokens.iter().rev().take(LIMIT) {
-        state = match (state, token.kind()) {
-            (S::Start, TK::Name | TK::Unknown | TK::As) => S::As,
-            (S::As, TK::Name | TK::Case | TK::Match | TK::Type | TK::Unknown) => S::Name,
-            (
-                S::Name,
-                TK::Name
-                | TK::Dot
-                | TK::Ellipsis
-                | TK::Case
-                | TK::Match
-                | TK::Type
-                | TK::Unknown
-                | TK::Comma
-                | TK::As
-                | TK::Newline
-                | TK::NonLogicalNewline
-                | TK::Lpar
-                | TK::Rpar,
-            ) => S::Name,
-            // Once we reach the `import` token we know we're in
-            // `import name <CURSOR>`.
-            (S::Name, TK::Import) => return true,
-            _ => return false,
-        };
-    }
-    false
-}
-
 /// Looks for the text typed immediately before the cursor offset
 /// given.
 ///
 /// If there isn't any typed text or it could not otherwise be found,
 /// then `None` is returned.
+///
+/// When `Some` is returned, the string is guaranteed to be non-empty.
 fn find_typed_text(
     db: &dyn Db,
     file: File,
@@ -997,7 +1260,7 @@ fn find_typed_text(
     // been typed. This likely means there is whitespace
     // or something that isn't represented in the token
     // stream. So just give up.
-    if last.end() < offset {
+    if last.end() < offset || last.range().is_empty() {
         return None;
     }
     Some(source[last.range()].to_string())
@@ -1007,10 +1270,14 @@ fn find_typed_text(
 fn is_in_no_completions_place(
     db: &dyn Db,
     file: File,
+    parsed: &ParsedModuleRef,
+    offset: TextSize,
     tokens: &[Token],
     typed: Option<&str>,
 ) -> bool {
-    is_in_comment(tokens) || is_in_string(tokens) || is_in_definition_place(db, file, tokens, typed)
+    is_in_comment(tokens)
+        || is_in_string(tokens)
+        || is_in_definition_place(db, file, parsed, offset, tokens, typed)
 }
 
 /// Whether the last token is within a comment or not.
@@ -1033,11 +1300,18 @@ fn is_in_string(tokens: &[Token]) -> bool {
 
 /// Returns true when the tokens indicate that the definition of a new
 /// name is being introduced at the end.
-fn is_in_definition_place(db: &dyn Db, file: File, tokens: &[Token], typed: Option<&str>) -> bool {
+fn is_in_definition_place(
+    db: &dyn Db,
+    file: File,
+    parsed: &ParsedModuleRef,
+    offset: TextSize,
+    tokens: &[Token],
+    typed: Option<&str>,
+) -> bool {
     fn is_definition_token(token: &Token) -> bool {
         matches!(
             token.kind(),
-            TokenKind::Def | TokenKind::Class | TokenKind::Type | TokenKind::As
+            TokenKind::Def | TokenKind::Class | TokenKind::Type | TokenKind::As | TokenKind::For
         )
     }
 
@@ -1051,11 +1325,37 @@ fn is_in_definition_place(db: &dyn Db, file: File, tokens: &[Token], typed: Opti
             false
         }
     };
-    match tokens {
+    if match tokens {
         [.., penultimate, _] if typed.is_some() => is_definition_keyword(penultimate),
         [.., last] if typed.is_none() => is_definition_keyword(last),
         _ => false,
+    } {
+        return true;
     }
+    // Analyze the AST if token matching is insufficient
+    // to determine if we're inside a name definition.
+    is_in_variable_binding(parsed, offset, typed)
+}
+
+/// Returns true when the cursor sits on a binding statement.
+/// E.g. naming a parameter, type parameter, or `for` <name>).
+fn is_in_variable_binding(parsed: &ParsedModuleRef, offset: TextSize, typed: Option<&str>) -> bool {
+    let range = if let Some(typed) = typed {
+        let start = offset.saturating_sub(typed.text_len());
+        TextRange::new(start, offset)
+    } else {
+        TextRange::empty(offset)
+    };
+
+    let covering = covering_node(parsed.syntax().into(), range);
+    covering.ancestors().any(|node| match node {
+        ast::AnyNodeRef::Parameter(param) => param.name.range.contains_range(range),
+        ast::AnyNodeRef::TypeParamTypeVar(type_param) => {
+            type_param.name.range.contains_range(range)
+        }
+        ast::AnyNodeRef::StmtFor(stmt_for) => stmt_for.target.range().contains_range(range),
+        _ => false,
+    })
 }
 
 /// Order completions according to the following rules:
@@ -2136,10 +2436,10 @@ C.<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r"
+            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r###"
         meta_attr :: int
         mro :: bound method <class 'C'>.mro() -> list[type]
-        __annotate__ :: @Todo | None
+        __annotate__ :: (() -> dict[str, Any]) | None
         __annotations__ :: dict[str, Any]
         __base__ :: type | None
         __bases__ :: tuple[type, ...]
@@ -2182,7 +2482,7 @@ C.<CURSOR>
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
         __weakrefoffset__ :: int
-        ");
+        "###);
     }
 
     #[test]
@@ -2331,14 +2631,14 @@ Quux.<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r"
+            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r###"
         mro :: bound method <class 'Quux'>.mro() -> list[type]
         some_attribute :: int
         some_class_method :: bound method <class 'Quux'>.some_class_method() -> int
         some_method :: def some_method(self) -> int
         some_property :: property
         some_static_method :: def some_static_method(self) -> int
-        __annotate__ :: @Todo | None
+        __annotate__ :: (() -> dict[str, Any]) | None
         __annotations__ :: dict[str, Any]
         __base__ :: type | None
         __bases__ :: tuple[type, ...]
@@ -2381,7 +2681,7 @@ Quux.<CURSOR>
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
         __weakrefoffset__ :: int
-        ");
+        "###);
     }
 
     #[test]
@@ -3717,13 +4017,33 @@ import <CURSOR>
     }
 
     #[test]
-    fn import_multiple() {
+    fn import_multiple_betwixt() {
         let builder = completion_test_builder(
             "\
 import re, c<CURSOR>, sys
 ",
         );
         builder.build().contains("collections");
+    }
+
+    #[test]
+    fn import_multiple_end1() {
+        let builder = completion_test_builder(
+            "\
+import collections.abc, unico<CURSOR>
+",
+        );
+        builder.build().contains("unicodedata");
+    }
+
+    #[test]
+    fn import_multiple_end2() {
+        let builder = completion_test_builder(
+            "\
+import collections.abc, urllib.parse, bu<CURSOR>
+",
+        );
+        builder.build().contains("builtins");
     }
 
     #[test]
@@ -4747,10 +5067,20 @@ from collections import defaultdict as f<CURSOR>
     }
 
     #[test]
-    fn import_missing_alias_suggests_as() {
+    fn import_missing_alias_suggests_as_with_leading_char() {
         let builder = completion_test_builder(
             "\
 import collections a<CURSOR>
+    ",
+        );
+        assert_snapshot!(builder.build().snapshot(), @"as");
+    }
+
+    #[test]
+    fn import_missing_alias_suggests_as() {
+        let builder = completion_test_builder(
+            "\
+import collections <CURSOR>
     ",
         );
         assert_snapshot!(builder.build().snapshot(), @"as");
@@ -4777,10 +5107,20 @@ import collections.abc as c, typing a<CURSOR>
     }
 
     #[test]
-    fn from_import_missing_alias_suggests_as() {
+    fn from_import_missing_alias_suggests_as_with_leading_char() {
         let builder = completion_test_builder(
             "\
 from collections.abc import Mapping a<CURSOR>
+    ",
+        );
+        assert_snapshot!(builder.build().snapshot(), @"as");
+    }
+
+    #[test]
+    fn from_import_missing_alias_suggests_as() {
+        let builder = completion_test_builder(
+            "\
+from collections import defaultdict <CURSOR>
     ",
         );
         assert_snapshot!(builder.build().snapshot(), @"as");
@@ -4872,6 +5212,96 @@ match status:
     }
 
     #[test]
+    fn no_completions_in_empty_for_variable_binding() {
+        let builder = completion_test_builder(
+            "\
+for <CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn no_completions_in_for_variable_binding() {
+        let builder = completion_test_builder(
+            "\
+for foo<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn no_completions_in_for_tuple_variable_binding() {
+        let builder = completion_test_builder(
+            "\
+for foo, bar<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn no_completions_in_function_param() {
+        let builder = completion_test_builder(
+            "\
+def foo(p<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn no_completions_in_function_type_param() {
+        let builder = completion_test_builder(
+            "\
+def foo[T<CURSOR>]
+",
+        );
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
+    fn completions_in_function_type_param_bound() {
+        completion_test_builder(
+            "\
+def foo[T: s<CURSOR>]
+",
+        )
+        .build()
+        .contains("str");
+    }
+
+    #[test]
+    fn completions_in_function_param_type_annotation() {
+        // Ensure that completions are no longer
+        // suppressed when have left the name
+        // definition block.
+        completion_test_builder(
+            "\
+def foo(param: s<CURSOR>)
+",
+        )
+        .build()
+        .contains("str");
+    }
+
+    #[test]
     fn favour_symbols_currently_imported() {
         let snapshot = CursorTest::builder()
             .source("main.py", "long_nameb = 1\nlong_name<CURSOR>")
@@ -4918,15 +5348,15 @@ match status:
     }
 
     #[test]
-    fn from_import_import_suggests_nothing() {
+    fn from_import_import_suggests_import() {
         let builder = completion_test_builder("from typing import<CURSOR>");
         assert_snapshot!(builder.build().snapshot(), @"import");
     }
 
     #[test]
-    fn from_import_importt_suggests_import() {
+    fn from_import_importt_suggests_nothing() {
         let builder = completion_test_builder("from typing importt<CURSOR>");
-        assert_snapshot!(builder.build().snapshot(), @"import");
+        assert_snapshot!(builder.build().snapshot(), @"<No completions found>");
     }
 
     #[test]
@@ -4953,12 +5383,10 @@ match status:
         assert_snapshot!(builder.build().snapshot(), @"import");
     }
 
-    /// The following behaviour may not be reflected in editors, since LSP
-    /// clients may do their own filtering of completion suggestions.
     #[test]
-    fn from_import_random_name_suggests_import() {
+    fn from_import_random_name_suggests_nothing() {
         let builder = completion_test_builder("from typing aa<CURSOR>");
-        assert_snapshot!(builder.build().snapshot(), @"import");
+        assert_snapshot!(builder.build().snapshot(), @"<No completions found>");
     }
 
     #[test]
@@ -5007,29 +5435,37 @@ match status:
     #[test]
     fn from_import_only_dot() {
         let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/foo.py", "")
             .source(
-                "main.py",
+                "package/sub1/sub2/bar.py",
                 "
-                import_zqzqzq = 1
-                from .<CURSOR>
-                ",
+import_zqzqzq = 1
+from .<CURSOR>
+",
             )
             .completion_test_builder();
-        assert_snapshot!(builder.build().snapshot(), @"import");
+        assert_snapshot!(builder.build().snapshot(), @r"
+        import
+        ");
     }
 
     #[test]
     fn from_import_only_dot_incomplete() {
         let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/foo.py", "")
             .source(
-                "main.py",
+                "package/sub1/sub2/bar.py",
                 "
-                import_zqzqzq = 1
-                from .imp<CURSOR>
-                ",
+import_zqzqzq = 1
+from .imp<CURSOR>
+",
             )
             .completion_test_builder();
-        assert_snapshot!(builder.build().snapshot(), @"import");
+        assert_snapshot!(builder.build().snapshot(), @r"
+        import
+        ");
     }
 
     #[test]
@@ -5041,6 +5477,114 @@ match status:
              ZQ<CURSOR>",
         );
         assert_snapshot!(builder.build().snapshot(), @"ZQZQZQ");
+    }
+
+    #[test]
+    fn relative_import_module_after_dots1() {
+        let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/foo.py", "")
+            .source("package/sub1/sub2/bar.py", "from ...<CURSOR>")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        import
+        foo
+        ");
+    }
+
+    #[test]
+    fn relative_import_module_after_dots2() {
+        let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/foo/__init__.py", "")
+            .source("package/foo/bar.py", "")
+            .source("package/foo/baz.py", "")
+            .source("package/sub1/sub2/bar.py", "from ...foo.<CURSOR>")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        bar
+        baz
+        ");
+    }
+
+    #[test]
+    fn relative_import_module_after_dots3() {
+        let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/foo.py", "")
+            .source("package/sub1/sub2/bar.py", "from.<CURSOR>")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        import
+        ");
+    }
+
+    #[test]
+    fn relative_import_module_after_dots4() {
+        let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/foo.py", "")
+            .source("package/sub1/bar.py", "from ..<CURSOR>")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        import
+        foo
+        ");
+    }
+
+    #[test]
+    fn relative_import_module_after_typing1() {
+        let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/foo.py", "")
+            .source("package/sub1/sub2/bar.py", "from ...fo<CURSOR>")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @"foo");
+    }
+
+    #[test]
+    fn relative_import_module_after_typing2() {
+        let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/foo/__init__.py", "")
+            .source("package/foo/bar.py", "")
+            .source("package/foo/baz.py", "")
+            .source("package/sub1/sub2/bar.py", "from ...foo.ba<CURSOR>")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        bar
+        baz
+        ");
+    }
+
+    #[test]
+    fn relative_import_module_after_typing3() {
+        let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/foo.py", "")
+            .source("package/imposition.py", "")
+            .source("package/sub1/sub2/bar.py", "from ...im<CURSOR>")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        import
+        imposition
+        ");
+    }
+
+    #[test]
+    fn relative_import_module_after_typing4() {
+        let builder = CursorTest::builder()
+            .source("package/__init__.py", "")
+            .source("package/sub1/__init__.py", "")
+            .source("package/sub1/foo.py", "")
+            .source("package/sub1/imposition.py", "")
+            .source("package/sub1/bar.py", "from ..sub1.<CURSOR>")
+            .completion_test_builder();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        bar
+        foo
+        imposition
+        ");
     }
 
     /// A way to create a simple single-file (named `main.py`) completion test

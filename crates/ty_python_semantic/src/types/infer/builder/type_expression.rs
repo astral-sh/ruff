@@ -147,7 +147,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     // anything else is an invalid annotation:
                     op => {
-                        self.infer_binary_expression(binary);
+                        self.infer_binary_expression(binary, TypeContext::default());
                         if let Some(mut diag) = self.report_invalid_type_expression(
                             expression,
                             format_args!(
@@ -518,7 +518,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     /// Infer the type of a string type expression.
-    fn infer_string_type_expression(&mut self, string: &ast::ExprStringLiteral) -> Type<'db> {
+    pub(super) fn infer_string_type_expression(
+        &mut self,
+        string: &ast::ExprStringLiteral,
+    ) -> Type<'db> {
         match parse_string_annotation(&self.context, string) {
             Some(parsed) => {
                 // String annotations are always evaluated in the deferred context.
@@ -842,6 +845,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(_)) => {
                     self.infer_type_expression(slice);
                     todo_type!("Generic manual PEP-695 type alias")
+                }
+                KnownInstanceType::LiteralStringAlias(_) => {
+                    self.infer_type_expression(slice);
+                    todo_type!("Generic stringified PEP-613 type alias")
                 }
                 KnownInstanceType::UnionType(_) => {
                     self.infer_type_expression(slice);

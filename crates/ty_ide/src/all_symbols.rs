@@ -8,13 +8,12 @@ use crate::symbols::{QueryPattern, SymbolInfo, symbols_for_file_global_only};
 ///
 /// Returns symbols from all files in the workspace and dependencies, filtered
 /// by the query.
-pub fn all_symbols<'db>(db: &'db dyn Db, query: &str) -> Vec<AllSymbolInfo<'db>> {
+pub fn all_symbols<'db>(db: &'db dyn Db, query: &QueryPattern) -> Vec<AllSymbolInfo<'db>> {
     // If the query is empty, return immediately to avoid expensive file scanning
-    if query.is_empty() {
+    if query.will_match_everything() {
         return Vec::new();
     }
 
-    let query = QueryPattern::new(query);
     let results = std::sync::Mutex::new(Vec::new());
     {
         let modules = all_modules(db);
@@ -144,7 +143,7 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
 
     impl CursorTest {
         fn all_symbols(&self, query: &str) -> String {
-            let symbols = all_symbols(&self.db, query);
+            let symbols = all_symbols(&self.db, &QueryPattern::new(query));
 
             if symbols.is_empty() {
                 return "No symbols found".to_string();

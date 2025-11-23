@@ -2209,9 +2209,9 @@ reveal_type(False.real)  # revealed: Literal[0]
 All attribute access on literal `bytes` types is currently delegated to `builtins.bytes`:
 
 ```py
-# revealed: bound method Literal[b"foo"].join(iterable_of_bytes: Iterable[@Todo(Support for `typing.TypeAlias`)], /) -> bytes
+# revealed: bound method Literal[b"foo"].join(iterable_of_bytes: Iterable[Buffer], /) -> bytes
 reveal_type(b"foo".join)
-# revealed: bound method Literal[b"foo"].endswith(suffix: @Todo(Support for `typing.TypeAlias`) | tuple[@Todo(Support for `typing.TypeAlias`), ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
+# revealed: bound method Literal[b"foo"].endswith(suffix: Buffer | tuple[Buffer, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
 reveal_type(b"foo".endswith)
 ```
 
@@ -2682,6 +2682,39 @@ import datetime
 reveal_type(datetime.UTC)  # revealed: Unknown
 # error: [unresolved-attribute]
 reveal_type(datetime.fakenotreal)  # revealed: Unknown
+```
+
+## Unimported submodule incorrectly accessed as attribute
+
+We give special diagnostics for this common case too:
+
+<!-- snapshot-diagnostics -->
+
+`foo/__init__.py`:
+
+```py
+```
+
+`foo/bar.py`:
+
+```py
+```
+
+`baz/bar.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import foo
+import baz
+
+# error: [unresolved-attribute]
+reveal_type(foo.bar)  # revealed: Unknown
+# error: [unresolved-attribute]
+reveal_type(baz.bar)  # revealed: Unknown
 ```
 
 ## References

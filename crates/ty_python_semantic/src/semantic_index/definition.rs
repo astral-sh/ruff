@@ -364,10 +364,12 @@ pub(crate) struct ImportFromDefinitionNodeRef<'ast> {
     pub(crate) alias_index: usize,
     pub(crate) is_reexported: bool,
 }
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromSubmoduleDefinitionNodeRef<'ast> {
     pub(crate) node: &'ast ast::StmtImportFrom,
 }
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AssignmentDefinitionNodeRef<'ast, 'db> {
     pub(crate) unpack: Option<(UnpackPosition, Unpack<'db>)>,
@@ -702,7 +704,7 @@ impl DefinitionKind<'_> {
         match self {
             DefinitionKind::Import(import) => import.is_reexported(),
             DefinitionKind::ImportFrom(import) => import.is_reexported(),
-            DefinitionKind::ImportFromSubmodule(_) => false,
+            DefinitionKind::ImportFromSubmodule(_) => true,
             _ => true,
         }
     }

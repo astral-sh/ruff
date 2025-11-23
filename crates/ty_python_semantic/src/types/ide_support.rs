@@ -15,7 +15,7 @@ use crate::types::generics::Specialization;
 use crate::types::signatures::Signature;
 use crate::types::{CallDunderError, UnionType};
 use crate::types::{
-    ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type, TypeContext,
+    ClassBase, ClassLiteral, KnownClass, KnownInstanceType, Type, TypeContext,
     TypeVarBoundOrConstraints, class::CodeGeneratorKind,
 };
 use crate::{Db, DisplaySettings, HasType, NameKind, SemanticModel};
@@ -299,9 +299,10 @@ impl<'db> AllMembers<'db> {
                             Type::KnownInstance(
                                 KnownInstanceType::TypeVar(_)
                                 | KnownInstanceType::TypeAliasType(_)
-                                | KnownInstanceType::UnionType(_),
+                                | KnownInstanceType::UnionType(_)
+                                | KnownInstanceType::Literal(_)
+                                | KnownInstanceType::Annotated(_),
                             ) => continue,
-                            Type::Dynamic(DynamicType::TodoTypeAlias) => continue,
                             _ => {}
                         }
                     }

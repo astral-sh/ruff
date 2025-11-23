@@ -36,7 +36,7 @@ use ruff_db::{
 };
 use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parentheses_iterator;
-use ruff_python_ast::{self as ast, AnyNodeRef, Identifier};
+use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
@@ -2519,6 +2519,7 @@ pub(super) fn report_possibly_missing_attribute(
 pub(super) fn report_invalid_exception_tuple_caught<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     node: &'ast ast::ExprTuple,
+    node_type: Type<'db>,
     invalid_tuple_nodes: impl IntoIterator<Item = (&'ast ast::Expr, Type<'db>)>,
 ) {
     let Some(builder) = context.report_lint(&INVALID_EXCEPTION_CAUGHT, node) else {
@@ -2526,6 +2527,10 @@ pub(super) fn report_invalid_exception_tuple_caught<'db, 'ast>(
     };
 
     let mut diagnostic = builder.into_diagnostic("Invalid tuple caught in an exception handler");
+    diagnostic.set_concise_message(format_args!(
+        "Cannot catch object of type `{}` in an exception handler",
+        node_type.display(context.db())
+    ));
 
     for (sub_node, ty) in invalid_tuple_nodes {
         let span = context.span(sub_node);
@@ -3677,7 +3682,7 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     db: &dyn Db,
     mut diagnostic: LintDiagnosticGuard,
     value_type: &Type,
-    attr: &Identifier,
+    attr: &str,
 ) {
     // Currently we limit this analysis to attributes of stdlib modules,
     // as this covers the most important cases while not being too noisy
@@ -3711,6 +3716,6 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     add_inferred_python_version_hint_to_diagnostic(
         db,
         &mut diagnostic,
-        &format!("accessing `{}`", attr.id),
+        &format!("accessing `{attr}`"),
     );
 }
