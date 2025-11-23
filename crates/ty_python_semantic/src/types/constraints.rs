@@ -1093,7 +1093,8 @@ impl<'db> Node<'db> {
                 // typevar depends on, and existentially abstract them away.
                 let inferable_dependencies = interior
                     .sequent_map(db)
-                    .get_typevar_dependencies(typevar.identity(db));
+                    .get_typevar_dependencies(typevar.identity(db))
+                    .filter(|dependency| dependency.is_inferable(db, inferable));
                 let restricted = self.exists(db, inferable_dependencies);
 
                 // Complicating things, the typevar might have gradual constraints. For those, we

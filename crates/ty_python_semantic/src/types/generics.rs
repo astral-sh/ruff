@@ -128,7 +128,7 @@ pub(crate) enum InferableTypeVars<'a, 'db> {
     ),
 }
 
-impl<'db> BoundTypeVarInstance<'db> {
+impl<'db> BoundTypeVarIdentity<'db> {
     pub(crate) fn is_inferable(
         self,
         db: &'db dyn Db,
@@ -136,11 +136,21 @@ impl<'db> BoundTypeVarInstance<'db> {
     ) -> bool {
         match inferable {
             InferableTypeVars::None => false,
-            InferableTypeVars::One(typevars) => typevars.contains(&self.identity(db)),
+            InferableTypeVars::One(typevars) => typevars.contains(&self),
             InferableTypeVars::Two(left, right) => {
                 self.is_inferable(db, *left) || self.is_inferable(db, *right)
             }
         }
+    }
+}
+
+impl<'db> BoundTypeVarInstance<'db> {
+    pub(crate) fn is_inferable(
+        self,
+        db: &'db dyn Db,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> bool {
+        self.identity(db).is_inferable(db, inferable)
     }
 
     /// Returns `true` if all bounds or constraints on this typevar are fully static.
@@ -153,12 +163,11 @@ impl<'db> BoundTypeVarInstance<'db> {
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 bound.top_materialization(db) == bound.bottom_materialization(db)
             }
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                .elements(db)
-                .iter()
-                .all(|constraint| {
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                constraints.elements(db).iter().all(|constraint| {
                     constraint.top_materialization(db) == constraint.bottom_materialization(db)
-                }),
+                })
+            }
         }
     }
 }
