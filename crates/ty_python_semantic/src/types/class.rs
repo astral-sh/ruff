@@ -1259,6 +1259,20 @@ impl MethodDecorator {
             (false, false) => Ok(Self::None),
         }
     }
+
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            MethodDecorator::None => "instance method",
+            MethodDecorator::ClassMethod => "classmethod",
+            MethodDecorator::StaticMethod => "staticmethod",
+        }
+    }
+}
+
+impl std::fmt::Display for MethodDecorator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
 
 /// Kind-specific metadata for different types of fields

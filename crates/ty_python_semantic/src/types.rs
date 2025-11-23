@@ -1107,13 +1107,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) const fn as_bound_method(self) -> Option<BoundMethodType<'db>> {
-        match self {
-            Type::BoundMethod(bound_method) => Some(bound_method),
-            _ => None,
-        }
-    }
-
     #[track_caller]
     pub(crate) const fn expect_class_literal(self) -> ClassLiteral<'db> {
         self.as_class_literal()
