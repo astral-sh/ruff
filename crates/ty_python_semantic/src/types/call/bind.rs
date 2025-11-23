@@ -810,6 +810,7 @@ impl<'db> Bindings<'db> {
                                 overload.set_return_type(match ty {
                                     Type::ClassLiteral(class) => class
                                         .generic_context(db)
+                                        .ok()
                                         .map(wrap_generic_context)
                                         .unwrap_or_else(|| Type::none(db)),
 

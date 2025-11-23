@@ -2,6 +2,7 @@ use itertools::Either;
 use ruff_python_ast as ast;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
+use crate::types::class::GenericContextError;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NON_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_callable,
@@ -885,7 +886,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             Type::ClassLiteral(class) => {
                 match class.generic_context(self.db()) {
-                    Some(generic_context) => {
+                    Ok(generic_context) => {
                         let specialized_class = self.infer_explicit_class_specialization(
                             subscript,
                             value_ty,
@@ -901,7 +902,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             )
                             .unwrap_or(Type::unknown())
                     }
-                    None => {
+                    Err(GenericContextError::Cyclic) => {
+                        self.infer_type_expression(slice);
+                        todo_type!("specialized generic class with cyclic bases")
+                    }
+                    Err(GenericContextError::NonGeneric) => {
                         // TODO: emit a diagnostic if you try to specialize a non-generic class.
                         self.infer_type_expression(slice);
                         todo_type!("specialized non-generic class")

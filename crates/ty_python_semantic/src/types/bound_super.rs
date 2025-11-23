@@ -585,8 +585,8 @@ impl<'db> BoundSuperType<'db> {
         //  super(B[int], b_unknown)
         //  ```
         match class_literal.generic_context(db) {
-            Some(_) => Place::bound(todo_type!("super in generic class")).into(),
-            None => class_literal.class_member_from_mro(
+            Ok(_) => Place::bound(todo_type!("super in generic class")).into(),
+            Err(_) => class_literal.class_member_from_mro(
                 db,
                 name,
                 policy,

@@ -443,6 +443,7 @@ impl NodeWithScopeKind {
                 binding_type(db, definition)
                     .as_class_literal()?
                     .generic_context(db)
+                    .ok()
             }
             NodeWithScopeKind::Function(function) => {
                 let definition = index.expect_single_definition(function);
