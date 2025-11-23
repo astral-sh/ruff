@@ -1560,6 +1560,16 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                     .entry(name)
                                     .or_insert(ImportKind::ImportFrom);
                             }
+                            for name in &node.names {
+                                let Some(relative_name) = ModuleName::new(&name.name) else {
+                                    continue;
+                                };
+                                let mut full_name = module_name.clone();
+                                full_name.extend(&relative_name);
+                                self.imported_modules
+                                    .entry(full_name)
+                                    .or_insert(ImportKind::ImportFrom);
+                            }
                         }
                     }
                 }
