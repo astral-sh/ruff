@@ -313,7 +313,8 @@ impl MainLoop {
                     let terminal_settings = db.project().settings(db).terminal();
                     let display_config = DisplayDiagnosticConfig::default()
                         .format(terminal_settings.output_format.into())
-                        .color(colored::control::SHOULD_COLORIZE.should_colorize());
+                        .color(colored::control::SHOULD_COLORIZE.should_colorize())
+                        .show_fix_diff(true);
 
                     if check_revision == revision {
                         if db.project().files(db).is_empty() {

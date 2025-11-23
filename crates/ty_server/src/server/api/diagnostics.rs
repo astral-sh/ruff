@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash as _, Hasher as _};
 
 use lsp_types::notification::PublishDiagnostics;
@@ -5,18 +6,21 @@ use lsp_types::{
     CodeDescription, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag,
     NumberOrString, PublishDiagnosticsParams, Url,
 };
+use ruff_diagnostics::Applicability;
+use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::{File, FileRange};
 use ruff_db::system::SystemPathBuf;
+use serde::{Deserialize, Serialize};
 use ty_project::{Db as _, ProjectDatabase};
 
-use crate::Db;
 use crate::document::{FileRangeExt, ToRangeExt};
 use crate::session::DocumentHandle;
 use crate::session::client::Client;
 use crate::system::{AnySystemPath, file_to_url};
+use crate::{DIAGNOSTIC_NAME, Db};
 use crate::{PositionEncoding, Session};
 
 pub(super) struct Diagnostics {
@@ -351,6 +355,8 @@ pub(super) fn to_lsp_diagnostic(
         );
     }
 
+    let data = DiagnosticData::try_from_diagnostic(db, diagnostic, encoding);
+
     (
         url,
         Diagnostic {
@@ -359,10 +365,10 @@ pub(super) fn to_lsp_diagnostic(
             tags,
             code: Some(NumberOrString::String(diagnostic.id().to_string())),
             code_description,
-            source: Some("ty".into()),
+            source: Some(DIAGNOSTIC_NAME.into()),
             message: diagnostic.concise_message().to_string(),
             related_information: Some(related_information),
-            data: None,
+            data: serde_json::to_value(data).ok(),
         },
     )
 }
@@ -401,4 +407,50 @@ fn sub_diagnostic_to_related_information(
         location,
         message: diagnostic.concise_message().to_string(),
     })
+}
+
+#[derive(Serialize, Deserialize)]
+pub(crate) struct DiagnosticData {
+    pub(crate) fix_title: String,
+    pub(crate) edits: HashMap<Url, Vec<lsp_types::TextEdit>>,
+}
+
+impl DiagnosticData {
+    fn try_from_diagnostic(
+        db: &dyn Db,
+        diagnostic: &ruff_db::diagnostic::Diagnostic,
+        encoding: PositionEncoding,
+    ) -> Option<Self> {
+        let fix = diagnostic
+            .fix()
+            .filter(|fix| fix.applies(Applicability::Unsafe))?;
+
+        let primary_span = diagnostic.primary_span()?;
+        let file = primary_span.expect_ty_file();
+
+        let mut lsp_edits: HashMap<Url, Vec<lsp_types::TextEdit>> = HashMap::new();
+
+        for edit in fix.edits() {
+            let location = edit
+                .range()
+                .to_lsp_range(db, file, encoding)?
+                .to_location()?;
+
+            lsp_edits
+                .entry(location.uri)
+                .or_default()
+                .push(lsp_types::TextEdit {
+                    range: location.range,
+                    new_text: edit.content().unwrap_or_default().to_string(),
+                });
+        }
+
+        Some(Self {
+            fix_title: diagnostic
+                .first_help_text()
+                .map(ToString::to_string)
+                .unwrap_or_else(|| format!("Fix {}", diagnostic.id())),
+            edits: lsp_edits,
+        })
+    }
 }

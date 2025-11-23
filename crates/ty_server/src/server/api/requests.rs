@@ -1,3 +1,4 @@
+mod code_action;
 mod completion;
 mod diagnostic;
 mod doc_highlights;
@@ -19,6 +20,7 @@ mod signature_help;
 mod workspace_diagnostic;
 mod workspace_symbols;
 
+pub(super) use code_action::CodeActionRequestHandler;
 pub(super) use completion::CompletionRequestHandler;
 pub(super) use diagnostic::DocumentDiagnosticRequestHandler;
 pub(super) use doc_highlights::DocumentHighlightRequestHandler;
