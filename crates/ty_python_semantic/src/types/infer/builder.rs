@@ -108,7 +108,7 @@ use crate::types::{
     TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
     TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
     TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
-    UnionTypeInstance, binding_type, todo_type,
+    UnionTypeInstance, binding_type, liskov, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -548,9 +548,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "Inferring deferred types should not add more deferred definitions"
         );
 
-        // TODO: Only call this function when diagnostics are enabled.
-        self.check_class_definitions();
-        self.check_overloaded_functions(node);
+        if self.db().should_check_file(self.file()) {
+            self.check_class_definitions();
+            self.check_overloaded_functions(node);
+        }
     }
 
     /// Iterate over all class definitions to check that the definition will not cause an exception
@@ -948,6 +949,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
+
+            // (8) Check for Liskov violations
+            liskov::check_class(&self.context, class);
 
             if let Some(protocol) = class.into_protocol_class(self.db()) {
                 protocol.validate_members(&self.context);
