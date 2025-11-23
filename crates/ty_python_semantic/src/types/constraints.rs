@@ -1059,6 +1059,8 @@ impl<'db> Node<'db> {
             }
         });
 
+        let without_inferable = self.exists(db, inferable.iter());
+
         // Returns if some specialization satisfies this constraint set.
         let some_specialization_satisfies = move |specializations: Node<'db>| {
             let when_satisfied = specializations.implies(db, self).and(db, specializations);
@@ -1067,7 +1069,9 @@ impl<'db> Node<'db> {
 
         // Returns if all specializations satisfy this constraint set.
         let all_specializations_satisfy = move |specializations: Node<'db>| {
-            let when_satisfied = specializations.implies(db, self).and(db, specializations);
+            let when_satisfied = specializations
+                .implies(db, without_inferable)
+                .and(db, specializations);
             when_satisfied
                 .iff(db, specializations)
                 .is_always_satisfied(db)
