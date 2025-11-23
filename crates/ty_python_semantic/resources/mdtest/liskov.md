@@ -219,7 +219,7 @@ class E(A[int]):
 
 class F[T](A[T]):
     # TODO: we should emit `invalid-method-override` on this:
-    # `str` is not necessarily a subtype of `T`!
+    # `str` is not necessarily a supertype of `T`!
     def method(self, x: str) -> None: ...
 
 class G(A[int]):
