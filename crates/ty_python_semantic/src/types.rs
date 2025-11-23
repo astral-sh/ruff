@@ -8573,25 +8573,23 @@ impl<'db> InvalidTypeExpression<'db> {
                     InvalidTypeExpression::Field => {
                         f.write_str("`dataclasses.Field` is not allowed in type expressions")
                     }
-                    InvalidTypeExpression::ConstraintSet => {
-                        f.write_str("`ty_extensions.ConstraintSet` is not allowed in type expressions")
-                    }
-                    InvalidTypeExpression::GenericContext => {
-                        f.write_str("`ty_extensions.GenericContext` is not allowed in type expressions")
-                    }
-                    InvalidTypeExpression::Specialization => {
-                        f.write_str("`ty_extensions.GenericContext` is not allowed in type expressions")
-                    }
-                    InvalidTypeExpression::TypedDict => {
-                        f.write_str(
-                            "The special form `typing.TypedDict` is not allowed in type expressions. \
-                            Did you mean to use a concrete TypedDict or `collections.abc.Mapping[str, object]` instead?")
-                    }
-                    InvalidTypeExpression::TypeAlias => {
-                        f.write_str(
-                            "`typing.TypeAlias` is only allowed as the sole annotation on an annotated assignment",
-                        )
-                    }
+                    InvalidTypeExpression::ConstraintSet => f.write_str(
+                        "`ty_extensions.ConstraintSet` is not allowed in type expressions",
+                    ),
+                    InvalidTypeExpression::GenericContext => f.write_str(
+                        "`ty_extensions.GenericContext` is not allowed in type expressions",
+                    ),
+                    InvalidTypeExpression::Specialization => f.write_str(
+                        "`ty_extensions.GenericContext` is not allowed in type expressions",
+                    ),
+                    InvalidTypeExpression::TypedDict => f.write_str(
+                        "The special form `typing.TypedDict` \
+                            is not allowed in type expressions",
+                    ),
+                    InvalidTypeExpression::TypeAlias => f.write_str(
+                        "`typing.TypeAlias` is only allowed \
+                            as the sole annotation on an annotated assignment",
+                    ),
                     InvalidTypeExpression::TypeQualifier(qualifier) => write!(
                         f,
                         "Type qualifier `{qualifier}` is not allowed in type expressions \
@@ -8601,6 +8599,11 @@ impl<'db> InvalidTypeExpression<'db> {
                         f,
                         "Type qualifier `{qualifier}` is not allowed in type expressions \
                         (only in annotation expressions, and only with exactly one argument)",
+                    ),
+                    InvalidTypeExpression::InvalidType(Type::ModuleLiteral(module), _) => write!(
+                        f,
+                        "Module `{module}` is not valid in a type expression",
+                        module = module.module(self.db).name(self.db)
                     ),
                     InvalidTypeExpression::InvalidType(ty, _) => write!(
                         f,
@@ -8615,35 +8618,39 @@ impl<'db> InvalidTypeExpression<'db> {
     }
 
     fn add_subdiagnostics(self, db: &'db dyn Db, mut diagnostic: LintDiagnosticGuard) {
-        let InvalidTypeExpression::InvalidType(ty, scope) = self else {
-            return;
-        };
-        let Type::ModuleLiteral(module_type) = ty else {
-            return;
-        };
-        let module = module_type.module(db);
-        let Some(module_name_final_part) = module.name(db).components().next_back() else {
-            return;
-        };
-        let Some(module_member_with_same_name) = ty
-            .member(db, module_name_final_part)
-            .place
-            .ignore_possibly_undefined()
-        else {
-            return;
-        };
-        if module_member_with_same_name
-            .in_type_expression(db, scope, None)
-            .is_err()
-        {
-            return;
-        }
+        if let InvalidTypeExpression::InvalidType(ty, scope) = self {
+            let Type::ModuleLiteral(module_type) = ty else {
+                return;
+            };
+            let module = module_type.module(db);
+            let Some(module_name_final_part) = module.name(db).components().next_back() else {
+                return;
+            };
+            let Some(module_member_with_same_name) = ty
+                .member(db, module_name_final_part)
+                .place
+                .ignore_possibly_undefined()
+            else {
+                return;
+            };
+            if module_member_with_same_name
+                .in_type_expression(db, scope, None)
+                .is_err()
+            {
+                return;
+            }
 
-        // TODO: showing a diff (and even having an autofix) would be even better
-        diagnostic.info(format_args!(
-            "Did you mean to use the module's member \
-            `{module_name_final_part}.{module_name_final_part}` instead?"
-        ));
+            // TODO: showing a diff (and even having an autofix) would be even better
+            diagnostic.set_primary_message(format_args!(
+                "Did you mean to use the module's member \
+                `{module_name_final_part}.{module_name_final_part}`?"
+            ));
+        } else if let InvalidTypeExpression::TypedDict = self {
+            diagnostic.help(
+                "You might have meant to use a concrete TypedDict \
+                or `collections.abc.Mapping[str, object]`",
+            );
+        }
     }
 }
 
