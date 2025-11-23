@@ -19,7 +19,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
  5 |     def method(self, x: int, /): ...  # fine
  6 | 
  7 | class Sub2(Super):
- 8 |     def method(self, x: object, /): ...  # fine: `method` still accepts any argument of type `bool`
+ 8 |     def method(self, x: object, /): ...  # fine: `method` still accepts any argument of type `int`
  9 | 
 10 | class Sub4(Super):
 11 |     def method(self, x: int | str, /): ...  # fine
@@ -53,7 +53,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
 39 | 
 40 | class Sub13(Super):
 41 |     # Some calls permitted by the superclass are now no longer allowed
-42 |     # (the method can no longer be passed with exactly one argument!)
+42 |     # (the method can no longer be passed exactly one argument!)
 43 |     def method(self, x, y, /): ...  # error: [invalid-method-override]
 44 | 
 45 | class Sub14(Super):
@@ -131,7 +131,7 @@ error[invalid-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:43:9
    |
 41 |     # Some calls permitted by the superclass are now no longer allowed
-42 |     # (the method can no longer be passed with exactly one argument!)
+42 |     # (the method can no longer be passed exactly one argument!)
 43 |     def method(self, x, y, /): ...  # error: [invalid-method-override]
    |         ^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
 44 |

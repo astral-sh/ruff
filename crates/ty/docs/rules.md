@@ -872,7 +872,7 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.20">0
 
 Detects method overrides that violate the [Liskov Substitution Principle] ("LSP").
 
-The LSP states that any subtype should be substitutable for its supertype.
+The LSP states that an instance of a subtype should be substitutable for an instance of its supertype.
 Applied to Python, this means:
 1. All argument combinations a superclass method accepts
    must also be accepted by an overriding subclass method.

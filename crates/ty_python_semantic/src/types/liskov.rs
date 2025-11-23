@@ -107,6 +107,10 @@ fn check_class_declaration<'db>(
                 Some(CodeGeneratorKind::DataclassLike(_)) => {
                     MethodKind::Synthesized(SynthesizedMethodKind::Dataclass)
                 }
+                // It's invalid to define a method on a `TypedDict` (and this should be
+                // reported elsewhere), but it's valid to override other things on a
+                // `TypedDict`, so this case isn't relevant right now but may become
+                // so when we expand Liskov checking in the future
                 Some(CodeGeneratorKind::TypedDict) => {
                     MethodKind::Synthesized(SynthesizedMethodKind::TypedDict)
                 }

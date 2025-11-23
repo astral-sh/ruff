@@ -8,17 +8,17 @@ generally makes about types in Python:
 
 In order for a type checker's assumptions to be sound, it is crucial for the type checker to enforce
 the Liskov Substitution Principle on code that it checks. In practice, this usually manifests as
-three checks for a type checker to perform when it checks a subclass `B` of a class `A`:
+several checks for a type checker to perform when it checks a subclass `B` of a class `A`:
 
 1. Read-only attributes should only ever be overridden covariantly: if a property `A.p` resolves to
     `int` when accessed, accessing `B.p` should either resolve to `int` or a subtype of `int`.
-1. Method return types should only ever be overidden covariantly: if a method `A.f` returns `int`
+1. Method return types should only ever be overridden covariantly: if a method `A.f` returns `int`
     when called, calling `B.f` should also resolve to `int or a subtype of`int\`.
 1. Method parameters should only ever be overridden contravariantly: if a method `A.f` can be called
     with an argument of type `bool`, then the method `B.f` must also be callable with type `bool`
     (though it is permitted for the override to also accept other types)
 1. Mutable attributes should only ever be overridden invariantly: if a mutable attribute `A.attr`
-    resolves to type `str`, it can only be overidden on a subclass with exactly the same type.
+    resolves to type `str`, it can only be overridden on a subclass with exactly the same type.
 
 ## Method return types
 
@@ -53,7 +53,7 @@ class Sub1(Super):
     def method(self, x: int, /): ...  # fine
 
 class Sub2(Super):
-    def method(self, x: object, /): ...  # fine: `method` still accepts any argument of type `bool`
+    def method(self, x: object, /): ...  # fine: `method` still accepts any argument of type `int`
 
 class Sub4(Super):
     def method(self, x: int | str, /): ...  # fine
@@ -87,7 +87,7 @@ class Sub12(Super):
 
 class Sub13(Super):
     # Some calls permitted by the superclass are now no longer allowed
-    # (the method can no longer be passed with exactly one argument!)
+    # (the method can no longer be passed exactly one argument!)
     def method(self, x, y, /): ...  # error: [invalid-method-override]
 
 class Sub14(Super):
@@ -464,8 +464,6 @@ source-code definitions. There are several scenarios to consider here:
     subclass
 1. A "normal" method on a superclass is overridden by a synthesized method on a subclass
 1. A synthesized method on a superclass is overridden by a synthesized method on a subclass
-1. No methods are overridden, but the Liskov Substitution Principle is arguably violated anyway
-    because a generated method on a superclass is incompatible with subclassing(!)
 
 <!-- snapshot-diagnostics -->
 
@@ -490,13 +488,22 @@ class Bar(Foo):
 class Bar2(Foo):
     y: str
 
-# TODO: Although this class does not override any methods of `Foo`, it nonetheless
-# arguably violates the Liskov Substitution Principle. Instances of `Bar3` cannot be
-# substituted wherever an instance of `Foo` is expected, because the generated
-# `__lt__` method on `Foo` raises an error unless the r.h.s. and `l.h.s.` have exactly
-# the same `__class__` (it does not permit instances of `Foo` to be compared with
-# instances of subclasses of `Foo`). We could therefore consider treating all
-# `order=True` dataclasses as implicitly `@final` in order to enforce Liskov soundness.
+# TODO: Although this class does not override any methods of `Foo`, the design of the
+# `order=True` stdlib dataclasses feature itself arguably violates the Liskov Substitution
+# Principle! Instances of `Bar3` cannot be substituted wherever an instance of `Foo` is
+# expected, because the generated `__lt__` method on `Foo` raises an error unless the r.h.s.
+# and `l.h.s.` have exactly the same `__class__` (it does not permit instances of `Foo` to
+# be compared with instances of subclasses of `Foo`).
+#
+# Many users would probably like their type checkers to alert them to cases where instances
+# of subclasses cannot be substituted for instances of superclasses, as this violates many
+# assumptions a type checker will make and makes it likely that a type checker will fail to
+# catch type errors elsewhere in the user's code. We could therefore consider treating all
+# `order=True` dataclasses as implicitly `@final` in order to enforce soundness. However,
+# this probably shouldn't be reported with the same error code as Liskov violations, since
+# the error does not stem from any method signatures written by the user. The example is
+# only included here for completeness.
+#
 # Note that no other type checker catches this error as of 2025-11-21.
 class Bar3(Foo): ...
 
