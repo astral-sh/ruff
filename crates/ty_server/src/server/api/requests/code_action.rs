@@ -6,9 +6,9 @@ use types::{CodeActionKind, CodeActionOrCommand};
 
 use crate::DIAGNOSTIC_NAME;
 use crate::server::Result;
+use crate::server::api::RequestHandler;
 use crate::server::api::diagnostics::DiagnosticData;
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RetriableRequestHandler};
-use crate::server::api::{LSPResult, RequestHandler};
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 
@@ -31,46 +31,45 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
     ) -> Result<Option<types::CodeActionResponse>> {
         let diagnostics = params.context.diagnostics;
 
-        let diagnostic_actions = diagnostics
-            .into_iter()
-            .filter(|diagnostic| {
-                diagnostic.source.as_deref() == Some(DIAGNOSTIC_NAME)
-                    && range_intersect(&diagnostic.range, &params.range)
-            })
-            .map(|mut diagnostic| {
-                let Some(data) = diagnostic.data.take() else {
-                    return Ok(None);
-                };
-                let data: DiagnosticData = serde_json::from_value(data).map_err(|err| {
-                    anyhow::anyhow!("Failed to deserialize diagnostic data: {err}")
-                })?;
+        let mut actions = Vec::new();
 
-                Ok(Some(CodeActionOrCommand::CodeAction(
-                    lsp_types::CodeAction {
-                        title: data.fix_title,
-                        kind: Some(CodeActionKind::QUICKFIX),
-                        diagnostics: Some(vec![diagnostic]),
-                        edit: Some(lsp_types::WorkspaceEdit {
-                            changes: Some(data.edits),
-                            document_changes: None,
-                            change_annotations: None,
-                        }),
-                        is_preferred: Some(true),
-                        command: None,
-                        disabled: None,
-                        data: None,
-                    },
-                )))
-            })
-            .filter_map(crate::Result::transpose)
-            .collect::<crate::Result<Vec<_>>>()
-            .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+        for mut diagnostic in diagnostics.into_iter().filter(|diagnostic| {
+            diagnostic.source.as_deref() == Some(DIAGNOSTIC_NAME)
+                && range_intersect(&diagnostic.range, &params.range)
+        }) {
+            let Some(data) = diagnostic.data.take() else {
+                continue;
+            };
 
-        if diagnostic_actions.is_empty() {
+            let data: DiagnosticData = match serde_json::from_value(data) {
+                Ok(data) => data,
+                Err(err) => {
+                    tracing::warn!("Failed to deserialize diagnostic data: {err}");
+                    continue;
+                }
+            };
+
+            actions.push(CodeActionOrCommand::CodeAction(lsp_types::CodeAction {
+                title: data.fix_title,
+                kind: Some(CodeActionKind::QUICKFIX),
+                diagnostics: Some(vec![diagnostic]),
+                edit: Some(lsp_types::WorkspaceEdit {
+                    changes: Some(data.edits),
+                    document_changes: None,
+                    change_annotations: None,
+                }),
+                is_preferred: Some(true),
+                command: None,
+                disabled: None,
+                data: None,
+            }));
+        }
+
+        if actions.is_empty() {
             return Ok(None);
         }
 
-        Ok(Some(diagnostic_actions))
+        Ok(Some(actions))
     }
 }
 

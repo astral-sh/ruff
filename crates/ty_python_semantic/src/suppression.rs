@@ -228,13 +228,14 @@ fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
 
     let mut unused_iter = unused
         .iter()
-        .filter(|suppression|
-        // This looks silly but it's necessary to check again if a `unused-ignore-comment` is indeed unused
-        // in case the "unused" directive comes after it:
-        // ```py
-        // a = 10 / 2  # ty: ignore[unused-ignore-comment, division-by-zero]
-        // ```
-        !context.is_suppression_used(suppression.id()))
+        .filter(|suppression| {
+            // This looks silly but it's necessary to check again if a `unused-ignore-comment` is indeed unused
+            // in case the "unused" directive comes after it:
+            // ```py
+            // a = 10 / 2  # ty: ignore[unused-ignore-comment, division-by-zero]
+            // ```
+            !context.is_suppression_used(suppression.id())
+        })
         .peekable();
 
     let source = source_text(context.db, context.file);
@@ -266,18 +267,18 @@ fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
 
                 // Group successive codes together into a single diagnostic,
                 // or report the entire directive if all codes are unused.
-                while let Some(next) = unused_iter.next_if(|next| {
-                    next.comment_range == current.comment_range
-                        && next.target.is_lint()
+                while let Some(next) = unused_iter.peek() {
+                    if let SuppressionTarget::Lint(next_lint) = next.target
+                        && next.comment_range == current.comment_range
                         && source[TextRange::new(current.range.end(), next.range.start())]
                             .chars()
                             .all(|c| c.is_whitespace() || c == ',')
-                }) {
-                    if let SuppressionTarget::Lint(next_lint) = next.target {
+                    {
                         unused_codes.push(next_lint);
-                        current = next;
+                        current = *next;
+                        unused_iter.next();
                     } else {
-                        unreachable!()
+                        break;
                     }
                 }
 
@@ -581,12 +582,22 @@ pub(crate) struct Suppression {
     target: SuppressionTarget,
     kind: SuppressionKind,
 
-    /// The range of this specific suppression.
-    /// This is the same as `comment_range` except for suppression comments that suppress multiple
-    /// codes. For those, the range is limited to the specific code.
+    /// The range of the code in this suppression.
+    ///
+    /// This is the same as the `comment_range` for the
+    /// targets [`SuppressionTarget::All`] and [`SuppressionTarget::Empty`].
     range: TextRange,
 
     /// The range of the suppression comment.
+    ///
+    /// This isn't the range of the entire comment if this is a nested comment:
+    ///
+    /// ```py
+    /// a # ty: ignore # fmt: off
+    ///   ^^^^^^^^^^^^^
+    /// ```
+    ///
+    /// It doesn't include the range of the nested `# fmt: off` comment.
     comment_range: TextRange,
 
     /// The range for which this suppression applies.
@@ -1069,7 +1080,21 @@ enum ParseErrorKind {
 }
 
 fn remove_comment_fix(suppression: &Suppression, source: &str) -> Fix {
+    let comment_end = suppression.comment_range.end();
     let comment_start = suppression.comment_range.start();
+    let after_comment = &source[comment_end.to_usize()..];
+
+    if !after_comment.starts_with(['\n', '\r']) {
+        // For example: `# ty: ignore # fmt: off`
+        // Don't remove the trailing whitespace up to the `ty: ignore` comment
+        return Fix::safe_edit(Edit::range_deletion(TextRange::new(
+            comment_start,
+            suppression.comment_range.end(),
+        )));
+    }
+
+    // Remove any leading whitespace before the comment
+    // to avoid unnecessary trailing whitespace once the comment is removed
     let before_comment = &source[..comment_start.to_usize()];
 
     let mut leading_len = TextSize::default();

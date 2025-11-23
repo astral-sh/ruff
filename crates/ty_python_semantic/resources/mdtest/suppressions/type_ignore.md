@@ -96,7 +96,7 @@ a = test  # type: ignore[name-defined]
 
 ## Nested comments
 
-\<-- snapshot-diagnostics -->
+<!-- snapshot-diagnostics -->
 
 ```py
 # fmt: off
