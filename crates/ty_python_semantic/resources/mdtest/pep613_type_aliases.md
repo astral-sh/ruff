@@ -170,15 +170,11 @@ def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
 # from prefect/utilities/collections.py
 K = TypeVar("K")
 V = TypeVar("V")
-# TODO no error
-# error: [invalid-type-form]
 NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
 
-# TODO no error
-# error: [invalid-type-form]
 def _(nested: NestedDict[str, int]):
     # TODO should be `dict[str, int | NestedDict[str, int]]`
-    reveal_type(nested)  # revealed: Unknown
+    reveal_type(nested)  # revealed: @Todo(specialized generic alias in type expression)
 
 my_isinstance(1, int)
 my_isinstance(1, int | str)

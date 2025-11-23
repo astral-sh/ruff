@@ -732,6 +732,11 @@ class Base(Generic[T]): ...
 class Sub(Base["Sub"]): ...
 
 reveal_type(Sub)  # revealed: <class 'Sub'>
+
+U = TypeVar("U")
+
+class Base2(Generic[T, U]): ...
+class Sub2(Base2["Sub2", U]): ...
 ```
 
 #### Without string forward references
@@ -756,8 +761,6 @@ from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
 
-# TODO: no error "Unsupported class base with type `<class 'list[Derived[T@Derived]]'> | <class 'list[@Todo]'>`"
-# error: [unsupported-base]
 class Derived(list[Derived[T]], Generic[T]): ...
 ```
 

@@ -295,6 +295,18 @@ impl<'db> GenericAlias<'db> {
         ))
     }
 
+    pub(super) fn join_with_previous_cycle(self, db: &'db dyn Db, previous: Self) -> Option<Self> {
+        if self.origin(db) != previous.origin(db) {
+            return None;
+        }
+        Some(Self::new(
+            db,
+            self.origin(db),
+            self.specialization(db)
+                .join_with_previous_cycle(db, previous.specialization(db))?,
+        ))
+    }
+
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.origin(db).definition(db)
     }

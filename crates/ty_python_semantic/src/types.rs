@@ -899,13 +899,48 @@ impl<'db> Type<'db> {
         matches!(self, Type::Callable(..))
     }
 
+    /// Joins the type from the previous cycle with the type from the current cycle.
+    /// This is essentially the same as a union operation, but it unifies types more aggressively.
+    /// Specifically, joining the type from the previous cycle, `list[T]`, with the type from the current cycle, `list[U]`, results in `list[T | U]`.
+    /// This is not allowed under the usual union semantics (because `list[T]` is invariant with respect to `T`).
+    /// However, in this operation, we know that the two types are essentially the same type, so it is fine to combine them with `list[T | U]`.
+    fn join_with_previous_cycle(self, db: &'db dyn Db, previous: Self) -> Self {
+        match (previous, self) {
+            (Type::GenericAlias(previous_generic), Type::GenericAlias(generic)) => {
+                if let Some(joined) = generic.join_with_previous_cycle(db, previous_generic) {
+                    Type::GenericAlias(joined)
+                } else {
+                    UnionType::from_elements_cycle_recovery(db, [self, previous])
+                }
+            }
+            (Type::NominalInstance(previous_instance), Type::NominalInstance(instance)) => {
+                if let Some(joined) = instance.join_with_previous_cycle(db, previous_instance) {
+                    Type::NominalInstance(joined)
+                } else {
+                    UnionType::from_elements_cycle_recovery(db, [self, previous])
+                }
+            }
+            (Type::KnownInstance(previous_known), Type::KnownInstance(known)) => {
+                if let Some(joined) = known.join_with_previous_cycle(db, previous_known) {
+                    Type::KnownInstance(joined)
+                } else {
+                    UnionType::from_elements_cycle_recovery(db, [self, previous])
+                }
+            }
+            // `Union` and `Intersection` do not implement `join_with_previous_cycle`.
+            // Unioning elements within union types creates a nested union.
+            // Even with intersection types, unioning internal types does not result in a disjunctive normal form.
+            _ => UnionType::from_elements_cycle_recovery(db, [self, previous]),
+        }
+    }
+
     pub(crate) fn cycle_normalized(
         self,
         db: &'db dyn Db,
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        UnionType::from_elements_cycle_recovery(db, [self, previous])
+        self.join_with_previous_cycle(db, previous)
             .recursive_type_normalized(db, cycle)
     }
 
@@ -8454,6 +8489,28 @@ impl<'db> KnownInstanceType<'db> {
         }
     }
 
+    fn join_with_previous_cycle(self, db: &'db dyn Db, previous: Self) -> Option<Self> {
+        // Not all patterns need to implement `join_with_previous_cycle`, only types that allow structural joining are required.
+        match (self, previous) {
+            (Self::UnionType(current), Self::UnionType(previous)) => current
+                .join_with_previous_cycle(db, previous)
+                .map(Self::UnionType),
+            (Self::Literal(current), Self::Literal(previous)) => Some(Self::Literal(
+                current.join_with_previous_cycle(db, previous),
+            )),
+            (Self::Annotated(current), Self::Annotated(previous)) => Some(Self::Annotated(
+                current.join_with_previous_cycle(db, previous),
+            )),
+            (Self::TypeGenericAlias(current), Self::TypeGenericAlias(previous)) => Some(
+                Self::TypeGenericAlias(current.join_with_previous_cycle(db, previous)),
+            ),
+            (Self::LiteralStringAlias(current), Self::LiteralStringAlias(previous)) => Some(
+                Self::LiteralStringAlias(current.join_with_previous_cycle(db, previous)),
+            ),
+            _ => None,
+        }
+    }
+
     fn class(self, db: &'db dyn Db) -> KnownClass {
         match self {
             Self::SubscriptedProtocol(_) | Self::SubscriptedGeneric(_) => KnownClass::SpecialForm,
@@ -9955,6 +10012,31 @@ impl<'db> UnionTypeInstance<'db> {
 
         Some(Self::new(db, value_expr_types, union_type))
     }
+
+    fn join_with_previous_cycle(self, db: &'db dyn Db, previous: Self) -> Option<Self> {
+        let value_expr_types = match (
+            self._value_expr_types(db).as_ref(),
+            previous._value_expr_types(db).as_ref(),
+        ) {
+            (Some(types), Some(prev_types)) if types.len() == prev_types.len() => {
+                let joined_types = types
+                    .iter()
+                    .zip(prev_types.iter())
+                    .map(|(ty, prev_ty)| ty.join_with_previous_cycle(db, *prev_ty))
+                    .collect::<Box<_>>();
+                Some(joined_types)
+            }
+            (None, None) => None,
+            _ => return None,
+        };
+        let union_type = match (self.union_type(db).clone(), previous.union_type(db).clone()) {
+            (Ok(ty), Ok(prev_ty)) => Ok(ty.join_with_previous_cycle(db, prev_ty)),
+            (Err(err), Err(prev_err)) if err == prev_err => Err(err),
+            _ => return None,
+        };
+
+        Some(Self::new(db, value_expr_types, union_type))
+    }
 }
 
 /// A salsa-interned `Type`
@@ -9991,6 +10073,14 @@ impl<'db> InternedType<'db> {
                 .unwrap_or(div)
         };
         Some(InternedType::new(db, inner))
+    }
+
+    fn join_with_previous_cycle(self, db: &'db dyn Db, previous: Self) -> Self {
+        InternedType::new(
+            db,
+            self.inner(db)
+                .join_with_previous_cycle(db, previous.inner(db)),
+        )
     }
 }
 
@@ -12997,7 +13087,7 @@ impl<'db> IntersectionType<'db> {
         self.normalized_impl(db, &NormalizedVisitor::default())
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         fn normalized_set<'db>(
             db: &'db dyn Db,
             elements: &FxOrderSet<Type<'db>>,
@@ -13019,7 +13109,7 @@ impl<'db> IntersectionType<'db> {
         )
     }
 
-    pub(crate) fn recursive_type_normalized_impl(
+    fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
         div: Type<'db>,
