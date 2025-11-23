@@ -1535,11 +1535,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         is_self_import = &module_name == thispackage;
                     }
 
-                    if self.current_scope().is_global() && node.module.is_some() {
+                    if node.module.is_some() {
                         if let Ok(thispackage) = this_package
                             && let Some(relative_submodule) = module_name.relative_to(&thispackage)
                         {
                             if is_package
+                                && self.current_scope().is_global()
                                 && let Some(direct_submodule) =
                                     relative_submodule.components().next()
                                 && !self.seen_submodule_imports.contains(direct_submodule)
