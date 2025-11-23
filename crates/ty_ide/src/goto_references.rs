@@ -149,7 +149,6 @@ result = calculate_sum(value=42)
     }
 
     #[test]
-    #[ignore] // TODO: Enable when nonlocal support is fully implemented in goto.rs
     fn test_nonlocal_variable_references() {
         let test = cursor_test(
             "
@@ -183,7 +182,7 @@ def outer_function():
         2 | def outer_function():
         3 |     counter = 0
           |     ^^^^^^^
-        4 |     
+        4 |
         5 |     def increment():
           |
 
@@ -214,7 +213,7 @@ def outer_function():
          7 |         counter += 1
          8 |         return counter
            |                ^^^^^^^
-         9 |     
+         9 |
         10 |     def decrement():
            |
 
@@ -245,7 +244,7 @@ def outer_function():
         12 |         counter -= 1
         13 |         return counter
            |                ^^^^^^^
-        14 |     
+        14 |
         15 |     # Use counter in outer scope
            |
 
@@ -266,14 +265,13 @@ def outer_function():
         18 |     decrement()
         19 |     final = counter
            |             ^^^^^^^
-        20 |     
+        20 |
         21 |     return increment, decrement
            |
         ");
     }
 
     #[test]
-    #[ignore] // TODO: Enable when global support is fully implemented in goto.rs
     fn test_global_variable_references() {
         let test = cursor_test(
             "

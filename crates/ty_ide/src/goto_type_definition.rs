@@ -1063,6 +1063,118 @@ f(**kwargs<CURSOR>)
     }
 
     #[test]
+    fn goto_type_nonlocal_binding() {
+        let test = cursor_test(
+            r#"
+def outer():
+    x = "outer_value"
+    
+    def inner():
+        nonlocal x
+        x = "modified"
+        return x<CURSOR>  # Should find the nonlocal x declaration in outer scope
+    
+    return inner
+"#,
+        );
+
+        // Should find the variable declaration in the outer scope, not the nonlocal statement
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+          --> main.py:8:16
+           |
+         6 |         nonlocal x
+         7 |         x = "modified"
+         8 |         return x  # Should find the nonlocal x declaration in outer scope
+           |                ^
+         9 |
+        10 |     return inner
+           |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_nonlocal_stmt() {
+        let test = cursor_test(
+            r#"
+def outer():
+    xy = "outer_value"
+    
+    def inner():
+        nonlocal x<CURSOR>y
+        xy = "modified"
+        return x  # Should find the nonlocal x declaration in outer scope
+    
+    return inner
+"#,
+        );
+
+        // Should find the variable declaration in the outer scope, not the nonlocal statement
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_type_global_binding() {
+        let test = cursor_test(
+            r#"
+global_var = "global_value"
+
+def function():
+    global global_var
+    global_var = "modified"
+    return global_<CURSOR>var  # Should find the global variable declaration
+"#,
+        );
+
+        // Should find the global variable declaration, not the global statement
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+         --> main.py:7:12
+          |
+        5 |     global global_var
+        6 |     global_var = "modified"
+        7 |     return global_var  # Should find the global variable declaration
+          |            ^^^^^^^^^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_global_stmt() {
+        let test = cursor_test(
+            r#"
+global_var = "global_value"
+
+def function():
+    global global_<CURSOR>var
+    global_var = "modified"
+    return global_var  # Should find the global variable declaration
+"#,
+        );
+
+        // Should find the global variable declaration, not the global statement
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
     fn goto_type_of_expression_with_builtin() {
         let test = cursor_test(
             r#"

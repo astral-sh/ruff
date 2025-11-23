@@ -1255,6 +1255,45 @@ def outer():
     }
 
     #[test]
+    fn goto_declaration_nonlocal_stmt() {
+        let test = cursor_test(
+            r#"
+def outer():
+    xy = "outer_value"
+    
+    def inner():
+        nonlocal x<CURSOR>y
+        xy = "modified"
+        return x  # Should find the nonlocal x declaration in outer scope
+    
+    return inner
+"#,
+        );
+
+        // Should find the variable declaration in the outer scope, not the nonlocal statement
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> main.py:3:5
+          |
+        2 | def outer():
+        3 |     xy = "outer_value"
+          |     ^^
+        4 |
+        5 |     def inner():
+          |
+        info: Source
+         --> main.py:6:18
+          |
+        5 |     def inner():
+        6 |         nonlocal xy
+          |                  ^^
+        7 |         xy = "modified"
+        8 |         return x  # Should find the nonlocal x declaration in outer scope
+          |
+        "#);
+    }
+
+    #[test]
     fn goto_declaration_global_binding() {
         let test = cursor_test(
             r#"
@@ -1284,6 +1323,41 @@ def function():
         6 |     global_var = "modified"
         7 |     return global_var  # Should find the global variable declaration
           |            ^^^^^^^^^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_global_stmt() {
+        let test = cursor_test(
+            r#"
+global_var = "global_value"
+
+def function():
+    global global_<CURSOR>var
+    global_var = "modified"
+    return global_var  # Should find the global variable declaration
+"#,
+        );
+
+        // Should find the global variable declaration, not the global statement
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> main.py:2:1
+          |
+        2 | global_var = "global_value"
+          | ^^^^^^^^^^
+        3 |
+        4 | def function():
+          |
+        info: Source
+         --> main.py:5:12
+          |
+        4 | def function():
+        5 |     global global_var
+          |            ^^^^^^^^^^
+        6 |     global_var = "modified"
+        7 |     return global_var  # Should find the global variable declaration
           |
         "#);
     }
