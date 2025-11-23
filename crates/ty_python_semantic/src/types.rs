@@ -1784,13 +1784,6 @@ impl<'db> Type<'db> {
             {
                 ConstraintSet::from(true)
             }
-            (Type::TypeVar(lhs_bound_typevar), Type::TypeVar(rhs_bound_typevar))
-                if relation.is_assignability()
-                    && lhs_bound_typevar.typevar(db).identity(db)
-                        == rhs_bound_typevar.typevar(db).identity(db) =>
-            {
-                ConstraintSet::from(true)
-            }
 
             // Typevars with non-fully-static bounds or constraints do not participate in
             // subtyping while they are in a non-inferable position.
