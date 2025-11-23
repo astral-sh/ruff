@@ -13317,7 +13317,17 @@ impl<'db> ModuleLiteralType<'db> {
         let place_and_qualifiers = self
             .module(db)
             .file(db)
-            .map(|file| imported_symbol(db, file, name, None))
+            .map(|file| {
+                imported_symbol(db, file, name, None).map_type(|ty| {
+                    if let Some(importing) = self.importing_file(db)
+                        && let Type::ModuleLiteral(module) = ty
+                    {
+                        Type::module_literal(db, importing, module.module(db))
+                    } else {
+                        ty
+                    }
+                })
+            })
             .unwrap_or_default();
 
         if !place_and_qualifiers.is_undefined() {
