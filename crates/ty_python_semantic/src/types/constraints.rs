@@ -1051,6 +1051,12 @@ impl<'db> Node<'db> {
         let mut typevars = FxHashSet::default();
         self.for_each_constraint(db, &mut |constraint| {
             typevars.insert(constraint.typevar(db));
+            if let Type::TypeVar(bound_typevar) = constraint.lower(db) {
+                typevars.insert(bound_typevar);
+            }
+            if let Type::TypeVar(bound_typevar) = constraint.upper(db) {
+                typevars.insert(bound_typevar);
+            }
         });
 
         // Returns if some specialization satisfies this constraint set.
