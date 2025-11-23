@@ -2400,6 +2400,16 @@ class C2:
         self.x = other.x.flip()
 
 reveal_type(C2(Sub()).x)  # revealed: Unknown | Base
+
+class C3:
+    def __init__(self, x: Sub):
+        self.x = [x]
+
+    def replace_with(self, other: "C3"):
+        self.x = [self.x[0].flip()]
+
+# TODO: should be `Unknown | list[Unknown | Sub] | list[Unknown | Base]`
+reveal_type(C3(Sub()).x)  # revealed: Unknown | list[Unknown | Sub] | list[Divergent]
 ```
 
 And cycles between many attributes:
@@ -2652,12 +2662,18 @@ reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Unknown]
 
 ## Divergent inferred implicit instance attribute types
 
+If an implicit attribute is defined recursively and type inference diverges, the divergent part is
+filled in with the dynamic type `Divergent`. Types containing `Divergent` can be seen as "cheap"
+recursive types: they are not true recursive types based on recursive type theory, so no unfolding
+is performed when you use them.
+
 ```py
 class C:
     def f(self, other: "C"):
         self.x = (other.x, 1)
 
 reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
+reveal_type(C().x[0])  # revealed: Unknown | Divergent
 ```
 
 This also works if the tuple is not constructed directly:

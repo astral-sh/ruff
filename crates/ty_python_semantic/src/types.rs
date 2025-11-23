@@ -1570,6 +1570,20 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Performs nest reduction for recursive types (types that contain `Divergent` types).
+    /// For example, consider the following implicit attribute inference:
+    /// ```python
+    /// class C:
+    ///     def f(self, other: "C"):
+    ///         self.x = (other.x, 1)
+    ///
+    /// reveal_type(C().x) # revealed: Unknown | tuple[Divergent, Literal[1]]
+    /// ```
+    ///
+    /// A query that performs implicit attribute type inference enters a cycle because the attribute is recursively defined, and the cycle initial value is set to `Divergent`.
+    /// In the next (1st) cycle it is inferred to be `tuple[Divergent, Literal[1]]`, and in the 2nd cycle it becomes `tuple[tuple[Divergent, Literal[1]], Literal[1]]`.
+    /// If this continues, the query will not converge, so this method is called in the cycle recovery function.
+    /// Then `tuple[tuple[Divergent, Literal[1]], Literal[1]]` is replaced with `tuple[Divergent, Literal[1]]` and the query converges.
     #[must_use]
     pub(crate) fn recursive_type_normalized(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
         cycle.head_ids().fold(self, |ty, id| {
