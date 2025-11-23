@@ -51,5 +51,54 @@ expression: code_actions
       }
     },
     "isPreferred": true
+  },
+  {
+    "title": "Ignore 'unused-ignore-comment' for this line",
+    "kind": "quickfix",
+    "diagnostics": [
+      {
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 12
+          },
+          "end": {
+            "line": 0,
+            "character": 42
+          }
+        },
+        "severity": 2,
+        "code": "unused-ignore-comment",
+        "codeDescription": {
+          "href": "https://ty.dev/rules#unused-ignore-comment"
+        },
+        "source": "ty",
+        "message": "Unused `ty: ignore` directive",
+        "relatedInformation": [],
+        "tags": [
+          1
+        ]
+      }
+    ],
+    "edit": {
+      "changes": {
+        "file://<temp_dir>/src/foo.py": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 41
+              },
+              "end": {
+                "line": 0,
+                "character": 41
+              }
+            },
+            "newText": ", unused-ignore-comment"
+          }
+        ]
+      }
+    },
+    "isPreferred": false
   }
 ]

@@ -2,4 +2,97 @@
 source: crates/ty_server/tests/e2e/code_actions.rs
 expression: code_actions
 ---
-null
+[
+  {
+    "title": "Ignore 'unresolved-reference' for this line",
+    "kind": "quickfix",
+    "diagnostics": [
+      {
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 3
+          },
+          "end": {
+            "line": 0,
+            "character": 9
+          }
+        },
+        "severity": 1,
+        "code": "unresolved-reference",
+        "codeDescription": {
+          "href": "https://ty.dev/rules#unresolved-reference"
+        },
+        "source": "ty",
+        "message": "Name `typing` used when not defined",
+        "relatedInformation": []
+      }
+    ],
+    "edit": {
+      "changes": {
+        "file://<temp_dir>/src/foo.py": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 24
+              },
+              "end": {
+                "line": 0,
+                "character": 24
+              }
+            },
+            "newText": "  # ty:ignore[unresolved-reference]"
+          }
+        ]
+      }
+    },
+    "isPreferred": false
+  },
+  {
+    "title": "Ignore 'invalid-type-form' for this line",
+    "kind": "quickfix",
+    "diagnostics": [
+      {
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 18
+          },
+          "end": {
+            "line": 0,
+            "character": 19
+          }
+        },
+        "severity": 1,
+        "code": "invalid-type-form",
+        "codeDescription": {
+          "href": "https://ty.dev/rules#invalid-type-form"
+        },
+        "source": "ty",
+        "message": "Int literals are not allowed in this context in a type expression",
+        "relatedInformation": []
+      }
+    ],
+    "edit": {
+      "changes": {
+        "file://<temp_dir>/src/foo.py": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 24
+              },
+              "end": {
+                "line": 0,
+                "character": 24
+              }
+            },
+            "newText": "  # ty:ignore[invalid-type-form]"
+          }
+        ]
+      }
+    },
+    "isPreferred": false
+  }
+]

@@ -573,15 +573,13 @@ impl Workspace {
         // This is only for actions that are messy to compute at the time of the diagnostic.
         // For instance, suggesting imports requires finding symbols for the entire project,
         // which is dubious when you're in the middle of resolving symbols.
-        if let Some(range) = diagnostic.inner.range()
-            && let Some(fixes) = ty_ide::code_actions(
+        if let Some(range) = diagnostic.inner.range() {
+            for action in ty_ide::code_actions(
                 &self.db,
                 file_id.file,
                 range,
                 diagnostic.inner.id().as_str(),
-            )
-        {
-            for action in fixes {
+            ) {
                 actions.push(CodeAction {
                     title: action.title,
                     preferred: action.preferred,
