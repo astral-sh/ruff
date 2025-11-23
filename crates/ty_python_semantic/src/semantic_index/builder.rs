@@ -1469,9 +1469,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     .record_node_reachability(NodeKey::from_node(node));
 
                 for (alias_index, alias) in node.names.iter().enumerate() {
-                    // Mark the imported module, and all of its parents, as being imported in this
-                    // file.
-                    if let Some(module_name) = ModuleName::new(&alias.name) {
+                    // If we're in the global scope, mark the imported module,
+                    // and all of its parents, as being imported in this file.
+                    if self.current_scope().is_global()
+                        && let Some(module_name) = ModuleName::new(&alias.name)
+                    {
                         self.imported_modules.extend(module_name.ancestors());
                     }
 

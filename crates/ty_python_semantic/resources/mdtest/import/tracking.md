@@ -1,6 +1,6 @@
 # Tracking imported modules
 
-These tests depend on how we track which modules have been imported. There are currently two
+These tests depend on how we track which modules have been imported. There are several
 characteristics of our module tracking that can lead to inaccuracies:
 
 - Imports are tracked on a per-file basis. At runtime, importing a submodule in one file makes that
@@ -13,10 +13,10 @@ characteristics of our module tracking that can lead to inaccuracies:
     typing spec and that are visible to our file-scoped import tracking.
 
 - Imports are tracked flow-insensitively: submodule accesses are allowed and resolved if that
-    submodule is imported _anywhere in the file_. This handles the common case where all imports are
-    grouped at the top of the file, and is easiest to implement. We might revisit this decision and
-    track submodule imports flow-sensitively, in which case we will have to update the assertions in
-    some of these tests.
+    submodule is imported _anywhere in the global scope of the file_. This handles the common case
+    where all imports are grouped at the top of the file, and is easiest to implement. We might
+    revisit this decision and track submodule imports flow-sensitively, in which case we will have
+    to update the assertions in some of these tests.
 
 ## Import submodule later in file
 
@@ -115,4 +115,29 @@ b = 1
 `attr/b.py`:
 
 ```py
+```
+
+## Submodule is loaded in a non-global scope
+
+We do not recognise a submodule as being available as an attribute if it is only loaded in a
+function scope. The function might never be executed, which would mean that the submodule would
+never be loaded:
+
+`a/b.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import a
+
+def f():
+    import a.b
+
+f()
+
+# error: [unresolved-attribute]
+reveal_type(a.b)  # revealed: Unknown
 ```
