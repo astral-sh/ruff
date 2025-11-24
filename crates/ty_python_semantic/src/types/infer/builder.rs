@@ -10809,8 +10809,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let value_ty = self.infer_expression(&subscript.value, TypeContext::default());
 
         if value_ty.is_generic_alias() {
-            return self
-                .infer_explicitly_specialized_implicit_type_alias(subscript, value_ty, false);
+            return self.infer_explicitly_specialized_type_alias(subscript, value_ty, false);
         }
 
         self.infer_subscript_load_impl(value_ty, subscript)
