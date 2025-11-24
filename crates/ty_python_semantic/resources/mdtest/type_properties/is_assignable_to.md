@@ -252,7 +252,7 @@ static_assert(not is_assignable_to(TypeOf[Foo[bool]], type[Bar[int]]))
 
 # `TypeOf` does not implicitly default-specialize. The unspecialized class literal object `Bar` does
 # not inhabit the type `type[Foo[int]]`.
-static_assert(not is_assignable_to(TypeOf[Bar], type[Foo[int]]))
+static_assert(is_assignable_to(TypeOf[Bar], type[Foo[int]]))
 ```
 
 ## `type[]` is not assignable to types disjoint from `builtins.type`

@@ -362,6 +362,11 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
     get_size2::GetSize,
 )]
 pub enum ClassType<'db> {
+    // `NonGeneric` is intended to mean that the `ClassLiteral` has no type parameters. There are
+    // places where we currently violate this rule (e.g. so that we print `Foo` instead of
+    // `Foo[Unknown]`), but most callers who need to make a `ClassType` from a `ClassLiteral`
+    // should use `ClassLiteral::default_specialization` instead of assuming
+    // `ClassType::NonGeneric`.
     NonGeneric(ClassLiteral<'db>),
     Generic(GenericAlias<'db>),
 }
@@ -3659,12 +3664,6 @@ impl<'db> ClassLiteral<'db> {
 impl<'db> From<ClassLiteral<'db>> for Type<'db> {
     fn from(class: ClassLiteral<'db>) -> Type<'db> {
         Type::ClassLiteral(class)
-    }
-}
-
-impl<'db> From<ClassLiteral<'db>> for ClassType<'db> {
-    fn from(class: ClassLiteral<'db>) -> ClassType<'db> {
-        ClassType::NonGeneric(class)
     }
 }
 
