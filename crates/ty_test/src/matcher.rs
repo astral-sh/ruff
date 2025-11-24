@@ -14,8 +14,9 @@ use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_source_file::{LineIndex, OneIndexed};
 
 use crate::assertion::{InlineFileAssertions, ParsedAssertion, UnparsedAssertion};
+use crate::check_output::{CheckOutput, SortedCheckOutputs};
 use crate::db::Db;
-use crate::diagnostic::SortedDiagnostics;
+use crate::hover::HoverOutput;
 
 #[derive(Debug, Default)]
 pub(super) struct FailuresByLine {
@@ -56,66 +57,66 @@ struct LineFailures {
 pub(super) fn match_file(
     db: &Db,
     file: File,
-    diagnostics: &[Diagnostic],
+    check_outputs: &[CheckOutput],
 ) -> Result<(), FailuresByLine> {
-    // Parse assertions from comments in the file, and get diagnostics from the file; both
+    // Parse assertions from comments in the file, and get check outputs from the file; both
     // ordered by line number.
     let assertions = InlineFileAssertions::from_file(db, file);
-    let diagnostics = SortedDiagnostics::new(diagnostics, &line_index(db, file));
+    let check_outputs = SortedCheckOutputs::new(check_outputs, &line_index(db, file));
 
-    // Get iterators over assertions and diagnostics grouped by line, in ascending line order.
+    // Get iterators over assertions and check outputs grouped by line, in ascending line order.
     let mut line_assertions = assertions.into_iter();
-    let mut line_diagnostics = diagnostics.iter_lines();
+    let mut line_outputs = check_outputs.iter_lines();
 
     let mut current_assertions = line_assertions.next();
-    let mut current_diagnostics = line_diagnostics.next();
+    let mut current_outputs = line_outputs.next();
 
     let matcher = Matcher::from_file(db, file);
     let mut failures = FailuresByLine::default();
 
     loop {
-        match (&current_assertions, &current_diagnostics) {
-            (Some(assertions), Some(diagnostics)) => {
-                match assertions.line_number.cmp(&diagnostics.line_number) {
+        match (&current_assertions, &current_outputs) {
+            (Some(assertions), Some(outputs)) => {
+                match assertions.line_number.cmp(&outputs.line_number) {
                     Ordering::Equal => {
-                        // We have assertions and diagnostics on the same line; check for
+                        // We have assertions and outputs on the same line; check for
                         // matches and error on any that don't match, then advance both
                         // iterators.
                         matcher
-                            .match_line(diagnostics, assertions)
+                            .match_line(outputs.outputs, assertions)
                             .unwrap_or_else(|messages| {
                                 failures.push(assertions.line_number, messages);
                             });
                         current_assertions = line_assertions.next();
-                        current_diagnostics = line_diagnostics.next();
+                        current_outputs = line_outputs.next();
                     }
                     Ordering::Less => {
-                        // We have assertions on an earlier line than diagnostics; report these
+                        // We have assertions on an earlier line than outputs; report these
                         // assertions as all unmatched, and advance the assertions iterator.
                         failures.push(assertions.line_number, unmatched(assertions));
                         current_assertions = line_assertions.next();
                     }
                     Ordering::Greater => {
-                        // We have diagnostics on an earlier line than assertions; report these
-                        // diagnostics as all unmatched, and advance the diagnostics iterator.
-                        failures.push(diagnostics.line_number, unmatched(diagnostics));
-                        current_diagnostics = line_diagnostics.next();
+                        // We have outputs on an earlier line than assertions; report these
+                        // outputs as all unmatched, and advance the outputs iterator.
+                        failures.push(outputs.line_number, unmatched(outputs.outputs));
+                        current_outputs = line_outputs.next();
                     }
                 }
             }
             (Some(assertions), None) => {
-                // We've exhausted diagnostics but still have assertions; report these assertions
+                // We've exhausted outputs but still have assertions; report these assertions
                 // as unmatched and advance the assertions iterator.
                 failures.push(assertions.line_number, unmatched(assertions));
                 current_assertions = line_assertions.next();
             }
-            (None, Some(diagnostics)) => {
-                // We've exhausted assertions but still have diagnostics; report these
-                // diagnostics as unmatched and advance the diagnostics iterator.
-                failures.push(diagnostics.line_number, unmatched(diagnostics));
-                current_diagnostics = line_diagnostics.next();
+            (None, Some(outputs)) => {
+                // We've exhausted assertions but still have outputs; report these
+                // outputs as unmatched and advance the outputs iterator.
+                failures.push(outputs.line_number, unmatched(outputs.outputs));
+                current_outputs = line_outputs.next();
             }
-            // When we've exhausted both diagnostics and assertions, break.
+            // When we've exhausted both outputs and assertions, break.
             (None, None) => break,
         }
     }
@@ -169,6 +170,45 @@ fn maybe_add_undefined_reveal_clarification(
         )
     } else {
         format!("{} {original}", "unexpected error:".red())
+    }
+}
+
+impl Unmatched for &CheckOutput {
+    fn unmatched(&self) -> String {
+        match self {
+            CheckOutput::Diagnostic(diag) => diag.unmatched(),
+            CheckOutput::Hover(hover) => hover.unmatched(),
+        }
+    }
+}
+
+impl UnmatchedWithColumn for &CheckOutput {
+    fn unmatched_with_column(&self, column: OneIndexed) -> String {
+        match self {
+            CheckOutput::Diagnostic(diag) => diag.unmatched_with_column(column),
+            CheckOutput::Hover(hover) => hover.unmatched_with_column(column),
+        }
+    }
+}
+
+impl Unmatched for &HoverOutput {
+    fn unmatched(&self) -> String {
+        format!(
+            "{} hover result: {}",
+            "unexpected:".red(),
+            self.inferred_type
+        )
+    }
+}
+
+impl UnmatchedWithColumn for &HoverOutput {
+    fn unmatched_with_column(&self, column: OneIndexed) -> String {
+        format!(
+            "{} {} hover result: {}",
+            "unexpected:".red(),
+            column,
+            self.inferred_type
+        )
     }
 }
 
@@ -249,23 +289,23 @@ impl Matcher {
         }
     }
 
-    /// Check a slice of [`Diagnostic`]s against a slice of
+    /// Check a slice of [`CheckOutput`]s against a slice of
     /// [`UnparsedAssertion`]s.
     ///
-    /// Return vector of [`Unmatched`] for any unmatched diagnostics or
+    /// Return vector of [`Unmatched`] for any unmatched outputs or
     /// assertions.
     fn match_line<'a, 'b>(
         &self,
-        diagnostics: &'a [&'a Diagnostic],
+        outputs: &'a [&'a CheckOutput],
         assertions: &'a [UnparsedAssertion<'b>],
     ) -> Result<(), Vec<String>>
     where
         'b: 'a,
     {
         let mut failures = vec![];
-        let mut unmatched = diagnostics.to_vec();
+        let mut unmatched = outputs.to_vec();
         for assertion in assertions {
-            match assertion.parse() {
+            match assertion.parse(&self.line_index, &self.source) {
                 Ok(assertion) => {
                     if !self.matches(&assertion, &mut unmatched) {
                         failures.push(assertion.unmatched());
@@ -276,8 +316,8 @@ impl Matcher {
                 }
             }
         }
-        for diagnostic in unmatched {
-            failures.push(diagnostic.unmatched_with_column(self.column(diagnostic)));
+        for output in unmatched {
+            failures.push(output.unmatched_with_column(self.column(output)));
         }
         if failures.is_empty() {
             Ok(())
@@ -286,21 +326,28 @@ impl Matcher {
         }
     }
 
-    fn column(&self, diagnostic: &Diagnostic) -> OneIndexed {
-        diagnostic
-            .primary_span()
-            .and_then(|span| span.range())
-            .map(|range| {
+    fn column(&self, output: &CheckOutput) -> OneIndexed {
+        match output {
+            CheckOutput::Diagnostic(diag) => diag
+                .primary_span()
+                .and_then(|span| span.range())
+                .map(|range| {
+                    self.line_index
+                        .line_column(range.start(), &self.source)
+                        .column
+                })
+                .unwrap_or(OneIndexed::from_zero_indexed(0)),
+            CheckOutput::Hover(hover) => {
                 self.line_index
-                    .line_column(range.start(), &self.source)
+                    .line_column(hover.offset, &self.source)
                     .column
-            })
-            .unwrap_or(OneIndexed::from_zero_indexed(0))
+            }
+        }
     }
 
-    /// Check if `assertion` matches any [`Diagnostic`]s in `unmatched`.
+    /// Check if `assertion` matches any [`CheckOutput`]s in `unmatched`.
     ///
-    /// If so, return `true` and remove the matched diagnostics from `unmatched`. Otherwise, return
+    /// If so, return `true` and remove the matched outputs from `unmatched`. Otherwise, return
     /// `false`.
     ///
     /// An `Error` assertion can only match one diagnostic; even if it could match more than one,
@@ -308,16 +355,17 @@ impl Matcher {
     ///
     /// A `Revealed` assertion must match a revealed-type diagnostic, and may also match an
     /// undefined-reveal diagnostic, if present.
-    fn matches(&self, assertion: &ParsedAssertion, unmatched: &mut Vec<&Diagnostic>) -> bool {
+    fn matches(&self, assertion: &ParsedAssertion, unmatched: &mut Vec<&CheckOutput>) -> bool {
         match assertion {
             ParsedAssertion::Error(error) => {
-                let position = unmatched.iter().position(|diagnostic| {
+                let position = unmatched.iter().position(|output| {
+                    let CheckOutput::Diagnostic(diagnostic) = output else {
+                        return false;
+                    };
                     let lint_name_matches = !error.rule.is_some_and(|rule| {
                         !(diagnostic.id().is_lint_named(rule) || diagnostic.id().as_str() == rule)
                     });
-                    let column_matches = error
-                        .column
-                        .is_none_or(|col| col == self.column(diagnostic));
+                    let column_matches = error.column.is_none_or(|col| col == self.column(output));
                     let message_matches = error.message_contains.is_none_or(|needle| {
                         normalize_paths(&diagnostic.concise_message().to_string()).contains(needle)
                     });
@@ -368,7 +416,10 @@ impl Matcher {
 
                 let mut matched_revealed_type = None;
                 let mut matched_undefined_reveal = None;
-                for (index, diagnostic) in unmatched.iter().enumerate() {
+                for (index, output) in unmatched.iter().enumerate() {
+                    let CheckOutput::Diagnostic(diagnostic) = output else {
+                        continue;
+                    };
                     if matched_revealed_type.is_none() && diagnostic_matches_reveal(diagnostic) {
                         matched_revealed_type = Some(index);
                     } else if matched_undefined_reveal.is_none()
@@ -389,6 +440,27 @@ impl Matcher {
                 });
                 matched_revealed_type.is_some()
             }
+            ParsedAssertion::Hover(hover) => {
+                let expected_type = discard_todo_metadata(hover.expected_type);
+
+                // Find a hover output that matches the expected type
+                let position = unmatched.iter().position(|output| {
+                    let CheckOutput::Hover(hover_output) = output else {
+                        return false;
+                    };
+
+                    // Compare the inferred type with the expected type
+                    let inferred_type = discard_todo_metadata(&hover_output.inferred_type);
+                    inferred_type == expected_type
+                });
+
+                if let Some(position) = position {
+                    unmatched.swap_remove(position);
+                    true
+                } else {
+                    false
+                }
+            }
         }
     }
 }
@@ -396,6 +468,7 @@ impl Matcher {
 #[cfg(test)]
 mod tests {
     use super::FailuresByLine;
+    use crate::check_output::CheckOutput;
     use ruff_db::Db;
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
     use ruff_db::files::{File, system_path_to_file};
@@ -455,11 +528,11 @@ mod tests {
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
 
-        let diagnostics: Vec<Diagnostic> = expected_diagnostics
+        let check_outputs: Vec<CheckOutput> = expected_diagnostics
             .into_iter()
-            .map(|diagnostic| diagnostic.into_diagnostic(file))
+            .map(|diagnostic| CheckOutput::Diagnostic(diagnostic.into_diagnostic(file)))
             .collect();
-        super::match_file(&db, file, &diagnostics)
+        super::match_file(&db, file, &check_outputs)
     }
 
     fn assert_fail(result: Result<(), FailuresByLine>, messages: &[(usize, &[&str])]) {
