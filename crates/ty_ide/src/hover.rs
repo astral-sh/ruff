@@ -22,8 +22,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     let model = SemanticModel::new(db, file);
     let docs = goto_target
         .get_definition_targets(
-            file,
-            db,
+            &model,
             ty_python_semantic::ImportAliasResolution::ResolveAliases,
         )
         .and_then(|definitions| definitions.docstring(db))
@@ -1488,11 +1487,17 @@ def ab(a: int, *, c: int):
         .unwrap();
 
         assert_snapshot!(test.hover(), @r"
+        <module 'lib'>
+        ---------------------------------------------
         The cool lib_py module!
 
         Wow this module rocks.
 
         ---------------------------------------------
+        ```python
+        <module 'lib'>
+        ```
+        ---
         The cool lib/_py module!  
           
         Wow this module rocks.

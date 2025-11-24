@@ -108,7 +108,7 @@ use crate::types::{
     TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
     TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
     TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
-    UnionTypeInstance, binding_type, todo_type,
+    UnionTypeInstance, binding_type, liskov, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -548,9 +548,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "Inferring deferred types should not add more deferred definitions"
         );
 
-        // TODO: Only call this function when diagnostics are enabled.
-        self.check_class_definitions();
-        self.check_overloaded_functions(node);
+        if self.db().should_check_file(self.file()) {
+            self.check_class_definitions();
+            self.check_overloaded_functions(node);
+        }
     }
 
     /// Iterate over all class definitions to check that the definition will not cause an exception
@@ -948,6 +949,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
+
+            // (8) Check for Liskov violations
+            liskov::check_class(&self.context, class);
 
             if let Some(protocol) = class.into_protocol_class(self.db()) {
                 protocol.validate_members(&self.context);
@@ -3053,7 +3057,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .iter()
                         .map(|(index, ty)| (&tuple.elts[*index], **ty));
 
-                    report_invalid_exception_tuple_caught(&self.context, tuple, invalid_elements);
+                    report_invalid_exception_tuple_caught(
+                        &self.context,
+                        tuple,
+                        node_ty,
+                        invalid_elements,
+                    );
                 } else {
                     report_invalid_exception_caught(&self.context, node, node_ty);
                 }
@@ -6231,16 +6240,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        let diagnostic = builder.into_diagnostic(format_args!(
+        let mut diagnostic = builder.into_diagnostic(format_args!(
             "Module `{module_name}` has no member `{name}`"
         ));
 
+        let mut submodule_hint_added = false;
+
         if let Some(full_submodule_name) = full_submodule_name {
-            hint_if_stdlib_submodule_exists_on_other_versions(
+            submodule_hint_added = hint_if_stdlib_submodule_exists_on_other_versions(
                 self.db(),
-                diagnostic,
+                &mut diagnostic,
                 &full_submodule_name,
                 module,
+            );
+        }
+
+        if !submodule_hint_added {
+            hint_if_stdlib_attribute_exists_on_other_versions(
+                self.db(),
+                diagnostic,
+                module_ty,
+                name,
+                "resolving imports",
             );
         }
     }
@@ -6326,13 +6347,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        let diagnostic = builder.into_diagnostic(format_args!(
+        let mut diagnostic = builder.into_diagnostic(format_args!(
             "Module `{thispackage_name}` has no submodule `{final_part}`"
         ));
 
         hint_if_stdlib_submodule_exists_on_other_versions(
             self.db(),
-            diagnostic,
+            &mut diagnostic,
             &full_submodule_name,
             module,
         );
@@ -9077,10 +9098,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 let diagnostic = match value_type {
-                    Type::ModuleLiteral(module) => builder.into_diagnostic(format_args!(
-                        "Module `{}` has no member `{attr_name}`",
-                        module.module(db).name(db),
-                    )),
+                    Type::ModuleLiteral(module) => {
+                        let module = module.module(db);
+                        let module_name = module.name(db);
+                        if module.kind(db).is_package()
+                            && let Some(relative_submodule) = ModuleName::new(attr_name)
+                        {
+                            let mut maybe_submodule_name = module_name.clone();
+                            maybe_submodule_name.extend(&relative_submodule);
+                            if resolve_module(db, &maybe_submodule_name).is_some() {
+                                let mut diag = builder.into_diagnostic(format_args!(
+                                    "Submodule `{attr_name}` may not be available as an attribute \
+                                    on module `{module_name}`"
+                                ));
+                                diag.help(format_args!(
+                                    "Consider explicitly importing `{maybe_submodule_name}`"
+                                ));
+                                return fallback();
+                            }
+                        }
+
+                        builder.into_diagnostic(format_args!(
+                            "Module `{module_name}` has no member `{attr_name}`",
+                        ))
+                    }
                     Type::ClassLiteral(class) => builder.into_diagnostic(format_args!(
                         "Class `{}` has no attribute `{attr_name}`",
                         class.name(db),
@@ -9102,8 +9143,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 hint_if_stdlib_attribute_exists_on_other_versions(
                     db,
                     diagnostic,
-                    &value_type,
+                    value_type,
                     attr_name,
+                    &format!("resolving the `{attr_name}` attribute"),
                 );
 
                 fallback()

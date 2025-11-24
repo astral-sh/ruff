@@ -3,12 +3,13 @@ use crate::references::{ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
 use ruff_db::files::File;
 use ruff_text_size::{Ranged, TextSize};
-use ty_python_semantic::ImportAliasResolution;
+use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 
 /// Returns the range of the symbol if it can be renamed, None if not.
 pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text_size::TextRange> {
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
+    let model = SemanticModel::new(db, file);
 
     // Get the definitions for the symbol at the offset
     let goto_target = find_goto_target(&module, offset)?;
@@ -24,7 +25,7 @@ pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text
     let current_file_in_project = is_file_in_project(db, file);
 
     if let Some(definition_targets) = goto_target
-        .get_definition_targets(file, db, ImportAliasResolution::PreserveAliases)
+        .get_definition_targets(&model, ImportAliasResolution::PreserveAliases)
         .and_then(|definitions| definitions.declaration_targets(db))
     {
         for target in &definition_targets {

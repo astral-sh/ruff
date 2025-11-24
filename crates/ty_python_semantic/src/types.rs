@@ -96,6 +96,7 @@ mod generics;
 pub mod ide_support;
 mod infer;
 mod instance;
+mod liskov;
 mod member;
 mod mro;
 mod narrow;
@@ -1101,6 +1102,13 @@ impl<'db> Type<'db> {
     pub(crate) const fn as_protocol_instance(self) -> Option<ProtocolInstanceType<'db>> {
         match self {
             Type::ProtocolInstance(instance) => Some(instance),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn as_bound_method(self) -> Option<BoundMethodType<'db>> {
+        match self {
+            Type::BoundMethod(bound_method) => Some(bound_method),
             _ => None,
         }
     }
@@ -3523,9 +3531,10 @@ impl<'db> Type<'db> {
             return;
         };
 
-        let tcx_specialization = tcx
-            .annotation
-            .and_then(|tcx| tcx.specialization_of(db, class_literal));
+        let tcx_specialization = tcx.annotation.and_then(|tcx| {
+            tcx.filter_union(db, |ty| ty.specialization_of(db, class_literal).is_some())
+                .specialization_of(db, class_literal)
+        });
 
         for (typevar, ty) in specialization
             .generic_context(db)

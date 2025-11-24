@@ -155,10 +155,10 @@ class GtReturnType: ...
 class GeReturnType: ...
 
 class A:
-    def __eq__(self, o: object) -> EqReturnType:
+    def __eq__(self, o: object) -> EqReturnType:  # error: [invalid-method-override]
         return EqReturnType()
 
-    def __ne__(self, o: object) -> NeReturnType:
+    def __ne__(self, o: object) -> NeReturnType:  # error: [invalid-method-override]
         return NeReturnType()
 
     def __lt__(self, o: A) -> LtReturnType:
@@ -386,6 +386,7 @@ class NotBoolable:
     __bool__: None = None
 
 class A:
+    # error: [invalid-method-override]
     def __eq__(self, other) -> NotBoolable:
         return NotBoolable()
 

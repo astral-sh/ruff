@@ -1,0 +1,192 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: liskov.md - The Liskov Substitution Principle - The entire class hierarchy is checked
+mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
+---
+
+# Python source files
+
+## stub.pyi
+
+```
+ 1 | from typing import Any
+ 2 | 
+ 3 | class Grandparent:
+ 4 |     def method(self, x: int) -> None: ...
+ 5 | 
+ 6 | class Parent(Grandparent):
+ 7 |     def method(self, x: str) -> None: ...  # error: [invalid-method-override]
+ 8 | 
+ 9 | class Child(Parent):
+10 |     # compatible with the signature of `Parent.method`, but not with `Grandparent.method`:
+11 |     def method(self, x: str) -> None: ...  # error: [invalid-method-override]
+12 | 
+13 | class OtherChild(Parent):
+14 |     # compatible with the signature of `Grandparent.method`, but not with `Parent.method`:
+15 |     def method(self, x: int) -> None: ...  # error: [invalid-method-override]
+16 | 
+17 | class GradualParent(Grandparent):
+18 |     def method(self, x: Any) -> None: ...
+19 | 
+20 | class ThirdChild(GradualParent):
+21 |     # `GradualParent.method` is compatible with the signature of `Grandparent.method`,
+22 |     # and `ThirdChild.method` is compatible with the signature of `GradualParent.method`,
+23 |     # but `ThirdChild.method` is not compatible with the signature of `Grandparent.method`
+24 |     def method(self, x: str) -> None: ...  # error: [invalid-method-override]
+```
+
+## other_stub.pyi
+
+```
+ 1 | class A:
+ 2 |     def get(self, default): ...
+ 3 | 
+ 4 | class B(A):
+ 5 |     def get(self, default, /): ...  # error: [invalid-method-override]
+ 6 | 
+ 7 | get = 56
+ 8 | 
+ 9 | class C(B):
+10 |     # `get` appears in the symbol table of `C`,
+11 |     # but that doesn't confuse our diagnostic...
+12 |     foo = get
+13 | 
+14 | class D(C):
+15 |     # compatible with `C.get` and `B.get`, but not with `A.get`
+16 |     def get(self, my_default): ...  # error: [invalid-method-override]
+```
+
+# Diagnostics
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+ --> src/stub.pyi:4:9
+  |
+3 | class Grandparent:
+4 |     def method(self, x: int) -> None: ...
+  |         ---------------------------- `Grandparent.method` defined here
+5 |
+6 | class Parent(Grandparent):
+7 |     def method(self, x: str) -> None: ...  # error: [invalid-method-override]
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Grandparent.method`
+8 |
+9 | class Child(Parent):
+  |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/stub.pyi:11:9
+   |
+ 9 | class Child(Parent):
+10 |     # compatible with the signature of `Parent.method`, but not with `Grandparent.method`:
+11 |     def method(self, x: str) -> None: ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Grandparent.method`
+12 |
+13 | class OtherChild(Parent):
+   |
+  ::: src/stub.pyi:4:9
+   |
+ 3 | class Grandparent:
+ 4 |     def method(self, x: int) -> None: ...
+   |         ---------------------------- `Grandparent.method` defined here
+ 5 |
+ 6 | class Parent(Grandparent):
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/stub.pyi:15:9
+   |
+13 | class OtherChild(Parent):
+14 |     # compatible with the signature of `Grandparent.method`, but not with `Parent.method`:
+15 |     def method(self, x: int) -> None: ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
+16 |
+17 | class GradualParent(Grandparent):
+   |
+  ::: src/stub.pyi:7:9
+   |
+ 6 | class Parent(Grandparent):
+ 7 |     def method(self, x: str) -> None: ...  # error: [invalid-method-override]
+   |         ---------------------------- `Parent.method` defined here
+ 8 |
+ 9 | class Child(Parent):
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/stub.pyi:24:9
+   |
+22 |     # and `ThirdChild.method` is compatible with the signature of `GradualParent.method`,
+23 |     # but `ThirdChild.method` is not compatible with the signature of `Grandparent.method`
+24 |     def method(self, x: str) -> None: ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Grandparent.method`
+   |
+  ::: src/stub.pyi:4:9
+   |
+ 3 | class Grandparent:
+ 4 |     def method(self, x: int) -> None: ...
+   |         ---------------------------- `Grandparent.method` defined here
+ 5 |
+ 6 | class Parent(Grandparent):
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `get`
+ --> src/other_stub.pyi:2:9
+  |
+1 | class A:
+2 |     def get(self, default): ...
+  |         ------------------ `A.get` defined here
+3 |
+4 | class B(A):
+5 |     def get(self, default, /): ...  # error: [invalid-method-override]
+  |         ^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `A.get`
+6 |
+7 | get = 56
+  |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `get`
+  --> src/other_stub.pyi:16:9
+   |
+14 | class D(C):
+15 |     # compatible with `C.get` and `B.get`, but not with `A.get`
+16 |     def get(self, my_default): ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `A.get`
+   |
+  ::: src/other_stub.pyi:2:9
+   |
+ 1 | class A:
+ 2 |     def get(self, default): ...
+   |         ------------------ `A.get` defined here
+ 3 |
+ 4 | class B(A):
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```

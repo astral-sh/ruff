@@ -335,6 +335,9 @@ reveal_type(x19)  # revealed: list[Literal[1]]
 x20: list[Literal[1]] | None = [1]
 reveal_type(x20)  # revealed: list[Literal[1]]
 
-x21: X[Literal[1]] | None = x(1)
+x21: X[Literal[1]] | None = X(1)
 reveal_type(x21)  # revealed: X[Literal[1]]
+
+x22: X[Literal[1]] | None = x(1)
+reveal_type(x22)  # revealed: X[Literal[1]]
 ```
