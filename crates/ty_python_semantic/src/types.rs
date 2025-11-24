@@ -11127,7 +11127,10 @@ impl<'db> CallableTypes<'db> {
     }
 
     pub(crate) fn exactly_one(self) -> Option<CallableType<'db>> {
-        self.0.into_iter().exactly_one().ok()
+        match self.0.as_slice() {
+            [single] => Some(*single),
+            _ => None,
+        }
     }
 
     fn is_empty(&self) -> bool {
