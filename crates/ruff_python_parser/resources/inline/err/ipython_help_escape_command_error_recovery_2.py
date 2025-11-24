@@ -1,2 +1,3 @@
 # parse_options: {"mode": "ipython"}
-with (a, ?b): pass
+with (a, ?b
+?

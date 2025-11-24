@@ -1110,25 +1110,26 @@ impl RecoveryContextKind {
                 }
             }
             RecoveryContextKind::WithItems(with_item_kind) => match with_item_kind {
-                // test_err ipython_escape_command_in_parenthesized_with_statement
-                // # parse_options: {"mode": "ipython"}
-                // with (a, ?b): pass
                 WithItemKind::Parenthesized => match p.current_token_kind() {
                     TokenKind::Rpar => Some(ListTerminatorKind::Regular),
                     TokenKind::Colon => Some(ListTerminatorKind::ErrorRecovery),
                     _ => None,
                 },
-                // test_err ipython_escape_command_in_with_statement
+                // test_err ipython_help_escape_command_error_recovery_1
                 // # parse_options: {"mode": "ipython"}
-                // with a,?b
-                //     pass
-                // with a,?b
-                //     x = 1
-                //     y = 2
+                // with (a, ?b)
+                // ?
 
-                // test_err ipython_help_escape_command_as_expression
+                // test_err ipython_help_escape_command_error_recovery_2
                 // # parse_options: {"mode": "ipython"}
-                // with a,?b: pass
+                // with (a, ?b
+                // ?
+
+                // test_err ipython_help_escape_command_error_recovery_3
+                // # parse_options: {"mode": "ipython"}
+                // with a, ?b
+                // ?
+                // x = 1
                 WithItemKind::Unparenthesized => matches!(
                     p.current_token_kind(),
                     TokenKind::Colon | TokenKind::Newline
