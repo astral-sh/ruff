@@ -5683,14 +5683,6 @@ mod tests {
         4 | a[: <class 'Foo[int]'>] = Foo[int]
           |                 ^^^
           |
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: File after edits
-        info: Source
-
-        class Foo[T]: ...
-
-        a: <class 'Foo[int]'> = Foo[int]
         "#);
     }
 
@@ -6267,6 +6259,39 @@ mod tests {
           |                                                               ^^^^^^^
           |
         "#);
+    }
+
+    #[test]
+    fn test_module_inlay_hint() {
+        let mut test = inlay_hint_test(
+            "
+                      import foo
+
+                      a = foo",
+        );
+
+        test.with_extra_file("foo.py", "'''Foo module'''");
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        import foo
+
+        a[: <module 'foo'>] = foo
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo.py:1:1
+          |
+        1 | '''Foo module'''
+          | ^^^^^^^^^^^^^^^^
+          |
+        info: Source
+         --> main2.py:4:5
+          |
+        2 | import foo
+        3 |
+        4 | a[: <module 'foo'>] = foo
+          |     ^^^^^^^^^^^^^^
+          |
+        ");
     }
 
     struct InlayHintLocationDiagnostic {
