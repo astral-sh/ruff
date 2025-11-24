@@ -3630,30 +3630,32 @@ pub(super) fn report_invalid_method_override<'db>(
 /// *does* exist as a submodule in the standard library on *other* Python
 /// versions, we add a hint to the diagnostic that the user may have
 /// misconfigured their Python version.
+///
+/// The funciton returns `true` if a hint was added, `false` otherwise.
 pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
     db: &dyn Db,
-    mut diagnostic: LintDiagnosticGuard,
+    diagnostic: &mut Diagnostic,
     full_submodule_name: &ModuleName,
     parent_module: Module,
-) {
+) -> bool {
     let Some(search_path) = parent_module.search_path(db) else {
-        return;
+        return false;
     };
 
     if !search_path.is_standard_library() {
-        return;
+        return false;
     }
 
     let program = Program::get(db);
     let typeshed_versions = program.search_paths(db).typeshed_versions();
 
     let Some(version_range) = typeshed_versions.exact(full_submodule_name) else {
-        return;
+        return false;
     };
 
     let python_version = program.python_version(db);
     if version_range.contains(python_version) {
-        return;
+        return false;
     }
 
     diagnostic.info(format_args!(
@@ -3667,7 +3669,9 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
         version_range = version_range.diagnostic_display(),
     ));
 
-    add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, "resolving modules");
+    add_inferred_python_version_hint_to_diagnostic(db, diagnostic, "resolving modules");
+
+    true
 }
 
 /// This function receives an unresolved `foo.bar` attribute access,
@@ -3681,8 +3685,9 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
 pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     db: &dyn Db,
     mut diagnostic: LintDiagnosticGuard,
-    value_type: &Type,
+    value_type: Type,
     attr: &str,
+    action: &str,
 ) {
     // Currently we limit this analysis to attributes of stdlib modules,
     // as this covers the most important cases while not being too noisy
@@ -3705,17 +3710,19 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     // so if this lookup succeeds then we know that this lookup *could* succeed with possible
     // configuration changes.
     let symbol_table = place_table(db, global_scope(db, file));
-    if symbol_table.symbol_by_name(attr).is_none() {
+    let Some(symbol) = symbol_table.symbol_by_name(attr) else {
+        return;
+    };
+
+    if !symbol.is_bound() {
         return;
     }
+
+    diagnostic.info("The member may be available on other Python versions or platforms");
 
     // For now, we just mention the current version they're on, and hope that's enough of a nudge.
     // TODO: determine what version they need to be on
     // TODO: also mention the platform we're assuming
     // TODO: determine what platform they need to be on
-    add_inferred_python_version_hint_to_diagnostic(
-        db,
-        &mut diagnostic,
-        &format!("accessing `{attr}`"),
-    );
+    add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, action);
 }
