@@ -75,7 +75,7 @@ class Ty(Tool):
 
             [environment]
             python-version = "{project.python_version}"
-            python = "{venv.path}"
+            python = "{venv.path.as_posix()}"
             """,
         )
 
@@ -108,7 +108,7 @@ class Mypy(Tool):
         command = [
             str(path),
             "--python-executable",
-            str(venv.python),
+            str(venv.python.as_posix()),
             "--python-version",
             project.python_version,
             "--no-pretty",
@@ -171,7 +171,7 @@ class Pyright(Tool):
                     # CLI option when `venv` is set in the configuration... 🤷‍♂️
                     "venv": venv.name,
                     # This is not the path to the venv folder, but the folder that contains the venv...
-                    "venvPath": str(venv.path.parent),
+                    "venvPath": str(venv.path.parent.as_posix()),
                     "pythonVersion": project.python_version,
                 }
             ),
@@ -211,9 +211,9 @@ class Pyrefly(Tool):
             f"""
             project-includes = [{", ".join([f'"{include}"' for include in project.include])}]
             project-excludes = [{", ".join([f'"{exclude}"' for exclude in project.exclude])}]
-            python-interpreter-path = "{venv.python}"
+            python-interpreter-path = "{venv.python.as_posix()}"
             python-version = "{project.python_version}"
-            site-package-path = ["{venv.path}"]
+            site-package-path = ["{venv.path.as_posix()}"]
             ignore-missing-source = true
             untyped-def-behavior="check-and-infer-return-any"
             """,
