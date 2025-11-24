@@ -96,6 +96,24 @@ def _(x: MyAlias):
     reveal_type(x)  # revealed: int | ((str, /) -> int)
 ```
 
+## Generic aliases
+
+```py
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+
+MyList: TypeAlias = list[T]
+ListOrSet: TypeAlias = list[T] | set[T]
+
+reveal_type(MyList)  # revealed: <class 'list[T]'>
+reveal_type(ListOrSet)  # revealed: types.UnionType
+
+def _(list_of_int: MyList[int], list_or_set_of_str: ListOrSet[str]):
+    reveal_type(list_of_int)  # revealed: list[int]
+    reveal_type(list_or_set_of_str)  # revealed: list[str] | set[str]
+```
+
 ## Subscripted generic alias in union
 
 ```py

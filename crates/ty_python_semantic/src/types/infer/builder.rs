@@ -5588,10 +5588,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.deferred_state = DeferredExpressionState::Deferred;
             }
 
+            let previous_typevar_binding_context = self.typevar_binding_context;
+            self.typevar_binding_context = Some(definition);
+
             let inferred_ty = self.infer_maybe_standalone_expression(
                 value,
                 TypeContext::new(Some(declared.inner_type())),
             );
+
+            self.typevar_binding_context = previous_typevar_binding_context;
 
             self.deferred_state = previous_deferred_state;
 
