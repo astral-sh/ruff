@@ -237,4 +237,26 @@ class Matrix:
 Matrix() < Matrix()
 ```
 
+## `self`-binding behaviour of function-like `Callable`s
+
+Binding the `self` parameter of a function-like `Callable` creates a new `Callable` that is also
+function-like:
+
+`main.py`:
+
+```py
+from typing import Callable
+
+def my_lossy_decorator(fn: Callable[..., int]) -> Callable[..., int]:
+    return fn
+
+class MyClass:
+    @my_lossy_decorator
+    def method(self) -> int:
+        return 42
+
+reveal_type(MyClass().method)  # revealed: (...) -> int
+reveal_type(MyClass().method.__name__)  # revealed: str
+```
+
 [`tensorbase`]: https://github.com/pytorch/pytorch/blob/f3913ea641d871f04fa2b6588a77f63efeeb9f10/torch/_tensor.py#L1084-L1092
