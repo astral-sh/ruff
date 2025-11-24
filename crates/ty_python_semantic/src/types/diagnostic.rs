@@ -8,13 +8,13 @@ use super::{
 use crate::diagnostic::did_you_mean;
 use crate::diagnostic::format_enumeration;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
+use crate::place::Place;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::semantic_index::{global_scope, place_table, use_def_map};
 use crate::suppression::FileSuppressionId;
-use crate::types::KnownInstanceType;
 use crate::types::call::CallError;
-use crate::types::class::{DisjointBase, DisjointBaseKind, Field};
+use crate::types::class::{DisjointBase, DisjointBaseKind, Field, MethodDecorator};
 use crate::types::function::{FunctionType, KnownFunction};
 use crate::types::liskov::{MethodKind, SynthesizedMethodKind};
 use crate::types::string_annotation::{
@@ -27,6 +27,7 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
     infer_isolated_expression, protocol_class::ProtocolClass,
 };
+use crate::types::{KnownInstanceType, MemberLookupPolicy};
 use crate::{Db, DisplaySettings, FxIndexMap, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::{
@@ -3519,6 +3520,27 @@ pub(super) fn report_invalid_method_override<'db>(
         "Definition is incompatible with `{overridden_method}`"
     ));
 
+    let class_member = |cls: ClassType<'db>| {
+        cls.class_member(db, member, MemberLookupPolicy::default())
+            .place
+    };
+
+    if let Place::Defined(Type::FunctionLiteral(subclass_function), _, _) = class_member(subclass)
+        && let Place::Defined(Type::FunctionLiteral(superclass_function), _, _) =
+            class_member(superclass)
+        && let Ok(superclass_function_kind) =
+            MethodDecorator::try_from_fn_type(db, superclass_function)
+        && let Ok(subclass_function_kind) = MethodDecorator::try_from_fn_type(db, subclass_function)
+        && superclass_function_kind != subclass_function_kind
+    {
+        diagnostic.info(format_args!(
+            "`{class_name}.{member}` is {subclass_function_kind} \
+            but `{overridden_method}` is {superclass_function_kind}",
+            superclass_function_kind = superclass_function_kind.description(),
+            subclass_function_kind = subclass_function_kind.description(),
+        ));
+    }
+
     diagnostic.info("This violates the Liskov Substitution Principle");
 
     if !subclass_definition_kind.is_function_def()
@@ -3545,9 +3567,11 @@ pub(super) fn report_invalid_method_override<'db>(
                         .full_range(db, &parsed_module(db, superclass_scope.file(db)).load(db)),
                 );
 
-                let superclass_function_span = superclass_type
-                    .as_bound_method()
-                    .and_then(|method| signature_span(method.function(db)));
+                let superclass_function_span = match superclass_type {
+                    Type::FunctionLiteral(function) => signature_span(function),
+                    Type::BoundMethod(method) => signature_span(method.function(db)),
+                    _ => None,
+                };
 
                 let superclass_definition_kind = definition.kind(db);
 

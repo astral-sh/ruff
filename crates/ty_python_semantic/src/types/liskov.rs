@@ -49,11 +49,6 @@ fn check_class_declaration<'db>(
         return;
     };
 
-    // TODO: classmethods and staticmethods
-    if function.is_classmethod(db) || function.is_staticmethod(db) {
-        return;
-    }
-
     // Constructor methods are not checked for Liskov compliance
     if matches!(
         &*member.name,

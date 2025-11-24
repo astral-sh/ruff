@@ -1264,6 +1264,14 @@ impl MethodDecorator {
             (false, false) => Ok(Self::None),
         }
     }
+
+    pub(crate) const fn description(self) -> &'static str {
+        match self {
+            MethodDecorator::None => "an instance method",
+            MethodDecorator::ClassMethod => "a classmethod",
+            MethodDecorator::StaticMethod => "a staticmethod",
+        }
+    }
 }
 
 /// Kind-specific metadata for different types of fields
