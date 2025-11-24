@@ -1082,6 +1082,15 @@ impl<'db> Node<'db> {
                 // specialization satisfies the constraint set.
                 let valid_specializations = typevar.valid_specializations(db);
                 if !some_specialization_satisfies(valid_specializations.node) {
+                    if std::env::var("DEBUG_SAT").is_ok() {
+                        let inferable_ids: Vec<_> = inferable.iter().collect();
+                        eprintln!(
+                            "inferable typevar {:?} no satisfying specialization for {} (inferable set: {:?})",
+                            typevar.identity(db),
+                            ConstraintSet { node: self }.display(db),
+                            inferable_ids
+                        );
+                    }
                     return false;
                 }
             } else {
@@ -1091,11 +1100,13 @@ impl<'db> Node<'db> {
                 // of those inferable typevars for each specialization of this non-inferable one.
                 // To handle this, we use the sequent map to find which inferable typevars this
                 // typevar depends on, and existentially abstract them away.
+                let inferable_ids: FxHashSet<_> = inferable.iter().collect();
                 let inferable_dependencies = interior
                     .sequent_map(db)
                     .get_typevar_dependencies(typevar.identity(db))
-                    .filter(|dependency| dependency.is_inferable(db, inferable));
-                let restricted = self.exists(db, inferable_dependencies);
+                    .filter(|dep| inferable_ids.contains(dep));
+                let inferable_dependencies: Vec<_> = inferable_dependencies.collect();
+                let restricted = self.exists(db, inferable_dependencies.iter().copied());
 
                 // Complicating things, the typevar might have gradual constraints. For those, we
                 // need to know the range of valid materializations, but we only need some
@@ -1109,10 +1120,31 @@ impl<'db> Node<'db> {
                 let (static_specializations, gradual_constraints) =
                     typevar.required_specializations(db);
                 if !all_specializations_satisfy(restricted, static_specializations) {
+                    if std::env::var("DEBUG_SAT").is_ok() {
+                        let inferable_ids: Vec<_> = inferable.iter().collect();
+                        eprintln!(
+                            "non-inferable typevar {:?} static specializations fail for {} (inferable set: {:?}, deps: {:?}, restricted: {}, restricted_always?: {})",
+                            typevar.identity(db),
+                            ConstraintSet { node: self }.display(db),
+                            inferable_ids,
+                            inferable_dependencies,
+                            ConstraintSet { node: restricted }.display(db),
+                            restricted.is_always_satisfied(db)
+                        );
+                    }
                     return false;
                 }
                 for gradual_constraint in gradual_constraints {
                     if !some_specialization_satisfies(gradual_constraint) {
+                        if std::env::var("DEBUG_SAT").is_ok() {
+                            let inferable_ids: Vec<_> = inferable.iter().collect();
+                            eprintln!(
+                                "non-inferable typevar {:?} gradual constraint fails for {} (inferable set: {:?})",
+                                typevar.identity(db),
+                                ConstraintSet { node: self }.display(db),
+                                inferable_ids
+                            );
+                        }
                         return false;
                     }
                 }
