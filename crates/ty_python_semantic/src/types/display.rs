@@ -1056,6 +1056,7 @@ impl<'db> FmtDetailed<'db> for DisplayOverloadLiteral<'db> {
             settings: self.settings.clone(),
         };
 
+        f.set_invalid_syntax();
         f.write_str("def ")?;
         write!(f, "{}", self.literal.name(self.db))?;
         type_parameters.fmt_detailed(f)?;
@@ -1102,7 +1103,7 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
                     db: self.db,
                     settings: self.settings.clone(),
                 };
-
+                f.set_invalid_syntax();
                 f.write_str("def ")?;
                 write!(f, "{}", self.ty.name(self.db))?;
                 type_parameters.fmt_detailed(f)?;
@@ -1722,6 +1723,7 @@ impl<'db> FmtDetailed<'db> for DisplayOmitted {
         } else {
             self.plural
         };
+        f.set_invalid_syntax();
         write!(f, "... omitted {} {}", self.count, noun)
     }
 }
@@ -1936,6 +1938,7 @@ impl<'db> FmtDetailed<'db> for DisplayIntersectionType<'_, 'db> {
                     }),
             );
 
+        f.set_invalid_syntax();
         f.join(" & ").entries(tys).finish()
     }
 }
@@ -1988,6 +1991,7 @@ struct DisplayMaybeParenthesizedType<'db> {
 impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let write_parentheses = |f: &mut TypeWriter<'_, '_, 'db>| {
+            f.set_invalid_syntax();
             f.write_char('(')?;
             self.ty
                 .display_with(self.db, self.settings.clone())
