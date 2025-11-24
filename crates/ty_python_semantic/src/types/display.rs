@@ -853,6 +853,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 write!(f, ".{}", enum_literal.name(self.db))
             }
             Type::TypeVar(bound_typevar) => {
+                f.set_invalid_syntax();
                 write!(f, "{}", bound_typevar.identity(self.db).display(self.db))
             }
             Type::AlwaysTruthy => f.with_type(self.ty).write_str("AlwaysTruthy"),
@@ -1284,6 +1285,7 @@ impl<'db> DisplayGenericContext<'_, 'db> {
             if idx > 0 {
                 f.write_str(", ")?;
             }
+            f.set_invalid_syntax();
             f.write_str(bound_typevar.typevar(self.db).name(self.db))?;
         }
         f.write_char(']')
@@ -1296,6 +1298,7 @@ impl<'db> DisplayGenericContext<'_, 'db> {
             if idx > 0 {
                 f.write_str(", ")?;
             }
+            f.set_invalid_syntax();
             write!(f, "{}", bound_typevar.identity(self.db).display(self.db))?;
         }
         f.write_char(']')
@@ -1386,6 +1389,7 @@ impl<'db> DisplaySpecialization<'db> {
             if idx > 0 {
                 f.write_str(", ")?;
             }
+            f.set_invalid_syntax();
             write!(f, "{}", bound_typevar.identity(self.db).display(self.db))?;
             f.write_str(" = ")?;
             ty.display_with(self.db, self.settings.clone())

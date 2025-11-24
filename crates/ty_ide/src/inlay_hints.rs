@@ -3850,8 +3850,8 @@ mod tests {
 
         class MyClass[T, U]:
             def __init__(self, x: list[T], y: tuple[U, U]):
-                self.x: list[T@MyClass] = x
-                self.y: tuple[U@MyClass, U@MyClass] = y
+                self.x = x
+                self.y = y
 
         x: MyClass[Unknown | int, str] = MyClass([42], ("a", "b"))
         y: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]] = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
