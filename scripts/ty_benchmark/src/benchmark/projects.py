@@ -1,5 +1,6 @@
 import logging
 import subprocess
+import sys
 from pathlib import Path
 from typing import Final, Literal, NamedTuple
 
@@ -107,8 +108,8 @@ ALL: Final = [
             # All extras except jupyter because installing the jupyter optional results in a mypy typing error.
             "--extra",
             "colorama",
-            "--extra",
-            "uvloop",
+            # uvloop is not supported on Windows
+            *(["--extra", "uvloop"] if sys.platform != "win32" else []),
             "--extra",
             "d",
         ],

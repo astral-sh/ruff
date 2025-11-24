@@ -21,5 +21,3 @@ packages = ["src/benchmark"]
 ignore = [
     "E501", # We use ruff format
 ]
-
-[tool.ty]

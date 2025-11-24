@@ -55,8 +55,9 @@ class Ty(Tool):
 
     def __init__(self, *, path: Path | None = None):
         self.name = str(path) if path else "ty"
+        executable = "ty.exe" if sys.platform == "win32" else "ty"
         self.path = (
-            path or (Path(__file__) / "../../../../../target/release/ty")
+            path or (Path(__file__) / "../../../../../target/release" / executable)
         ).resolve()
 
         assert self.path.is_file(), (
@@ -150,7 +151,7 @@ class Pyright(Tool):
             self.path = path
         else:
             if sys.platform == "win32":
-                self.path = Path("./node_modules/.bin/pyright.exe").resolve()
+                self.path = Path("./node_modules/.bin/pyright.cmd").resolve()
             else:
                 self.path = Path("./node_modules/.bin/pyright").resolve()
 
