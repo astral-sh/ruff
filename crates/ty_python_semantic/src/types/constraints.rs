@@ -1106,7 +1106,16 @@ impl<'db> Node<'db> {
                     .get_typevar_dependencies(typevar.identity(db))
                     .filter(|dep| inferable_ids.contains(dep));
                 let inferable_dependencies: Vec<_> = inferable_dependencies.collect();
-                let restricted = self.exists(db, inferable_dependencies.iter().copied());
+                let mut restricted = self.exists(db, inferable_dependencies.iter().copied());
+                // If this non-inferable typevar depends on any inferable typevars, we are allowed
+                // to pick different specializations of those inferable typevars for each
+                // specialization of this non-inferable one. Existentially abstract them away.
+                // If any constraints on this typevar remain after abstracting its inferable
+                // dependencies, they are independent of those inferable typevars, so it is safe to
+                // existentially abstract this typevar as well.
+                if !inferable_dependencies.is_empty() {
+                    restricted = restricted.exists_one(db, typevar.identity(db));
+                }
 
                 // Complicating things, the typevar might have gradual constraints. For those, we
                 // need to know the range of valid materializations, but we only need some
