@@ -118,11 +118,7 @@ impl Printer {
                     let (prefix, suffix) = if show_legend {
                         (
                             String::new(),
-                            format!(
-                                " ([{}] = all fixable, [{}] = some fixable)",
-                                "*".cyan(),
-                                "~".cyan()
-                            ),
+                            format!(" ([{}] all, [{}] some)", "*".cyan(), "-".cyan()),
                         )
                     } else {
                         (format!("[{}] ", "*".cyan()), String::new())
@@ -352,7 +348,7 @@ impl Printer {
                 let any_fixable = statistics.iter().any(ExpandedStatistics::any_fixable);
 
                 let all_fixable = format!("[{}] ", "*".cyan());
-                let partially_fixable = format!("[{}] ", "~".cyan());
+                let partially_fixable = format!("[{}] ", "-".cyan());
                 let unfixable = "[ ] ";
 
                 // By default, we mimic Flake8's `--statistics` format.

@@ -1043,7 +1043,7 @@ def mvce(keys, values):
     ----- stdout -----
     1	C416	[*] unnecessary-comprehension
     Found 1 error.
-    1 fixable with the --fix option ([*] = all fixable, [~] = some fixable).
+    1 fixable with the --fix option ([*] all, [-] some).
 
     ----- stderr -----
     ");
@@ -1156,9 +1156,9 @@ fn show_statistics_partial_fix() {
     success: false
     exit_code: 1
     ----- stdout -----
-    2	UP035	[~] deprecated-import
+    2	UP035	[-] deprecated-import
     Found 2 errors.
-    1 fixable with the `--fix` option ([*] = all fixable, [~] = some fixable).
+    1 fixable with the `--fix` option ([*] all, [-] some).
 
     ----- stderr -----
     ");
