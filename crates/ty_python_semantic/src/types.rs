@@ -1537,7 +1537,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Callable(callable) => Some(CallableTypes::one(callable)),
 
-            Type::Dynamic(_) => Some(CallableTypes::one(CallableType::function_like_callable(
+            Type::Dynamic(_) => Some(CallableTypes::one(CallableType::function_like(
                 db,
                 Signature::dynamic(self),
             ))),
@@ -1578,7 +1578,7 @@ impl<'db> Type<'db> {
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(class) => class.into_callable(db),
                 SubclassOfInner::Dynamic(dynamic) => {
-                    Some(CallableTypes::one(CallableType::single_callable(
+                    Some(CallableTypes::one(CallableType::single(
                         db,
                         Signature::new(Parameters::unknown(), Some(Type::Dynamic(dynamic))),
                     )))
@@ -1615,7 +1615,7 @@ impl<'db> Type<'db> {
             }
 
             Type::KnownInstance(KnownInstanceType::NewType(newtype)) => {
-                Some(CallableTypes::one(CallableType::single_callable(
+                Some(CallableTypes::one(CallableType::single(
                     db,
                     Signature::new(
                         Parameters::new([Parameter::positional_only(None)
@@ -5645,7 +5645,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
                                         [
-                                            CallableType::single(db, getter_signature),
+                                            Type::single_callable(db, getter_signature),
                                             Type::none(db),
                                         ],
                                     ))
@@ -5654,7 +5654,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
                                         [
-                                            CallableType::single(db, setter_signature),
+                                            Type::single_callable(db, setter_signature),
                                             Type::none(db),
                                         ],
                                     ))
@@ -5663,7 +5663,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
                                         [
-                                            CallableType::single(db, deleter_signature),
+                                            Type::single_callable(db, deleter_signature),
                                             Type::none(db),
                                         ],
                                     ))
@@ -10984,33 +10984,32 @@ pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for CallableType<'_> {}
 
-impl<'db> CallableType<'db> {
+impl<'db> Type<'db> {
     /// Create a callable type with a single non-overloaded signature.
-    pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
-        Type::Callable(Self::single_callable(db, signature))
-    }
-
-    pub(crate) fn single_callable(db: &'db dyn Db, signature: Signature<'db>) -> CallableType<'db> {
-        CallableType::new(db, CallableSignature::single(signature), false)
+    pub(crate) fn single_callable(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
+        Type::Callable(CallableType::single(db, signature))
     }
 
     /// Create a non-overloaded, function-like callable type with a single signature.
     ///
     /// A function-like callable will bind `self` when accessed as an attribute on an instance.
-    pub(crate) fn function_like(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
-        Type::Callable(Self::function_like_callable(db, signature))
+    pub(crate) fn function_like_callable(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
+        Type::Callable(CallableType::function_like(db, signature))
+    }
+}
+
+impl<'db> CallableType<'db> {
+    pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> CallableType<'db> {
+        CallableType::new(db, CallableSignature::single(signature), false)
     }
 
-    pub(crate) fn function_like_callable(
-        db: &'db dyn Db,
-        signature: Signature<'db>,
-    ) -> CallableType<'db> {
+    pub(crate) fn function_like(db: &'db dyn Db, signature: Signature<'db>) -> CallableType<'db> {
         CallableType::new(db, CallableSignature::single(signature), true)
     }
 
     /// Create a callable type which accepts any parameters and returns an `Unknown` type.
     pub(crate) fn unknown(db: &'db dyn Db) -> Type<'db> {
-        Self::single(db, Signature::unknown())
+        Type::Callable(Self::single(db, Signature::unknown()))
     }
 
     pub(crate) fn bind_self(

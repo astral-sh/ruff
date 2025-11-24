@@ -791,7 +791,7 @@ impl<'db> ClassType<'db> {
                         .with_annotated_type(Type::instance(db, self))]);
 
                 let synthesized_dunder_method =
-                    CallableType::function_like(db, Signature::new(parameters, Some(return_type)));
+                    Type::function_like_callable(db, Signature::new(parameters, Some(return_type)));
 
                 Member::definitely_declared(synthesized_dunder_method)
             }
@@ -1013,7 +1013,7 @@ impl<'db> ClassType<'db> {
                     iterable_parameter,
                 ]);
 
-                let synthesized_dunder = CallableType::function_like(
+                let synthesized_dunder = Type::function_like_callable(
                     db,
                     Signature::new_generic(inherited_generic_context, parameters, None),
                 );
@@ -1193,7 +1193,7 @@ impl<'db> ClassType<'db> {
                     ))
                 } else {
                     // Fallback if no `object.__new__` is found.
-                    Some(CallableTypes::one(CallableType::single_callable(
+                    Some(CallableTypes::one(CallableType::single(
                         db,
                         Signature::new(Parameters::empty(), Some(correct_return_type)),
                     )))
@@ -2160,7 +2160,7 @@ impl<'db> ClassLiteral<'db> {
                     Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))]),
                     Some(field.declared_ty),
                 );
-                let property_getter = CallableType::single(db, property_getter_signature);
+                let property_getter = Type::single_callable(db, property_getter_signature);
                 let property = PropertyInstanceType::new(db, Some(property_getter), None);
                 return Member::definitely_declared(Type::PropertyInstance(property));
             }
@@ -2374,7 +2374,7 @@ impl<'db> ClassLiteral<'db> {
                 ),
                 _ => Signature::new(Parameters::new(parameters), return_ty),
             };
-            Some(CallableType::function_like(db, signature))
+            Some(Type::function_like_callable(db, signature))
         };
 
         match (field_policy, name) {
@@ -2410,7 +2410,7 @@ impl<'db> ClassLiteral<'db> {
                     Some(KnownClass::Bool.to_instance(db)),
                 );
 
-                Some(CallableType::function_like(db, signature))
+                Some(Type::function_like_callable(db, signature))
             }
             (CodeGeneratorKind::DataclassLike(_), "__hash__") => {
                 let unsafe_hash = has_dataclass_param(DataclassFlags::UNSAFE_HASH);
@@ -2426,7 +2426,7 @@ impl<'db> ClassLiteral<'db> {
                         Some(KnownClass::Int.to_instance(db)),
                     );
 
-                    Some(CallableType::function_like(db, signature))
+                    Some(Type::function_like_callable(db, signature))
                 } else if eq && !frozen {
                     Some(Type::none(db))
                 } else {
@@ -2513,7 +2513,7 @@ impl<'db> ClassLiteral<'db> {
                         Some(Type::Never),
                     );
 
-                    return Some(CallableType::function_like(db, signature));
+                    return Some(Type::function_like_callable(db, signature));
                 }
                 None
             }
@@ -2791,7 +2791,7 @@ impl<'db> ClassLiteral<'db> {
                     Some(Type::none(db)),
                 );
 
-                Some(CallableType::function_like(db, signature))
+                Some(Type::function_like_callable(db, signature))
             }
             _ => None,
         }

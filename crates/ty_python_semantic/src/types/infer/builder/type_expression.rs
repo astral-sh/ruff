@@ -1011,7 +1011,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let callable_type = if let (Some(parameters), Some(return_type), true) =
             (parameters, return_type, correct_argument_number)
         {
-            CallableType::single(db, Signature::new(parameters, Some(return_type)))
+            Type::single_callable(db, Signature::new(parameters, Some(return_type)))
         } else {
             CallableType::unknown(db)
         };

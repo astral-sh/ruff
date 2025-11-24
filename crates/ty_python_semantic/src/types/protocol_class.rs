@@ -202,7 +202,7 @@ impl<'db> ProtocolInterface<'db> {
                     Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))]),
                     Some(ty.normalized(db)),
                 );
-                let property_getter = CallableType::single(db, property_getter_signature);
+                let property_getter = Type::single_callable(db, property_getter_signature);
                 let property = PropertyInstanceType::new(db, Some(property_getter), None);
                 (
                     Name::new(name),

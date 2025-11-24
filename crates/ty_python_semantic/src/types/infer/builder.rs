@@ -3284,7 +3284,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // specified in this context.
         match default {
             ast::Expr::EllipsisLiteral(_) => {
-                CallableType::single(self.db(), Signature::new(Parameters::gradual_form(), None))
+                Type::single_callable(self.db(), Signature::new(Parameters::gradual_form(), None))
             }
             ast::Expr::List(ast::ExprList { elts, .. }) => {
                 let mut parameter_types = Vec::with_capacity(elts.len());
@@ -3312,7 +3312,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }))
                 };
 
-                CallableType::single(self.db(), Signature::new(parameters, None))
+                Type::single_callable(self.db(), Signature::new(parameters, None))
             }
             ast::Expr::Name(name) => {
                 let name_ty = self.infer_name_load(name);
@@ -7945,7 +7945,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // TODO: Useful inference of a lambda's return type will require a different approach,
         // which does the inference of the body expression based on arguments at each call site,
         // rather than eagerly computing a return type without knowing the argument types.
-        CallableType::function_like(self.db(), Signature::new(parameters, Some(Type::unknown())))
+        Type::function_like_callable(self.db(), Signature::new(parameters, Some(Type::unknown())))
     }
 
     fn infer_call_expression(
