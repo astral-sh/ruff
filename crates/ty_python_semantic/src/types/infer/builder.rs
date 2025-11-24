@@ -6240,16 +6240,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        let diagnostic = builder.into_diagnostic(format_args!(
+        let mut diagnostic = builder.into_diagnostic(format_args!(
             "Module `{module_name}` has no member `{name}`"
         ));
 
+        let mut submodule_hint_added = false;
+
         if let Some(full_submodule_name) = full_submodule_name {
-            hint_if_stdlib_submodule_exists_on_other_versions(
+            submodule_hint_added = hint_if_stdlib_submodule_exists_on_other_versions(
                 self.db(),
-                diagnostic,
+                &mut diagnostic,
                 &full_submodule_name,
                 module,
+            );
+        }
+
+        if !submodule_hint_added {
+            hint_if_stdlib_attribute_exists_on_other_versions(
+                self.db(),
+                diagnostic,
+                module_ty,
+                name,
+                "resolving imports",
             );
         }
     }
@@ -6335,13 +6347,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        let diagnostic = builder.into_diagnostic(format_args!(
+        let mut diagnostic = builder.into_diagnostic(format_args!(
             "Module `{thispackage_name}` has no submodule `{final_part}`"
         ));
 
         hint_if_stdlib_submodule_exists_on_other_versions(
             self.db(),
-            diagnostic,
+            &mut diagnostic,
             &full_submodule_name,
             module,
         );
@@ -9131,8 +9143,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 hint_if_stdlib_attribute_exists_on_other_versions(
                     db,
                     diagnostic,
-                    &value_type,
+                    value_type,
                     attr_name,
+                    &format!("resolving the `{attr_name}` attribute"),
                 );
 
                 fallback()
