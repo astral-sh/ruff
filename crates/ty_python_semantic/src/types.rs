@@ -1566,7 +1566,7 @@ impl<'db> Type<'db> {
                 }
             }
             Type::ClassLiteral(class_literal) => {
-                Some(ClassType::NonGeneric(class_literal).into_callable(db))
+                Some(class_literal.default_specialization(db).into_callable(db))
             }
 
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
@@ -2406,7 +2406,7 @@ impl<'db> Type<'db> {
                 .subclass_of()
                 .into_class()
                 .map(|subclass_of_class| {
-                    ClassType::NonGeneric(class).has_relation_to_impl(
+                    class.default_specialization(db).has_relation_to_impl(
                         db,
                         subclass_of_class,
                         inferable,
@@ -6707,7 +6707,9 @@ impl<'db> Type<'db> {
                             KnownClass::Float.to_instance(db),
                         ],
                     ),
-                    _ if class.is_typed_dict(db) => Type::typed_dict(*class),
+                    _ if class.is_typed_dict(db) => {
+                        Type::typed_dict(class.default_specialization(db))
+                    }
                     _ => Type::instance(db, class.default_specialization(db)),
                 };
                 Ok(ty)

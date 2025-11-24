@@ -679,11 +679,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 Type::unknown()
             }
-            ast::Expr::Subscript(ast::ExprSubscript {
-                value,
-                slice: parameters,
-                ..
-            }) => {
+            ast::Expr::Subscript(
+                subscript @ ast::ExprSubscript {
+                    value,
+                    slice: parameters,
+                    ..
+                },
+            ) => {
                 let parameters_ty = match self.infer_expression(value, TypeContext::default()) {
                     Type::SpecialForm(SpecialFormType::Union) => match &**parameters {
                         ast::Expr::Tuple(tuple) => {
@@ -698,6 +700,40 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         }
                         _ => self.infer_subclass_of_type_expression(parameters),
                     },
+                    value_ty @ Type::ClassLiteral(class_literal) => {
+                        if class_literal.is_protocol(self.db()) {
+                            SubclassOfType::from(
+                                self.db(),
+                                todo_type!("type[T] for protocols").expect_dynamic(),
+                            )
+                        } else {
+                            match class_literal.generic_context(self.db()) {
+                                Some(generic_context) => {
+                                    let db = self.db();
+                                    let specialize = |types: &[Option<Type<'db>>]| {
+                                        SubclassOfType::from(
+                                            db,
+                                            class_literal.apply_specialization(db, |_| {
+                                                generic_context
+                                                    .specialize_partial(db, types.iter().copied())
+                                            }),
+                                        )
+                                    };
+                                    self.infer_explicit_callable_specialization(
+                                        subscript,
+                                        value_ty,
+                                        generic_context,
+                                        specialize,
+                                    )
+                                }
+                                None => {
+                                    // TODO: emit a diagnostic if you try to specialize a non-generic class.
+                                    self.infer_type_expression(parameters);
+                                    todo_type!("specialized non-generic class")
+                                }
+                            }
+                        }
+                    }
                     _ => {
                         self.infer_type_expression(parameters);
                         todo_type!("unsupported nested subscript in type[X]")
