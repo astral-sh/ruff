@@ -1037,59 +1037,36 @@ impl<'db> Node<'db> {
             Node::Interior(_) => {}
         }
 
-        let mut typevars = FxHashSet::default();
+        let mut inferable_typevars = FxHashSet::default();
+        let mut non_inferable_typevars = FxHashSet::default();
+        let mut valid_inferable_specializations = Node::AlwaysTrue;
+        let mut valid_non_inferable_specializations = Node::AlwaysTrue;
+        let mut add_typevar = |bound_typevar: BoundTypeVarInstance<'db>| {
+            let valid_specializations = bound_typevar.valid_specializations(db);
+            if bound_typevar.is_inferable(db, inferable) {
+                inferable_typevars.insert(bound_typevar);
+                valid_inferable_specializations =
+                    valid_inferable_specializations.and(db, valid_specializations);
+            } else {
+                non_inferable_typevars.insert(bound_typevar);
+                valid_non_inferable_specializations =
+                    valid_non_inferable_specializations.and(db, valid_specializations);
+            }
+        };
         self.for_each_constraint(db, &mut |constraint| {
-            typevars.insert(constraint.typevar(db));
+            add_typevar(constraint.typevar(db));
+            if let Type::TypeVar(bound_typevar) = constraint.lower(db) {
+                add_typevar(bound_typevar);
+            }
+            if let Type::TypeVar(bound_typevar) = constraint.upper(db) {
+                add_typevar(bound_typevar);
+            }
         });
 
-        // Returns if some specialization satisfies this constraint set.
-        let some_specialization_satisfies = move |specializations: Node<'db>| {
-            let when_satisfied = specializations.implies(db, self).and(db, specializations);
-            !when_satisfied.is_never_satisfied(db)
-        };
-
-        // Returns if all specializations satisfy this constraint set.
-        let all_specializations_satisfy = move |specializations: Node<'db>| {
-            let when_satisfied = specializations.implies(db, self).and(db, specializations);
-            when_satisfied
-                .iff(db, specializations)
-                .is_always_satisfied(db)
-        };
-
-        for typevar in typevars {
-            if typevar.is_inferable(db, inferable) {
-                // If the typevar is in inferable position, we need to verify that some valid
-                // specialization satisfies the constraint set.
-                let valid_specializations = typevar.valid_specializations(db);
-                if !some_specialization_satisfies(valid_specializations) {
-                    return false;
-                }
-            } else {
-                // If the typevar is in non-inferable position, we need to verify that all required
-                // specializations satisfy the constraint set. Complicating things, the typevar
-                // might have gradual constraints. For those, we need to know the range of valid
-                // materializations, but we only need some materialization to satisfy the
-                // constraint set.
-                //
-                // NB: We could also model this by introducing a synthetic typevar for the gradual
-                // constraint, treating that synthetic typevar as always inferable (so that we only
-                // need to verify for some materialization), and then update this typevar's
-                // constraint to refer to the synthetic typevar instead of the original gradual
-                // constraint.
-                let (static_specializations, gradual_constraints) =
-                    typevar.required_specializations(db);
-                if !all_specializations_satisfy(static_specializations) {
-                    return false;
-                }
-                for gradual_constraint in gradual_constraints {
-                    if !some_specialization_satisfies(gradual_constraint) {
-                        return false;
-                    }
-                }
-            }
-        }
-
-        true
+        let restricted = self.and(db, valid_inferable_specializations);
+        let restricted = restricted.exists(db, inferable.iter());
+        let restricted = valid_non_inferable_specializations.implies(db, restricted);
+        restricted.is_always_satisfied(db)
     }
 
     /// Returns a new BDD that is the _existential abstraction_ of `self` for a set of typevars.
@@ -3058,56 +3035,6 @@ impl<'db> BoundTypeVarInstance<'db> {
                     );
                 }
                 specializations
-            }
-        }
-    }
-
-    /// Returns the required specializations of a typevar. This is used when checking a constraint
-    /// set when this typevar is in non-inferable position, where we need _all_ specializations to
-    /// satisfy the constraint set.
-    ///
-    /// That causes complications if this is a constrained typevar, where one of the constraints is
-    /// gradual. In that case, we need to return the range of valid materializations, but we don't
-    /// want to require that all of those materializations satisfy the constraint set.
-    ///
-    /// To handle this, we return a "primary" result, and an iterator of any gradual constraints.
-    /// For an unbounded/unconstrained typevar or a bounded typevar, the primary result fully
-    /// specifies the required specializations, and the iterator will be empty. For a constrained
-    /// typevar, the primary result will include the fully static constraints, and the iterator
-    /// will include an entry for each non-fully-static constraint.
-    fn required_specializations(
-        self,
-        db: &'db dyn Db,
-    ) -> (Node<'db>, impl IntoIterator<Item = Node<'db>>) {
-        // For upper bounds and constraints, we are free to choose any materialization that makes
-        // the check succeed. In non-inferable positions, it is most helpful to choose a
-        // materialization that is as restrictive as possible, since that minimizes the number of
-        // valid specializations that must satisfy the check. We therefore take the bottom
-        // materialization of the bound or constraints.
-        match self.typevar(db).bound_or_constraints(db) {
-            None => (Node::AlwaysTrue, Vec::new()),
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                let bound = bound.bottom_materialization(db);
-                (
-                    ConstrainedTypeVar::new_node(db, self, Type::Never, bound),
-                    Vec::new(),
-                )
-            }
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                let mut non_gradual_constraints = Node::AlwaysFalse;
-                let mut gradual_constraints = Vec::new();
-                for constraint in constraints.elements(db) {
-                    let constraint_lower = constraint.bottom_materialization(db);
-                    let constraint_upper = constraint.top_materialization(db);
-                    let constraint =
-                        ConstrainedTypeVar::new_node(db, self, constraint_lower, constraint_upper);
-                    if constraint_lower == constraint_upper {
-                        non_gradual_constraints = non_gradual_constraints.or(db, constraint);
-                    } else {
-                        gradual_constraints.push(constraint);
-                    }
-                }
-                (non_gradual_constraints, gradual_constraints)
             }
         }
     }
