@@ -27,7 +27,7 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
     infer_isolated_expression, protocol_class::ProtocolClass,
 };
-use crate::types::{KnownInstanceType, MemberLookupPolicy};
+use crate::types::{CallableType, KnownInstanceType, MemberLookupPolicy};
 use crate::{Db, DisplaySettings, FxIndexMap, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::{
@@ -3464,14 +3464,14 @@ pub(super) fn report_invalid_method_override<'db>(
     member: &str,
     subclass: ClassType<'db>,
     subclass_definition: Definition<'db>,
-    subclass_function: FunctionType<'db>,
+    subclass_type: Type<'db>,
     superclass: ClassType<'db>,
     superclass_type: Type<'db>,
     superclass_method_kind: MethodKind,
 ) {
     let db = context.db();
 
-    let signature_span = |function: FunctionType<'db>| {
+    let signature_span_inner = |function: FunctionType<'db>| {
         function
             .literal(db)
             .last_definition(db)
@@ -3479,23 +3479,31 @@ pub(super) fn report_invalid_method_override<'db>(
             .map(|spans| spans.signature)
     };
 
+    let signature_span = |ty| match ty {
+        Type::FunctionLiteral(function) => signature_span_inner(function),
+        Type::BoundMethod(method) => signature_span_inner(method.function(db)),
+        _ => None,
+    };
+
     let subclass_definition_kind = subclass_definition.kind(db);
-    let subclass_definition_signature_span = signature_span(subclass_function);
+    let subclass_definition_signature_span = signature_span(subclass_type);
 
     // If the function was originally defined elsewhere and simply assigned
     // in the body of the class here, we cannot use the range associated with the `FunctionType`
-    let diagnostic_range = if subclass_definition_kind.is_function_def() {
-        subclass_definition_signature_span
-            .as_ref()
-            .and_then(Span::range)
-            .unwrap_or_else(|| {
-                subclass_function
-                    .node(db, context.file(), context.module())
-                    .range
-            })
-    } else {
-        subclass_definition.full_range(db, context.module()).range()
-    };
+    let diagnostic_range = subclass_definition_kind
+        .as_function_def()
+        .map(|node| {
+            let function = node.node(context.module());
+            TextRange::new(
+                function.name.start(),
+                function
+                    .returns
+                    .as_deref()
+                    .map(Ranged::end)
+                    .unwrap_or(function.parameters.end()),
+            )
+        })
+        .unwrap_or_else(|| subclass_definition.full_range(db, context.module()).range());
 
     let class_name = subclass.name(db);
     let superclass_name = superclass.name(db);
@@ -3539,6 +3547,33 @@ pub(super) fn report_invalid_method_override<'db>(
             superclass_function_kind = superclass_function_kind.description(),
             subclass_function_kind = subclass_function_kind.description(),
         ));
+    } else if !matches!(
+        subclass_type,
+        Type::FunctionLiteral(_) | Type::BoundMethod(_)
+    ) {
+        if let Some(callables) = subclass_type.try_upcast_to_callable(db) {
+            diagnostic.info(format_args!(
+                "`{class_name}.{member}` has type `{}`",
+                subclass_type.display(db)
+            ));
+            if let Some(callable) = callables.exactly_one()
+                && !callable.is_function_like(db)
+                && let Some(superclass_callable) = superclass_type.try_upcast_to_callable(db)
+                && Type::Callable(CallableType::new(db, callable.signatures(db), true))
+                    .is_assignable_to(db, superclass_callable.into_type(db))
+            {
+                diagnostic.info(format_args!(
+                    "`{}` is a callable type with the correct signature, \
+                    but objects with this type cannot necessarily be used as method descriptors",
+                    subclass_type.display(db)
+                ));
+            }
+        } else {
+            diagnostic.info(format_args!(
+                "`{class_name}.{member}` has type `{}`, which is not callable",
+                subclass_type.display(db)
+            ));
+        }
     }
 
     diagnostic.info("This violates the Liskov Substitution Principle");
@@ -3568,8 +3603,8 @@ pub(super) fn report_invalid_method_override<'db>(
                 );
 
                 let superclass_function_span = match superclass_type {
-                    Type::FunctionLiteral(function) => signature_span(function),
-                    Type::BoundMethod(method) => signature_span(method.function(db)),
+                    Type::FunctionLiteral(function) => signature_span_inner(function),
+                    Type::BoundMethod(method) => signature_span_inner(method.function(db)),
                     _ => None,
                 };
 

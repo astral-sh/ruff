@@ -737,6 +737,13 @@ impl DefinitionKind<'_> {
         matches!(self, DefinitionKind::Assignment(_))
     }
 
+    pub(crate) const fn as_function_def(&self) -> Option<&AstNodeRef<ast::StmtFunctionDef>> {
+        match self {
+            DefinitionKind::Function(function) => Some(function),
+            _ => None,
+        }
+    }
+
     pub(crate) const fn is_function_def(&self) -> bool {
         matches!(self, DefinitionKind::Function(_))
     }
