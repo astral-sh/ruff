@@ -3,8 +3,8 @@ use crate::place::{builtins_symbol, known_module_symbol};
 use crate::types::enums::is_single_member_enum;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    BoundMethodType, CallableType, EnumLiteralType, IntersectionBuilder, KnownClass, Parameter,
-    Parameters, Signature, SpecialFormType, SubclassOfType, Type, UnionType,
+    BoundMethodType, EnumLiteralType, IntersectionBuilder, KnownClass, Parameter, Parameters,
+    Signature, SpecialFormType, SubclassOfType, Type, UnionType,
 };
 use crate::{Db, module_resolver::KnownModule};
 use quickcheck::{Arbitrary, Gen};
@@ -229,7 +229,7 @@ impl Ty {
 
                 create_bound_method(db, function, builtins_class)
             }
-            Ty::Callable { params, returns } => CallableType::single(
+            Ty::Callable { params, returns } => Type::single_callable(
                 db,
                 Signature::new(
                     params.into_parameters(db),

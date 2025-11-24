@@ -2003,6 +2003,7 @@ python-version = "3.12"
 ```
 
 ```py
+from typing import final
 from typing_extensions import TypeVar, Self, Protocol
 from ty_extensions import is_equivalent_to, static_assert, is_assignable_to, is_subtype_of
 
@@ -2094,6 +2095,13 @@ class NominalReturningSelfNotGeneric:
     def g(self) -> "NominalReturningSelfNotGeneric":
         return self
 
+@final
+class Other: ...
+
+class NominalReturningOtherClass:
+    def g(self) -> Other:
+        raise NotImplementedError
+
 # TODO: should pass
 static_assert(is_equivalent_to(LegacyFunctionScoped, NewStyleFunctionScoped))  # error: [static-assert-error]
 
@@ -2112,8 +2120,7 @@ static_assert(not is_assignable_to(NominalLegacy, UsesSelf))
 static_assert(not is_assignable_to(NominalWithSelf, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalWithSelf, LegacyFunctionScoped))
 static_assert(is_assignable_to(NominalWithSelf, UsesSelf))
-# TODO: should pass
-static_assert(is_subtype_of(NominalWithSelf, UsesSelf))  # error: [static-assert-error]
+static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
 
 # TODO: these should pass
 static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))  # error: [static-assert-error]
@@ -2125,6 +2132,8 @@ static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, LegacyFunctio
 
 # TODO: should pass
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, UsesSelf))  # error: [static-assert-error]
+
+static_assert(not is_assignable_to(NominalReturningOtherClass, UsesSelf))
 
 # These test cases are taken from the typing conformance suite:
 class ShapeProtocolImplicitSelf(Protocol):

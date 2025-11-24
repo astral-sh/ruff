@@ -1011,7 +1011,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let callable_type = if let (Some(parameters), Some(return_type), true) =
             (parameters, return_type, correct_argument_number)
         {
-            CallableType::single(db, Signature::new(parameters, Some(return_type)))
+            Type::single_callable(db, Signature::new(parameters, Some(return_type)))
         } else {
             CallableType::unknown(db)
         };
@@ -1227,7 +1227,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let argument_type = self.infer_expression(&arguments[0], TypeContext::default());
 
-                let Some(callable_type) = argument_type.try_upcast_to_callable(db) else {
+                let Some(callable_type) = argument_type
+                    .try_upcast_to_callable(db)
+                    .map(|callables| callables.into_type(self.db()))
+                else {
                     if let Some(builder) = self
                         .context
                         .report_lint(&INVALID_TYPE_FORM, arguments_slice)

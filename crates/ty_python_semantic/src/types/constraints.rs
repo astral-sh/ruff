@@ -1790,7 +1790,11 @@ impl<'db> InteriorNode<'db> {
 
     /// Returns a sequent map for this BDD, which records the relationships between the constraints
     /// that appear in the BDD.
-    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial=sequent_map_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
     fn sequent_map(self, db: &'db dyn Db) -> SequentMap<'db> {
         let mut map = SequentMap::default();
         Node::Interior(self).for_each_constraint(db, &mut |constraint| {
@@ -2107,6 +2111,14 @@ impl<'db> InteriorNode<'db> {
 
         simplified
     }
+}
+
+fn sequent_map_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: InteriorNode<'db>,
+) -> SequentMap<'db> {
+    SequentMap::default()
 }
 
 /// An assignment of one BDD variable to either `true` or `false`. (When evaluating a BDD, we
