@@ -191,13 +191,13 @@ def _(
     reveal_type(int_or_callable)  # revealed: int | ((str, /) -> bytes)
     reveal_type(callable_or_int)  # revealed: ((str, /) -> bytes) | int
     # TODO should be Unknown | int
-    reveal_type(type_var_or_int)  # revealed: typing.TypeVar | int
+    reveal_type(type_var_or_int)  # revealed: T@TypeVarOrInt | int
     # TODO should be int | Unknown
-    reveal_type(int_or_type_var)  # revealed: int | typing.TypeVar
+    reveal_type(int_or_type_var)  # revealed: int | T@IntOrTypeVar
     # TODO should be Unknown | None
-    reveal_type(type_var_or_none)  # revealed: typing.TypeVar | None
+    reveal_type(type_var_or_none)  # revealed: T@TypeVarOrNone | None
     # TODO should be None | Unknown
-    reveal_type(none_or_type_var)  # revealed: None | typing.TypeVar
+    reveal_type(none_or_type_var)  # revealed: None | T@NoneOrTypeVar
 ```
 
 If a type is unioned with itself in a value expression, the result is just that type. No
@@ -391,17 +391,17 @@ AnnotatedType = Annotated[T, "tag"]
 TransparentAlias = T
 MyOptional = T | None
 
-# TODO: Consider displaying this as `<class 'list[T]'>`, … instead? (and similar for some others below)
-reveal_type(MyList)  # revealed: <class 'list[typing.TypeVar]'>
-reveal_type(MyDict)  # revealed: <class 'dict[typing.TypeVar, typing.TypeVar]'>
+reveal_type(MyList)  # revealed: <class 'list[T@MyList]'>
+reveal_type(MyDict)  # revealed: <class 'dict[T@MyDict, U@MyDict]'>
 reveal_type(MyType)  # revealed: GenericAlias
-reveal_type(IntAndType)  # revealed: <class 'tuple[int, typing.TypeVar]'>
-reveal_type(Pair)  # revealed: <class 'tuple[typing.TypeVar, typing.TypeVar]'>
-reveal_type(Sum)  # revealed: <class 'tuple[typing.TypeVar, typing.TypeVar]'>
+reveal_type(IntAndType)  # revealed: <class 'tuple[int, T@IntAndType]'>
+reveal_type(Pair)  # revealed: <class 'tuple[T@Pair, T@Pair]'>
+reveal_type(Sum)  # revealed: <class 'tuple[T@Sum, U@Sum]'>
 reveal_type(ListOrTuple)  # revealed: types.UnionType
 reveal_type(ListOrTupleLegacy)  # revealed: types.UnionType
 reveal_type(MyCallable)  # revealed: GenericAlias
 reveal_type(AnnotatedType)  # revealed: <typing.Annotated special form>
+# TODO: This should ideally be `T@TransparentAlias`
 reveal_type(TransparentAlias)  # revealed: typing.TypeVar
 reveal_type(MyOptional)  # revealed: types.UnionType
 
@@ -445,7 +445,7 @@ U = TypeVar("U")
 
 DictStrTo = MyDict[str, U]
 
-reveal_type(DictStrTo)  # revealed: <class 'dict[str, typing.TypeVar]'>
+reveal_type(DictStrTo)  # revealed: <class 'dict[str, U@DictStrTo]'>
 
 def _(
     dict_str_to_int: DictStrTo[int],
@@ -480,7 +480,7 @@ A generic implicit type alias can also be used in another generic implicit type 
 ```py
 MyOtherList = MyList[T]
 
-reveal_type(MyOtherList)  # revealed: <class 'list[typing.TypeVar]'>
+reveal_type(MyOtherList)  # revealed: <class 'list[T@MyOtherList]'>
 
 def _(
     list_of_ints: MyOtherList[int],
@@ -498,11 +498,11 @@ def _(
     my_callable: MyCallable,
 ):
     # TODO: Should be `list[Unknown]`
-    reveal_type(my_list)  # revealed: list[typing.TypeVar]
+    reveal_type(my_list)  # revealed: list[T@MyList]
     # TODO: Should be `dict[Unknown, Unknown]`
-    reveal_type(my_dict)  # revealed: dict[typing.TypeVar, typing.TypeVar]
+    reveal_type(my_dict)  # revealed: dict[T@MyDict, U@MyDict]
     # TODO: Should be `(...) -> Unknown`
-    reveal_type(my_callable)  # revealed: (...) -> typing.TypeVar
+    reveal_type(my_callable)  # revealed: (...) -> T@MyCallable
 ```
 
 (Generic) implicit type aliases can be used as base classes:
@@ -550,6 +550,23 @@ def _(
 ):
     reveal_type(list_too_many_args)  # revealed: Unknown
     reveal_type(dict_too_few_args)  # revealed: Unknown
+```
+
+Trying to specialize a non-name node results in an error:
+
+```py
+from ty_extensions import TypeOf
+
+IntOrStr = int | str
+
+def this_does_not_work() -> TypeOf[IntOrStr]:
+    raise NotImplementedError()
+
+def _(
+    # error: [invalid-type-form] "Cannot specialize a non-name node in a type expression"
+    specialized: this_does_not_work()[int],
+):
+    reveal_type(specialized)  # revealed: Unknown
 ```
 
 ## `Literal`s

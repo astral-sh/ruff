@@ -90,6 +90,12 @@ impl<'db> Definition<'db> {
                         .to_string(),
                 )
             }
+            DefinitionKind::Assignment(assignment) => {
+                let target_node = assignment.target.node(&module);
+                target_node
+                    .as_name_expr()
+                    .map(|name_expr| name_expr.id.as_str().to_string())
+            }
             _ => None,
         }
     }
