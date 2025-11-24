@@ -3177,6 +3177,33 @@ from ty_extensions import reveal_protocol_interface
 reveal_protocol_interface(Foo)
 ```
 
+## Known panics
+
+### Protocols generic over TypeVars bound to forward references
+
+This test currently panics because the `ClassLiteral::explicit_bases` query fails to converge. See
+issue <https://github.com/astral-sh/ty/issues/1587>.
+
+<!-- expect-panic: execute: too many cycle iterations -->
+
+```py
+from typing import Any, Protocol, TypeVar
+
+T1 = TypeVar("T1", bound="A2[Any]")
+T2 = TypeVar("T2", bound="A1[Any]")
+T3 = TypeVar("T3", bound="B2[Any]")
+T4 = TypeVar("T4", bound="B1[Any]")
+
+class A1(Protocol[T1]):
+    def get_x(self): ...
+
+class A2(Protocol[T2]):
+    def get_y(self): ...
+
+class B1(A1[T3], Protocol[T3]): ...
+class B2(A2[T4], Protocol[T4]): ...
+```
+
 ## TODO
 
 Add tests for:
