@@ -19,7 +19,7 @@ pub struct InlayHint {
 }
 
 impl InlayHint {
-    fn variable_type(expr: &Expr, ty: Type, db: &dyn Db) -> Self {
+    fn variable_type(expr: &Expr, ty: Type, db: &dyn Db, allow_edits: bool) -> Self {
         let position = expr.range().end();
         // Render the type to a string, and get subspans for all the types that make it up
         let details = ty.display(db).to_string_parts();
@@ -64,7 +64,7 @@ impl InlayHint {
             label_parts.push(details.label[offset..details.label.len()].into());
         }
 
-        let text_edits = if details.is_valid_syntax {
+        let text_edits = if details.is_valid_syntax && allow_edits {
             vec![InlayHintTextEdit {
                 range: TextRange::new(position, position),
                 new_text: format!(": {}", details.label),
@@ -253,6 +253,7 @@ struct InlayHintVisitor<'a, 'db> {
     in_assignment: bool,
     range: TextRange,
     settings: &'a InlayHintSettings,
+    in_no_edits_allowed: bool,
 }
 
 impl<'a, 'db> InlayHintVisitor<'a, 'db> {
@@ -264,15 +265,16 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             in_assignment: false,
             range,
             settings,
+            in_no_edits_allowed: false,
         }
     }
 
-    fn add_type_hint(&mut self, expr: &Expr, ty: Type<'db>) {
+    fn add_type_hint(&mut self, expr: &Expr, ty: Type<'db>, allow_edits: bool) {
         if !self.settings.variable_types {
             return;
         }
 
-        let inlay_hint = InlayHint::variable_type(expr, ty, self.db);
+        let inlay_hint = InlayHint::variable_type(expr, ty, self.db, allow_edits);
 
         self.hints.push(inlay_hint);
     }
@@ -316,9 +318,13 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
         match stmt {
             Stmt::Assign(assign) => {
                 self.in_assignment = !type_hint_is_excessive_for_expr(&assign.value);
+                if dont_allow_edits(assign) {
+                    self.in_no_edits_allowed = true;
+                }
                 for target in &assign.targets {
                     self.visit_expr(target);
                 }
+                self.in_no_edits_allowed = false;
                 self.in_assignment = false;
 
                 self.visit_expr(&assign.value);
@@ -344,7 +350,7 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
                 if self.in_assignment {
                     if name.ctx.is_store() {
                         let ty = expr.inferred_type(&self.model);
-                        self.add_type_hint(expr, ty);
+                        self.add_type_hint(expr, ty, !self.in_no_edits_allowed);
                     }
                 }
                 source_order::walk_expr(self, expr);
@@ -353,7 +359,7 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
                 if self.in_assignment {
                     if attribute.ctx.is_store() {
                         let ty = expr.inferred_type(&self.model);
-                        self.add_type_hint(expr, ty);
+                        self.add_type_hint(expr, ty, !self.in_no_edits_allowed);
                     }
                 }
                 source_order::walk_expr(self, expr);
@@ -437,6 +443,22 @@ fn type_hint_is_excessive_for_expr(expr: &Expr) -> bool {
         // Everything else is reasonable
         _ => false,
     }
+}
+
+fn dont_allow_edits(stmt_assign: &ruff_python_ast::StmtAssign) -> bool {
+    if stmt_assign.targets.len() > 1 {
+        return true;
+    }
+
+    if stmt_assign
+        .targets
+        .iter()
+        .any(|target| matches!(target, Expr::Tuple(_)))
+    {
+        return true;
+    }
+
+    false
 }
 
 #[cfg(test)]
@@ -972,20 +994,6 @@ mod tests {
         10 | x4[: int], y4[: str] = (x3, y3)
            |                 ^^^
            |
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: File after edits
-        info: Source
-
-        def i(x: int, /) -> int:
-            return x
-        def s(x: str, /) -> str:
-            return x
-
-        x1, y1 = (1, 'abc')
-        x2: Literal[1], y2: Literal["abc"] = (x1, y1)
-        x3: int, y3: str = (i(1), s('abc'))
-        x4: int, y4: str = (x3, y3)
         "#);
     }
 
@@ -1166,20 +1174,6 @@ mod tests {
         10 | x4[: int], y4[: str] = x3, y3
            |                 ^^^
            |
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: File after edits
-        info: Source
-
-        def i(x: int, /) -> int:
-            return x
-        def s(x: str, /) -> str:
-            return x
-
-        x1, y1 = 1, 'abc'
-        x2: Literal[1], y2: Literal["abc"] = x1, y1
-        x3: int, y3: str = i(1), s('abc')
-        x4: int, y4: str = x3, y3
         "#);
     }
 
@@ -1680,20 +1674,6 @@ mod tests {
         10 | x4[: int], (y4[: str], z4[: int]) = (x3, (y3, z3))
            |                             ^^^
            |
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: File after edits
-        info: Source
-
-        def i(x: int, /) -> int:
-            return x
-        def s(x: str, /) -> str:
-            return x
-
-        x1, (y1, z1) = (1, ('abc', 2))
-        x2: Literal[1], (y2: Literal["abc"], z2: Literal[2]) = (x1, (y1, z1))
-        x3: int, (y3: str, z3: int) = (i(1), (s('abc'), i(2)))
-        x4: int, (y4: str, z4: int) = (x3, (y3, z3))
         "#);
     }
 
@@ -2991,8 +2971,8 @@ mod tests {
 
         x: MyClass = MyClass()
         y: tuple[MyClass, MyClass] = (MyClass(), MyClass())
-        a: MyClass, b: MyClass = MyClass(), MyClass()
-        c: MyClass, d: MyClass = (MyClass(), MyClass())
+        a, b = MyClass(), MyClass()
+        c, d = (MyClass(), MyClass())
         "#);
     }
 
@@ -3875,8 +3855,8 @@ mod tests {
 
         x: MyClass[Unknown | int, str] = MyClass([42], ("a", "b"))
         y: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]] = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
-        a: MyClass[Unknown | int, str], b: MyClass[Unknown | int, str] = MyClass([42], ("a", "b")), MyClass([42], ("a", "b"))
-        c: MyClass[Unknown | int, str], d: MyClass[Unknown | int, str] = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
+        a, b = MyClass([42], ("a", "b")), MyClass([42], ("a", "b"))
+        c, d = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
         "#);
     }
 
