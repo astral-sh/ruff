@@ -2,7 +2,6 @@ use itertools::Either;
 use ruff_python_ast as ast;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
-use crate::FxOrderSet;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NON_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_callable,
@@ -16,6 +15,7 @@ use crate::types::{
     KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType,
     Type, TypeAliasType, TypeContext, TypeIsType, TypeMapping, UnionBuilder, UnionType, todo_type,
 };
+use crate::{FxOrderSet, ResolvedDefinition, definitions_for_name};
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -759,9 +759,32 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let db = self.db();
 
+        let Some(value) = subscript.value.as_name_expr() else {
+            if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                builder.into_diagnostic("Cannot specialize a non-name node in a type expression");
+            }
+            return Type::unknown();
+        };
+
+        // TODO: This is an expensive call to an API that was never meant to be called from
+        // type inference. We plan to rework how `in_type_expression` works in the future.
+        // This new approach will make this call unnecessary, so for now, we accept the hit
+        // in performance.
+        let definitions = definitions_for_name(self.db(), self.file(), value);
+        let Some(type_alias_definition) =
+            definitions.iter().find_map(ResolvedDefinition::definition)
+        else {
+            if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                builder.into_diagnostic(
+                    "Cannot specialize implicit type alias with unknown definition",
+                );
+            }
+            return Type::unknown();
+        };
+
         let generic_type_alias = value_ty.apply_type_mapping(
             db,
-            &TypeMapping::BindLegacyTypevars(BindingContext::Synthetic),
+            &TypeMapping::BindLegacyTypevars(BindingContext::Definition(type_alias_definition)),
             TypeContext::default(),
         );
 

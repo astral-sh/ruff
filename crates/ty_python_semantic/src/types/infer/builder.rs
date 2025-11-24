@@ -4739,6 +4739,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 unpacked.expression_type(target)
             }
             TargetKind::Single => {
+                // This could be an implicit type alias (OptionalList = list[T] | None). Use the definition
+                // of `OptionalList` as the typevar binding context while inferring the RHS (`list[T] | None`),
+                // in order to bind `T@OptionalList`.
+                let previous_typevar_binding_context =
+                    self.typevar_binding_context.replace(definition);
+
                 let value_ty = if let Some(standalone_expression) = self.index.try_expression(value)
                 {
                     self.infer_standalone_expression_impl(value, standalone_expression, tcx)
@@ -4776,6 +4782,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else {
                     self.infer_expression(value, tcx)
                 };
+
+                self.typevar_binding_context = previous_typevar_binding_context;
 
                 // `TYPE_CHECKING` is a special variable that should only be assigned `False`
                 // at runtime, but is always considered `True` in type checking.
