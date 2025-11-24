@@ -462,19 +462,39 @@ expected:
 IntsOrNone = MyList[int] | None
 IntsOrStrs = Pair[int] | Pair[str]
 ListOfPairs = MyList[Pair[str]]
+ListOrTupleOfInts = ListOrTuple[int]
+AnnotatedInt = AnnotatedType[int]
+SubclassOfInt = MyType[int]
+# TODO: No error here
+# error: [too-many-positional-arguments] "Too many positional arguments: expected 1, got 2"
+# error: [invalid-type-form] "List literals are not allowed in this context in a type expression: Did you mean `list[int]`?"
+CallableIntToStr = MyCallable[[int], str]
 
 reveal_type(IntsOrNone)  # revealed: types.UnionType
 reveal_type(IntsOrStrs)  # revealed: types.UnionType
 reveal_type(ListOfPairs)  # revealed: <class 'list[tuple[str, str]]'>
+reveal_type(ListOrTupleOfInts)  # revealed: types.UnionType
+reveal_type(AnnotatedInt)  # revealed: <typing.Annotated special form>
+reveal_type(SubclassOfInt)  # revealed: GenericAlias
+reveal_type(CallableIntToStr)  # revealed: Unknown
 
 def _(
     ints_or_none: IntsOrNone,
     ints_or_strs: IntsOrStrs,
     list_of_pairs: ListOfPairs,
+    list_or_tuple_of_ints: ListOrTupleOfInts,
+    annotated_int: AnnotatedInt,
+    subclass_of_int: SubclassOfInt,
+    callable_int_to_str: CallableIntToStr,
 ):
     reveal_type(ints_or_none)  # revealed: list[int] | None
     reveal_type(ints_or_strs)  # revealed: tuple[int, int] | tuple[str, str]
     reveal_type(list_of_pairs)  # revealed: list[tuple[str, str]]
+    reveal_type(list_or_tuple_of_ints)  # revealed: list[int] | tuple[int, ...]
+    reveal_type(annotated_int)  # revealed: int
+    reveal_type(subclass_of_int)  # revealed: type[int]
+    # TODO: This should be `(int, /) -> str`
+    reveal_type(callable_int_to_str)  # revealed: Unknown
 ```
 
 A generic implicit type alias can also be used in another generic implicit type alias:

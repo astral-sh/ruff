@@ -11113,8 +11113,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .map(Type::from)
                     .unwrap_or_else(Type::unknown);
             }
-            Type::KnownInstance(KnownInstanceType::UnionType(_)) => {
-                return todo_type!("Specialization of union type alias");
+            Type::KnownInstance(
+                KnownInstanceType::UnionType(_)
+                | KnownInstanceType::Annotated(_)
+                | KnownInstanceType::Callable(_)
+                | KnownInstanceType::TypeGenericAlias(_),
+            ) => {
+                return self.infer_explicitly_specialized_type_alias(subscript, value_ty, false);
             }
             _ => {}
         }
