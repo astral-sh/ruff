@@ -52,7 +52,7 @@ class Hyperfine(NamedTuple):
             # pyright exit codes: https://docs.basedpyright.com/v1.31.6/configuration/command-line/#pyright-exit-codes
             # pyrefly exit codes: Not documented
             # ty: https://docs.astral.sh/ty/reference/exit-codes/
-            "-i=1",
+            "--ignore-failure=1",
         ]
 
         # Export to JSON.

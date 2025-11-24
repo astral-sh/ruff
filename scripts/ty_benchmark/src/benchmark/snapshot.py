@@ -54,7 +54,7 @@ class SnapshotRunner(NamedTuple):
     accept: bool
     """Whether to accept snapshot changes."""
 
-    def run(self, *, cwd: Path, env: Mapping[str, str] = dict()):
+    def run(self, *, cwd: Path, env: Mapping[str, str]):
         """Run commands and snapshot their output."""
         # Create snapshot directory if it doesn't exist.
         self.snapshot_dir.mkdir(parents=True, exist_ok=True)
@@ -73,6 +73,7 @@ class SnapshotRunner(NamedTuple):
                     cwd=cwd,
                     env=env,
                     capture_output=True,
+                    check=True,
                 )
 
             # Run the actual command and capture output.
