@@ -1229,7 +1229,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let Some(callable_type) = argument_type
                     .try_upcast_to_callable(db)
-                    .into_type(self.db())
+                    .map(|callables| callables.into_type(self.db()))
                 else {
                     if let Some(builder) = self
                         .context

@@ -707,15 +707,18 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 let fallback_other = other.literal_fallback_instance(db).unwrap_or(other);
                 attribute_type
                     .try_upcast_to_callable(db)
-                    .map(|callable| callable.apply_self(db, fallback_other))
-                    .has_relation_to_impl(
-                        db,
-                        method.bind_self(db, Some(fallback_other)),
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
+                    .when_some_and(|callables| {
+                        callables
+                            .map(|callable| callable.apply_self(db, fallback_other))
+                            .has_relation_to_impl(
+                                db,
+                                method.bind_self(db, Some(fallback_other)),
+                                inferable,
+                                relation,
+                                relation_visitor,
+                                disjointness_visitor,
+                            )
+                    })
             }
             // TODO: consider the types of the attribute on `other` for property members
             ProtocolMemberKind::Property(_) => ConstraintSet::from(matches!(

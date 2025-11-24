@@ -871,12 +871,14 @@ impl ReachabilityConstraints {
                     return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
                 }
 
-                let overloads_iterator =
-                    if let Some(callable) = ty.try_upcast_to_callable(db).exactly_one() {
-                        callable.signatures(db).overloads.iter()
-                    } else {
-                        return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
-                    };
+                let overloads_iterator = if let Some(callable) = ty
+                    .try_upcast_to_callable(db)
+                    .and_then(|callables| callables.exactly_one())
+                {
+                    callable.signatures(db).overloads.iter()
+                } else {
+                    return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
+                };
 
                 let (no_overloads_return_never, all_overloads_return_never) = overloads_iterator
                     .fold((true, true), |(none, all), overload| {
