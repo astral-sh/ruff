@@ -90,6 +90,7 @@ that makes the test succeed.
 from typing import Any
 
 def bounded_by_gradual[T: Any]():
+    # TODO: revealed: ty_extensions.Specialization[T@bounded_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@bounded_by_gradual = object]
     reveal_type(generic_context(bounded_by_gradual).specialize_constrained(ConstraintSet.always()))
     # revealed: None
@@ -170,6 +171,7 @@ from typing import Any
 # fmt: off
 
 def constrained_by_gradual[T: (Base, Any)]():
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Unknown]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual = Base]
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.always()))
     # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
@@ -178,18 +180,21 @@ def constrained_by_gradual[T: (Base, Any)]():
     # revealed: None
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.never()))
 
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual = Base]
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.range(Never, T, Base)))
     # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual = Unrelated]
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.range(Never, T, Unrelated)))
 
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual = Base]
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.range(Never, T, Super)))
     # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual = Super]
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.range(Super, T, Super)))
 
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual = Base]
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.range(Sub, T, object)))
     # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
