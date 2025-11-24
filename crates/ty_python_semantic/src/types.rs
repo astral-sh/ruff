@@ -1570,6 +1570,14 @@ impl<'db> Type<'db> {
     /// When nested is true, propagate `None`. That is, if the type contains a `Divergent` type, the return value of this method is `None`.
     /// When nested is false, create a type containing `Divergent` types instead of propagating `None`.
     /// This is to preserve the structure of the non-divergent parts of the type instead of completely collapsing the type containing a `Divergent` type into a `Divergent` type.
+    /// ```python
+    /// tuple[tuple[Divergent, Literal[1]], Literal[1]].recursive_type_normalized(nested: false)
+    /// => tuple[
+    ///     tuple[Divergent, Literal[1]].recursive_type_normalized_impl(nested: true).unwrap_or(Divergent),
+    ///     Literal[1].recursive_type_normalized_impl(nested: true).unwrap_or(Divergent)
+    /// ]
+    /// => tuple[Divergent, Literal[1]]
+    /// ```
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
