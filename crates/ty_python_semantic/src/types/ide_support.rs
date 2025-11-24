@@ -15,7 +15,7 @@ use crate::types::generics::Specialization;
 use crate::types::signatures::Signature;
 use crate::types::{CallDunderError, UnionType};
 use crate::types::{
-    ClassBase, ClassLiteral, KnownClass, KnownInstanceType, Type, TypeContext,
+    CallableTypes, ClassBase, ClassLiteral, KnownClass, KnownInstanceType, Type, TypeContext,
     TypeVarBoundOrConstraints, class::CodeGeneratorKind,
 };
 use crate::{Db, DisplaySettings, HasType, NameKind, SemanticModel};
@@ -878,7 +878,7 @@ pub fn definitions_for_keyword_argument<'db>(
 
     if let Some(callable_type) = func_type
         .try_upcast_to_callable(db)
-        .and_then(|callables| callables.exactly_one())
+        .and_then(CallableTypes::exactly_one)
     {
         let signatures = callable_type.signatures(db);
 

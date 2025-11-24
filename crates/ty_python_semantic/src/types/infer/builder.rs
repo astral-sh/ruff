@@ -101,8 +101,8 @@ use crate::types::typed_dict::{
 };
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    CallDunderError, CallableBinding, CallableType, ClassLiteral, ClassType, DataclassParams,
-    DynamicType, InternedType, IntersectionBuilder, IntersectionType, KnownClass,
+    CallDunderError, CallableBinding, CallableType, CallableTypes, ClassLiteral, ClassType,
+    DataclassParams, DynamicType, InternedType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
     PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType, SubclassOfType,
     TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
@@ -2291,7 +2291,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     let is_input_function_like = inferred_ty
                         .try_upcast_to_callable(self.db())
-                        .and_then(|callables| callables.exactly_one())
+                        .and_then(CallableTypes::exactly_one)
                         .is_some_and(|callable| callable.is_function_like(self.db()));
 
                     if is_input_function_like

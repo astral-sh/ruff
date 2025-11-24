@@ -208,7 +208,7 @@ use crate::semantic_index::predicate::{
     Predicates, ScopedPredicateId,
 };
 use crate::types::{
-    IntersectionBuilder, Truthiness, Type, TypeContext, UnionBuilder, UnionType,
+    CallableTypes, IntersectionBuilder, Truthiness, Type, TypeContext, UnionBuilder, UnionType,
     infer_expression_type, static_expression_truthiness,
 };
 
@@ -873,7 +873,7 @@ impl ReachabilityConstraints {
 
                 let overloads_iterator = if let Some(callable) = ty
                     .try_upcast_to_callable(db)
-                    .and_then(|callables| callables.exactly_one())
+                    .and_then(CallableTypes::exactly_one)
                 {
                     callable.signatures(db).overloads.iter()
                 } else {
