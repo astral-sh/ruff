@@ -248,7 +248,7 @@ from . import foo
 import package
 
 # error: [possibly-missing-attribute]
-reveal_type(package.foo.X)  # revealed: Unknown
+reveal_type(package.foo.X)  # revealed: int
 ```
 
 ## Relative imports at the top of a search path
