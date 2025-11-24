@@ -125,11 +125,21 @@ impl<'db> ClassBase<'db> {
                 // "fold" the other potential bases into the dynamic type,
                 // and return `Any`/`Unknown` as the class base to prevent
                 // invalid-base diagnostics and further downstream errors.
-                let Some(Type::Dynamic(dynamic)) = union
+                let base = if let Some(Type::Dynamic(dynamic)) = union
                     .elements(db)
                     .iter()
                     .find(|elem| matches!(elem, Type::Dynamic(_)))
-                else {
+                {
+                    ClassBase::Dynamic(*dynamic)
+                } else if let Some(base) = union.elements(db).iter().find_map(|elem| {
+                    if elem.is_gradual(db) {
+                        ClassBase::try_from_type(db, *elem, subclass)
+                    } else {
+                        None
+                    }
+                }) {
+                    base
+                } else {
                     return None;
                 };
 
@@ -138,7 +148,7 @@ impl<'db> ClassBase<'db> {
                     .iter()
                     .all(|elem| ClassBase::try_from_type(db, *elem, subclass).is_some())
                 {
-                    Some(ClassBase::Dynamic(*dynamic))
+                    Some(base)
                 } else {
                     None
                 }
