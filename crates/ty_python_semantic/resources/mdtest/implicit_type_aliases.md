@@ -558,6 +558,23 @@ def _(
     reveal_type(list_of_ints2)  # revealed: list[int]
 ```
 
+### In stringified annotations
+
+Generic implicit type aliases can be specialized in stringified annotations:
+
+```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+
+MyList = list[T]
+
+def _(
+    list_of_ints: "MyList[int]",
+):
+    reveal_type(list_of_ints)  # revealed: @Todo(Specialization of generic type alias in stringified annotation)
+```
+
 ### Error cases
 
 A generic alias that is already fully specialized cannot be specialized again:

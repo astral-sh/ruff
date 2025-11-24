@@ -743,6 +743,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let db = self.db();
 
+        if self
+            .index
+            .try_expression_scope_id(&ast::ExprRef::from(subscript))
+            .is_none()
+        {
+            return todo_type!("Specialization of generic type alias in stringified annotation");
+        }
+
         let definitions = match &*subscript.value {
             ast::Expr::Name(id) => {
                 // TODO: This is an expensive call to an API that was never meant to be called from
