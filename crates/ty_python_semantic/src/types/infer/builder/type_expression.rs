@@ -735,7 +735,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
-    pub(crate) fn infer_explicitly_specialized_implicit_type_alias(
+    /// Infer the type of an explicitly specialized generic type alias (implicit or PEP 613).
+    pub(crate) fn infer_explicitly_specialized_type_alias(
         &mut self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
@@ -967,14 +968,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
-                KnownInstanceType::TypeVar(_) => self
-                    .infer_explicitly_specialized_implicit_type_alias(subscript, value_ty, false),
+                KnownInstanceType::TypeVar(_) => {
+                    self.infer_explicitly_specialized_type_alias(subscript, value_ty, false)
+                }
 
                 KnownInstanceType::UnionType(_)
                 | KnownInstanceType::Callable(_)
                 | KnownInstanceType::Annotated(_)
                 | KnownInstanceType::TypeGenericAlias(_) => {
-                    self.infer_explicitly_specialized_implicit_type_alias(subscript, value_ty, true)
+                    self.infer_explicitly_specialized_type_alias(subscript, value_ty, true)
                 }
                 KnownInstanceType::NewType(newtype) => {
                     self.infer_type_expression(&subscript.slice);
@@ -1017,7 +1019,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
             Type::GenericAlias(_) => {
-                self.infer_explicitly_specialized_implicit_type_alias(subscript, value_ty, true)
+                self.infer_explicitly_specialized_type_alias(subscript, value_ty, true)
             }
             Type::StringLiteral(_) => {
                 self.infer_type_expression(slice);
