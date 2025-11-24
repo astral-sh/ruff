@@ -66,7 +66,7 @@ install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
 global = "depot-ubuntu-latest-4"
 
 [dist.github-action-commits]
-"actions/checkout" = "ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493" # v5.0.0
+"actions/checkout" = "c2d88d3ecc89a9ef08eebf45d9637801dcee7eb5" # v6.0.0
 "actions/upload-artifact" = "330a01c490aca151604b8cf639adc76d48f6c5d4" # v5.0.0
 "actions/download-artifact" = "018cc2cf5baa6db3ef3c5f8a56943fffe632ef53" # v6.0.0
 "actions/attest-build-provenance" = "c074443f1aee8d4aeeae555aebba3282517141b2" #v2.2.3
