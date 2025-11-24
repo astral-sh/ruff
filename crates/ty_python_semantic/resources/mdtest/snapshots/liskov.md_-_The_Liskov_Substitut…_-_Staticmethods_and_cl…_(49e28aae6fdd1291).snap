@@ -85,7 +85,7 @@ error[invalid-method-override]: Invalid override of method `instance_method`
  3 |     @classmethod
  4 |     def class_method(cls, x: int) -> int: ...
    |
-info: `BadChild1.instance_method` is a staticmethod but `Parent.instance_method` is a instance method
+info: `BadChild1.instance_method` is a staticmethod but `Parent.instance_method` is an instance method
 info: This violates the Liskov Substitution Principle
 info: rule `invalid-method-override` is enabled by default
 
@@ -111,7 +111,7 @@ error[invalid-method-override]: Invalid override of method `static_method`
  7 |
  8 | class BadChild1(Parent):
    |
-info: `BadChild1.static_method` is a instance method but `Parent.static_method` is a staticmethod
+info: `BadChild1.static_method` is an instance method but `Parent.static_method` is a staticmethod
 info: This violates the Liskov Substitution Principle
 info: rule `invalid-method-override` is enabled by default
 

@@ -1260,18 +1260,12 @@ impl MethodDecorator {
         }
     }
 
-    pub(crate) const fn as_str(self) -> &'static str {
+    pub(crate) const fn description(self) -> &'static str {
         match self {
-            MethodDecorator::None => "instance method",
-            MethodDecorator::ClassMethod => "classmethod",
-            MethodDecorator::StaticMethod => "staticmethod",
+            MethodDecorator::None => "an instance method",
+            MethodDecorator::ClassMethod => "a classmethod",
+            MethodDecorator::StaticMethod => "a staticmethod",
         }
-    }
-}
-
-impl std::fmt::Display for MethodDecorator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
     }
 }
 

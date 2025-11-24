@@ -3534,8 +3534,10 @@ pub(super) fn report_invalid_method_override<'db>(
         && superclass_function_kind != subclass_function_kind
     {
         diagnostic.info(format_args!(
-            "`{class_name}.{member}` is a {subclass_function_kind} \
-            but `{overridden_method}` is a {superclass_function_kind}"
+            "`{class_name}.{member}` is {subclass_function_kind} \
+            but `{overridden_method}` is {superclass_function_kind}",
+            superclass_function_kind = superclass_function_kind.description(),
+            subclass_function_kind = subclass_function_kind.description(),
         ));
     }
 
