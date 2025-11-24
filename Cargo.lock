@@ -1255,7 +1255,7 @@ checksum = "ac7bb8710e1f09672102be7ddf39f764d8440ae74a9f4e30aaa4820dcdffa4af"
 dependencies = [
  "compact_str",
  "get-size-derive2",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "indexmap",
  "smallvec",
 ]
@@ -1353,9 +1353,9 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
+checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
 dependencies = [
  "equivalent",
 ]
@@ -1569,7 +1569,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6717a8d2a5a929a1a2eb43a12812498ed141a0bcfb7e8f7844fbdbe4303bba9f"
 dependencies = [
  "equivalent",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "serde",
  "serde_core",
 ]
@@ -3127,7 +3127,7 @@ dependencies = [
  "fern",
  "glob",
  "globset",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "imperative",
  "insta",
  "is-macro",
@@ -4462,7 +4462,7 @@ dependencies = [
  "drop_bomb",
  "get-size2",
  "glob",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "indexmap",
  "indoc",
  "insta",
