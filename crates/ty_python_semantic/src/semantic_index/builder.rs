@@ -1536,25 +1536,22 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     }
 
                     if node.module.is_some() {
-                        if let Ok(thispackage) = this_package
+                        if is_package
+                            && let Ok(thispackage) = this_package
+                            && self.current_scope().is_global()
                             && let Some(relative_submodule) = module_name.relative_to(&thispackage)
+                            && let Some(direct_submodule) = relative_submodule.components().next()
+                            && !self.seen_submodule_imports.contains(direct_submodule)
                         {
-                            if is_package
-                                && self.current_scope().is_global()
-                                && let Some(direct_submodule) =
-                                    relative_submodule.components().next()
-                                && !self.seen_submodule_imports.contains(direct_submodule)
-                            {
-                                self.seen_submodule_imports
-                                    .insert(direct_submodule.to_owned());
+                            self.seen_submodule_imports
+                                .insert(direct_submodule.to_owned());
 
-                                let direct_submodule_name = Name::new(direct_submodule);
-                                let symbol = self.add_symbol(direct_submodule_name);
-                                self.add_definition(
-                                    symbol.into(),
-                                    ImportFromSubmoduleDefinitionNodeRef { node },
-                                );
-                            }
+                            let direct_submodule_name = Name::new(direct_submodule);
+                            let symbol = self.add_symbol(direct_submodule_name);
+                            self.add_definition(
+                                symbol.into(),
+                                ImportFromSubmoduleDefinitionNodeRef { node },
+                            );
                         } else {
                             for name in module_name.ancestors() {
                                 self.imported_modules
