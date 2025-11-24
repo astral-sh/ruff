@@ -1358,6 +1358,8 @@ impl KnownFunction {
         let db = context.db();
         let parameter_types = overload.parameter_types();
 
+        let is_todo_type = |ty: Type<'db>| ty.is_todo();
+
         match self {
             KnownFunction::RevealType => {
                 let revealed_type = overload
@@ -1391,7 +1393,10 @@ impl KnownFunction {
                 let [Some(actual_ty), Some(asserted_ty)] = parameter_types else {
                     return;
                 };
-                if actual_ty.is_equivalent_to(db, *asserted_ty) {
+                if actual_ty.is_equivalent_to(db, *asserted_ty)
+                    || any_over_type(db, *actual_ty, &is_todo_type, true)
+                    || any_over_type(db, *asserted_ty, &is_todo_type, true)
+                {
                     return;
                 }
                 if let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
@@ -1427,7 +1432,9 @@ impl KnownFunction {
                 let [Some(actual_ty)] = parameter_types else {
                     return;
                 };
-                if actual_ty.is_equivalent_to(db, Type::Never) {
+                if actual_ty.is_equivalent_to(db, Type::Never)
+                    || any_over_type(db, *actual_ty, &is_todo_type, true)
+                {
                     return;
                 }
                 if let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
