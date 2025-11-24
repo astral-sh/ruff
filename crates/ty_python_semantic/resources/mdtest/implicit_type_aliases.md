@@ -366,7 +366,9 @@ def g(obj: Y):
     reveal_type(obj)  # revealed: list[int | str]
 ```
 
-## Generic types
+## Generic implicit type aliases
+
+### Functionality
 
 Implicit type aliases can also be generic:
 
@@ -528,6 +530,36 @@ class Derived2(GenericBaseAlias[int]):
     pass
 ```
 
+### Imported aliases
+
+Generic implicit type aliases can be imported from other modules and specialized:
+
+`my_types.py`:
+
+```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+
+MyList = list[T]
+```
+
+`main.py`:
+
+```py
+from my_types import MyList
+import my_types as mt
+
+def _(
+    list_of_ints1: MyList[int],
+    list_of_ints2: mt.MyList[int],
+):
+    reveal_type(list_of_ints1)  # revealed: list[int]
+    reveal_type(list_of_ints2)  # revealed: list[int]
+```
+
+### Error cases
+
 A generic alias that is already fully specialized cannot be specialized again:
 
 ```py
@@ -542,6 +574,14 @@ Specializing a generic implicit type alias with an incorrect number of type argu
 in an error:
 
 ```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+MyList = list[T]
+MyDict = dict[T, U]
+
 def _(
     # error: [too-many-positional-arguments] "Too many positional arguments: expected 1, got 2"
     list_too_many_args: MyList[int, str],
@@ -563,10 +603,77 @@ def this_does_not_work() -> TypeOf[IntOrStr]:
     raise NotImplementedError()
 
 def _(
-    # error: [invalid-type-form] "Cannot specialize a non-name node in a type expression"
+    # error: [invalid-type-form] "Only name- and attribute expressions can be specialized in type expressions"
     specialized: this_does_not_work()[int],
 ):
     reveal_type(specialized)  # revealed: Unknown
+```
+
+### Multiple definitions
+
+#### Shadowed definitions
+
+When a generic type alias shadows a definition from an outer scope, the inner definition is used:
+
+```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+
+MyAlias = list[T]
+
+def outer():
+    MyAlias = set[T]
+
+    def _(x: MyAlias[int]):
+        reveal_type(x)  # revealed: set[int]
+```
+
+#### Statically known conditions
+
+```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+
+if True:
+    MyAlias1 = list[T]
+else:
+    MyAlias1 = set[T]
+
+if False:
+    MyAlias2 = list[T]
+else:
+    MyAlias2 = set[T]
+
+def _(
+    x1: MyAlias1[int],
+    x2: MyAlias2[int],
+):
+    reveal_type(x1)  # revealed: list[int]
+    reveal_type(x2)  # revealed: set[int]
+```
+
+#### Statically unknown conditions
+
+If several definitions are visible, we emit an error:
+
+```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+
+def flag() -> bool:
+    return True
+
+if flag():
+    MyAlias = list[T]
+else:
+    MyAlias = set[T]
+
+# error: [invalid-type-form] "Invalid subscript of object of type `<class 'list[T@MyAlias]'> | <class 'set[T@MyAlias]'>` in type expression"
+def _(x: MyAlias[int]):
+    reveal_type(x)  # revealed: Unknown
 ```
 
 ## `Literal`s
