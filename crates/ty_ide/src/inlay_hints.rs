@@ -6128,6 +6128,147 @@ mod tests {
         ");
     }
 
+    #[test]
+    fn test_function_signature_inlay_hint() {
+        let mut test = inlay_hint_test(
+            "
+                  def foo(x: int, *y: bool, z: str | int | list[str]): ...
+
+                  a = foo",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        def foo(x: int, *y: bool, z: str | int | list[str]): ...
+
+        a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:4:16
+          |
+        2 | def foo(x: int, *y: bool, z: str | int | list[str]): ...
+        3 |
+        4 | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
+          |                ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2591:7
+             |
+        2590 | @final
+        2591 | class bool(int):
+             |       ^^^^
+        2592 |     """Returns True when the argument is true, False otherwise.
+        2593 |     The builtins True and False are the only two instances of the class bool.
+             |
+        info: Source
+         --> main2.py:4:25
+          |
+        2 | def foo(x: int, *y: bool, z: str | int | list[str]): ...
+        3 |
+        4 | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
+          |                         ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+         --> main2.py:4:37
+          |
+        2 | def foo(x: int, *y: bool, z: str | int | list[str]): ...
+        3 |
+        4 | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
+          |                                     ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:4:43
+          |
+        2 | def foo(x: int, *y: bool, z: str | int | list[str]): ...
+        3 |
+        4 | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
+          |                                           ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2802:7
+             |
+        2801 | @disjoint_base
+        2802 | class list(MutableSequence[_T]):
+             |       ^^^^
+        2803 |     """Built-in mutable sequence.
+             |
+        info: Source
+         --> main2.py:4:49
+          |
+        2 | def foo(x: int, *y: bool, z: str | int | list[str]): ...
+        3 |
+        4 | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
+          |                                                 ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+         --> main2.py:4:54
+          |
+        2 | def foo(x: int, *y: bool, z: str | int | list[str]): ...
+        3 |
+        4 | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
+          |                                                      ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/ty_extensions.pyi:20:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+           | ^^^^^^^
+        21 | AlwaysTruthy = object()
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main2.py:4:63
+          |
+        2 | def foo(x: int, *y: bool, z: str | int | list[str]): ...
+        3 |
+        4 | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
+          |                                                               ^^^^^^^
+          |
+        "#);
+    }
+
     struct InlayHintLocationDiagnostic {
         source: FileRange,
         target: FileRange,
