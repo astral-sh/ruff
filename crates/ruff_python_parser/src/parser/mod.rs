@@ -1115,7 +1115,27 @@ impl RecoveryContextKind {
                     TokenKind::Colon => Some(ListTerminatorKind::ErrorRecovery),
                     _ => None,
                 },
-                WithItemKind::Unparenthesized | WithItemKind::ParenthesizedExpression => p
+                // test_err ipython_help_escape_command_error_recovery_1
+                // # parse_options: {"mode": "ipython"}
+                // with (a, ?b)
+                // ?
+
+                // test_err ipython_help_escape_command_error_recovery_2
+                // # parse_options: {"mode": "ipython"}
+                // with (a, ?b
+                // ?
+
+                // test_err ipython_help_escape_command_error_recovery_3
+                // # parse_options: {"mode": "ipython"}
+                // with a, ?b
+                // ?
+                // x = 1
+                WithItemKind::Unparenthesized => matches!(
+                    p.current_token_kind(),
+                    TokenKind::Colon | TokenKind::Newline
+                )
+                .then_some(ListTerminatorKind::Regular),
+                WithItemKind::ParenthesizedExpression => p
                     .at(TokenKind::Colon)
                     .then_some(ListTerminatorKind::Regular),
             },

@@ -1904,6 +1904,7 @@ we only consider the attribute assignment to be valid if the assigned attribute 
 from typing import Literal
 
 class Date:
+    # error: [invalid-method-override]
     def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
         pass
 
@@ -2388,7 +2389,7 @@ class Base:
         return Sub()
 
 class Sub(Base):
-    # TODO invalid override error
+    # error: [invalid-method-override]
     def flip(self) -> "Base":
         return Base()
 

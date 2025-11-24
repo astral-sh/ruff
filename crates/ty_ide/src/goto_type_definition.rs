@@ -286,6 +286,300 @@ mod tests {
     }
 
     #[test]
+    fn goto_type_of_import_module() {
+        let mut test = cursor_test(
+            r#"
+            import l<CURSOR>ib
+            "#,
+        );
+
+        test.write_file("lib.py", "a = 10").unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> lib.py:1:1
+          |
+        1 | a = 10
+          | ^^^^^^
+          |
+        info: Source
+         --> main.py:2:8
+          |
+        2 | import lib
+          |        ^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_import_module_multi1() {
+        let mut test = cursor_test(
+            r#"
+            import li<CURSOR>b.submod
+            "#,
+        );
+
+        test.write_file("lib/__init__.py", "b = 7").unwrap();
+        test.write_file("lib/submod.py", "a = 10").unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> lib/__init__.py:1:1
+          |
+        1 | b = 7
+          | ^^^^^
+          |
+        info: Source
+         --> main.py:2:8
+          |
+        2 | import lib.submod
+          |        ^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_import_module_multi2() {
+        let mut test = cursor_test(
+            r#"
+            import lib.subm<CURSOR>od
+            "#,
+        );
+
+        test.write_file("lib/__init__.py", "b = 7").unwrap();
+        test.write_file("lib/submod.py", "a = 10").unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> lib/submod.py:1:1
+          |
+        1 | a = 10
+          | ^^^^^^
+          |
+        info: Source
+         --> main.py:2:12
+          |
+        2 | import lib.submod
+          |            ^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_from_import_module() {
+        let mut test = cursor_test(
+            r#"
+            from l<CURSOR>ib import a
+            "#,
+        );
+
+        test.write_file("lib.py", "a = 10").unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> lib.py:1:1
+          |
+        1 | a = 10
+          | ^^^^^^
+          |
+        info: Source
+         --> main.py:2:6
+          |
+        2 | from lib import a
+          |      ^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_from_import_module_multi1() {
+        let mut test = cursor_test(
+            r#"
+            from li<CURSOR>b.submod import a
+            "#,
+        );
+
+        test.write_file("lib/__init__.py", "b = 7").unwrap();
+        test.write_file("lib/submod.py", "a = 10").unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> lib/__init__.py:1:1
+          |
+        1 | b = 7
+          | ^^^^^
+          |
+        info: Source
+         --> main.py:2:6
+          |
+        2 | from lib.submod import a
+          |      ^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_from_import_module_multi2() {
+        let mut test = cursor_test(
+            r#"
+            from lib.subm<CURSOR>od import a
+            "#,
+        );
+
+        test.write_file("lib/__init__.py", "b = 7").unwrap();
+        test.write_file("lib/submod.py", "a = 10").unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> lib/submod.py:1:1
+          |
+        1 | a = 10
+          | ^^^^^^
+          |
+        info: Source
+         --> main.py:2:10
+          |
+        2 | from lib.submod import a
+          |          ^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_from_import_rel1() {
+        let mut test = CursorTest::builder()
+            .source(
+                "lib/sub/__init__.py",
+                r#"
+            from .bot.bot<CURSOR>mod import *
+            sub = 2
+            "#,
+            )
+            .build();
+
+        test.write_file("lib/__init__.py", "lib = 1").unwrap();
+        // test.write_file("lib/sub/__init__.py", "sub = 2").unwrap();
+        test.write_file("lib/sub/bot/__init__.py", "bot = 3")
+            .unwrap();
+        test.write_file("lib/sub/submod.py", "submod = 21").unwrap();
+        test.write_file("lib/sub/bot/botmod.py", "botmod = 31")
+            .unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> lib/sub/bot/botmod.py:1:1
+          |
+        1 | botmod = 31
+          | ^^^^^^^^^^^
+          |
+        info: Source
+         --> lib/sub/__init__.py:2:11
+          |
+        2 | from .bot.botmod import *
+          |           ^^^^^^
+        3 | sub = 2
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_from_import_rel2() {
+        let mut test = CursorTest::builder()
+            .source(
+                "lib/sub/__init__.py",
+                r#"
+            from .bo<CURSOR>t.botmod import *
+            sub = 2
+            "#,
+            )
+            .build();
+
+        test.write_file("lib/__init__.py", "lib = 1").unwrap();
+        // test.write_file("lib/sub/__init__.py", "sub = 2").unwrap();
+        test.write_file("lib/sub/bot/__init__.py", "bot = 3")
+            .unwrap();
+        test.write_file("lib/sub/submod.py", "submod = 21").unwrap();
+        test.write_file("lib/sub/bot/botmod.py", "botmod = 31")
+            .unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> lib/sub/bot/__init__.py:1:1
+          |
+        1 | bot = 3
+          | ^^^^^^^
+          |
+        info: Source
+         --> lib/sub/__init__.py:2:7
+          |
+        2 | from .bot.botmod import *
+          |       ^^^
+        3 | sub = 2
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_from_import_rel3() {
+        let mut test = CursorTest::builder()
+            .source(
+                "lib/sub/__init__.py",
+                r#"
+            from .<CURSOR>bot.botmod import *
+            sub = 2
+            "#,
+            )
+            .build();
+
+        test.write_file("lib/__init__.py", "lib = 1").unwrap();
+        // test.write_file("lib/sub/__init__.py", "sub = 2").unwrap();
+        test.write_file("lib/sub/bot/__init__.py", "bot = 3")
+            .unwrap();
+        test.write_file("lib/sub/submod.py", "submod = 21").unwrap();
+        test.write_file("lib/sub/bot/botmod.py", "botmod = 31")
+            .unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> lib/sub/bot/__init__.py:1:1
+          |
+        1 | bot = 3
+          | ^^^^^^^
+          |
+        info: Source
+         --> lib/sub/__init__.py:2:7
+          |
+        2 | from .bot.botmod import *
+          |       ^^^
+        3 | sub = 2
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_from_import_rel4() {
+        let mut test = CursorTest::builder()
+            .source(
+                "lib/sub/__init__.py",
+                r#"
+            from .<CURSOR> import submod
+            sub = 2
+            "#,
+            )
+            .build();
+
+        test.write_file("lib/__init__.py", "lib = 1").unwrap();
+        // test.write_file("lib/sub/__init__.py", "sub = 2").unwrap();
+        test.write_file("lib/sub/bot/__init__.py", "bot = 3")
+            .unwrap();
+        test.write_file("lib/sub/submod.py", "submod = 21").unwrap();
+        test.write_file("lib/sub/bot/botmod.py", "botmod = 31")
+            .unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
     fn goto_type_of_expression_with_module() {
         let mut test = cursor_test(
             r#"

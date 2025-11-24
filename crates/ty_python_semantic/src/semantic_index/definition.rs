@@ -737,6 +737,10 @@ impl DefinitionKind<'_> {
         matches!(self, DefinitionKind::Assignment(_))
     }
 
+    pub(crate) const fn is_function_def(&self) -> bool {
+        matches!(self, DefinitionKind::Function(_))
+    }
+
     /// Returns the [`TextRange`] of the definition target.
     ///
     /// A definition target would mainly be the node representing the place being defined i.e.,
