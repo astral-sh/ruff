@@ -16,7 +16,7 @@ use crate::types::{
     KnownInstanceType, LintDiagnosticGuard, SpecialFormType, SubclassOfType, Type, TypeAliasType,
     TypeContext, TypeIsType, TypeMapping, UnionBuilder, UnionType, todo_type,
 };
-use crate::{FxOrderSet, ResolvedDefinition, definitions_for_name};
+use crate::{FxOrderSet, ResolvedDefinition, definitions_for_attribute, definitions_for_name};
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -743,18 +743,34 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let db = self.db();
 
-        let Some(value) = subscript.value.as_name_expr() else {
-            if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                builder.into_diagnostic("Cannot specialize a non-name node in a type expression");
+        let definitions = match &*subscript.value {
+            ast::Expr::Name(id) => {
+                // TODO: This is an expensive call to an API that was never meant to be called from
+                // type inference. We plan to rework how `in_type_expression` works in the future.
+                // This new approach will make this call unnecessary, so for now, we accept the hit
+                // in performance.
+                definitions_for_name(self.db(), self.file(), id)
             }
-            return Type::unknown();
+            ast::Expr::Attribute(attribute) => {
+                // TODO: See above
+                definitions_for_attribute(self.db(), self.file(), attribute)
+            }
+            _ => {
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                    builder.into_diagnostic(
+                    "Only name- and attribute expressions can be specialized in type expressions",
+                );
+                }
+                return Type::unknown();
+            }
         };
 
-        // TODO: This is an expensive call to an API that was never meant to be called from
-        // type inference. We plan to rework how `in_type_expression` works in the future.
-        // This new approach will make this call unnecessary, so for now, we accept the hit
-        // in performance.
-        let definitions = definitions_for_name(self.db(), self.file(), value);
+        // TODO: If an implicit type alias is defined multiple times, we arbitrarily pick the
+        // first definition here. Instead, we should do proper name resolution to find the
+        // definition that is actually being referenced. Similar to the comments above, this
+        // should soon be addressed by a rework of how `in_type_expression` works. In the
+        // meantime, we seem to be doing okay in practice (see "Multiple definitions" tests in
+        // `implicit_type_aliases.md`).
         let Some(type_alias_definition) =
             definitions.iter().find_map(ResolvedDefinition::definition)
         else {
