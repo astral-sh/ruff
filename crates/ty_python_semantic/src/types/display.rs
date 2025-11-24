@@ -107,6 +107,8 @@ pub struct TypeDisplayDetails<'db> {
     pub targets: Vec<TextRange>,
     /// Metadata for each range
     pub details: Vec<TypeDetail<'db>>,
+    /// Whether the label is valid Python syntax
+    pub is_valid_syntax: bool,
 }
 
 /// Abstraction over "are we doing normal formatting, or tracking ranges with metadata?"
@@ -119,6 +121,7 @@ struct TypeDetailsWriter<'db> {
     label: String,
     targets: Vec<TextRange>,
     details: Vec<TypeDetail<'db>>,
+    is_valid_syntax: bool,
 }
 
 impl<'db> TypeDetailsWriter<'db> {
@@ -127,6 +130,7 @@ impl<'db> TypeDetailsWriter<'db> {
             label: String::new(),
             targets: Vec::new(),
             details: Vec::new(),
+            is_valid_syntax: true,
         }
     }
 
@@ -136,6 +140,7 @@ impl<'db> TypeDetailsWriter<'db> {
             label: self.label,
             targets: self.targets,
             details: self.details,
+            is_valid_syntax: self.is_valid_syntax,
         }
     }
 
@@ -190,6 +195,13 @@ impl<'a, 'b, 'db> TypeWriter<'a, 'b, 'db> {
     /// Convenience for `with_detail(TypeDetail::Type(ty))`
     fn with_type<'c>(&'c mut self, ty: Type<'db>) -> TypeDetailGuard<'a, 'b, 'c, 'db> {
         self.with_detail(TypeDetail::Type(ty))
+    }
+
+    fn set_invalid_syntax(&mut self) {
+        match self {
+            TypeWriter::Formatter(_) => {}
+            TypeWriter::Details(details) => details.is_valid_syntax = false,
+        }
     }
 
     fn join<'c>(&'c mut self, separator: &'static str) -> Join<'a, 'b, 'c, 'db> {
@@ -1505,6 +1517,7 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         // Immediately write a marker signaling we're starting a signature
         let _ = f.with_detail(TypeDetail::SignatureStart);
+        f.set_invalid_syntax();
         // When we exit this function, write a marker signaling we're ending a signature
         let mut f = f.with_detail(TypeDetail::SignatureEnd);
         let multiline = self.settings.multiline && self.parameters.len() > 1;

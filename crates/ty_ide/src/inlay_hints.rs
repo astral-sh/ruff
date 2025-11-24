@@ -1,24 +1,35 @@
 use std::{fmt, vec};
 
+use crate::importer::{ImportRequest, Importer};
 use crate::{Db, HasNavigationTargets, NavigationTarget};
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::source::source_text;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Stmt, UnaryOp};
+use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::inlay_hint_call_argument_details;
-use ty_python_semantic::{HasType, SemanticModel};
+use ty_python_semantic::types::{Type, TypeDetail};
+use ty_python_semantic::{HasType, SemanticModel, file_to_module};
 
 #[derive(Debug, Clone)]
 pub struct InlayHint {
     pub position: TextSize,
     pub kind: InlayHintKind,
     pub label: InlayHintLabel,
+    pub text_edits: Vec<InlayHintTextEdit>,
 }
 
 impl InlayHint {
-    fn variable_type(position: TextSize, ty: Type, db: &dyn Db) -> Self {
+    fn variable_type(
+        expr: &Expr,
+        ty: Type,
+        db: &dyn Db,
+        file: File,
+        parsed: &ParsedModuleRef,
+    ) -> Self {
+        let position = expr.range().end();
         // Render the type to a string, and get subspans for all the types that make it up
         let details = ty.display(db).to_string_parts();
 
@@ -34,7 +45,7 @@ impl InlayHint {
         let mut label_parts = vec![": ".into()];
         for (target, detail) in details.targets.iter().zip(&details.details) {
             match detail {
-                ty_python_semantic::types::TypeDetail::Type(ty) => {
+                TypeDetail::Type(ty) => {
                     let start = target.start().to_usize();
                     let end = target.end().to_usize();
                     // If we skipped over some bytes, push them with no target
@@ -50,9 +61,9 @@ impl InlayHint {
                         offset = end;
                     }
                 }
-                ty_python_semantic::types::TypeDetail::SignatureStart
-                | ty_python_semantic::types::TypeDetail::SignatureEnd
-                | ty_python_semantic::types::TypeDetail::Parameter(_) => {
+                TypeDetail::SignatureStart
+                | TypeDetail::SignatureEnd
+                | TypeDetail::Parameter(_) => {
                     // Don't care about these
                 }
             }
@@ -62,10 +73,73 @@ impl InlayHint {
             label_parts.push(details.label[offset..details.label.len()].into());
         }
 
+        let text_edits = if details.is_valid_syntax {
+            let mut text_edits = vec![InlayHintTextEdit {
+                range: TextRange::new(position, position),
+                new_text: format!(": {}", details.label),
+            }];
+
+            let source = source_text(db, file);
+            let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
+            let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
+            let members = importer.members_in_scope_at(expr.into(), expr.range().start());
+
+            for detail in &details.details {
+                match detail {
+                    TypeDetail::Type(ty) => {
+                        let Some(type_definition) = ty.definition(db) else {
+                            continue;
+                        };
+
+                        let Some(definition) = type_definition.definition() else {
+                            continue;
+                        };
+
+                        let Some(module) = file_to_module(db, definition.file(db)) else {
+                            continue;
+                        };
+
+                        let module_name = module.name(db).as_str();
+
+                        if module_name == "builtins" {
+                            continue;
+                        }
+
+                        let Some(definition_name) = definition.name(db) else {
+                            continue;
+                        };
+
+                        let request = ImportRequest::import_from(module_name, &definition_name);
+
+                        let import_action = importer.import(request, &members);
+
+                        if let Some(edit) = import_action.import() {
+                            if let Some(content) = &edit.content() {
+                                text_edits.push(InlayHintTextEdit {
+                                    range: edit.range(),
+                                    new_text: (*content).to_string(),
+                                });
+                            }
+                        }
+                    }
+                    TypeDetail::SignatureStart
+                    | TypeDetail::SignatureEnd
+                    | TypeDetail::Parameter(_) => {
+                        // Don't care about these
+                    }
+                }
+            }
+
+            text_edits
+        } else {
+            vec![]
+        };
+
         Self {
             position,
             kind: InlayHintKind::Type,
             label: InlayHintLabel { parts: label_parts },
+            text_edits,
         }
     }
 
@@ -83,6 +157,7 @@ impl InlayHint {
             position,
             kind: InlayHintKind::CallArgumentName,
             label: InlayHintLabel { parts: label_parts },
+            text_edits: vec![],
         }
     }
 
@@ -175,15 +250,21 @@ impl From<&str> for InlayHintLabelPart {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct InlayHintTextEdit {
+    pub range: TextRange,
+    pub new_text: String,
+}
+
 pub fn inlay_hints(
     db: &dyn Db,
     file: File,
     range: TextRange,
     settings: &InlayHintSettings,
 ) -> Vec<InlayHint> {
-    let mut visitor = InlayHintVisitor::new(db, file, range, settings);
-
     let ast = parsed_module(db, file).load(db);
+
+    let mut visitor = InlayHintVisitor::new(db, file, range, settings, &ast);
 
     visitor.visit_body(ast.suite());
 
@@ -227,20 +308,28 @@ impl Default for InlayHintSettings {
     }
 }
 
-struct InlayHintVisitor<'a, 'db> {
+struct InlayHintVisitor<'a, 'b, 'db> {
     db: &'db dyn Db,
     model: SemanticModel<'db>,
+    ast: &'b ParsedModuleRef,
     hints: Vec<InlayHint>,
     in_assignment: bool,
     range: TextRange,
     settings: &'a InlayHintSettings,
 }
 
-impl<'a, 'db> InlayHintVisitor<'a, 'db> {
-    fn new(db: &'db dyn Db, file: File, range: TextRange, settings: &'a InlayHintSettings) -> Self {
+impl<'a, 'b, 'db> InlayHintVisitor<'a, 'b, 'db> {
+    fn new(
+        db: &'db dyn Db,
+        file: File,
+        range: TextRange,
+        settings: &'a InlayHintSettings,
+        ast: &'b ParsedModuleRef,
+    ) -> Self {
         Self {
             db,
             model: SemanticModel::new(db, file),
+            ast,
             hints: Vec::new(),
             in_assignment: false,
             range,
@@ -248,12 +337,12 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         }
     }
 
-    fn add_type_hint(&mut self, position: TextSize, ty: Type<'db>) {
+    fn add_type_hint(&mut self, expr: &Expr, ty: Type<'db>) {
         if !self.settings.variable_types {
             return;
         }
 
-        let inlay_hint = InlayHint::variable_type(position, ty, self.db);
+        let inlay_hint = InlayHint::variable_type(expr, ty, self.db, self.model.file(), self.ast);
 
         self.hints.push(inlay_hint);
     }
@@ -278,7 +367,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
     }
 }
 
-impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
+impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_, '_> {
     fn enter_node(&mut self, node: AnyNodeRef<'_>) -> TraversalSignal {
         if self.range.intersect(node.range()).is_some() {
             TraversalSignal::Traverse
@@ -325,7 +414,7 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
                 if self.in_assignment {
                     if name.ctx.is_store() {
                         let ty = expr.inferred_type(&self.model);
-                        self.add_type_hint(expr.range().end(), ty);
+                        self.add_type_hint(expr, ty);
                     }
                 }
                 source_order::walk_expr(self, expr);
@@ -334,7 +423,7 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
                 if self.in_assignment {
                     if attribute.ctx.is_store() {
                         let ty = expr.inferred_type(&self.model);
-                        self.add_type_hint(expr.range().end(), ty);
+                        self.add_type_hint(expr, ty);
                     }
                 }
                 source_order::walk_expr(self, expr);
