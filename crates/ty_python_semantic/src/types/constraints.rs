@@ -494,7 +494,11 @@ impl<'db> ConstrainedTypeVar<'db> {
                     })
                 }) =>
             {
-                return Node::AlwaysFalse;
+                return Node::new_constraint(
+                    db,
+                    ConstrainedTypeVar::new(db, typevar, Type::Never, Type::object()),
+                )
+                .negate(db);
             }
             _ => {}
         }
@@ -520,12 +524,6 @@ impl<'db> ConstrainedTypeVar<'db> {
         // is both greater than `lower`, and less than `upper`.
         if !lower.is_subtype_of(db, upper) {
             return Node::AlwaysFalse;
-        }
-
-        // If the requested constraint is `Never ≤ T ≤ object`, then the typevar can be specialized
-        // to _any_ type, and the constraint does nothing.
-        if lower.is_never() && upper.is_object() {
-            return Node::AlwaysTrue;
         }
 
         // We have an (arbitrary) ordering for typevars. If the upper and/or lower bounds are
@@ -574,13 +572,21 @@ impl<'db> ConstrainedTypeVar<'db> {
                     db,
                     ConstrainedTypeVar::new(db, lower, Type::Never, Type::TypeVar(typevar)),
                 );
-                let upper = Self::new_node(db, typevar, Type::Never, upper);
+                let upper = if upper.is_object() {
+                    Node::AlwaysTrue
+                } else {
+                    Self::new_node(db, typevar, Type::Never, upper)
+                };
                 lower.and(db, upper)
             }
 
             // L ≤ T ≤ U == (L ≤ [T]) && (T ≤ [U])
             (_, Type::TypeVar(upper)) if typevar.can_be_bound_for(db, upper) => {
-                let lower = Self::new_node(db, typevar, lower, Type::object());
+                let lower = if lower.is_never() {
+                    Node::AlwaysTrue
+                } else {
+                    Self::new_node(db, typevar, lower, Type::object())
+                };
                 let upper = Node::new_constraint(
                     db,
                     ConstrainedTypeVar::new(db, upper, Type::TypeVar(typevar), Type::object()),
@@ -700,6 +706,15 @@ impl<'db> ConstrainedTypeVar<'db> {
                         typevar.identity(self.db).display(self.db),
                         if self.negated { "≠" } else { "=" },
                         lower.display(self.db)
+                    );
+                }
+
+                if lower.is_never() && upper.is_object() {
+                    return write!(
+                        f,
+                        "({} {} *)",
+                        typevar.identity(self.db).display(self.db),
+                        if self.negated { "≠" } else { "=" }
                     );
                 }
 
@@ -1127,27 +1142,30 @@ impl<'db> Node<'db> {
     /// Invokes a callback for each of the representative types of a particular typevar for this
     /// constraint set.
     ///
-    /// There is a representative type for each distinct path from the BDD root to the `AlwaysTrue`
+    /// We first abstract the BDD so that it only mentions constraints on the requested typevar. We
+    /// then invoke your callback for each distinct path from the BDD root to the `AlwaysTrue`
     /// terminal. Each of those paths can be viewed as the conjunction of the individual
     /// constraints of each internal node that we traverse as we walk that path. We provide the
     /// lower/upper bound of this conjunction to your callback, allowing you to choose any suitable
     /// type in the range.
+    ///
+    /// If the abstracted BDD does not mention the typevar at all (i.e., it leaves the typevar
+    /// completely unconstrained), we will invoke your callback once with `None`.
     fn find_representative_types(
         self,
         db: &'db dyn Db,
         bound_typevar: BoundTypeVarIdentity<'db>,
-        mut f: impl FnMut(Type<'db>, Type<'db>),
+        mut f: impl FnMut(Option<(Type<'db>, Type<'db>)>),
     ) {
         self.retain_one(db, bound_typevar)
-            .find_representative_types_inner(db, Type::Never, Type::object(), &mut f);
+            .find_representative_types_inner(db, None, &mut f);
     }
 
     fn find_representative_types_inner(
         self,
         db: &'db dyn Db,
-        greatest_lower_bound: Type<'db>,
-        least_upper_bound: Type<'db>,
-        f: &mut dyn FnMut(Type<'db>, Type<'db>),
+        current_bounds: Option<(Type<'db>, Type<'db>)>,
+        f: &mut dyn FnMut(Option<(Type<'db>, Type<'db>)>),
     ) {
         match self {
             Node::AlwaysTrue => {
@@ -1157,12 +1175,16 @@ impl<'db> Node<'db> {
                 // If `lower ≰ upper`, then this path somehow represents in invalid specialization.
                 // That should have been removed from the BDD domain as part of the simplification
                 // process.
-                debug_assert!(greatest_lower_bound.is_subtype_of(db, least_upper_bound));
+                debug_assert!(current_bounds.is_none_or(
+                    |(greatest_lower_bound, least_upper_bound)| {
+                        greatest_lower_bound.is_subtype_of(db, least_upper_bound)
+                    }
+                ));
 
                 // We've been tracking the lower and upper bound that the types for this path must
                 // satisfy. Pass those bounds along and let the caller choose a representative type
                 // from within that range.
-                f(greatest_lower_bound, least_upper_bound);
+                f(current_bounds);
             }
 
             Node::AlwaysFalse => {
@@ -1171,6 +1193,9 @@ impl<'db> Node<'db> {
             }
 
             Node::Interior(interior) => {
+                let (greatest_lower_bound, least_upper_bound) =
+                    current_bounds.unwrap_or((Type::Never, Type::object()));
+
                 // For an interior node, there are two outgoing paths: one for the `if_true`
                 // branch, and one for the `if_false` branch.
                 //
@@ -1185,8 +1210,7 @@ impl<'db> Node<'db> {
                     IntersectionType::from_elements(db, [least_upper_bound, constraint.upper(db)]);
                 interior.if_true(db).find_representative_types_inner(
                     db,
-                    new_greatest_lower_bound,
-                    new_least_upper_bound,
+                    Some((new_greatest_lower_bound, new_least_upper_bound)),
                     f,
                 );
 
@@ -1202,8 +1226,7 @@ impl<'db> Node<'db> {
                 // path.
                 interior.if_false(db).find_representative_types_inner(
                     db,
-                    greatest_lower_bound,
-                    least_upper_bound,
+                    Some((greatest_lower_bound, least_upper_bound)),
                     f,
                 );
             }
@@ -2239,6 +2262,9 @@ impl<'db> ConstraintAssignment<'db> {
 ///
 /// We support several kinds of sequent:
 ///
+/// - `¬C₁ → false`: This indicates that `C₁` is always true. Any path that assumes it is false is
+///   impossible and can be pruned.
+///
 /// - `C₁ ∧ C₂ → false`: This indicates that `C₁` and `C₂` are disjoint: it is not possible for
 ///   both to hold. Any path that assumes both is impossible and can be pruned.
 ///
@@ -2250,8 +2276,10 @@ impl<'db> ConstraintAssignment<'db> {
 ///   holds but `D` does _not_ is impossible and can be pruned.
 #[derive(Debug, Default, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
 struct SequentMap<'db> {
+    /// Sequents of the form `¬C₁ → false`
+    single_tautologies: FxHashSet<ConstrainedTypeVar<'db>>,
     /// Sequents of the form `C₁ ∧ C₂ → false`
-    impossibilities: FxHashSet<(ConstrainedTypeVar<'db>, ConstrainedTypeVar<'db>)>,
+    pair_impossibilities: FxHashSet<(ConstrainedTypeVar<'db>, ConstrainedTypeVar<'db>)>,
     /// Sequents of the form `C₁ ∧ C₂ → D`
     pair_implications: FxHashMap<
         (ConstrainedTypeVar<'db>, ConstrainedTypeVar<'db>),
@@ -2310,13 +2338,17 @@ impl<'db> SequentMap<'db> {
         }
     }
 
-    fn add_impossibility(
+    fn add_single_tautology(&mut self, ante: ConstrainedTypeVar<'db>) {
+        self.single_tautologies.insert(ante);
+    }
+
+    fn add_pair_impossibility(
         &mut self,
         db: &'db dyn Db,
         ante1: ConstrainedTypeVar<'db>,
         ante2: ConstrainedTypeVar<'db>,
     ) {
-        self.impossibilities
+        self.pair_impossibilities
             .insert(Self::pair_key(db, ante1, ante2));
     }
 
@@ -2352,6 +2384,15 @@ impl<'db> SequentMap<'db> {
     }
 
     fn add_sequents_for_single(&mut self, db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) {
+        // If this constraint binds its typevar to `Never ≤ T ≤ object`, then the typevar can take
+        // on any type, and the constraint is always satisfied.
+        let lower = constraint.lower(db);
+        let upper = constraint.upper(db);
+        if lower.is_never() && upper.is_object() {
+            self.add_single_tautology(constraint);
+            return;
+        }
+
         // If the lower or upper bound of this constraint is a typevar, we can propagate the
         // constraint:
         //
@@ -2362,8 +2403,6 @@ impl<'db> SequentMap<'db> {
         // Technically, (1) also allows `(S = T) → (S = S)`, but the rhs of that is vacuously true,
         // so we don't add a sequent for that case.
 
-        let lower = constraint.lower(db);
-        let upper = constraint.upper(db);
         let post_constraint = match (lower, upper) {
             // Case 1
             (Type::TypeVar(lower_typevar), Type::TypeVar(upper_typevar)) => {
@@ -2568,7 +2607,7 @@ impl<'db> SequentMap<'db> {
                 self.enqueue_constraint(intersection_constraint);
             }
             None => {
-                self.add_impossibility(db, left_constraint, right_constraint);
+                self.add_pair_impossibility(db, left_constraint, right_constraint);
             }
         }
     }
@@ -2593,7 +2632,7 @@ impl<'db> SequentMap<'db> {
                     }
                 };
 
-                for (ante1, ante2) in &self.map.impossibilities {
+                for (ante1, ante2) in &self.map.pair_impossibilities {
                     maybe_write_prefix(f)?;
                     write!(
                         f,
@@ -2726,7 +2765,15 @@ impl<'db> PathAssignments<'db> {
         // don't anticipate the sequent maps to be very large. We might consider avoiding the
         // brute-force search.
 
-        for (ante1, ante2) in &map.impossibilities {
+        for ante in &map.single_tautologies {
+            if self.assignment_holds(ante.when_false()) {
+                // The sequent map says (ante1) is always true, and the current path asserts that
+                // it's false.
+                return Err(PathAssignmentConflict);
+            }
+        }
+
+        for (ante1, ante2) in &map.pair_impossibilities {
             if self.assignment_holds(ante1.when_true()) && self.assignment_holds(ante2.when_true())
             {
                 // The sequent map says (ante1 ∧ ante2) is an impossible combination, and the
@@ -3088,8 +3135,8 @@ impl<'db> GenericContext<'db> {
             });
 
         // Then we find all of the "representative types" for each typevar in the constraint set.
-        let mut types = vec![Type::Never; self.len(db)];
-        for (i, bound_typevar) in self.variables(db).enumerate() {
+        let mut error_occurred = false;
+        let types = self.variables(db).map(|bound_typevar| {
             // Each representative type represents one of the ways that the typevar can satisfy the
             // constraint, expressed as a lower/upper bound on the types that the typevar can
             // specialize to.
@@ -3101,40 +3148,55 @@ impl<'db> GenericContext<'db> {
             // _each_ of the paths into separate specializations, but it's not clear what we would
             // do with that, so instead we just report the ambiguity as a specialization failure.
             let mut satisfied = false;
+            let mut unconstrained = false;
             let mut greatest_lower_bound = Type::Never;
             let mut least_upper_bound = Type::object();
-            abstracted.find_representative_types(
-                db,
-                bound_typevar.identity(db),
-                |lower_bound, upper_bound| {
-                    satisfied = true;
-                    greatest_lower_bound =
-                        UnionType::from_elements(db, [greatest_lower_bound, lower_bound]);
-                    least_upper_bound =
-                        IntersectionType::from_elements(db, [least_upper_bound, upper_bound]);
-                },
-            );
+            abstracted.find_representative_types(db, bound_typevar.identity(db), |bounds| {
+                satisfied = true;
+                match bounds {
+                    Some((lower_bound, upper_bound)) => {
+                        greatest_lower_bound =
+                            UnionType::from_elements(db, [greatest_lower_bound, lower_bound]);
+                        least_upper_bound =
+                            IntersectionType::from_elements(db, [least_upper_bound, upper_bound]);
+                    }
+                    None => {
+                        unconstrained = true;
+                    }
+                }
+            });
 
             // If there are no satisfiable paths in the BDD, then there is no valid specialization
             // for this constraint set.
             if !satisfied {
                 // TODO: Construct a useful error here
-                return Err(());
+                error_occurred = true;
+                return None;
+            }
+
+            // The BDD is satisfiable, but the typevar is unconstrained, then we use `None` to tell
+            // specialize_recursive to fall back on the typevar's default.
+            if unconstrained {
+                return None;
             }
 
             // If `lower ≰ upper`, then there is no type that satisfies all of the paths in the
             // BDD. That's an ambiguous specialization, as described above.
             if !greatest_lower_bound.is_subtype_of(db, least_upper_bound) {
-                // TODO: Construct a useful error here
-                return Err(());
+                error_occurred = true;
+                return None;
             }
 
             // Of all of the types that satisfy all of the paths in the BDD, we choose the
             // "largest" one (i.e., "closest to `object`") as the specialization.
-            types[i] = least_upper_bound;
-        }
+            Some(least_upper_bound)
+        });
 
-        Ok(self.specialize_recursive(db, types.into_boxed_slice()))
+        let specialization = self.specialize_recursive(db, types);
+        if error_occurred {
+            return Err(());
+        }
+        Ok(specialization)
     }
 }
 
