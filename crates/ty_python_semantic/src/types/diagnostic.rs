@@ -3631,7 +3631,7 @@ pub(super) fn report_invalid_method_override<'db>(
 /// versions, we add a hint to the diagnostic that the user may have
 /// misconfigured their Python version.
 ///
-/// The funciton returns `true` if a hint was added, `false` otherwise.
+/// The function returns `true` if a hint was added, `false` otherwise.
 pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
     db: &dyn Db,
     diagnostic: &mut Diagnostic,
