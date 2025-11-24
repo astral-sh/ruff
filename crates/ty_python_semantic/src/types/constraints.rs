@@ -1053,12 +1053,15 @@ impl<'db> Node<'db> {
         let mut valid_inferable_specializations = Node::AlwaysTrue;
         let mut valid_non_inferable_specializations = Node::AlwaysTrue;
         let mut add_typevar = |bound_typevar: BoundTypeVarInstance<'db>| {
-            let valid_specializations = bound_typevar.valid_specializations(db).node;
             if bound_typevar.is_inferable(db, inferable) {
+                let valid_specializations =
+                    bound_typevar.valid_specializations_with_materialization(db, true);
                 inferable_typevars.insert(bound_typevar);
                 valid_inferable_specializations =
                     valid_inferable_specializations.and(db, valid_specializations);
             } else {
+                let valid_specializations =
+                    bound_typevar.valid_specializations_with_materialization(db, false);
                 non_inferable_typevars.insert(bound_typevar);
                 valid_non_inferable_specializations =
                     valid_non_inferable_specializations.and(db, valid_specializations);
@@ -3060,6 +3063,23 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// when this typevar is in inferable position, where we only need _some_ specialization to
     /// satisfy the constraint set.
     pub(crate) fn valid_specializations(self, db: &'db dyn Db) -> ConstraintSet<'db> {
+        let node = self.valid_specializations_with_materialization(db, true);
+        ConstraintSet { node }
+    }
+
+    /// Returns the valid specializations of a typevar, choosing whether to use the top or bottom
+    /// materialization of any gradual types that appear in the bounds or constraints.
+    ///
+    /// For inferable typevars we want the most permissive view of gradual types (top
+    /// materialization), so that we succeed if there exists _any_ materialization that works.
+    /// For non-inferable typevars we want the most restrictive view (bottom materialization), so
+    /// that we only consider the specializations that are guaranteed to be valid regardless of how
+    /// the gradual type is materialized.
+    fn valid_specializations_with_materialization(
+        self,
+        db: &'db dyn Db,
+        use_top_materialization: bool,
+    ) -> Node<'db> {
         // For gradual upper bounds and constraints, we are free to choose any materialization that
         // makes the check succeed. In inferable positions, it is most helpful to choose a
         // materialization that is as permissive as possible, since that maximizes the number of
@@ -3071,25 +3091,33 @@ impl<'db> BoundTypeVarInstance<'db> {
         // that _some_ valid specialization satisfies the constraint set, it's correct for us to
         // return the range of valid materializations that we can choose from.
         match self.typevar(db).bound_or_constraints(db) {
-            None => ConstraintSet::from(true),
+            None => Node::AlwaysTrue,
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                let bound = bound.top_materialization(db);
-                let node = ConstrainedTypeVar::new_node(db, self, Type::Never, bound);
-                ConstraintSet { node }
+                let bound = if use_top_materialization {
+                    bound.top_materialization(db)
+                } else {
+                    bound.bottom_materialization(db)
+                };
+                ConstrainedTypeVar::new_node(db, self, Type::Never, bound)
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                 let mut specializations = Node::AlwaysFalse;
                 for constraint in constraints.elements(db) {
-                    let constraint_lower = constraint.bottom_materialization(db);
-                    let constraint_upper = constraint.top_materialization(db);
+                    let (constraint_lower, constraint_upper) = if use_top_materialization {
+                        (
+                            constraint.bottom_materialization(db),
+                            constraint.top_materialization(db),
+                        )
+                    } else {
+                        let materialized = constraint.bottom_materialization(db);
+                        (materialized, materialized)
+                    };
                     specializations = specializations.or(
                         db,
                         ConstrainedTypeVar::new_node(db, self, constraint_lower, constraint_upper),
                     );
                 }
-                ConstraintSet {
-                    node: specializations,
-                }
+                specializations
             }
         }
     }
