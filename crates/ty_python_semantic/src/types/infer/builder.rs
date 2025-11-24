@@ -62,9 +62,9 @@ use crate::types::diagnostic::{
     INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT,
     INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NON_SUBSCRIPTABLE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
-    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
+    POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
+    SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
+    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
     hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_cannot_pop_required_field_on_typed_dict,
@@ -101,14 +101,14 @@ use crate::types::typed_dict::{
 };
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    CallDunderError, CallableBinding, CallableType, ClassLiteral, ClassType, DataclassParams,
-    DynamicType, InternedType, IntersectionBuilder, IntersectionType, KnownClass,
+    CallDunderError, CallableBinding, CallableType, CallableTypes, ClassLiteral, ClassType,
+    DataclassParams, DynamicType, InternedType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
     PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType, SubclassOfType,
     TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
     TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
     TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
-    UnionTypeInstance, binding_type, todo_type,
+    UnionTypeInstance, binding_type, liskov, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -548,9 +548,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "Inferring deferred types should not add more deferred definitions"
         );
 
-        // TODO: Only call this function when diagnostics are enabled.
-        self.check_class_definitions();
-        self.check_overloaded_functions(node);
+        if self.db().should_check_file(self.file()) {
+            self.check_class_definitions();
+            self.check_overloaded_functions(node);
+        }
     }
 
     /// Iterate over all class definitions to check that the definition will not cause an exception
@@ -948,6 +949,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
+
+            // (8) Check for Liskov violations
+            liskov::check_class(&self.context, class);
 
             if let Some(protocol) = class.into_protocol_class(self.db()) {
                 protocol.validate_members(&self.context);
@@ -2287,7 +2291,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     let is_input_function_like = inferred_ty
                         .try_upcast_to_callable(self.db())
-                        .and_then(Type::as_callable)
+                        .and_then(CallableTypes::exactly_one)
                         .is_some_and(|callable| callable.is_function_like(self.db()));
 
                     if is_input_function_like
@@ -3053,7 +3057,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .iter()
                         .map(|(index, ty)| (&tuple.elts[*index], **ty));
 
-                    report_invalid_exception_tuple_caught(&self.context, tuple, invalid_elements);
+                    report_invalid_exception_tuple_caught(
+                        &self.context,
+                        tuple,
+                        node_ty,
+                        invalid_elements,
+                    );
                 } else {
                     report_invalid_exception_caught(&self.context, node, node_ty);
                 }
@@ -3275,7 +3284,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // specified in this context.
         match default {
             ast::Expr::EllipsisLiteral(_) => {
-                CallableType::single(self.db(), Signature::new(Parameters::gradual_form(), None))
+                Type::single_callable(self.db(), Signature::new(Parameters::gradual_form(), None))
             }
             ast::Expr::List(ast::ExprList { elts, .. }) => {
                 let mut parameter_types = Vec::with_capacity(elts.len());
@@ -3303,7 +3312,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }))
                 };
 
-                CallableType::single(self.db(), Signature::new(parameters, None))
+                Type::single_callable(self.db(), Signature::new(parameters, None))
             }
             ast::Expr::Name(name) => {
                 let name_ty = self.infer_name_load(name);
@@ -6231,16 +6240,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        let diagnostic = builder.into_diagnostic(format_args!(
+        let mut diagnostic = builder.into_diagnostic(format_args!(
             "Module `{module_name}` has no member `{name}`"
         ));
 
+        let mut submodule_hint_added = false;
+
         if let Some(full_submodule_name) = full_submodule_name {
-            hint_if_stdlib_submodule_exists_on_other_versions(
+            submodule_hint_added = hint_if_stdlib_submodule_exists_on_other_versions(
                 self.db(),
-                diagnostic,
+                &mut diagnostic,
                 &full_submodule_name,
                 module,
+            );
+        }
+
+        if !submodule_hint_added {
+            hint_if_stdlib_attribute_exists_on_other_versions(
+                self.db(),
+                diagnostic,
+                module_ty,
+                name,
+                "resolving imports",
             );
         }
     }
@@ -6326,13 +6347,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        let diagnostic = builder.into_diagnostic(format_args!(
+        let mut diagnostic = builder.into_diagnostic(format_args!(
             "Module `{thispackage_name}` has no submodule `{final_part}`"
         ));
 
         hint_if_stdlib_submodule_exists_on_other_versions(
             self.db(),
-            diagnostic,
+            &mut diagnostic,
             &full_submodule_name,
             module,
         );
@@ -7924,7 +7945,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // TODO: Useful inference of a lambda's return type will require a different approach,
         // which does the inference of the body expression based on arguments at each call site,
         // rather than eagerly computing a return type without knowing the argument types.
-        CallableType::function_like(self.db(), Signature::new(parameters, Some(Type::unknown())))
+        Type::function_like_callable(self.db(), Signature::new(parameters, Some(Type::unknown())))
     }
 
     fn infer_call_expression(
@@ -9062,6 +9083,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     _ => false,
                 };
 
+                if let Type::ModuleLiteral(module) = value_type {
+                    let module = module.module(db);
+                    let module_name = module.name(db);
+                    if module.kind(db).is_package()
+                        && let Some(relative_submodule) = ModuleName::new(attr_name)
+                    {
+                        let mut maybe_submodule_name = module_name.clone();
+                        maybe_submodule_name.extend(&relative_submodule);
+                        if resolve_module(db, &maybe_submodule_name).is_some() {
+                            if let Some(builder) = self
+                                .context
+                                .report_lint(&POSSIBLY_MISSING_ATTRIBUTE, attribute)
+                            {
+                                let mut diag = builder.into_diagnostic(format_args!(
+                                    "Submodule `{attr_name}` may not be available as an attribute \
+                                    on module `{module_name}`"
+                                ));
+                                diag.help(format_args!(
+                                    "Consider explicitly importing `{maybe_submodule_name}`"
+                                ));
+                            }
+                            return fallback();
+                        }
+                    }
+                }
+
                 let Some(builder) = self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
                 else {
                     return fallback();
@@ -9078,8 +9125,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let diagnostic = match value_type {
                     Type::ModuleLiteral(module) => builder.into_diagnostic(format_args!(
-                        "Module `{}` has no member `{attr_name}`",
-                        module.module(db).name(db),
+                        "Module `{module_name}` has no member `{attr_name}`",
+                        module_name = module.module(db).name(db),
                     )),
                     Type::ClassLiteral(class) => builder.into_diagnostic(format_args!(
                         "Class `{}` has no attribute `{attr_name}`",
@@ -9102,8 +9149,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 hint_if_stdlib_attribute_exists_on_other_versions(
                     db,
                     diagnostic,
-                    &value_type,
+                    value_type,
                     attr_name,
+                    &format!("resolving the `{attr_name}` attribute"),
                 );
 
                 fallback()

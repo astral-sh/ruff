@@ -113,13 +113,12 @@ pub(crate) fn infer_definition_types<'db>(
 
 fn definition_cycle_recover<'db>(
     db: &'db dyn Db,
-    _id: salsa::Id,
+    cycle: &salsa::Cycle,
     last_provisional_value: &DefinitionInference<'db>,
     value: DefinitionInference<'db>,
-    count: u32,
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
-    if &value == last_provisional_value || count != ITERATIONS_BEFORE_FALLBACK {
+    if &value == last_provisional_value || cycle.iteration() != ITERATIONS_BEFORE_FALLBACK {
         value
     } else {
         DefinitionInference::cycle_fallback(definition.scope(db))
@@ -227,13 +226,12 @@ pub(crate) fn infer_isolated_expression<'db>(
 
 fn expression_cycle_recover<'db>(
     db: &'db dyn Db,
-    _id: salsa::Id,
+    cycle: &salsa::Cycle,
     last_provisional_value: &ExpressionInference<'db>,
     value: ExpressionInference<'db>,
-    count: u32,
     input: InferExpression<'db>,
 ) -> ExpressionInference<'db> {
-    if &value == last_provisional_value || count != ITERATIONS_BEFORE_FALLBACK {
+    if &value == last_provisional_value || cycle.iteration() != ITERATIONS_BEFORE_FALLBACK {
         value
     } else {
         ExpressionInference::cycle_fallback(input.expression(db).scope(db))

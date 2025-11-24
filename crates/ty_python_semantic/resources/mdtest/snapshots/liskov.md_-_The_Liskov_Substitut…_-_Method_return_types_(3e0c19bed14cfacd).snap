@@ -1,0 +1,75 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: liskov.md - The Liskov Substitution Principle - Method return types
+mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
+---
+
+# Python source files
+
+## mdtest_snippet.pyi
+
+```
+ 1 | class Super:
+ 2 |     def method(self) -> int: ...
+ 3 | 
+ 4 | class Sub1(Super):
+ 5 |     def method(self) -> int: ...  # fine
+ 6 | 
+ 7 | class Sub2(Super):
+ 8 |     def method(self) -> bool: ...  # fine: `bool` is a subtype of `int`
+ 9 | 
+10 | class Sub3(Super):
+11 |     def method(self) -> object: ...  # error: [invalid-method-override]
+12 | 
+13 | class Sub4(Super):
+14 |     def method(self) -> str: ...  # error: [invalid-method-override]
+```
+
+# Diagnostics
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:11:9
+   |
+10 | class Sub3(Super):
+11 |     def method(self) -> object: ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
+12 |
+13 | class Sub4(Super):
+   |
+  ::: src/mdtest_snippet.pyi:2:9
+   |
+ 1 | class Super:
+ 2 |     def method(self) -> int: ...
+   |         ------------------- `Super.method` defined here
+ 3 |
+ 4 | class Sub1(Super):
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:14:9
+   |
+13 | class Sub4(Super):
+14 |     def method(self) -> str: ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
+   |
+  ::: src/mdtest_snippet.pyi:2:9
+   |
+ 1 | class Super:
+ 2 |     def method(self) -> int: ...
+   |         ------------------- `Super.method` defined here
+ 3 |
+ 4 | class Sub1(Super):
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```

@@ -1376,9 +1376,7 @@ mod implicit_globals {
     use crate::place::{Definedness, PlaceAndQualifiers, TypeOrigin};
     use crate::semantic_index::symbol::Symbol;
     use crate::semantic_index::{place_table, use_def_map};
-    use crate::types::{
-        CallableType, KnownClass, MemberLookupPolicy, Parameter, Parameters, Signature, Type,
-    };
+    use crate::types::{KnownClass, MemberLookupPolicy, Parameter, Parameters, Signature, Type};
     use ruff_python_ast::PythonVersion;
 
     use super::{Place, place_from_declarations};
@@ -1461,7 +1459,7 @@ mod implicit_globals {
                     )),
                 );
                 Place::Defined(
-                    CallableType::function_like(db, signature),
+                    Type::function_like_callable(db, signature),
                     TypeOrigin::Inferred,
                     Definedness::PossiblyUndefined,
                 )

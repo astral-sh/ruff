@@ -61,6 +61,7 @@ pub(crate) enum GotoTarget<'a> {
     /// ```
     ImportModuleComponent {
         module_name: String,
+        level: u32,
         component_index: usize,
         component_range: TextRange,
     },
@@ -302,12 +303,21 @@ impl GotoTarget<'_> {
             // (i.e. the type of `MyClass` in `MyClass()` is `<class MyClass>` and not `() -> MyClass`)
             GotoTarget::Call { callable, .. } => callable.inferred_type(model),
             GotoTarget::TypeParamTypeVarName(typevar) => typevar.inferred_type(model),
+            GotoTarget::ImportModuleComponent {
+                module_name,
+                component_index,
+                level,
+                ..
+            } => {
+                // We don't currently support hovering the bare `.` so there is always a name
+                let module = import_name(module_name, *component_index);
+                model.resolve_module_type(Some(module), *level)?
+            }
             // TODO: Support identifier targets
             GotoTarget::PatternMatchRest(_)
             | GotoTarget::PatternKeywordArgument(_)
             | GotoTarget::PatternMatchStarName(_)
             | GotoTarget::PatternMatchAsName(_)
-            | GotoTarget::ImportModuleComponent { .. }
             | GotoTarget::TypeParamParamSpecName(_)
             | GotoTarget::TypeParamTypeVarTupleName(_)
             | GotoTarget::NonLocal { .. }
@@ -353,37 +363,30 @@ impl GotoTarget<'_> {
     /// as just returning a raw `NavigationTarget`.
     pub(crate) fn get_definition_targets<'db>(
         &self,
-        file: ruff_db::files::File,
-        db: &'db dyn crate::Db,
+        model: &SemanticModel<'db>,
         alias_resolution: ImportAliasResolution,
     ) -> Option<DefinitionsOrTargets<'db>> {
         use crate::NavigationTarget;
+        let db = model.db();
+        let file = model.file();
 
         match self {
-            GotoTarget::Expression(expression) => definitions_for_expression(db, file, expression)
-                .map(DefinitionsOrTargets::Definitions),
+            GotoTarget::Expression(expression) => {
+                definitions_for_expression(model, expression).map(DefinitionsOrTargets::Definitions)
+            }
 
             // For already-defined symbols, they are their own definitions
-            GotoTarget::FunctionDef(function) => {
-                let model = SemanticModel::new(db, file);
-                Some(DefinitionsOrTargets::Definitions(vec![
-                    ResolvedDefinition::Definition(function.definition(&model)),
-                ]))
-            }
+            GotoTarget::FunctionDef(function) => Some(DefinitionsOrTargets::Definitions(vec![
+                ResolvedDefinition::Definition(function.definition(model)),
+            ])),
 
-            GotoTarget::ClassDef(class) => {
-                let model = SemanticModel::new(db, file);
-                Some(DefinitionsOrTargets::Definitions(vec![
-                    ResolvedDefinition::Definition(class.definition(&model)),
-                ]))
-            }
+            GotoTarget::ClassDef(class) => Some(DefinitionsOrTargets::Definitions(vec![
+                ResolvedDefinition::Definition(class.definition(model)),
+            ])),
 
-            GotoTarget::Parameter(parameter) => {
-                let model = SemanticModel::new(db, file);
-                Some(DefinitionsOrTargets::Definitions(vec![
-                    ResolvedDefinition::Definition(parameter.definition(&model)),
-                ]))
-            }
+            GotoTarget::Parameter(parameter) => Some(DefinitionsOrTargets::Definitions(vec![
+                ResolvedDefinition::Definition(parameter.definition(model)),
+            ])),
 
             // For import aliases (offset within 'y' or 'z' in "from x import y as z")
             GotoTarget::ImportSymbolAlias {
@@ -404,24 +407,18 @@ impl GotoTarget<'_> {
             GotoTarget::ImportModuleComponent {
                 module_name,
                 component_index,
+                level,
                 ..
             } => {
-                // Handle both `import foo.bar` and `from foo.bar import baz` where offset is within module component
-                let components: Vec<&str> = module_name.split('.').collect();
-
-                // Build the module name up to and including the component containing the offset
-                let target_module_name = components[..=*component_index].join(".");
-
-                // Try to resolve the module
-                definitions_for_module(db, &target_module_name)
+                // We don't currently support hovering the bare `.` so there is always a name
+                let module = import_name(module_name, *component_index);
+                definitions_for_module(model, Some(module), *level)
             }
 
             // Handle import aliases (offset within 'z' in "import x.y as z")
             GotoTarget::ImportModuleAlias { alias } => {
                 if alias_resolution == ImportAliasResolution::ResolveAliases {
-                    let full_module_name = alias.name.as_str();
-                    // Try to resolve the module
-                    definitions_for_module(db, full_module_name)
+                    definitions_for_module(model, Some(alias.name.as_str()), 0)
                 } else {
                     let alias_range = alias.asname.as_ref().unwrap().range;
                     Some(DefinitionsOrTargets::Targets(
@@ -444,9 +441,8 @@ impl GotoTarget<'_> {
 
             // For exception variables, they are their own definitions (like parameters)
             GotoTarget::ExceptVariable(except_handler) => {
-                let model = SemanticModel::new(db, file);
                 Some(DefinitionsOrTargets::Definitions(vec![
-                    ResolvedDefinition::Definition(except_handler.definition(&model)),
+                    ResolvedDefinition::Definition(except_handler.definition(model)),
                 ]))
             }
 
@@ -478,9 +474,9 @@ impl GotoTarget<'_> {
             //
             // Prefer the function impl over the callable so that its docstrings win if defined.
             GotoTarget::Call { callable, call } => {
-                let mut definitions = definitions_for_callable(db, file, call);
+                let mut definitions = definitions_for_callable(model, call);
                 let expr_definitions =
-                    definitions_for_expression(db, file, callable).unwrap_or_default();
+                    definitions_for_expression(model, callable).unwrap_or_default();
                 definitions.extend(expr_definitions);
 
                 if definitions.is_empty() {
@@ -491,18 +487,15 @@ impl GotoTarget<'_> {
             }
 
             GotoTarget::BinOp { expression, .. } => {
-                let model = SemanticModel::new(db, file);
-
                 let (definitions, _) =
-                    ty_python_semantic::definitions_for_bin_op(db, &model, expression)?;
+                    ty_python_semantic::definitions_for_bin_op(db, model, expression)?;
 
                 Some(DefinitionsOrTargets::Definitions(definitions))
             }
 
             GotoTarget::UnaryOp { expression, .. } => {
-                let model = SemanticModel::new(db, file);
                 let (definitions, _) =
-                    ty_python_semantic::definitions_for_unary_op(db, &model, expression)?;
+                    ty_python_semantic::definitions_for_unary_op(db, model, expression)?;
 
                 Some(DefinitionsOrTargets::Definitions(definitions))
             }
@@ -632,6 +625,7 @@ impl GotoTarget<'_> {
                                 {
                                     return Some(GotoTarget::ImportModuleComponent {
                                         module_name: full_name.to_string(),
+                                        level: 0,
                                         component_index,
                                         component_range,
                                     });
@@ -672,14 +666,12 @@ impl GotoTarget<'_> {
                     // Handle offset within module name in from import statements
                     if let Some(module_expr) = &from.module {
                         let full_module_name = module_expr.to_string();
-
-                        if let Some((component_index, component_range)) = find_module_component(
-                            &full_module_name,
-                            module_expr.range.start(),
-                            offset,
-                        ) {
+                        if let Some((component_index, component_range)) =
+                            find_module_component(&full_module_name, module_expr.start(), offset)
+                        {
                             return Some(GotoTarget::ImportModuleComponent {
                                 module_name: full_module_name,
+                                level: from.level,
                                 component_index,
                                 component_range,
                             });
@@ -876,27 +868,26 @@ fn convert_resolved_definitions_to_targets(
 
 /// Shared helper to get definitions for an expr (that is presumably a name/attr)
 fn definitions_for_expression<'db>(
-    db: &'db dyn crate::Db,
-    file: ruff_db::files::File,
+    model: &SemanticModel<'db>,
     expression: &ruff_python_ast::ExprRef<'_>,
 ) -> Option<Vec<ResolvedDefinition<'db>>> {
     match expression {
-        ast::ExprRef::Name(name) => Some(definitions_for_name(db, file, name)),
+        ast::ExprRef::Name(name) => Some(definitions_for_name(model.db(), model.file(), name)),
         ast::ExprRef::Attribute(attribute) => Some(ty_python_semantic::definitions_for_attribute(
-            db, file, attribute,
+            model.db(),
+            model.file(),
+            attribute,
         )),
         _ => None,
     }
 }
 
 fn definitions_for_callable<'db>(
-    db: &'db dyn crate::Db,
-    file: ruff_db::files::File,
+    model: &SemanticModel<'db>,
     call: &ast::ExprCall,
 ) -> Vec<ResolvedDefinition<'db>> {
-    let model = SemanticModel::new(db, file);
     // Attempt to refine to a specific call
-    let signature_info = call_signature_details(db, &model, call);
+    let signature_info = call_signature_details(model.db(), model, call);
     signature_info
         .into_iter()
         .filter_map(|signature| signature.definition.map(ResolvedDefinition::Definition))
@@ -947,7 +938,9 @@ pub(crate) fn find_goto_target(
     }
 
     let covering_node = covering_node(parsed.syntax().into(), token.range())
-        .find_first(|node| node.is_identifier() || node.is_expression())
+        .find_first(|node| {
+            node.is_identifier() || node.is_expression() || node.is_stmt_import_from()
+        })
         .ok()?;
 
     GotoTarget::from_covering_node(&covering_node, offset, parsed.tokens())
@@ -955,21 +948,15 @@ pub(crate) fn find_goto_target(
 
 /// Helper function to resolve a module name and create a navigation target.
 fn definitions_for_module<'db>(
-    db: &'db dyn crate::Db,
-    module_name_str: &str,
+    model: &SemanticModel,
+    module: Option<&str>,
+    level: u32,
 ) -> Option<DefinitionsOrTargets<'db>> {
-    use ty_python_semantic::{ModuleName, resolve_module};
-
-    if let Some(module_name) = ModuleName::new(module_name_str) {
-        if let Some(resolved_module) = resolve_module(db, &module_name) {
-            if let Some(module_file) = resolved_module.file(db) {
-                return Some(DefinitionsOrTargets::Definitions(vec![
-                    ResolvedDefinition::Module(module_file),
-                ]));
-            }
-        }
-    }
-    None
+    let module = model.resolve_module(module, level)?;
+    let file = module.file(model.db())?;
+    Some(DefinitionsOrTargets::Definitions(vec![
+        ResolvedDefinition::Module(file),
+    ]))
 }
 
 /// Helper function to extract module component information from a dotted module name
@@ -983,9 +970,7 @@ fn find_module_component(
 
     // Split the module name into components and find which one contains the offset
     let mut current_pos = 0;
-    let components: Vec<&str> = full_module_name.split('.').collect();
-
-    for (i, component) in components.iter().enumerate() {
+    for (i, component) in full_module_name.split('.').enumerate() {
         let component_start = current_pos;
         let component_end = current_pos + component.len();
 
@@ -1003,4 +988,17 @@ fn find_module_component(
     }
 
     None
+}
+
+/// Helper to get the module name up to the given component index
+fn import_name(module_name: &str, component_index: usize) -> &str {
+    // We want everything to the left of the nth `.`
+    // If there's no nth `.` then we want the whole thing.
+    let idx = module_name
+        .match_indices('.')
+        .nth(component_index)
+        .map(|(idx, _)| idx)
+        .unwrap_or(module_name.len());
+
+    &module_name[..idx]
 }
