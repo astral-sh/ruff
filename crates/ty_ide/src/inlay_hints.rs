@@ -318,7 +318,7 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
         match stmt {
             Stmt::Assign(assign) => {
                 self.in_assignment = !type_hint_is_excessive_for_expr(&assign.value);
-                if dont_allow_edits(assign) {
+                if !annotations_are_valid_syntax(assign) {
                     self.in_no_edits_allowed = true;
                 }
                 for target in &assign.targets {
@@ -445,9 +445,9 @@ fn type_hint_is_excessive_for_expr(expr: &Expr) -> bool {
     }
 }
 
-fn dont_allow_edits(stmt_assign: &ruff_python_ast::StmtAssign) -> bool {
+fn annotations_are_valid_syntax(stmt_assign: &ruff_python_ast::StmtAssign) -> bool {
     if stmt_assign.targets.len() > 1 {
-        return true;
+        return false;
     }
 
     if stmt_assign
@@ -455,10 +455,10 @@ fn dont_allow_edits(stmt_assign: &ruff_python_ast::StmtAssign) -> bool {
         .iter()
         .any(|target| matches!(target, Expr::Tuple(_)))
     {
-        return true;
+        return false;
     }
 
-    false
+    true
 }
 
 #[cfg(test)]
