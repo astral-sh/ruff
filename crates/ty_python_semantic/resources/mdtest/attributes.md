@@ -2711,9 +2711,9 @@ We give special diagnostics for this common case too:
 import foo
 import baz
 
-# error: [unresolved-attribute]
+# error: [possibly-missing-attribute]
 reveal_type(foo.bar)  # revealed: Unknown
-# error: [unresolved-attribute]
+# error: [possibly-missing-attribute]
 reveal_type(baz.bar)  # revealed: Unknown
 ```
 

@@ -62,9 +62,9 @@ use crate::types::diagnostic::{
     INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT,
     INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NON_SUBSCRIPTABLE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
-    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
+    POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
+    SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
+    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
     hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_cannot_pop_required_field_on_typed_dict,
@@ -9083,6 +9083,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     _ => false,
                 };
 
+                if let Type::ModuleLiteral(module) = value_type {
+                    let module = module.module(db);
+                    let module_name = module.name(db);
+                    if module.kind(db).is_package()
+                        && let Some(relative_submodule) = ModuleName::new(attr_name)
+                    {
+                        let mut maybe_submodule_name = module_name.clone();
+                        maybe_submodule_name.extend(&relative_submodule);
+                        if resolve_module(db, &maybe_submodule_name).is_some() {
+                            if let Some(builder) = self
+                                .context
+                                .report_lint(&POSSIBLY_MISSING_ATTRIBUTE, attribute)
+                            {
+                                let mut diag = builder.into_diagnostic(format_args!(
+                                    "Submodule `{attr_name}` may not be available as an attribute \
+                                    on module `{module_name}`"
+                                ));
+                                diag.help(format_args!(
+                                    "Consider explicitly importing `{maybe_submodule_name}`"
+                                ));
+                            }
+                            return fallback();
+                        }
+                    }
+                }
+
                 let Some(builder) = self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
                 else {
                     return fallback();
@@ -9098,30 +9124,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 let diagnostic = match value_type {
-                    Type::ModuleLiteral(module) => {
-                        let module = module.module(db);
-                        let module_name = module.name(db);
-                        if module.kind(db).is_package()
-                            && let Some(relative_submodule) = ModuleName::new(attr_name)
-                        {
-                            let mut maybe_submodule_name = module_name.clone();
-                            maybe_submodule_name.extend(&relative_submodule);
-                            if resolve_module(db, &maybe_submodule_name).is_some() {
-                                let mut diag = builder.into_diagnostic(format_args!(
-                                    "Submodule `{attr_name}` may not be available as an attribute \
-                                    on module `{module_name}`"
-                                ));
-                                diag.help(format_args!(
-                                    "Consider explicitly importing `{maybe_submodule_name}`"
-                                ));
-                                return fallback();
-                            }
-                        }
-
-                        builder.into_diagnostic(format_args!(
-                            "Module `{module_name}` has no member `{attr_name}`",
-                        ))
-                    }
+                    Type::ModuleLiteral(module) => builder.into_diagnostic(format_args!(
+                        "Module `{module_name}` has no member `{attr_name}`",
+                        module_name = module.module(db).name(db),
+                    )),
                     Type::ClassLiteral(class) => builder.into_diagnostic(format_args!(
                         "Class `{}` has no attribute `{attr_name}`",
                         class.name(db),
