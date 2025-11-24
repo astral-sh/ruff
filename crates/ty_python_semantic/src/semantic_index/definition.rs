@@ -364,10 +364,12 @@ pub(crate) struct ImportFromDefinitionNodeRef<'ast> {
     pub(crate) alias_index: usize,
     pub(crate) is_reexported: bool,
 }
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromSubmoduleDefinitionNodeRef<'ast> {
     pub(crate) node: &'ast ast::StmtImportFrom,
 }
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AssignmentDefinitionNodeRef<'ast, 'db> {
     pub(crate) unpack: Option<(UnpackPosition, Unpack<'db>)>,
@@ -733,6 +735,10 @@ impl DefinitionKind<'_> {
 
     pub(crate) const fn is_unannotated_assignment(&self) -> bool {
         matches!(self, DefinitionKind::Assignment(_))
+    }
+
+    pub(crate) const fn is_function_def(&self) -> bool {
+        matches!(self, DefinitionKind::Function(_))
     }
 
     /// Returns the [`TextRange`] of the definition target.
