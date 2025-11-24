@@ -1048,119 +1048,36 @@ impl<'db> Node<'db> {
             Node::Interior(interior) => interior,
         };
 
-        let mut typevars = FxHashSet::default();
+        let mut inferable_typevars = FxHashSet::default();
+        let mut non_inferable_typevars = FxHashSet::default();
+        let mut valid_inferable_specializations = Node::AlwaysTrue;
+        let mut valid_non_inferable_specializations = Node::AlwaysTrue;
+        let mut add_typevar = |bound_typevar: BoundTypeVarInstance<'db>| {
+            let valid_specializations = bound_typevar.valid_specializations(db).node;
+            if bound_typevar.is_inferable(db, inferable) {
+                inferable_typevars.insert(bound_typevar);
+                valid_inferable_specializations =
+                    valid_inferable_specializations.and(db, valid_specializations);
+            } else {
+                non_inferable_typevars.insert(bound_typevar);
+                valid_non_inferable_specializations =
+                    valid_non_inferable_specializations.and(db, valid_specializations);
+            }
+        };
         self.for_each_constraint(db, &mut |constraint| {
-            typevars.insert(constraint.typevar(db));
+            add_typevar(constraint.typevar(db));
             if let Type::TypeVar(bound_typevar) = constraint.lower(db) {
-                typevars.insert(bound_typevar);
+                add_typevar(bound_typevar);
             }
             if let Type::TypeVar(bound_typevar) = constraint.upper(db) {
-                typevars.insert(bound_typevar);
+                add_typevar(bound_typevar);
             }
         });
 
-        // Returns if some specialization satisfies this constraint set.
-        let some_specialization_satisfies = move |specializations: Node<'db>| {
-            let when_satisfied = specializations.implies(db, self).and(db, specializations);
-            !when_satisfied.is_never_satisfied(db)
-        };
-
-        // Returns if all specializations satisfy this constraint set.
-        let all_specializations_satisfy =
-            move |restricted: Node<'db>, specializations: Node<'db>| {
-                let when_satisfied = specializations
-                    .implies(db, restricted)
-                    .and(db, specializations);
-                when_satisfied
-                    .iff(db, specializations)
-                    .is_always_satisfied(db)
-            };
-
-        for typevar in typevars {
-            if typevar.is_inferable(db, inferable) {
-                // If the typevar is in inferable position, we need to verify that some valid
-                // specialization satisfies the constraint set.
-                let valid_specializations = typevar.valid_specializations(db);
-                if !some_specialization_satisfies(valid_specializations.node) {
-                    if std::env::var("DEBUG_SAT").is_ok() {
-                        let inferable_ids: Vec<_> = inferable.iter().collect();
-                        eprintln!(
-                            "inferable typevar {:?} no satisfying specialization for {} (inferable set: {:?})",
-                            typevar.identity(db),
-                            ConstraintSet { node: self }.display(db),
-                            inferable_ids
-                        );
-                    }
-                    return false;
-                }
-            } else {
-                // If the typevar is in non-inferable position, we need to verify that all required
-                // specializations satisfy the constraint set. If the typevar depends on any other
-                // typevars that are inferable, we are allowed to choose different specializations
-                // of those inferable typevars for each specialization of this non-inferable one.
-                // To handle this, we use the sequent map to find which inferable typevars this
-                // typevar depends on, and existentially abstract them away.
-                let inferable_ids: FxHashSet<_> = inferable.iter().collect();
-                let inferable_dependencies = interior
-                    .sequent_map(db)
-                    .get_typevar_dependencies(typevar.identity(db))
-                    .filter(|dep| inferable_ids.contains(dep));
-                let inferable_dependencies: Vec<_> = inferable_dependencies.collect();
-                let mut restricted = self.exists(db, inferable_dependencies.iter().copied());
-                // If this non-inferable typevar depends on any inferable typevars, we are allowed
-                // to pick different specializations of those inferable typevars for each
-                // specialization of this non-inferable one. Existentially abstract them away.
-                // If any constraints on this typevar remain after abstracting its inferable
-                // dependencies, they are independent of those inferable typevars, so it is safe to
-                // existentially abstract this typevar as well.
-                if !inferable_dependencies.is_empty() {
-                    restricted = restricted.exists_one(db, typevar.identity(db));
-                }
-
-                // Complicating things, the typevar might have gradual constraints. For those, we
-                // need to know the range of valid materializations, but we only need some
-                // materialization to satisfy the constraint set.
-                //
-                // NB: We could also model this by introducing a synthetic typevar for the gradual
-                // constraint, treating that synthetic typevar as always inferable (so that we only
-                // need to verify for some materialization), and then update this typevar's
-                // constraint to refer to the synthetic typevar instead of the original gradual
-                // constraint.
-                let (static_specializations, gradual_constraints) =
-                    typevar.required_specializations(db);
-                if !all_specializations_satisfy(restricted, static_specializations) {
-                    if std::env::var("DEBUG_SAT").is_ok() {
-                        let inferable_ids: Vec<_> = inferable.iter().collect();
-                        eprintln!(
-                            "non-inferable typevar {:?} static specializations fail for {} (inferable set: {:?}, deps: {:?}, restricted: {}, restricted_always?: {})",
-                            typevar.identity(db),
-                            ConstraintSet { node: self }.display(db),
-                            inferable_ids,
-                            inferable_dependencies,
-                            ConstraintSet { node: restricted }.display(db),
-                            restricted.is_always_satisfied(db)
-                        );
-                    }
-                    return false;
-                }
-                for gradual_constraint in gradual_constraints {
-                    if !some_specialization_satisfies(gradual_constraint) {
-                        if std::env::var("DEBUG_SAT").is_ok() {
-                            let inferable_ids: Vec<_> = inferable.iter().collect();
-                            eprintln!(
-                                "non-inferable typevar {:?} gradual constraint fails for {} (inferable set: {:?})",
-                                typevar.identity(db),
-                                ConstraintSet { node: self }.display(db),
-                                inferable_ids
-                            );
-                        }
-                        return false;
-                    }
-                }
-            }
-        }
-
-        true
+        let restricted = self.and(db, valid_inferable_specializations);
+        let restricted = restricted.exists(db, inferable.iter());
+        let restricted = valid_non_inferable_specializations.implies(db, restricted);
+        restricted.is_always_satisfied(db)
     }
 
     /// Returns a new BDD that is the _existential abstraction_ of `self` for a set of typevars.
