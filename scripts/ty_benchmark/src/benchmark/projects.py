@@ -23,6 +23,9 @@ class Project(NamedTuple):
 
     python_version: Literal["3.13", "3.14", "3.12", "3.11", "3.10", "3.9", "3.8"]
 
+    skip: str | None = None
+    """The project is skipped from benchmarking if not `None`."""
+
     include: list[str] = []
     """The directories and files to check. If empty, checks the current directory"""
 
@@ -136,6 +139,7 @@ ALL: Final = [
         revision="10c12623bfc0b3a06ffaa88bf986f61818cfb8be",
         python_version="3.13",
         include=["homeassistant"],
+        skip="Missing dependencies on Windows" if sys.platform == "win32" else None,
         install_arguments=[
             "-r",
             "requirements_test_all.txt",

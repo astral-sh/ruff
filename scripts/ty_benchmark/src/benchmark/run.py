@@ -134,6 +134,10 @@ def main() -> None:
     first = True
 
     for project in projects:
+        if skip_reason := project.skip:
+            print(f"Skipping {project.name}: {skip_reason}")
+            continue
+
         with tempfile.TemporaryDirectory() as tempdir:
             cwd = Path(tempdir)
             project.clone(cwd)
