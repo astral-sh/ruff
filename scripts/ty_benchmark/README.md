@@ -17,11 +17,6 @@ Requires hyperfine 1.20 or newer.
 The tested type checkers implement Python's type system to varying degrees and
 some projects only successfully pass type checking using a specific type checker.
 
-### Windows support
-
-The script should work on Windows, but we haven't tested it yet.
-We do make use of `shlex` which has known limitations when using non-POSIX shells.
-
 ## Updating the benchmark
 
 The benchmark script supports snapshoting the results when running with `--snapshot` and `--accept`.

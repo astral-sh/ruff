@@ -3,8 +3,14 @@ from __future__ import annotations
 import logging
 import shlex
 import subprocess
+import sys
 from pathlib import Path
 from typing import Mapping, NamedTuple
+
+if sys.platform == "win32":
+    import mslex as shlex
+else:
+    import shlex
 
 
 class Command(NamedTuple):

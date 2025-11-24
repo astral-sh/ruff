@@ -3,6 +3,15 @@ revision = 3
 requires-python = ">=3.12"
 
 [[package]]
+name = "mslex"
+version = "1.3.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e0/97/7022667073c99a0fe028f2e34b9bf76b49a611afd21b02527fbfd92d4cd5/mslex-1.3.0.tar.gz", hash = "sha256:641c887d1d3db610eee2af37a8e5abda3f70b3006cdfd2d0d29dc0d1ae28a85d", size = 11583, upload-time = "2024-10-16T13:16:18.523Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/64/f2/66bd65ca0139675a0d7b18f0bada6e12b51a984e41a76dbe44761bf1b3ee/mslex-1.3.0-py3-none-any.whl", hash = "sha256:c7074b347201b3466fc077c5692fbce9b5f62a63a51f537a53fbbd02eff2eea4", size = 7820, upload-time = "2024-10-16T13:16:17.566Z" },
+]
+
+[[package]]
 name = "pyrefly"
 version = "0.42.1"
 source = { registry = "https://pypi.org/simple" }
@@ -23,8 +32,12 @@ name = "ty-benchmark"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
+    { name = "mslex" },
     { name = "pyrefly" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pyrefly", specifier = ">=0.41.3" }]
+requires-dist = [
+    { name = "mslex", specifier = ">=1.3.0" },
+    { name = "pyrefly", specifier = ">=0.41.3" },
+]
