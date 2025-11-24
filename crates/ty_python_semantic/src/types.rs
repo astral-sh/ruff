@@ -11018,11 +11018,19 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         self_type: Option<Type<'db>>,
     ) -> CallableType<'db> {
-        CallableType::new(db, self.signatures(db).bind_self(db, self_type), false)
+        CallableType::new(
+            db,
+            self.signatures(db).bind_self(db, self_type),
+            self.is_function_like(db),
+        )
     }
 
     pub(crate) fn apply_self(self, db: &'db dyn Db, self_type: Type<'db>) -> CallableType<'db> {
-        CallableType::new(db, self.signatures(db).apply_self(db, self_type), false)
+        CallableType::new(
+            db,
+            self.signatures(db).apply_self(db, self_type),
+            self.is_function_like(db),
+        )
     }
 
     /// Create a callable type which represents a fully-static "bottom" callable.

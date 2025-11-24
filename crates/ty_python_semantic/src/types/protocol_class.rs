@@ -300,7 +300,7 @@ impl<'db> ProtocolInterface<'db> {
                     .and(db, || {
                         our_type.has_relation_to_impl(
                             db,
-                            Type::Callable(other_type.bind_self(db, None)),
+                            Type::Callable(protocol_bind_self(db, other_type, None)),
                             inferable,
                             relation,
                             relation_visitor,
@@ -313,7 +313,7 @@ impl<'db> ProtocolInterface<'db> {
                         ProtocolMemberKind::Method(other_method),
                     ) => our_method.bind_self(db, None).has_relation_to_impl(
                         db,
-                        other_method.bind_self(db, None),
+                        protocol_bind_self(db, other_method, None),
                         inferable,
                         relation,
                         relation_visitor,
@@ -712,7 +712,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                             .map(|callable| callable.apply_self(db, fallback_other))
                             .has_relation_to_impl(
                                 db,
-                                method.bind_self(db, Some(fallback_other)),
+                                protocol_bind_self(db, *method, Some(fallback_other)),
                                 inferable,
                                 relation,
                                 relation_visitor,
@@ -911,4 +911,17 @@ fn proto_interface_cycle_initial<'db>(
     _class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
     ProtocolInterface::empty(db)
+}
+
+/// Bind `self`, and *also* discard the functionlike-ness of the callable.
+///
+/// This additional upcasting is required in order for protocols with `__call__` method
+/// members to be considered assignable to `Callable` types, since the `Callable` supertype
+/// of the `__call__` method will be function-like but a `Callable` type is not.
+fn protocol_bind_self<'db>(
+    db: &'db dyn Db,
+    callable: CallableType<'db>,
+    self_type: Option<Type<'db>>,
+) -> CallableType<'db> {
+    CallableType::new(db, callable.signatures(db).bind_self(db, self_type), false)
 }
