@@ -106,6 +106,13 @@ def _(flag: bool):
 ```py
 type ListOrSet[T] = list[T] | set[T]
 reveal_type(ListOrSet.__type_params__)  # revealed: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
+type Tuple1[T] = tuple[T]
+
+def _(cond: bool):
+    Generic = ListOrSet if cond else Tuple1
+
+    def _(x: Generic[int]):
+        reveal_type(x)  # revealed: list[int] | set[int] | tuple[int]
 ```
 
 ## In unions and intersections

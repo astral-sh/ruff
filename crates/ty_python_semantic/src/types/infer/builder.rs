@@ -285,6 +285,11 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     multi_inference_state: MultiInferenceState,
 
+    /// If you cannot avoid the possibility of calling `infer(_type)_expression` multiple times for a given expression,
+    /// set this to `Get` after the expression has been inferred for the first time.
+    /// While this is `Get`, any expressions will be considered to have already been inferred.
+    inner_expression_inference_state: InnerExpressionInferenceState,
+
     /// For function definitions, the undecorated type of the function.
     undecorated_type: Option<Type<'db>>,
 
@@ -324,6 +329,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             called_functions: FxIndexSet::default(),
             deferred_state: DeferredExpressionState::None,
             multi_inference_state: MultiInferenceState::Panic,
+            inner_expression_inference_state: InnerExpressionInferenceState::Infer,
             expressions: FxHashMap::default(),
             bindings: VecMap::default(),
             declarations: VecMap::default(),
@@ -6977,6 +6983,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
+        if self.inner_expression_inference_state.is_get() {
+            return self.expression_type(expression);
+        }
         let ty = match expression {
             ast::Expr::NoneLiteral(ast::ExprNoneLiteral {
                 range: _,
@@ -11744,6 +11753,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             typevar_binding_context: _,
             deferred_state: _,
             multi_inference_state: _,
+            inner_expression_inference_state: _,
             called_functions: _,
             index: _,
             region: _,
@@ -11808,6 +11818,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             typevar_binding_context: _,
             deferred_state: _,
             multi_inference_state: _,
+            inner_expression_inference_state: _,
             called_functions: _,
             index: _,
             region: _,
@@ -11881,6 +11892,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             typevar_binding_context: _,
             deferred_state: _,
             multi_inference_state: _,
+            inner_expression_inference_state: _,
             called_functions: _,
             index: _,
             region: _,
@@ -11949,6 +11961,19 @@ enum MultiInferenceState {
 impl MultiInferenceState {
     const fn is_panic(self) -> bool {
         matches!(self, MultiInferenceState::Panic)
+    }
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+enum InnerExpressionInferenceState {
+    #[default]
+    Infer,
+    Get,
+}
+
+impl InnerExpressionInferenceState {
+    const fn is_get(self) -> bool {
+        matches!(self, InnerExpressionInferenceState::Get)
     }
 }
 
