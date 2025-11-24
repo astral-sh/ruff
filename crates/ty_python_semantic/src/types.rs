@@ -1565,10 +1565,10 @@ impl<'db> Type<'db> {
                 }
             }
             Type::ClassLiteral(class_literal) => {
-                ClassType::NonGeneric(class_literal).into_callable(db)
+                Some(ClassType::NonGeneric(class_literal).into_callable(db))
             }
 
-            Type::GenericAlias(alias) => ClassType::Generic(alias).into_callable(db),
+            Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
 
             Type::NewTypeInstance(newtype) => {
                 Type::instance(db, newtype.base_class_type(db)).try_upcast_to_callable(db)
@@ -1576,7 +1576,7 @@ impl<'db> Type<'db> {
 
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Class(class) => class.into_callable(db),
+                SubclassOfInner::Class(class) => Some(class.into_callable(db)),
                 SubclassOfInner::Dynamic(dynamic) => {
                     Some(CallableTypes::one(CallableType::single(
                         db,

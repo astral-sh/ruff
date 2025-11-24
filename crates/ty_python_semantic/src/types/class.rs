@@ -1052,7 +1052,7 @@ impl<'db> ClassType<'db> {
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
     #[salsa::tracked(cycle_initial=into_callable_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
-    pub(super) fn into_callable(self, db: &'db dyn Db) -> Option<CallableTypes<'db>> {
+    pub(super) fn into_callable(self, db: &'db dyn Db) -> CallableTypes<'db> {
         let self_ty = Type::from(self);
         let metaclass_dunder_call_function_symbol = self_ty
             .member_lookup_with_policy(
@@ -1070,9 +1070,7 @@ impl<'db> ClassType<'db> {
             // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
             // by always respecting the signature of the metaclass `__call__`, rather than
             // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
-            return Some(CallableTypes::one(
-                metaclass_dunder_call_function.into_callable_type(db),
-            ));
+            return CallableTypes::one(metaclass_dunder_call_function.into_callable_type(db));
         }
 
         let dunder_new_function_symbol = self_ty.lookup_dunder_new(db);
@@ -1107,7 +1105,7 @@ impl<'db> ClassType<'db> {
             );
 
             if returns_non_subclass {
-                return Some(CallableTypes::one(dunder_new_bound_method));
+                return CallableTypes::one(dunder_new_bound_method);
             }
             Some(dunder_new_bound_method)
         } else {
@@ -1164,13 +1162,13 @@ impl<'db> ClassType<'db> {
 
         match (dunder_new_function, synthesized_dunder_init_callable) {
             (Some(dunder_new_function), Some(synthesized_dunder_init_callable)) => {
-                Some(CallableTypes::from_elements([
+                CallableTypes::from_elements([
                     dunder_new_function,
                     synthesized_dunder_init_callable,
-                ]))
+                ])
             }
             (Some(constructor), None) | (None, Some(constructor)) => {
-                Some(CallableTypes::one(constructor))
+                CallableTypes::one(constructor)
             }
             (None, None) => {
                 // If no `__new__` or `__init__` method is found, then we fall back to looking for
@@ -1186,17 +1184,17 @@ impl<'db> ClassType<'db> {
                 if let Place::Defined(Type::FunctionLiteral(new_function), _, _) =
                     new_function_symbol
                 {
-                    Some(CallableTypes::one(
+                    CallableTypes::one(
                         new_function
                             .into_bound_method_type(db, correct_return_type)
                             .into_callable_type(db),
-                    ))
+                    )
                 } else {
                     // Fallback if no `object.__new__` is found.
-                    Some(CallableTypes::one(CallableType::single(
+                    CallableTypes::one(CallableType::single(
                         db,
                         Signature::new(Parameters::empty(), Some(correct_return_type)),
-                    )))
+                    ))
                 }
             }
         }
@@ -1212,11 +1210,11 @@ impl<'db> ClassType<'db> {
 }
 
 fn into_callable_cycle_initial<'db>(
-    _db: &'db dyn Db,
+    db: &'db dyn Db,
     _id: salsa::Id,
     _self: ClassType<'db>,
-) -> Option<CallableTypes<'db>> {
-    None
+) -> CallableTypes<'db> {
+    CallableTypes::one(CallableType::bottom(db))
 }
 
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
