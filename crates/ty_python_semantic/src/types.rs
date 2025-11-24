@@ -968,10 +968,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::Dynamic(_))
     }
 
-    pub(crate) fn is_gradual(&self, db: &'db dyn Db) -> bool {
-        any_over_type(db, *self, &|ty| ty.is_dynamic(), false)
-    }
-
     const fn is_non_divergent_dynamic(&self) -> bool {
         self.is_dynamic() && !self.is_divergent()
     }
