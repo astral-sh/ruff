@@ -1054,34 +1054,6 @@ impl<'db> Specialization<'db> {
         Specialization::new(db, self.generic_context(db), types, None, None)
     }
 
-    pub(crate) fn join_with_previous_cycle(self, db: &'db dyn Db, previous: Self) -> Option<Self> {
-        if self.generic_context(db) != previous.generic_context(db) {
-            return None;
-        }
-        let types: Box<[_]> = self
-            .types(db)
-            .iter()
-            .zip(previous.types(db))
-            .map(|(self_type, other_type)| self_type.join_with_previous_cycle(db, *other_type))
-            .collect();
-
-        let tuple_inner = match (self.tuple_inner(db), previous.tuple_inner(db)) {
-            (Some(self_tuple), Some(previous_tuple)) => {
-                Some(self_tuple.join_with_previous_cycle(db, previous_tuple)?)
-            }
-            (None, None) => None,
-            _ => return None,
-        };
-
-        Some(Specialization::new(
-            db,
-            self.generic_context(db),
-            types,
-            self.materialization_kind(db),
-            tuple_inner,
-        ))
-    }
-
     #[must_use]
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
         self.normalized_impl(db, &NormalizedVisitor::default())

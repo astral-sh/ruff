@@ -394,26 +394,6 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn join_with_previous_cycle(&self, db: &'db dyn Db, previous: Self) -> Option<Self> {
-        match (self.0, previous.0) {
-            (
-                NominalInstanceInner::ExactTuple(tuple),
-                NominalInstanceInner::ExactTuple(previous_tuple),
-            ) => Some(Self(NominalInstanceInner::ExactTuple(
-                tuple.join_with_previous_cycle(db, previous_tuple)?,
-            ))),
-            (NominalInstanceInner::NonTuple(ty), NominalInstanceInner::NonTuple(previous_ty))
-                if ty == previous_ty =>
-            {
-                Some(Self(NominalInstanceInner::NonTuple(ty)))
-            }
-            (NominalInstanceInner::Object, NominalInstanceInner::Object) => {
-                Some(Self(NominalInstanceInner::Object))
-            }
-            _ => None,
-        }
-    }
-
     pub(super) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,

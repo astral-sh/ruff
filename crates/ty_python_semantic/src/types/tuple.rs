@@ -243,14 +243,6 @@ impl<'db> TupleType<'db> {
         ))
     }
 
-    pub(super) fn join_with_previous_cycle(self, db: &'db dyn Db, previous: Self) -> Option<Self> {
-        Some(TupleType::new_internal(
-            db,
-            self.tuple(db)
-                .join_with_previous_cycle(db, previous.tuple(db))?,
-        ))
-    }
-
     pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -439,22 +431,6 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     .collect::<Box<[_]>>(),
             ))
         }
-    }
-
-    fn join_with_previous_cycle(&self, db: &'db dyn Db, previous: &Self) -> Option<Self> {
-        if self.len() != previous.len() {
-            return None;
-        }
-
-        Some(Self::from_elements(
-            self.0
-                .iter()
-                .zip(&previous.0)
-                .map(|(current_ty, previous_ty)| {
-                    current_ty.join_with_previous_cycle(db, *previous_ty)
-                })
-                .collect::<Box<[_]>>(),
-        ))
     }
 
     fn apply_type_mapping_impl<'a>(
@@ -873,35 +849,6 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         })
     }
 
-    fn join_with_previous_cycle(&self, db: &'db dyn Db, previous: &Self) -> Option<Self> {
-        if self.prefix.len() != previous.prefix.len() || self.suffix.len() != previous.suffix.len()
-        {
-            return None;
-        }
-
-        Some(Self {
-            prefix: self
-                .prefix
-                .iter()
-                .zip(&previous.prefix)
-                .map(|(current_ty, previous_ty)| {
-                    current_ty.join_with_previous_cycle(db, *previous_ty)
-                })
-                .collect::<Box<[_]>>(),
-            variable: self
-                .variable
-                .join_with_previous_cycle(db, previous.variable),
-            suffix: self
-                .suffix
-                .iter()
-                .zip(&previous.suffix)
-                .map(|(current_ty, previous_ty)| {
-                    current_ty.join_with_previous_cycle(db, *previous_ty)
-                })
-                .collect::<Box<[_]>>(),
-        })
-    }
-
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
@@ -1312,22 +1259,6 @@ impl<'db> Tuple<Type<'db>> {
             Tuple::Variable(tuple) => Some(Tuple::Variable(
                 tuple.recursive_type_normalized_impl(db, div, nested, visitor)?,
             )),
-        }
-    }
-
-    pub(super) fn join_with_previous_cycle(
-        &self,
-        db: &'db dyn Db,
-        previous: &Self,
-    ) -> Option<Self> {
-        match (self, previous) {
-            (Tuple::Fixed(self_tuple), Tuple::Fixed(previous_tuple)) => Some(Tuple::Fixed(
-                self_tuple.join_with_previous_cycle(db, previous_tuple)?,
-            )),
-            (Tuple::Variable(self_tuple), Tuple::Variable(previous_tuple)) => Some(
-                Tuple::Variable(self_tuple.join_with_previous_cycle(db, previous_tuple)?),
-            ),
-            _ => None,
         }
     }
 
