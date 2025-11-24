@@ -3298,7 +3298,6 @@ impl<'db> Binding<'db> {
                 }
             }
         }
-
         for (keywords_index, keywords_type) in keywords_arguments {
             matcher.match_keyword_variadic(db, keywords_index, keywords_type);
         }

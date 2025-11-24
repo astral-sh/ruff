@@ -11312,13 +11312,6 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn class_definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
-        let definition_scope = self.function(db).definition(db).scope(db);
-        let index = semantic_index(db, definition_scope.file(db));
-        Some(index.expect_single_definition(definition_scope.node(db).as_class()?))
-    }
-
     fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
@@ -12455,7 +12448,6 @@ impl<'db> PEP695TypeAliasType<'db> {
     }
 }
 
-#[allow(clippy::unnecessary_wraps)]
 fn generic_context_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,

@@ -71,7 +71,7 @@ use rustc_hash::FxHashSet;
 fn explicit_bases_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,
-    _class: ClassLiteral<'db>,
+    _self: ClassLiteral<'db>,
 ) -> Box<[Type<'db>]> {
     Box::default()
 }
@@ -84,7 +84,6 @@ fn inheritance_cycle_initial<'db>(
     None
 }
 
-#[allow(clippy::needless_pass_by_value)]
 fn implicit_attribute_initial<'db>(
     _db: &'db dyn Db,
     id: salsa::Id,
@@ -97,7 +96,7 @@ fn implicit_attribute_initial<'db>(
     }
 }
 
-#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
+#[allow(clippy::too_many_arguments)]
 fn implicit_attribute_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle: &salsa::Cycle,
@@ -125,7 +124,6 @@ fn try_mro_cycle_initial<'db>(
     ))
 }
 
-#[allow(clippy::unnecessary_wraps)]
 fn is_typed_dict_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,
@@ -1416,7 +1414,6 @@ pub struct ClassLiteral<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ClassLiteral<'_> {}
 
-#[allow(clippy::unnecessary_wraps)]
 fn generic_context_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,
