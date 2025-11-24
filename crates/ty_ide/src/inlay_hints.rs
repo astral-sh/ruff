@@ -1,17 +1,14 @@
 use std::{fmt, vec};
 
-use crate::importer::{ImportRequest, Importer};
 use crate::{Db, HasNavigationTargets, NavigationTarget};
 use ruff_db::files::File;
-use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-use ruff_db::source::source_text;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Stmt, UnaryOp};
-use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::types::ide_support::inlay_hint_call_argument_details;
 use ty_python_semantic::types::{Type, TypeDetail};
-use ty_python_semantic::{HasType, SemanticModel, file_to_module};
+use ty_python_semantic::{HasType, SemanticModel};
 
 #[derive(Debug, Clone)]
 pub struct InlayHint {
@@ -22,13 +19,7 @@ pub struct InlayHint {
 }
 
 impl InlayHint {
-    fn variable_type(
-        expr: &Expr,
-        ty: Type,
-        db: &dyn Db,
-        file: File,
-        parsed: &ParsedModuleRef,
-    ) -> Self {
+    fn variable_type(expr: &Expr, ty: Type, db: &dyn Db) -> Self {
         let position = expr.range().end();
         // Render the type to a string, and get subspans for all the types that make it up
         let details = ty.display(db).to_string_parts();
@@ -74,63 +65,10 @@ impl InlayHint {
         }
 
         let text_edits = if details.is_valid_syntax {
-            let mut text_edits = vec![InlayHintTextEdit {
+            vec![InlayHintTextEdit {
                 range: TextRange::new(position, position),
                 new_text: format!(": {}", details.label),
-            }];
-
-            let source = source_text(db, file);
-            let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
-            let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
-            let members = importer.members_in_scope_at(expr.into(), expr.range().start());
-
-            for detail in &details.details {
-                match detail {
-                    TypeDetail::Type(ty) => {
-                        let Some(type_definition) = ty.definition(db) else {
-                            continue;
-                        };
-
-                        let Some(definition) = type_definition.definition() else {
-                            continue;
-                        };
-
-                        let Some(module) = file_to_module(db, definition.file(db)) else {
-                            continue;
-                        };
-
-                        let module_name = module.name(db).as_str();
-
-                        if module_name == "builtins" {
-                            continue;
-                        }
-
-                        let Some(definition_name) = definition.name(db) else {
-                            continue;
-                        };
-
-                        let request = ImportRequest::import_from(module_name, &definition_name);
-
-                        let import_action = importer.import(request, &members);
-
-                        if let Some(edit) = import_action.import() {
-                            if let Some(content) = &edit.content() {
-                                text_edits.push(InlayHintTextEdit {
-                                    range: edit.range(),
-                                    new_text: (*content).to_string(),
-                                });
-                            }
-                        }
-                    }
-                    TypeDetail::SignatureStart
-                    | TypeDetail::SignatureEnd
-                    | TypeDetail::Parameter(_) => {
-                        // Don't care about these
-                    }
-                }
-            }
-
-            text_edits
+            }]
         } else {
             vec![]
         };
@@ -262,9 +200,9 @@ pub fn inlay_hints(
     range: TextRange,
     settings: &InlayHintSettings,
 ) -> Vec<InlayHint> {
-    let ast = parsed_module(db, file).load(db);
+    let mut visitor = InlayHintVisitor::new(db, file, range, settings);
 
-    let mut visitor = InlayHintVisitor::new(db, file, range, settings, &ast);
+    let ast = parsed_module(db, file).load(db);
 
     visitor.visit_body(ast.suite());
 
@@ -308,28 +246,20 @@ impl Default for InlayHintSettings {
     }
 }
 
-struct InlayHintVisitor<'a, 'b, 'db> {
+struct InlayHintVisitor<'a, 'db> {
     db: &'db dyn Db,
     model: SemanticModel<'db>,
-    ast: &'b ParsedModuleRef,
     hints: Vec<InlayHint>,
     in_assignment: bool,
     range: TextRange,
     settings: &'a InlayHintSettings,
 }
 
-impl<'a, 'b, 'db> InlayHintVisitor<'a, 'b, 'db> {
-    fn new(
-        db: &'db dyn Db,
-        file: File,
-        range: TextRange,
-        settings: &'a InlayHintSettings,
-        ast: &'b ParsedModuleRef,
-    ) -> Self {
+impl<'a, 'db> InlayHintVisitor<'a, 'db> {
+    fn new(db: &'db dyn Db, file: File, range: TextRange, settings: &'a InlayHintSettings) -> Self {
         Self {
             db,
             model: SemanticModel::new(db, file),
-            ast,
             hints: Vec::new(),
             in_assignment: false,
             range,
@@ -342,7 +272,7 @@ impl<'a, 'b, 'db> InlayHintVisitor<'a, 'b, 'db> {
             return;
         }
 
-        let inlay_hint = InlayHint::variable_type(expr, ty, self.db, self.model.file(), self.ast);
+        let inlay_hint = InlayHint::variable_type(expr, ty, self.db);
 
         self.hints.push(inlay_hint);
     }
@@ -367,7 +297,7 @@ impl<'a, 'b, 'db> InlayHintVisitor<'a, 'b, 'db> {
     }
 }
 
-impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_, '_> {
+impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
     fn enter_node(&mut self, node: AnyNodeRef<'_>) -> TraversalSignal {
         if self.range.intersect(node.range()).is_some() {
             TraversalSignal::Traverse
@@ -516,6 +446,7 @@ mod tests {
     use crate::NavigationTarget;
     use crate::tests::IntoDiagnostic;
     use insta::{assert_snapshot, internals::SettingsBindDropGuard};
+    use itertools::Itertools;
     use ruff_db::{
         diagnostic::{
             Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
@@ -606,11 +537,14 @@ mod tests {
         fn inlay_hints_with_settings(&mut self, settings: &InlayHintSettings) -> String {
             let hints = inlay_hints(&self.db, self.file, self.range, settings);
 
-            let mut buf = source_text(&self.db, self.file).as_str().to_string();
+            let mut inlay_hint_buf = source_text(&self.db, self.file).as_str().to_string();
+            let mut text_edit_buf = inlay_hint_buf.clone();
 
             let mut tbd_diagnostics = Vec::new();
 
             let mut offset = 0;
+
+            let mut edit_offset = 0;
 
             for hint in hints {
                 let end_position = hint.position.to_usize() + offset;
@@ -627,36 +561,65 @@ mod tests {
                     hint_str.push_str(part.text());
                 }
 
+                for edit in hint.text_edits {
+                    let start = edit.range.start().to_usize() + edit_offset;
+                    let end = edit.range.end().to_usize() + edit_offset;
+
+                    text_edit_buf.replace_range(start..end, &edit.new_text);
+
+                    if start == end {
+                        edit_offset += edit.new_text.len();
+                    } else {
+                        edit_offset += edit.new_text.len() - edit.range.len().to_usize();
+                    }
+                }
+
                 hint_str.push(']');
                 offset += hint_str.len();
 
-                buf.insert_str(end_position, &hint_str);
+                inlay_hint_buf.insert_str(end_position, &hint_str);
             }
 
-            self.db.write_file("main2.py", &buf).unwrap();
+            self.db.write_file("main2.py", &inlay_hint_buf).unwrap();
             let inlayed_file =
                 system_path_to_file(&self.db, "main2.py").expect("newly written file to existing");
 
-            let diagnostics = tbd_diagnostics.into_iter().map(|(label_range, target)| {
+            let location_diagnostics = tbd_diagnostics.into_iter().map(|(label_range, target)| {
                 InlayHintLocationDiagnostic::new(FileRange::new(inlayed_file, label_range), &target)
             });
 
-            let mut rendered_diagnostics = self.render_diagnostics(diagnostics);
+            let mut rendered_diagnostics = location_diagnostics
+                .map(|diagnostic| self.render_diagnostic(diagnostic))
+                .join("");
 
             if !rendered_diagnostics.is_empty() {
                 rendered_diagnostics = format!(
                     "{}{}",
                     crate::MarkupKind::PlainText.horizontal_line(),
                     rendered_diagnostics
+                        .strip_suffix("\n")
+                        .unwrap_or(&rendered_diagnostics)
                 );
             }
 
-            format!("{buf}{rendered_diagnostics}",)
+            let rendered_edit_diagnostic = if edit_offset != 0 {
+                let edit_diagnostic = InlayHintEditDiagnostic::new(text_edit_buf);
+                let text_edit_buf = self.render_diagnostic(edit_diagnostic);
+
+                format!(
+                    "{}{}",
+                    crate::MarkupKind::PlainText.horizontal_line(),
+                    text_edit_buf
+                )
+            } else {
+                String::new()
+            };
+
+            format!("{inlay_hint_buf}{rendered_diagnostics}{rendered_edit_diagnostic}",)
         }
 
-        fn render_diagnostics<I, D>(&self, diagnostics: I) -> String
+        fn render_diagnostic<D>(&self, diagnostic: D) -> String
         where
-            I: IntoIterator<Item = D>,
             D: IntoDiagnostic,
         {
             use std::fmt::Write;
@@ -667,10 +630,8 @@ mod tests {
                 .color(false)
                 .format(DiagnosticFormat::Full);
 
-            for diagnostic in diagnostics {
-                let diag = diagnostic.into_diagnostic();
-                write!(buf, "{}", diag.display(&self.db, &config)).unwrap();
-            }
+            let diag = diagnostic.into_diagnostic();
+            write!(buf, "{}", diag.display(&self.db, &config)).unwrap();
 
             buf
         }
@@ -817,6 +778,20 @@ mod tests {
         10 | bb[: Literal[b"foo"]] = aa
            |              ^^^^^^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def i(x: int, /) -> int:
+            return x
+
+        x = 1
+        y: Literal[1] = x
+        z: int = i(1)
+        w: int = z
+        aa = b'foo'
+        bb: Literal[b"foo"] = aa
         "#);
     }
 
@@ -997,6 +972,20 @@ mod tests {
         10 | x4[: int], y4[: str] = (x3, y3)
            |                 ^^^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def i(x: int, /) -> int:
+            return x
+        def s(x: str, /) -> str:
+            return x
+
+        x1, y1 = (1, 'abc')
+        x2: Literal[1], y2: Literal["abc"] = (x1, y1)
+        x3: int, y3: str = (i(1), s('abc'))
+        x4: int, y4: str = (x3, y3)
         "#);
     }
 
@@ -1177,6 +1166,20 @@ mod tests {
         10 | x4[: int], y4[: str] = x3, y3
            |                 ^^^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def i(x: int, /) -> int:
+            return x
+        def s(x: str, /) -> str:
+            return x
+
+        x1, y1 = 1, 'abc'
+        x2: Literal[1], y2: Literal["abc"] = x1, y1
+        x3: int, y3: str = i(1), s('abc')
+        x4: int, y4: str = x3, y3
         "#);
     }
 
@@ -1410,6 +1413,20 @@ mod tests {
         10 | w[: tuple[int, str]] = z
            |                ^^^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def i(x: int, /) -> int:
+            return x
+        def s(x: str, /) -> str:
+            return x
+
+        x = (1, 'abc')
+        y: tuple[Literal[1], Literal["abc"]] = x
+        z: tuple[int, str] = (i(1), s('abc'))
+        w: tuple[int, str] = z
         "#);
     }
 
@@ -1663,6 +1680,20 @@ mod tests {
         10 | x4[: int], (y4[: str], z4[: int]) = (x3, (y3, z3))
            |                             ^^^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def i(x: int, /) -> int:
+            return x
+        def s(x: str, /) -> str:
+            return x
+
+        x1, (y1, z1) = (1, ('abc', 2))
+        x2: Literal[1], (y2: Literal["abc"], z2: Literal[2]) = (x1, (y1, z1))
+        x3: int, (y3: str, z3: int) = (i(1), (s('abc'), i(2)))
+        x4: int, (y4: str, z4: int) = (x3, (y3, z3))
         "#);
     }
 
@@ -1743,6 +1774,18 @@ mod tests {
         8 | w[: int] = z
           |     ^^^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def i(x: int, /) -> int:
+            return x
+
+        x: int = 1
+        y: Literal[1] = x
+        z: int = i(1)
+        w: int = z
         "#);
     }
 
@@ -1780,6 +1823,15 @@ mod tests {
           |     ^^^
         5 | z = x
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def i(x: int, /) -> int:
+            return x
+        x: int = i(1)
+        z = x
         "#);
     }
 
@@ -1899,6 +1951,18 @@ mod tests {
         8 | a.y[: int] = int(3)
           |       ^^^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        class A:
+            def __init__(self, y):
+                self.x: int = int(1)
+                self.y: Unknown = y
+
+        a: A = A(2)
+        a.y: int = int(3)
         "#);
     }
 
@@ -2729,6 +2793,22 @@ mod tests {
         12 | k[: list[Unknown | int | float]] = [-1, -2.0]
            |                          ^^^^^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        a: list[Unknown | int] = [1, 2]
+        b: list[Unknown | float] = [1.0, 2.0]
+        c: list[Unknown | bool] = [True, False]
+        d: list[Unknown | None] = [None, None]
+        e: list[Unknown | str] = ["hel", "lo"]
+        f: list[Unknown | str] = ['the', 're']
+        g: list[Unknown | str] = [f"{ft}", f"{ft}"]
+        h: list[Unknown | Template] = [t"wow %d", t"wow %d"]
+        i: list[Unknown | bytes] = [b'/x01', b'/x02']
+        j: list[Unknown | int | float] = [+1, +2.0]
+        k: list[Unknown | int | float] = [-1, -2.0]
         "#);
     }
 
@@ -2900,6 +2980,19 @@ mod tests {
         9 | c[: MyClass], d[: MyClass] = (MyClass(), MyClass())
           |                   ^^^^^^^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        class MyClass:
+            def __init__(self):
+                self.x: int = 1
+
+        x: MyClass = MyClass()
+        y: tuple[MyClass, MyClass] = (MyClass(), MyClass())
+        a: MyClass, b: MyClass = MyClass(), MyClass()
+        c: MyClass, d: MyClass = (MyClass(), MyClass())
         "#);
     }
 
@@ -3770,6 +3863,20 @@ mod tests {
         10 | c[: MyClass[Unknown | int, str]], d[: MyClass[Unknown | int, str]] = (MyClass([x=][42], [y=]("a", "b")), MyClass([x=][42], [y=]("a", "…
            |                                                                                                                             ^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        class MyClass[T, U]:
+            def __init__(self, x: list[T], y: tuple[U, U]):
+                self.x: list[T@MyClass] = x
+                self.y: tuple[U@MyClass, U@MyClass] = y
+
+        x: MyClass[Unknown | int, str] = MyClass([42], ("a", "b"))
+        y: tuple[MyClass[Unknown | int, str], MyClass[Unknown | int, str]] = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
+        a: MyClass[Unknown | int, str], b: MyClass[Unknown | int, str] = MyClass([42], ("a", "b")), MyClass([42], ("a", "b"))
+        c: MyClass[Unknown | int, str], d: MyClass[Unknown | int, str] = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
         "#);
     }
 
@@ -3925,6 +4032,20 @@ mod tests {
         10 | foo([x=]val.y)
            |      ^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: int): pass
+        class MyClass:
+            def __init__(self):
+                self.x: int = 1
+                self.y: int = 2
+        val: MyClass = MyClass()
+
+        foo(val.x)
+        foo(val.y)
         ");
     }
 
@@ -3990,6 +4111,20 @@ mod tests {
         10 | foo([x=]x.y)
            |      ^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: int): pass
+        class MyClass:
+            def __init__(self):
+                self.x: int = 1
+                self.y: int = 2
+        x: MyClass = MyClass()
+
+        foo(x.x)
+        foo(x.y)
         ");
     }
 
@@ -4058,6 +4193,22 @@ mod tests {
         12 | foo([x=]val.y())
            |      ^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: int): pass
+        class MyClass:
+            def __init__(self):
+            def x() -> int:
+                return 1
+            def y() -> int:
+                return 2
+        val: MyClass = MyClass()
+
+        foo(val.x())
+        foo(val.y())
         ");
     }
 
@@ -4132,6 +4283,24 @@ mod tests {
         14 | foo([x=]val.y()[1])
            |      ^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from typing import List
+
+        def foo(x: int): pass
+        class MyClass:
+            def __init__(self):
+            def x() -> List[int]:
+                return 1
+            def y() -> List[int]:
+                return 2
+        val: MyClass = MyClass()
+
+        foo(val.x()[0])
+        foo(val.y()[1])
         ");
     }
 
@@ -4282,6 +4451,17 @@ mod tests {
         7 | foo([x=]y[0])
           |      ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: int): pass
+        x: list[Unknown | int] = [1]
+        y: list[Unknown | int] = [2]
+
+        foo(x[0])
+        foo(y[0])
         "#);
     }
 
@@ -4467,6 +4647,15 @@ mod tests {
         5 | f[: Foo] = Foo([x=]1)
           |                 ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        class Foo:
+            def __init__(self, x: int): pass
+        Foo(1)
+        f: Foo = Foo(1)
         ");
     }
 
@@ -4539,6 +4728,15 @@ mod tests {
         5 | f[: Foo] = Foo([x=]1)
           |                 ^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        class Foo:
+            def __new__(cls, x: int): pass
+        Foo(1)
+        f: Foo = Foo(1)
         ");
     }
 
@@ -5286,6 +5484,15 @@ mod tests {
           |         ^^^^^^^^^^^^^
         5 | my_func(x="hello")
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from typing import LiteralString
+        def my_func(x: LiteralString):
+            y: LiteralString = x
+        my_func(x="hello")
         "#);
     }
 
@@ -5428,6 +5635,23 @@ mod tests {
         13 |     y[: Literal[1, 2, 3, "hello"] | None] = x
            |                                     ^^^^
            |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def branch(cond: int):
+            if cond < 10:
+                x = 1
+            elif cond < 20:
+                x = 2
+            elif cond < 30:
+                x = 3
+            elif cond < 40:
+                x = "hello"
+            else:
+                x = None
+            y: Literal[1, 2, 3, "hello"] | None = x
         "#);
     }
 
@@ -5479,6 +5703,14 @@ mod tests {
         4 | a[: <class 'Foo[int]'>] = Foo[int]
           |                 ^^^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        class Foo[T]: ...
+
+        a: <class 'Foo[int]'> = Foo[int]
         "#);
     }
 
@@ -5543,6 +5775,13 @@ mod tests {
         3 |     y[: type[list[str]]] = type(x)
           |                   ^^^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def f(x: list[str]):
+            y: type[list[str]] = type(x)
         "#);
     }
 
@@ -5582,6 +5821,16 @@ mod tests {
         6 | ab[: property] = F.whatever
           |      ^^^^^^^^
           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        class F:
+            @property
+            def whatever(self): ...
+
+        ab: property = F.whatever
         ");
     }
 
@@ -5932,6 +6181,33 @@ mod tests {
             ));
 
             main.sub(source);
+
+            main
+        }
+    }
+
+    struct InlayHintEditDiagnostic {
+        file_content: String,
+    }
+
+    impl InlayHintEditDiagnostic {
+        fn new(file_content: String) -> Self {
+            Self { file_content }
+        }
+    }
+
+    impl IntoDiagnostic for InlayHintEditDiagnostic {
+        fn into_diagnostic(self) -> Diagnostic {
+            let mut main = Diagnostic::new(
+                DiagnosticId::Lint(LintName::of("inlay-hint-edit")),
+                Severity::Info,
+                "File after edits".to_string(),
+            );
+
+            main.sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                format!("{}\n{}", "Source", self.file_content),
+            ));
 
             main
         }

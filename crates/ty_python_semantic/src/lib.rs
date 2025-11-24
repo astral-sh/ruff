@@ -12,8 +12,8 @@ pub use db::Db;
 pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 pub use module_name::{ModuleName, ModuleNameResolutionError};
 pub use module_resolver::{
-    Module, SearchPath, SearchPathValidationError, SearchPaths, all_modules, file_to_module,
-    list_modules, resolve_module, resolve_real_module, system_module_search_paths,
+    Module, SearchPath, SearchPathValidationError, SearchPaths, all_modules, list_modules,
+    resolve_module, resolve_real_module, system_module_search_paths,
 };
 pub use program::{
     Program, ProgramSettings, PythonVersionFileSource, PythonVersionSource,
