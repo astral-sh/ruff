@@ -6,7 +6,7 @@ expression: completions
   {
     "label": "Literal (import typing)",
     "kind": 6,
-    "sortText": " 50",
+    "sortText": " 58",
     "insertText": "Literal",
     "additionalTextEdits": [
       {
@@ -27,7 +27,7 @@ expression: completions
   {
     "label": "LiteralString (import typing)",
     "kind": 6,
-    "sortText": " 51",
+    "sortText": " 59",
     "insertText": "LiteralString",
     "additionalTextEdits": [
       {
