@@ -49,7 +49,7 @@ impl SuppressionComment {
     }
 }
 
-#[allow(unused)]
+#[expect(unused)]
 #[derive(Clone, Debug)]
 pub(crate) struct Suppression {
     /// The lint code being suppressed
@@ -74,14 +74,14 @@ pub(crate) enum InvalidSuppressionKind {
     Indentation,
 }
 
-#[allow(unused)]
+#[expect(unused)]
 #[derive(Clone, Debug)]
 pub(crate) struct InvalidSuppression {
     kind: InvalidSuppressionKind,
     comment: SuppressionComment,
 }
 
-#[allow(unused)]
+#[expect(unused)]
 #[derive(Debug)]
 pub(crate) struct Suppressions {
     /// Valid suppression ranges with associated comments
