@@ -1649,6 +1649,117 @@ def ab(a: int, *, c: int):
     }
 
     #[test]
+    fn hover_nonlocal_binding() {
+        let test = cursor_test(
+            r#"
+def outer():
+    x = "outer_value"
+    
+    def inner():
+        nonlocal x
+        x = "modified"
+        return x<CURSOR>  # Should find the nonlocal x declaration in outer scope
+    
+    return inner
+"#,
+        );
+
+        // Should find the variable declaration in the outer scope, not the nonlocal statement
+        assert_snapshot!(test.hover(), @r#"
+        Literal["modified"]
+        ---------------------------------------------
+        ```python
+        Literal["modified"]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:8:16
+           |
+         6 |         nonlocal x
+         7 |         x = "modified"
+         8 |         return x  # Should find the nonlocal x declaration in outer scope
+           |                ^- Cursor offset
+           |                |
+           |                source
+         9 |
+        10 |     return inner
+           |
+        "#);
+    }
+
+    #[test]
+    fn hover_nonlocal_stmt() {
+        let test = cursor_test(
+            r#"
+def outer():
+    xy = "outer_value"
+    
+    def inner():
+        nonlocal x<CURSOR>y
+        xy = "modified"
+        return x  # Should find the nonlocal x declaration in outer scope
+    
+    return inner
+"#,
+        );
+
+        // Should find the variable declaration in the outer scope, not the nonlocal statement
+        assert_snapshot!(test.hover(), @"Hover provided no content");
+    }
+
+    #[test]
+    fn hover_global_binding() {
+        let test = cursor_test(
+            r#"
+global_var = "global_value"
+
+def function():
+    global global_var
+    global_var = "modified"
+    return global_<CURSOR>var  # Should find the global variable declaration
+"#,
+        );
+
+        // Should find the global variable declaration, not the global statement
+        assert_snapshot!(test.hover(), @r#"
+        Literal["modified"]
+        ---------------------------------------------
+        ```python
+        Literal["modified"]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:7:12
+          |
+        5 |     global global_var
+        6 |     global_var = "modified"
+        7 |     return global_var  # Should find the global variable declaration
+          |            ^^^^^^^-^^
+          |            |      |
+          |            |      Cursor offset
+          |            source
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_global_stmt() {
+        let test = cursor_test(
+            r#"
+global_var = "global_value"
+
+def function():
+    global global_<CURSOR>var
+    global_var = "modified"
+    return global_var  # Should find the global variable declaration
+"#,
+        );
+
+        // Should find the global variable declaration, not the global statement
+        assert_snapshot!(test.hover(), @"Hover provided no content");
+    }
+
+    #[test]
     fn hover_module_import() {
         let mut test = cursor_test(
             r#"

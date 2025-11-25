@@ -331,15 +331,6 @@ impl GotoTarget<'_> {
                 let module = import_name(module_name, *component_index);
                 model.resolve_module_type(Some(module), *level)?
             }
-            // TODO: Support identifier targets
-            GotoTarget::PatternMatchRest(_)
-            | GotoTarget::PatternKeywordArgument(_)
-            | GotoTarget::PatternMatchStarName(_)
-            | GotoTarget::PatternMatchAsName(_)
-            | GotoTarget::TypeParamParamSpecName(_)
-            | GotoTarget::TypeParamTypeVarTupleName(_)
-            | GotoTarget::NonLocal { .. }
-            | GotoTarget::Globals { .. } => return None,
             GotoTarget::StringAnnotationSubexpr {
                 string_expr,
                 subrange,
@@ -366,6 +357,15 @@ impl GotoTarget<'_> {
                 let (_, ty) = ty_python_semantic::definitions_for_unary_op(model, expression)?;
                 ty
             }
+            // TODO: Support identifier targets
+            GotoTarget::PatternMatchRest(_)
+            | GotoTarget::PatternKeywordArgument(_)
+            | GotoTarget::PatternMatchStarName(_)
+            | GotoTarget::PatternMatchAsName(_)
+            | GotoTarget::TypeParamParamSpecName(_)
+            | GotoTarget::TypeParamTypeVarTupleName(_)
+            | GotoTarget::NonLocal { .. }
+            | GotoTarget::Globals { .. } => return None,
         };
 
         Some(ty)
@@ -402,9 +402,8 @@ impl GotoTarget<'_> {
     ) -> Option<DefinitionsOrTargets<'db>> {
         use crate::NavigationTarget;
         match self {
-            GotoTarget::Expression(expression) => {
-                definitions_for_expression(model, expression).map(DefinitionsOrTargets::Definitions)
-            }
+            GotoTarget::Expression(expression) => definitions_for_expression(model, *expression)
+                .map(DefinitionsOrTargets::Definitions),
             // For already-defined symbols, they are their own definitions
             GotoTarget::FunctionDef(function) => Some(DefinitionsOrTargets::Definitions(vec![
                 ResolvedDefinition::Definition(function.definition(model)),
@@ -511,7 +510,7 @@ impl GotoTarget<'_> {
             GotoTarget::Call { callable, call } => {
                 let mut definitions = definitions_for_callable(model, call);
                 let expr_definitions =
-                    definitions_for_expression(model, callable).unwrap_or_default();
+                    definitions_for_expression(model, *callable).unwrap_or_default();
                 definitions.extend(expr_definitions);
 
                 if definitions.is_empty() {
@@ -545,8 +544,15 @@ impl GotoTarget<'_> {
                 let subexpr = covering_node(subast.syntax().into(), *subrange)
                     .node()
                     .as_expr_ref()?;
-                definitions_for_expression(&submodel, &subexpr)
+                definitions_for_expression(&submodel, subexpr)
                     .map(DefinitionsOrTargets::Definitions)
+            }
+            GotoTarget::NonLocal { identifier } | GotoTarget::Globals { identifier } => {
+                Some(DefinitionsOrTargets::Definitions(definitions_for_name(
+                    model,
+                    identifier.as_str(),
+                    AnyNodeRef::Identifier(identifier),
+                )))
             }
 
             // TODO: implement these
@@ -554,9 +560,7 @@ impl GotoTarget<'_> {
             | GotoTarget::PatternMatchStarName(..)
             | GotoTarget::TypeParamTypeVarName(..)
             | GotoTarget::TypeParamParamSpecName(..)
-            | GotoTarget::TypeParamTypeVarTupleName(..)
-            | GotoTarget::NonLocal { .. }
-            | GotoTarget::Globals { .. } => None,
+            | GotoTarget::TypeParamTypeVarTupleName(..) => None,
         }
     }
 
@@ -916,9 +920,9 @@ impl Ranged for GotoTarget<'_> {
 }
 
 /// Converts a collection of `ResolvedDefinition` items into `NavigationTarget` items.
-fn convert_resolved_definitions_to_targets(
-    db: &dyn ty_python_semantic::Db,
-    definitions: Vec<ty_python_semantic::ResolvedDefinition<'_>>,
+fn convert_resolved_definitions_to_targets<'db>(
+    db: &'db dyn ty_python_semantic::Db,
+    definitions: Vec<ty_python_semantic::ResolvedDefinition<'db>>,
 ) -> Vec<crate::NavigationTarget> {
     definitions
         .into_iter()
@@ -953,10 +957,14 @@ fn convert_resolved_definitions_to_targets(
 /// Shared helper to get definitions for an expr (that is presumably a name/attr)
 fn definitions_for_expression<'db>(
     model: &SemanticModel<'db>,
-    expression: &ruff_python_ast::ExprRef<'_>,
+    expression: ruff_python_ast::ExprRef<'_>,
 ) -> Option<Vec<ResolvedDefinition<'db>>> {
     match expression {
-        ast::ExprRef::Name(name) => Some(definitions_for_name(model, name)),
+        ast::ExprRef::Name(name) => Some(definitions_for_name(
+            model,
+            name.id.as_str(),
+            expression.into(),
+        )),
         ast::ExprRef::Attribute(attribute) => Some(ty_python_semantic::definitions_for_attribute(
             model, attribute,
         )),

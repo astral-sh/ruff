@@ -22,7 +22,7 @@ use crate::{Db, DisplaySettings, HasType, NameKind, SemanticModel};
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
@@ -515,7 +515,7 @@ pub fn definition_for_name<'db>(
     model: &SemanticModel<'db>,
     name: &ast::ExprName,
 ) -> Option<Definition<'db>> {
-    let definitions = definitions_for_name(model, name);
+    let definitions = definitions_for_name(model, name.id.as_str(), name.into());
 
     // Find the first valid definition and return its kind
     for declaration in definitions {
@@ -531,15 +531,15 @@ pub fn definition_for_name<'db>(
 /// are resolved (recursively) to the original definitions or module files.
 pub fn definitions_for_name<'db>(
     model: &SemanticModel<'db>,
-    name: &ast::ExprName,
+    name_str: &str,
+    node: AnyNodeRef<'_>,
 ) -> Vec<ResolvedDefinition<'db>> {
     let db = model.db();
     let file = model.file();
     let index = semantic_index(db, file);
-    let name_str = name.id.as_str();
 
     // Get the scope for this name expression
-    let Some(file_scope) = model.scope(name.into()) else {
+    let Some(file_scope) = model.scope(node) else {
         return vec![];
     };
 
@@ -648,7 +648,8 @@ pub fn definitions_for_name<'db>(
         //
         // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
         if matches!(name_str, "float" | "complex")
-            && let Some(union) = name.inferred_type(&SemanticModel::new(db, file)).as_union()
+            && let Some(expr) = node.expr_name()
+            && let Some(union) = expr.inferred_type(&SemanticModel::new(db, file)).as_union()
             && is_float_or_complex_annotation(db, union, name_str)
         {
             return union
