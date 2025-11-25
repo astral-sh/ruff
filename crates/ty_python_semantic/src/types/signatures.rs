@@ -829,6 +829,7 @@ impl<'db> Signature<'db> {
             relation_visitor,
             disjointness_visitor,
         );
+        let when = when.limit_to_valid_specializations(db);
 
         // But the caller does not need to consider those extra typevars. Whatever constraint set
         // we produce, we reduce it back down to the inferable set that the caller asked about.
