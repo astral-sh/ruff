@@ -64,7 +64,7 @@ pub(crate) struct Suppression {
     comments: SmallVec<[SuppressionComment; 2]>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) enum InvalidSuppressionKind {
     /// Trailing suppression not supported
     Trailing,
@@ -246,7 +246,7 @@ impl<'a> SuppressionsBuilder<'a> {
     }
 }
 
-#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, Error, PartialEq)]
 enum ParseErrorKind {
     #[error("not a suppression comment")]
     NotASuppression,
