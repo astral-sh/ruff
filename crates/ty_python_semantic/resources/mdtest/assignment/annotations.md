@@ -715,3 +715,17 @@ def _(a: int, b: str, c: int | str):
     x9: int | str | None = f(lst(c))
     reveal_type(x9)  # revealed: int | str | None
 ```
+
+## Forward annotation with unclosed string literal
+
+Regression test for [#1611](https://github.com/astral-sh/ty/issues/1611).
+
+<!-- blacken-docs:off -->
+
+```py
+# error: [invalid-syntax]
+# error: [invalid-syntax-in-forward-annotation]
+a:'
+```
+
+<!-- blacken-docs:on -->

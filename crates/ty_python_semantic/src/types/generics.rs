@@ -17,11 +17,11 @@ use crate::types::signatures::{Parameter, Parameters, ParametersKind, Signature}
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
-    ClassLiteral, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
-    IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
-    Type, TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, declaration_type,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature,
+    CallableType, CallableTypeKind, ClassLiteral, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
+    IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind,
+    NormalizedVisitor, Type, TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
+    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, declaration_type,
     walk_bound_type_var_type,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
@@ -536,14 +536,15 @@ impl<'db> GenericContext<'db> {
     /// Creates a specialization of this generic context. Panics if the length of `types` does not
     /// match the number of typevars in the generic context.
     ///
-    /// You are allowed to provide types that mention the typevars in this generic context.
-    pub(crate) fn specialize_recursive(
-        self,
-        db: &'db dyn Db,
-        mut types: Box<[Type<'db>]>,
-    ) -> Specialization<'db> {
+    /// If any provided type is `None`, we will use the corresponding typevar's default type. You
+    /// are allowed to provide types that mention the typevars in this generic context.
+    pub(crate) fn specialize_recursive<I>(self, db: &'db dyn Db, types: I) -> Specialization<'db>
+    where
+        I: IntoIterator<Item = Option<Type<'db>>>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let mut types = self.fill_in_defaults(db, types);
         let len = types.len();
-        assert!(self.len(db) == len);
         loop {
             let mut any_changed = false;
             for i in 0..len {
@@ -578,10 +579,7 @@ impl<'db> GenericContext<'db> {
         Specialization::new(db, self, Box::from([element_type]), None, Some(tuple))
     }
 
-    /// Creates a specialization of this generic context. Panics if the length of `types` does not
-    /// match the number of typevars in the generic context. If any provided type is `None`, we
-    /// will use the corresponding typevar's default type.
-    pub(crate) fn specialize_partial<I>(self, db: &'db dyn Db, types: I) -> Specialization<'db>
+    fn fill_in_defaults<I>(self, db: &'db dyn Db, types: I) -> Box<[Type<'db>]>
     where
         I: IntoIterator<Item = Option<Type<'db>>>,
         I::IntoIter: ExactSizeIterator,
@@ -624,7 +622,18 @@ impl<'db> GenericContext<'db> {
             expanded[idx] = default;
         }
 
-        Specialization::new(db, self, expanded.into_boxed_slice(), None, None)
+        expanded.into_boxed_slice()
+    }
+
+    /// Creates a specialization of this generic context. Panics if the length of `types` does not
+    /// match the number of typevars in the generic context. If any provided type is `None`, we
+    /// will use the corresponding typevar's default type.
+    pub(crate) fn specialize_partial<I>(self, db: &'db dyn Db, types: I) -> Specialization<'db>
+    where
+        I: IntoIterator<Item = Option<Type<'db>>>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        Specialization::new(db, self, self.fill_in_defaults(db, types), None, None)
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
@@ -1057,11 +1066,6 @@ impl<'db> Specialization<'db> {
         // TODO: Combine the tuple specs too
         // TODO(jelle): specialization type?
         Specialization::new(db, self.generic_context(db), types, None, None)
-    }
-
-    #[must_use]
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &NormalizedVisitor::default())
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
@@ -1662,8 +1666,8 @@ impl<'db> SpecializationBuilder<'db> {
             }
 
             (Type::Callable(formal_callable), _) => {
-                if let Some(Type::Callable(actual_callable)) =
-                    actual.try_upcast_to_callable(self.db)
+                if let Some(callable_types) = actual.try_upcast_to_callable(self.db)
+                    && let Some(actual_callable) = callable_types.exactly_one()
                 {
                     // We're only interested in a formal callable of the form `Callable[P, ...]` for
                     // now where `P` is a `ParamSpec`.
@@ -1678,12 +1682,15 @@ impl<'db> SpecializationBuilder<'db> {
                     };
                     self.add_type_mapping(
                         typevar,
-                        CallableType::overloaded_paramspec_value(
+                        Type::Callable(CallableType::new(
                             self.db,
-                            actual_callable.signatures(self.db).iter().map(|signature| {
-                                Signature::new(signature.parameters().clone(), None)
-                            }),
-                        ),
+                            CallableSignature::from_overloads(
+                                actual_callable.signatures(self.db).iter().map(|signature| {
+                                    Signature::new(signature.parameters().clone(), None)
+                                }),
+                            ),
+                            CallableTypeKind::ParamSpecValue,
+                        )),
                         polarity,
                         &mut f,
                     );

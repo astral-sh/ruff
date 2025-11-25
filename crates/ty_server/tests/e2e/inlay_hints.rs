@@ -63,7 +63,22 @@ y = foo(1)
             }
           }
         ],
-        "kind": 1
+        "kind": 1,
+        "textEdits": [
+          {
+            "range": {
+              "start": {
+                "line": 5,
+                "character": 1
+              },
+              "end": {
+                "line": 5,
+                "character": 1
+              }
+            },
+            "newText": ": int"
+          }
+        ]
       },
       {
         "position": {
@@ -91,7 +106,8 @@ y = foo(1)
             "value": "="
           }
         ],
-        "kind": 2
+        "kind": 2,
+        "textEdits": []
       }
     ]
     "#);

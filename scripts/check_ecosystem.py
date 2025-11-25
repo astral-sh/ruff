@@ -22,10 +22,11 @@ import re
 import tempfile
 import time
 from asyncio.subprocess import PIPE, create_subprocess_exec
+from collections.abc import Awaitable
 from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path
 from signal import SIGINT, SIGTERM
-from typing import TYPE_CHECKING, NamedTuple, Self, TypeVar
+from typing import TYPE_CHECKING, Any, NamedTuple, Self, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterator, Sequence
@@ -342,7 +343,7 @@ DIFF_LINE_RE = re.compile(
     r"^(?P<pre>[+-]) (?P<inner>(?P<path>[^:]+):(?P<lnum>\d+):\d+:) (?P<post>.*)$",
 )
 
-T = TypeVar("T")
+T = TypeVar("T", bound=Awaitable[Any])
 
 
 async def main(

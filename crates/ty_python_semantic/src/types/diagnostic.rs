@@ -8,14 +8,15 @@ use super::{
 use crate::diagnostic::did_you_mean;
 use crate::diagnostic::format_enumeration;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
+use crate::place::Place;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
-use crate::semantic_index::{global_scope, place_table};
+use crate::semantic_index::{global_scope, place_table, use_def_map};
 use crate::suppression::FileSuppressionId;
-use crate::types::KnownInstanceType;
 use crate::types::call::CallError;
-use crate::types::class::{DisjointBase, DisjointBaseKind, Field};
-use crate::types::function::KnownFunction;
+use crate::types::class::{DisjointBase, DisjointBaseKind, Field, MethodDecorator};
+use crate::types::function::{FunctionType, KnownFunction};
+use crate::types::liskov::{MethodKind, SynthesizedMethodKind};
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
@@ -26,17 +27,21 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
     infer_isolated_expression, protocol_class::ProtocolClass,
 };
+use crate::types::{KnownInstanceType, MemberLookupPolicy};
 use crate::{Db, DisplaySettings, FxIndexMap, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
-use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
-use ruff_db::source::source_text;
+use ruff_db::{
+    diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
+    parsed::parsed_module,
+    source::source_text,
+};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parentheses_iterator;
-use ruff_python_ast::{self as ast, AnyNodeRef, Identifier};
+use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
-use std::fmt::Formatter;
+use std::fmt::{self, Formatter};
 
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
@@ -108,6 +113,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&REDUNDANT_CAST);
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
+    registry.register_lint(&INVALID_METHOD_OVERRIDE);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -1934,6 +1940,84 @@ declare_lint! {
     }
 }
 
+declare_lint! {
+    /// ## What it does
+    /// Detects method overrides that violate the [Liskov Substitution Principle] ("LSP").
+    ///
+    /// The LSP states that an instance of a subtype should be substitutable for an instance of its supertype.
+    /// Applied to Python, this means:
+    /// 1. All argument combinations a superclass method accepts
+    ///    must also be accepted by an overriding subclass method.
+    /// 2. The return type of an overriding subclass method must be a subtype
+    ///    of the return type of the superclass method.
+    ///
+    /// ## Why is this bad?
+    /// Violating the Liskov Substitution Principle will lead to many of ty's assumptions and
+    /// inferences being incorrect, which will mean that it will fail to catch many possible
+    /// type errors in your code.
+    ///
+    /// ## Example
+    /// ```python
+    /// class Super:
+    ///     def method(self, x) -> int:
+    ///         return 42
+    ///
+    /// class Sub(Super):
+    ///     # Liskov violation: `str` is not a subtype of `int`,
+    ///     # but the supertype method promises to return an `int`.
+    ///     def method(self, x) -> str:  # error: [invalid-override]
+    ///         return "foo"
+    ///
+    /// def accepts_super(s: Super) -> int:
+    ///     return s.method(x=42)
+    ///
+    /// accepts_super(Sub())  # The result of this call is a string, but ty will infer
+    ///                       # it to be an `int` due to the violation of the Liskov Substitution Principle.
+    ///
+    /// class Sub2(Super):
+    ///     # Liskov violation: the superclass method can be called with a `x=`
+    ///     # keyword argument, but the subclass method does not accept it.
+    ///     def method(self, y) -> int:  # error: [invalid-override]
+    ///        return 42
+    ///
+    /// accepts_super(Sub2())  # TypeError at runtime: method() got an unexpected keyword argument 'x'
+    ///                        # ty cannot catch this error due to the violation of the Liskov Substitution Principle.
+    /// ```
+    ///
+    /// ## Common issues
+    ///
+    /// ### Why does ty complain about my `__eq__` method?
+    ///
+    /// `__eq__` and `__ne__` methods in Python are generally expected to accept arbitrary
+    /// objects as their second argument, for example:
+    ///
+    /// ```python
+    /// class A:
+    ///     x: int
+    ///
+    ///     def __eq__(self, other: object) -> bool:
+    ///         # gracefully handle an object of an unexpected type
+    ///         # without raising an exception
+    ///         if not isinstance(other, A):
+    ///             return False
+    ///         return self.x == other.x
+    /// ```
+    ///
+    /// If `A.__eq__` here were annotated as only accepting `A` instances for its second argument,
+    /// it would imply that you wouldn't be able to use `==` between instances of `A` and
+    /// instances of unrelated classes without an exception possibly being raised. While some
+    /// classes in Python do indeed behave this way, the strongly held convention is that it should
+    /// be avoided wherever possible. As part of this check, therefore, ty enforces that `__eq__`
+    /// and `__ne__` methods accept `object` as their second argument.
+    ///
+    /// [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
+    pub(crate) static INVALID_METHOD_OVERRIDE = {
+        summary: "detects method definitions that violate the Liskov Substitution Principle",
+        status: LintStatus::stable("0.0.1-alpha.20"),
+        default_level: Level::Error,
+    }
+}
+
 /// A collection of type check diagnostics.
 #[derive(Default, Eq, PartialEq, get_size2::GetSize)]
 pub struct TypeCheckDiagnostics {
@@ -2436,6 +2520,7 @@ pub(super) fn report_possibly_missing_attribute(
 pub(super) fn report_invalid_exception_tuple_caught<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     node: &'ast ast::ExprTuple,
+    node_type: Type<'db>,
     invalid_tuple_nodes: impl IntoIterator<Item = (&'ast ast::Expr, Type<'db>)>,
 ) {
     let Some(builder) = context.report_lint(&INVALID_EXCEPTION_CAUGHT, node) else {
@@ -2443,6 +2528,10 @@ pub(super) fn report_invalid_exception_tuple_caught<'db, 'ast>(
     };
 
     let mut diagnostic = builder.into_diagnostic("Invalid tuple caught in an exception handler");
+    diagnostic.set_concise_message(format_args!(
+        "Cannot catch object of type `{}` in an exception handler",
+        node_type.display(context.db())
+    ));
 
     for (sub_node, ty) in invalid_tuple_nodes {
         let span = context.span(sub_node);
@@ -3367,6 +3456,196 @@ pub(crate) fn report_rebound_typevar<'db>(
     }
 }
 
+// I tried refactoring this function to placate Clippy,
+// but it did not improve readability! -- AW.
+#[expect(clippy::too_many_arguments)]
+pub(super) fn report_invalid_method_override<'db>(
+    context: &InferContext<'db, '_>,
+    member: &str,
+    subclass: ClassType<'db>,
+    subclass_definition: Definition<'db>,
+    subclass_function: FunctionType<'db>,
+    superclass: ClassType<'db>,
+    superclass_type: Type<'db>,
+    superclass_method_kind: MethodKind,
+) {
+    let db = context.db();
+
+    let signature_span = |function: FunctionType<'db>| {
+        function
+            .literal(db)
+            .last_definition(db)
+            .spans(db)
+            .map(|spans| spans.signature)
+    };
+
+    let subclass_definition_kind = subclass_definition.kind(db);
+    let subclass_definition_signature_span = signature_span(subclass_function);
+
+    // If the function was originally defined elsewhere and simply assigned
+    // in the body of the class here, we cannot use the range associated with the `FunctionType`
+    let diagnostic_range = if subclass_definition_kind.is_function_def() {
+        subclass_definition_signature_span
+            .as_ref()
+            .and_then(Span::range)
+            .unwrap_or_else(|| {
+                subclass_function
+                    .node(db, context.file(), context.module())
+                    .range
+            })
+    } else {
+        subclass_definition.full_range(db, context.module()).range()
+    };
+
+    let class_name = subclass.name(db);
+    let superclass_name = superclass.name(db);
+
+    let overridden_method = if class_name == superclass_name {
+        format!(
+            "{superclass}.{member}",
+            superclass = superclass.class_literal(db).0.qualified_name(db),
+        )
+    } else {
+        format!("{superclass_name}.{member}")
+    };
+
+    let Some(builder) = context.report_lint(&INVALID_METHOD_OVERRIDE, diagnostic_range) else {
+        return;
+    };
+
+    let mut diagnostic =
+        builder.into_diagnostic(format_args!("Invalid override of method `{member}`"));
+
+    diagnostic.set_primary_message(format_args!(
+        "Definition is incompatible with `{overridden_method}`"
+    ));
+
+    let class_member = |cls: ClassType<'db>| {
+        cls.class_member(db, member, MemberLookupPolicy::default())
+            .place
+    };
+
+    if let Place::Defined(Type::FunctionLiteral(subclass_function), _, _) = class_member(subclass)
+        && let Place::Defined(Type::FunctionLiteral(superclass_function), _, _) =
+            class_member(superclass)
+        && let Ok(superclass_function_kind) =
+            MethodDecorator::try_from_fn_type(db, superclass_function)
+        && let Ok(subclass_function_kind) = MethodDecorator::try_from_fn_type(db, subclass_function)
+        && superclass_function_kind != subclass_function_kind
+    {
+        diagnostic.info(format_args!(
+            "`{class_name}.{member}` is {subclass_function_kind} \
+            but `{overridden_method}` is {superclass_function_kind}",
+            superclass_function_kind = superclass_function_kind.description(),
+            subclass_function_kind = subclass_function_kind.description(),
+        ));
+    }
+
+    diagnostic.info("This violates the Liskov Substitution Principle");
+
+    if !subclass_definition_kind.is_function_def()
+        && let Some(span) = subclass_definition_signature_span
+    {
+        diagnostic.annotate(
+            Annotation::secondary(span)
+                .message(format_args!("Signature of `{class_name}.{member}`")),
+        );
+    }
+
+    let superclass_scope = superclass.class_literal(db).0.body_scope(db);
+
+    match superclass_method_kind {
+        MethodKind::NotSynthesized => {
+            if let Some(superclass_symbol) = place_table(db, superclass_scope).symbol_id(member)
+                && let Some(binding) = use_def_map(db, superclass_scope)
+                    .end_of_scope_bindings(ScopedPlaceId::Symbol(superclass_symbol))
+                    .next()
+                && let Some(definition) = binding.binding.definition()
+            {
+                let definition_span = Span::from(
+                    definition
+                        .full_range(db, &parsed_module(db, superclass_scope.file(db)).load(db)),
+                );
+
+                let superclass_function_span = match superclass_type {
+                    Type::FunctionLiteral(function) => signature_span(function),
+                    Type::BoundMethod(method) => signature_span(method.function(db)),
+                    _ => None,
+                };
+
+                let superclass_definition_kind = definition.kind(db);
+
+                let secondary_span = if superclass_definition_kind.is_function_def()
+                    && let Some(function_span) = superclass_function_span.clone()
+                {
+                    function_span
+                } else {
+                    definition_span
+                };
+
+                diagnostic.annotate(
+                    Annotation::secondary(secondary_span.clone())
+                        .message(format_args!("`{overridden_method}` defined here")),
+                );
+
+                if !superclass_definition_kind.is_function_def()
+                    && let Some(function_span) = superclass_function_span
+                    && function_span != secondary_span
+                {
+                    diagnostic.annotate(
+                        Annotation::secondary(function_span)
+                            .message(format_args!("Signature of `{overridden_method}`")),
+                    );
+                }
+            }
+        }
+        MethodKind::Synthesized(synthesized_kind) => {
+            let make_sub =
+                |message: fmt::Arguments| SubDiagnostic::new(SubDiagnosticSeverity::Info, message);
+
+            let mut sub = match synthesized_kind {
+                SynthesizedMethodKind::Dataclass => make_sub(format_args!(
+                    "`{overridden_method}` is a generated method created because \
+                        `{superclass_name}` is a dataclass"
+                )),
+                SynthesizedMethodKind::NamedTuple => make_sub(format_args!(
+                    "`{overridden_method}` is a generated method created because \
+                        `{superclass_name}` inherits from `typing.NamedTuple`"
+                )),
+                SynthesizedMethodKind::TypedDict => make_sub(format_args!(
+                    "`{overridden_method}` is a generated method created because \
+                        `{superclass_name}` is a `TypedDict`"
+                )),
+            };
+
+            sub.annotate(
+                Annotation::primary(superclass.header_span(db))
+                    .message(format_args!("Definition of `{superclass_name}`")),
+            );
+            diagnostic.sub(sub);
+        }
+    }
+
+    if superclass.is_object(db) && matches!(member, "__eq__" | "__ne__") {
+        // Inspired by mypy's subdiagnostic at <https://github.com/python/mypy/blob/1b6ebb17b7fe64488a7b3c3b4b0187bb14fe331b/mypy/messages.py#L1307-L1318>
+        let eq_subdiagnostics = [
+            format_args!(
+                "It is recommended for `{member}` to work with arbitrary objects, for example:",
+            ),
+            format_args!(""),
+            format_args!("    def {member}(self, other: object) -> bool:",),
+            format_args!("        if not isinstance(other, {class_name}):",),
+            format_args!("            return False"),
+            format_args!("        return <logic to compare two `{class_name}` instances>"),
+            format_args!(""),
+        ];
+
+        for subdiag in eq_subdiagnostics {
+            diagnostic.help(subdiag);
+        }
+    }
+}
+
 /// This function receives an unresolved `from foo import bar` import,
 /// where `foo` can be resolved to a module but that module does not
 /// have a `bar` member or submodule.
@@ -3375,30 +3654,32 @@ pub(crate) fn report_rebound_typevar<'db>(
 /// *does* exist as a submodule in the standard library on *other* Python
 /// versions, we add a hint to the diagnostic that the user may have
 /// misconfigured their Python version.
+///
+/// The function returns `true` if a hint was added, `false` otherwise.
 pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
     db: &dyn Db,
-    mut diagnostic: LintDiagnosticGuard,
+    diagnostic: &mut Diagnostic,
     full_submodule_name: &ModuleName,
     parent_module: Module,
-) {
+) -> bool {
     let Some(search_path) = parent_module.search_path(db) else {
-        return;
+        return false;
     };
 
     if !search_path.is_standard_library() {
-        return;
+        return false;
     }
 
     let program = Program::get(db);
     let typeshed_versions = program.search_paths(db).typeshed_versions();
 
     let Some(version_range) = typeshed_versions.exact(full_submodule_name) else {
-        return;
+        return false;
     };
 
     let python_version = program.python_version(db);
     if version_range.contains(python_version) {
-        return;
+        return false;
     }
 
     diagnostic.info(format_args!(
@@ -3412,7 +3693,9 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
         version_range = version_range.diagnostic_display(),
     ));
 
-    add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, "resolving modules");
+    add_inferred_python_version_hint_to_diagnostic(db, diagnostic, "resolving modules");
+
+    true
 }
 
 /// This function receives an unresolved `foo.bar` attribute access,
@@ -3426,8 +3709,9 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
 pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     db: &dyn Db,
     mut diagnostic: LintDiagnosticGuard,
-    value_type: &Type,
-    attr: &Identifier,
+    value_type: Type,
+    attr: &str,
+    action: &str,
 ) {
     // Currently we limit this analysis to attributes of stdlib modules,
     // as this covers the most important cases while not being too noisy
@@ -3450,17 +3734,19 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     // so if this lookup succeeds then we know that this lookup *could* succeed with possible
     // configuration changes.
     let symbol_table = place_table(db, global_scope(db, file));
-    if symbol_table.symbol_by_name(attr).is_none() {
+    let Some(symbol) = symbol_table.symbol_by_name(attr) else {
+        return;
+    };
+
+    if !symbol.is_bound() {
         return;
     }
+
+    diagnostic.info("The member may be available on other Python versions or platforms");
 
     // For now, we just mention the current version they're on, and hope that's enough of a nudge.
     // TODO: determine what version they need to be on
     // TODO: also mention the platform we're assuming
     // TODO: determine what platform they need to be on
-    add_inferred_python_version_hint_to_diagnostic(
-        db,
-        &mut diagnostic,
-        &format!("accessing `{}`", attr.id),
-    );
+    add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, action);
 }

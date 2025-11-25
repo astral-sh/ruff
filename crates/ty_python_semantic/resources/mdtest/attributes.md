@@ -1904,6 +1904,7 @@ we only consider the attribute assignment to be valid if the assigned attribute 
 from typing import Literal
 
 class Date:
+    # error: [invalid-method-override]
     def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
         pass
 
@@ -2681,6 +2682,39 @@ import datetime
 reveal_type(datetime.UTC)  # revealed: Unknown
 # error: [unresolved-attribute]
 reveal_type(datetime.fakenotreal)  # revealed: Unknown
+```
+
+## Unimported submodule incorrectly accessed as attribute
+
+We give special diagnostics for this common case too:
+
+<!-- snapshot-diagnostics -->
+
+`foo/__init__.py`:
+
+```py
+```
+
+`foo/bar.py`:
+
+```py
+```
+
+`baz/bar.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import foo
+import baz
+
+# error: [possibly-missing-attribute]
+reveal_type(foo.bar)  # revealed: Unknown
+# error: [possibly-missing-attribute]
+reveal_type(baz.bar)  # revealed: Unknown
 ```
 
 ## References

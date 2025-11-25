@@ -2003,6 +2003,7 @@ python-version = "3.12"
 ```
 
 ```py
+from typing import final
 from typing_extensions import TypeVar, Self, Protocol
 from ty_extensions import is_equivalent_to, static_assert, is_assignable_to, is_subtype_of
 
@@ -2094,6 +2095,13 @@ class NominalReturningSelfNotGeneric:
     def g(self) -> "NominalReturningSelfNotGeneric":
         return self
 
+@final
+class Other: ...
+
+class NominalReturningOtherClass:
+    def g(self) -> Other:
+        raise NotImplementedError
+
 # TODO: should pass
 static_assert(is_equivalent_to(LegacyFunctionScoped, NewStyleFunctionScoped))  # error: [static-assert-error]
 
@@ -2112,8 +2120,7 @@ static_assert(not is_assignable_to(NominalLegacy, UsesSelf))
 static_assert(not is_assignable_to(NominalWithSelf, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalWithSelf, LegacyFunctionScoped))
 static_assert(is_assignable_to(NominalWithSelf, UsesSelf))
-# TODO: should pass
-static_assert(is_subtype_of(NominalWithSelf, UsesSelf))  # error: [static-assert-error]
+static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
 
 # TODO: these should pass
 static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))  # error: [static-assert-error]
@@ -2125,6 +2132,8 @@ static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, LegacyFunctio
 
 # TODO: should pass
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, UsesSelf))  # error: [static-assert-error]
+
+static_assert(not is_assignable_to(NominalReturningOtherClass, UsesSelf))
 
 # These test cases are taken from the typing conformance suite:
 class ShapeProtocolImplicitSelf(Protocol):
@@ -3069,18 +3078,15 @@ from typing import Protocol
 from ty_extensions import static_assert, is_subtype_of, is_equivalent_to, is_disjoint_from
 
 class HasRepr(Protocol):
-    # TODO: we should emit a diagnostic here complaining about a Liskov violation
-    # (it incompatibly overrides `__repr__` from `object`, a supertype of `HasRepr`)
+    # error: [invalid-method-override]
     def __repr__(self) -> object: ...
 
 class HasReprRecursive(Protocol):
-    # TODO: we should emit a diagnostic here complaining about a Liskov violation
-    # (it incompatibly overrides `__repr__` from `object`, a supertype of `HasReprRecursive`)
+    # error: [invalid-method-override]
     def __repr__(self) -> "HasReprRecursive": ...
 
 class HasReprRecursiveAndFoo(Protocol):
-    # TODO: we should emit a diagnostic here complaining about a Liskov violation
-    # (it incompatibly overrides `__repr__` from `object`, a supertype of `HasReprRecursiveAndFoo`)
+    # error: [invalid-method-override]
     def __repr__(self) -> "HasReprRecursiveAndFoo": ...
     foo: int
 
@@ -3178,6 +3184,33 @@ from ty_extensions import reveal_protocol_interface
 
 # revealed: {"x": AttributeMember(`int`; ClassVar)}
 reveal_protocol_interface(Foo)
+```
+
+## Known panics
+
+### Protocols generic over TypeVars bound to forward references
+
+This test currently panics because the `ClassLiteral::explicit_bases` query fails to converge. See
+issue <https://github.com/astral-sh/ty/issues/1587>.
+
+<!-- expect-panic: execute: too many cycle iterations -->
+
+```py
+from typing import Any, Protocol, TypeVar
+
+T1 = TypeVar("T1", bound="A2[Any]")
+T2 = TypeVar("T2", bound="A1[Any]")
+T3 = TypeVar("T3", bound="B2[Any]")
+T4 = TypeVar("T4", bound="B1[Any]")
+
+class A1(Protocol[T1]):
+    def get_x(self): ...
+
+class A2(Protocol[T2]):
+    def get_y(self): ...
+
+class B1(A1[T3], Protocol[T3]): ...
+class B2(A2[T4], Protocol[T4]): ...
 ```
 
 ## TODO

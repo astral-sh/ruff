@@ -60,7 +60,7 @@ Y: int = 47
 import mypackage
 
 reveal_type(mypackage.imported.X)  # revealed: int
-# error: "has no member `fails`"
+# error: [possibly-missing-attribute] "Submodule `fails` may not be available"
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
@@ -90,7 +90,7 @@ Y: int = 47
 import mypackage
 
 reveal_type(mypackage.imported.X)  # revealed: int
-# error: "has no member `fails`"
+# error: [possibly-missing-attribute] "Submodule `fails` may not be available"
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
@@ -125,7 +125,7 @@ Y: int = 47
 import mypackage
 
 reveal_type(mypackage.imported.X)  # revealed: int
-# error: "has no member `fails`"
+# error: [possibly-missing-attribute] "Submodule `fails` may not be available"
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
@@ -155,7 +155,7 @@ Y: int = 47
 import mypackage
 
 reveal_type(mypackage.imported.X)  # revealed: int
-# error: "has no member `fails`"
+# error: [possibly-missing-attribute] "Submodule `fails` may not be available"
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
@@ -184,7 +184,7 @@ X: int = 42
 import mypackage
 
 # TODO: this could work and would be nice to have?
-# error: "has no member `imported`"
+# error: [possibly-missing-attribute] "Submodule `imported` may not be available"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
@@ -208,14 +208,14 @@ X: int = 42
 import mypackage
 
 # TODO: this could work and would be nice to have
-# error: "has no member `imported`"
+# error: [possibly-missing-attribute] "Submodule `imported` may not be available"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
 ## Relative `from` Import of Nested Submodule in `__init__`
 
-`from .submodule import nested` in an `__init__.pyi` does not re-export `mypackage.submodule`,
-`mypackage.submodule.nested`, or `nested`.
+`from .submodule import nested` in an `__init__.pyi` does re-export `mypackage.submodule`, but not
+`mypackage.submodule.nested` or `nested`.
 
 ### In Stub
 
@@ -241,15 +241,14 @@ X: int = 42
 ```py
 import mypackage
 
-# error: "has no member `submodule`"
-reveal_type(mypackage.submodule)  # revealed: Unknown
-# error: "has no member `submodule`"
+reveal_type(mypackage.submodule)  # revealed: <module 'mypackage.submodule'>
+# error: [possibly-missing-attribute] "Submodule `nested` may not be available"
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
-# error: "has no member `submodule`"
+# error: [possibly-missing-attribute] "Submodule `nested` may not be available"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
-# error: "has no member `nested`"
+# error: [unresolved-attribute] "has no member `nested`"
 reveal_type(mypackage.nested)  # revealed: Unknown
-# error: "has no member `nested`"
+# error: [unresolved-attribute] "has no member `nested`"
 reveal_type(mypackage.nested.X)  # revealed: Unknown
 ```
 
@@ -281,9 +280,9 @@ import mypackage
 
 reveal_type(mypackage.submodule)  # revealed: <module 'mypackage.submodule'>
 # TODO: this would be nice to support
-# error: "has no member `nested`"
+# error: [possibly-missing-attribute] "Submodule `nested` may not be available"
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
-# error: "has no member `nested`"
+# error: [possibly-missing-attribute] "Submodule `nested` may not be available"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
 reveal_type(mypackage.nested)  # revealed: <module 'mypackage.submodule.nested'>
 reveal_type(mypackage.nested.X)  # revealed: int
@@ -318,16 +317,14 @@ X: int = 42
 ```py
 import mypackage
 
-# TODO: this could work and would be nice to have
-# error: "has no member `submodule`"
-reveal_type(mypackage.submodule)  # revealed: Unknown
-# error: "has no member `submodule`"
+reveal_type(mypackage.submodule)  # revealed: <module 'mypackage.submodule'>
+# error: [possibly-missing-attribute] "Submodule `nested` may not be available"
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
-# error: "has no member `submodule`"
+# error: [possibly-missing-attribute] "Submodule `nested` may not be available"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
-# error: "has no member `nested`"
+# error: [unresolved-attribute] "has no member `nested`"
 reveal_type(mypackage.nested)  # revealed: Unknown
-# error: "has no member `nested`"
+# error: [unresolved-attribute] "has no member `nested`"
 reveal_type(mypackage.nested.X)  # revealed: Unknown
 ```
 
@@ -359,9 +356,9 @@ import mypackage
 
 reveal_type(mypackage.submodule)  # revealed: <module 'mypackage.submodule'>
 # TODO: this would be nice to support
-# error: "has no member `nested`"
+# error: [possibly-missing-attribute] "Submodule `nested` may not be available"
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
-# error: "has no member `nested`"
+# error: [possibly-missing-attribute] "Submodule `nested` may not be available"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
 reveal_type(mypackage.nested)  # revealed: <module 'mypackage.submodule.nested'>
 reveal_type(mypackage.nested.X)  # revealed: int
@@ -396,11 +393,11 @@ X: int = 42
 ```py
 import mypackage
 
-# error: "has no member `submodule`"
+# error: [possibly-missing-attribute] "Submodule `submodule` may not be available"
 reveal_type(mypackage.submodule)  # revealed: Unknown
-# error: "has no member `submodule`"
+# error: [possibly-missing-attribute] "Submodule `submodule` may not be available"
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
-# error: "has no member `submodule`"
+# error: [possibly-missing-attribute] "Submodule `submodule` may not be available"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
 ```
 
@@ -432,11 +429,11 @@ X: int = 42
 import mypackage
 
 # TODO: this would be nice to support
-# error: "has no member `submodule`"
+# error: [possibly-missing-attribute] "Submodule `submodule` may not be available"
 reveal_type(mypackage.submodule)  # revealed: Unknown
-# error: "has no member `submodule`"
+# error: [possibly-missing-attribute] "Submodule `submodule` may not be available"
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
-# error: "has no member `submodule`"
+# error: [possibly-missing-attribute] "Submodule `submodule` may not be available"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
 ```
 
@@ -463,9 +460,9 @@ X: int = 42
 ```py
 import mypackage
 
-# error: "has no member `imported`"
+# error: [possibly-missing-attribute] "Submodule `imported` may not be available"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
-# error: "has no member `imported_m`"
+# error: [unresolved-attribute] "has no member `imported_m`"
 reveal_type(mypackage.imported_m.X)  # revealed: Unknown
 ```
 
@@ -489,7 +486,7 @@ X: int = 42
 import mypackage
 
 # TODO: this would be nice to support, as it works at runtime
-# error: "has no member `imported`"
+# error: [possibly-missing-attribute] "Submodule `imported` may not be available"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 reveal_type(mypackage.imported_m.X)  # revealed: int
 ```
@@ -569,7 +566,7 @@ X: int = 42
 from mypackage import *
 
 # TODO: this would be nice to support
-# error: "`imported` used when not defined"
+# error: [unresolved-reference] "`imported` used when not defined"
 reveal_type(imported.X)  # revealed: Unknown
 reveal_type(Z)  # revealed: int
 ```
@@ -623,8 +620,7 @@ X: int = 42
 ```py
 import mypackage
 
-# error: "no member `imported`"
-reveal_type(mypackage.imported.X)  # revealed: Unknown
+reveal_type(mypackage.imported.X)  # revealed: int
 ```
 
 ### In Non-Stub
@@ -673,10 +669,11 @@ X: int = 42
 import mypackage
 from mypackage import imported
 
+reveal_type(imported.X)  # revealed: int
+
 # TODO: this would be nice to support, but it's dangerous with available_submodule_attributes
 # for details, see: https://github.com/astral-sh/ty/issues/1488
-reveal_type(imported.X)  # revealed: int
-# error: "has no member `imported`"
+# error: [possibly-missing-attribute] "Submodule `imported` may not be available"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
@@ -699,9 +696,10 @@ X: int = 42
 import mypackage
 from mypackage import imported
 
-# TODO: this would be nice to support, as it works at runtime
 reveal_type(imported.X)  # revealed: int
-# error: "has no member `imported`"
+
+# TODO: this would be nice to support, as it works at runtime
+# error: [possibly-missing-attribute] "Submodule `imported` may not be available"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
 ```
 
@@ -737,9 +735,9 @@ import mypackage
 from mypackage import imported
 
 reveal_type(imported.X)  # revealed: int
-# error: "has no member `fails`"
+# error: [unresolved-attribute] "has no member `fails`"
 reveal_type(imported.fails.Y)  # revealed: Unknown
-# error: "has no member `fails`"
+# error: [possibly-missing-attribute] "Submodule `fails` may not be available"
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
@@ -772,7 +770,7 @@ from mypackage import imported
 
 reveal_type(imported.X)  # revealed: int
 reveal_type(imported.fails.Y)  # revealed: int
-# error: "has no member `fails`"
+# error: [possibly-missing-attribute] "Submodule `fails`"
 reveal_type(mypackage.fails.Y)  # revealed: Unknown
 ```
 
