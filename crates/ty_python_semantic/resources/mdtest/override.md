@@ -104,31 +104,31 @@ class Grandchild(OtherChild):
 
 class Invalid:
     @override
-    def ___reprrr__(self): ...  # error: [explicit-override]
+    def ___reprrr__(self): ...  # error: [invalid-explicit-override]
     @override
     @classmethod
-    def foo(self): ...  # error: [explicit-override]
+    def foo(self): ...  # error: [invalid-explicit-override]
     @classmethod
     @override
-    def bar(self): ...  # error: [explicit-override]
+    def bar(self): ...  # error: [invalid-explicit-override]
     @staticmethod
     @override
-    def baz(): ...  # error: [explicit-override]
+    def baz(): ...  # error: [invalid-explicit-override]
     @override
     @staticmethod
-    def eggs(): ...  # error: [explicit-override]
+    def eggs(): ...  # error: [invalid-explicit-override]
     @property
     @override
-    def bad_property1(self) -> int: ...  # TODO: should emit `invalid-override` here
+    def bad_property1(self) -> int: ...  # TODO: should emit `invalid-explicit-override` here
     @override
     @property
-    def bad_property2(self) -> int: ...  # TODO: should emit `invalid-override` here
+    def bad_property2(self) -> int: ...  # TODO: should emit `invalid-explicit-override` here
     @lossy_decorator
     @override
-    def lossy(self): ...  # TODO: should emit `invalid-override` here
+    def lossy(self): ...  # TODO: should emit `invalid-explicit-override` here
     @override
     @lossy_decorator
-    def lossy2(self): ...  # TODO: should emit `invalid-override` here
+    def lossy2(self): ...  # TODO: should emit `invalid-explicit-override` here
 
 # TODO: all overrides in this class should cause us to emit *Liskov* violations,
 # but not `@override` violations
@@ -171,7 +171,7 @@ class Foo:
     @identity
     @identity
     @identity
-    def bar(self): ...  # error: [explicit-override]
+    def bar(self): ...  # error: [invalid-explicit-override]
 ```
 
 ## Overloads
@@ -189,7 +189,7 @@ class Spam:
     @overload
     def foo(self, x: int) -> int: ...
     @override
-    def foo(self, x: str | int) -> str | int:  # error: [explicit-override]
+    def foo(self, x: str | int) -> str | int:  # error: [invalid-explicit-override]
         return x
 
     @overload
@@ -201,7 +201,7 @@ class Spam:
     @override
     # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
     # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
-    # error: [explicit-override]
+    # error: [invalid-explicit-override]
     def bar(self, x: str | int) -> str | int:
         return x
 
@@ -211,13 +211,13 @@ class Spam:
     @overload
     def baz(self, x: int) -> int: ...
     # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
-    # error: [explicit-override]
+    # error: [invalid-explicit-override]
     def baz(self, x: str | int) -> str | int:
         return x
 ```
 
 In a stub file, `@override` should always be applied to the first overload. Even if it isn't, we
-always emit `explicit-override` diagnostics on the first overload.
+always emit `invalid-explicit-override` diagnostics on the first overload.
 
 `module.pyi`:
 
@@ -226,7 +226,7 @@ from typing_extensions import override, overload
 
 class Spam:
     @overload
-    def foo(self, x: str) -> str: ...  # error: [explicit-override]
+    def foo(self, x: str) -> str: ...  # error: [invalid-explicit-override]
     @overload
     @override
     # error: [invalid-overload]  "`@override` decorator should be applied only to the first overload"
@@ -234,7 +234,7 @@ class Spam:
 
     @overload
     @override
-    def bar(self, x: str) -> str: ...  # error: [explicit-override]
+    def bar(self, x: str) -> str: ...  # error: [invalid-explicit-override]
     @overload
     @override
     # error: [invalid-overload]  "`@override` decorator should be applied only to the first overload"
@@ -242,7 +242,7 @@ class Spam:
 
     @overload
     @override
-    def baz(self, x: str) -> str: ...  # error: [explicit-override]
+    def baz(self, x: str) -> str: ...  # error: [invalid-explicit-override]
     @overload
     def baz(self, x: int) -> int: ...
 ```
@@ -284,7 +284,7 @@ class MyNamedTuple(NamedTuple):
 
     @override
     # TODO: this raises an exception at runtime (which we should emit a diagnostic for).
-    # It shouldn't be an `explicit-override` diagnostic, however.
+    # It shouldn't be an `invalid-explicit-override` diagnostic, however.
     def _asdict(self, /) -> dict[str, Any]: ...
 
 class MyNamedTupleParent(NamedTuple):
@@ -300,7 +300,7 @@ class MyTypedDict(TypedDict):
     @override
     # TODO: it's invalid to define a method on a `TypedDict` class,
     # so we should emit a diagnostic here.
-    # It shouldn't be an `explicit-override` diagnostic, however.
+    # It shouldn't be an `invalid-explicit-override` diagnostic, however.
     def copy(self) -> Self: ...
 
 class Grandparent(Any): ...

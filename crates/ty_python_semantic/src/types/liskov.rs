@@ -13,7 +13,7 @@ use crate::{
         class::CodeGeneratorKind,
         context::InferContext,
         definition_expression_type,
-        diagnostic::{EXPLICIT_OVERRIDE, report_invalid_method_override},
+        diagnostic::{INVALID_EXPLICIT_OVERRIDE, report_invalid_method_override},
         function::{FunctionDecorators, KnownFunction},
         ide_support::{MemberWithDefinition, all_declarations_and_bindings},
     },
@@ -194,7 +194,7 @@ fn check_class_declaration<'db>(
             function.literal(db).last_definition(db)
         };
         if let Some(builder) = context.report_lint(
-            &EXPLICIT_OVERRIDE,
+            &INVALID_EXPLICIT_OVERRIDE,
             function_literal.focus_range(db, context.module()),
         ) {
             let mut diagnostic = builder.into_diagnostic(format_args!(

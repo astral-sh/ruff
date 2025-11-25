@@ -116,7 +116,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
-    registry.register_lint(&EXPLICIT_OVERRIDE);
+    registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -1577,7 +1577,7 @@ declare_lint! {
     ///     @override
     ///     def foo(self): ...  # fine: overrides `A.foo`
     /// ```
-    pub(crate) static EXPLICIT_OVERRIDE = {
+    pub(crate) static INVALID_EXPLICIT_OVERRIDE = {
         summary: "detects methods that are decorated with `@override` but do not override any method in a superclass",
         status: LintStatus::stable("0.0.1-alpha.28"),
         default_level: Level::Error,

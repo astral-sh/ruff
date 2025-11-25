@@ -107,31 +107,31 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/override.md
  93 | 
  94 | class Invalid:
  95 |     @override
- 96 |     def ___reprrr__(self): ...  # error: [explicit-override]
+ 96 |     def ___reprrr__(self): ...  # error: [invalid-explicit-override]
  97 |     @override
  98 |     @classmethod
- 99 |     def foo(self): ...  # error: [explicit-override]
+ 99 |     def foo(self): ...  # error: [invalid-explicit-override]
 100 |     @classmethod
 101 |     @override
-102 |     def bar(self): ...  # error: [explicit-override]
+102 |     def bar(self): ...  # error: [invalid-explicit-override]
 103 |     @staticmethod
 104 |     @override
-105 |     def baz(): ...  # error: [explicit-override]
+105 |     def baz(): ...  # error: [invalid-explicit-override]
 106 |     @override
 107 |     @staticmethod
-108 |     def eggs(): ...  # error: [explicit-override]
+108 |     def eggs(): ...  # error: [invalid-explicit-override]
 109 |     @property
 110 |     @override
-111 |     def bad_property1(self) -> int: ...  # TODO: should emit `invalid-override` here
+111 |     def bad_property1(self) -> int: ...  # TODO: should emit `invalid-explicit-override` here
 112 |     @override
 113 |     @property
-114 |     def bad_property2(self) -> int: ...  # TODO: should emit `invalid-override` here
+114 |     def bad_property2(self) -> int: ...  # TODO: should emit `invalid-explicit-override` here
 115 |     @lossy_decorator
 116 |     @override
-117 |     def lossy(self): ...  # TODO: should emit `invalid-override` here
+117 |     def lossy(self): ...  # TODO: should emit `invalid-explicit-override` here
 118 |     @override
 119 |     @lossy_decorator
-120 |     def lossy2(self): ...  # TODO: should emit `invalid-override` here
+120 |     def lossy2(self): ...  # TODO: should emit `invalid-explicit-override` here
 121 | 
 122 | # TODO: all overrides in this class should cause us to emit *Liskov* violations,
 123 | # but not `@override` violations
@@ -174,109 +174,109 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/override.md
 160 |     @identity
 161 |     @identity
 162 |     @identity
-163 |     def bar(self): ...  # error: [explicit-override]
+163 |     def bar(self): ...  # error: [invalid-explicit-override]
 ```
 
 # Diagnostics
 
 ```
-error[explicit-override]: Method `___reprrr__` is decorated with `@override` but does not override anything
+error[invalid-explicit-override]: Method `___reprrr__` is decorated with `@override` but does not override anything
   --> src/mdtest_snippet.pyi:95:5
    |
 94 | class Invalid:
 95 |     @override
    |     ---------
-96 |     def ___reprrr__(self): ...  # error: [explicit-override]
+96 |     def ___reprrr__(self): ...  # error: [invalid-explicit-override]
    |         ^^^^^^^^^^^
 97 |     @override
 98 |     @classmethod
    |
 info: No `___reprrr__` definitions were found on any superclasses of `Invalid`
-info: rule `explicit-override` is enabled by default
+info: rule `invalid-explicit-override` is enabled by default
 
 ```
 
 ```
-error[explicit-override]: Method `foo` is decorated with `@override` but does not override anything
+error[invalid-explicit-override]: Method `foo` is decorated with `@override` but does not override anything
    --> src/mdtest_snippet.pyi:97:5
     |
  95 |     @override
- 96 |     def ___reprrr__(self): ...  # error: [explicit-override]
+ 96 |     def ___reprrr__(self): ...  # error: [invalid-explicit-override]
  97 |     @override
     |     ---------
  98 |     @classmethod
- 99 |     def foo(self): ...  # error: [explicit-override]
+ 99 |     def foo(self): ...  # error: [invalid-explicit-override]
     |         ^^^
 100 |     @classmethod
 101 |     @override
     |
 info: No `foo` definitions were found on any superclasses of `Invalid`
-info: rule `explicit-override` is enabled by default
+info: rule `invalid-explicit-override` is enabled by default
 
 ```
 
 ```
-error[explicit-override]: Method `bar` is decorated with `@override` but does not override anything
+error[invalid-explicit-override]: Method `bar` is decorated with `@override` but does not override anything
    --> src/mdtest_snippet.pyi:101:5
     |
- 99 |     def foo(self): ...  # error: [explicit-override]
+ 99 |     def foo(self): ...  # error: [invalid-explicit-override]
 100 |     @classmethod
 101 |     @override
     |     ---------
-102 |     def bar(self): ...  # error: [explicit-override]
+102 |     def bar(self): ...  # error: [invalid-explicit-override]
     |         ^^^
 103 |     @staticmethod
 104 |     @override
     |
 info: No `bar` definitions were found on any superclasses of `Invalid`
-info: rule `explicit-override` is enabled by default
+info: rule `invalid-explicit-override` is enabled by default
 
 ```
 
 ```
-error[explicit-override]: Method `baz` is decorated with `@override` but does not override anything
+error[invalid-explicit-override]: Method `baz` is decorated with `@override` but does not override anything
    --> src/mdtest_snippet.pyi:104:5
     |
-102 |     def bar(self): ...  # error: [explicit-override]
+102 |     def bar(self): ...  # error: [invalid-explicit-override]
 103 |     @staticmethod
 104 |     @override
     |     ---------
-105 |     def baz(): ...  # error: [explicit-override]
+105 |     def baz(): ...  # error: [invalid-explicit-override]
     |         ^^^
 106 |     @override
 107 |     @staticmethod
     |
 info: No `baz` definitions were found on any superclasses of `Invalid`
-info: rule `explicit-override` is enabled by default
+info: rule `invalid-explicit-override` is enabled by default
 
 ```
 
 ```
-error[explicit-override]: Method `eggs` is decorated with `@override` but does not override anything
+error[invalid-explicit-override]: Method `eggs` is decorated with `@override` but does not override anything
    --> src/mdtest_snippet.pyi:106:5
     |
 104 |     @override
-105 |     def baz(): ...  # error: [explicit-override]
+105 |     def baz(): ...  # error: [invalid-explicit-override]
 106 |     @override
     |     ---------
 107 |     @staticmethod
-108 |     def eggs(): ...  # error: [explicit-override]
+108 |     def eggs(): ...  # error: [invalid-explicit-override]
     |         ^^^^
 109 |     @property
 110 |     @override
     |
 info: No `eggs` definitions were found on any superclasses of `Invalid`
-info: rule `explicit-override` is enabled by default
+info: rule `invalid-explicit-override` is enabled by default
 
 ```
 
 ```
-error[explicit-override]: Method `bar` is decorated with `@override` but does not override anything
+error[invalid-explicit-override]: Method `bar` is decorated with `@override` but does not override anything
    --> src/mdtest_snippet.pyi:163:9
     |
 161 |     @identity
 162 |     @identity
-163 |     def bar(self): ...  # error: [explicit-override]
+163 |     def bar(self): ...  # error: [invalid-explicit-override]
     |         ^^^
     |
    ::: src/mdtest_snippet.pyi:144:5
@@ -288,6 +288,6 @@ error[explicit-override]: Method `bar` is decorated with `@override` but does no
 146 |     @identity
     |
 info: No `bar` definitions were found on any superclasses of `Foo`
-info: rule `explicit-override` is enabled by default
+info: rule `invalid-explicit-override` is enabled by default
 
 ```
