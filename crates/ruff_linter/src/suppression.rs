@@ -8,6 +8,8 @@ use ruff_python_trivia::{Cursor, is_python_whitespace};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize, TextSlice};
 use smallvec::{SmallVec, smallvec};
 
+use crate::checkers::ast::LintContext;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum SuppressionAction {
     Disable,
@@ -100,6 +102,35 @@ impl Suppressions {
     pub(crate) fn from_tokens(source: &str, tokens: &Tokens) -> Suppressions {
         let mut builder = SuppressionsBuilder::new(source);
         builder.load_from_tokens(tokens)
+    }
+
+    /// Check reported diagnostics against the set of valid range suppressions, and remove any
+    /// diagnostics from the context that should be suppressed by those ranges.
+    pub(crate) fn filter_diagnostics(&self, context: &mut LintContext) {
+        let mut ignored: Vec<usize> = vec![];
+
+        'outer: for (index, diagnostic) in context.iter().enumerate() {
+            let Some(code) = diagnostic.secondary_code() else {
+                continue;
+            };
+            let Some(span) = diagnostic.primary_span() else {
+                continue;
+            };
+            let Some(range) = span.range() else {
+                continue;
+            };
+
+            for suppression in &self.valid {
+                if *code == suppression.code.as_str() && suppression.range.contains_range(range) {
+                    ignored.push(index);
+                    continue 'outer;
+                }
+            }
+        }
+
+        for index in ignored.iter().rev() {
+            context.as_mut_vec().swap_remove(*index);
+        }
     }
 }
 

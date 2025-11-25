@@ -139,9 +139,6 @@ pub fn check_path(
     let tokens = parsed.tokens();
     let comment_ranges = indexer.comment_ranges();
 
-    // Gather all ruff:directive suppressions
-    let _suppressions = Suppressions::from_tokens(locator.contents(), tokens);
-
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
     // (for docstrings), which demands special-casing at this level.
     let use_doc_lines = context.is_rule_enabled(Rule::DocLineTooLong);
@@ -327,6 +324,14 @@ pub fn check_path(
                 _ => unreachable!("All test rules must have an implementation"),
             }
         }
+    }
+
+    // Apply range suppressions before noqa, so that #noqa on a line already covered by a range
+    // will be reported as unused noqa rather than unused range.
+    // TODO: check if enabled?
+    {
+        let suppressions = Suppressions::from_tokens(locator.contents(), tokens);
+        suppressions.filter_diagnostics(&mut context);
     }
 
     // Enforce `noqa` directives.
