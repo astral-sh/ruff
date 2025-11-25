@@ -172,11 +172,14 @@ pub(super) struct DiagnosticGuard<'sink> {
     /// We use a [`RefCell`] here over a `&mut TypeCheckDiagnostics` to ensure the fact that
     /// `InferContext` (and other contexts with diagnostics) use a [`RefCell`] internally
     /// remains abstracted away. Specifically, we want to ensure that calling `report_lint` on
-    /// [`InferContext`] twice doesn't result in a panic:
+    /// `InferContext` twice doesn't result in a panic:
     ///
     /// ```ignore
     /// let diag1 = context.report_lint(...);
-    /// let diag2 = context.report_lint(...); // should not panic because of second mutable borrow
+    ///
+    /// // would panic if using a `&mut TypeCheckDiagnostics`
+    /// // because of a second mutable borrow.
+    /// let diag2 = context.report_lint(...);
     /// ```
     sink: &'sink RefCell<TypeCheckDiagnostics>,
 
