@@ -1,0 +1,293 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: override.md - `typing.override` - Basics
+mdtest path: crates/ty_python_semantic/resources/mdtest/override.md
+---
+
+# Python source files
+
+## mdtest_snippet.pyi
+
+```
+  1 | from typing_extensions import override, Callable, TypeVar
+  2 | 
+  3 | def lossy_decorator(fn: Callable) -> Callable: ...
+  4 | 
+  5 | class A:
+  6 |     @override
+  7 |     def __repr__(self): ...  # fine: overrides `object.__repr__`
+  8 | 
+  9 | class Parent:
+ 10 |     def foo(self): ...
+ 11 |     @property
+ 12 |     def my_property1(self) -> int: ...
+ 13 |     @property
+ 14 |     def my_property2(self) -> int: ...
+ 15 |     baz = None
+ 16 |     @classmethod
+ 17 |     def class_method1(cls) -> int: ...
+ 18 |     @staticmethod
+ 19 |     def static_method1() -> int: ...
+ 20 |     @classmethod
+ 21 |     def class_method2(cls) -> int: ...
+ 22 |     @staticmethod
+ 23 |     def static_method2() -> int: ...
+ 24 |     @lossy_decorator
+ 25 |     def decorated_1(self): ...
+ 26 |     @lossy_decorator
+ 27 |     def decorated_2(self): ...
+ 28 |     @lossy_decorator
+ 29 |     def decorated_3(self): ...
+ 30 | 
+ 31 | class Child(Parent):
+ 32 |     @override
+ 33 |     def foo(self): ...  # fine: overrides `Parent.foo`
+ 34 |     @property
+ 35 |     @override
+ 36 |     def my_property1(self) -> int: ...  # fine: overrides `Parent.my_property1`
+ 37 |     @override
+ 38 |     @property
+ 39 |     def my_property2(self) -> int: ...  # fine: overrides `Parent.my_property2`
+ 40 |     @override
+ 41 |     def baz(self): ...  # fine: overrides `Parent.baz`
+ 42 |     @classmethod
+ 43 |     @override
+ 44 |     def class_method1(cls) -> int: ...  # fine: overrides `Parent.class_method1`
+ 45 |     @staticmethod
+ 46 |     @override
+ 47 |     def static_method1() -> int: ...  # fine: overrides `Parent.static_method1`
+ 48 |     @override
+ 49 |     @classmethod
+ 50 |     def class_method2(cls) -> int: ...  # fine: overrides `Parent.class_method2`
+ 51 |     @override
+ 52 |     @staticmethod
+ 53 |     def static_method2() -> int: ...  # fine: overrides `Parent.static_method2`
+ 54 |     @override
+ 55 |     def decorated_1(self): ...  # fine: overrides `Parent.decorated_1`
+ 56 |     @override
+ 57 |     @lossy_decorator
+ 58 |     def decorated_2(self): ...  # fine: overrides `Parent.decorated_2`
+ 59 |     @lossy_decorator
+ 60 |     @override
+ 61 |     def decorated_3(self): ...  # fine: overrides `Parent.decorated_3`
+ 62 | 
+ 63 | class OtherChild(Parent): ...
+ 64 | 
+ 65 | class Grandchild(OtherChild):
+ 66 |     @override
+ 67 |     def foo(self): ...  # fine: overrides `Parent.foo`
+ 68 |     @override
+ 69 |     @property
+ 70 |     def bar(self) -> int: ...  # fine: overrides `Parent.bar`
+ 71 |     @override
+ 72 |     def baz(self): ...  # fine: overrides `Parent.baz`
+ 73 |     @classmethod
+ 74 |     @override
+ 75 |     def class_method1(cls) -> int: ...  # fine: overrides `Parent.class_method1`
+ 76 |     @staticmethod
+ 77 |     @override
+ 78 |     def static_method1() -> int: ...  # fine: overrides `Parent.static_method1`
+ 79 |     @override
+ 80 |     @classmethod
+ 81 |     def class_method2(cls) -> int: ...  # fine: overrides `Parent.class_method2`
+ 82 |     @override
+ 83 |     @staticmethod
+ 84 |     def static_method2() -> int: ...  # fine: overrides `Parent.static_method2`
+ 85 |     @override
+ 86 |     def decorated_1(self): ...  # fine: overrides `Parent.decorated_1`
+ 87 |     @override
+ 88 |     @lossy_decorator
+ 89 |     def decorated_2(self): ...  # fine: overrides `Parent.decorated_2`
+ 90 |     @lossy_decorator
+ 91 |     @override
+ 92 |     def decorated_3(self): ...  # fine: overrides `Parent.decorated_3`
+ 93 | 
+ 94 | class Invalid:
+ 95 |     @override
+ 96 |     def ___reprrr__(self): ...  # error: [explicit-override]
+ 97 |     @override
+ 98 |     @classmethod
+ 99 |     def foo(self): ...  # error: [explicit-override]
+100 |     @classmethod
+101 |     @override
+102 |     def bar(self): ...  # error: [explicit-override]
+103 |     @staticmethod
+104 |     @override
+105 |     def baz(): ...  # error: [explicit-override]
+106 |     @override
+107 |     @staticmethod
+108 |     def eggs(): ...  # error: [explicit-override]
+109 |     @property
+110 |     @override
+111 |     def bad_property1(self) -> int: ...  # TODO: should emit `invalid-override` here
+112 |     @override
+113 |     @property
+114 |     def bad_property2(self) -> int: ...  # TODO: should emit `invalid-override` here
+115 |     @lossy_decorator
+116 |     @override
+117 |     def lossy(self): ...  # TODO: should emit `invalid-override` here
+118 |     @override
+119 |     @lossy_decorator
+120 |     def lossy2(self): ...  # TODO: should emit `invalid-override` here
+121 | 
+122 | # TODO: all overrides in this class should cause us to emit *Liskov* violations,
+123 | # but not `@override` violations
+124 | class LiskovViolatingButNotOverrideViolating(Parent):
+125 |     @override
+126 |     @property
+127 |     def foo(self) -> int: ...
+128 |     @override
+129 |     def my_property1(self) -> int: ...
+130 |     @staticmethod
+131 |     @override
+132 |     def class_method1() -> int: ...
+133 |     @classmethod
+134 |     @override
+135 |     def static_method1(cls) -> int: ...
+136 | 
+137 | # Diagnostic edge case: `override` is very far away from the method definition in the source code:
+138 | 
+139 | T = TypeVar("T")
+140 | 
+141 | def identity(x: T) -> T: ...
+142 | 
+143 | class Foo:
+144 |     @override
+145 |     @identity
+146 |     @identity
+147 |     @identity
+148 |     @identity
+149 |     @identity
+150 |     @identity
+151 |     @identity
+152 |     @identity
+153 |     @identity
+154 |     @identity
+155 |     @identity
+156 |     @identity
+157 |     @identity
+158 |     @identity
+159 |     @identity
+160 |     @identity
+161 |     @identity
+162 |     @identity
+163 |     def bar(self): ...  # error: [explicit-override]
+```
+
+# Diagnostics
+
+```
+error[explicit-override]: Method `___reprrr__` is decorated with `@override` but does not override anything
+  --> src/mdtest_snippet.pyi:95:5
+   |
+94 | class Invalid:
+95 |     @override
+   |     ---------
+96 |     def ___reprrr__(self): ...  # error: [explicit-override]
+   |         ^^^^^^^^^^^
+97 |     @override
+98 |     @classmethod
+   |
+info: No `___reprrr__` definitions were found on any superclasses of `Invalid`
+info: rule `explicit-override` is enabled by default
+
+```
+
+```
+error[explicit-override]: Method `foo` is decorated with `@override` but does not override anything
+   --> src/mdtest_snippet.pyi:97:5
+    |
+ 95 |     @override
+ 96 |     def ___reprrr__(self): ...  # error: [explicit-override]
+ 97 |     @override
+    |     ---------
+ 98 |     @classmethod
+ 99 |     def foo(self): ...  # error: [explicit-override]
+    |         ^^^
+100 |     @classmethod
+101 |     @override
+    |
+info: No `foo` definitions were found on any superclasses of `Invalid`
+info: rule `explicit-override` is enabled by default
+
+```
+
+```
+error[explicit-override]: Method `bar` is decorated with `@override` but does not override anything
+   --> src/mdtest_snippet.pyi:101:5
+    |
+ 99 |     def foo(self): ...  # error: [explicit-override]
+100 |     @classmethod
+101 |     @override
+    |     ---------
+102 |     def bar(self): ...  # error: [explicit-override]
+    |         ^^^
+103 |     @staticmethod
+104 |     @override
+    |
+info: No `bar` definitions were found on any superclasses of `Invalid`
+info: rule `explicit-override` is enabled by default
+
+```
+
+```
+error[explicit-override]: Method `baz` is decorated with `@override` but does not override anything
+   --> src/mdtest_snippet.pyi:104:5
+    |
+102 |     def bar(self): ...  # error: [explicit-override]
+103 |     @staticmethod
+104 |     @override
+    |     ---------
+105 |     def baz(): ...  # error: [explicit-override]
+    |         ^^^
+106 |     @override
+107 |     @staticmethod
+    |
+info: No `baz` definitions were found on any superclasses of `Invalid`
+info: rule `explicit-override` is enabled by default
+
+```
+
+```
+error[explicit-override]: Method `eggs` is decorated with `@override` but does not override anything
+   --> src/mdtest_snippet.pyi:106:5
+    |
+104 |     @override
+105 |     def baz(): ...  # error: [explicit-override]
+106 |     @override
+    |     ---------
+107 |     @staticmethod
+108 |     def eggs(): ...  # error: [explicit-override]
+    |         ^^^^
+109 |     @property
+110 |     @override
+    |
+info: No `eggs` definitions were found on any superclasses of `Invalid`
+info: rule `explicit-override` is enabled by default
+
+```
+
+```
+error[explicit-override]: Method `bar` is decorated with `@override` but does not override anything
+   --> src/mdtest_snippet.pyi:163:9
+    |
+161 |     @identity
+162 |     @identity
+163 |     def bar(self): ...  # error: [explicit-override]
+    |         ^^^
+    |
+   ::: src/mdtest_snippet.pyi:144:5
+    |
+143 | class Foo:
+144 |     @override
+    |     ---------
+145 |     @identity
+146 |     @identity
+    |
+info: No `bar` definitions were found on any superclasses of `Foo`
+info: rule `explicit-override` is enabled by default
+
+```

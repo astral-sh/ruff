@@ -114,6 +114,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
+    registry.register_lint(&EXPLICIT_OVERRIDE);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -1541,6 +1542,42 @@ declare_lint! {
     pub(crate) static SUBCLASS_OF_FINAL_CLASS = {
         summary: "detects subclasses of final classes",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for methods that are decorated with `@override` but do not override any method in a superclass.
+    ///
+    /// ## Why is this bad?
+    /// Decorating a method with `@override` declares to the type checker that the intention is that it should
+    /// override a method from a superclass.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from typing import override
+    ///
+    /// class A:
+    ///     @override
+    ///     def foo(self): ...  # Error raised here
+    ///
+    /// class B(A):
+    ///     @override
+    ///     def ffooo(self): ...  # Error raised here
+    ///
+    /// class C:
+    ///     @override
+    ///     def __repr__(self): ...  # fine: overrides `object.__repr__`
+    ///
+    /// class D(A):
+    ///     @override
+    ///     def foo(self): ...  # fine: overrides `A.foo`
+    /// ```
+    pub(crate) static EXPLICIT_OVERRIDE = {
+        summary: "detects methods that are decorated with `@override` but do not override any method in a superclass",
+        status: LintStatus::stable("0.0.1-alpha.28"),
         default_level: Level::Error,
     }
 }

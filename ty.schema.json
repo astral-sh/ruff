@@ -423,6 +423,16 @@
             }
           ]
         },
+        "explicit-override": {
+          "title": "detects methods that are decorated with `@override` but do not override any method in a superclass",
+          "description": "## What it does\nChecks for methods that are decorated with `@override` but do not override any method in a superclass.\n\n## Why is this bad?\nDecorating a method with `@override` declares to the type checker that the intention is that it should\noverride a method from a superclass.\n\n## Example\n\n```python\nfrom typing import override\n\nclass A:\n    @override\n    def foo(self): ...  # Error raised here\n\nclass B(A):\n    @override\n    def ffooo(self): ...  # Error raised here\n\nclass C:\n    @override\n    def __repr__(self): ...  # fine: overrides `object.__repr__`\n\nclass D(A):\n    @override\n    def foo(self): ...  # fine: overrides `A.foo`\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "fstring-type-annotation": {
           "title": "detects F-strings in type annotation positions",
           "description": "## What it does\nChecks for f-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use f-string notation.\n\n## Examples\n```python\ndef test(): -> f\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",

@@ -39,6 +39,7 @@ Settings: Settings {
         "duplicate-base": Error (Default),
         "duplicate-kw-only": Error (Default),
         "escape-character-in-forward-annotation": Error (Default),
+        "explicit-override": Error (Default),
         "fstring-type-annotation": Error (Default),
         "ignore-comment-unknown-rule": Warning (Default),
         "implicit-concatenated-string-type-annotation": Error (Default),

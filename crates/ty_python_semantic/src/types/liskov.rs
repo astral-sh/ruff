@@ -2,6 +2,7 @@
 //!
 //! [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 
+use ruff_db::diagnostic::Annotation;
 use rustc_hash::FxHashSet;
 
 use crate::{
@@ -11,7 +12,9 @@ use crate::{
         ClassBase, ClassLiteral, ClassType, KnownClass, Type,
         class::CodeGeneratorKind,
         context::InferContext,
-        diagnostic::report_invalid_method_override,
+        definition_expression_type,
+        diagnostic::{EXPLICIT_OVERRIDE, report_invalid_method_override},
+        function::{FunctionDecorators, KnownFunction},
         ide_support::{MemberWithDefinition, all_declarations_and_bindings},
     },
 };
@@ -73,7 +76,19 @@ fn check_class_declaration<'db>(
         return;
     };
 
-    for superclass in class.iter_mro(db).skip(1).filter_map(ClassBase::into_class) {
+    let mut subclass_overrides_superclass_declaration = false;
+    let mut has_dynamic_superclass = false;
+
+    for class_base in class.iter_mro(db).skip(1) {
+        let superclass = match class_base {
+            ClassBase::Dynamic(_) => {
+                has_dynamic_superclass = true;
+                continue;
+            }
+            ClassBase::Class(class) => class,
+            ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => continue,
+        };
+
         let superclass_symbol_table =
             place_table(db, superclass.class_literal(db).0.body_scope(db));
 
@@ -113,6 +128,8 @@ fn check_class_declaration<'db>(
             };
         }
 
+        subclass_overrides_superclass_declaration = true;
+
         let Place::Defined(superclass_type, _, _) = Type::instance(db, superclass)
             .member(db, &member.name)
             .place
@@ -148,6 +165,48 @@ fn check_class_declaration<'db>(
         // It's possible `report_invalid_method_override` didn't emit a diagnostic because there's a
         // suppression comment, but that too should cause us to exit early here.
         break;
+    }
+
+    if !subclass_overrides_superclass_declaration
+        && !has_dynamic_superclass
+        && definition.kind(db).is_function_def()
+        && let Type::FunctionLiteral(function) = member.ty
+        && function.has_known_decorator(db, FunctionDecorators::OVERRIDE)
+    {
+        let function_literal = if context.in_stub() {
+            function
+                .iter_overloads_and_implementation(db)
+                .next()
+                .expect("There should always be at least one overload or implementation")
+        } else {
+            function.literal(db).last_definition(db)
+        };
+        if let Some(builder) = context.report_lint(
+            &EXPLICIT_OVERRIDE,
+            function_literal.focus_range(db, context.module()),
+        ) {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Method `{}` is decorated with `@override` but does not override anything",
+                member.name
+            ));
+            if let Some(decorator) = function_literal
+                .node(db, context.file(), context.module())
+                .decorator_list
+                .iter()
+                .find(|decorator| {
+                    definition_expression_type(db, *definition, &decorator.expression)
+                        .as_function_literal()
+                        .is_some_and(|function| function.is_known(db, KnownFunction::Override))
+                })
+            {
+                diagnostic.annotate(Annotation::secondary(context.span(decorator)));
+            }
+            diagnostic.info(format_args!(
+                "No `{member}` definitions were found on any superclasses of `{class}`",
+                member = &member.name,
+                class = class.name(db)
+            ));
+        }
     }
 }
 
