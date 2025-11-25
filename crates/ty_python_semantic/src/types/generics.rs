@@ -1657,36 +1657,32 @@ impl<'db> SpecializationBuilder<'db> {
                 }
             }
 
-            (Type::Callable(formal_callable), Type::Callable(actual_callable)) => {
-                // We're only interested in a formal callable of the form `Callable[P, ...]` for
-                // now where `P` is a `ParamSpec`.
-                let [signature] = formal_callable.signatures(self.db).as_slice() else {
-                    return Ok(());
-                };
-                let formal_parameters = signature.parameters();
-                let ParametersKind::ParamSpec(typevar) = formal_parameters.kind() else {
-                    return Ok(());
-                };
-                self.add_type_mapping(
-                    typevar,
-                    CallableType::overloaded_paramspec_value(
-                        self.db,
-                        actual_callable
-                            .signatures(self.db)
-                            .iter()
-                            .map(|signature| Signature::new(signature.parameters().clone(), None)),
-                    ),
-                    polarity,
-                    &mut f,
-                );
-            }
-
-            (
-                Type::Callable(_),
-                Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::KnownBoundMethod(_),
-            ) => {
-                if let Some(actual_callable) = actual.try_upcast_to_callable(self.db) {
-                    self.infer_map_impl(formal, actual_callable, polarity, &mut f)?;
+            (Type::Callable(formal_callable), _) => {
+                if let Some(Type::Callable(actual_callable)) =
+                    actual.try_upcast_to_callable(self.db)
+                {
+                    // We're only interested in a formal callable of the form `Callable[P, ...]` for
+                    // now where `P` is a `ParamSpec`.
+                    // TODO: This would need to be updated once we support `Concatenate`
+                    // TODO: What to do for overloaded callables?
+                    let [signature] = formal_callable.signatures(self.db).as_slice() else {
+                        return Ok(());
+                    };
+                    let formal_parameters = signature.parameters();
+                    let ParametersKind::ParamSpec(typevar) = formal_parameters.kind() else {
+                        return Ok(());
+                    };
+                    self.add_type_mapping(
+                        typevar,
+                        CallableType::overloaded_paramspec_value(
+                            self.db,
+                            actual_callable.signatures(self.db).iter().map(|signature| {
+                                Signature::new(signature.parameters().clone(), None)
+                            }),
+                        ),
+                        polarity,
+                        &mut f,
+                    );
                 }
             }
 
