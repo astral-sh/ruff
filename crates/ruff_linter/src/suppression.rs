@@ -98,7 +98,7 @@ pub(crate) struct Suppressions {
 
 impl Suppressions {
     pub(crate) fn from_tokens(source: &str, tokens: &Tokens) -> Suppressions {
-        let mut builder = SuppressionsBuilder::new(source);
+        let builder = SuppressionsBuilder::new(source);
         builder.load_from_tokens(tokens)
     }
 }
@@ -172,7 +172,7 @@ impl<'a> SuppressionsBuilder<'a> {
         }
     }
 
-    pub(crate) fn load_from_tokens(&mut self, tokens: &Tokens) -> Suppressions {
+    pub(crate) fn load_from_tokens(mut self, tokens: &Tokens) -> Suppressions {
         let default_indent = String::new();
         let mut current_indent: &String = &default_indent;
         let mut indents: Vec<String> = vec![];
@@ -239,9 +239,9 @@ impl<'a> SuppressionsBuilder<'a> {
         self.match_comments(&default_indent);
 
         Suppressions {
-            valid: self.valid.clone(),
-            invalid: self.invalid.clone(),
-            errors: self.errors.clone(),
+            valid: self.valid,
+            invalid: self.invalid,
+            errors: self.errors,
         }
     }
 }
