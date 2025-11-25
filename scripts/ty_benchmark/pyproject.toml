@@ -19,3 +19,7 @@ packages = ["src/benchmark"]
 ignore = [
     "E501", # We use ruff format
 ]
+
+[tool.ty.rules]
+possibly-unresolved-reference = "error"
+division-by-zero = "error"

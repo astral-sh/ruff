@@ -16,6 +16,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
+use smallvec::{SmallVec, smallvec};
 
 use type_ordering::union_or_intersection_elements_ordering;
 
@@ -74,7 +75,8 @@ use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;
 use crate::unpack::EvaluationMode;
 use crate::{Db, FxOrderSet, Module, Program};
-pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
+pub use class::KnownClass;
+pub(crate) use class::{ClassLiteral, ClassType, GenericAlias};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
 pub use special_form::SpecialFormType;
@@ -952,7 +954,7 @@ impl<'db> Type<'db> {
         !(check_dunder("__eq__", true) && check_dunder("__ne__", false))
     }
 
-    pub(crate) fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
+    pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
         self.is_instance_of(db, KnownClass::NotImplementedType)
     }
 
@@ -1161,13 +1163,6 @@ impl<'db> Type<'db> {
     pub(crate) const fn as_protocol_instance(self) -> Option<ProtocolInstanceType<'db>> {
         match self {
             Type::ProtocolInstance(instance) => Some(instance),
-            _ => None,
-        }
-    }
-
-    pub(crate) const fn as_bound_method(self) -> Option<BoundMethodType<'db>> {
-        match self {
-            Type::BoundMethod(bound_method) => Some(bound_method),
             _ => None,
         }
     }
@@ -1750,17 +1745,20 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) fn try_upcast_to_callable(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(crate) fn try_upcast_to_callable(self, db: &'db dyn Db) -> Option<CallableTypes<'db>> {
         match self {
-            Type::Callable(_) => Some(self),
+            Type::Callable(callable) => Some(CallableTypes::one(callable)),
 
-            Type::Dynamic(_) => Some(CallableType::function_like(db, Signature::dynamic(self))),
+            Type::Dynamic(_) => Some(CallableTypes::one(CallableType::function_like(
+                db,
+                Signature::dynamic(self),
+            ))),
 
             Type::FunctionLiteral(function_literal) => {
-                Some(Type::Callable(function_literal.into_callable_type(db)))
+                Some(CallableTypes::one(function_literal.into_callable_type(db)))
             }
             Type::BoundMethod(bound_method) => {
-                Some(Type::Callable(bound_method.into_callable_type(db)))
+                Some(CallableTypes::one(bound_method.into_callable_type(db)))
             }
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
@@ -1779,7 +1777,7 @@ impl<'db> Type<'db> {
                 }
             }
             Type::ClassLiteral(class_literal) => {
-                Some(ClassType::NonGeneric(class_literal).into_callable(db))
+                Some(class_literal.default_specialization(db).into_callable(db))
             }
 
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
@@ -1791,13 +1789,22 @@ impl<'db> Type<'db> {
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(class) => Some(class.into_callable(db)),
-                SubclassOfInner::Dynamic(dynamic) => Some(CallableType::single(
-                    db,
-                    Signature::new(Parameters::unknown(), Some(Type::Dynamic(dynamic))),
-                )),
+                SubclassOfInner::Dynamic(dynamic) => {
+                    Some(CallableTypes::one(CallableType::single(
+                        db,
+                        Signature::new(Parameters::unknown(), Some(Type::Dynamic(dynamic))),
+                    )))
+                }
             },
 
-            Type::Union(union) => union.try_map(db, |element| element.try_upcast_to_callable(db)),
+            Type::Union(union) => {
+                let mut callables = SmallVec::new();
+                for element in union.elements(db) {
+                    let element_callable = element.try_upcast_to_callable(db)?;
+                    callables.extend(element_callable.into_inner());
+                }
+                Some(CallableTypes(callables))
+            }
 
             Type::EnumLiteral(enum_literal) => enum_literal
                 .enum_class_instance(db)
@@ -1805,26 +1812,30 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(alias) => alias.value_type(db).try_upcast_to_callable(db),
 
-            Type::KnownBoundMethod(method) => Some(Type::Callable(CallableType::new(
+            Type::KnownBoundMethod(method) => Some(CallableTypes::one(CallableType::new(
                 db,
                 CallableSignature::from_overloads(method.signatures(db)),
                 false,
             ))),
 
-            Type::WrapperDescriptor(wrapper_descriptor) => Some(Type::Callable(CallableType::new(
-                db,
-                CallableSignature::from_overloads(wrapper_descriptor.signatures(db)),
-                false,
-            ))),
+            Type::WrapperDescriptor(wrapper_descriptor) => {
+                Some(CallableTypes::one(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(wrapper_descriptor.signatures(db)),
+                    false,
+                )))
+            }
 
-            Type::KnownInstance(KnownInstanceType::NewType(newtype)) => Some(CallableType::single(
-                db,
-                Signature::new(
-                    Parameters::new([Parameter::positional_only(None)
-                        .with_annotated_type(newtype.base(db).instance_type(db))]),
-                    Some(Type::NewTypeInstance(newtype)),
-                ),
-            )),
+            Type::KnownInstance(KnownInstanceType::NewType(newtype)) => {
+                Some(CallableTypes::one(CallableType::single(
+                    db,
+                    Signature::new(
+                        Parameters::new([Parameter::positional_only(None)
+                            .with_annotated_type(newtype.base(db).instance_type(db))]),
+                        Some(Type::NewTypeInstance(newtype)),
+                    ),
+                )))
+            }
 
             Type::Never
             | Type::DataclassTransformer(_)
@@ -1888,8 +1899,8 @@ impl<'db> Type<'db> {
 
     /// Return true if this type is assignable to type `target`.
     ///
-    /// See [`TypeRelation::Assignability`] for more details.
-    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+    /// See `TypeRelation::Assignability` for more details.
+    pub fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         self.when_assignable_to(db, target, InferableTypeVars::None)
             .is_always_satisfied(db)
     }
@@ -2400,18 +2411,20 @@ impl<'db> Type<'db> {
                     )
                 }),
 
-            (_, Type::Callable(_)) => relation_visitor.visit((self, target, relation), || {
-                self.try_upcast_to_callable(db).when_some_and(|callable| {
-                    callable.has_relation_to_impl(
-                        db,
-                        target,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
+            (_, Type::Callable(other_callable)) => {
+                relation_visitor.visit((self, target, relation), || {
+                    self.try_upcast_to_callable(db).when_some_and(|callables| {
+                        callables.has_relation_to_impl(
+                            db,
+                            other_callable,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
                 })
-            }),
+            }
 
             (_, Type::ProtocolInstance(protocol)) => {
                 relation_visitor.visit((self, target, relation), || {
@@ -2604,7 +2617,7 @@ impl<'db> Type<'db> {
                 .subclass_of()
                 .into_class()
                 .map(|subclass_of_class| {
-                    ClassType::NonGeneric(class).has_relation_to_impl(
+                    class.default_specialization(db).has_relation_to_impl(
                         db,
                         subclass_of_class,
                         inferable,
@@ -4310,7 +4323,7 @@ impl<'db> Type<'db> {
                     Some((self, AttributeKind::NormalOrNonDataDescriptor))
                 } else {
                     Some((
-                        Type::Callable(callable.bind_self(db)),
+                        Type::Callable(callable.bind_self(db, None)),
                         AttributeKind::NormalOrNonDataDescriptor,
                     ))
                 };
@@ -5844,7 +5857,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
                                         [
-                                            CallableType::single(db, getter_signature),
+                                            Type::single_callable(db, getter_signature),
                                             Type::none(db),
                                         ],
                                     ))
@@ -5853,7 +5866,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
                                         [
-                                            CallableType::single(db, setter_signature),
+                                            Type::single_callable(db, setter_signature),
                                             Type::none(db),
                                         ],
                                     ))
@@ -5862,7 +5875,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
                                         [
-                                            CallableType::single(db, deleter_signature),
+                                            Type::single_callable(db, deleter_signature),
                                             Type::none(db),
                                         ],
                                     ))
@@ -6905,7 +6918,9 @@ impl<'db> Type<'db> {
                             KnownClass::Float.to_instance(db),
                         ],
                     ),
-                    _ if class.is_typed_dict(db) => Type::typed_dict(*class),
+                    _ if class.is_typed_dict(db) => {
+                        Type::typed_dict(class.default_specialization(db))
+                    }
                     _ => Type::instance(db, class.default_specialization(db)),
                 };
                 Ok(ty)
@@ -7355,6 +7370,15 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
+        // If we are binding `typing.Self`, and this type is what we are binding `Self` to, return
+        // early. This is not just an optimization, it also prevents us from infinitely expanding
+        // the type, if it's something that can contain a `Self` reference.
+        if let TypeMapping::BindSelf(self_type) = type_mapping
+            && self == *self_type
+        {
+            return self;
+        }
+
         match self {
             Type::TypeVar(bound_typevar) => match type_mapping {
                 TypeMapping::Specialization(specialization) => {
@@ -8598,7 +8622,7 @@ impl<'db> KnownInstanceType<'db> {
                         write!(
                             f,
                             "ty_extensions.Specialization{}",
-                            specialization.normalized(self.db).display_full(self.db)
+                            specialization.display_full(self.db)
                         )
                     }
                     KnownInstanceType::UnionType(_) => f.write_str("types.UnionType"),
@@ -11429,34 +11453,52 @@ pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for CallableType<'_> {}
 
-impl<'db> CallableType<'db> {
+impl<'db> Type<'db> {
     /// Create a callable type with a single non-overloaded signature.
-    pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
-        Type::Callable(CallableType::new(
-            db,
-            CallableSignature::single(signature),
-            false,
-        ))
+    pub(crate) fn single_callable(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
+        Type::Callable(CallableType::single(db, signature))
     }
 
     /// Create a non-overloaded, function-like callable type with a single signature.
     ///
     /// A function-like callable will bind `self` when accessed as an attribute on an instance.
-    pub(crate) fn function_like(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
-        Type::Callable(CallableType::new(
-            db,
-            CallableSignature::single(signature),
-            true,
-        ))
+    pub(crate) fn function_like_callable(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
+        Type::Callable(CallableType::function_like(db, signature))
+    }
+}
+
+impl<'db> CallableType<'db> {
+    pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> CallableType<'db> {
+        CallableType::new(db, CallableSignature::single(signature), false)
+    }
+
+    pub(crate) fn function_like(db: &'db dyn Db, signature: Signature<'db>) -> CallableType<'db> {
+        CallableType::new(db, CallableSignature::single(signature), true)
     }
 
     /// Create a callable type which accepts any parameters and returns an `Unknown` type.
     pub(crate) fn unknown(db: &'db dyn Db) -> Type<'db> {
-        Self::single(db, Signature::unknown())
+        Type::Callable(Self::single(db, Signature::unknown()))
     }
 
-    pub(crate) fn bind_self(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(db, self.signatures(db).bind_self(db, None), false)
+    pub(crate) fn bind_self(
+        self,
+        db: &'db dyn Db,
+        self_type: Option<Type<'db>>,
+    ) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            self.signatures(db).bind_self(db, self_type),
+            self.is_function_like(db),
+        )
+    }
+
+    pub(crate) fn apply_self(self, db: &'db dyn Db, self_type: Type<'db>) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            self.signatures(db).apply_self(db, self_type),
+            self.is_function_like(db),
+        )
     }
 
     /// Create a callable type which represents a fully-static "bottom" callable.
@@ -11561,6 +11603,72 @@ impl<'db> CallableType<'db> {
         ConstraintSet::from(self.is_function_like(db) == other.is_function_like(db)).and(db, || {
             self.signatures(db)
                 .is_equivalent_to_impl(db, other.signatures(db), inferable, visitor)
+        })
+    }
+}
+
+/// Converting a type "into a callable" can possibly return a _union_ of callables. Eventually,
+/// when coercing that result to a single type, you'll get a `UnionType`. But this lets you handle
+/// that result as a list of `CallableType`s before merging them into a `UnionType` should that be
+/// helpful.
+///
+/// Note that this type is guaranteed to contain at least one callable. If you need to support "no
+/// callables" as a possibility, use `Option<CallableTypes>`.
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
+pub(crate) struct CallableTypes<'db>(SmallVec<[CallableType<'db>; 1]>);
+
+impl<'db> CallableTypes<'db> {
+    pub(crate) fn one(callable: CallableType<'db>) -> Self {
+        CallableTypes(smallvec![callable])
+    }
+
+    pub(crate) fn from_elements(callables: impl IntoIterator<Item = CallableType<'db>>) -> Self {
+        let callables: SmallVec<_> = callables.into_iter().collect();
+        assert!(!callables.is_empty(), "CallableTypes should not be empty");
+        CallableTypes(callables)
+    }
+
+    pub(crate) fn exactly_one(self) -> Option<CallableType<'db>> {
+        match self.0.as_slice() {
+            [single] => Some(*single),
+            _ => None,
+        }
+    }
+
+    fn into_inner(self) -> SmallVec<[CallableType<'db>; 1]> {
+        self.0
+    }
+
+    pub(crate) fn into_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self.0.as_slice() {
+            [] => unreachable!("CallableTypes should not be empty"),
+            [single] => Type::Callable(*single),
+            slice => UnionType::from_elements(db, slice.iter().copied().map(Type::Callable)),
+        }
+    }
+
+    pub(crate) fn map(self, mut f: impl FnMut(CallableType<'db>) -> CallableType<'db>) -> Self {
+        Self::from_elements(self.0.iter().map(|element| f(*element)))
+    }
+
+    pub(crate) fn has_relation_to_impl(
+        self,
+        db: &'db dyn Db,
+        other: CallableType<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        relation: TypeRelation<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        self.0.iter().when_all(db, |element| {
+            element.has_relation_to_impl(
+                db,
+                other,
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            )
         })
     }
 }
@@ -12686,7 +12794,7 @@ impl get_size2::GetSize for UnionType<'_> {}
 impl<'db> UnionType<'db> {
     /// Create a union from a list of elements
     /// (which may be eagerly simplified into a different variant of [`Type`] altogether).
-    pub(crate) fn from_elements<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
+    pub fn from_elements<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
     where
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,

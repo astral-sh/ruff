@@ -523,3 +523,63 @@ class Baz(NamedTuple):
 class Spam(Baz):
     def _asdict(self) -> tuple[int, ...]: ...  # error: [invalid-method-override]
 ```
+
+## Staticmethods and classmethods
+
+Methods decorated with `@staticmethod` or `@classmethod` are checked in much the same way as other
+methods.
+
+<!-- snapshot-diagnostics -->
+
+```pyi
+class Parent:
+    def instance_method(self, x: int) -> int: ...
+    @classmethod
+    def class_method(cls, x: int) -> int: ...
+    @staticmethod
+    def static_method(x: int) -> int: ...
+
+class BadChild1(Parent):
+    @staticmethod
+    def instance_method(self, x: int) -> int: ...  # error: [invalid-method-override]
+    # TODO: we should emit `invalid-method-override` here.
+    # Although the method has the same signature as `Parent.class_method`
+    # when accessed on instances, it does not have the same signature as
+    # `Parent.class_method` when accessed on the class object itself
+    def class_method(cls, x: int) -> int: ...
+    def static_method(x: int) -> int: ...  # error: [invalid-method-override]
+
+class BadChild2(Parent):
+    # TODO: we should emit `invalid-method-override` here.
+    # Although the method has the same signature as `Parent.class_method`
+    # when accessed on instances, it does not have the same signature as
+    # `Parent.class_method` when accessed on the class object itself.
+    #
+    # Note that whereas `BadChild1.class_method` is reported as a Liskov violation by
+    # mypy, pyright and pyrefly, pyright is the only one of those three to report a
+    # Liskov violation on this method as of 2025-11-23.
+    @classmethod
+    def instance_method(self, x: int) -> int: ...
+    @staticmethod
+    def class_method(cls, x: int) -> int: ...  # error: [invalid-method-override]
+    @classmethod
+    def static_method(x: int) -> int: ...  # error: [invalid-method-override]
+
+class BadChild3(Parent):
+    @classmethod
+    def class_method(cls, x: bool) -> object: ...  # error: [invalid-method-override]
+    @staticmethod
+    def static_method(x: bool) -> object: ...  # error: [invalid-method-override]
+
+class GoodChild1(Parent):
+    @classmethod
+    def class_method(cls, x: int) -> int: ...
+    @staticmethod
+    def static_method(x: int) -> int: ...
+
+class GoodChild2(Parent):
+    @classmethod
+    def class_method(cls, x: object) -> bool: ...
+    @staticmethod
+    def static_method(x: object) -> bool: ...
+```

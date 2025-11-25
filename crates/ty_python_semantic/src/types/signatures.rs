@@ -229,6 +229,19 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
+    /// Replaces any occurrences of `typing.Self` in the parameter and return annotations with the
+    /// given type. (Does not bind the `self` parameter; to do that, use
+    /// [`bind_self`][Self::bind_self].)
+    pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
+        Self {
+            overloads: self
+                .overloads
+                .iter()
+                .map(|signature| signature.apply_self(db, self_type))
+                .collect(),
+        }
+    }
+
     fn is_subtype_of_impl(
         &self,
         db: &'db dyn Db,
@@ -668,6 +681,28 @@ impl<'db> Signature<'db> {
                 )
             });
         }
+        Self {
+            generic_context: self.generic_context,
+            definition: self.definition,
+            parameters,
+            return_ty,
+        }
+    }
+
+    pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
+        let parameters = self.parameters.apply_type_mapping_impl(
+            db,
+            &TypeMapping::BindSelf(self_type),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        );
+        let return_ty = self.return_ty.map(|ty| {
+            ty.apply_type_mapping(
+                db,
+                &TypeMapping::BindSelf(self_type),
+                TypeContext::default(),
+            )
+        });
         Self {
             generic_context: self.generic_context,
             definition: self.definition,

@@ -32,7 +32,8 @@ error[unresolved-attribute]: Module `datetime` has no member `UTC`
 5 | # error: [unresolved-attribute]
 6 | reveal_type(datetime.fakenotreal)  # revealed: Unknown
   |
-info: Python 3.10 was assumed when accessing `UTC` because it was specified on the command line
+info: The member may be available on other Python versions or platforms
+info: Python 3.10 was assumed when resolving the `UTC` attribute because it was specified on the command line
 info: rule `unresolved-attribute` is enabled by default
 
 ```

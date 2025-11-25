@@ -2,7 +2,8 @@ use std::borrow::Cow;
 
 use lsp_types::request::InlayHintRequest;
 use lsp_types::{InlayHintParams, Url};
-use ty_ide::{InlayHintKind, InlayHintLabel, inlay_hints};
+use ruff_db::files::File;
+use ty_ide::{InlayHintKind, InlayHintLabel, InlayHintTextEdit, inlay_hints};
 use ty_project::ProjectDatabase;
 
 use crate::PositionEncoding;
@@ -64,7 +65,14 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
                     padding_left: None,
                     padding_right: None,
                     data: None,
-                    text_edits: None,
+                    text_edits: Some(
+                        hint.text_edits
+                            .into_iter()
+                            .filter_map(|text_edit| {
+                                inlay_hint_text_edit(text_edit, db, file, snapshot.encoding())
+                            })
+                            .collect(),
+                    ),
                 })
             })
             .collect();
@@ -99,4 +107,27 @@ fn inlay_hint_label(
         });
     }
     lsp_types::InlayHintLabel::LabelParts(label_parts)
+}
+
+fn inlay_hint_text_edit(
+    inlay_hint_text_edit: InlayHintTextEdit,
+    db: &ProjectDatabase,
+    file: File,
+    encoding: PositionEncoding,
+) -> Option<lsp_types::TextEdit> {
+    Some(lsp_types::TextEdit {
+        range: lsp_types::Range {
+            start: inlay_hint_text_edit
+                .range
+                .start()
+                .to_lsp_position(db, file, encoding)?
+                .local_position(),
+            end: inlay_hint_text_edit
+                .range
+                .end()
+                .to_lsp_position(db, file, encoding)?
+                .local_position(),
+        },
+        new_text: inlay_hint_text_edit.new_text,
+    })
 }

@@ -522,14 +522,15 @@ impl<'db> GenericContext<'db> {
     /// Creates a specialization of this generic context. Panics if the length of `types` does not
     /// match the number of typevars in the generic context.
     ///
-    /// You are allowed to provide types that mention the typevars in this generic context.
-    pub(crate) fn specialize_recursive(
-        self,
-        db: &'db dyn Db,
-        mut types: Box<[Type<'db>]>,
-    ) -> Specialization<'db> {
+    /// If any provided type is `None`, we will use the corresponding typevar's default type. You
+    /// are allowed to provide types that mention the typevars in this generic context.
+    pub(crate) fn specialize_recursive<I>(self, db: &'db dyn Db, types: I) -> Specialization<'db>
+    where
+        I: IntoIterator<Item = Option<Type<'db>>>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let mut types = self.fill_in_defaults(db, types);
         let len = types.len();
-        assert!(self.len(db) == len);
         loop {
             let mut any_changed = false;
             for i in 0..len {
@@ -564,10 +565,7 @@ impl<'db> GenericContext<'db> {
         Specialization::new(db, self, Box::from([element_type]), None, Some(tuple))
     }
 
-    /// Creates a specialization of this generic context. Panics if the length of `types` does not
-    /// match the number of typevars in the generic context. If any provided type is `None`, we
-    /// will use the corresponding typevar's default type.
-    pub(crate) fn specialize_partial<I>(self, db: &'db dyn Db, types: I) -> Specialization<'db>
+    fn fill_in_defaults<I>(self, db: &'db dyn Db, types: I) -> Box<[Type<'db>]>
     where
         I: IntoIterator<Item = Option<Type<'db>>>,
         I::IntoIter: ExactSizeIterator,
@@ -610,7 +608,18 @@ impl<'db> GenericContext<'db> {
             expanded[idx] = default;
         }
 
-        Specialization::new(db, self, expanded.into_boxed_slice(), None, None)
+        expanded.into_boxed_slice()
+    }
+
+    /// Creates a specialization of this generic context. Panics if the length of `types` does not
+    /// match the number of typevars in the generic context. If any provided type is `None`, we
+    /// will use the corresponding typevar's default type.
+    pub(crate) fn specialize_partial<I>(self, db: &'db dyn Db, types: I) -> Specialization<'db>
+    where
+        I: IntoIterator<Item = Option<Type<'db>>>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        Specialization::new(db, self, self.fill_in_defaults(db, types), None, None)
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
@@ -1052,11 +1061,6 @@ impl<'db> Specialization<'db> {
         // TODO: Combine the tuple specs too
         // TODO(jelle): specialization type?
         Specialization::new(db, self.generic_context(db), types, None, None)
-    }
-
-    #[must_use]
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &NormalizedVisitor::default())
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {

@@ -107,6 +107,8 @@ pub struct TypeDisplayDetails<'db> {
     pub targets: Vec<TextRange>,
     /// Metadata for each range
     pub details: Vec<TypeDetail<'db>>,
+    /// Whether the label is valid Python syntax
+    pub is_valid_syntax: bool,
 }
 
 /// Abstraction over "are we doing normal formatting, or tracking ranges with metadata?"
@@ -119,6 +121,7 @@ struct TypeDetailsWriter<'db> {
     label: String,
     targets: Vec<TextRange>,
     details: Vec<TypeDetail<'db>>,
+    is_valid_syntax: bool,
 }
 
 impl<'db> TypeDetailsWriter<'db> {
@@ -127,6 +130,7 @@ impl<'db> TypeDetailsWriter<'db> {
             label: String::new(),
             targets: Vec::new(),
             details: Vec::new(),
+            is_valid_syntax: true,
         }
     }
 
@@ -136,6 +140,7 @@ impl<'db> TypeDetailsWriter<'db> {
             label: self.label,
             targets: self.targets,
             details: self.details,
+            is_valid_syntax: self.is_valid_syntax,
         }
     }
 
@@ -190,6 +195,13 @@ impl<'a, 'b, 'db> TypeWriter<'a, 'b, 'db> {
     /// Convenience for `with_detail(TypeDetail::Type(ty))`
     fn with_type<'c>(&'c mut self, ty: Type<'db>) -> TypeDetailGuard<'a, 'b, 'c, 'db> {
         self.with_detail(TypeDetail::Type(ty))
+    }
+
+    fn set_invalid_syntax(&mut self) {
+        match self {
+            TypeWriter::Formatter(_) => {}
+            TypeWriter::Details(details) => details.is_valid_syntax = false,
+        }
     }
 
     fn join<'c>(&'c mut self, separator: &'static str) -> Join<'a, 'b, 'c, 'db> {
@@ -539,6 +551,7 @@ impl<'db> FmtDetailed<'db> for ClassDisplay<'db> {
             let line_index = line_index(self.db, file);
             let class_offset = self.class.header_range(self.db).start();
             let line_number = line_index.line_index(class_offset);
+            f.set_invalid_syntax();
             write!(f, " @ {path}:{line_number}")?;
         }
         Ok(())
@@ -599,6 +612,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .fmt_detailed(f),
                 },
                 Protocol::Synthesized(synthetic) => {
+                    f.set_invalid_syntax();
                     f.write_char('<')?;
                     f.with_type(Type::SpecialForm(SpecialFormType::Protocol))
                         .write_str("Protocol")?;
@@ -618,6 +632,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             },
             Type::PropertyInstance(_) => f.with_type(self.ty).write_str("property"),
             Type::ModuleLiteral(module) => {
+                f.set_invalid_syntax();
                 write!(
                     f.with_type(self.ty),
                     "<module '{}'>",
@@ -625,6 +640,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 )
             }
             Type::ClassLiteral(class) => {
+                f.set_invalid_syntax();
                 let mut f = f.with_type(self.ty);
                 f.write_str("<class '")?;
                 class
@@ -633,6 +649,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.write_str("'>")
             }
             Type::GenericAlias(generic) => {
+                f.set_invalid_syntax();
                 let mut f = f.with_type(self.ty);
                 f.write_str("<class '")?;
                 generic
@@ -691,7 +708,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                             db: self.db,
                             settings: self.settings.clone(),
                         };
-
+                        f.set_invalid_syntax();
                         f.write_str("bound method ")?;
                         self_ty
                             .display_with(self.db, self.settings.singleline())
@@ -729,51 +746,57 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     }
                 }
             }
-            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
-                write!(
-                    f,
-                    "<method-wrapper `__get__` of `{function}`>",
-                    function = function.name(self.db),
-                )
+            Type::KnownBoundMethod(method_type) => {
+                f.set_invalid_syntax();
+                match method_type {
+                    KnownBoundMethodType::FunctionTypeDunderGet(function) => {
+                        write!(
+                            f,
+                            "<method-wrapper `__get__` of `{function}`>",
+                            function = function.name(self.db),
+                        )
+                    }
+                    KnownBoundMethodType::FunctionTypeDunderCall(function) => {
+                        write!(
+                            f,
+                            "<method-wrapper `__call__` of `{function}`>",
+                            function = function.name(self.db),
+                        )
+                    }
+                    KnownBoundMethodType::PropertyDunderGet(_) => {
+                        f.write_str("<method-wrapper `__get__` of `property` object>")
+                    }
+                    KnownBoundMethodType::PropertyDunderSet(_) => {
+                        f.write_str("<method-wrapper `__set__` of `property` object>")
+                    }
+                    KnownBoundMethodType::StrStartswith(_) => {
+                        f.write_str("<method-wrapper `startswith` of `str` object>")
+                    }
+                    KnownBoundMethodType::ConstraintSetRange => {
+                        f.write_str("bound method `ConstraintSet.range`")
+                    }
+                    KnownBoundMethodType::ConstraintSetAlways => {
+                        f.write_str("bound method `ConstraintSet.always`")
+                    }
+                    KnownBoundMethodType::ConstraintSetNever => {
+                        f.write_str("bound method `ConstraintSet.never`")
+                    }
+                    KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => {
+                        f.write_str("bound method `ConstraintSet.implies_subtype_of`")
+                    }
+                    KnownBoundMethodType::ConstraintSetSatisfies(_) => {
+                        f.write_str("bound method `ConstraintSet.satisfies`")
+                    }
+                    KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {
+                        f.write_str("bound method `ConstraintSet.satisfied_by_all_typevars`")
+                    }
+                    KnownBoundMethodType::GenericContextSpecializeConstrained(_) => {
+                        f.write_str("bound method `GenericContext.specialize_constrained`")
+                    }
+                }
             }
-            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)) => {
-                write!(
-                    f,
-                    "<method-wrapper `__call__` of `{function}`>",
-                    function = function.name(self.db),
-                )
-            }
-            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(_)) => {
-                f.write_str("<method-wrapper `__get__` of `property` object>")
-            }
-            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(_)) => {
-                f.write_str("<method-wrapper `__set__` of `property` object>")
-            }
-            Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_)) => {
-                f.write_str("<method-wrapper `startswith` of `str` object>")
-            }
-            Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetRange) => {
-                f.write_str("bound method `ConstraintSet.range`")
-            }
-            Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetAlways) => {
-                f.write_str("bound method `ConstraintSet.always`")
-            }
-            Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetNever) => {
-                f.write_str("bound method `ConstraintSet.never`")
-            }
-            Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)) => {
-                f.write_str("bound method `ConstraintSet.implies_subtype_of`")
-            }
-            Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetSatisfies(_)) => {
-                f.write_str("bound method `ConstraintSet.satisfies`")
-            }
-            Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(
-                _,
-            )) => f.write_str("bound method `ConstraintSet.satisfied_by_all_typevars`"),
-            Type::KnownBoundMethod(KnownBoundMethodType::GenericContextSpecializeConstrained(
-                _,
-            )) => f.write_str("bound method `GenericContext.specialize_constrained`"),
             Type::WrapperDescriptor(kind) => {
+                f.set_invalid_syntax();
                 let (method, object) = match kind {
                     WrapperDescriptorKind::FunctionTypeDunderGet => ("__get__", "function"),
                     WrapperDescriptorKind::PropertyDunderGet => ("__get__", "property"),
@@ -782,9 +805,11 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 write!(f, "<wrapper-descriptor `{method}` of `{object}` objects>")
             }
             Type::DataclassDecorator(_) => {
+                f.set_invalid_syntax();
                 f.write_str("<decorator produced by dataclass-like function>")
             }
             Type::DataclassTransformer(_) => {
+                f.set_invalid_syntax();
                 f.write_str("<decorator produced by typing.dataclass_transform>")
             }
             Type::Union(union) => union
@@ -828,11 +853,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 write!(f, ".{}", enum_literal.name(self.db))
             }
             Type::TypeVar(bound_typevar) => {
+                f.set_invalid_syntax();
                 write!(f, "{}", bound_typevar.identity(self.db).display(self.db))
             }
             Type::AlwaysTruthy => f.with_type(self.ty).write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.with_type(self.ty).write_str("AlwaysFalsy"),
             Type::BoundSuper(bound_super) => {
+                f.set_invalid_syntax();
                 f.write_str("<super: ")?;
                 Type::from(bound_super.pivot_class(self.db))
                     .display_with(self.db, self.settings.singleline())
@@ -852,6 +879,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .display_with(self.db, self.settings.singleline())
                     .fmt_detailed(f)?;
                 if let Some(name) = type_is.place_name(self.db) {
+                    f.set_invalid_syntax();
                     f.write_str(" @ ")?;
                     f.write_str(&name)?;
                 }
@@ -1029,6 +1057,7 @@ impl<'db> FmtDetailed<'db> for DisplayOverloadLiteral<'db> {
             settings: self.settings.clone(),
         };
 
+        f.set_invalid_syntax();
         f.write_str("def ")?;
         write!(f, "{}", self.literal.name(self.db))?;
         type_parameters.fmt_detailed(f)?;
@@ -1075,7 +1104,7 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
                     db: self.db,
                     settings: self.settings.clone(),
                 };
-
+                f.set_invalid_syntax();
                 f.write_str("def ")?;
                 write!(f, "{}", self.ty.name(self.db))?;
                 type_parameters.fmt_detailed(f)?;
@@ -1256,6 +1285,7 @@ impl<'db> DisplayGenericContext<'_, 'db> {
             if idx > 0 {
                 f.write_str(", ")?;
             }
+            f.set_invalid_syntax();
             f.write_str(bound_typevar.typevar(self.db).name(self.db))?;
         }
         f.write_char(']')
@@ -1268,6 +1298,7 @@ impl<'db> DisplayGenericContext<'_, 'db> {
             if idx > 0 {
                 f.write_str(", ")?;
             }
+            f.set_invalid_syntax();
             write!(f, "{}", bound_typevar.identity(self.db).display(self.db))?;
         }
         f.write_char(']')
@@ -1358,6 +1389,7 @@ impl<'db> DisplaySpecialization<'db> {
             if idx > 0 {
                 f.write_str(", ")?;
             }
+            f.set_invalid_syntax();
             write!(f, "{}", bound_typevar.identity(self.db).display(self.db))?;
             f.write_str(" = ")?;
             ty.display_with(self.db, self.settings.clone())
@@ -1505,6 +1537,7 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         // Immediately write a marker signaling we're starting a signature
         let _ = f.with_detail(TypeDetail::SignatureStart);
+        f.set_invalid_syntax();
         // When we exit this function, write a marker signaling we're ending a signature
         let mut f = f.with_detail(TypeDetail::SignatureEnd);
         let multiline = self.settings.multiline && self.parameters.len() > 1;
@@ -1694,6 +1727,7 @@ impl<'db> FmtDetailed<'db> for DisplayOmitted {
         } else {
             self.plural
         };
+        f.set_invalid_syntax();
         write!(f, "... omitted {} {}", self.count, noun)
     }
 }
@@ -1908,6 +1942,7 @@ impl<'db> FmtDetailed<'db> for DisplayIntersectionType<'_, 'db> {
                     }),
             );
 
+        f.set_invalid_syntax();
         f.join(" & ").entries(tys).finish()
     }
 }
@@ -1960,6 +1995,7 @@ struct DisplayMaybeParenthesizedType<'db> {
 impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let write_parentheses = |f: &mut TypeWriter<'_, '_, 'db>| {
+            f.set_invalid_syntax();
             f.write_char('(')?;
             self.ty
                 .display_with(self.db, self.settings.clone())

@@ -30,39 +30,39 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/attributes.md
 1 | import foo
 2 | import baz
 3 | 
-4 | # error: [unresolved-attribute]
+4 | # error: [possibly-missing-attribute]
 5 | reveal_type(foo.bar)  # revealed: Unknown
-6 | # error: [unresolved-attribute]
+6 | # error: [possibly-missing-attribute]
 7 | reveal_type(baz.bar)  # revealed: Unknown
 ```
 
 # Diagnostics
 
 ```
-error[unresolved-attribute]: Submodule `bar` may not be available as an attribute on module `foo`
+warning[possibly-missing-attribute]: Submodule `bar` may not be available as an attribute on module `foo`
  --> src/main.py:5:13
   |
-4 | # error: [unresolved-attribute]
+4 | # error: [possibly-missing-attribute]
 5 | reveal_type(foo.bar)  # revealed: Unknown
   |             ^^^^^^^
-6 | # error: [unresolved-attribute]
+6 | # error: [possibly-missing-attribute]
 7 | reveal_type(baz.bar)  # revealed: Unknown
   |
 help: Consider explicitly importing `foo.bar`
-info: rule `unresolved-attribute` is enabled by default
+info: rule `possibly-missing-attribute` is enabled by default
 
 ```
 
 ```
-error[unresolved-attribute]: Submodule `bar` may not be available as an attribute on module `baz`
+warning[possibly-missing-attribute]: Submodule `bar` may not be available as an attribute on module `baz`
  --> src/main.py:7:13
   |
 5 | reveal_type(foo.bar)  # revealed: Unknown
-6 | # error: [unresolved-attribute]
+6 | # error: [possibly-missing-attribute]
 7 | reveal_type(baz.bar)  # revealed: Unknown
   |             ^^^^^^^
   |
 help: Consider explicitly importing `baz.bar`
-info: rule `unresolved-attribute` is enabled by default
+info: rule `possibly-missing-attribute` is enabled by default
 
 ```

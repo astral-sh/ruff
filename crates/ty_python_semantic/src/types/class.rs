@@ -32,7 +32,7 @@ use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, DATACLASS_FLAGS,
+    ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, CallableTypes, DATACLASS_FLAGS,
     DataclassFlags, DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType,
     ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
@@ -401,6 +401,11 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
     get_size2::GetSize,
 )]
 pub enum ClassType<'db> {
+    // `NonGeneric` is intended to mean that the `ClassLiteral` has no type parameters. There are
+    // places where we currently violate this rule (e.g. so that we print `Foo` instead of
+    // `Foo[Unknown]`), but most callers who need to make a `ClassType` from a `ClassLiteral`
+    // should use `ClassLiteral::default_specialization` instead of assuming
+    // `ClassType::NonGeneric`.
     NonGeneric(ClassLiteral<'db>),
     Generic(GenericAlias<'db>),
 }
@@ -845,7 +850,7 @@ impl<'db> ClassType<'db> {
                         .with_annotated_type(Type::instance(db, self))]);
 
                 let synthesized_dunder_method =
-                    CallableType::function_like(db, Signature::new(parameters, Some(return_type)));
+                    Type::function_like_callable(db, Signature::new(parameters, Some(return_type)));
 
                 Member::definitely_declared(synthesized_dunder_method)
             }
@@ -1067,7 +1072,7 @@ impl<'db> ClassType<'db> {
                     iterable_parameter,
                 ]);
 
-                let synthesized_dunder = CallableType::function_like(
+                let synthesized_dunder = Type::function_like_callable(
                     db,
                     Signature::new_generic(inherited_generic_context, parameters, None),
                 );
@@ -1106,7 +1111,7 @@ impl<'db> ClassType<'db> {
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
     #[salsa::tracked(cycle_initial=into_callable_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
-    pub(super) fn into_callable(self, db: &'db dyn Db) -> Type<'db> {
+    pub(super) fn into_callable(self, db: &'db dyn Db) -> CallableTypes<'db> {
         let self_ty = Type::from(self);
         let metaclass_dunder_call_function_symbol = self_ty
             .member_lookup_with_policy(
@@ -1124,7 +1129,7 @@ impl<'db> ClassType<'db> {
             // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
             // by always respecting the signature of the metaclass `__call__`, rather than
             // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
-            return Type::Callable(metaclass_dunder_call_function.into_callable_type(db));
+            return CallableTypes::one(metaclass_dunder_call_function.into_callable_type(db));
         }
 
         let dunder_new_function_symbol = self_ty.lookup_dunder_new(db);
@@ -1152,14 +1157,14 @@ impl<'db> ClassType<'db> {
             });
 
             let instance_ty = Type::instance(db, self);
-            let dunder_new_bound_method = Type::Callable(CallableType::new(
+            let dunder_new_bound_method = CallableType::new(
                 db,
                 dunder_new_signature.bind_self(db, Some(instance_ty)),
                 true,
-            ));
+            );
 
             if returns_non_subclass {
-                return dunder_new_bound_method;
+                return CallableTypes::one(dunder_new_bound_method);
             }
             Some(dunder_new_bound_method)
         } else {
@@ -1202,11 +1207,11 @@ impl<'db> ClassType<'db> {
                         signature.overloads.iter().map(synthesized_signature),
                     );
 
-                    Some(Type::Callable(CallableType::new(
+                    Some(CallableType::new(
                         db,
                         synthesized_dunder_init_signature,
                         true,
-                    )))
+                    ))
                 } else {
                     None
                 }
@@ -1216,12 +1221,14 @@ impl<'db> ClassType<'db> {
 
         match (dunder_new_function, synthesized_dunder_init_callable) {
             (Some(dunder_new_function), Some(synthesized_dunder_init_callable)) => {
-                UnionType::from_elements(
-                    db,
-                    vec![dunder_new_function, synthesized_dunder_init_callable],
-                )
+                CallableTypes::from_elements([
+                    dunder_new_function,
+                    synthesized_dunder_init_callable,
+                ])
             }
-            (Some(constructor), None) | (None, Some(constructor)) => constructor,
+            (Some(constructor), None) | (None, Some(constructor)) => {
+                CallableTypes::one(constructor)
+            }
             (None, None) => {
                 // If no `__new__` or `__init__` method is found, then we fall back to looking for
                 // an `object.__new__` method.
@@ -1236,17 +1243,17 @@ impl<'db> ClassType<'db> {
                 if let Place::Defined(Type::FunctionLiteral(new_function), _, _) =
                     new_function_symbol
                 {
-                    Type::Callable(
+                    CallableTypes::one(
                         new_function
                             .into_bound_method_type(db, correct_return_type)
                             .into_callable_type(db),
                     )
                 } else {
                     // Fallback if no `object.__new__` is found.
-                    CallableType::single(
+                    CallableTypes::one(CallableType::single(
                         db,
                         Signature::new(Parameters::empty(), Some(correct_return_type)),
-                    )
+                    ))
                 }
             }
         }
@@ -1265,8 +1272,8 @@ fn into_callable_cycle_initial<'db>(
     db: &'db dyn Db,
     _id: salsa::Id,
     _self: ClassType<'db>,
-) -> Type<'db> {
-    Type::Callable(CallableType::bottom(db))
+) -> CallableTypes<'db> {
+    CallableTypes::one(CallableType::bottom(db))
 }
 
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
@@ -1309,6 +1316,14 @@ impl MethodDecorator {
             (true, false) => Ok(Self::ClassMethod),
             (false, true) => Ok(Self::StaticMethod),
             (false, false) => Ok(Self::None),
+        }
+    }
+
+    pub(crate) const fn description(self) -> &'static str {
+        match self {
+            MethodDecorator::None => "an instance method",
+            MethodDecorator::ClassMethod => "a classmethod",
+            MethodDecorator::StaticMethod => "a staticmethod",
         }
     }
 }
@@ -2200,7 +2215,7 @@ impl<'db> ClassLiteral<'db> {
                     Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))]),
                     Some(field.declared_ty),
                 );
-                let property_getter = CallableType::single(db, property_getter_signature);
+                let property_getter = Type::single_callable(db, property_getter_signature);
                 let property = PropertyInstanceType::new(db, Some(property_getter), None);
                 return Member::definitely_declared(Type::PropertyInstance(property));
             }
@@ -2414,7 +2429,7 @@ impl<'db> ClassLiteral<'db> {
                 ),
                 _ => Signature::new(Parameters::new(parameters), return_ty),
             };
-            Some(CallableType::function_like(db, signature))
+            Some(Type::function_like_callable(db, signature))
         };
 
         match (field_policy, name) {
@@ -2450,7 +2465,7 @@ impl<'db> ClassLiteral<'db> {
                     Some(KnownClass::Bool.to_instance(db)),
                 );
 
-                Some(CallableType::function_like(db, signature))
+                Some(Type::function_like_callable(db, signature))
             }
             (CodeGeneratorKind::DataclassLike(_), "__hash__") => {
                 let unsafe_hash = has_dataclass_param(DataclassFlags::UNSAFE_HASH);
@@ -2466,7 +2481,7 @@ impl<'db> ClassLiteral<'db> {
                         Some(KnownClass::Int.to_instance(db)),
                     );
 
-                    Some(CallableType::function_like(db, signature))
+                    Some(Type::function_like_callable(db, signature))
                 } else if eq && !frozen {
                     Some(Type::none(db))
                 } else {
@@ -2553,7 +2568,7 @@ impl<'db> ClassLiteral<'db> {
                         Some(Type::Never),
                     );
 
-                    return Some(CallableType::function_like(db, signature));
+                    return Some(Type::function_like_callable(db, signature));
                 }
                 None
             }
@@ -2831,7 +2846,7 @@ impl<'db> ClassLiteral<'db> {
                     Some(Type::none(db)),
                 );
 
-                Some(CallableType::function_like(db, signature))
+                Some(Type::function_like_callable(db, signature))
             }
             _ => None,
         }
@@ -3704,12 +3719,6 @@ impl<'db> ClassLiteral<'db> {
 impl<'db> From<ClassLiteral<'db>> for Type<'db> {
     fn from(class: ClassLiteral<'db>) -> Type<'db> {
         Type::ClassLiteral(class)
-    }
-}
-
-impl<'db> From<ClassLiteral<'db>> for ClassType<'db> {
-    fn from(class: ClassLiteral<'db>) -> ClassType<'db> {
-        ClassType::NonGeneric(class)
     }
 }
 
@@ -4788,7 +4797,7 @@ impl KnownClass {
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     #[track_caller]
-    pub(crate) fn to_instance(self, db: &dyn Db) -> Type<'_> {
+    pub fn to_instance(self, db: &dyn Db) -> Type<'_> {
         debug_assert_ne!(
             self,
             KnownClass::Tuple,
@@ -4941,7 +4950,7 @@ impl KnownClass {
     /// representing that class and all possible subclasses of the class.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
-    pub(crate) fn to_subclass_of(self, db: &dyn Db) -> Type<'_> {
+    pub fn to_subclass_of(self, db: &dyn Db) -> Type<'_> {
         self.to_class_literal(db)
             .to_class_type(db)
             .map(|class| SubclassOfType::from(db, class))
