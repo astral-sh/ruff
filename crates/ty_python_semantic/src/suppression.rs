@@ -1,21 +1,23 @@
+use smallvec::{SmallVec, smallvec};
+use std::error::Error;
+use std::fmt;
+use std::fmt::Formatter;
+use std::fmt::Write as _;
+use thiserror::Error;
+
 use crate::diagnostic::DiagnosticGuard;
 use crate::lint::{GetLintError, Level, LintMetadata, LintRegistry, LintStatus};
 use crate::types::TypeCheckDiagnostics;
 use crate::{Db, declare_lint, lint::LintId};
+
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span, SubDiagnostic,
-    SubDiagnosticSeverity,
+    Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span,
 };
 use ruff_db::{files::File, parsed::parsed_module, source::source_text};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_parser::TokenKind;
 use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
-use smallvec::{SmallVec, smallvec};
-use std::error::Error;
-use std::fmt;
-use std::fmt::Formatter;
-use thiserror::Error;
 
 declare_lint! {
     /// ## What it does
@@ -186,8 +188,6 @@ fn check_invalid_suppression(context: &mut CheckSuppressionsContext) {
 ///
 /// Does nothing if the [`UNUSED_IGNORE_COMMENT`] rule is disabled.
 fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
-    use std::fmt::Write as _;
-
     if context.is_lint_disabled(&UNUSED_IGNORE_COMMENT) {
         return;
     }
@@ -333,15 +333,9 @@ fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
                         diag.set_fix(Fix::safe_edit(Edit::range_deletion(fix_range)));
 
                         if unused_codes.is_empty() {
-                            diag.sub(SubDiagnostic::new(
-                                SubDiagnosticSeverity::Help,
-                                "Remove the unused suppression code",
-                            ));
+                            diag.help("Remove the unused suppression code");
                         } else {
-                            diag.sub(SubDiagnostic::new(
-                                SubDiagnosticSeverity::Help,
-                                "Remove the unused suppression codes",
-                            ));
+                            diag.help("Remove the unused suppression codes");
                         }
                     }
 
@@ -377,10 +371,7 @@ fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
             .unwrap()
             .push_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
         diag.set_fix(remove_comment_fix(suppression, &source));
-        diag.sub(SubDiagnostic::new(
-            SubDiagnosticSeverity::Help,
-            "Remove the unused suppression comment",
-        ));
+        diag.help("Remove the unused suppression comment");
     }
 }
 
@@ -1087,10 +1078,7 @@ fn remove_comment_fix(suppression: &Suppression, source: &str) -> Fix {
     if !after_comment.starts_with(['\n', '\r']) {
         // For example: `# ty: ignore # fmt: off`
         // Don't remove the trailing whitespace up to the `ty: ignore` comment
-        return Fix::safe_edit(Edit::range_deletion(TextRange::new(
-            comment_start,
-            suppression.comment_range.end(),
-        )));
+        return Fix::safe_edit(Edit::range_deletion(suppression.comment_range));
     }
 
     // Remove any leading whitespace before the comment
@@ -1109,7 +1097,7 @@ fn remove_comment_fix(suppression: &Suppression, source: &str) -> Fix {
 
     Fix::safe_edit(Edit::range_deletion(TextRange::new(
         comment_start - leading_len,
-        suppression.comment_range.end(),
+        comment_end,
     )))
 }
 
