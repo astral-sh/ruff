@@ -990,7 +990,7 @@ pub fn call_signature_details<'db>(
     // Use into_callable to handle all the complex type conversions
     if let Some(callable_type) = func_type
         .try_upcast_to_callable(model.db())
-        .map(|callables| callables.into_type(db))
+        .map(|callables| callables.into_type(model.db()))
     {
         let call_arguments =
             CallArguments::from_arguments(&call_expr.arguments, |_, splatted_value| {
