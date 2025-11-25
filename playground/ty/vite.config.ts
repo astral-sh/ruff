@@ -20,7 +20,9 @@ export default defineConfig({
 });
 
 export function viteStaticCopyPyodide() {
-  const pyodideDir = normalizePath(join(dirname(fileURLToPath(import.meta.resolve("pyodide"))), "*"));
+  const pyodideDir = normalizePath(
+    join(dirname(fileURLToPath(import.meta.resolve("pyodide"))), "*"),
+  );
   return viteStaticCopy({
     targets: [
       {
