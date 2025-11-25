@@ -1407,10 +1407,12 @@ msg.content
 
 ### `typing.TypedDict` is not allowed in type expressions
 
+<!-- snapshot-diagnostics -->
+
 ```py
 from typing import TypedDict
 
-# error: [invalid-type-form] "The special form `typing.TypedDict` is not allowed in type expressions."
+# error: [invalid-type-form] "The special form `typing.TypedDict` is not allowed in type expressions"
 x: TypedDict = {"name": "Alice"}
 ```
 
