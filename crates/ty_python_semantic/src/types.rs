@@ -9134,12 +9134,12 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// of synthetic generic functions.
     pub(crate) fn synthetic(
         db: &'db dyn Db,
-        name: &'static str,
+        name: impl Into<Name>,
         variance: TypeVarVariance,
     ) -> Self {
         let identity = TypeVarIdentity::new(
             db,
-            Name::new_static(name),
+            name.into(),
             None, // definition
             TypeVarKind::Pep695,
         );

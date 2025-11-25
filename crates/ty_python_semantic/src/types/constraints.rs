@@ -66,7 +66,7 @@ use crate::types::generics::{GenericContext, InferableTypeVars, Specialization};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation,
-    TypeVarBoundOrConstraints, UnionType, walk_bound_type_var_type,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionType, walk_bound_type_var_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -1037,21 +1037,17 @@ impl<'db> Node<'db> {
             Node::Interior(_) => {}
         }
 
-        let mut inferable_typevars = FxHashSet::default();
-        let mut non_inferable_typevars = FxHashSet::default();
         let mut valid_inferable_specializations = Node::AlwaysTrue;
         let mut valid_non_inferable_specializations = Node::AlwaysTrue;
+        let mut gradual_tokens = Vec::default();
         let mut add_typevar = |bound_typevar: BoundTypeVarInstance<'db>| {
-            let valid_specializations = bound_typevar.valid_specializations(db);
-            if bound_typevar.is_inferable(db, inferable) {
-                inferable_typevars.insert(bound_typevar);
-                valid_inferable_specializations =
-                    valid_inferable_specializations.and(db, valid_specializations);
-            } else {
-                non_inferable_typevars.insert(bound_typevar);
-                valid_non_inferable_specializations =
-                    valid_non_inferable_specializations.and(db, valid_specializations);
-            }
+            let (inferable_specializations, noninferable_specializations, synthetic_typevars) =
+                bound_typevar.valid_specializations(db, inferable);
+            valid_inferable_specializations =
+                valid_inferable_specializations.and(db, inferable_specializations);
+            valid_non_inferable_specializations =
+                valid_non_inferable_specializations.and(db, noninferable_specializations);
+            gradual_tokens.extend_from_slice(&synthetic_typevars);
         };
         self.for_each_constraint(db, &mut |constraint| {
             add_typevar(constraint.typevar(db));
@@ -1064,7 +1060,19 @@ impl<'db> Node<'db> {
         });
 
         let restricted = self.and(db, valid_inferable_specializations);
+        let restricted = restricted.exists(
+            db,
+            gradual_tokens
+                .iter()
+                .map(|bound_typevar| bound_typevar.identity(db)),
+        );
         let restricted = restricted.exists(db, inferable.iter());
+        let valid_non_inferable_specializations = valid_non_inferable_specializations.exists(
+            db,
+            gradual_tokens
+                .iter()
+                .map(|bound_typevar| bound_typevar.identity(db)),
+        );
         let restricted = valid_non_inferable_specializations.implies(db, restricted);
         restricted.is_always_satisfied(db)
     }
@@ -3007,7 +3015,11 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// Returns the valid specializations of a typevar. This is used when checking a constraint set
     /// when this typevar is in inferable position, where we only need _some_ specialization to
     /// satisfy the constraint set.
-    fn valid_specializations(self, db: &'db dyn Db) -> Node<'db> {
+    fn valid_specializations(
+        self,
+        db: &'db dyn Db,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> (Node<'db>, Node<'db>, Vec<BoundTypeVarInstance<'db>>) {
         // For gradual upper bounds and constraints, we are free to choose any materialization that
         // makes the check succeed. In inferable positions, it is most helpful to choose a
         // materialization that is as permissive as possible, since that maximizes the number of
@@ -3019,22 +3031,126 @@ impl<'db> BoundTypeVarInstance<'db> {
         // that _some_ valid specialization satisfies the constraint set, it's correct for us to
         // return the range of valid materializations that we can choose from.
         match self.typevar(db).bound_or_constraints(db) {
-            None => ConstrainedTypeVar::new_node(db, self, Type::Never, Type::object()),
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                let bound = bound.top_materialization(db);
-                ConstrainedTypeVar::new_node(db, self, Type::Never, bound)
+            None => {
+                let valid = ConstrainedTypeVar::new_node(db, self, Type::Never, Type::object());
+                if self.is_inferable(db, inferable) {
+                    (valid, Node::AlwaysTrue, Vec::default())
+                } else {
+                    (Node::AlwaysTrue, valid, Vec::default())
+                }
             }
+
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                let bound_lower = bound.bottom_materialization(db);
+                let bound_upper = bound.top_materialization(db);
+                if bound_lower == bound_upper {
+                    if self.is_inferable(db, inferable) {
+                        (
+                            ConstrainedTypeVar::new_node(db, self, Type::Never, bound_upper),
+                            Node::AlwaysTrue,
+                            Vec::default(),
+                        )
+                    } else {
+                        (
+                            Node::AlwaysTrue,
+                            ConstrainedTypeVar::new_node(db, self, Type::Never, bound_lower),
+                            Vec::default(),
+                        )
+                    }
+                } else {
+                    let gradual_bound_typevar = BoundTypeVarInstance::synthetic(
+                        db,
+                        format!("{}'bound", self.identity(db).display(db)),
+                        TypeVarVariance::Covariant,
+                    );
+                    let gradual_bound_constraints = ConstrainedTypeVar::new_node(
+                        db,
+                        gradual_bound_typevar,
+                        bound_lower,
+                        bound_upper,
+                    );
+                    let gradual_bound = ConstrainedTypeVar::new_node(
+                        db,
+                        self,
+                        Type::Never,
+                        Type::TypeVar(gradual_bound_typevar),
+                    );
+                    if self.is_inferable(db, inferable) {
+                        (
+                            gradual_bound.and(db, gradual_bound_constraints),
+                            Node::AlwaysTrue,
+                            vec![gradual_bound_typevar],
+                        )
+                    } else {
+                        (
+                            gradual_bound.and(db, gradual_bound_constraints),
+                            gradual_bound,
+                            vec![gradual_bound_typevar],
+                        )
+                    }
+                }
+            }
+
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                let mut specializations = Node::AlwaysFalse;
-                for constraint in constraints.elements(db) {
+                let mut inferable_specializations = Node::AlwaysFalse;
+                let mut noninferable_specializations = Node::AlwaysFalse;
+                let mut synthetic_typevars = Vec::default();
+                for (idx, constraint) in constraints.elements(db).iter().enumerate() {
                     let constraint_lower = constraint.bottom_materialization(db);
                     let constraint_upper = constraint.top_materialization(db);
-                    specializations = specializations.or(
-                        db,
-                        ConstrainedTypeVar::new_node(db, self, constraint_lower, constraint_upper),
-                    );
+                    if constraint_lower == constraint_upper {
+                        let constraint = ConstrainedTypeVar::new_node(
+                            db,
+                            self,
+                            constraint_lower,
+                            constraint_upper,
+                        );
+                        if self.is_inferable(db, inferable) {
+                            inferable_specializations =
+                                inferable_specializations.or(db, constraint);
+                        } else {
+                            noninferable_specializations =
+                                noninferable_specializations.or(db, constraint);
+                        }
+                    } else {
+                        let gradual_constraint_typevar = BoundTypeVarInstance::synthetic(
+                            db,
+                            format!("{}'constraint{idx}", self.identity(db).display(db)),
+                            TypeVarVariance::Covariant,
+                        );
+                        let gradual_constraint_constraints = ConstrainedTypeVar::new_node(
+                            db,
+                            gradual_constraint_typevar,
+                            constraint_lower,
+                            constraint_upper,
+                        );
+                        let gradual_constraint = ConstrainedTypeVar::new_node(
+                            db,
+                            self,
+                            Type::Never,
+                            Type::TypeVar(gradual_constraint_typevar),
+                        );
+                        synthetic_typevars.push(gradual_constraint_typevar);
+                        if self.is_inferable(db, inferable) {
+                            inferable_specializations = inferable_specializations.or(
+                                db,
+                                gradual_constraint.and(db, gradual_constraint_constraints),
+                            );
+                        } else {
+                            inferable_specializations = inferable_specializations.or(
+                                db,
+                                gradual_constraint.and(db, gradual_constraint_constraints),
+                            );
+                            noninferable_specializations =
+                                noninferable_specializations.or(db, gradual_constraint);
+                        }
+                    }
                 }
-                specializations
+                (
+                    inferable_specializations,
+                    noninferable_specializations,
+                    synthetic_typevars,
+                )
             }
         }
     }
@@ -3058,7 +3174,11 @@ impl<'db> GenericContext<'db> {
         let abstracted = self
             .variables(db)
             .fold(constraints.node, |constraints, bound_typevar| {
-                constraints.and(db, bound_typevar.valid_specializations(db))
+                let (inferable_specializations, noninferable_specializations, _) =
+                    bound_typevar.valid_specializations(db, InferableTypeVars::None);
+                constraints
+                    .and(db, inferable_specializations)
+                    .and(db, noninferable_specializations)
             });
 
         // Then we find all of the "representative types" for each typevar in the constraint set.
