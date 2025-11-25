@@ -35,11 +35,8 @@ pub(crate) struct SuppressionComment {
 
 impl SuppressionComment {
     /// Return the suppressed codes as strings
-    fn codes_as_str(&self, source: &str) -> Vec<String> {
-        self.codes
-            .iter()
-            .map(|range| source.slice(range).to_string())
-            .collect()
+    fn codes_as_str<'src>(&self, source: &'src str) -> impl Iterator<Item = &'src str> {
+        self.codes.iter().map(|range| source.slice(range))
     }
 
     /// Whether the comment "matches" another comment, based on indentation and suppressed codes
@@ -48,7 +45,7 @@ impl SuppressionComment {
             || (self.action == SuppressionAction::Disable
                 && other.action == SuppressionAction::Enable))
             && self.indent == other.indent
-            && self.codes_as_str(source) == other.codes_as_str(source)
+            && self.codes_as_str(source).eq(other.codes_as_str(source))
     }
 }
 
