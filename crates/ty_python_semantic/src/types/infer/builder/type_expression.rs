@@ -2,6 +2,8 @@ use itertools::Either;
 use ruff_python_ast as ast;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
+use crate::FxOrderSet;
+use crate::semantic_index::definition::Definition;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NON_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_callable,
@@ -15,7 +17,6 @@ use crate::types::{
     KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType,
     Type, TypeAliasType, TypeContext, TypeIsType, TypeMapping, UnionBuilder, UnionType, todo_type,
 };
-use crate::{FxOrderSet, ResolvedDefinition, definitions_for_attribute, definitions_for_name};
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -756,49 +757,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
+        typevar_binding_context: Option<Definition<'db>>,
         in_type_expression: bool,
     ) -> Type<'db> {
         let db = self.db();
 
-        if self
-            .index
-            .try_expression_scope_id(&ast::ExprRef::from(subscript))
-            .is_none()
-        {
-            return todo_type!("Specialization of generic type alias in stringified annotation");
-        }
-
-        let definitions = match &*subscript.value {
-            ast::Expr::Name(id) => {
-                // TODO: This is an expensive call to an API that was never meant to be called from
-                // type inference. We plan to rework how `in_type_expression` works in the future.
-                // This new approach will make this call unnecessary, so for now, we accept the hit
-                // in performance.
-                definitions_for_name(self.db(), self.file(), id)
-            }
-            ast::Expr::Attribute(attribute) => {
-                // TODO: See above
-                definitions_for_attribute(self.db(), self.file(), attribute)
-            }
-            _ => {
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                    builder.into_diagnostic(
-                    "Only name- and attribute expressions can be specialized in type expressions",
-                );
-                }
-                return Type::unknown();
-            }
-        };
-
-        // TODO: If an implicit type alias is defined multiple times, we arbitrarily pick the
-        // first definition here. Instead, we should do proper name resolution to find the
-        // definition that is actually being referenced. Similar to the comments above, this
-        // should soon be addressed by a rework of how `in_type_expression` works. In the
-        // meantime, we seem to be doing okay in practice (see "Multiple definitions" tests in
-        // `implicit_type_aliases.md`).
-        let Some(type_alias_definition) =
-            definitions.iter().find_map(ResolvedDefinition::definition)
-        else {
+        let Some(type_alias_definition) = typevar_binding_context else {
+            // TODO
             if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                 builder.into_diagnostic(
                     "Cannot specialize implicit type alias with unknown definition",
@@ -984,16 +949,35 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
-                KnownInstanceType::TypeVar(_) => {
-                    self.infer_explicitly_specialized_type_alias(subscript, value_ty, false)
-                }
-
-                KnownInstanceType::UnionType(_)
-                | KnownInstanceType::Callable(_)
-                | KnownInstanceType::Annotated(_)
-                | KnownInstanceType::TypeGenericAlias(_) => {
-                    self.infer_explicitly_specialized_type_alias(subscript, value_ty, true)
-                }
+                KnownInstanceType::TypeVar(instance) => self
+                    .infer_explicitly_specialized_type_alias(
+                        subscript,
+                        value_ty,
+                        instance.definition(self.db()),
+                        false,
+                    ),
+                KnownInstanceType::UnionType(instance) => self
+                    .infer_explicitly_specialized_type_alias(
+                        subscript,
+                        value_ty,
+                        instance.binding_context(self.db()),
+                        true,
+                    ),
+                KnownInstanceType::Annotated(instance)
+                | KnownInstanceType::TypeGenericAlias(instance) => self
+                    .infer_explicitly_specialized_type_alias(
+                        subscript,
+                        value_ty,
+                        instance.binding_context(self.db()),
+                        true,
+                    ),
+                KnownInstanceType::Callable(instance) => self
+                    .infer_explicitly_specialized_type_alias(
+                        subscript,
+                        value_ty,
+                        instance.binding_context(self.db()),
+                        true,
+                    ),
                 KnownInstanceType::NewType(newtype) => {
                     self.infer_type_expression(&subscript.slice);
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
@@ -1034,9 +1018,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
             }
-            Type::GenericAlias(_) => {
-                self.infer_explicitly_specialized_type_alias(subscript, value_ty, true)
-            }
+            Type::GenericAlias(alias) => self.infer_explicitly_specialized_type_alias(
+                subscript,
+                value_ty,
+                Some(alias.definition(self.db())),
+                true,
+            ),
             Type::StringLiteral(_) => {
                 self.infer_type_expression(slice);
                 // For stringified TypeAlias; remove once properly supported

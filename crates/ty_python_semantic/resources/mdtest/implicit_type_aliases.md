@@ -416,9 +416,9 @@ def _(
     int_and_bytes: Sum[int, bytes],
     list_or_tuple: ListOrTuple[int],
     list_or_tuple_legacy: ListOrTupleLegacy[int],
-    # TODO: no errors here
-    # error: [invalid-type-form] "List literals are not allowed in this context in a type expression: Did you mean `tuple[str, bytes]`?"
+    # TODO: no error here
     # error: [too-many-positional-arguments] "Too many positional arguments: expected 1, got 2"
+    # error: [invalid-type-form] "List literals are not allowed in this context in a type expression: Did you mean `tuple[str, bytes]`?"
     my_callable: MyCallable[[str, bytes], int],
     annotated_int: AnnotatedType[int],
     transparent_alias: TransparentAlias[int],
@@ -592,7 +592,7 @@ MyList = list[T]
 def _(
     list_of_ints: "MyList[int]",
 ):
-    reveal_type(list_of_ints)  # revealed: @Todo(Specialization of generic type alias in stringified annotation)
+    reveal_type(list_of_ints)  # revealed: list[int]
 ```
 
 ### Error cases
@@ -640,7 +640,8 @@ def this_does_not_work() -> TypeOf[IntOrStr]:
     raise NotImplementedError()
 
 def _(
-    # error: [invalid-type-form] "Only name- and attribute expressions can be specialized in type expressions"
+    # TODO: Better error message? `invalid-type-form`
+    # error: [too-many-positional-arguments] "Too many positional arguments: expected 0, got 1"
     specialized: this_does_not_work()[int],
 ):
     reveal_type(specialized)  # revealed: Unknown

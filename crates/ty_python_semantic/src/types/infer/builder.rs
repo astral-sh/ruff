@@ -101,14 +101,14 @@ use crate::types::typed_dict::{
 };
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    CallDunderError, CallableBinding, CallableType, CallableTypes, ClassLiteral, ClassType,
-    DataclassParams, DynamicType, InternedType, IntersectionBuilder, IntersectionType, KnownClass,
-    KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
-    PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType, SubclassOfType,
-    TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
-    UnionTypeInstance, binding_type, liskov, todo_type,
+    CallDunderError, CallableBinding, CallableType, CallableTypeInstance, CallableTypes,
+    ClassLiteral, ClassType, DataclassParams, DynamicType, InternedType, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy,
+    MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType,
+    SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
+    TypeContext, TypeInContext, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation,
+    TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
+    TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type, liskov, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -10808,8 +10808,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_subscript_load(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
         let value_ty = self.infer_expression(&subscript.value, TypeContext::default());
 
-        if value_ty.is_generic_alias() {
-            return self.infer_explicitly_specialized_type_alias(subscript, value_ty, false);
+        if let Some(alias) = value_ty.as_generic_alias() {
+            return self.infer_explicitly_specialized_type_alias(
+                subscript,
+                value_ty,
+                Some(alias.definition(self.db())),
+                false,
+            );
         }
 
         self.infer_subscript_load_impl(value_ty, subscript)
@@ -10866,7 +10871,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else if class.is_known(self.db(), KnownClass::Type) {
                     let argument_ty = self.infer_type_expression(slice);
                     return Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
-                        InternedType::new(self.db(), argument_ty),
+                        TypeInContext::new(self.db(), argument_ty, self.typevar_binding_context),
                     ));
                 }
 
@@ -10944,9 +10949,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let ty = self.infer_type_expression(type_expr);
 
-                return Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(
+                return Type::KnownInstance(KnownInstanceType::Annotated(TypeInContext::new(
                     self.db(),
                     ty,
+                    self.typevar_binding_context,
                 )));
             }
             Type::SpecialForm(SpecialFormType::Optional) => {
@@ -10977,6 +10983,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 match **slice {
                     ast::Expr::Tuple(ref tuple) => {
+                        let typevar_binding_context = self.typevar_binding_context;
                         let mut elements = tuple
                             .elts
                             .iter()
@@ -10987,6 +10994,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let union_type = Type::KnownInstance(KnownInstanceType::UnionType(
                             UnionTypeInstance::new(
                                 db,
+                                typevar_binding_context,
                                 None,
                                 Ok(UnionType::from_elements(db, elements)),
                             ),
@@ -11013,7 +11021,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Similar to the branch above that handles `type[…]`, handle `typing.Type[…]`
                 let argument_ty = self.infer_type_expression(slice);
                 return Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
-                    InternedType::new(self.db(), argument_ty),
+                    TypeInContext::new(self.db(), argument_ty, self.typevar_binding_context),
                 ));
             }
             Type::SpecialForm(SpecialFormType::Callable) => {
@@ -11022,7 +11030,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .as_callable()
                     .expect("always returns Type::Callable");
 
-                return Type::KnownInstance(KnownInstanceType::Callable(callable));
+                return Type::KnownInstance(KnownInstanceType::Callable(
+                    CallableTypeInstance::new(self.db(), callable, self.typevar_binding_context),
+                ));
             }
             // `typing` special forms with a single generic argument
             Type::SpecialForm(
@@ -11113,13 +11123,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .map(Type::from)
                     .unwrap_or_else(Type::unknown);
             }
+            Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
+                return self.infer_explicitly_specialized_type_alias(
+                    subscript,
+                    value_ty,
+                    instance.binding_context(self.db()),
+                    false,
+                );
+            }
             Type::KnownInstance(
-                KnownInstanceType::UnionType(_)
-                | KnownInstanceType::Annotated(_)
-                | KnownInstanceType::Callable(_)
-                | KnownInstanceType::TypeGenericAlias(_),
+                KnownInstanceType::Annotated(instance)
+                | KnownInstanceType::TypeGenericAlias(instance),
             ) => {
-                return self.infer_explicitly_specialized_type_alias(subscript, value_ty, false);
+                return self.infer_explicitly_specialized_type_alias(
+                    subscript,
+                    value_ty,
+                    instance.binding_context(self.db()),
+                    false,
+                );
+            }
+            Type::KnownInstance(KnownInstanceType::Callable(instance)) => {
+                return self.infer_explicitly_specialized_type_alias(
+                    subscript,
+                    value_ty,
+                    instance.binding_context(self.db()),
+                    false,
+                );
             }
             _ => {}
         }

@@ -906,6 +906,13 @@ impl<'db> Type<'db> {
         matches!(self, Type::GenericAlias(_))
     }
 
+    pub(crate) fn as_generic_alias(&self) -> Option<GenericAlias<'db>> {
+        match self {
+            Type::GenericAlias(alias) => Some(*alias),
+            _ => None,
+        }
+    }
+
     const fn is_dynamic(&self) -> bool {
         matches!(self, Type::Dynamic(_))
     }
@@ -6803,7 +6810,9 @@ impl<'db> Type<'db> {
 
                     Ok(ty.inner(db).to_meta_type(db))
                 }
-                KnownInstanceType::Callable(callable) => Ok(Type::Callable(*callable)),
+                KnownInstanceType::Callable(instance) => {
+                    Ok(Type::Callable(instance.callable_type(db)))
+                }
                 KnownInstanceType::LiteralStringAlias(ty) => Ok(ty.inner(db)),
             },
 
@@ -7218,6 +7227,7 @@ impl<'db> Type<'db> {
                         Type::KnownInstance(KnownInstanceType::UnionType(
                             UnionTypeInstance::new(
                                 db,
+                                instance.binding_context(db),
                                 instance._value_expr_types(db),
                                 Ok(union_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                             )
@@ -7226,28 +7236,31 @@ impl<'db> Type<'db> {
                         self
                     }
                 },
-                KnownInstanceType::Annotated(ty) => {
+                KnownInstanceType::Annotated(instance) => {
                     Type::KnownInstance(KnownInstanceType::Annotated(
-                        InternedType::new(
+                        TypeInContext::new(
                             db,
-                            ty.inner(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                            instance.inner(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                            instance.binding_context(db),
                         )
                     ))
                 },
-                KnownInstanceType::Callable(callable_type) => {
-                    Type::KnownInstance(KnownInstanceType::Callable(
-                        callable_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                    ))
-                },
-                KnownInstanceType::TypeGenericAlias(ty) => {
+                KnownInstanceType::TypeGenericAlias(instance) => {
                     Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
-                        InternedType::new(
+                        TypeInContext::new(
                             db,
-                            ty.inner(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                            instance.inner(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                            instance.binding_context(db),
                         )
                     ))
                 },
-
+                KnownInstanceType::Callable(instance) => {
+                    Type::KnownInstance(KnownInstanceType::Callable(CallableTypeInstance::new(
+                        db,
+                        instance.callable_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                        instance.binding_context(db),
+                    )))
+                },
                 KnownInstanceType::SubscriptedProtocol(_) |
                 KnownInstanceType::SubscriptedGeneric(_) |
                 KnownInstanceType::TypeAliasType(_) |
@@ -7574,8 +7587,13 @@ impl<'db> Type<'db> {
                     ty.inner(db)
                         .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
                 }
-                KnownInstanceType::Callable(callable_type) => {
-                    callable_type.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                KnownInstanceType::Callable(instance) => {
+                    instance.callable_type(db).find_legacy_typevars_impl(
+                        db,
+                        binding_context,
+                        typevars,
+                        visitor,
+                    );
                 }
                 KnownInstanceType::TypeGenericAlias(ty) => {
                     ty.inner(db)
@@ -8164,13 +8182,13 @@ pub enum KnownInstanceType<'db> {
     Literal(InternedType<'db>),
 
     /// A single instance of `typing.Annotated`
-    Annotated(InternedType<'db>),
+    Annotated(TypeInContext<'db>),
 
     /// An instance of `typing.GenericAlias` representing a `type[...]` expression.
-    TypeGenericAlias(InternedType<'db>),
+    TypeGenericAlias(TypeInContext<'db>),
 
     /// An instance of `typing.GenericAlias` representing a `Callable[...]` expression.
-    Callable(CallableType<'db>),
+    Callable(CallableTypeInstance<'db>),
 
     /// A literal string which is the right-hand side of a PEP 613 `TypeAlias`.
     LiteralStringAlias(InternedType<'db>),
@@ -8212,14 +8230,14 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
                 visitor.visit_type(db, *union_type);
             }
         }
-        KnownInstanceType::Literal(ty)
-        | KnownInstanceType::Annotated(ty)
-        | KnownInstanceType::TypeGenericAlias(ty)
-        | KnownInstanceType::LiteralStringAlias(ty) => {
+        KnownInstanceType::Annotated(instance) | KnownInstanceType::TypeGenericAlias(instance) => {
+            visitor.visit_type(db, instance.inner(db));
+        }
+        KnownInstanceType::Literal(ty) | KnownInstanceType::LiteralStringAlias(ty) => {
             visitor.visit_type(db, ty.inner(db));
         }
-        KnownInstanceType::Callable(callable) => {
-            visitor.visit_callable_type(db, callable);
+        KnownInstanceType::Callable(instance) => {
+            visitor.visit_callable_type(db, instance.callable_type(db));
         }
         KnownInstanceType::NewType(newtype) => {
             if let ClassType::Generic(generic_alias) = newtype.base_class_type(db) {
@@ -9568,6 +9586,8 @@ impl InferredAs {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct UnionTypeInstance<'db> {
+    binding_context: Option<Definition<'db>>,
+
     /// The types of the elements of this union, as they were inferred in a value
     /// expression context. For `int | str`, this would contain `<class 'int'>` and
     /// `<class 'str'>`. For `Union[int, str]`, this field is `None`, as we infer
@@ -9602,7 +9622,12 @@ impl<'db> UnionTypeInstance<'db> {
                 Ok(ty) => builder.add_in_place(ty),
                 Err(error) => {
                     return Type::KnownInstance(KnownInstanceType::UnionType(
-                        UnionTypeInstance::new(db, Some(value_expr_types), Err(error)),
+                        UnionTypeInstance::new(
+                            db,
+                            typevar_binding_context,
+                            Some(value_expr_types),
+                            Err(error),
+                        ),
                     ));
                 }
             }
@@ -9610,6 +9635,7 @@ impl<'db> UnionTypeInstance<'db> {
 
         Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::new(
             db,
+            typevar_binding_context,
             Some(value_expr_types),
             Ok(builder.build()),
         )))
@@ -9657,7 +9683,7 @@ impl<'db> UnionTypeInstance<'db> {
             .clone()
             .map(|ty| ty.normalized_impl(db, visitor));
 
-        Self::new(db, value_expr_types, union_type)
+        Self::new(db, self.binding_context(db), value_expr_types, union_type)
     }
 }
 
@@ -9677,6 +9703,54 @@ impl get_size2::GetSize for InternedType<'_> {}
 impl<'db> InternedType<'db> {
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         InternedType::new(db, self.inner(db).normalized_impl(db, visitor))
+    }
+}
+
+/// A salsa-interned `Type` with an associated typevar binding context.
+///
+/// # Ordering
+/// Ordering is based on the context's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the context was garbage collected and recreated.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct TypeInContext<'db> {
+    inner: Type<'db>,
+    binding_context: Option<Definition<'db>>,
+}
+
+impl get_size2::GetSize for TypeInContext<'_> {}
+
+impl<'db> TypeInContext<'db> {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        TypeInContext::new(
+            db,
+            self.inner(db).normalized_impl(db, visitor),
+            self.binding_context(db),
+        )
+    }
+}
+
+/// An instance of `typing.GenericAlias` representing a `Callable[...]` expression.
+///
+/// # Ordering
+/// Ordering is based on the context's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the context was garbage collected and recreated.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct CallableTypeInstance<'db> {
+    callable_type: CallableType<'db>,
+    binding_context: Option<Definition<'db>>,
+}
+
+impl get_size2::GetSize for CallableTypeInstance<'_> {}
+
+impl<'db> CallableTypeInstance<'db> {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        CallableTypeInstance::new(
+            db,
+            self.callable_type(db).normalized_impl(db, visitor),
+            self.binding_context(db),
+        )
     }
 }
 
