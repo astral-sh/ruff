@@ -7219,7 +7219,7 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::Literal(ty) => Ok(ty.inner(db)),
                 KnownInstanceType::Annotated(ty) => Ok(ty.inner(db)),
-                KnownInstanceType::TypeGenericAlias(ty) => {
+                KnownInstanceType::TypeGenericAlias(instance) => {
                     // When `type[…]` appears in a value position (e.g. in an implicit type alias),
                     // we infer its argument as a type expression. This ensures that we can emit
                     // diagnostics for invalid type expressions, and more importantly, that we can
@@ -7228,7 +7228,13 @@ impl<'db> Type<'db> {
                     // (`int` -> instance of `int` -> subclass of `int`) can be lossy, but it is
                     // okay for all valid arguments to `type[…]`.
 
-                    Ok(ty.inner(db).to_meta_type(db))
+                    let ty = instance.inner(db);
+
+                    if ty.is_type_var() {
+                        Ok(todo_type!("type[T] for typevar T"))
+                    } else {
+                        Ok(ty.to_meta_type(db))
+                    }
                 }
                 KnownInstanceType::Callable(callable) => Ok(Type::Callable(*callable)),
                 KnownInstanceType::LiteralStringAlias(ty) => Ok(ty.inner(db)),

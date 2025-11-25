@@ -500,14 +500,27 @@ def _(
 A generic implicit type alias can also be used in another generic implicit type alias:
 
 ```py
+from typing_extensions import Any
+
+B = TypeVar("B", bound=int)
+
 MyOtherList = MyList[T]
+MyOtherType = MyType[T]
+TypeOrList = MyType[B] | MyList[B]
 
 reveal_type(MyOtherList)  # revealed: <class 'list[T@MyOtherList]'>
+reveal_type(MyOtherType)  # revealed: GenericAlias
+reveal_type(TypeOrList)  # revealed: types.UnionType
 
 def _(
     list_of_ints: MyOtherList[int],
+    subclass_of_int: MyOtherType[int],
+    type_or_list: TypeOrList[Any],
 ):
     reveal_type(list_of_ints)  # revealed: list[int]
+    reveal_type(subclass_of_int)  # revealed: type[int]
+    # TODO: Should be `type[Any] | list[Any]`
+    reveal_type(type_or_list)  # revealed: @Todo(type[T] for typevar T) | list[Any]
 ```
 
 If a generic implicit type alias is used unspecialized in a type expression, we treat it as an
@@ -1454,4 +1467,15 @@ def _(
     reveal_type(recursive_dict2)  # revealed: dict[str, Divergent]
     reveal_type(recursive_dict3)  # revealed: dict[Divergent, int]
     reveal_type(recursive_dict4)  # revealed: dict[Divergent, int]
+```
+
+### Self-referential generic implicit type aliases
+
+<!-- expect-panic: execute: too many cycle iterations -->
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+NestedDict = dict[str, "NestedDict[T] | T"]
 ```
