@@ -9,6 +9,7 @@ use ruff_python_trivia::{Cursor, is_python_whitespace};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize, TextSlice};
 use smallvec::{SmallVec, smallvec};
 
+#[allow(unused)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum SuppressionAction {
     Disable,
@@ -30,6 +31,7 @@ pub(crate) struct SuppressionComment {
     reason: TextRange,
 }
 
+#[allow(unused)]
 impl SuppressionComment {
     /// Return the suppressed codes as strings
     fn codes_as_str<'src>(&self, source: &'src str) -> impl Iterator<Item = &'src str> {
@@ -46,6 +48,7 @@ pub(crate) struct PendingSuppressionComment<'a> {
     comment: SuppressionComment,
 }
 
+#[allow(unused)]
 impl PendingSuppressionComment<'_> {
     /// Whether the comment "matches" another comment, based on indentation and suppressed codes
     fn matches(&self, other: &PendingSuppressionComment, source: &str) -> bool {
@@ -74,6 +77,7 @@ pub(crate) struct Suppression {
     comments: SmallVec<[SuppressionComment; 2]>,
 }
 
+#[allow(unused)]
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum InvalidSuppressionKind {
     /// Trailing suppression not supported
@@ -106,6 +110,7 @@ pub(crate) struct Suppressions {
     errors: Vec<ParseError>,
 }
 
+#[allow(unused)]
 impl Suppressions {
     pub(crate) fn from_tokens(source: &str, tokens: &Tokens) -> Suppressions {
         let builder = SuppressionsBuilder::new(source);

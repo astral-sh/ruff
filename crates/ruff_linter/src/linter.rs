@@ -32,7 +32,6 @@ use crate::rules::ruff::rules::test_rules::{self, TEST_RULES, TestRule};
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::source_kind::SourceKind;
-use crate::suppression::Suppressions;
 use crate::{Locator, directives, fs};
 
 pub(crate) mod float;
@@ -138,9 +137,6 @@ pub fn check_path(
 
     let tokens = parsed.tokens();
     let comment_ranges = indexer.comment_ranges();
-
-    // Gather all ruff:directive suppressions
-    let _suppressions = Suppressions::from_tokens(locator.contents(), tokens);
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
     // (for docstrings), which demands special-casing at this level.
