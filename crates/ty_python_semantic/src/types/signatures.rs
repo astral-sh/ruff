@@ -29,7 +29,7 @@ use crate::types::generics::{
 };
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassLiteral,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, CallableTypeKind, ClassLiteral,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
     KnownClass, MaterializationKind, NormalizedVisitor, ParamSpecAttrKind, TypeContext,
     TypeMapping, TypeRelation, VarianceInferable, todo_type,
@@ -190,6 +190,7 @@ impl<'db> CallableSignature<'db> {
             && let [self_signature] = self.overloads.as_slice()
             && let ParametersKind::ParamSpec(typevar) = self_signature.parameters.kind
             && let Some(Type::Callable(callable)) = specialization.get(db, typevar)
+            && matches!(callable.kind(db), CallableTypeKind::ParamSpecValue)
         {
             return Self::from_overloads(callable.signatures(db).iter().map(|signature| {
                 Signature::new(signature.parameters.clone(), self_signature.return_ty)
@@ -933,6 +934,7 @@ impl<'db> Signature<'db> {
             return ConstraintSet::from(relation.is_assignability());
         }
 
+        // TODO: Handle `Concatenate`
         match (self.parameters.kind(), other.parameters.kind()) {
             (ParametersKind::ParamSpec(self_typevar), ParametersKind::ParamSpec(other_typevar)) => {
                 return if self_typevar.is_same_typevar_as(db, other_typevar) {
@@ -1389,6 +1391,10 @@ impl<'db> Parameters<'db> {
 
     pub(crate) const fn is_gradual(&self) -> bool {
         matches!(self.kind, ParametersKind::Gradual)
+    }
+
+    pub(crate) const fn is_paramspec(&self) -> bool {
+        matches!(self.kind, ParametersKind::ParamSpec(_))
     }
 
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)

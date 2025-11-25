@@ -171,3 +171,25 @@ def foo[**P: int]() -> None:
 def foo[**P = int]() -> None:
     pass
 ```
+
+## Validating `ParamSpec` usage
+
+`ParamSpec` is only valid as the first element to `Callable` or the final element to `Concatenate`.
+
+```py
+from typing import ParamSpec, Callable
+
+P = ParamSpec("P")
+
+def f(
+    # error
+    a1: P,
+    # error
+    a2: list[P],
+    a3: Callable[P, int],
+    # error
+    a4: Callable[[P], int],
+    # error
+    a5: Callable[..., P],
+) -> None: ...
+```

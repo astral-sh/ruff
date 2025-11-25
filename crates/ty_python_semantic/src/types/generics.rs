@@ -135,6 +135,10 @@ impl<'db> BoundTypeVarInstance<'db> {
         db: &'db dyn Db,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> bool {
+        if self.is_paramspec(db) {
+            tracing::debug!("bound type var: {}", self.identity(db).display(db));
+            tracing::debug!("inferrable type vars: {}", inferable.display(db));
+        }
         match inferable {
             InferableTypeVars::None => false,
             InferableTypeVars::One(typevars) => typevars.contains(&self.identity(db)),
