@@ -142,7 +142,7 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
             .map(|error| Diagnostic::invalid_syntax(file, error, error)),
     );
 
-    check_suppressions(db, file, &mut diagnostics);
+    let diagnostics = check_suppressions(db, file, diagnostics);
 
     let elapsed = start.elapsed();
     if elapsed >= Duration::from_millis(100) {
@@ -152,7 +152,7 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
         );
     }
 
-    diagnostics.into_diagnostics()
+    diagnostics
 }
 
 /// Infer the type of a binding.

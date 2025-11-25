@@ -1,7 +1,10 @@
+use crate::diagnostic::DiagnosticGuard;
 use crate::lint::{GetLintError, Level, LintMetadata, LintRegistry, LintStatus};
 use crate::types::TypeCheckDiagnostics;
 use crate::{Db, declare_lint, lint::LintId};
-use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Span};
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span,
+};
 use ruff_db::{files::File, parsed::parsed_module, source::source_text};
 use ruff_python_parser::TokenKind;
 use ruff_python_trivia::Cursor;
@@ -133,12 +136,18 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     builder.finish()
 }
 
-pub(crate) fn check_suppressions(db: &dyn Db, file: File, diagnostics: &mut TypeCheckDiagnostics) {
+pub(crate) fn check_suppressions(
+    db: &dyn Db,
+    file: File,
+    diagnostics: TypeCheckDiagnostics,
+) -> Vec<Diagnostic> {
     let mut context = CheckSuppressionsContext::new(db, file, diagnostics);
 
     check_unknown_rule(&mut context);
     check_invalid_suppression(&mut context);
     check_unused_suppressions(&mut context);
+
+    context.diagnostics.into_inner().into_diagnostics()
 }
 
 /// Checks for `ty: ignore` comments that reference unknown rules.
@@ -148,7 +157,9 @@ fn check_unknown_rule(context: &mut CheckSuppressionsContext) {
     }
 
     for unknown in &context.suppressions.unknown {
-        context.report_lint(&IGNORE_COMMENT_UNKNOWN_RULE, unknown.range, &unknown.reason);
+        if let Some(diag) = context.report_lint(&IGNORE_COMMENT_UNKNOWN_RULE, unknown.range) {
+            diag.into_diagnostic(&unknown.reason);
+        }
     }
 }
 
@@ -158,15 +169,13 @@ fn check_invalid_suppression(context: &mut CheckSuppressionsContext) {
     }
 
     for invalid in &context.suppressions.invalid {
-        context.report_lint(
-            &INVALID_IGNORE_COMMENT,
-            invalid.error.range,
-            format_args!(
+        if let Some(diag) = context.report_lint(&INVALID_IGNORE_COMMENT, invalid.error.range) {
+            diag.into_diagnostic(format_args!(
                 "Invalid `{kind}` comment: {reason}",
                 kind = invalid.kind,
                 reason = &invalid.error
-            ),
-        );
+            ));
+        }
     }
 }
 
@@ -179,17 +188,19 @@ fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
         return;
     }
 
+    let diagnostics = context.diagnostics.get_mut();
+
     let all = context.suppressions;
     let mut unused = Vec::with_capacity(
         all.file
             .len()
             .saturating_add(all.line.len())
-            .saturating_sub(context.diagnostics.used_len()),
+            .saturating_sub(diagnostics.used_len()),
     );
 
     // Collect all suppressions that are unused after type-checking.
     for suppression in all {
-        if context.diagnostics.is_used(suppression.id()) {
+        if diagnostics.is_used(suppression.id()) {
             continue;
         }
 
@@ -203,7 +214,7 @@ fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
             // A `unused-ignore-comment` suppression can't ignore itself.
             // It can only ignore other suppressions.
             if unused_suppression.id() != suppression.id() {
-                context.diagnostics.mark_used(unused_suppression.id());
+                diagnostics.mark_used(unused_suppression.id());
                 continue;
             }
         }
@@ -211,37 +222,52 @@ fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
         unused.push(suppression);
     }
 
-    for suppression in unused {
+    let unused = unused.iter().filter(|suppression| {
         // This looks silly but it's necessary to check again if a `unused-ignore-comment` is indeed unused
         // in case the "unused" directive comes after it:
         // ```py
         // a = 10 / 2  # ty: ignore[unused-ignore-comment, division-by-zero]
         // ```
-        if context.diagnostics.is_used(suppression.id()) {
-            continue;
-        }
+        !context.is_suppression_used(suppression.id())
+    });
 
+    for suppression in unused {
         match suppression.target {
-            SuppressionTarget::All => context.report_unchecked(
-                &UNUSED_IGNORE_COMMENT,
-                suppression.range,
-                format_args!("Unused blanket `{}` directive", suppression.kind),
-            ),
-            SuppressionTarget::Lint(lint) => context.report_unchecked(
-                &UNUSED_IGNORE_COMMENT,
-                suppression.range,
-                format_args!(
+            SuppressionTarget::All => {
+                let Some(diag) =
+                    context.report_unchecked(&UNUSED_IGNORE_COMMENT, suppression.range)
+                else {
+                    continue;
+                };
+                diag.into_diagnostic(format_args!(
+                    "Unused blanket `{}` directive",
+                    suppression.kind
+                ))
+            }
+            SuppressionTarget::Lint(lint) => {
+                let Some(diag) =
+                    context.report_unchecked(&UNUSED_IGNORE_COMMENT, suppression.range)
+                else {
+                    continue;
+                };
+                diag.into_diagnostic(format_args!(
                     "Unused `{kind}` directive: '{code}'",
                     kind = suppression.kind,
                     code = lint.name()
-                ),
-            ),
-            SuppressionTarget::Empty => context.report_unchecked(
-                &UNUSED_IGNORE_COMMENT,
-                suppression.range,
-                format_args!("Unused `{kind}` without a code", kind = suppression.kind),
-            ),
-        }
+                ))
+            }
+            SuppressionTarget::Empty => {
+                let Some(diag) =
+                    context.report_unchecked(&UNUSED_IGNORE_COMMENT, suppression.range)
+                else {
+                    continue;
+                };
+                diag.into_diagnostic(format_args!(
+                    "Unused `{kind}` without a code",
+                    kind = suppression.kind
+                ))
+            }
+        };
     }
 }
 
@@ -249,17 +275,17 @@ struct CheckSuppressionsContext<'a> {
     db: &'a dyn Db,
     file: File,
     suppressions: &'a Suppressions,
-    diagnostics: &'a mut TypeCheckDiagnostics,
+    diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
 }
 
 impl<'a> CheckSuppressionsContext<'a> {
-    fn new(db: &'a dyn Db, file: File, diagnostics: &'a mut TypeCheckDiagnostics) -> Self {
+    fn new(db: &'a dyn Db, file: File, diagnostics: TypeCheckDiagnostics) -> Self {
         let suppressions = suppressions(db, file);
         Self {
             db,
             file,
             suppressions,
-            diagnostics,
+            diagnostics: diagnostics.into(),
         }
     }
 
@@ -270,38 +296,77 @@ impl<'a> CheckSuppressionsContext<'a> {
             .is_enabled(LintId::of(lint))
     }
 
-    fn report_lint(
-        &mut self,
+    fn is_suppression_used(&self, id: FileSuppressionId) -> bool {
+        self.diagnostics.borrow().is_used(id)
+    }
+
+    fn report_lint<'ctx>(
+        &'ctx self,
         lint: &'static LintMetadata,
         range: TextRange,
-        message: impl IntoDiagnosticMessage,
-    ) {
+    ) -> Option<SuppressionDiagnosticGuardBuilder<'ctx, 'a>> {
         if let Some(suppression) = self.suppressions.find_suppression(range, LintId::of(lint)) {
-            self.diagnostics.mark_used(suppression.id());
-            return;
+            self.diagnostics.borrow_mut().mark_used(suppression.id());
+            return None;
         }
 
-        self.report_unchecked(lint, range, message);
+        self.report_unchecked(lint, range)
     }
 
     /// Reports a diagnostic without checking if the lint at the given range is suppressed or marking
     /// the suppression as used.
-    fn report_unchecked(
-        &mut self,
+    fn report_unchecked<'ctx>(
+        &'ctx self,
         lint: &'static LintMetadata,
         range: TextRange,
-        message: impl IntoDiagnosticMessage,
-    ) {
-        let Some(severity) = self.db.rule_selection(self.file).severity(LintId::of(lint)) else {
-            return;
-        };
+    ) -> Option<SuppressionDiagnosticGuardBuilder<'ctx, 'a>> {
+        SuppressionDiagnosticGuardBuilder::new(self, lint, range)
+    }
+}
 
-        let id = DiagnosticId::Lint(lint.name());
-        let mut diag = Diagnostic::new(id, severity, message);
-        diag.set_documentation_url(Some(lint.documentation_url()));
-        let span = Span::from(self.file).with_range(range);
-        diag.annotate(Annotation::primary(span));
-        self.diagnostics.push(diag);
+/// A builder for constructing a diagnostic guard.
+///
+/// This type exists to separate the phases of "check if a diagnostic should
+/// be reported" and "build the actual diagnostic."
+pub(crate) struct SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
+    ctx: &'ctx CheckSuppressionsContext<'db>,
+    id: DiagnosticId,
+    range: TextRange,
+    severity: Severity,
+}
+
+impl<'ctx, 'db> SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
+    fn new(
+        ctx: &'ctx CheckSuppressionsContext<'db>,
+        lint: &'static LintMetadata,
+        range: TextRange,
+    ) -> Option<Self> {
+        let severity = ctx.db.rule_selection(ctx.file).severity(LintId::of(lint))?;
+
+        Some(Self {
+            ctx,
+            id: DiagnosticId::Lint(lint.name()),
+            severity,
+            range,
+        })
+    }
+
+    /// Create a new guard.
+    ///
+    /// This initializes a new diagnostic using the given message along with
+    /// the ID and severity used to create this builder.
+    ///
+    /// The diagnostic can be further mutated on the guard via its `DerefMut`
+    /// impl to `Diagnostic`.
+    pub(crate) fn into_diagnostic(
+        self,
+        message: impl IntoDiagnosticMessage,
+    ) -> DiagnosticGuard<'ctx> {
+        let mut diag = Diagnostic::new(self.id, self.severity, message);
+
+        let primary_span = Span::from(self.ctx.file).with_range(self.range);
+        diag.annotate(Annotation::primary(primary_span));
+        DiagnosticGuard::new(self.ctx.file, &self.ctx.diagnostics, diag)
     }
 }
 
