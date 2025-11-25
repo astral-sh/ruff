@@ -177,7 +177,7 @@ class Foo:
 ## Overloads
 
 The typing spec states that for an overloaded method, `@override` should only be applied to the
-implementation function. However, we nonetheless respect the decorator in this situation, even =
+implementation function. However, we nonetheless respect the decorator in this situation, even
 though we also emit `invalid-overload` on these methods.
 
 ```py

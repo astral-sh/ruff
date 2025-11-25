@@ -129,7 +129,8 @@ fn check_class_declaration<'db>(
             .member(db, &member.name)
             .place
         else {
-            continue;
+            // If not defined on any superclass, no point in continuing to walk up the MRO
+            break;
         };
 
         let Some(superclass_type_as_callable) = superclass_type
