@@ -29,7 +29,7 @@ use crate::types::generics::{
 };
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, CallableTypeKind, ClassLiteral,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableTypeKind, ClassLiteral,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
     KnownClass, MaterializationKind, NormalizedVisitor, ParamSpecAttrKind, TypeContext,
     TypeMapping, TypeRelation, VarianceInferable, todo_type,

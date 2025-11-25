@@ -62,10 +62,10 @@ use crate::types::diagnostic::{
     INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD,
     INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_FORM,
     INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases,
-    NON_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
-    SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
-    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
-    hint_if_stdlib_attribute_exists_on_other_versions,
+    NON_SUBSCRIPTABLE, POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL,
+    POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR,
+    USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_cannot_pop_required_field_on_typed_dict,
     report_duplicate_bases, report_implicit_return_type, report_index_out_of_bounds,
@@ -110,6 +110,7 @@ use crate::types::{
     TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
     UnionType, UnionTypeInstance, binding_type, todo_type,
 };
+use crate::types::{CallableTypes, liskov};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
 use crate::{Db, FxIndexSet, FxOrderSet, Program};

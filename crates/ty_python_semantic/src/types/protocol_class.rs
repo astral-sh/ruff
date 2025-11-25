@@ -6,7 +6,7 @@ use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
-use crate::types::TypeContext;
+use crate::types::{CallableTypeKind, TypeContext};
 use crate::{
     Db, FxOrderSet,
     place::{Definedness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
@@ -926,5 +926,9 @@ fn protocol_bind_self<'db>(
     callable: CallableType<'db>,
     self_type: Option<Type<'db>>,
 ) -> CallableType<'db> {
-    CallableType::new(db, callable.signatures(db).bind_self(db, self_type), false)
+    CallableType::new(
+        db,
+        callable.signatures(db).bind_self(db, self_type),
+        CallableTypeKind::Regular,
+    )
 }
