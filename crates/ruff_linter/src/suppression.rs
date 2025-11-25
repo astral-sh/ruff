@@ -20,9 +20,6 @@ pub(crate) struct SuppressionComment {
     /// Range containing the entire suppression comment
     range: TextRange,
 
-    /// How indented an own-line comment is, or None for trailing comments
-    indent: Option<String>,
-
     /// The action directive
     action: SuppressionAction,
 
@@ -38,14 +35,29 @@ impl SuppressionComment {
     fn codes_as_str<'src>(&self, source: &'src str) -> impl Iterator<Item = &'src str> {
         self.codes.iter().map(|range| source.slice(range))
     }
+}
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct PendingSuppressionComment<'a> {
+    /// How indented an own-line comment is, or None for trailing comments
+    indent: &'a str,
+
+    /// The suppression comment
+    comment: SuppressionComment,
+}
+
+impl PendingSuppressionComment<'_> {
     /// Whether the comment "matches" another comment, based on indentation and suppressed codes
-    fn matches(&self, other: &SuppressionComment, source: &str) -> bool {
-        ((self.action == SuppressionAction::Enable && other.action == SuppressionAction::Disable)
-            || (self.action == SuppressionAction::Disable
-                && other.action == SuppressionAction::Enable))
+    fn matches(&self, other: &PendingSuppressionComment, source: &str) -> bool {
+        ((self.comment.action == SuppressionAction::Enable
+            && other.comment.action == SuppressionAction::Disable)
+            || (self.comment.action == SuppressionAction::Disable
+                && other.comment.action == SuppressionAction::Enable))
             && self.indent == other.indent
-            && self.codes_as_str(source).eq(other.codes_as_str(source))
+            && self
+                .comment
+                .codes_as_str(source)
+                .eq(other.comment.codes_as_str(source))
     }
 }
 
@@ -109,7 +121,7 @@ pub(crate) struct SuppressionsBuilder<'a> {
     invalid: Vec<InvalidSuppression>,
     errors: Vec<ParseError>,
 
-    pending: Vec<SuppressionComment>,
+    pending: Vec<PendingSuppressionComment<'a>>,
 }
 
 impl<'a> SuppressionsBuilder<'a> {
@@ -143,7 +155,14 @@ impl<'a> SuppressionsBuilder<'a> {
                     let mut parser = SuppressionParser::new(self.source, token.range());
                     match parser.parse_comment() {
                         Ok(comment) => {
-                            let Some(indent) = &comment.indent else {
+                            let text_before = self.source.slice(TextRange::new(
+                                self.source.line_start(comment.range.start()),
+                                comment.range.start(),
+                            ));
+                            let is_own_line = text_before.chars().all(is_python_whitespace);
+                            let indent = is_own_line.then_some(text_before);
+
+                            let Some(indent) = indent else {
                                 // trailing suppressions are not supported
                                 self.invalid.push(InvalidSuppression {
                                     kind: InvalidSuppressionKind::Trailing,
@@ -162,7 +181,8 @@ impl<'a> SuppressionsBuilder<'a> {
                                             || t.kind() == TokenKind::Indent
                                     })
                             {
-                                self.pending.push(comment);
+                                self.pending
+                                    .push(PendingSuppressionComment { indent, comment });
                             } else {
                                 // weirdly indented? ¯\_(ツ)_/¯
                                 self.invalid.push(InvalidSuppression {
@@ -203,11 +223,7 @@ impl<'a> SuppressionsBuilder<'a> {
             let comment = &self.pending[comment_index];
 
             // skip comments from an outer indentation level
-            if comment
-                .indent
-                .as_ref()
-                .is_some_and(|indent| indent.text_len() < current_indent.text_len())
-            {
+            if comment.indent.text_len() < current_indent.text_len() {
                 comment_index += 1;
                 continue;
             }
@@ -222,12 +238,13 @@ impl<'a> SuppressionsBuilder<'a> {
                 let other = &self.pending[other_index];
 
                 // record a combined range suppression from the matching comments
-                let combined_range = TextRange::new(comment.range.start(), other.range.end());
-                for code in comment.codes_as_str(self.source) {
+                let combined_range =
+                    TextRange::new(comment.comment.range.start(), other.comment.range.end());
+                for code in comment.comment.codes_as_str(self.source) {
                     self.valid.push(Suppression {
                         code: code.into(),
                         range: combined_range,
-                        comments: smallvec![comment.clone(), other.clone()],
+                        comments: smallvec![comment.comment.clone(), other.comment.clone()],
                     });
                 }
 
@@ -237,7 +254,7 @@ impl<'a> SuppressionsBuilder<'a> {
             } else {
                 self.invalid.push(InvalidSuppression {
                     kind: InvalidSuppressionKind::Unmatched,
-                    comment: self.pending.remove(comment_index).clone(),
+                    comment: self.pending.remove(comment_index).comment.clone(),
                 });
             }
         }
@@ -290,18 +307,13 @@ impl Error for ParseError {}
 
 struct SuppressionParser<'src> {
     cursor: Cursor<'src>,
-    source: &'src str,
     range: TextRange,
 }
 
 impl<'src> SuppressionParser<'src> {
     fn new(source: &'src str, range: TextRange) -> Self {
         let cursor = Cursor::new(&source[range]);
-        Self {
-            cursor,
-            source,
-            range,
-        }
+        Self { cursor, range }
     }
 
     fn parse_comment(&mut self) -> Result<SuppressionComment, ParseError> {
@@ -321,16 +333,9 @@ impl<'src> SuppressionParser<'src> {
 
         self.eat_whitespace();
         let reason = TextRange::new(self.offset(), self.range.end());
-        let text_before = self.source.slice(TextRange::new(
-            self.source.line_start(self.range.start()),
-            self.range.start(),
-        ));
-        let is_own_line = text_before.chars().all(is_python_whitespace);
-        let indent = is_own_line.then(|| text_before.to_string());
 
         Ok(SuppressionComment {
             range: self.range,
-            indent,
             action,
             codes,
             reason,
@@ -485,9 +490,6 @@ def bar():
                     comments: [
                         SuppressionComment {
                             range: 129..156,
-                            indent: Some(
-                                "    ",
-                            ),
                             action: Disable,
                             codes: [
                                 145..149,
@@ -497,9 +499,6 @@ def bar():
                         },
                         SuppressionComment {
                             range: 231..257,
-                            indent: Some(
-                                "    ",
-                            ),
                             action: Enable,
                             codes: [
                                 246..250,
@@ -515,9 +514,6 @@ def bar():
                     comments: [
                         SuppressionComment {
                             range: 129..156,
-                            indent: Some(
-                                "    ",
-                            ),
                             action: Disable,
                             codes: [
                                 145..149,
@@ -527,9 +523,6 @@ def bar():
                         },
                         SuppressionComment {
                             range: 231..257,
-                            indent: Some(
-                                "    ",
-                            ),
                             action: Enable,
                             codes: [
                                 246..250,
@@ -545,9 +538,6 @@ def bar():
                     comments: [
                         SuppressionComment {
                             range: 91..113,
-                            indent: Some(
-                                "",
-                            ),
                             action: Disable,
                             codes: [
                                 107..112,
@@ -556,9 +546,6 @@ def bar():
                         },
                         SuppressionComment {
                             range: 258..279,
-                            indent: Some(
-                                "",
-                            ),
                             action: Enable,
                             codes: [
                                 273..278,
@@ -573,7 +560,6 @@ def bar():
                     kind: Trailing,
                     comment: SuppressionComment {
                         range: 57..89,
-                        indent: None,
                         action: Disable,
                         codes: [
                             73..76,
@@ -585,9 +571,6 @@ def bar():
                     kind: Unmatched,
                     comment: SuppressionComment {
                         range: 178..213,
-                        indent: Some(
-                            "        ",
-                        ),
                         action: Disable,
                         codes: [
                             194..199,
@@ -599,9 +582,6 @@ def bar():
                     kind: Indentation,
                     comment: SuppressionComment {
                         range: 372..409,
-                        indent: Some(
-                            "",
-                        ),
                         action: Enable,
                         codes: [
                             387..391,
@@ -613,9 +593,6 @@ def bar():
                     kind: Unmatched,
                     comment: SuppressionComment {
                         range: 328..362,
-                        indent: Some(
-                            "    ",
-                        ),
                         action: Disable,
                         codes: [
                             344..348,
@@ -738,13 +715,10 @@ def bar():
     fn disable_single_code() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable[foo]"),
-            @r#"
+            @r"
         Ok(
             SuppressionComment {
                 range: 0..20,
-                indent: Some(
-                    "",
-                ),
                 action: Disable,
                 codes: [
                     16..19,
@@ -752,7 +726,7 @@ def bar():
                 reason: 20..20,
             },
         )
-        "#,
+        ",
         );
     }
 
@@ -760,13 +734,10 @@ def bar():
     fn disable_single_code_with_reason() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable[foo] I like bar better"),
-            @r#"
+            @r"
         Ok(
             SuppressionComment {
                 range: 0..38,
-                indent: Some(
-                    "",
-                ),
                 action: Disable,
                 codes: [
                     16..19,
@@ -774,7 +745,7 @@ def bar():
                 reason: 21..38,
             },
         )
-        "#,
+        ",
         );
     }
 
@@ -782,13 +753,10 @@ def bar():
     fn disable_multiple_codes() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable[foo, bar]"),
-            @r#"
+            @r"
         Ok(
             SuppressionComment {
                 range: 0..25,
-                indent: Some(
-                    "",
-                ),
                 action: Disable,
                 codes: [
                     16..19,
@@ -797,7 +765,7 @@ def bar():
                 reason: 25..25,
             },
         )
-        "#,
+        ",
         );
     }
 
@@ -805,13 +773,10 @@ def bar():
     fn enable_single_code() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: enable[some-thing]"),
-            @r#"
+            @r"
         Ok(
             SuppressionComment {
                 range: 0..26,
-                indent: Some(
-                    "",
-                ),
                 action: Enable,
                 codes: [
                     15..25,
@@ -819,7 +784,7 @@ def bar():
                 reason: 26..26,
             },
         )
-        "#,
+        ",
         );
     }
 
@@ -833,7 +798,6 @@ def bar():
         Ok(
             SuppressionComment {
                 range: 22..48,
-                indent: None,
                 action: Enable,
                 codes: [
                     37..47,
@@ -843,10 +807,6 @@ def bar():
         )
         ",
         );
-        assert_debug_snapshot!(
-            comment.unwrap().indent,
-            @"None",
-        );
     }
 
     #[test]
@@ -855,13 +815,10 @@ def bar():
         let comment = parse_suppression_comment(source);
         assert_debug_snapshot!(
             comment,
-            @r#"
+            @r"
         Ok(
             SuppressionComment {
                 range: 4..30,
-                indent: Some(
-                    "    ",
-                ),
                 action: Enable,
                 codes: [
                     19..29,
@@ -869,15 +826,7 @@ def bar():
                 reason: 30..30,
             },
         )
-        "#,
-        );
-        assert_debug_snapshot!(
-            comment.unwrap().indent,
-            @r#"
-        Some(
-            "    ",
-        )
-        "#,
+        ",
         );
     }
 
