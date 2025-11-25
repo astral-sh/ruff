@@ -5812,13 +5812,7 @@ from .imp<CURSOR>
         let builder = completion_test_builder("deprecated<CURSOR>")
             .auto_import()
             .module_names();
-        assert_snapshot!(builder.build().snapshot(), @r"
-        Deprecated :: importlib.metadata
-        DeprecatedList :: importlib.metadata
-        DeprecatedNonAbstract :: importlib.metadata
-        DeprecatedTuple :: importlib.metadata
-        deprecated :: warnings
-        ");
+        assert_snapshot!(builder.build().snapshot(), @"deprecated :: warnings");
     }
 
     #[test]
@@ -5843,10 +5837,6 @@ from .imp<CURSOR>
             .auto_import()
             .module_names();
         assert_snapshot!(builder.build().snapshot(), @r"
-        Deprecated :: importlib.metadata
-        DeprecatedList :: importlib.metadata
-        DeprecatedNonAbstract :: importlib.metadata
-        DeprecatedTuple :: importlib.metadata
         deprecated :: typing_extensions
         deprecated :: warnings
         ");
@@ -5872,12 +5862,120 @@ from .imp<CURSOR>
             .auto_import()
             .module_names();
         assert_snapshot!(builder.build().snapshot(), @r"
-        Deprecated :: importlib.metadata
-        DeprecatedList :: importlib.metadata
-        DeprecatedNonAbstract :: importlib.metadata
-        DeprecatedTuple :: importlib.metadata
         deprecated :: typing_extensions
         deprecated :: warnings
+        ");
+    }
+
+    #[test]
+    fn reexport_simple_import_noauto() {
+        let snapshot = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+import foo
+foo.ZQ<CURSOR>
+"#,
+            )
+            .source("foo.py", r#"from bar import ZQZQ"#)
+            .source("bar.py", r#"ZQZQ = 1"#)
+            .completion_test_builder()
+            .module_names()
+            .build()
+            .snapshot();
+        assert_snapshot!(snapshot, @"ZQZQ :: Current module");
+    }
+
+    #[test]
+    fn reexport_simple_import_auto() {
+        let snapshot = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+ZQ<CURSOR>
+"#,
+            )
+            .source("foo.py", r#"from bar import ZQZQ"#)
+            .source("bar.py", r#"ZQZQ = 1"#)
+            .completion_test_builder()
+            .auto_import()
+            .module_names()
+            .build()
+            .snapshot();
+        // We're specifically looking for `ZQZQ` in `bar`
+        // here but *not* in `foo`. Namely, in `foo`,
+        // `ZQZQ` is a "regular" import that is not by
+        // convention considered a re-export.
+        assert_snapshot!(snapshot, @"ZQZQ :: bar");
+    }
+
+    #[test]
+    fn reexport_redundant_convention_import_noauto() {
+        let snapshot = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+import foo
+foo.ZQ<CURSOR>
+"#,
+            )
+            .source("foo.py", r#"from bar import ZQZQ as ZQZQ"#)
+            .source("bar.py", r#"ZQZQ = 1"#)
+            .completion_test_builder()
+            .module_names()
+            .build()
+            .snapshot();
+        assert_snapshot!(snapshot, @"ZQZQ :: Current module");
+    }
+
+    #[test]
+    fn reexport_redundant_convention_import_auto() {
+        let snapshot = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+ZQ<CURSOR>
+"#,
+            )
+            .source("foo.py", r#"from bar import ZQZQ as ZQZQ"#)
+            .source("bar.py", r#"ZQZQ = 1"#)
+            .completion_test_builder()
+            .auto_import()
+            .module_names()
+            .build()
+            .snapshot();
+        assert_snapshot!(snapshot, @r"
+        ZQZQ :: bar
+        ZQZQ :: foo
+        ");
+    }
+
+    #[test]
+    fn auto_import_respects_all() {
+        let snapshot = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+ZQ<CURSOR>
+"#,
+            )
+            .source(
+                "bar.py",
+                r#"
+                ZQZQ1 = 1
+                ZQZQ2 = 1
+                __all__ = ['ZQZQ1']
+            "#,
+            )
+            .completion_test_builder()
+            .auto_import()
+            .module_names()
+            .build()
+            .snapshot();
+        // We specifically do not want `ZQZQ2` here, since
+        // it is not part of `__all__`.
+        assert_snapshot!(snapshot, @r"
+        ZQZQ1 :: bar
         ");
     }
 
