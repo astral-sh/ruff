@@ -32,6 +32,7 @@ use crate::rules::ruff::rules::test_rules::{self, TEST_RULES, TestRule};
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::source_kind::SourceKind;
+use crate::suppression::Suppressions;
 use crate::{Locator, directives, fs};
 
 pub(crate) mod float;
@@ -323,6 +324,14 @@ pub fn check_path(
                 _ => unreachable!("All test rules must have an implementation"),
             }
         }
+    }
+
+    // Apply range suppressions before noqa, so that #noqa on a line already covered by a range
+    // will be reported as unused noqa rather than unused range.
+    // TODO: check if enabled?
+    {
+        let suppressions = Suppressions::from_tokens(locator.contents(), tokens);
+        suppressions.filter_diagnostics(&mut context);
     }
 
     // Enforce `noqa` directives.
