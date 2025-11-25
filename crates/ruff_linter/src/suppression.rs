@@ -1,3 +1,4 @@
+use compact_str::CompactString;
 use core::fmt;
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::LineRanges;
@@ -55,7 +56,7 @@ impl SuppressionComment {
 #[derive(Clone, Debug)]
 pub(crate) struct Suppression {
     /// The lint code being suppressed
-    code: String,
+    code: CompactString,
 
     /// Range for which the suppression applies
     range: TextRange,
@@ -154,7 +155,7 @@ impl<'a> SuppressionsBuilder<'a> {
                 let combined_range = TextRange::new(comment.range.start(), other.range.end());
                 for code in comment.codes_as_str(self.source) {
                     self.valid.push(Suppression {
-                        code,
+                        code: code.into(),
                         range: combined_range,
                         comments: smallvec![comment.clone(), other.clone()],
                     });
