@@ -25,7 +25,7 @@ use crate::types::string_annotation::{
 use crate::types::{
     BoundTypeVarInstance, ClassType, DynamicType, LintDiagnosticGuard, Protocol,
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
-    infer_isolated_expression, protocol_class::ProtocolClass,
+    protocol_class::ProtocolClass,
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy};
 use crate::{Db, DisplaySettings, FxIndexMap, Module, ModuleName, Program, declare_lint};
@@ -2190,7 +2190,7 @@ pub(super) fn report_invalid_assignment<'db>(
     target_node: AnyNodeRef,
     definition: Definition<'db>,
     target_ty: Type,
-    mut value_ty: Type<'db>,
+    value_ty: Type<'db>,
 ) {
     let definition_kind = definition.kind(context.db());
     let value_node = match definition_kind {
@@ -2208,13 +2208,6 @@ pub(super) fn report_invalid_assignment<'db>(
 
     let settings =
         DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), target_ty, value_ty);
-
-    if let Some(value_node) = value_node {
-        // Re-infer the RHS of the annotated assignment, ignoring the type context for more precise
-        // error messages.
-        value_ty =
-            infer_isolated_expression(context.db(), definition.scope(context.db()), value_node);
-    }
 
     let diagnostic_range = if let Some(value_node) = value_node {
         // Expand the range to include parentheses around the value, if any. This allows

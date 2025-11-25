@@ -37,7 +37,6 @@
 //! be considered a bug.)
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
@@ -204,24 +203,6 @@ fn infer_expression_types_impl<'db>(
         &module,
     )
     .finish_expression()
-}
-
-/// Infer the type of an expression in isolation.
-///
-/// The type returned by this function may be different than the type of the expression
-/// if it was inferred within its region, as it does not account for surrounding type context.
-/// This can be useful to re-infer the type of an expression for diagnostics.
-pub(crate) fn infer_isolated_expression<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    expr: &ast::Expr,
-) -> Type<'db> {
-    let file = scope.file(db);
-    let module = parsed_module(db, file).load(db);
-    let index = semantic_index(db, file);
-
-    TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index, &module)
-        .infer_isolated_expression(expr)
 }
 
 fn expression_cycle_recover<'db>(

@@ -11703,13 +11703,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Infer the type of the given expression in isolation, ignoring the surrounding region.
-    pub(super) fn infer_isolated_expression(mut self, expr: &ast::Expr) -> Type<'db> {
-        let expr_ty = self.infer_expression_impl(expr, TypeContext::default());
-        let _ = self.context.finish();
-        expr_ty
-    }
-
     pub(super) fn finish_expression(mut self) -> ExpressionInference<'db> {
         self.infer_region();
 
