@@ -3124,6 +3124,7 @@ dependencies = [
  "bitflags 2.10.0",
  "clap",
  "colored 3.0.0",
+ "compact_str",
  "fern",
  "glob",
  "globset",
