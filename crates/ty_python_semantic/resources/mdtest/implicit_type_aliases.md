@@ -403,7 +403,6 @@ reveal_type(ListOrTuple)  # revealed: types.UnionType
 reveal_type(ListOrTupleLegacy)  # revealed: types.UnionType
 reveal_type(MyCallable)  # revealed: GenericAlias
 reveal_type(AnnotatedType)  # revealed: <typing.Annotated special form>
-# TODO: This should ideally be `T@TransparentAlias`
 reveal_type(TransparentAlias)  # revealed: typing.TypeVar
 reveal_type(MyOptional)  # revealed: types.UnionType
 
@@ -658,6 +657,16 @@ def _(
     specialized: this_does_not_work()[int],
 ):
     reveal_type(specialized)  # revealed: Unknown
+```
+
+Similarly, if you try to specialize a union type without a binding context, we emit an error:
+
+```py
+# error: [invalid-type-form] "`types.UnionType` is not subscriptable"
+x: (list[T] | set[T])[int]
+
+def _():
+    reveal_type(x)  # revealed: Unknown
 ```
 
 ### Multiple definitions

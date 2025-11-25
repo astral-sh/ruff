@@ -762,19 +762,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let db = self.db();
 
-        let Some(type_alias_definition) = typevar_binding_context else {
-            // TODO
+        let Some(typevar_binding_context) = typevar_binding_context else {
             if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                builder.into_diagnostic(
-                    "Cannot specialize implicit type alias with unknown definition",
-                );
+                let mut diag = builder.into_diagnostic(format_args!(
+                    "`{}` is not subscriptable",
+                    value_ty.display(db)
+                ));
+                diag.info("Consider creating a type alias to create a binding context for the type variable(s)");
             }
             return Type::unknown();
         };
 
         let generic_type_alias = value_ty.apply_type_mapping(
             db,
-            &TypeMapping::BindLegacyTypevars(BindingContext::Definition(type_alias_definition)),
+            &TypeMapping::BindLegacyTypevars(BindingContext::Definition(typevar_binding_context)),
             TypeContext::default(),
         );
 
