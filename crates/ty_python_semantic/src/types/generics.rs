@@ -128,7 +128,7 @@ pub(crate) enum InferableTypeVars<'a, 'db> {
     ),
 }
 
-impl<'db> BoundTypeVarInstance<'db> {
+impl<'db> BoundTypeVarIdentity<'db> {
     pub(crate) fn is_inferable(
         self,
         db: &'db dyn Db,
@@ -136,9 +136,37 @@ impl<'db> BoundTypeVarInstance<'db> {
     ) -> bool {
         match inferable {
             InferableTypeVars::None => false,
-            InferableTypeVars::One(typevars) => typevars.contains(&self.identity(db)),
+            InferableTypeVars::One(typevars) => typevars.contains(&self),
             InferableTypeVars::Two(left, right) => {
                 self.is_inferable(db, *left) || self.is_inferable(db, *right)
+            }
+        }
+    }
+}
+
+impl<'db> BoundTypeVarInstance<'db> {
+    pub(crate) fn is_inferable(
+        self,
+        db: &'db dyn Db,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> bool {
+        self.identity(db).is_inferable(db, inferable)
+    }
+
+    /// Returns `true` if all bounds or constraints on this typevar are fully static.
+    ///
+    /// A type is fully static if its top and bottom materializations are the same; dynamic types
+    /// (like `Any`) will have different materializations.
+    pub(crate) fn has_fully_static_bound_or_constraints(self, db: &'db dyn Db) -> bool {
+        match self.typevar(db).bound_or_constraints(db) {
+            None => true,
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                bound.top_materialization(db) == bound.bottom_materialization(db)
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                constraints.elements(db).iter().all(|constraint| {
+                    constraint.top_materialization(db) == constraint.bottom_materialization(db)
+                })
             }
         }
     }
@@ -1511,7 +1539,7 @@ impl<'db> SpecializationBuilder<'db> {
                     let assignable_elements = (formal.elements(self.db).iter()).filter(|ty| {
                         actual
                             .when_subtype_of(self.db, **ty, self.inferable)
-                            .is_always_satisfied(self.db)
+                            .satisfied_by_all_typevars(self.db, self.inferable)
                     });
                     if assignable_elements.exactly_one().is_ok() {
                         return Ok(());
@@ -1521,6 +1549,20 @@ impl<'db> SpecializationBuilder<'db> {
                 let bound_typevars =
                     (formal.elements(self.db).iter()).filter_map(|ty| ty.as_typevar());
                 if let Ok(bound_typevar) = bound_typevars.exactly_one() {
+                    // If the actual argument can be satisfied by a non-typevar element of the
+                    // union, then prefer that element and avoid inferring a mapping for the
+                    // typevar. This lets other occurrences of the typevar (if any) drive the
+                    // specialization instead of opportunistically binding it here.
+                    let matches_non_typevar = formal.elements(self.db).iter().any(|ty| {
+                        !ty.has_typevar(self.db)
+                            && actual
+                                .when_subtype_of(self.db, *ty, self.inferable)
+                                .satisfied_by_all_typevars(self.db, self.inferable)
+                    });
+                    if matches_non_typevar {
+                        return Ok(());
+                    }
+
                     self.add_type_mapping(bound_typevar, actual, polarity, f);
                 }
             }
@@ -1542,7 +1584,7 @@ impl<'db> SpecializationBuilder<'db> {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         if !ty
                             .when_assignable_to(self.db, bound, self.inferable)
-                            .is_always_satisfied(self.db)
+                            .satisfied_by_all_typevars(self.db, self.inferable)
                         {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
@@ -1563,7 +1605,7 @@ impl<'db> SpecializationBuilder<'db> {
                         for constraint in constraints.elements(self.db) {
                             if ty
                                 .when_assignable_to(self.db, *constraint, self.inferable)
-                                .is_always_satisfied(self.db)
+                                .satisfied_by_all_typevars(self.db, self.inferable)
                             {
                                 self.add_type_mapping(bound_typevar, *constraint, polarity, f);
                                 return Ok(());
