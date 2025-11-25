@@ -284,6 +284,10 @@ jobs:
         run: cargo insta test --all-features --unreferenced reject --test-runner nextest
       - name: Dogfood ty on py-fuzzer
         run: uv run --project=./python/py-fuzzer cargo run -p ty check --project=./python/py-fuzzer
+      - name: Dogfood ty on the scripts directory
+        run: uv run --project=./scripts cargo run -p ty check --project=./scripts
+      - name: Dogfood ty on ty_benchmark
+        run: uv run --project=./scripts/ty_benchmark cargo run -p ty check --project=./scripts/ty_benchmark
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:

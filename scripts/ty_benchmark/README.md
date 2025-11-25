@@ -7,15 +7,19 @@
 
 1. Build ty: `cargo build --bin ty --release`
 1. `cd` into the benchmark directory: `cd scripts/ty_benchmark`
+1. Install Pyright: `npm install`
 1. Run benchmarks: `uv run benchmark`
+
+Requires hyperfine 1.20 or newer.
 
 ## Known limitations
 
-ty only implements a tiny fraction of Mypy's and Pyright's functionality,
-so the benchmarks aren't in any way a fair comparison today. However,
-they'll become more meaningful as we build out more type checking features in ty.
+The tested type checkers implement Python's type system to varying degrees and
+some projects only successfully pass type checking using a specific type checker.
 
-### Windows support
+## Updating the benchmark
 
-The script should work on Windows, but we haven't tested it yet.
-We do make use of `shlex` which has known limitations when using non-POSIX shells.
+The benchmark script supports snapshoting the results when running with `--snapshot` and `--accept`.
+The goal of those snapshots is to catch accidental regressions. For example, if a project adds
+new dependencies that we fail to install. They are not intended as a testing tool. E.g. the snapshot runner doesn't account for platform differences so that
+you might see differences when running the snapshots on your machine.

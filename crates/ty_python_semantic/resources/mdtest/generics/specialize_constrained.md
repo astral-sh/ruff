@@ -22,8 +22,10 @@ from ty_extensions import ConstraintSet, generic_context
 # fmt: off
 
 def unbounded[T]():
-    # revealed: ty_extensions.Specialization[T@unbounded = object]
+    # revealed: ty_extensions.Specialization[T@unbounded = Unknown]
     reveal_type(generic_context(unbounded).specialize_constrained(ConstraintSet.always()))
+    # revealed: ty_extensions.Specialization[T@unbounded = object]
+    reveal_type(generic_context(unbounded).specialize_constrained(ConstraintSet.range(Never, T, object)))
     # revealed: None
     reveal_type(generic_context(unbounded).specialize_constrained(ConstraintSet.never()))
 
@@ -88,6 +90,7 @@ that makes the test succeed.
 from typing import Any
 
 def bounded_by_gradual[T: Any]():
+    # TODO: revealed: ty_extensions.Specialization[T@bounded_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@bounded_by_gradual = object]
     reveal_type(generic_context(bounded_by_gradual).specialize_constrained(ConstraintSet.always()))
     # revealed: None
@@ -168,12 +171,16 @@ from typing import Any
 # fmt: off
 
 def constrained_by_gradual[T: (Base, Any)]():
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Unknown]
+    # revealed: ty_extensions.Specialization[T@constrained_by_gradual = Base]
+    reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.always()))
     # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual = object]
-    reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.always()))
+    reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.range(Never, T, object)))
     # revealed: None
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.never()))
 
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual = Base]
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.range(Never, T, Base)))
     # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
@@ -181,14 +188,14 @@ def constrained_by_gradual[T: (Base, Any)]():
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.range(Never, T, Unrelated)))
 
     # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
-    # revealed: ty_extensions.Specialization[T@constrained_by_gradual = Super]
+    # revealed: ty_extensions.Specialization[T@constrained_by_gradual = Base]
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.range(Never, T, Super)))
     # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual = Super]
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.range(Super, T, Super)))
 
     # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
-    # revealed: ty_extensions.Specialization[T@constrained_by_gradual = object]
+    # revealed: ty_extensions.Specialization[T@constrained_by_gradual = Base]
     reveal_type(generic_context(constrained_by_gradual).specialize_constrained(ConstraintSet.range(Sub, T, object)))
     # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual = Any]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual = Sub]
@@ -288,7 +295,7 @@ class Unrelated: ...
 # fmt: off
 
 def mutually_bound[T: Base, U]():
-    # revealed: ty_extensions.Specialization[T@mutually_bound = Base, U@mutually_bound = object]
+    # revealed: ty_extensions.Specialization[T@mutually_bound = Base, U@mutually_bound = Unknown]
     reveal_type(generic_context(mutually_bound).specialize_constrained(ConstraintSet.always()))
     # revealed: None
     reveal_type(generic_context(mutually_bound).specialize_constrained(ConstraintSet.never()))
@@ -296,7 +303,7 @@ def mutually_bound[T: Base, U]():
     # revealed: ty_extensions.Specialization[T@mutually_bound = Base, U@mutually_bound = Base]
     reveal_type(generic_context(mutually_bound).specialize_constrained(ConstraintSet.range(Never, U, T)))
 
-    # revealed: ty_extensions.Specialization[T@mutually_bound = Sub, U@mutually_bound = object]
+    # revealed: ty_extensions.Specialization[T@mutually_bound = Sub, U@mutually_bound = Unknown]
     reveal_type(generic_context(mutually_bound).specialize_constrained(ConstraintSet.range(Never, T, Sub)))
     # revealed: ty_extensions.Specialization[T@mutually_bound = Sub, U@mutually_bound = Sub]
     reveal_type(generic_context(mutually_bound).specialize_constrained(ConstraintSet.range(Never, T, Sub) & ConstraintSet.range(Never, U, T)))

@@ -49,11 +49,6 @@ fn check_class_declaration<'db>(
         return;
     };
 
-    // TODO: classmethods and staticmethods
-    if function.is_classmethod(db) || function.is_staticmethod(db) {
-        return;
-    }
-
     // Constructor methods are not checked for Liskov compliance
     if matches!(
         &*member.name,
@@ -126,7 +121,10 @@ fn check_class_declaration<'db>(
             break;
         };
 
-        let Some(superclass_type_as_callable) = superclass_type.try_upcast_to_callable(db) else {
+        let Some(superclass_type_as_callable) = superclass_type
+            .try_upcast_to_callable(db)
+            .map(|callables| callables.into_type(db))
+        else {
             continue;
         };
 

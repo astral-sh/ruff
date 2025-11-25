@@ -37,7 +37,8 @@ fn config_override_python_version() -> anyhow::Result<()> {
     5 | print(sys.last_exc)
       |       ^^^^^^^^^^^^
       |
-    info: Python 3.11 was assumed when accessing `last_exc`
+    info: The member may be available on other Python versions or platforms
+    info: Python 3.11 was assumed when resolving the `last_exc` attribute
      --> pyproject.toml:3:18
       |
     2 | [tool.ty.environment]
@@ -1179,6 +1180,8 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
             import os
 
             os.grantpt(1) # only available on unix, Python 3.13 or newer
+
+            from typing import LiteralString  # added in Python 3.11
             "#,
         ),
     ])?;
@@ -1194,8 +1197,11 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     3 |
     4 | os.grantpt(1) # only available on unix, Python 3.13 or newer
       | ^^^^^^^^^^
+    5 |
+    6 | from typing import LiteralString  # added in Python 3.11
       |
-    info: Python 3.10 was assumed when accessing `grantpt`
+    info: The member may be available on other Python versions or platforms
+    info: Python 3.10 was assumed when resolving the `grantpt` attribute
      --> ty.toml:3:18
       |
     2 | [environment]
@@ -1205,7 +1211,26 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
       |
     info: rule `unresolved-attribute` is enabled by default
 
-    Found 1 diagnostic
+    error[unresolved-import]: Module `typing` has no member `LiteralString`
+     --> main.py:6:20
+      |
+    4 | os.grantpt(1) # only available on unix, Python 3.13 or newer
+    5 |
+    6 | from typing import LiteralString  # added in Python 3.11
+      |                    ^^^^^^^^^^^^^
+      |
+    info: The member may be available on other Python versions or platforms
+    info: Python 3.10 was assumed when resolving imports
+     --> ty.toml:3:18
+      |
+    2 | [environment]
+    3 | python-version = "3.10"
+      |                  ^^^^^^ Python 3.10 assumed due to this configuration setting
+    4 | python-platform = "linux"
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 2 diagnostics
 
     ----- stderr -----
     "#);
@@ -1225,6 +1250,8 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
             import os
 
             os.grantpt(1) # only available on unix, Python 3.13 or newer
+
+            from typing import LiteralString  # added in Python 3.11
             "#,
         ),
     ])?;

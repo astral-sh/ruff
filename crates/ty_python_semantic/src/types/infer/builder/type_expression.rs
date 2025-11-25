@@ -679,11 +679,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 Type::unknown()
             }
-            ast::Expr::Subscript(ast::ExprSubscript {
-                value,
-                slice: parameters,
-                ..
-            }) => {
+            ast::Expr::Subscript(
+                subscript @ ast::ExprSubscript {
+                    value,
+                    slice: parameters,
+                    ..
+                },
+            ) => {
                 let parameters_ty = match self.infer_expression(value, TypeContext::default()) {
                     Type::SpecialForm(SpecialFormType::Union) => match &**parameters {
                         ast::Expr::Tuple(tuple) => {
@@ -698,6 +700,40 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         }
                         _ => self.infer_subclass_of_type_expression(parameters),
                     },
+                    value_ty @ Type::ClassLiteral(class_literal) => {
+                        if class_literal.is_protocol(self.db()) {
+                            SubclassOfType::from(
+                                self.db(),
+                                todo_type!("type[T] for protocols").expect_dynamic(),
+                            )
+                        } else {
+                            match class_literal.generic_context(self.db()) {
+                                Some(generic_context) => {
+                                    let db = self.db();
+                                    let specialize = |types: &[Option<Type<'db>>]| {
+                                        SubclassOfType::from(
+                                            db,
+                                            class_literal.apply_specialization(db, |_| {
+                                                generic_context
+                                                    .specialize_partial(db, types.iter().copied())
+                                            }),
+                                        )
+                                    };
+                                    self.infer_explicit_callable_specialization(
+                                        subscript,
+                                        value_ty,
+                                        generic_context,
+                                        specialize,
+                                    )
+                                }
+                                None => {
+                                    // TODO: emit a diagnostic if you try to specialize a non-generic class.
+                                    self.infer_type_expression(parameters);
+                                    todo_type!("specialized non-generic class")
+                                }
+                            }
+                        }
+                    }
                     _ => {
                         self.infer_type_expression(parameters);
                         todo_type!("unsupported nested subscript in type[X]")
@@ -1011,7 +1047,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let callable_type = if let (Some(parameters), Some(return_type), true) =
             (parameters, return_type, correct_argument_number)
         {
-            CallableType::single(db, Signature::new(parameters, Some(return_type)))
+            Type::single_callable(db, Signature::new(parameters, Some(return_type)))
         } else {
             CallableType::unknown(db)
         };
@@ -1227,7 +1263,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let argument_type = self.infer_expression(&arguments[0], TypeContext::default());
 
-                let Some(callable_type) = argument_type.try_upcast_to_callable(db) else {
+                let Some(callable_type) = argument_type
+                    .try_upcast_to_callable(db)
+                    .map(|callables| callables.into_type(self.db()))
+                else {
                     if let Some(builder) = self
                         .context
                         .report_lint(&INVALID_TYPE_FORM, arguments_slice)
