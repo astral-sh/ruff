@@ -5,6 +5,7 @@ use ruff_db::{
     diagnostic::{Annotation, Diagnostic, DiagnosticId, SubDiagnostic, SubDiagnosticSeverity},
     files::File,
 };
+use std::cell::RefCell;
 use std::fmt::Write;
 
 /// Suggest a name from `existing_names` that is similar to `wrong_name`.
@@ -163,9 +164,21 @@ where
 /// if either is violated, then the `Drop` impl on `DiagnosticGuard` will
 /// panic.
 pub(super) struct DiagnosticGuard<'sink> {
+    /// The file of the primary span (to which file does this diagnostic belong).
     file: File,
 
-    sink: &'sink std::cell::RefCell<TypeCheckDiagnostics>,
+    /// The target where to emit the diagnostic to.
+    ///
+    /// We use a [`RefCell`] here over a `&mut TypeCheckDiagnostics` to ensure the fact that
+    /// `InferContext` (and other contexts with diagnostics) use a [`RefCell`] internally
+    /// remains abstracted away. Specifically, we want to ensure that calling `report_lint` on
+    /// [`InferContext`] twice doesn't result in a panic:
+    ///
+    /// ```ignore
+    /// let diag1 = context.report_lint(...);
+    /// let diag2 = context.report_lint(...); // should not panic because of second mutable borrow
+    /// ```
+    sink: &'sink RefCell<TypeCheckDiagnostics>,
 
     /// The diagnostic that we want to report.
     ///
