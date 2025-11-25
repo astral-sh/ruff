@@ -7037,18 +7037,7 @@ impl<'db> Type<'db> {
             }
             Type::Callable(_) | Type::DataclassTransformer(_) => KnownClass::Type.to_instance(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
-            Type::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db) {
-                    None => KnownClass::Type.to_instance(db),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.to_meta_type(db),
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        // TODO: If we add a proper `OneOf` connector, we should use that here instead
-                        // of union. (Using a union here doesn't break anything, but it is imprecise.)
-                        constraints.map(db, |constraint| constraint.to_meta_type(db))
-                    }
-                }
-            }
-
+            Type::TypeVar(_) => todo_type!("type[T] for a type variable T"),
             Type::ClassLiteral(class) => class.metaclass(db),
             Type::GenericAlias(alias) => ClassType::from(alias).metaclass(db),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
