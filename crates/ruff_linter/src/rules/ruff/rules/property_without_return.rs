@@ -1,8 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
 use ruff_python_ast::{Expr, Stmt, StmtFunctionDef};
 use ruff_python_semantic::analyze::{function_type, visibility};
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::{FixAvailability, Violation};
@@ -79,7 +79,7 @@ pub(crate) fn property_without_return(checker: &Checker, function_def: &StmtFunc
         PropertyWithoutReturn {
             name: name.to_string(),
         },
-        function_def.range(),
+        function_def.identifier(),
     );
 }
 

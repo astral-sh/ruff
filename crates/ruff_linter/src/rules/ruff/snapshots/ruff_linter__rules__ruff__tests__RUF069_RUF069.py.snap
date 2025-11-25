@@ -2,40 +2,30 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
 RUF069 name is a property without a `return` statement
-  --> RUF069.py:6:5
-   |
- 5 |   class User:  # Test normal class properties
- 6 | /     @property
- 7 | |     def name(self):  # ERROR: No return
- 8 | |         f"{self.first_name} {self.last_name}"
-   | |_____________________________________________^
- 9 |
-10 |       @property
-   |
+ --> RUF069.py:7:9
+  |
+5 | class User:  # Test normal class properties
+6 |     @property
+7 |     def name(self):  # ERROR: No return
+  |         ^^^^
+8 |         f"{self.first_name} {self.last_name}"
+  |
 
 RUF069 nested is a property without a `return` statement
-  --> RUF069.py:17:5
+  --> RUF069.py:18:9
    |
-15 |           x = 1
-16 |
-17 | /     @property
-18 | |     def nested(self):  # ERROR: Property itself doesn't return
-19 | |         def inner():
-20 | |             return 0
-   | |____________________^
-21 |
-22 |       @property
+17 |     @property
+18 |     def nested(self):  # ERROR: Property itself doesn't return
+   |         ^^^^^^
+19 |         def inner():
+20 |             return 0
    |
 
 RUF069 prop2 is a property without a `return` statement
-  --> RUF069.py:42:5
+  --> RUF069.py:43:9
    |
-40 |           return 1
-41 |
-42 | /     @property
-43 | |     def prop2(self):  # ERROR: Not returning something (even when we are inside an ABC)
-44 | |         50
-   | |__________^
-45 |
-46 |       def method(self):  # OK: Not a property
+42 |     @property
+43 |     def prop2(self):  # ERROR: Not returning something (even when we are inside an ABC)
+   |         ^^^^^
+44 |         50
    |
