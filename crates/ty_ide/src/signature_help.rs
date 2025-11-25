@@ -74,7 +74,7 @@ pub fn signature_help(db: &dyn Db, file: File, offset: TextSize) -> Option<Signa
 
     // Get signature details from the semantic analyzer.
     let signature_details: Vec<CallSignatureDetails<'_>> =
-        call_signature_details(db, &model, call_expr);
+        call_signature_details(&model, call_expr);
 
     if signature_details.is_empty() {
         return None;

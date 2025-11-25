@@ -11,7 +11,8 @@ use ty_python_semantic::{DisplaySettings, SemanticModel};
 
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
     let parsed = parsed_module(db, file).load(db);
-    let goto_target = find_goto_target(&parsed, offset)?;
+    let model = SemanticModel::new(db, file);
+    let goto_target = find_goto_target(&model, &parsed, offset)?;
 
     if let GotoTarget::Expression(expr) = goto_target {
         if expr.is_literal_expr() {
@@ -19,7 +20,6 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         }
     }
 
-    let model = SemanticModel::new(db, file);
     let docs = goto_target
         .get_definition_targets(
             &model,
@@ -902,6 +902,191 @@ mod tests {
            | source
            |
         ");
+    }
+
+    #[test]
+    fn hover_string_annotation1() {
+        let test = cursor_test(
+            r#"
+        a: "MyCla<CURSOR>ss" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        MyClass
+        ---------------------------------------------
+        some docs
+
+        ---------------------------------------------
+        ```python
+        MyClass
+        ```
+        ---
+        some docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:5
+          |
+        2 | a: "MyClass" = 1
+          |     ^^^^^-^
+          |     |    |
+          |     |    Cursor offset
+          |     source
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_string_annotation2() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyCl<CURSOR>ass" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        some docs
+
+        ---------------------------------------------
+        some docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^-^^
+          |            |   |
+          |            |   Cursor offset
+          |            source
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_string_annotation3() {
+        let test = cursor_test(
+            r#"
+        a: "None |<CURSOR> MyClass" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"Hover provided no content");
+    }
+
+    #[test]
+    fn hover_string_annotation4() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyClass<CURSOR>" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        some docs
+
+        ---------------------------------------------
+        some docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^^^^- Cursor offset
+          |            |
+          |            source
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_string_annotation5() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyClass"<CURSOR> = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"Hover provided no content");
+    }
+
+    #[test]
+    fn hover_string_annotation_dangling1() {
+        let test = cursor_test(
+            r#"
+        a: "MyCl<CURSOR>ass |" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"Hover provided no content");
+    }
+
+    #[test]
+    fn hover_string_annotation_dangling2() {
+        let test = cursor_test(
+            r#"
+        a: "MyCl<CURSOR>ass | No" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        some docs
+
+        ---------------------------------------------
+        some docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:5
+          |
+        2 | a: "MyClass | No" = 1
+          |     ^^^^-^^
+          |     |   |
+          |     |   Cursor offset
+          |     source
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_string_annotation_dangling3() {
+        let test = cursor_test(
+            r#"
+        a: "MyClass | N<CURSOR>o" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"Hover provided no content");
     }
 
     #[test]

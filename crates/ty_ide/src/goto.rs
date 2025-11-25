@@ -190,6 +190,24 @@ pub(crate) enum GotoTarget<'a> {
         /// The call of the callable
         call: &'a ast::ExprCall,
     },
+
+    /// Go to on a sub-expression of a string annotation's sub-AST
+    ///
+    /// ```py
+    /// x: "int | None"
+    ///           ^^^^
+    /// ```
+    ///
+    /// This is equivalent to `GotoTarget::Expression` but the expression
+    /// isn't actually in the AST.
+    StringAnnotationSubexpr {
+        /// The string literal that is a string annotation.
+        string_expr: &'a ast::ExprStringLiteral,
+        /// The range to query in the sub-AST for the sub-expression.
+        subrange: TextRange,
+        /// If the expression is a Name of some kind this is the name (just a cached result).
+        name: Option<String>,
+    },
 }
 
 /// The resolved definitions for a `GotoTarget`
@@ -227,7 +245,7 @@ impl<'db> DefinitionsOrTargets<'db> {
     /// In this case it basically returns exactly what was found.
     pub(crate) fn declaration_targets(
         self,
-        db: &'db dyn crate::Db,
+        db: &'db dyn ty_python_semantic::Db,
     ) -> Option<crate::NavigationTargets> {
         match self {
             DefinitionsOrTargets::Definitions(definitions) => {
@@ -243,7 +261,7 @@ impl<'db> DefinitionsOrTargets<'db> {
     /// if the definition we have is found in a stub file.
     pub(crate) fn definition_targets(
         self,
-        db: &'db dyn crate::Db,
+        db: &'db dyn ty_python_semantic::Db,
     ) -> Option<crate::NavigationTargets> {
         match self {
             DefinitionsOrTargets::Definitions(definitions) => {
@@ -322,14 +340,30 @@ impl GotoTarget<'_> {
             | GotoTarget::TypeParamTypeVarTupleName(_)
             | GotoTarget::NonLocal { .. }
             | GotoTarget::Globals { .. } => return None,
+            GotoTarget::StringAnnotationSubexpr {
+                string_expr,
+                subrange,
+                ..
+            } => {
+                let (subast, _submodel) = model.enter_string_annotation(string_expr)?;
+                let submod = subast.syntax();
+                let subnode = covering_node(submod.into(), *subrange).node();
+
+                // The type checker knows the type of the full annotation but nothing else
+                if AnyNodeRef::from(&*submod.body) == subnode {
+                    string_expr.inferred_type(model)
+                } else {
+                    // TODO: force the typechecker to tell us its secrets
+                    // (it computes but then immediately discards these types)
+                    return None;
+                }
+            }
             GotoTarget::BinOp { expression, .. } => {
-                let (_, ty) =
-                    ty_python_semantic::definitions_for_bin_op(model.db(), model, expression)?;
+                let (_, ty) = ty_python_semantic::definitions_for_bin_op(model, expression)?;
                 ty
             }
             GotoTarget::UnaryOp { expression, .. } => {
-                let (_, ty) =
-                    ty_python_semantic::definitions_for_unary_op(model.db(), model, expression)?;
+                let (_, ty) = ty_python_semantic::definitions_for_unary_op(model, expression)?;
                 ty
             }
         };
@@ -343,7 +377,7 @@ impl GotoTarget<'_> {
         model: &SemanticModel,
     ) -> Option<String> {
         if let GotoTarget::Call { call, .. } = self {
-            call_type_simplified_by_overloads(model.db(), model, call)
+            call_type_simplified_by_overloads(model, call)
         } else {
             None
         }
@@ -367,14 +401,10 @@ impl GotoTarget<'_> {
         alias_resolution: ImportAliasResolution,
     ) -> Option<DefinitionsOrTargets<'db>> {
         use crate::NavigationTarget;
-        let db = model.db();
-        let file = model.file();
-
         match self {
             GotoTarget::Expression(expression) => {
                 definitions_for_expression(model, expression).map(DefinitionsOrTargets::Definitions)
             }
-
             // For already-defined symbols, they are their own definitions
             GotoTarget::FunctionDef(function) => Some(DefinitionsOrTargets::Definitions(vec![
                 ResolvedDefinition::Definition(function.definition(model)),
@@ -395,8 +425,7 @@ impl GotoTarget<'_> {
                 let symbol_name = alias.name.as_str();
                 Some(DefinitionsOrTargets::Definitions(
                     definitions_for_imported_symbol(
-                        db,
-                        file,
+                        model,
                         import_from,
                         symbol_name,
                         alias_resolution,
@@ -423,7 +452,7 @@ impl GotoTarget<'_> {
                     let alias_range = alias.asname.as_ref().unwrap().range;
                     Some(DefinitionsOrTargets::Targets(
                         crate::NavigationTargets::single(NavigationTarget {
-                            file,
+                            file: model.file(),
                             focus_range: alias_range,
                             full_range: alias.range(),
                         }),
@@ -436,7 +465,7 @@ impl GotoTarget<'_> {
                 keyword,
                 call_expression,
             } => Some(DefinitionsOrTargets::Definitions(
-                definitions_for_keyword_argument(db, file, keyword, call_expression),
+                definitions_for_keyword_argument(model, keyword, call_expression),
             )),
 
             // For exception variables, they are their own definitions (like parameters)
@@ -451,7 +480,10 @@ impl GotoTarget<'_> {
                 if let Some(rest_name) = &pattern_mapping.rest {
                     let range = rest_name.range;
                     Some(DefinitionsOrTargets::Targets(
-                        crate::NavigationTargets::single(NavigationTarget::new(file, range)),
+                        crate::NavigationTargets::single(NavigationTarget::new(
+                            model.file(),
+                            range,
+                        )),
                     ))
                 } else {
                     None
@@ -463,7 +495,10 @@ impl GotoTarget<'_> {
                 if let Some(name) = &pattern_as.name {
                     let range = name.range;
                     Some(DefinitionsOrTargets::Targets(
-                        crate::NavigationTargets::single(NavigationTarget::new(file, range)),
+                        crate::NavigationTargets::single(NavigationTarget::new(
+                            model.file(),
+                            range,
+                        )),
                     ))
                 } else {
                     None
@@ -488,19 +523,40 @@ impl GotoTarget<'_> {
 
             GotoTarget::BinOp { expression, .. } => {
                 let (definitions, _) =
-                    ty_python_semantic::definitions_for_bin_op(db, model, expression)?;
+                    ty_python_semantic::definitions_for_bin_op(model, expression)?;
 
                 Some(DefinitionsOrTargets::Definitions(definitions))
             }
 
             GotoTarget::UnaryOp { expression, .. } => {
                 let (definitions, _) =
-                    ty_python_semantic::definitions_for_unary_op(db, model, expression)?;
+                    ty_python_semantic::definitions_for_unary_op(model, expression)?;
 
                 Some(DefinitionsOrTargets::Definitions(definitions))
             }
 
-            _ => None,
+            // String annotations sub-expressions require us to recurse into the sub-AST
+            GotoTarget::StringAnnotationSubexpr {
+                string_expr,
+                subrange,
+                ..
+            } => {
+                let (subast, submodel) = model.enter_string_annotation(string_expr)?;
+                let subexpr = covering_node(subast.syntax().into(), *subrange)
+                    .node()
+                    .as_expr_ref()?;
+                definitions_for_expression(&submodel, &subexpr)
+                    .map(DefinitionsOrTargets::Definitions)
+            }
+
+            // TODO: implement these
+            GotoTarget::PatternKeywordArgument(..)
+            | GotoTarget::PatternMatchStarName(..)
+            | GotoTarget::TypeParamTypeVarName(..)
+            | GotoTarget::TypeParamParamSpecName(..)
+            | GotoTarget::TypeParamTypeVarTupleName(..)
+            | GotoTarget::NonLocal { .. }
+            | GotoTarget::Globals { .. } => None,
         }
     }
 
@@ -519,6 +575,7 @@ impl GotoTarget<'_> {
                 ast::ExprRef::Attribute(attr) => Some(Cow::Borrowed(attr.attr.as_str())),
                 _ => None,
             },
+            GotoTarget::StringAnnotationSubexpr { name, .. } => name.as_deref().map(Cow::Borrowed),
             GotoTarget::FunctionDef(function) => Some(Cow::Borrowed(function.name.as_str())),
             GotoTarget::ClassDef(class) => Some(Cow::Borrowed(class.name.as_str())),
             GotoTarget::Parameter(parameter) => Some(Cow::Borrowed(parameter.name.as_str())),
@@ -579,6 +636,7 @@ impl GotoTarget<'_> {
 
     /// Creates a `GotoTarget` from a `CoveringNode` and an offset within the node
     pub(crate) fn from_covering_node<'a>(
+        model: &SemanticModel,
         covering_node: &crate::find_node::CoveringNode<'a>,
         offset: TextSize,
         tokens: &Tokens,
@@ -778,6 +836,31 @@ impl GotoTarget<'_> {
                 Some(GotoTarget::Expression(unary.into()))
             }
 
+            node @ AnyNodeRef::ExprStringLiteral(string_expr) => {
+                // Check if we've clicked on a sub-GotoTarget inside a string annotation's sub-AST
+                if let Some((subast, submodel)) = model.enter_string_annotation(string_expr)
+                    && let Some(GotoTarget::Expression(subexpr)) = find_goto_target_impl(
+                        &submodel,
+                        subast.tokens(),
+                        subast.syntax().into(),
+                        offset,
+                    )
+                {
+                    let name = match subexpr {
+                        ast::ExprRef::Name(name) => Some(name.id.to_string()),
+                        ast::ExprRef::Attribute(attr) => Some(attr.attr.to_string()),
+                        _ => None,
+                    };
+                    Some(GotoTarget::StringAnnotationSubexpr {
+                        string_expr,
+                        subrange: subexpr.range(),
+                        name,
+                    })
+                } else {
+                    node.as_expr_ref().map(GotoTarget::Expression)
+                }
+            }
+
             node => {
                 // Check if this is seemingly a callable being invoked (the `x` in `x(...)`)
                 let parent = covering_node.parent();
@@ -813,6 +896,7 @@ impl Ranged for GotoTarget<'_> {
             GotoTarget::ImportModuleComponent {
                 component_range, ..
             } => *component_range,
+            GotoTarget::StringAnnotationSubexpr { subrange, .. } => *subrange,
             GotoTarget::ImportModuleAlias { alias } => alias.asname.as_ref().unwrap().range,
             GotoTarget::ExceptVariable(except) => except.name.as_ref().unwrap().range,
             GotoTarget::KeywordArgument { keyword, .. } => keyword.arg.as_ref().unwrap().range,
@@ -833,7 +917,7 @@ impl Ranged for GotoTarget<'_> {
 
 /// Converts a collection of `ResolvedDefinition` items into `NavigationTarget` items.
 fn convert_resolved_definitions_to_targets(
-    db: &dyn crate::Db,
+    db: &dyn ty_python_semantic::Db,
     definitions: Vec<ty_python_semantic::ResolvedDefinition<'_>>,
 ) -> Vec<crate::NavigationTarget> {
     definitions
@@ -872,11 +956,9 @@ fn definitions_for_expression<'db>(
     expression: &ruff_python_ast::ExprRef<'_>,
 ) -> Option<Vec<ResolvedDefinition<'db>>> {
     match expression {
-        ast::ExprRef::Name(name) => Some(definitions_for_name(model.db(), model.file(), name)),
+        ast::ExprRef::Name(name) => Some(definitions_for_name(model, name)),
         ast::ExprRef::Attribute(attribute) => Some(ty_python_semantic::definitions_for_attribute(
-            model.db(),
-            model.file(),
-            attribute,
+            model, attribute,
         )),
         _ => None,
     }
@@ -887,7 +969,7 @@ fn definitions_for_callable<'db>(
     call: &ast::ExprCall,
 ) -> Vec<ResolvedDefinition<'db>> {
     // Attempt to refine to a specific call
-    let signature_info = call_signature_details(model.db(), model, call);
+    let signature_info = call_signature_details(model, call);
     signature_info
         .into_iter()
         .filter_map(|signature| signature.definition.map(ResolvedDefinition::Definition))
@@ -896,7 +978,7 @@ fn definitions_for_callable<'db>(
 
 /// Shared helper to map and convert resolved definitions into navigation targets.
 fn definitions_to_navigation_targets<'db>(
-    db: &dyn crate::Db,
+    db: &dyn ty_python_semantic::Db,
     stub_mapper: Option<&StubMapper<'db>>,
     mut definitions: Vec<ty_python_semantic::ResolvedDefinition<'db>>,
 ) -> Option<crate::NavigationTargets> {
@@ -911,12 +993,21 @@ fn definitions_to_navigation_targets<'db>(
     }
 }
 
-pub(crate) fn find_goto_target(
-    parsed: &ParsedModuleRef,
+pub(crate) fn find_goto_target<'a>(
+    model: &'a SemanticModel,
+    parsed: &'a ParsedModuleRef,
     offset: TextSize,
-) -> Option<GotoTarget<'_>> {
-    let token = parsed
-        .tokens()
+) -> Option<GotoTarget<'a>> {
+    find_goto_target_impl(model, parsed.tokens(), parsed.syntax().into(), offset)
+}
+
+pub(crate) fn find_goto_target_impl<'a>(
+    model: &'a SemanticModel,
+    tokens: &'a Tokens,
+    syntax: AnyNodeRef<'a>,
+    offset: TextSize,
+) -> Option<GotoTarget<'a>> {
+    let token = tokens
         .at_offset(offset)
         .max_by_key(|token| match token.kind() {
             TokenKind::Name
@@ -937,18 +1028,18 @@ pub(crate) fn find_goto_target(
         return None;
     }
 
-    let covering_node = covering_node(parsed.syntax().into(), token.range())
+    let covering_node = covering_node(syntax, token.range())
         .find_first(|node| {
             node.is_identifier() || node.is_expression() || node.is_stmt_import_from()
         })
         .ok()?;
 
-    GotoTarget::from_covering_node(&covering_node, offset, parsed.tokens())
+    GotoTarget::from_covering_node(model, &covering_node, offset, tokens)
 }
 
 /// Helper function to resolve a module name and create a navigation target.
 fn definitions_for_module<'db>(
-    model: &SemanticModel,
+    model: &SemanticModel<'db>,
     module: Option<&str>,
     level: u32,
 ) -> Option<DefinitionsOrTargets<'db>> {
