@@ -1,16 +1,23 @@
 use std::borrow::Cow;
+use std::collections::HashMap;
 
-use lsp_types::{self as types, Url, request as req};
+use lsp_types::{self as types, NumberOrString, TextEdit, Url, request as req};
+use ruff_db::files::File;
+use ruff_diagnostics::Edit;
+use ruff_text_size::Ranged;
+use ty_ide::code_actions;
 use ty_project::ProjectDatabase;
 use types::{CodeActionKind, CodeActionOrCommand};
 
-use crate::DIAGNOSTIC_NAME;
+use crate::db::Db;
+use crate::document::{RangeExt, ToRangeExt};
 use crate::server::Result;
 use crate::server::api::RequestHandler;
 use crate::server::api::diagnostics::DiagnosticData;
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RetriableRequestHandler};
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
+use crate::{DIAGNOSTIC_NAME, PositionEncoding};
 
 pub(crate) struct CodeActionRequestHandler;
 
@@ -24,45 +31,81 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
     }
 
     fn run_with_snapshot(
-        _db: &ProjectDatabase,
-        _snapshot: &DocumentSnapshot,
+        db: &ProjectDatabase,
+        snapshot: &DocumentSnapshot,
         _client: &Client,
         params: types::CodeActionParams,
     ) -> Result<Option<types::CodeActionResponse>> {
         let diagnostics = params.context.diagnostics;
 
+        let Some(file) = snapshot.to_notebook_or_file(db) else {
+            return Ok(None);
+        };
         let mut actions = Vec::new();
 
         for mut diagnostic in diagnostics.into_iter().filter(|diagnostic| {
             diagnostic.source.as_deref() == Some(DIAGNOSTIC_NAME)
                 && range_intersect(&diagnostic.range, &params.range)
         }) {
-            let Some(data) = diagnostic.data.take() else {
+            // If the diagnostic already encoded a fix, just use that
+            if let Some(data) = diagnostic.data.take() {
+                let data: DiagnosticData = match serde_json::from_value(data) {
+                    Ok(data) => data,
+                    Err(err) => {
+                        tracing::warn!("Failed to deserialize diagnostic data: {err}");
+                        continue;
+                    }
+                };
+
+                actions.push(CodeActionOrCommand::CodeAction(lsp_types::CodeAction {
+                    title: data.fix_title,
+                    kind: Some(CodeActionKind::QUICKFIX),
+                    diagnostics: Some(vec![diagnostic]),
+                    edit: Some(lsp_types::WorkspaceEdit {
+                        changes: Some(data.edits),
+                        document_changes: None,
+                        change_annotations: None,
+                    }),
+                    is_preferred: Some(true),
+                    command: None,
+                    disabled: None,
+                    data: None,
+                }));
+                continue;
+            }
+
+            // Try to find actions to resolve this diagnostic
+            let Some(NumberOrString::String(diagnostic_id)) = &diagnostic.code else {
                 continue;
             };
 
-            let data: DiagnosticData = match serde_json::from_value(data) {
-                Ok(data) => data,
-                Err(err) => {
-                    tracing::warn!("Failed to deserialize diagnostic data: {err}");
-                    continue;
-                }
+            let Some(range) =
+                diagnostic
+                    .range
+                    .to_text_range(db, file, snapshot.url(), snapshot.encoding())
+            else {
+                continue;
+            };
+            let Some(fixes) = code_actions(db, file, range, diagnostic_id) else {
+                continue;
             };
 
-            actions.push(CodeActionOrCommand::CodeAction(lsp_types::CodeAction {
-                title: data.fix_title,
-                kind: Some(CodeActionKind::QUICKFIX),
-                diagnostics: Some(vec![diagnostic]),
-                edit: Some(lsp_types::WorkspaceEdit {
-                    changes: Some(data.edits),
-                    document_changes: None,
-                    change_annotations: None,
-                }),
-                is_preferred: Some(true),
-                command: None,
-                disabled: None,
-                data: None,
-            }));
+            for action in fixes {
+                actions.push(CodeActionOrCommand::CodeAction(lsp_types::CodeAction {
+                    title: action.title,
+                    kind: Some(CodeActionKind::QUICKFIX),
+                    diagnostics: Some(vec![diagnostic.clone()]),
+                    edit: Some(lsp_types::WorkspaceEdit {
+                        changes: to_lsp_edits(db, file, snapshot.encoding(), vec![action.edit]),
+                        document_changes: None,
+                        change_annotations: None,
+                    }),
+                    is_preferred: Some(true),
+                    command: None,
+                    disabled: None,
+                    data: None,
+                }));
+            }
         }
 
         if actions.is_empty() {
@@ -71,6 +114,32 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
 
         Ok(Some(actions))
     }
+}
+
+fn to_lsp_edits(
+    db: &dyn Db,
+    file: File,
+    encoding: PositionEncoding,
+    edits: Vec<Edit>,
+) -> Option<HashMap<Url, Vec<TextEdit>>> {
+    let mut lsp_edits: HashMap<Url, Vec<lsp_types::TextEdit>> = HashMap::new();
+
+    for edit in edits {
+        let location = edit
+            .range()
+            .to_lsp_range(db, file, encoding)?
+            .to_location()?;
+
+        lsp_edits
+            .entry(location.uri)
+            .or_default()
+            .push(lsp_types::TextEdit {
+                range: location.range,
+                new_text: edit.content().unwrap_or_default().to_string(),
+            });
+    }
+
+    Some(lsp_edits)
 }
 
 fn range_intersect(range: &lsp_types::Range, other: &lsp_types::Range) -> bool {
