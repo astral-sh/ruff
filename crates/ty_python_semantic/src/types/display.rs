@@ -1646,7 +1646,11 @@ struct DisplayParameters<'a, 'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let multiline = self.settings.multiline && self.parameters.len() > 1;
+        // For `ParamSpec` kind, the parameters still contain `*args` and `**kwargs`, but we
+        // display them as `**P` instead, so avoid multiline in that case.
+        // TODO: This might change once we support `Concatenate`
+        let multiline =
+            self.settings.multiline && self.parameters.len() > 1 && !self.parameters.is_paramspec();
         // Opening parenthesis
         f.write_char('(')?;
         if multiline {
