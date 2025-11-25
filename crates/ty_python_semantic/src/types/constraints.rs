@@ -3019,7 +3019,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         // that _some_ valid specialization satisfies the constraint set, it's correct for us to
         // return the range of valid materializations that we can choose from.
         match self.typevar(db).bound_or_constraints(db) {
-            None => Node::AlwaysTrue,
+            None => ConstrainedTypeVar::new_node(db, self, Type::Never, Type::object()),
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 let bound = bound.top_materialization(db);
                 ConstrainedTypeVar::new_node(db, self, Type::Never, bound)
