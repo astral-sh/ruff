@@ -27,6 +27,7 @@
 //! [`await_request`]: TestServer::await_request
 //! [`await_notification`]: TestServer::await_notification
 
+mod code_actions;
 mod commands;
 mod initialize;
 mod inlay_hints;
@@ -740,7 +741,7 @@ impl TestServer {
         self.initialize_response.as_ref()
     }
 
-    fn file_uri(&self, path: impl AsRef<SystemPath>) -> Url {
+    pub(crate) fn file_uri(&self, path: impl AsRef<SystemPath>) -> Url {
         Url::from_file_path(self.test_context.root().join(path.as_ref()).as_std_path())
             .expect("Path must be a valid URL")
     }

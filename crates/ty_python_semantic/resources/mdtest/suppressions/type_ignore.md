@@ -96,6 +96,8 @@ a = test  # type: ignore[name-defined]
 
 ## Nested comments
 
+<!-- snapshot-diagnostics -->
+
 ```py
 # fmt: off
 a = test \
@@ -103,6 +105,14 @@ a = test \
 
 a = test \
   + 2  # type: ignore # fmt: skip
+
+a = (3
+  # error: [unused-ignore-comment]
+  + 2)  # ty:ignore[division-by-zero] # fmt: skip
+
+a = (3
+  # error: [unused-ignore-comment]
+  + 2)  # fmt: skip # ty:ignore[division-by-zero]
 ```
 
 ## Misspelled `type: ignore`
