@@ -12,6 +12,7 @@ use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashSet;
 use ty_project::Db;
 
 use crate::completion::CompletionKind;
@@ -340,11 +341,16 @@ pub(crate) fn symbols_for_file(db: &dyn Db, file: File) -> FlatSymbols {
         symbols: IndexVec::new(),
         symbol_stack: vec![],
         in_function: false,
+        in_class: false,
         global_only: false,
+        all_origin: None,
+        all_names: FxHashSet::default(),
+        all_invalid: false,
+        debug: false,
     };
     visitor.visit_body(&module.syntax().body);
     FlatSymbols {
-        symbols: visitor.symbols,
+        symbols: visitor.into_symbols(),
     }
 }
 
@@ -362,11 +368,23 @@ pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: File) -> FlatSymbo
         symbols: IndexVec::new(),
         symbol_stack: vec![],
         in_function: false,
+        in_class: false,
         global_only: true,
+        all_origin: None,
+        all_names: FxHashSet::default(),
+        all_invalid: false,
+        debug: {
+            let path = file.path(db);
+            let yes = path.as_str().ends_with("numpy/__init__.pyi");
+            if yes {
+                eprintln!("DEBUGGING: {path}");
+            }
+            yes
+        },
     };
     visitor.visit_body(&module.syntax().body);
     FlatSymbols {
-        symbols: visitor.symbols,
+        symbols: visitor.into_symbols(),
     }
 }
 
@@ -377,6 +395,13 @@ struct SymbolTree {
     kind: SymbolKind,
     name_range: TextRange,
     full_range: TextRange,
+    re_export: Option<ReExport>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+enum ReExport {
+    Normal,
+    RedundantAlias,
 }
 
 /// A visitor over all symbols in a single file.
@@ -386,12 +411,81 @@ struct SymbolTree {
 struct SymbolVisitor {
     symbols: IndexVec<SymbolId, SymbolTree>,
     symbol_stack: Vec<SymbolId>,
-    /// Track if we're currently inside a function (to exclude local variables)
+    /// Track if we're currently inside a function.
     in_function: bool,
+    /// Track if we're currently inside a class.
+    in_class: bool,
     global_only: bool,
+    /// The origin of an `__all__` variable, if found.
+    all_origin: Option<DunderAllOrigin>,
+    /// A set of names extracted from `__all__`.
+    all_names: FxHashSet<String>,
+    /// A flag indicating whether the module uses unrecognized
+    /// `__all__` idioms or there are any invalid elements in
+    /// `__all__`.
+    all_invalid: bool,
+    #[allow(dead_code)]
+    debug: bool,
 }
 
+// BREADCRUMBS:
+//
+// There are a few remaining cases we need to consider here.
+//
+// First is `__all__` support. We should try to parse it in the visitor
+// below, and then use it as a filter in `SymbolVisitor::into_symbols`.
+//
+// Second is `from module import *` support. This one is tricky because
+// it requires getting the imports from another module and then
+// re-exporting them here.
+//
+// Third is a higher level concern: we need to come up with a rule
+// to pair down the symbols we include in auto-import. Perhaps, for
+// example, we should omit modules that themselves or a parent start
+// with a `_`.
+//
+// N.B. numpy uses `__all__` to declare re-exports as public.
+
 impl SymbolVisitor {
+    fn into_symbols(self) -> IndexVec<SymbolId, SymbolTree> {
+        // We want to filter out some of the symbols we collected.
+        // But, we always assigned IDs to each symbol based on
+        // their position in a sequence. So when we filter some
+        // out, we need to remap the identifiers.
+        //
+        // N.B. This can be skipped when `global_only` is true,
+        // since in that case, none of the symbols have a parent
+        // ID by construction.
+        let mut remap = IndexVec::with_capacity(self.symbols.len());
+        let mut new = IndexVec::with_capacity(self.symbols.len());
+        for mut symbol in self.symbols {
+            if symbol.re_export == Some(ReExport::Normal) && !self.all_names.contains(&symbol.name)
+            {
+                remap.push(None);
+                continue;
+            }
+            if let Some(ref mut parent) = symbol.parent {
+                // OK because the visitor guarantees that
+                // all parents have IDs less than their
+                // children. So its ID has already been
+                // remapped.
+                if let Some(new_parent) = remap[*parent] {
+                    *parent = new_parent;
+                } else {
+                    // The parent symbol was dropped, so
+                    // all of its children should be as
+                    // well.
+                    remap.push(None);
+                    continue;
+                }
+            }
+            let new_id = new.next_index();
+            remap.push(Some(new_id));
+            new.push(symbol);
+        }
+        new
+    }
+
     fn visit_body(&mut self, body: &[ast::Stmt]) {
         for stmt in body {
             self.visit_stmt(stmt);
@@ -429,8 +523,154 @@ impl SymbolVisitor {
             kind,
             name_range: name.range(),
             full_range: stmt.range(),
+            re_export: None,
         };
         self.add_symbol(symbol)
+    }
+
+    fn add_import_alias(&mut self, stmt: &ast::Stmt, alias: &ast::Alias) -> SymbolId {
+        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+        let kind = if stmt.is_import_stmt() {
+            SymbolKind::Module
+        } else if Self::is_constant_name(name.as_str()) {
+            SymbolKind::Constant
+        } else {
+            SymbolKind::Variable
+        };
+        let re_export = Some(
+            if alias.asname.as_ref().map(ast::Identifier::as_str) == Some(alias.name.as_str()) {
+                ReExport::RedundantAlias
+            } else {
+                ReExport::Normal
+            },
+        );
+        self.add_symbol(SymbolTree {
+            parent: None,
+            name: name.id.to_string(),
+            kind,
+            name_range: name.range(),
+            full_range: stmt.range(),
+            re_export,
+        })
+    }
+
+    /// Extracts `__all__` names from the given assignment.
+    ///
+    /// If the assignment isn't for `__all__`, then this is a no-op.
+    fn add_all_assignment(&mut self, targets: &[ast::Expr], value: Option<&ast::Expr>) {
+        if self.in_function || self.in_class {
+            return;
+        }
+        let Some(target) = targets.first() else {
+            return;
+        };
+        if !is_dunder_all(&target) {
+            return;
+        }
+
+        let Some(value) = value else { return };
+        match *value {
+            // `__all__ = [...]`
+            // `__all__ = (...)`
+            ast::Expr::List(ast::ExprList { ref elts, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { ref elts, .. }) => {
+                self.update_all_origin(DunderAllOrigin::CurrentModule);
+                if !self.add_all_names(elts) {
+                    self.all_invalid = true;
+                }
+            }
+            _ => {
+                self.all_invalid = true;
+            }
+        }
+    }
+
+    /// Extends the current set of names with the names from the
+    /// given expression which currently must be a list/tuple/set of
+    /// string-literal names. This currently does not support using a
+    /// submodule's `__all__` variable.
+    ///
+    /// Returns `true` if the expression is a valid list/tuple/set or
+    /// module `__all__`, `false` otherwise.
+    fn extend_all(&mut self, expr: &ast::Expr) -> bool {
+        match expr {
+            // `__all__ += [...]`
+            // `__all__ += (...)`
+            // `__all__ += {...}`
+            ast::Expr::List(ast::ExprList { elts, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { elts, .. })
+            | ast::Expr::Set(ast::ExprSet { elts, .. }) => self.add_all_names(elts),
+            _ => false,
+        }
+    }
+
+    /// Processes a call idiom for `__all__` and updates the set of
+    /// names accordingly.
+    ///
+    /// Returns `true` if the call idiom is recognized and valid,
+    /// `false` otherwise.
+    fn update_all_by_call_idiom(
+        &mut self,
+        function_name: &ast::Identifier,
+        arguments: &ast::Arguments,
+    ) -> bool {
+        if arguments.len() != 1 {
+            return false;
+        }
+        let Some(argument) = arguments.find_positional(0) else {
+            return false;
+        };
+        match function_name.as_str() {
+            // `__all__.extend([...])`
+            // `__all__.extend(module.__all__)`
+            "extend" => {
+                if !self.extend_all(argument) {
+                    return false;
+                }
+            }
+            // `__all__.append(...)`
+            "append" => {
+                let Some(name) = create_all_name(argument) else {
+                    return false;
+                };
+                self.all_names.insert(name);
+            }
+            // `__all__.remove(...)`
+            "remove" => {
+                let Some(name) = create_all_name(argument) else {
+                    return false;
+                };
+                self.all_names.remove(&name);
+            }
+            _ => return false,
+        }
+        true
+    }
+
+    /// Add valid names from `__all__` to the set of existing `__all__`
+    /// names.
+    ///
+    /// Returns `false` if any of the names are invalid.
+    fn add_all_names(&mut self, exprs: &[ast::Expr]) -> bool {
+        for expr in exprs {
+            let Some(name) = create_all_name(expr) else {
+                return false;
+            };
+            self.all_names.insert(name);
+        }
+        true
+    }
+
+    /// Updates the origin of `__all__` in the current module.
+    ///
+    /// This will clear existing names if the origin is changed to
+    /// mimic the behavior of overriding `__all__` in the current
+    /// module.
+    fn update_all_origin(&mut self, origin: DunderAllOrigin) {
+        if self.all_origin.is_some() {
+            self.all_names.clear();
+        }
+        self.all_origin = Some(origin);
     }
 
     fn push_symbol(&mut self, symbol: SymbolTree) {
@@ -477,6 +717,7 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
                     kind,
                     name_range: func_def.name.range(),
                     full_range: stmt.range(),
+                    re_export: None,
                 };
 
                 if self.global_only {
@@ -505,6 +746,7 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
                     kind: SymbolKind::Class,
                     name_range: class_def.name.range(),
                     full_range: stmt.range(),
+                    re_export: None,
                 };
 
                 if self.global_only {
@@ -513,11 +755,20 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
                     return;
                 }
 
+                // Mark that we're entering a class scope
+                let was_in_class = self.in_class;
+                self.in_class = true;
+
                 self.push_symbol(symbol);
                 source_order::walk_stmt(self, stmt);
                 self.pop_symbol();
+
+                // Restore the previous class scope state
+                self.in_class = was_in_class;
             }
             ast::Stmt::Assign(assign) => {
+                self.add_all_assignment(&assign.targets, Some(&assign.value));
+
                 // Include assignments only when we're in global or class scope
                 if self.in_function {
                     return;
@@ -530,6 +781,11 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
                 }
             }
             ast::Stmt::AnnAssign(ann_assign) => {
+                self.add_all_assignment(
+                    std::slice::from_ref(&ann_assign.target),
+                    ann_assign.value.as_deref(),
+                );
+
                 // Include assignments only when we're in global or class scope
                 if self.in_function {
                     return;
@@ -539,11 +795,98 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
                 };
                 self.add_assignment(stmt, name);
             }
+            ast::Stmt::AugAssign(aug_assign) => {
+                if self.all_origin.is_none() {
+                    // We can't update `__all__` if it doesn't already
+                    // exist.
+                    return;
+                }
+                if !is_dunder_all(&aug_assign.target) {
+                    return;
+                }
+                if !self.extend_all(&aug_assign.value) {
+                    self.all_invalid = true;
+                }
+            }
+            ast::Stmt::Expr(expr) => {
+                if self.all_origin.is_none() {
+                    // We can't update `__all__` if it doesn't already exist.
+                    return;
+                }
+                let Some(ast::ExprCall {
+                    func, arguments, ..
+                }) = expr.value.as_call_expr()
+                else {
+                    return;
+                };
+                let Some(ast::ExprAttribute {
+                    value,
+                    attr,
+                    ctx: ast::ExprContext::Load,
+                    ..
+                }) = func.as_attribute_expr()
+                else {
+                    return;
+                };
+                if !is_dunder_all(value) {
+                    return;
+                }
+                if !self.update_all_by_call_idiom(attr, arguments) {
+                    self.all_invalid = true;
+                }
+
+                source_order::walk_stmt(self, stmt);
+            }
+            ast::Stmt::Import(import) => {
+                // We only consider imports in global scope.
+                if self.in_function {
+                    return;
+                }
+                for alias in &import.names {
+                    self.add_import_alias(stmt, alias);
+                }
+            }
+            ast::Stmt::ImportFrom(import_from) => {
+                // We only consider imports in global scope.
+                if self.in_function {
+                    return;
+                }
+                for alias in &import_from.names {
+                    self.add_import_alias(stmt, alias);
+                }
+            }
+            // FIXME: We don't currently try to evaluate `if`
+            // statements. We just assume that all `if` statements are
+            // always `True`. This applies to symbols in general but
+            // also `__all__`.
             _ => {
                 source_order::walk_stmt(self, stmt);
             }
         }
     }
+}
+
+/// Represents where an `__all__` has been defined.
+#[derive(Debug, Clone)]
+enum DunderAllOrigin {
+    /// The `__all__` variable is defined in the current module.
+    CurrentModule,
+    /// The `__all__` variable is imported from another module.
+    ExternalModule,
+    /// The `__all__` variable is imported from a module via a `*`-import.
+    StarImport,
+}
+
+/// Checks if the given expression is a name expression for `__all__`.
+fn is_dunder_all(expr: &ast::Expr) -> bool {
+    matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "__all__")
+}
+
+/// Create and return a string representing a name from the given
+/// expression, or `None` if it is an invalid expression for a
+/// `__all__` element.
+fn create_all_name(expr: &ast::Expr) -> Option<String> {
+    Some(expr.as_string_literal_expr()?.value.to_str().to_string())
 }
 
 #[cfg(test)]
@@ -612,6 +955,25 @@ def quux():
         );
     }
 
+    /// The typing spec says that names beginning with an underscore
+    /// ought to be considered unexported[1]. However, at present, we
+    /// currently include them in completions but rank them lower than
+    /// non-underscore names. So this tests that we return underscore
+    /// names.
+    ///
+    /// [1]: https://typing.python.org/en/latest/spec/distributing.html#library-interface-public-and-private-symbols
+    #[test]
+    fn exports_underscore() {
+        insta::assert_snapshot!(
+            public_test("\
+_foo = 1
+").exports(),
+            @r"
+        _foo :: Variable
+        ",
+        );
+    }
+
     #[test]
     fn exports_conditional_true() {
         insta::assert_snapshot!(
@@ -656,6 +1018,221 @@ if TYPE_CHECKING:
             @r"
         foo :: Variable
         bar :: Variable
+        ",
+        );
+    }
+
+    #[test]
+    fn exports_import_no_reexport() {
+        insta::assert_snapshot!(
+            public_test("\
+import collections
+").exports(),
+            @r"",
+        );
+    }
+
+    #[test]
+    fn exports_import_as_no_reexport() {
+        insta::assert_snapshot!(
+            public_test("\
+import numpy as np
+").exports(),
+            @r"",
+        );
+    }
+
+    #[test]
+    fn exports_from_import_no_reexport() {
+        insta::assert_snapshot!(
+            public_test("\
+from collections import defaultdict
+").exports(),
+            @r"",
+        );
+    }
+
+    #[test]
+    fn exports_from_import_as_no_reexport() {
+        insta::assert_snapshot!(
+            public_test("\
+from collections import defaultdict as dd
+").exports(),
+            @r"",
+        );
+    }
+
+    #[test]
+    fn exports_import_reexport() {
+        insta::assert_snapshot!(
+            public_test("\
+import numpy as numpy
+").exports(),
+            @"numpy :: Module",
+        );
+    }
+
+    #[test]
+    fn exports_from_import_reexport() {
+        insta::assert_snapshot!(
+            public_test("\
+from collections import defaultdict as defaultdict
+").exports(),
+            @"defaultdict :: Variable",
+        );
+    }
+
+    #[test]
+    fn exports_from_import_all_reexport_assignment() {
+        insta::assert_snapshot!(
+            public_test("\
+from collections import defaultdict
+__all__ = ['defaultdict']
+").exports(),
+            @r"
+        defaultdict :: Variable
+        __all__ :: Variable
+        ",
+        );
+
+        insta::assert_snapshot!(
+            public_test("\
+from collections import defaultdict
+__all__ = ('defaultdict',)
+").exports(),
+            @r"
+        defaultdict :: Variable
+        __all__ :: Variable
+        ",
+        );
+    }
+
+    #[test]
+    fn exports_from_import_all_reexport_annotated_assignment() {
+        insta::assert_snapshot!(
+            public_test("\
+from collections import defaultdict
+__all__: list[str] = ['defaultdict']
+").exports(),
+            @r"
+        defaultdict :: Variable
+        __all__ :: Variable
+        ",
+        );
+
+        insta::assert_snapshot!(
+            public_test("\
+from collections import defaultdict
+__all__: tuple[str, ...] = ('defaultdict',)
+").exports(),
+            @r"
+        defaultdict :: Variable
+        __all__ :: Variable
+        ",
+        );
+    }
+
+    #[test]
+    fn exports_from_import_all_reexport_augmented_assignment() {
+        insta::assert_snapshot!(
+            public_test("\
+from collections import defaultdict
+__all__ = []
+__all__ += ['defaultdict']
+").exports(),
+            @r"
+        defaultdict :: Variable
+        __all__ :: Variable
+        ",
+        );
+
+        insta::assert_snapshot!(
+            public_test("\
+from collections import defaultdict
+__all__ = []
+__all__ += ('defaultdict',)
+").exports(),
+            @r"
+        defaultdict :: Variable
+        __all__ :: Variable
+        ",
+        );
+
+        insta::assert_snapshot!(
+            public_test("\
+from collections import defaultdict
+__all__ = []
+__all__ += {'defaultdict'}
+").exports(),
+            @r"
+        defaultdict :: Variable
+        __all__ :: Variable
+        ",
+        );
+    }
+
+    #[test]
+    fn exports_from_import_all_reexport_invalid_augmented_assignment() {
+        insta::assert_snapshot!(
+            public_test("\
+from collections import defaultdict
+__all__ += ['defaultdict']
+").exports(),
+            @"",
+        );
+    }
+
+    #[test]
+    fn exports_from_import_all_reexport_extend() {
+        insta::assert_snapshot!(
+            public_test("\
+from collections import defaultdict
+__all__ = []
+__all__.extend(['defaultdict'])
+").exports(),
+            @r"
+        defaultdict :: Variable
+        __all__ :: Variable
+        ",
+        );
+    }
+
+    #[test]
+    fn exports_from_import_all_reexport_invalid_extend() {
+        insta::assert_snapshot!(
+            public_test("\
+from collections import defaultdict
+__all__.extend(['defaultdict'])
+").exports(),
+            @r"",
+        );
+    }
+
+    #[test]
+    fn exports_from_import_all_reexport_append() {
+        insta::assert_snapshot!(
+            public_test("\
+from collections import defaultdict
+__all__ = []
+__all__.append('defaultdict')
+").exports(),
+            @r"
+        defaultdict :: Variable
+        __all__ :: Variable
+        ",
+        );
+    }
+
+    #[test]
+    fn exports_from_import_all_reexport_remove() {
+        insta::assert_snapshot!(
+            public_test("\
+from collections import defaultdict
+__all__ = []
+__all__.remove('defaultdict')
+").exports(),
+            @r"
+        __all__ :: Variable
         ",
         );
     }
