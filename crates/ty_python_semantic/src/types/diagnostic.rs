@@ -14,9 +14,11 @@ use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::semantic_index::{global_scope, place_table, use_def_map};
 use crate::suppression::FileSuppressionId;
 use crate::types::call::CallError;
-use crate::types::class::{DisjointBase, DisjointBaseKind, Field, MethodDecorator};
+use crate::types::class::{
+    CodeGeneratorKind, DisjointBase, DisjointBaseKind, Field, MethodDecorator,
+};
 use crate::types::function::{FunctionType, KnownFunction};
-use crate::types::liskov::{MethodKind, SynthesizedMethodKind};
+use crate::types::liskov::MethodKind;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
@@ -3636,20 +3638,20 @@ pub(super) fn report_invalid_method_override<'db>(
                 }
             }
         }
-        MethodKind::Synthesized(synthesized_kind) => {
+        MethodKind::Synthesized(class_kind) => {
             let make_sub =
                 |message: fmt::Arguments| SubDiagnostic::new(SubDiagnosticSeverity::Info, message);
 
-            let mut sub = match synthesized_kind {
-                SynthesizedMethodKind::Dataclass => make_sub(format_args!(
+            let mut sub = match class_kind {
+                CodeGeneratorKind::DataclassLike(_) => make_sub(format_args!(
                     "`{overridden_method}` is a generated method created because \
                         `{superclass_name}` is a dataclass"
                 )),
-                SynthesizedMethodKind::NamedTuple => make_sub(format_args!(
+                CodeGeneratorKind::NamedTuple => make_sub(format_args!(
                     "`{overridden_method}` is a generated method created because \
                         `{superclass_name}` inherits from `typing.NamedTuple`"
                 )),
-                SynthesizedMethodKind::TypedDict => make_sub(format_args!(
+                CodeGeneratorKind::TypedDict => make_sub(format_args!(
                     "`{overridden_method}` is a generated method created because \
                         `{superclass_name}` is a `TypedDict`"
                 )),

@@ -264,3 +264,51 @@ class Child2(Parent2):
     @override
     def bar(self): ...  # fine
 ```
+
+## Override of a synthesized method
+
+```pyi
+from typing_extensions import NamedTuple, TypedDict, override, Any, Self
+from dataclasses import dataclass
+
+@dataclass(order=True)
+class ParentDataclass:
+    x: int
+
+class Child(ParentDataclass):
+    @override
+    def __lt__(self, other: ParentDataclass) -> bool: ...  # fine
+
+class MyNamedTuple(NamedTuple):
+    x: int
+
+    @override
+    # TODO: this raises an exception at runtime (which we should emit a diagnostic for).
+    # It shouldn't be an `explicit-override` diagnostic, however.
+    def _asdict(self, /) -> dict[str, Any]: ...
+
+class MyNamedTupleParent(NamedTuple):
+    x: int
+
+class MyNamedTupleChild(MyNamedTupleParent):
+    @override
+    def _asdict(self, /) -> dict[str, Any]: ...  # fine
+
+class MyTypedDict(TypedDict):
+    x: int
+
+    @override
+    # TODO: it's invalid to define a method on a `TypedDict` class,
+    # so we should emit a diagnostic here.
+    # It shouldn't be an `explicit-override` diagnostic, however.
+    def copy(self) -> Self: ...
+
+class Grandparent(Any): ...
+
+class Parent(Grandparent, NamedTuple):  # error: [invalid-named-tuple]
+    x: int
+
+class Child(Parent):
+    @override
+    def foo(self): ...  # fine because `Any` is in the MRO
+```

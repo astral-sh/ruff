@@ -60,12 +60,12 @@ fn check_class_declaration<'db>(
         return;
     }
 
+    let (literal, specialization) = class.class_literal(db);
+    let class_kind = CodeGeneratorKind::from_class(db, literal, specialization);
+
     // Synthesized `__replace__` methods on dataclasses are not checked
     if &member.name == "__replace__"
-        && matches!(
-            CodeGeneratorKind::from_class(db, class.class_literal(db).0, None),
-            Some(CodeGeneratorKind::DataclassLike(_))
-        )
+        && matches!(class_kind, Some(CodeGeneratorKind::DataclassLike(_)))
     {
         return;
     }
@@ -78,21 +78,26 @@ fn check_class_declaration<'db>(
 
     let mut subclass_overrides_superclass_declaration = false;
     let mut has_dynamic_superclass = false;
+    let mut has_typeddict_in_mro = false;
+    let mut liskov_diagnostic_emitted = false;
 
     for class_base in class.iter_mro(db).skip(1) {
         let superclass = match class_base {
+            ClassBase::Protocol | ClassBase::Generic => continue,
             ClassBase::Dynamic(_) => {
                 has_dynamic_superclass = true;
                 continue;
             }
+            ClassBase::TypedDict => {
+                has_typeddict_in_mro = true;
+                continue;
+            }
             ClassBase::Class(class) => class,
-            ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => continue,
         };
 
-        let superclass_symbol_table =
-            place_table(db, superclass.class_literal(db).0.body_scope(db));
-
-        let mut method_kind = MethodKind::NotSynthesized;
+        let (superclass_literal, superclass_specialization) = superclass.class_literal(db);
+        let superclass_symbol_table = place_table(db, superclass_literal.body_scope(db));
+        let mut method_kind = MethodKind::default();
 
         // If the member is not defined on the class itself, skip it
         if let Some(superclass_symbol) = superclass_symbol_table.symbol_by_name(&member.name) {
@@ -100,42 +105,31 @@ fn check_class_declaration<'db>(
                 continue;
             }
         } else {
-            let (superclass_literal, superclass_specialization) = superclass.class_literal(db);
             if superclass_literal
                 .own_synthesized_member(db, superclass_specialization, None, &member.name)
                 .is_none()
             {
                 continue;
             }
-            let class_kind =
-                CodeGeneratorKind::from_class(db, superclass_literal, superclass_specialization);
-
-            method_kind = match class_kind {
-                Some(CodeGeneratorKind::NamedTuple) => {
-                    MethodKind::Synthesized(SynthesizedMethodKind::NamedTuple)
-                }
-                Some(CodeGeneratorKind::DataclassLike(_)) => {
-                    MethodKind::Synthesized(SynthesizedMethodKind::Dataclass)
-                }
-                // It's invalid to define a method on a `TypedDict` (and this should be
-                // reported elsewhere), but it's valid to override other things on a
-                // `TypedDict`, so this case isn't relevant right now but may become
-                // so when we expand Liskov checking in the future
-                Some(CodeGeneratorKind::TypedDict) => {
-                    MethodKind::Synthesized(SynthesizedMethodKind::TypedDict)
-                }
-                None => MethodKind::NotSynthesized,
-            };
+            method_kind =
+                CodeGeneratorKind::from_class(db, superclass_literal, superclass_specialization)
+                    .map(MethodKind::Synthesized)
+                    .unwrap_or_default();
         }
 
         subclass_overrides_superclass_declaration = true;
+
+        // Only one Liskov diagnostic should be emitted per each invalid override,
+        // even if it overrides multiple superclasses incorrectly!
+        if liskov_diagnostic_emitted {
+            continue;
+        }
 
         let Place::Defined(superclass_type, _, _) = Type::instance(db, superclass)
             .member(db, &member.name)
             .place
         else {
-            // If not defined on any superclass, nothing to check
-            break;
+            continue;
         };
 
         let Some(superclass_type_as_callable) = superclass_type
@@ -160,11 +154,29 @@ fn check_class_declaration<'db>(
             method_kind,
         );
 
-        // Only one diagnostic should be emitted per each invalid override,
-        // even if it overrides multiple superclasses incorrectly!
-        // It's possible `report_invalid_method_override` didn't emit a diagnostic because there's a
-        // suppression comment, but that too should cause us to exit early here.
-        break;
+        liskov_diagnostic_emitted = true;
+    }
+
+    if !subclass_overrides_superclass_declaration && !has_dynamic_superclass {
+        if has_typeddict_in_mro {
+            if !KnownClass::TypedDictFallback
+                .to_instance(db)
+                .member(db, &member.name)
+                .place
+                .is_undefined()
+            {
+                subclass_overrides_superclass_declaration = true;
+            }
+        } else if class_kind == Some(CodeGeneratorKind::NamedTuple) {
+            if !KnownClass::NamedTupleFallback
+                .to_instance(db)
+                .member(db, &member.name)
+                .place
+                .is_undefined()
+            {
+                subclass_overrides_superclass_declaration = true;
+            }
+        }
     }
 
     if !subclass_overrides_superclass_declaration
@@ -210,15 +222,9 @@ fn check_class_declaration<'db>(
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum MethodKind {
-    Synthesized(SynthesizedMethodKind),
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(super) enum MethodKind<'db> {
+    Synthesized(CodeGeneratorKind<'db>),
+    #[default]
     NotSynthesized,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum SynthesizedMethodKind {
-    NamedTuple,
-    Dataclass,
-    TypedDict,
 }
