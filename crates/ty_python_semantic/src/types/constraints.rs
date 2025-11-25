@@ -1048,21 +1048,17 @@ impl<'db> Node<'db> {
             Node::Interior(interior) => interior,
         };
 
-        let mut inferable_typevars = FxHashSet::default();
-        let mut non_inferable_typevars = FxHashSet::default();
         let mut valid_inferable_specializations = Node::AlwaysTrue;
         let mut valid_non_inferable_specializations = Node::AlwaysTrue;
         let mut add_typevar = |bound_typevar: BoundTypeVarInstance<'db>| {
             if bound_typevar.is_inferable(db, inferable) {
                 let valid_specializations =
                     bound_typevar.valid_specializations_with_materialization(db, true);
-                inferable_typevars.insert(bound_typevar);
                 valid_inferable_specializations =
                     valid_inferable_specializations.and(db, valid_specializations);
             } else {
                 let valid_specializations =
                     bound_typevar.valid_specializations_with_materialization(db, false);
-                non_inferable_typevars.insert(bound_typevar);
                 valid_non_inferable_specializations =
                     valid_non_inferable_specializations.and(db, valid_specializations);
             }
