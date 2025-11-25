@@ -278,7 +278,7 @@ impl<'db> OverloadLiteral<'db> {
             || is_implicit_classmethod(self.name(db))
     }
 
-    fn node<'ast>(
+    pub(super) fn node<'ast>(
         self,
         db: &dyn Db,
         file: File,
