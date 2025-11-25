@@ -1,0 +1,527 @@
+<CWD>/src/prefect/events/actions.py
+  <CWD>/src/prefect/events/actions.py:27:5 - error: "type" overrides symbol of same name in class "Action"
+    Variable is mutable so its type is invariant
+      Override type "Literal['do-nothing']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/actions.py:63:5 - error: "type" overrides symbol of same name in class "Action"
+    Variable is mutable so its type is invariant
+      Override type "Literal['run-deployment']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/actions.py:91:5 - error: "type" overrides symbol of same name in class "Action"
+    Variable is mutable so its type is invariant
+      Override type "Literal['pause-deployment']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/actions.py:97:5 - error: "type" overrides symbol of same name in class "Action"
+    Variable is mutable so its type is invariant
+      Override type "Literal['resume-deployment']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/actions.py:103:5 - error: "type" overrides symbol of same name in class "Action"
+    Variable is mutable so its type is invariant
+      Override type "Literal['change-flow-run-state']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/actions.py:122:5 - error: "type" overrides symbol of same name in class "Action"
+    Variable is mutable so its type is invariant
+      Override type "Literal['cancel-flow-run']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/actions.py:128:5 - error: "type" overrides symbol of same name in class "Action"
+    Variable is mutable so its type is invariant
+      Override type "Literal['resume-flow-run']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/actions.py:134:5 - error: "type" overrides symbol of same name in class "Action"
+    Variable is mutable so its type is invariant
+      Override type "Literal['suspend-flow-run']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/actions.py:140:5 - error: "type" overrides symbol of same name in class "Action"
+    Variable is mutable so its type is invariant
+      Override type "Literal['call-webhook']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/actions.py:153:5 - error: "type" overrides symbol of same name in class "Action"
+    Variable is mutable so its type is invariant
+      Override type "Literal['send-notification']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/actions.py:184:5 - error: "type" overrides symbol of same name in class "Action"
+    Variable is mutable so its type is invariant
+      Override type "Literal['pause-work-pool']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/actions.py:190:5 - error: "type" overrides symbol of same name in class "Action"
+    Variable is mutable so its type is invariant
+      Override type "Literal['resume-work-pool']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/actions.py:226:5 - error: "type" overrides symbol of same name in class "Action"
+    Variable is mutable so its type is invariant
+      Override type "Literal['pause-work-queue']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/actions.py:232:5 - error: "type" overrides symbol of same name in class "Action"
+    Variable is mutable so its type is invariant
+      Override type "Literal['resume-work-queue']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/actions.py:268:5 - error: "type" overrides symbol of same name in class "Action"
+    Variable is mutable so its type is invariant
+      Override type "Literal['pause-automation']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/actions.py:274:5 - error: "type" overrides symbol of same name in class "Action"
+    Variable is mutable so its type is invariant
+      Override type "Literal['resume-automation']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/actions.py:280:5 - error: "type" overrides symbol of same name in class "Action"
+    Variable is mutable so its type is invariant
+      Override type "Literal['declare-incident']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+<CWD>/src/prefect/events/cli/automations.py
+  <CWD>/src/prefect/events/cli/automations.py:173:33 - error: Argument missing for parameter "self" (reportCallIssue)
+  <CWD>/src/prefect/events/cli/automations.py:175:23 - error: "automation" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/prefect/events/cli/automations.py:176:42 - error: Argument of type "Automation" cannot be assigned to parameter "obj" of type "type[BaseModel]" in function "no_really_json"
+    Type "Automation" is not assignable to type "type[BaseModel]" (reportArgumentType)
+  <CWD>/src/prefect/events/cli/automations.py:177:25 - error: "automation" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/prefect/events/cli/automations.py:178:41 - error: Argument of type "Automation" cannot be assigned to parameter "obj" of type "type[BaseModel]" in function "no_really_json"
+    Type "Automation" is not assignable to type "type[BaseModel]" (reportArgumentType)
+  <CWD>/src/prefect/events/cli/automations.py:181:43 - error: "automation" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/prefect/events/cli/automations.py:184:30 - error: "automation" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/prefect/events/cli/automations.py:187:34 - error: "automation" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/prefect/events/cli/automations.py:241:55 - error: "id" is not a known attribute of "None" (reportOptionalMemberAccess)
+  <CWD>/src/prefect/events/cli/automations.py:242:76 - error: "id" is not a known attribute of "None" (reportOptionalMemberAccess)
+  <CWD>/src/prefect/events/cli/automations.py:296:54 - error: "id" is not a known attribute of "None" (reportOptionalMemberAccess)
+  <CWD>/src/prefect/events/cli/automations.py:297:75 - error: "id" is not a known attribute of "None" (reportOptionalMemberAccess)
+  <CWD>/src/prefect/events/cli/automations.py:359:44 - error: Argument of type "str" cannot be assigned to parameter "automation_id" of type "UUID" in function "delete_automation"
+    "str" is not assignable to "UUID" (reportArgumentType)
+  <CWD>/src/prefect/events/cli/automations.py:429:33 - error: Argument of type "str | None" cannot be assigned to parameter "__obj" of type "bytes | bytearray | memoryview[int] | str" in function "loads"
+    Type "str | None" is not assignable to type "bytes | bytearray | memoryview[int] | str"
+      Type "None" is not assignable to type "bytes | bytearray | memoryview[int] | str"
+        "None" is not assignable to "bytes"
+        "None" is not assignable to "bytearray"
+        "None" is not assignable to "memoryview[int]"
+        "None" is not assignable to "str" (reportArgumentType)
+<CWD>/src/prefect/events/clients.py
+  <CWD>/src/prefect/events/clients.py:600:19 - error: Argument of type "datetime" cannot be assigned to parameter "since" of type "DateTime" in function "__init__"
+    "datetime" is not assignable to "DateTime" (reportArgumentType)
+  <CWD>/src/prefect/events/clients.py:601:19 - error: Argument of type "datetime" cannot be assigned to parameter "until" of type "DateTime" in function "__init__"
+    "datetime" is not assignable to "DateTime" (reportArgumentType)
+<CWD>/src/prefect/events/filters.py
+  <CWD>/src/prefect/events/filters.py:75:23 - error: Type "datetime" is not assignable to declared type "DateTime"
+    "datetime" is not assignable to "DateTime" (reportAssignmentType)
+  <CWD>/src/prefect/events/filters.py:82:23 - error: Type "datetime" is not assignable to declared type "DateTime"
+    "datetime" is not assignable to "DateTime" (reportAssignmentType)
+<CWD>/src/prefect/events/related.py
+  <CWD>/src/prefect/events/related.py:100:31 - error: Argument of type "(flow_run_id: UUID) -> CoroutineType[Any, Any, FlowRun]" cannot be assigned to parameter "client_method" of type "(UUID | str) -> Awaitable[ObjectBaseModel | None]" in function "_get_and_cache_related_object"
+    Type "(flow_run_id: UUID) -> CoroutineType[Any, Any, FlowRun]" is not assignable to type "(UUID | str) -> Awaitable[ObjectBaseModel | None]"
+      Parameter 1: type "UUID | str" is incompatible with type "UUID"
+        Type "UUID | str" is not assignable to type "UUID"
+          "str" is not assignable to "UUID" (reportArgumentType)
+  <CWD>/src/prefect/events/related.py:123:35 - error: Argument of type "(flow_id: UUID) -> CoroutineType[Any, Any, Flow]" cannot be assigned to parameter "client_method" of type "(UUID | str) -> Awaitable[ObjectBaseModel | None]" in function "_get_and_cache_related_object"
+    Type "(flow_id: UUID) -> CoroutineType[Any, Any, Flow]" is not assignable to type "(UUID | str) -> Awaitable[ObjectBaseModel | None]"
+      Parameter 1: type "UUID | str" is incompatible with type "UUID"
+        Type "UUID | str" is not assignable to type "UUID"
+          "str" is not assignable to "UUID" (reportArgumentType)
+  <CWD>/src/prefect/events/related.py:142:39 - error: Argument of type "(id: UUID) -> CoroutineType[Any, Any, WorkQueue]" cannot be assigned to parameter "client_method" of type "(UUID | str) -> Awaitable[ObjectBaseModel | None]" in function "_get_and_cache_related_object"
+    Type "(id: UUID) -> CoroutineType[Any, Any, WorkQueue]" is not assignable to type "(UUID | str) -> Awaitable[ObjectBaseModel | None]"
+      Parameter 1: type "UUID | str" is incompatible with type "UUID"
+        Type "UUID | str" is not assignable to type "UUID"
+          "str" is not assignable to "UUID" (reportArgumentType)
+  <CWD>/src/prefect/events/related.py:153:39 - error: Argument of type "(work_pool_name: str) -> CoroutineType[Any, Any, WorkPool]" cannot be assigned to parameter "client_method" of type "(UUID | str) -> Awaitable[ObjectBaseModel | None]" in function "_get_and_cache_related_object"
+    Type "(work_pool_name: str) -> CoroutineType[Any, Any, WorkPool]" is not assignable to type "(UUID | str) -> Awaitable[ObjectBaseModel | None]"
+      Parameter 1: type "UUID | str" is incompatible with type "str"
+        Type "UUID | str" is not assignable to type "str"
+          "UUID" is not assignable to "str" (reportArgumentType)
+  <CWD>/src/prefect/events/related.py:182:30 - error: Cannot access attribute "tags" for class "str"
+    Attribute "tags" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/events/related.py:182:30 - error: Cannot access attribute "tags" for class "ObjectBaseModel"
+    Attribute "tags" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/events/related.py:212:5 - error: Argument of type "tuple[ResourceCacheEntry | dict[str, Unknown], datetime]" cannot be assigned to parameter "value" of type "Tuple[ResourceCacheEntry, DateTime]" in function "__setitem__"
+    "tuple[ResourceCacheEntry | dict[str, Unknown], datetime]" is not assignable to "Tuple[ResourceCacheEntry, DateTime]"
+      Tuple entry 2 is incorrect type
+        "datetime" is not assignable to "DateTime" (reportArgumentType)
+<CWD>/src/prefect/events/schemas/automations.py
+  <CWD>/src/prefect/events/schemas/automations.py:86:28 - error: Cannot access attribute "trigger_type" for class "Trigger*"
+    Attribute "trigger_type" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/events/schemas/automations.py:124:5 - error: "type" overrides symbol of same name in class "ResourceTrigger"
+    Variable is mutable so its type is invariant
+      Override type "Literal['event']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/schemas/automations.py:299:5 - error: "type" overrides symbol of same name in class "ResourceTrigger"
+    Variable is mutable so its type is invariant
+      Override type "Literal['metric']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/schemas/automations.py:329:5 - error: "type" overrides symbol of same name in class "Trigger"
+    Variable is mutable so its type is invariant
+      Override type "Literal['compound', 'sequence']" is not the same as base type "str" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/schemas/automations.py:345:5 - error: "type" overrides symbol of same name in class "CompositeTrigger"
+    Variable is mutable so its type is invariant
+      Override type "Literal['compound']" is not the same as base type "Literal['compound', 'sequence']" (reportIncompatibleVariableOverride)
+  <CWD>/src/prefect/events/schemas/automations.py:382:5 - error: "type" overrides symbol of same name in class "CompositeTrigger"
+    Variable is mutable so its type is invariant
+      Override type "Literal['sequence']" is not the same as base type "Literal['compound', 'sequence']" (reportIncompatibleVariableOverride)
+<CWD>/src/prefect/events/schemas/events.py
+  <CWD>/src/prefect/events/schemas/events.py:119:50 - error: Type "datetime" is not assignable to declared type "DateTime"
+    "datetime" is not assignable to "DateTime" (reportAssignmentType)
+<CWD>/src/prefect/events/worker.py
+  <CWD>/src/prefect/events/worker.py:64:6 - error: Argument of type "(self: Self@EventsWorker) -> CoroutineType[Any, Any, Unknown]" cannot be assigned to parameter "func" of type "(**_P@asynccontextmanager) -> AsyncIterator[_T_co@asynccontextmanager]" in function "asynccontextmanager"
+    Type "(self: Self@EventsWorker) -> CoroutineType[Any, Any, Unknown]" is not assignable to type "(**_P@asynccontextmanager) -> AsyncIterator[_T_co@asynccontextmanager]"
+      Function return type "CoroutineType[Any, Any, Unknown]" is incompatible with type "AsyncIterator[_T_co@asynccontextmanager]"
+        "CoroutineType[Any, Any, Unknown]" is incompatible with protocol "AsyncIterator[_T_co@asynccontextmanager]"
+          "__anext__" is not present
+          "__aiter__" is not present (reportArgumentType)
+  <CWD>/src/prefect/events/worker.py:74:9 - error: Method "_prepare_item" overrides class "QueueService" in an incompatible manner
+    Parameter 2 name mismatch: base parameter is named "item", override parameter is named "event" (reportIncompatibleMethodOverride)
+  <CWD>/src/prefect/events/worker.py:78:15 - error: Method "_handle" overrides class "QueueService" in an incompatible manner
+    Parameter 2 name mismatch: base parameter is named "item", override parameter is named "event" (reportIncompatibleMethodOverride)
+  <CWD>/src/prefect/events/worker.py:100:9 - error: Method "instance" overrides class "_QueueServiceBase" in an incompatible manner
+    Parameter "args" is missing in override (reportIncompatibleMethodOverride)
+<CWD>/src/prefect/input/run_input.py
+  <CWD>/src/prefect/input/run_input.py:239:14 - error: Type of parameter "cls" must be a supertype of its class "type[BaseRunInput]" (reportGeneralTypeIssues)
+<CWD>/src/prefect/server/models/artifacts.py
+  <CWD>/src/prefect/server/models/artifacts.py:107:34 - error: Argument of type "datetime" cannot be assigned to parameter "now" of type "DateTime | None"
+    Type "datetime" is not assignable to type "DateTime | None"
+      "datetime" is not assignable to "DateTime"
+      "datetime" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/artifacts.py:112:13 - error: Argument of type "datetime" cannot be assigned to parameter "now" of type "DateTime | None"
+    Type "datetime" is not assignable to type "DateTime | None"
+      "datetime" is not assignable to "DateTime"
+      "datetime" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/artifacts.py:449:28 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/artifacts.py:449:57 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/artifacts.py:534:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+<CWD>/src/prefect/server/models/block_documents.py
+  <CWD>/src/prefect/server/models/block_documents.py:145:16 - error: Argument of type "dict[str, list[UUID]]" cannot be assigned to parameter "id" of type "BlockDocumentFilterId | None" in function "__init__"
+    Type "dict[str, list[UUID]]" is not assignable to type "BlockDocumentFilterId | None"
+      "dict[str, list[UUID]]" is not assignable to "BlockDocumentFilterId"
+      "dict[str, list[UUID]]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/block_documents.py:256:18 - error: Argument of type "dict[str, list[str]]" cannot be assigned to parameter "name" of type "BlockDocumentFilterName | None" in function "__init__"
+    Type "dict[str, list[str]]" is not assignable to type "BlockDocumentFilterName | None"
+      "dict[str, list[str]]" is not assignable to "BlockDocumentFilterName"
+      "dict[str, list[str]]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/block_documents.py:261:18 - error: Argument of type "dict[str, list[str]]" cannot be assigned to parameter "slug" of type "BlockTypeFilterSlug | None" in function "__init__"
+    Type "dict[str, list[str]]" is not assignable to type "BlockTypeFilterSlug | None"
+      "dict[str, list[str]]" is not assignable to "BlockTypeFilterSlug"
+      "dict[str, list[str]]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/block_documents.py:427:50 - error: Argument of type "dict[str, list[UUID]]" cannot be assigned to parameter "id" of type "BlockSchemaFilterId | None" in function "__init__"
+    Type "dict[str, list[UUID]]" is not assignable to type "BlockSchemaFilterId | None"
+      "dict[str, list[UUID]]" is not assignable to "BlockSchemaFilterId"
+      "dict[str, list[UUID]]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/block_documents.py:473:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/block_documents.py:664:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+<CWD>/src/prefect/server/models/block_schemas.py
+  <CWD>/src/prefect/server/models/block_schemas.py:264:34 - error: Cannot access attribute "replace" for class "dict[str, Any]"
+    Attribute "replace" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/block_schemas.py:268:47 - error: Cannot access attribute "replace" for class "dict[str, Any]"
+    Attribute "replace" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/block_schemas.py:303:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+<CWD>/src/prefect/server/models/block_types.py
+  <CWD>/src/prefect/server/models/block_types.py:200:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/block_types.py:221:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+<CWD>/src/prefect/server/models/concurrency_limits.py
+  <CWD>/src/prefect/server/models/concurrency_limits.py:153:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/concurrency_limits.py:165:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+<CWD>/src/prefect/server/models/concurrency_limits_v2.py
+  <CWD>/src/prefect/server/models/concurrency_limits_v2.py:171:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/concurrency_limits_v2.py:192:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/concurrency_limits_v2.py:236:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/concurrency_limits_v2.py:284:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/concurrency_limits_v2.py:306:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+<CWD>/src/prefect/server/models/csrf_token.py
+  <CWD>/src/prefect/server/models/csrf_token.py:105:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+<CWD>/src/prefect/server/models/deployments.py
+  <CWD>/src/prefect/server/models/deployments.py:108:74 - error: Argument of type "Deployment | DeploymentCreate" cannot be assigned to parameter "deployment" of type "Deployment" in function "with_system_labels_for_deployment"
+    Type "Deployment | DeploymentCreate" is not assignable to type "Deployment"
+      "DeploymentCreate" is not assignable to "Deployment" (reportArgumentType)
+  <CWD>/src/prefect/server/models/deployments.py:324:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/deployments.py:593:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/deployments.py:1041:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/deployments.py:1066:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/deployments.py:1093:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/deployments.py:1146:34 - error: Argument of type "datetime" cannot be assigned to parameter "occurred" of type "DateTime" in function "deployment_status_event"
+    "datetime" is not assignable to "DateTime" (reportArgumentType)
+  <CWD>/src/prefect/server/models/deployments.py:1199:38 - error: Argument of type "datetime" cannot be assigned to parameter "occurred" of type "DateTime" in function "deployment_status_event"
+    "datetime" is not assignable to "DateTime" (reportArgumentType)
+<CWD>/src/prefect/server/models/events.py
+  <CWD>/src/prefect/server/models/events.py:52:18 - error: Argument of type "datetime" cannot be assigned to parameter "occurred" of type "DateTime" in function "__init__"
+    "datetime" is not assignable to "DateTime" (reportArgumentType)
+  <CWD>/src/prefect/server/models/events.py:54:18 - error: Argument of type "dict[str, str | None]" cannot be assigned to parameter "resource" of type "Resource" in function "__init__" (reportArgumentType)
+  <CWD>/src/prefect/server/models/events.py:69:17 - error: Argument of type "RelatedResourceList" cannot be assigned to parameter "related" of type "list[RelatedResource]" in function "__init__"
+    "List[Dict[str, str]]" is not assignable to "list[RelatedResource]"
+      Type parameter "_T@list" is invariant, but "Dict[str, str]" is not the same as "RelatedResource"
+      Consider switching from "list" to "Sequence" which is covariant (reportArgumentType)
+  <CWD>/src/prefect/server/models/events.py:82:12 - error: Argument of type "UUID | None" cannot be assigned to parameter "id" of type "UUID" in function "__init__"
+    Type "UUID | None" is not assignable to type "UUID"
+      "None" is not assignable to "UUID" (reportArgumentType)
+  <CWD>/src/prefect/server/models/events.py:356:18 - error: Argument of type "dict[str, str]" cannot be assigned to parameter "resource" of type "Resource" in function "__init__" (reportArgumentType)
+  <CWD>/src/prefect/server/models/events.py:391:18 - error: Argument of type "dict[str, str]" cannot be assigned to parameter "resource" of type "Resource" in function "__init__" (reportArgumentType)
+  <CWD>/src/prefect/server/models/events.py:396:17 - error: Argument of type "List[Dict[str, Any]]" cannot be assigned to parameter "related" of type "list[RelatedResource]" in function "__init__"
+    "List[Dict[str, Any]]" is not assignable to "list[RelatedResource]"
+      Type parameter "_T@list" is invariant, but "Dict[str, Any]" is not the same as "RelatedResource"
+      Consider switching from "list" to "Sequence" which is covariant (reportArgumentType)
+  <CWD>/src/prefect/server/models/events.py:413:18 - error: Argument of type "dict[str, str]" cannot be assigned to parameter "resource" of type "Resource" in function "__init__" (reportArgumentType)
+<CWD>/src/prefect/server/models/flow_run_input.py
+  <CWD>/src/prefect/server/models/flow_run_input.py:91:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+<CWD>/src/prefect/server/models/flow_run_states.py
+  <CWD>/src/prefect/server/models/flow_run_states.py:79:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+<CWD>/src/prefect/server/models/flow_runs.py
+  <CWD>/src/prefect/server/models/flow_runs.py:174:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/flow_runs.py:251:26 - error: Variable not allowed in type expression (reportInvalidTypeForm)
+  <CWD>/src/prefect/server/models/flow_runs.py:252:26 - error: Variable not allowed in type expression (reportInvalidTypeForm)
+  <CWD>/src/prefect/server/models/flow_runs.py:267:50 - error: "flow_or_task_run_exists_clause" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/prefect/server/models/flow_runs.py:276:29 - error: "flow_or_task_run_exists_clause" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/prefect/server/models/flow_runs.py:322:42 - error: Argument of type "str" cannot be assigned to parameter "attrs" of type "_AttrType" in function "load_only"
+    Type "str" is not assignable to type "_AttrType"
+      "str" is not assignable to "QueryableAttribute[Any]"
+      "str" is not assignable to type "Literal['*']" (reportArgumentType)
+  <CWD>/src/prefect/server/models/flow_runs.py:419:39 - error: Argument of type "list[_TaskInput]" cannot be assigned to parameter "upstream_dependencies" of type "List[TaskRunResult]" in function "__init__"
+    "list[_TaskInput]" is not assignable to "List[TaskRunResult]"
+      Type parameter "_T@list" is invariant, but "_TaskInput" is not the same as "TaskRunResult"
+      Consider switching from "list" to "Sequence" which is covariant (reportArgumentType)
+  <CWD>/src/prefect/server/models/flow_runs.py:420:23 - error: Argument of type "TaskRunState | None" cannot be assigned to parameter "state" of type "State | None" in function "__init__"
+    Type "TaskRunState | None" is not assignable to type "State | None"
+      Type "TaskRunState" is not assignable to type "State | None"
+        "TaskRunState" is not assignable to "State"
+        "TaskRunState" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/flow_runs.py:504:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/flow_runs.py:582:15 - error: Argument missing for parameter "db" (reportCallIssue)
+  <CWD>/src/prefect/server/models/flow_runs.py:582:23 - error: Cannot access attribute "validate_proposed_state" for class "OrchestrationContext[FlowRun, FlowRunPolicy]"
+    Attribute "validate_proposed_state" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/flow_runs.py:611:15 - error: Argument of type "DateTime | datetime" cannot be assigned to parameter "since" of type "DateTime"
+    Type "DateTime | datetime" is not assignable to type "DateTime"
+      "datetime" is not assignable to "DateTime" (reportArgumentType)
+  <CWD>/src/prefect/server/models/flow_runs.py:685:26 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+<CWD>/src/prefect/server/models/flows.py
+  <CWD>/src/prefect/server/models/flows.py:83:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/flows.py:290:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+<CWD>/src/prefect/server/models/logs.py
+  <CWD>/src/prefect/server/models/logs.py:113:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+<CWD>/src/prefect/server/models/saved_searches.py
+  <CWD>/src/prefect/server/models/saved_searches.py:146:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+<CWD>/src/prefect/server/models/task_run_states.py
+  <CWD>/src/prefect/server/models/task_run_states.py:74:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+<CWD>/src/prefect/server/models/task_runs.py
+  <CWD>/src/prefect/server/models/task_runs.py:176:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/task_runs.py:462:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/task_runs.py:535:15 - error: Argument missing for parameter "db" (reportCallIssue)
+  <CWD>/src/prefect/server/models/task_runs.py:535:23 - error: Cannot access attribute "validate_proposed_state" for class "OrchestrationContext[TaskRun, TaskRunPolicy]"
+    Attribute "validate_proposed_state" is unknown (reportAttributeAccessIssue)
+<CWD>/src/prefect/server/models/task_workers.py
+  <CWD>/src/prefect/server/models/task_workers.py:71:23 - error: Argument of type "datetime" cannot be assigned to parameter "timestamp" of type "DateTime" in function "__init__"
+    "datetime" is not assignable to "DateTime" (reportArgumentType)
+<CWD>/src/prefect/server/models/variables.py
+  <CWD>/src/prefect/server/models/variables.py:123:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/variables.py:140:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/variables.py:154:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/variables.py:168:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+<CWD>/src/prefect/server/models/work_queues.py
+  <CWD>/src/prefect/server/models/work_queues.py:88:35 - error: Argument of type "UUID | None" cannot be assigned to parameter "work_queue_id" of type "uuid.UUID | prefect.server.utilities.database.UUID"
+    Type "UUID | None" is not assignable to type "uuid.UUID | prefect.server.utilities.database.UUID"
+      Type "None" is not assignable to type "uuid.UUID | prefect.server.utilities.database.UUID"
+        "None" is not assignable to "UUID"
+        "None" is not assignable to "UUID" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:282:22 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/work_queues.py:311:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/work_queues.py:342:30 - error: Argument of type "datetime | None" cannot be assigned to parameter "scheduled_before" of type "DateTime | None"
+    Type "datetime | None" is not assignable to type "DateTime | None"
+      Type "datetime" is not assignable to type "DateTime | None"
+        "datetime" is not assignable to "DateTime"
+        "datetime" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:403:19 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "operator" of type "Operator" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "Operator"
+      "dict[str, list[str] | None]" is not assignable to "Operator" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:403:19 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "id" of type "FlowRunFilterId | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterId | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterId | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterId"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:403:19 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "name" of type "FlowRunFilterName | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterName | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterName | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterName"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:403:19 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "tags" of type "FlowRunFilterTags | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterTags | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterTags | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterTags"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:403:19 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "deployment_id" of type "FlowRunFilterDeploymentId | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterDeploymentId | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterDeploymentId | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterDeploymentId"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:403:19 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "work_queue_name" of type "FlowRunFilterWorkQueueName | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterWorkQueueName | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterWorkQueueName | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterWorkQueueName"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:403:19 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "flow_version" of type "FlowRunFilterFlowVersion | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterFlowVersion | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterFlowVersion | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterFlowVersion"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:403:19 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "start_time" of type "FlowRunFilterStartTime | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterStartTime | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterStartTime | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterStartTime"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:403:19 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "end_time" of type "FlowRunFilterEndTime | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterEndTime | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterEndTime | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterEndTime"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:403:19 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "expected_start_time" of type "FlowRunFilterExpectedStartTime | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterExpectedStartTime | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterExpectedStartTime | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterExpectedStartTime"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:403:19 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "next_scheduled_start_time" of type "FlowRunFilterNextScheduledStartTime | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterNextScheduledStartTime | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterNextScheduledStartTime | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterNextScheduledStartTime"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:403:19 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "parent_flow_run_id" of type "FlowRunFilterParentFlowRunId | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterParentFlowRunId | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterParentFlowRunId | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterParentFlowRunId"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:403:19 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "parent_task_run_id" of type "FlowRunFilterParentTaskRunId | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterParentTaskRunId | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterParentTaskRunId | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterParentTaskRunId"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:403:19 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "idempotency_key" of type "FlowRunFilterIdempotencyKey | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterIdempotencyKey | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterIdempotencyKey | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterIdempotencyKey"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:404:23 - error: Argument of type "dict[str, dict[str, list[StateType]]]" cannot be assigned to parameter "state" of type "FlowRunFilterState | None" in function "__init__"
+    Type "dict[str, dict[str, list[StateType]]]" is not assignable to type "FlowRunFilterState | None"
+      "dict[str, dict[str, list[StateType]]]" is not assignable to "FlowRunFilterState"
+      "dict[str, dict[str, list[StateType]]]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:421:15 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "operator" of type "Operator" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "Operator"
+      "dict[str, list[str] | None]" is not assignable to "Operator" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:421:15 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "id" of type "FlowRunFilterId | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterId | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterId | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterId"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:421:15 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "name" of type "FlowRunFilterName | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterName | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterName | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterName"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:421:15 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "tags" of type "FlowRunFilterTags | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterTags | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterTags | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterTags"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:421:15 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "deployment_id" of type "FlowRunFilterDeploymentId | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterDeploymentId | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterDeploymentId | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterDeploymentId"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:421:15 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "work_queue_name" of type "FlowRunFilterWorkQueueName | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterWorkQueueName | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterWorkQueueName | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterWorkQueueName"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:421:15 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "flow_version" of type "FlowRunFilterFlowVersion | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterFlowVersion | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterFlowVersion | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterFlowVersion"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:421:15 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "start_time" of type "FlowRunFilterStartTime | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterStartTime | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterStartTime | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterStartTime"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:421:15 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "end_time" of type "FlowRunFilterEndTime | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterEndTime | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterEndTime | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterEndTime"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:421:15 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "expected_start_time" of type "FlowRunFilterExpectedStartTime | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterExpectedStartTime | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterExpectedStartTime | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterExpectedStartTime"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:421:15 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "parent_flow_run_id" of type "FlowRunFilterParentFlowRunId | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterParentFlowRunId | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterParentFlowRunId | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterParentFlowRunId"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:421:15 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "parent_task_run_id" of type "FlowRunFilterParentTaskRunId | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterParentTaskRunId | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterParentTaskRunId | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterParentTaskRunId"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:421:15 - error: Argument of type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" cannot be assigned to parameter "idempotency_key" of type "FlowRunFilterIdempotencyKey | None" in function "__init__"
+    Type "dict[str, list[str] | None] | dict[str, list[UUID] | bool | None]" is not assignable to type "FlowRunFilterIdempotencyKey | None"
+      Type "dict[str, list[str] | None]" is not assignable to type "FlowRunFilterIdempotencyKey | None"
+        "dict[str, list[str] | None]" is not assignable to "FlowRunFilterIdempotencyKey"
+        "dict[str, list[str] | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:422:19 - error: Argument of type "dict[str, dict[str, list[StateType]]]" cannot be assigned to parameter "state" of type "FlowRunFilterState | None" in function "__init__"
+    Type "dict[str, dict[str, list[StateType]]]" is not assignable to type "FlowRunFilterState | None"
+      "dict[str, dict[str, list[StateType]]]" is not assignable to "FlowRunFilterState"
+      "dict[str, dict[str, list[StateType]]]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:423:39 - error: Argument of type "dict[str, datetime | None]" cannot be assigned to parameter "next_scheduled_start_time" of type "FlowRunFilterNextScheduledStartTime | None" in function "__init__"
+    Type "dict[str, datetime | None]" is not assignable to type "FlowRunFilterNextScheduledStartTime | None"
+      "dict[str, datetime | None]" is not assignable to "FlowRunFilterNextScheduledStartTime"
+      "dict[str, datetime | None]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:452:28 - error: Arguments missing for parameters "concurrency_limit", "filter" (reportCallIssue)
+  <CWD>/src/prefect/server/models/work_queues.py:459:32 - error: Arguments missing for parameters "concurrency_limit", "filter" (reportCallIssue)
+  <CWD>/src/prefect/server/models/work_queues.py:463:52 - error: Argument of type "UUID | None" cannot be assigned to parameter "work_queue_id" of type "uuid.UUID | prefect.server.utilities.database.UUID"
+    Type "UUID | None" is not assignable to type "uuid.UUID | prefect.server.utilities.database.UUID"
+      Type "None" is not assignable to type "uuid.UUID | prefect.server.utilities.database.UUID"
+        "None" is not assignable to "UUID"
+        "None" is not assignable to "UUID" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:491:59 - error: Argument of type "dict[str, list[str]]" cannot be assigned to parameter "name" of type "FlowRunFilterStateName | None" in function "__init__"
+    Type "dict[str, list[str]]" is not assignable to type "FlowRunFilterStateName | None"
+      "dict[str, list[str]]" is not assignable to "FlowRunFilterStateName"
+      "dict[str, list[str]]" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:571:26 - error: Argument of type "datetime" cannot be assigned to parameter "occurred" of type "DateTime" in function "work_queue_status_event"
+    "datetime" is not assignable to "DateTime" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:609:26 - error: Argument of type "datetime" cannot be assigned to parameter "occurred" of type "DateTime" in function "work_queue_status_event"
+    "datetime" is not assignable to "DateTime" (reportArgumentType)
+  <CWD>/src/prefect/server/models/work_queues.py:628:22 - error: Argument of type "datetime" cannot be assigned to parameter "occurred" of type "DateTime" in function "work_queue_status_event"
+    "datetime" is not assignable to "DateTime" (reportArgumentType)
+<CWD>/src/prefect/server/models/workers.py
+  <CWD>/src/prefect/server/models/workers.py:77:20 - error: Arguments missing for parameters "concurrency_limit", "filter", "priority" (reportCallIssue)
+  <CWD>/src/prefect/server/models/workers.py:253:22 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/workers.py:289:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/workers.py:328:26 - error: Argument of type "datetime | None" cannot be assigned to parameter "scheduled_before" of type "DateTime | None"
+    Type "datetime | None" is not assignable to type "DateTime | None"
+      Type "datetime" is not assignable to type "DateTime | None"
+        "datetime" is not assignable to "DateTime"
+        "datetime" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/workers.py:329:25 - error: Argument of type "datetime | None" cannot be assigned to parameter "scheduled_after" of type "DateTime | None"
+    Type "datetime | None" is not assignable to type "DateTime | None"
+      Type "datetime" is not assignable to type "DateTime | None"
+        "datetime" is not assignable to "DateTime"
+        "datetime" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/prefect/server/models/workers.py:626:22 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/workers.py:672:15 - error: "exc" is not a known attribute of module "sqlalchemy" (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/workers.py:755:9 - error: Argument of type "int" cannot be assigned to parameter "value" of type "datetime | WorkerStatus" in function "__setitem__"
+    Type "int" is not assignable to type "datetime | WorkerStatus"
+      "int" is not assignable to "datetime"
+      "int" is not assignable to "WorkerStatus" (reportArgumentType)
+  <CWD>/src/prefect/server/models/workers.py:770:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/prefect/server/models/workers.py:799:19 - error: Cannot access attribute "rowcount" for class "Result[Any]"
+    Attribute "rowcount" is unknown (reportAttributeAccessIssue)
+174 errors, 0 warnings, 0 informations
