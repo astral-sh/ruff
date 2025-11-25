@@ -1579,6 +1579,8 @@ z = "int"
 w1: "int | str" = "hello"
 w2: "int | sr" = "hello"
 w3: "int | " = "hello"
+w4: "float"
+w5: "float
 "#,
         );
 
@@ -1604,6 +1606,10 @@ w3: "int | " = "hello"
         "w3" @ 86..88: Variable [definition]
         "\"int | \"" @ 90..98: String
         "\"hello\"" @ 101..108: String
+        "w4" @ 109..111: Variable [definition]
+        "float" @ 114..119: Class
+        "w5" @ 121..123: Variable [definition]
+        "float" @ 126..131: Class
         "#);
     }
 

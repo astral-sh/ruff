@@ -408,7 +408,13 @@ pub trait HasDefinition {
 impl HasType for ast::ExprRef<'_> {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
-        let file_scope = index.expression_scope_id(&model.expr_ref_in_ast(*self));
+        // TODO(#1637): semantic tokens is making this crash even with
+        // `try_expr_ref_in_ast` guarding this, for now just use `try_expression_scope_id`.
+        // The problematic input is `x: "float` (with a dangling quote). I imagine the issue
+        // is we're too eagerly setting `is_string_annotation` in inference.
+        let Some(file_scope) = index.try_expression_scope_id(&model.expr_ref_in_ast(*self)) else {
+            return Type::unknown();
+        };
         let scope = file_scope.to_scope_id(model.db, model.file);
 
         infer_scope_types(model.db, scope).expression_type(*self)
