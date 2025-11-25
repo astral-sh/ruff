@@ -120,56 +120,6 @@ impl<'a> SuppressionsBuilder<'a> {
         }
     }
 
-    fn match_comments(&mut self, current_indent: &String) {
-        let mut comment_index = 0;
-
-        // for each pending comment, search for matching comments at the same indentation level,
-        // generate range suppressions for any matches, and then discard and unmatched comments
-        // from the outgoing indentation block
-        while comment_index < self.pending.len() {
-            let comment = &self.pending[comment_index];
-
-            // skip comments from an outer indentation level
-            if comment
-                .indent
-                .as_ref()
-                .is_some_and(|indent| indent.text_len() < current_indent.text_len())
-            {
-                comment_index += 1;
-                continue;
-            }
-
-            // find the first matching comment
-            if let Some(other_index) = self.pending[comment_index + 1..]
-                .iter()
-                .position(|other| comment.matches(other, self.source))
-            {
-                // offset from current candidate
-                let other_index = comment_index + 1 + other_index;
-                let other = &self.pending[other_index];
-
-                // record a combined range suppression from the matching comments
-                let combined_range = TextRange::new(comment.range.start(), other.range.end());
-                for code in comment.codes_as_str(self.source) {
-                    self.valid.push(Suppression {
-                        code: code.into(),
-                        range: combined_range,
-                        comments: smallvec![comment.clone(), other.clone()],
-                    });
-                }
-
-                // remove both comments from further consideration
-                self.pending.remove(other_index);
-                self.pending.remove(comment_index);
-            } else {
-                self.invalid.push(InvalidSuppression {
-                    kind: InvalidSuppressionKind::Unmatched,
-                    comment: self.pending.remove(comment_index).clone(),
-                });
-            }
-        }
-    }
-
     pub(crate) fn load_from_tokens(mut self, tokens: &Tokens) -> Suppressions {
         let default_indent = String::new();
         let mut current_indent: &String = &default_indent;
@@ -240,6 +190,56 @@ impl<'a> SuppressionsBuilder<'a> {
             valid: self.valid,
             invalid: self.invalid,
             errors: self.errors,
+        }
+    }
+
+    fn match_comments(&mut self, current_indent: &String) {
+        let mut comment_index = 0;
+
+        // for each pending comment, search for matching comments at the same indentation level,
+        // generate range suppressions for any matches, and then discard and unmatched comments
+        // from the outgoing indentation block
+        while comment_index < self.pending.len() {
+            let comment = &self.pending[comment_index];
+
+            // skip comments from an outer indentation level
+            if comment
+                .indent
+                .as_ref()
+                .is_some_and(|indent| indent.text_len() < current_indent.text_len())
+            {
+                comment_index += 1;
+                continue;
+            }
+
+            // find the first matching comment
+            if let Some(other_index) = self.pending[comment_index + 1..]
+                .iter()
+                .position(|other| comment.matches(other, self.source))
+            {
+                // offset from current candidate
+                let other_index = comment_index + 1 + other_index;
+                let other = &self.pending[other_index];
+
+                // record a combined range suppression from the matching comments
+                let combined_range = TextRange::new(comment.range.start(), other.range.end());
+                for code in comment.codes_as_str(self.source) {
+                    self.valid.push(Suppression {
+                        code: code.into(),
+                        range: combined_range,
+                        comments: smallvec![comment.clone(), other.clone()],
+                    });
+                }
+
+                // remove both comments from further consideration
+                self.pending.remove(other_index);
+                self.pending.remove(comment_index);
+            } else {
+                self.invalid.push(InvalidSuppression {
+                    kind: InvalidSuppressionKind::Unmatched,
+                    comment: self.pending.remove(comment_index).clone(),
+                });
+            }
         }
     }
 }
