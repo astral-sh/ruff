@@ -6294,6 +6294,22 @@ mod tests {
         ");
     }
 
+    #[test]
+    fn test_literal_type_alias_inlay_hint() {
+        let mut test = inlay_hint_test(
+            "
+                        from typing import Literal
+
+                        a = Literal['a', 'b', 'c']",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        from typing import Literal
+
+        a[: <typing.Literal special form>] = Literal['a', 'b', 'c']
+        ");
+    }
+
     struct InlayHintLocationDiagnostic {
         source: FileRange,
         target: FileRange,
