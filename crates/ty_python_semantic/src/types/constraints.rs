@@ -3128,8 +3128,16 @@ impl<'db> BoundTypeVarInstance<'db> {
                             constraint.top_materialization(db),
                         )
                     } else {
-                        let materialized = constraint.bottom_materialization(db);
-                        (materialized, materialized)
+                        // For non-inferable typevars, we still have to consider all of the
+                        // explicitly-declared constraints. Keep the range of materializations
+                        // to avoid dropping permissive gradual constraints while staying fully
+                        // static. Reversing the order ensures that gradual constraints (like `Any`)
+                        // don't blow the valid-specialization set wide open for non-inferable
+                        // typevars.
+                        (
+                            constraint.top_materialization(db),
+                            constraint.bottom_materialization(db),
+                        )
                     };
                     specializations = specializations.or(
                         db,
