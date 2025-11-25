@@ -19,6 +19,15 @@ use ruff_linter::settings::types::{OutputFormat, UnsafeFixes};
 
 use crate::diagnostics::{Diagnostics, FixMap};
 
+/// Display mode for the summary text output.
+#[derive(Debug, Clone, Copy)]
+enum SummaryMode {
+    /// Default summary format without legend.
+    Default,
+    /// Statistics summary format with fixability legend.
+    Statistics,
+}
+
 bitflags! {
     #[derive(Default, Debug, Copy, Clone)]
     pub(crate) struct Flags: u8 {
@@ -87,7 +96,7 @@ impl Printer {
         &self,
         writer: &mut dyn Write,
         diagnostics: &Diagnostics,
-        show_legend: bool,
+        mode: SummaryMode,
     ) -> Result<()> {
         if self.log_level >= LogLevel::Default {
             let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
@@ -115,13 +124,12 @@ impl Printer {
                 }
 
                 if let Some(fixables) = fixables {
-                    let (prefix, suffix) = if show_legend {
-                        (
+                    let (prefix, suffix) = match mode {
+                        SummaryMode::Statistics => (
                             String::new(),
                             format!(" ([{}] all, [{}] some)", "*".cyan(), "-".cyan()),
-                        )
-                    } else {
-                        (format!("[{}] ", "*".cyan()), String::new())
+                        ),
+                        SummaryMode::Default => (format!("[{}] ", "*".cyan()), String::new()),
                     };
 
                     if self.unsafe_fixes.is_hint() {
@@ -241,7 +249,7 @@ impl Printer {
                         writeln!(writer)?;
                     }
                 }
-                self.write_summary_text(writer, diagnostics, false)?;
+                self.write_summary_text(writer, diagnostics, SummaryMode::Default)?;
             }
             return Ok(());
         }
@@ -270,7 +278,7 @@ impl Printer {
                     writeln!(writer)?;
                 }
             }
-            self.write_summary_text(writer, diagnostics, false)?;
+            self.write_summary_text(writer, diagnostics, SummaryMode::Default)?;
         }
 
         writer.flush()?;
@@ -378,7 +386,7 @@ impl Printer {
                     )?;
                 }
 
-                self.write_summary_text(writer, diagnostics, true)?;
+                self.write_summary_text(writer, diagnostics, SummaryMode::Statistics)?;
                 return Ok(());
             }
             OutputFormat::Json => {
