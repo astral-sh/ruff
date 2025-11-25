@@ -53,6 +53,7 @@ Settings: Settings {
         "invalid-context-manager": Error (Default),
         "invalid-declaration": Error (Default),
         "invalid-exception-caught": Error (Default),
+        "invalid-explicit-override": Error (Default),
         "invalid-generic-class": Error (Default),
         "invalid-ignore-comment": Warning (Default),
         "invalid-key": Error (Default),
