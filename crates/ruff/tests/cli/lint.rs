@@ -3710,3 +3710,161 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
     ");
     Ok(())
 }
+
+#[test]
+fn multiple_output_formats() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file("test.py", "import os  # F401\n")?;
+
+    let output = test
+        .command()
+        .args([
+            "check",
+            "--no-cache",
+            "--output-file",
+            "gitlab:gl-code-quality.json",
+            "--output-file",
+            "full:stdout",
+            "--select",
+            "F401",
+            "test.py",
+        ])
+        .output()?;
+
+    // Check that stdout contains the full format output
+    let stdout = str::from_utf8(&output.stdout)?;
+    // Full format shows diagnostics differently than concise format
+    assert!(
+        stdout.contains("F401") && stdout.contains("test.py"),
+        "Expected full format output with F401 and test.py. Got: {stdout}"
+    );
+    assert!(stdout.contains("Found") || stdout.contains("All checks passed"));
+
+    // Check that the GitLab format file was created
+    let gitlab_content = fs::read_to_string(test.root().join("gl-code-quality.json"))?;
+    assert!(gitlab_content.contains("check_name"));
+    assert!(gitlab_content.contains("F401"));
+
+    Ok(())
+}
+
+#[test]
+fn multiple_output_formats_env_var_comma_separated() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file("test.py", "import os  # F401\n")?;
+
+    let output = test
+        .command()
+        .env(
+            "RUFF_OUTPUT_FILE",
+            "gitlab:gl-code-quality.json,full:stdout",
+        )
+        .args(["check", "--no-cache", "--select", "F401", "test.py"])
+        .output()?;
+
+    // Check that stdout contains the full format output
+    let stdout = str::from_utf8(&output.stdout)?;
+    assert!(
+        stdout.contains("F401") && stdout.contains("test.py"),
+        "Expected full format output with F401 and test.py. Got: {stdout}"
+    );
+
+    // Check that the GitLab format file was created
+    let gitlab_content = fs::read_to_string(test.root().join("gl-code-quality.json"))?;
+    assert!(gitlab_content.contains("check_name"));
+    assert!(gitlab_content.contains("F401"));
+
+    Ok(())
+}
+
+#[test]
+fn multiple_output_formats_cli_comma_separated() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file("test.py", "import os  # F401\n")?;
+
+    let output = test
+        .command()
+        .args([
+            "check",
+            "--no-cache",
+            "--output-file",
+            "gitlab:gl-code-quality.json,full:stdout",
+            "--select",
+            "F401",
+            "test.py",
+        ])
+        .output()?;
+
+    // Check that stdout contains the full format output
+    let stdout = str::from_utf8(&output.stdout)?;
+    assert!(
+        stdout.contains("F401") && stdout.contains("test.py"),
+        "Expected full format output with F401 and test.py. Got: {stdout}"
+    );
+
+    // Check that the GitLab format file was created
+    let gitlab_content = fs::read_to_string(test.root().join("gl-code-quality.json"))?;
+    assert!(gitlab_content.contains("check_name"));
+    assert!(gitlab_content.contains("F401"));
+
+    Ok(())
+}
+
+#[test]
+fn multiple_output_formats_stdout_stderr() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file("test.py", "import os  # F401\n")?;
+
+    let output = test
+        .command()
+        .args([
+            "check",
+            "--no-cache",
+            "--output-file",
+            "concise:stdout",
+            "--output-file",
+            "json:stderr",
+            "--select",
+            "F401",
+            "test.py",
+        ])
+        .output()?;
+
+    // Check that stdout contains concise format
+    let stdout = str::from_utf8(&output.stdout)?;
+    assert!(stdout.contains("test.py:1:8: F401"));
+
+    // Check that stderr contains JSON format
+    let stderr = str::from_utf8(&output.stderr)?;
+    assert!(stderr.contains("\"code\""));
+    assert!(stderr.contains("F401"));
+
+    Ok(())
+}
+
+#[test]
+fn backward_compatibility_output_format_file() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file("test.py", "import os  # F401\n")?;
+
+    test.command()
+        .args([
+            "check",
+            "--no-cache",
+            "--output-format",
+            "gitlab",
+            "--output-file",
+            "gl-code-quality.json",
+            "--select",
+            "F401",
+            "test.py",
+        ])
+        .output()?;
+
+    // Check that the GitLab format file was created
+    let gitlab_content = fs::read_to_string(test.root().join("gl-code-quality.json"))?;
+    assert!(gitlab_content.contains("check_name"));
+    assert!(gitlab_content.contains("F401"));
+
+    Ok(())
+}

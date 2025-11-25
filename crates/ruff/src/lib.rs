@@ -21,7 +21,7 @@ use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
 use crate::args::{
-    AnalyzeCommand, AnalyzeGraphCommand, Args, CheckCommand, Command, FormatCommand,
+    AnalyzeCommand, AnalyzeGraphCommand, Args, CheckCommand, Command, FormatCommand, OutputTarget,
 };
 use crate::printer::{Flags as PrinterFlags, Printer};
 
@@ -240,23 +240,45 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     // files are present, or files are injected from outside of the hierarchy.
     let pyproject_config = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
 
-    let mut writer: Box<dyn Write> = match cli.output_file {
-        Some(path) if !cli.watch => {
-            colored::control::set_override(false);
-            if let Some(parent) = path.parent() {
-                std::fs::create_dir_all(parent)?;
-            }
-            let file = File::create(path)?;
-            Box::new(BufWriter::new(file))
-        }
-        _ => Box::new(BufWriter::new(io::stdout())),
+    // Resolve output targets (handles backward compatibility)
+    let output_targets = cli.resolve_output_targets()?;
+
+    // Helper function to create a default writer for show_settings/show_files
+    let create_default_writer = || -> Box<dyn Write> {
+        output_targets
+            .iter()
+            .find(|t| t.format.is_human_readable())
+            .or(output_targets.first())
+            .map(|t| -> Box<dyn Write> {
+                match &t.target {
+                    OutputTarget::Stdout => Box::new(BufWriter::new(io::stdout())),
+                    OutputTarget::Stderr => Box::new(BufWriter::new(io::stderr())),
+                    OutputTarget::File(path) => {
+                        if !cli.watch {
+                            colored::control::set_override(false);
+                            if let Some(parent) = path.parent() {
+                                let _ = std::fs::create_dir_all(parent);
+                            }
+                            if let Ok(file) = File::create(path) {
+                                Box::new(BufWriter::new(file))
+                            } else {
+                                Box::new(BufWriter::new(io::stdout()))
+                            }
+                        } else {
+                            Box::new(BufWriter::new(io::stdout()))
+                        }
+                    }
+                }
+            })
+            .unwrap_or_else(|| Box::new(BufWriter::new(io::stdout())))
     };
-    let stderr_writer = Box::new(BufWriter::new(io::stderr()));
 
     let is_stdin = is_stdin(&cli.files, cli.stdin_filename.as_deref());
     let files = resolve_default_files(cli.files, is_stdin);
 
     if cli.show_settings {
+        // For show_settings, use stdout (these are informational commands)
+        let mut writer = BufWriter::new(io::stdout());
         commands::show_settings::show_settings(
             &files,
             &pyproject_config,
@@ -266,6 +288,8 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         return Ok(ExitStatus::Success);
     }
     if cli.show_files {
+        // For show_files, use stdout (these are informational commands)
+        let mut writer = BufWriter::new(io::stdout());
         commands::show_files::show_files(
             &files,
             &pyproject_config,
@@ -281,7 +305,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         fix,
         fix_only,
         unsafe_fixes,
-        output_format,
+        output_format: _,
         show_fixes,
         ..
     } = pyproject_config.settings;
@@ -343,14 +367,6 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         return Ok(ExitStatus::Success);
     }
 
-    let printer = Printer::new(
-        output_format,
-        config_arguments.log_level,
-        fix_mode,
-        unsafe_fixes,
-        printer_flags,
-    );
-
     // the settings should already be combined with the CLI overrides at this point
     // TODO(jane): let's make this `PreviewMode`
     // TODO: this should reference the global preview mode once https://github.com/astral-sh/ruff/issues/8232
@@ -358,7 +374,11 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     let preview = pyproject_config.settings.linter.preview.is_enabled();
 
     if cli.watch {
-        if output_format != OutputFormat::default() {
+        if !output_targets.is_empty()
+            && output_targets
+                .iter()
+                .any(|t| t.format != OutputFormat::default())
+        {
             warn_user!(
                 "`--output-format {}` is always used in watch mode.",
                 OutputFormat::default()
@@ -377,7 +397,15 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
 
         // Perform an initial run instantly.
         Printer::clear_screen()?;
-        printer.write_to_user("Starting linter in watch mode...\n");
+        // Create a printer for watch mode (always uses default format)
+        let watch_printer = Printer::new(
+            OutputFormat::default(),
+            config_arguments.log_level,
+            fix_mode,
+            unsafe_fixes,
+            printer_flags,
+        );
+        watch_printer.write_to_user("Starting linter in watch mode...\n");
 
         let diagnostics = commands::check::check(
             &files,
@@ -388,7 +416,8 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             fix_mode,
             unsafe_fixes,
         )?;
-        printer.write_continuously(&mut writer, &diagnostics, preview)?;
+        let mut watch_writer = create_default_writer();
+        watch_printer.write_continuously(&mut *watch_writer, &diagnostics, preview)?;
 
         // In watch mode, we may need to re-resolve the configuration.
         // TODO(charlie): Re-compute other derivative values, like the `printer`.
@@ -406,7 +435,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
                             resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
                     }
                     Printer::clear_screen()?;
-                    printer.write_to_user("File change detected...\n");
+                    watch_printer.write_to_user("File change detected...\n");
 
                     let diagnostics = commands::check::check(
                         &files,
@@ -417,7 +446,8 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
                         fix_mode,
                         unsafe_fixes,
                     )?;
-                    printer.write_continuously(&mut writer, &diagnostics, preview)?;
+                    let mut watch_writer = create_default_writer();
+                    watch_printer.write_continuously(&mut *watch_writer, &diagnostics, preview)?;
                 }
                 Err(err) => return Err(err.into()),
             }
@@ -444,18 +474,79 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             )?
         };
 
-        // Always try to print violations (though the printer itself may suppress output)
-        // If we're writing fixes via stdin, the transformed source code goes to the writer
-        // so send the summary to stderr instead
-        let mut summary_writer = if is_stdin && matches!(fix_mode, FixMode::Apply | FixMode::Diff) {
-            stderr_writer
-        } else {
-            writer
-        };
-        if cli.statistics {
-            printer.write_statistics(&diagnostics, &mut summary_writer)?;
-        } else {
-            printer.write_once(&diagnostics, &mut summary_writer, preview)?;
+        // Write to all output targets
+        // Special case: If we're writing fixes via stdin, the transformed source code goes to stdout,
+        // so we need to handle summary separately for stdout targets
+        let is_stdin_with_fixes = is_stdin && matches!(fix_mode, FixMode::Apply | FixMode::Diff);
+
+        for target_pair in &output_targets {
+            // For stdin with fixes, if this is a stdout target, skip it (source code already written)
+            // and we'll handle the summary separately
+            if is_stdin_with_fixes && matches!(target_pair.target, OutputTarget::Stdout) {
+                // Skip writing diagnostics to stdout when fixes are applied via stdin
+                // The source code transformation is already written to stdout
+                continue;
+            }
+
+            let mut writer: Box<dyn Write> = match &target_pair.target {
+                OutputTarget::Stdout => Box::new(BufWriter::new(io::stdout())),
+                OutputTarget::Stderr => Box::new(BufWriter::new(io::stderr())),
+                OutputTarget::File(path) => {
+                    colored::control::set_override(false);
+                    if let Some(parent) = path.parent() {
+                        std::fs::create_dir_all(parent)?;
+                    }
+                    let file = File::create(path)?;
+                    Box::new(BufWriter::new(file))
+                }
+            };
+
+            let target_printer = Printer::new(
+                target_pair.format,
+                config_arguments.log_level,
+                fix_mode,
+                unsafe_fixes,
+                printer_flags,
+            );
+
+            if cli.statistics {
+                target_printer.write_statistics(&diagnostics, &mut *writer)?;
+            } else {
+                target_printer.write_once(&diagnostics, &mut *writer, preview)?;
+            }
+        }
+
+        // Special handling for stdin with fixes: write summary to stderr
+        if is_stdin_with_fixes {
+            // Check if we have a stderr target, otherwise create a temporary one for the summary
+            let has_stderr_target = output_targets
+                .iter()
+                .any(|t| matches!(t.target, OutputTarget::Stderr));
+            if !has_stderr_target {
+                // Write summary to stderr (old behavior)
+                let mut stderr_writer = BufWriter::new(io::stderr());
+                // Find the format to use for the summary (prefer human-readable, or first format)
+                let summary_format = output_targets
+                    .iter()
+                    .find(|t| t.format.is_human_readable())
+                    .or(output_targets.first())
+                    .map(|t| t.format)
+                    .unwrap_or(OutputFormat::Full);
+
+                let summary_printer = Printer::new(
+                    summary_format,
+                    config_arguments.log_level,
+                    fix_mode,
+                    unsafe_fixes,
+                    printer_flags,
+                );
+
+                if cli.statistics {
+                    summary_printer.write_statistics(&diagnostics, &mut stderr_writer)?;
+                } else {
+                    summary_printer.write_once(&diagnostics, &mut stderr_writer, preview)?;
+                }
+            }
         }
 
         if !cli.exit_zero {

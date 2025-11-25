@@ -246,12 +246,40 @@ pub struct CheckCommand {
 
     /// Output serialization format for violations.
     /// The default serialization format is "full".
+    ///
+    /// Note: For multiple output formats, use --output-file with format:target syntax instead.
+    /// Example: --output-file gitlab:gl-code-quality.json --output-file full:stdout
     #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
     pub output_format: Option<OutputFormat>,
 
-    /// Specify file to write the linter output to (default: stdout).
-    #[arg(short, long, env = "RUFF_OUTPUT_FILE")]
-    pub output_file: Option<PathBuf>,
+    /// Specify output destination(s) using format:target syntax.
+    /// Can be specified multiple times for multiple outputs.
+    /// Also supports comma-separated values: --output-file gitlab:file.json,full:stdout
+    ///
+    /// Examples:
+    ///   --output-file gitlab:gl-code-quality.json
+    ///   --output-file full:stdout
+    ///   --output-file concise:stderr
+    ///   --output-file gitlab:gl-code-quality.json --output-file full:stdout
+    ///   --output-file gitlab:file.json,full:stdout
+    ///
+    /// Environment variable `RUFF_OUTPUT_FILE` also supports comma-separated values:
+    ///   RUFF_OUTPUT_FILE="gitlab:gl-code-quality.json,full:stdout"
+    ///
+    /// Targets can be: stdout, stderr, or a file path.
+    /// Formats: full, concise, grouped, json, json-lines, junit, github, gitlab, pylint, rdjson, azure, sarif
+    ///
+    /// Legacy: If used with --output-format (without format: prefix), writes that format to the specified file.
+    #[arg(
+        short,
+        long,
+        action = clap::ArgAction::Append,
+        value_parser = OutputTargetPairParser,
+        env = "RUFF_OUTPUT_FILE",
+        value_delimiter = ',',
+        value_name = "FORMAT:TARGET"
+    )]
+    pub output_file: Vec<OutputTargetPairOrPath>,
     /// The minimum Python version that should be supported.
     #[arg(long, value_enum)]
     pub target_version: Option<PythonVersion>,
@@ -746,6 +774,7 @@ impl CheckCommand {
             ignore_noqa: self.ignore_noqa,
             no_cache: self.no_cache,
             output_file: self.output_file,
+            output_format: self.output_format,
             show_files: self.show_files,
             show_settings: self.show_settings,
             statistics: self.statistics,
@@ -895,6 +924,136 @@ impl InvalidConfigFlagReason {
             }
             Self::ExtendPassedViaConfigFlag => "Cannot include `extend` in a --config flag value",
         }
+    }
+}
+
+/// Represents a destination for output (stdout, stderr, or a file path).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum OutputTarget {
+    Stdout,
+    Stderr,
+    File(PathBuf),
+}
+
+/// Represents a format:target pair for output (e.g., "gitlab:gl-code-quality.json" or "full:stdout").
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OutputTargetPair {
+    pub format: OutputFormat,
+    pub target: OutputTarget,
+}
+
+/// Parser for output target pairs in the format "FORMAT:target".
+/// Examples:
+/// - "gitlab:gl-code-quality.json" -> `OutputFormat::Gitlab`, `OutputTarget::File("gl-code-quality.json`")
+/// - "full:stdout" -> `OutputFormat::Full`, `OutputTarget::Stdout`
+/// - "concise:stderr" -> `OutputFormat::Concise`, `OutputTarget::Stderr`
+#[derive(Clone)]
+pub struct OutputTargetPairParser;
+
+/// Represents either a format:target pair or a plain path (for backward compatibility).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum OutputTargetPairOrPath {
+    Pair(OutputTargetPair),
+    Path(PathBuf),
+}
+
+impl TypedValueParser for OutputTargetPairParser {
+    type Value = OutputTargetPairOrPath;
+
+    fn parse_ref(
+        &self,
+        cmd: &clap::Command,
+        arg: Option<&clap::Arg>,
+        value: &std::ffi::OsStr,
+    ) -> Result<Self::Value, clap::Error> {
+        let value = value
+            .to_str()
+            .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
+
+        // If it contains a colon, parse as format:target
+        if let Some((format_str, target_str)) = value.split_once(':') {
+            // Parse the format using clap's ValueEnum parsing
+            // We need to handle both kebab-case (from clap) and the display format
+            let format = match format_str {
+                "full" => OutputFormat::Full,
+                "concise" => OutputFormat::Concise,
+                "grouped" => OutputFormat::Grouped,
+                "json" => OutputFormat::Json,
+                "json-lines" | "json_lines" => OutputFormat::JsonLines,
+                "junit" => OutputFormat::Junit,
+                "github" => OutputFormat::Github,
+                "gitlab" => OutputFormat::Gitlab,
+                "pylint" => OutputFormat::Pylint,
+                "rdjson" => OutputFormat::Rdjson,
+                "azure" => OutputFormat::Azure,
+                "sarif" => OutputFormat::Sarif,
+                _ => {
+                    let mut error =
+                        clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
+                    if let Some(arg) = arg {
+                        error.insert(
+                            clap::error::ContextKind::InvalidArg,
+                            clap::error::ContextValue::String(arg.to_string()),
+                        );
+                    }
+                    error.insert(
+                        clap::error::ContextKind::InvalidValue,
+                        clap::error::ContextValue::String(format!(
+                            "Invalid output format '{}'. Valid formats: {}",
+                            format_str,
+                            [
+                                "full",
+                                "concise",
+                                "grouped",
+                                "json",
+                                "json-lines",
+                                "junit",
+                                "github",
+                                "gitlab",
+                                "pylint",
+                                "rdjson",
+                                "azure",
+                                "sarif"
+                            ]
+                            .join(", ")
+                        )),
+                    );
+                    return Err(error);
+                }
+            };
+
+            let target = match target_str {
+                "stdout" => OutputTarget::Stdout,
+                "stderr" => OutputTarget::Stderr,
+                path => {
+                    // Expand environment variables and tildes
+                    let expanded_path = shellexpand::full(path)
+                        .map(|expanded| PathBuf::from(expanded.as_ref()))
+                        .unwrap_or_else(|_| PathBuf::from(path));
+                    OutputTarget::File(expanded_path)
+                }
+            };
+
+            Ok(OutputTargetPairOrPath::Pair(OutputTargetPair {
+                format,
+                target,
+            }))
+        } else {
+            // No colon: treat as a plain path (for backward compatibility with --output-format)
+            // Expand environment variables and tildes
+            let expanded_path = shellexpand::full(value)
+                .map(|expanded| PathBuf::from(expanded.as_ref()))
+                .unwrap_or_else(|_| PathBuf::from(value));
+            Ok(OutputTargetPairOrPath::Path(expanded_path))
+        }
+    }
+}
+
+impl ValueParserFactory for OutputTargetPairOrPath {
+    type Parser = OutputTargetPairParser;
+
+    fn value_parser() -> Self::Parser {
+        OutputTargetPairParser
     }
 }
 
@@ -1080,12 +1239,63 @@ pub struct CheckArguments {
     pub files: Vec<PathBuf>,
     pub ignore_noqa: bool,
     pub no_cache: bool,
-    pub output_file: Option<PathBuf>,
+    pub output_file: Vec<OutputTargetPairOrPath>,
+    pub output_format: Option<OutputFormat>,
     pub show_files: bool,
     pub show_settings: bool,
     pub statistics: bool,
     pub stdin_filename: Option<PathBuf>,
     pub watch: bool,
+}
+
+impl CheckArguments {
+    /// Resolve output targets, handling backward compatibility with old --output-format and --output-file flags.
+    /// Returns a list of format:target pairs.
+    pub fn resolve_output_targets(&self) -> anyhow::Result<Vec<OutputTargetPair>> {
+        let mut targets = Vec::new();
+
+        // Process output_file entries
+        for entry in &self.output_file {
+            match entry {
+                OutputTargetPairOrPath::Pair(pair) => {
+                    targets.push(pair.clone());
+                }
+                OutputTargetPairOrPath::Path(path) => {
+                    // Backward compatibility: if --output-format is set, use it with this path
+                    if let Some(format) = self.output_format {
+                        targets.push(OutputTargetPair {
+                            format,
+                            target: OutputTarget::File(path.clone()),
+                        });
+                    } else {
+                        return Err(anyhow::anyhow!(
+                            "Cannot use plain file path '{}' without --output-format. Use format:target syntax instead (e.g., 'full:{}').",
+                            path.display(),
+                            path.display()
+                        ));
+                    }
+                }
+            }
+        }
+
+        // If no output_file entries but --output-format is specified, default to stdout
+        if targets.is_empty() {
+            if let Some(format) = self.output_format {
+                targets.push(OutputTargetPair {
+                    format,
+                    target: OutputTarget::Stdout,
+                });
+            } else {
+                // Default: full format to stdout
+                targets.push(OutputTargetPair {
+                    format: OutputFormat::Full,
+                    target: OutputTarget::Stdout,
+                });
+            }
+        }
+
+        Ok(targets)
+    }
 }
 
 /// CLI settings that are distinct from configuration (commands, lists of files,
