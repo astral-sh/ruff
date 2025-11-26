@@ -43,7 +43,7 @@ impl Violation for PropertyWithoutReturn {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { name } = self;
-        format!("{name} is a property without a `return` statement")
+        format!("`{name}` is a property without a `return` statement")
     }
 }
 
