@@ -1,5 +1,6 @@
 use compact_str::CompactString;
 use core::fmt;
+use ruff_db::diagnostic::Diagnostic;
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::LineRanges;
 use std::{error::Error, fmt::Formatter};
@@ -115,6 +116,30 @@ impl Suppressions {
     pub(crate) fn from_tokens(source: &str, tokens: &Tokens) -> Suppressions {
         let builder = SuppressionsBuilder::new(source);
         builder.load_from_tokens(tokens)
+    }
+
+    /// Check if a diagnostic is suppressed by any known range suppressions
+    pub(crate) fn check_diagnostic(&self, diagnostic: &Diagnostic) -> bool {
+        if self.valid.is_empty() {
+            return false;
+        }
+
+        let Some(code) = diagnostic.secondary_code() else {
+            return false;
+        };
+        let Some(span) = diagnostic.primary_span() else {
+            return false;
+        };
+        let Some(range) = span.range() else {
+            return false;
+        };
+
+        for suppression in &self.valid {
+            if *code == suppression.code.as_str() && suppression.range.contains_range(range) {
+                return true;
+            }
+        }
+        false
     }
 }
 

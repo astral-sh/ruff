@@ -32,6 +32,7 @@ use crate::rules::ruff::rules::test_rules::{self, TEST_RULES, TestRule};
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::source_kind::SourceKind;
+use crate::suppression::Suppressions;
 use crate::{Locator, directives, fs};
 
 pub(crate) mod float;
@@ -331,6 +332,7 @@ pub fn check_path(
             .iter_enabled_rules()
             .any(|rule_code| rule_code.lint_source().is_noqa())
     {
+        let suppressions = Suppressions::from_tokens(locator.contents(), tokens);
         let ignored = check_noqa(
             &mut context,
             path,
@@ -339,6 +341,7 @@ pub fn check_path(
             &directives.noqa_line_for,
             parsed.has_valid_syntax(),
             settings,
+            &suppressions,
         );
         if noqa.is_enabled() {
             for index in ignored.iter().rev() {
