@@ -13,6 +13,7 @@ use crate::checkers::ast::Checker;
 use crate::preview::{
     is_s310_resolve_string_literal_bindings_enabled, is_suspicious_function_reference_enabled,
 };
+use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for calls to `pickle` functions or modules that wrap them.
@@ -1020,17 +1021,23 @@ fn suspicious_function(
             || has_prefix(chars.skip_while(|c| c.is_whitespace()), "https://")
     }
 
-    /// Resolve a name expression to its binding value, or return the original expression.
-    fn resolve_name<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> &'a Expr {
-        if let Some(name_expr) = expr.as_name_expr() {
-            if let Some(binding_id) = semantic.only_binding(name_expr) {
-                let binding = semantic.binding(binding_id);
-                if let Some(value) = find_binding_value(binding, semantic) {
-                    return value;
-                }
-            }
-        }
-        expr
+    /// Resolves `expr` to its binding and checks if the resolved expression starts with an HTTP or HTTPS prefix.
+    fn expression_starts_with_http_prefix(
+        expr: &Expr,
+        semantic: &SemanticModel,
+        settings: &LinterSettings,
+    ) -> bool {
+        let resolved_expression = if is_s310_resolve_string_literal_bindings_enabled(settings)
+            && let Some(name_expr) = expr.as_name_expr()
+            && let Some(binding_id) = semantic.only_binding(name_expr)
+            && let Some(value) = find_binding_value(semantic.binding(binding_id), semantic)
+        {
+            value
+        } else {
+            expr
+        };
+
+        leading_chars(resolved_expression).is_some_and(has_http_prefix)
     }
 
     /// Return the leading characters for an expression, if it's a string literal, f-string, or
@@ -1054,7 +1061,7 @@ fn suspicious_function(
                     }
                 })
             }
-            // Ex) "foo" + "bar" or "a" + "b" + "c" (recursive concatenation)
+            // Ex) "foo" + "bar"
             Expr::BinOp(ast::ExprBinOp {
                 op: Operator::Add,
                 left,
@@ -1163,17 +1170,14 @@ fn suspicious_function(
                         .iter()
                         .all(|keyword| keyword.arg.is_some())
                 {
-                    if let Some(url_expr) = arguments.find_argument_value("url", 0) {
-                        let url_expr = if is_s310_resolve_string_literal_bindings_enabled(
+                    if let Some(url_expr) = arguments.find_argument_value("url", 0)
+                        && expression_starts_with_http_prefix(
+                            url_expr,
+                            checker.semantic(),
                             checker.settings(),
-                        ) {
-                            resolve_name(url_expr, checker.semantic())
-                        } else {
-                            url_expr
-                        };
-                        if leading_chars(url_expr).is_some_and(has_http_prefix) {
-                            return;
-                        }
+                        )
+                    {
+                        return;
                     }
                 }
             }
@@ -1208,32 +1212,25 @@ fn suspicious_function(
                                     name.segments() == ["urllib", "request", "Request"]
                                 })
                             {
-                                if let Some(url_expr) = arguments.find_argument_value("url", 0) {
-                                    let url_expr =
-                                        if is_s310_resolve_string_literal_bindings_enabled(
-                                            checker.settings(),
-                                        ) {
-                                            resolve_name(url_expr, checker.semantic())
-                                        } else {
-                                            url_expr
-                                        };
-                                    if leading_chars(url_expr).is_some_and(has_http_prefix) {
-                                        return;
-                                    }
+                                if let Some(url_expr) = arguments.find_argument_value("url", 0)
+                                    && expression_starts_with_http_prefix(
+                                        url_expr,
+                                        checker.semantic(),
+                                        checker.settings(),
+                                    )
+                                {
+                                    return;
                                 }
                             }
                         }
 
                         // If the `url` argument is a string literal (including resolved bindings), allow `http` and `https` schemes.
                         Some(expr) => {
-                            let expr = if is_s310_resolve_string_literal_bindings_enabled(
+                            if expression_starts_with_http_prefix(
+                                expr,
+                                checker.semantic(),
                                 checker.settings(),
                             ) {
-                                resolve_name(expr, checker.semantic())
-                            } else {
-                                expr
-                            };
-                            if leading_chars(expr).is_some_and(has_http_prefix) {
                                 return;
                             }
                         }
