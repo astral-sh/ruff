@@ -637,7 +637,9 @@ impl<'db> ClassType<'db> {
                     | TypeRelation::SubtypingAssuming(_) => {
                         ConstraintSet::from(other.is_object(db))
                     }
-                    TypeRelation::Assignability => ConstraintSet::from(!other.is_final(db)),
+                    TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
+                        ConstraintSet::from(!other.is_final(db))
+                    }
                 },
 
                 // Protocol, Generic, and TypedDict are not represented by a ClassType.
