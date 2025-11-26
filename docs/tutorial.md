@@ -372,7 +372,7 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
   rev: v0.14.6
   hooks:
     # Run the linter.
-    - id: ruff
+    - id: ruff-check
     # Run the formatter.
     - id: ruff-format
 ```
