@@ -1,0 +1,81 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: final.md - Tests for the `@typing(_extensions).final` decorator - Only the first `@final` violation is reported
+mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import final
+ 2 | 
+ 3 | class A:
+ 4 |     @final
+ 5 |     def f(self): ...
+ 6 | 
+ 7 | class B(A):
+ 8 |     @final
+ 9 |     def f(self): ...  # error: [override-of-final-method]
+10 | 
+11 | class C(B):
+12 |     @final
+13 |     # we only emit one error here, not two
+14 |     def f(self): ...  # error: [override-of-final-method]
+```
+
+# Diagnostics
+
+```
+error[override-of-final-method]: Cannot override `A.f`
+  --> src/mdtest_snippet.py:9:9
+   |
+ 7 | class B(A):
+ 8 |     @final
+ 9 |     def f(self): ...  # error: [override-of-final-method]
+   |         ^ Override of `f` from superclass `A`
+10 |
+11 | class C(B):
+   |
+info: `A.f` is decorated with `@final`, forbidding overrides
+ --> src/mdtest_snippet.py:4:5
+  |
+3 | class A:
+4 |     @final
+  |     ------
+5 |     def f(self): ...
+  |         - `A.f` defined here
+6 |
+7 | class B(A):
+  |
+info: rule `override-of-final-method` is enabled by default
+
+```
+
+```
+error[override-of-final-method]: Cannot override `B.f`
+  --> src/mdtest_snippet.py:14:9
+   |
+12 |     @final
+13 |     # we only emit one error here, not two
+14 |     def f(self): ...  # error: [override-of-final-method]
+   |         ^ Override of `f` from superclass `B`
+   |
+info: `B.f` is decorated with `@final`, forbidding overrides
+  --> src/mdtest_snippet.py:8:5
+   |
+ 7 | class B(A):
+ 8 |     @final
+   |     ------
+ 9 |     def f(self): ...  # error: [override-of-final-method]
+   |         - `B.f` defined here
+10 |
+11 | class C(B):
+   |
+info: rule `override-of-final-method` is enabled by default
+
+```

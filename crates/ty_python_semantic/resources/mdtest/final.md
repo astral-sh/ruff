@@ -312,3 +312,26 @@ class A:
 class B(A):
     def __init__(self) -> None: ...  # error: [override-of-final-method]
 ```
+
+## Only the first `@final` violation is reported
+
+(Don't do this.)
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import final
+
+class A:
+    @final
+    def f(self): ...
+
+class B(A):
+    @final
+    def f(self): ...  # error: [override-of-final-method]
+
+class C(B):
+    @final
+    # we only emit one error here, not two
+    def f(self): ...  # error: [override-of-final-method]
+```
