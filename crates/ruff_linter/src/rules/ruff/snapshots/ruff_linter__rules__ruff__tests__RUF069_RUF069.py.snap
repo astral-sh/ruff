@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF069 name is a property without a `return` statement
+RUF069 `name` is a property without a `return` statement
  --> RUF069.py:7:9
   |
 5 | class User:  # Test normal class properties
@@ -11,7 +11,7 @@ RUF069 name is a property without a `return` statement
 8 |         f"{self.first_name} {self.last_name}"
   |
 
-RUF069 nested is a property without a `return` statement
+RUF069 `nested` is a property without a `return` statement
   --> RUF069.py:18:9
    |
 17 |     @property
@@ -21,7 +21,7 @@ RUF069 nested is a property without a `return` statement
 20 |             return 0
    |
 
-RUF069 prop2 is a property without a `return` statement
+RUF069 `prop2` is a property without a `return` statement
   --> RUF069.py:43:9
    |
 42 |     @property
