@@ -711,7 +711,7 @@ impl SemanticSyntaxChecker {
                         if let Some(return_range) = visitor.return_range {
                             Self::add_error(
                                 ctx,
-                                SemanticSyntaxErrorKind::ReturnInAsyncGenerator,
+                                SemanticSyntaxErrorKind::ReturnInGenerator,
                                 return_range,
                             );
                         }
@@ -837,7 +837,6 @@ impl SemanticSyntaxChecker {
                     // def f(): yield *x
                     Self::invalid_star_expression(value, ctx);
                 }
-
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Yield);
             }
             Expr::YieldFrom(_) => {
@@ -1185,7 +1184,7 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::NonlocalWithoutBinding(name) => {
                 write!(f, "no binding for nonlocal `{name}` found")
             }
-            SemanticSyntaxErrorKind::ReturnInAsyncGenerator => {
+            SemanticSyntaxErrorKind::ReturnInGenerator => {
                 write!(f, "`return` with value in async generator")
             }
         }
@@ -1593,7 +1592,7 @@ pub enum SemanticSyntaxErrorKind {
     NonlocalWithoutBinding(String),
 
     /// Represents a `return` statement with a value in an asynchronous generator.
-    ReturnInAsyncGenerator,
+    ReturnInGenerator,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -1725,15 +1724,14 @@ impl StatementVisitor<'_> for ReturnVisitor {
                 }
                 _ => {}
             },
+            // Do not recurse into nested functions; they're evaluated separately.
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {}
             Stmt::Return(ast::StmtReturn {
                 value: Some(_),
                 range,
                 ..
             }) => {
-                if self.return_range.is_none() {
-                    self.return_range = Some(*range);
-                }
+                self.return_range = Some(*range);
             }
             _ => statement_visitor::walk_stmt(self, stmt),
         }

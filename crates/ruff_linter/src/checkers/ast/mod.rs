@@ -68,6 +68,7 @@ use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::preview::is_undefined_export_in_dunder_init_enabled;
 use crate::registry::Rule;
+use crate::rules::flake8_bugbear::rules::ReturnInGenerator;
 use crate::rules::pyflakes::rules::{
     LateFutureImport, MultipleStarredExpressions, ReturnOutsideFunction,
     UndefinedLocalWithNestedImportStarUsage, YieldOutsideFunction,
@@ -76,7 +77,7 @@ use crate::rules::pylint::rules::{
     AwaitOutsideAsync, LoadBeforeGlobalDeclaration, NonlocalWithoutBinding,
     YieldFromInAsyncFunction,
 };
-use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
+use crate::rules::{flake8_bugbear, flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::rule_table::RuleTable;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::{Edit, Violation};
@@ -728,6 +729,12 @@ impl SemanticSyntaxContext for Checker<'_> {
                     self.report_diagnostic(NonlocalWithoutBinding { name }, error.range);
                 }
             }
+            SemanticSyntaxErrorKind::ReturnInGenerator => {
+                // B901
+                if self.is_rule_enabled(Rule::ReturnInGenerator) {
+                    self.report_diagnostic(ReturnInGenerator, error.range);
+                }
+            }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
             | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
@@ -738,7 +745,6 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::InvalidExpression(..)
             | SemanticSyntaxErrorKind::GlobalParameter(_)
             | SemanticSyntaxErrorKind::DuplicateMatchKey(_)
-            | SemanticSyntaxErrorKind::ReturnInAsyncGenerator
             | SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(_)
             | SemanticSyntaxErrorKind::InvalidStarExpression
             | SemanticSyntaxErrorKind::AsyncComprehensionInSyncComprehension(_)
