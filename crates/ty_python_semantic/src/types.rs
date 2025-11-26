@@ -13533,14 +13533,14 @@ pub(crate) mod tests {
         let union = UnionType::from_elements(&db, [KnownClass::Object.to_instance(&db), div]);
         assert_eq!(union.display(&db).to_string(), "object");
 
-        let recursice = UnionType::from_elements(
+        let recursive = UnionType::from_elements(
             &db,
             [
                 KnownClass::List.to_specialized_instance(&db, [div]),
                 Type::none(&db),
             ],
         );
-        let nested_rec = KnownClass::List.to_specialized_instance(&db, [recursice]);
+        let nested_rec = KnownClass::List.to_specialized_instance(&db, [recursive]);
         assert_eq!(
             nested_rec.display(&db).to_string(),
             "list[list[Divergent] | None]"
