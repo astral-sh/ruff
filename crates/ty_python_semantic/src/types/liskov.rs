@@ -49,14 +49,14 @@ fn check_class_declaration<'db>(
         return;
     };
 
-    let (literal, specialization) = class.class_literal(db);
-    let class_kind = CodeGeneratorKind::from_class(db, literal, specialization);
-
     let Place::Defined(type_on_subclass_instance, _, _) =
         Type::instance(db, class).member(db, &member.name).place
     else {
         return;
     };
+
+    let (literal, specialization) = class.class_literal(db);
+    let class_kind = CodeGeneratorKind::from_class(db, literal, specialization);
 
     let mut subclass_overrides_superclass_declaration = false;
     let mut has_dynamic_superclass = false;
@@ -176,14 +176,12 @@ fn check_class_declaration<'db>(
             continue;
         }
 
-        let Some(superclass_type_as_callable) = superclass_type
-            .try_upcast_to_callable(db)
-            .map(|callables| callables.into_type(db))
-        else {
+        let Some(superclass_type_as_callable) = superclass_type.try_upcast_to_callable(db) else {
             continue;
         };
 
-        if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_callable) {
+        if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_callable.into_type(db))
+        {
             continue;
         }
 
