@@ -335,3 +335,38 @@ class C(B):
     # we only emit one error here, not two
     def f(self): ...  # error: [override-of-final-method]
 ```
+
+## For when you just really want to drive the point home
+
+```py
+from typing import final, Final
+
+@final
+@final
+@final
+@final
+@final
+@final
+class A:
+    @final
+    @final
+    @final
+    @final
+    @final
+    def method(self): ...
+
+@final
+@final
+@final
+@final
+@final
+class B:
+    method: Final = A.method
+
+class C(A):  # error: [subclass-of-final-class]
+    def method(self): ...  # error: [override-of-final-method]
+
+class D(B):  # error: [subclass-of-final-class]
+    # TODO: we should emit a diagnostic here
+    def method(self): ...
+```
