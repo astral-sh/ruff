@@ -187,9 +187,9 @@ impl Deref for SemanticTokens {
 /// Pass None to get tokens for the entire file.
 pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> SemanticTokens {
     let parsed = parsed_module(db, file).load(db);
-    let semantic_model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, file);
 
-    let mut visitor = SemanticTokenVisitor::new(&semantic_model, file, range);
+    let mut visitor = SemanticTokenVisitor::new(&model, range);
     visitor.visit_body(parsed.suite());
 
     SemanticTokens::new(visitor.tokens)
@@ -197,8 +197,7 @@ pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> Sem
 
 /// AST visitor that collects semantic tokens.
 struct SemanticTokenVisitor<'db> {
-    semantic_model: &'db SemanticModel<'db>,
-    file: File,
+    model: &'db SemanticModel<'db>,
     tokens: Vec<SemanticToken>,
     in_class_scope: bool,
     in_type_annotation: bool,
@@ -207,14 +206,9 @@ struct SemanticTokenVisitor<'db> {
 }
 
 impl<'db> SemanticTokenVisitor<'db> {
-    fn new(
-        semantic_model: &'db SemanticModel<'db>,
-        file: File,
-        range_filter: Option<TextRange>,
-    ) -> Self {
+    fn new(model: &'db SemanticModel<'db>, range_filter: Option<TextRange>) -> Self {
         Self {
-            semantic_model,
-            file,
+            model,
             tokens: Vec::new(),
             in_class_scope: false,
             in_target_creating_definition: false,
@@ -265,7 +259,7 @@ impl<'db> SemanticTokenVisitor<'db> {
 
     fn classify_name(&self, name: &ast::ExprName) -> (SemanticTokenType, SemanticTokenModifier) {
         // First try to classify the token based on its definition kind.
-        let definition = definition_for_name(self.semantic_model.db(), self.file, name);
+        let definition = definition_for_name(self.model, name);
 
         if let Some(definition) = definition {
             let name_str = name.id.as_str();
@@ -275,7 +269,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         }
 
         // Fall back to type-based classification.
-        let ty = name.inferred_type(self.semantic_model);
+        let ty = name.inferred_type(self.model);
         let name_str = name.id.as_str();
         self.classify_from_type_and_name_str(ty, name_str)
     }
@@ -286,7 +280,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         name_str: &str,
     ) -> Option<(SemanticTokenType, SemanticTokenModifier)> {
         let mut modifiers = SemanticTokenModifier::empty();
-        let db = self.semantic_model.db();
+        let db = self.model.db();
         let model = SemanticModel::new(db, definition.file(db));
 
         match definition.kind(db) {
@@ -712,12 +706,12 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 for alias in &import.names {
                     if let Some(asname) = &alias.asname {
                         // For aliased imports (from X import Y as Z), classify Z based on what Y is
-                        let ty = alias.inferred_type(self.semantic_model);
+                        let ty = alias.inferred_type(self.model);
                         let (token_type, modifiers) = self.classify_from_alias_type(ty, asname);
                         self.add_token(asname, token_type, modifiers);
                     } else {
                         // For direct imports (from X import Y), use semantic classification
-                        let ty = alias.inferred_type(self.semantic_model);
+                        let ty = alias.inferred_type(self.model);
                         let (token_type, modifiers) =
                             self.classify_from_alias_type(ty, &alias.name);
                         self.add_token(&alias.name, token_type, modifiers);
@@ -837,7 +831,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 self.visit_expr(&attr.value);
 
                 // Then add token for the attribute name (e.g., 'path' in 'os.path')
-                let ty = expr.inferred_type(self.semantic_model);
+                let ty = expr.inferred_type(self.model);
                 let (token_type, modifiers) =
                     Self::classify_from_type_for_attribute(ty, &attr.attr);
                 self.add_token(&attr.attr, token_type, modifiers);
@@ -880,6 +874,17 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 self.in_target_creating_definition = prev_in_target;
 
                 self.visit_expr(&named.value);
+            }
+            ast::Expr::StringLiteral(string_expr) => {
+                // Highlight the sub-AST of a string annotation
+                if let Some((sub_ast, sub_model)) = self.model.enter_string_annotation(string_expr)
+                {
+                    let mut sub_visitor = SemanticTokenVisitor::new(&sub_model, None);
+                    sub_visitor.visit_expr(sub_ast.expr());
+                    self.tokens.extend(sub_visitor.tokens);
+                } else {
+                    walk_expr(self, expr);
+                }
             }
             _ => {
                 // For all other expression types, let the default visitor handle them
@@ -1561,6 +1566,50 @@ from mymodule import CONSTANT, my_function, MyClass
         "CONSTANT" @ 140..148: Variable [readonly]
         "my_function" @ 150..161: Variable
         "MyClass" @ 163..170: Variable
+        "#);
+    }
+
+    #[test]
+    fn test_str_annotation() {
+        let test = SemanticTokenTest::new(
+            r#"
+x: int = 1
+y: "int" = 1
+z = "int"
+w1: "int | str" = "hello"
+w2: "int | sr" = "hello"
+w3: "int | " = "hello"
+w4: "float"
+w5: "float
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "x" @ 1..2: Variable [definition]
+        "int" @ 4..7: Class
+        "1" @ 10..11: Number
+        "y" @ 12..13: Variable [definition]
+        "int" @ 16..19: Class
+        "1" @ 23..24: Number
+        "z" @ 25..26: Variable [definition]
+        "\"int\"" @ 29..34: String
+        "w1" @ 35..37: Variable [definition]
+        "int" @ 40..43: Class
+        "str" @ 46..49: Class
+        "\"hello\"" @ 53..60: String
+        "w2" @ 61..63: Variable [definition]
+        "int" @ 66..69: Class
+        "sr" @ 72..74: Variable
+        "\"hello\"" @ 78..85: String
+        "w3" @ 86..88: Variable [definition]
+        "\"int | \"" @ 90..98: String
+        "\"hello\"" @ 101..108: String
+        "w4" @ 109..111: Variable [definition]
+        "float" @ 114..119: Class
+        "w5" @ 121..123: Variable [definition]
+        "float" @ 126..131: Class
         "#);
     }
 

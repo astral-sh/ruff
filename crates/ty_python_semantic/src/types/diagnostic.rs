@@ -14,9 +14,11 @@ use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::semantic_index::{global_scope, place_table, use_def_map};
 use crate::suppression::FileSuppressionId;
 use crate::types::call::CallError;
-use crate::types::class::{DisjointBase, DisjointBaseKind, Field, MethodDecorator};
+use crate::types::class::{
+    CodeGeneratorKind, DisjointBase, DisjointBaseKind, Field, MethodDecorator,
+};
 use crate::types::function::{FunctionType, KnownFunction};
-use crate::types::liskov::{MethodKind, SynthesizedMethodKind};
+use crate::types::liskov::MethodKind;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
@@ -25,7 +27,7 @@ use crate::types::string_annotation::{
 use crate::types::{
     BoundTypeVarInstance, ClassType, DynamicType, LintDiagnosticGuard, Protocol,
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
-    infer_isolated_expression, protocol_class::ProtocolClass,
+    protocol_class::ProtocolClass,
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy};
 use crate::{Db, DisplaySettings, FxIndexMap, Module, ModuleName, Program, declare_lint};
@@ -114,6 +116,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
+    registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -1547,6 +1550,42 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for methods that are decorated with `@override` but do not override any method in a superclass.
+    ///
+    /// ## Why is this bad?
+    /// Decorating a method with `@override` declares to the type checker that the intention is that it should
+    /// override a method from a superclass.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from typing import override
+    ///
+    /// class A:
+    ///     @override
+    ///     def foo(self): ...  # Error raised here
+    ///
+    /// class B(A):
+    ///     @override
+    ///     def ffooo(self): ...  # Error raised here
+    ///
+    /// class C:
+    ///     @override
+    ///     def __repr__(self): ...  # fine: overrides `object.__repr__`
+    ///
+    /// class D(A):
+    ///     @override
+    ///     def foo(self): ...  # fine: overrides `A.foo`
+    /// ```
+    pub(crate) static INVALID_EXPLICIT_OVERRIDE = {
+        summary: "detects methods that are decorated with `@override` but do not override any method in a superclass",
+        status: LintStatus::stable("0.0.1-alpha.28"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for `assert_type()` and `assert_never()` calls where the actual type
     /// is not the same as the asserted type.
     ///
@@ -2190,7 +2229,7 @@ pub(super) fn report_invalid_assignment<'db>(
     target_node: AnyNodeRef,
     definition: Definition<'db>,
     target_ty: Type,
-    mut value_ty: Type<'db>,
+    value_ty: Type<'db>,
 ) {
     let definition_kind = definition.kind(context.db());
     let value_node = match definition_kind {
@@ -2208,13 +2247,6 @@ pub(super) fn report_invalid_assignment<'db>(
 
     let settings =
         DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), target_ty, value_ty);
-
-    if let Some(value_node) = value_node {
-        // Re-infer the RHS of the annotated assignment, ignoring the type context for more precise
-        // error messages.
-        value_ty =
-            infer_isolated_expression(context.db(), definition.scope(context.db()), value_node);
-    }
 
     let diagnostic_range = if let Some(value_node) = value_node {
         // Expand the range to include parentheses around the value, if any. This allows
@@ -3599,20 +3631,20 @@ pub(super) fn report_invalid_method_override<'db>(
                 }
             }
         }
-        MethodKind::Synthesized(synthesized_kind) => {
+        MethodKind::Synthesized(class_kind) => {
             let make_sub =
                 |message: fmt::Arguments| SubDiagnostic::new(SubDiagnosticSeverity::Info, message);
 
-            let mut sub = match synthesized_kind {
-                SynthesizedMethodKind::Dataclass => make_sub(format_args!(
+            let mut sub = match class_kind {
+                CodeGeneratorKind::DataclassLike(_) => make_sub(format_args!(
                     "`{overridden_method}` is a generated method created because \
                         `{superclass_name}` is a dataclass"
                 )),
-                SynthesizedMethodKind::NamedTuple => make_sub(format_args!(
+                CodeGeneratorKind::NamedTuple => make_sub(format_args!(
                     "`{overridden_method}` is a generated method created because \
                         `{superclass_name}` inherits from `typing.NamedTuple`"
                 )),
-                SynthesizedMethodKind::TypedDict => make_sub(format_args!(
+                CodeGeneratorKind::TypedDict => make_sub(format_args!(
                     "`{overridden_method}` is a generated method created because \
                         `{superclass_name}` is a `TypedDict`"
                 )),

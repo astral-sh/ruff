@@ -148,15 +148,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // anything else is an invalid annotation:
                     op => {
                         self.infer_binary_expression(binary, TypeContext::default());
-                        if let Some(mut diag) = self.report_invalid_type_expression(
+                        self.report_invalid_type_expression(
                             expression,
                             format_args!(
                                 "Invalid binary operator `{}` in type annotation",
                                 op.as_str()
                             ),
-                        ) {
-                            diag.info("Did you mean to use `|`?");
-                        }
+                        );
                         Type::unknown()
                     }
                 }
@@ -524,6 +522,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         match parse_string_annotation(&self.context, string) {
             Some(parsed) => {
+                self.string_annotations
+                    .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
                 // String annotations are always evaluated in the deferred context.
                 self.infer_type_expression_with_state(
                     parsed.expr(),
@@ -1446,13 +1446,40 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
             SpecialFormType::LiteralString => {
-                self.infer_type_expression(arguments_slice);
+                let arguments = self.infer_expression(arguments_slice, TypeContext::default());
 
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                    let mut diag = builder.into_diagnostic(format_args!(
-                        "Type `{special_form}` expected no type parameter",
-                    ));
-                    diag.info("Did you mean to use `Literal[...]` instead?");
+                    let mut diag =
+                        builder.into_diagnostic("`LiteralString` expects no type parameter");
+
+                    let arguments_as_tuple = arguments.exact_tuple_instance_spec(db);
+
+                    let mut argument_elements = arguments_as_tuple
+                        .as_ref()
+                        .map(|tup| Either::Left(tup.all_elements().copied()))
+                        .unwrap_or(Either::Right(std::iter::once(arguments)));
+
+                    let probably_meant_literal = argument_elements.all(|ty| match ty {
+                        Type::StringLiteral(_)
+                        | Type::BytesLiteral(_)
+                        | Type::EnumLiteral(_)
+                        | Type::BooleanLiteral(_) => true,
+                        Type::NominalInstance(instance) => {
+                            instance.has_known_class(db, KnownClass::NoneType)
+                        }
+                        _ => false,
+                    });
+
+                    if probably_meant_literal {
+                        diag.annotate(
+                            self.context
+                                .secondary(&*subscript.value)
+                                .message("Did you mean `Literal`?"),
+                        );
+                        diag.set_concise_message(
+                            "`LiteralString` expects no type parameter - did you mean `Literal`?",
+                        );
+                    }
                 }
                 Type::unknown()
             }

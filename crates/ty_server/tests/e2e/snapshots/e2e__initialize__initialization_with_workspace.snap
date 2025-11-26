@@ -43,6 +43,11 @@ expression: initialization_result
     "documentHighlightProvider": true,
     "documentSymbolProvider": true,
     "workspaceSymbolProvider": true,
+    "codeActionProvider": {
+      "codeActionKinds": [
+        "quickfix"
+      ]
+    },
     "declarationProvider": true,
     "executeCommandProvider": {
       "commands": [

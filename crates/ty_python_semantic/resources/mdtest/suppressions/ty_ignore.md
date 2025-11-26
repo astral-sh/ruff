@@ -18,7 +18,7 @@ a = 4 + test  # ty: ignore[unresolved-reference]
 
 ```py
 test = 10
-# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'possibly-unresolved-reference'"
+# error: [unused-ignore-comment] "Unused `ty: ignore` directive"
 a = test + 3  # ty: ignore[possibly-unresolved-reference]
 ```
 
@@ -26,7 +26,7 @@ a = test + 3  # ty: ignore[possibly-unresolved-reference]
 
 ```py
 # error: [unresolved-reference]
-# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'possibly-unresolved-reference'"
+# error: [unused-ignore-comment] "Unused `ty: ignore` directive"
 a = test + 3  # ty: ignore[possibly-unresolved-reference]
 ```
 
@@ -50,17 +50,20 @@ a = 10 / 0  # ty: ignore[division-by-zero, unused-ignore-comment]
 
 ## Multiple unused comments
 
-Today, ty emits a diagnostic for every unused code. We might want to group the codes by comment at
-some point in the future.
+ty groups unused codes that are next to each other.
+
+<!-- snapshot-diagnostics -->
 
 ```py
-# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'division-by-zero'"
-# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-reference'"
+# error: [unused-ignore-comment] "Unused `ty: ignore` directive"
 a = 10 / 2  # ty: ignore[division-by-zero, unresolved-reference]
 
 # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment'"
 # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-reference'"
 a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
+
+# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment', 'unresolved-reference'"
+a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-zero]
 ```
 
 ## Multiple suppressions

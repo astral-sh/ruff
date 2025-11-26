@@ -117,6 +117,6 @@ from typing import no_type_check
 
 @no_type_check
 def test():
-    # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-reference'"
+    # error: [unused-ignore-comment] "Unused `ty: ignore` directive"
     return x + 5  # ty: ignore[unresolved-reference]
 ```

@@ -27,8 +27,7 @@ pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL};
 pub(crate) use self::infer::{
     TypeContext, infer_deferred_types, infer_definition_types, infer_expression_type,
-    infer_expression_types, infer_isolated_expression, infer_scope_types,
-    static_expression_truthiness,
+    infer_expression_types, infer_scope_types, static_expression_truthiness,
 };
 pub(crate) use self::signatures::{CallableSignature, Parameter, Parameters, Signature};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
@@ -51,7 +50,6 @@ use crate::types::constraints::{
 };
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
-use crate::types::display::TupleSpecialization;
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
 use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::function::{
@@ -142,7 +140,7 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
             .map(|error| Diagnostic::invalid_syntax(file, error, error)),
     );
 
-    check_suppressions(db, file, &mut diagnostics);
+    let diagnostics = check_suppressions(db, file, diagnostics);
 
     let elapsed = start.elapsed();
     if elapsed >= Duration::from_millis(100) {
@@ -152,7 +150,7 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
         );
     }
 
-    diagnostics.into_diagnostics()
+    diagnostics
 }
 
 /// Infer the type of a binding.
@@ -1370,14 +1368,13 @@ impl<'db> Type<'db> {
         };
 
         // Avoid literal promotion if it leads to an unassignable type.
-        if tcx
-            .annotation
-            .is_none_or(|annotation| promoted.is_assignable_to(db, annotation))
-        {
-            return promoted;
+        if tcx.annotation.is_some_and(|annotation| {
+            self.is_assignable_to(db, annotation) && !promoted.is_assignable_to(db, annotation)
+        }) {
+            return self;
         }
 
-        self
+        promoted
     }
 
     /// Return a "normalized" version of `self` that ensures that equivalent types have the same Salsa ID.
@@ -8233,97 +8230,7 @@ impl<'db> KnownInstanceType<'db> {
 
     /// Return the repr of the symbol at runtime
     fn repr(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
-        struct KnownInstanceRepr<'db> {
-            known_instance: KnownInstanceType<'db>,
-            db: &'db dyn Db,
-        }
-
-        impl std::fmt::Display for KnownInstanceRepr<'_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self.known_instance {
-                    KnownInstanceType::SubscriptedProtocol(generic_context) => {
-                        f.write_str("typing.Protocol")?;
-                        generic_context.display(self.db).fmt(f)
-                    }
-                    KnownInstanceType::SubscriptedGeneric(generic_context) => {
-                        f.write_str("typing.Generic")?;
-                        generic_context.display(self.db).fmt(f)
-                    }
-                    KnownInstanceType::TypeAliasType(alias) => {
-                        if let Some(specialization) = alias.specialization(self.db) {
-                            f.write_str(alias.name(self.db))?;
-                            specialization
-                                .display_short(
-                                    self.db,
-                                    TupleSpecialization::No,
-                                    DisplaySettings::default(),
-                                )
-                                .fmt(f)
-                        } else {
-                            f.write_str("typing.TypeAliasType")
-                        }
-                    }
-                    // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
-                    // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
-                    // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
-                    KnownInstanceType::TypeVar(typevar_instance) => {
-                        if typevar_instance.kind(self.db).is_paramspec() {
-                            f.write_str("typing.ParamSpec")
-                        } else {
-                            f.write_str("typing.TypeVar")
-                        }
-                    }
-                    KnownInstanceType::Deprecated(_) => f.write_str("warnings.deprecated"),
-                    KnownInstanceType::Field(field) => {
-                        f.write_str("dataclasses.Field")?;
-                        if let Some(default_ty) = field.default_type(self.db) {
-                            write!(f, "[{}]", default_ty.display(self.db))?;
-                        }
-                        Ok(())
-                    }
-                    KnownInstanceType::ConstraintSet(tracked_set) => {
-                        let constraints = tracked_set.constraints(self.db);
-                        write!(
-                            f,
-                            "ty_extensions.ConstraintSet[{}]",
-                            constraints.display(self.db)
-                        )
-                    }
-                    KnownInstanceType::GenericContext(generic_context) => {
-                        write!(
-                            f,
-                            "ty_extensions.GenericContext{}",
-                            generic_context.display_full(self.db)
-                        )
-                    }
-                    KnownInstanceType::Specialization(specialization) => {
-                        // Normalize for consistent output across CI platforms
-                        write!(
-                            f,
-                            "ty_extensions.Specialization{}",
-                            specialization.display_full(self.db)
-                        )
-                    }
-                    KnownInstanceType::UnionType(_) => f.write_str("types.UnionType"),
-                    KnownInstanceType::Literal(_) => f.write_str("<typing.Literal special form>"),
-                    KnownInstanceType::Annotated(_) => {
-                        f.write_str("<typing.Annotated special form>")
-                    }
-                    KnownInstanceType::TypeGenericAlias(_) | KnownInstanceType::Callable(_) => {
-                        f.write_str("GenericAlias")
-                    }
-                    KnownInstanceType::LiteralStringAlias(_) => f.write_str("str"),
-                    KnownInstanceType::NewType(declaration) => {
-                        write!(f, "<NewType pseudo-class '{}'>", declaration.name(self.db))
-                    }
-                }
-            }
-        }
-
-        KnownInstanceRepr {
-            known_instance: self,
-            db,
-        }
+        self.display_with(db, DisplaySettings::default())
     }
 }
 
@@ -8367,6 +8274,10 @@ impl DynamicType<'_> {
         } else {
             Self::Any
         }
+    }
+
+    pub(crate) fn is_todo(&self) -> bool {
+        matches!(self, Self::Todo(_) | Self::TodoUnpack)
     }
 }
 
@@ -8597,25 +8508,23 @@ impl<'db> InvalidTypeExpression<'db> {
                     InvalidTypeExpression::Field => {
                         f.write_str("`dataclasses.Field` is not allowed in type expressions")
                     }
-                    InvalidTypeExpression::ConstraintSet => {
-                        f.write_str("`ty_extensions.ConstraintSet` is not allowed in type expressions")
-                    }
-                    InvalidTypeExpression::GenericContext => {
-                        f.write_str("`ty_extensions.GenericContext` is not allowed in type expressions")
-                    }
-                    InvalidTypeExpression::Specialization => {
-                        f.write_str("`ty_extensions.GenericContext` is not allowed in type expressions")
-                    }
-                    InvalidTypeExpression::TypedDict => {
-                        f.write_str(
-                            "The special form `typing.TypedDict` is not allowed in type expressions. \
-                            Did you mean to use a concrete TypedDict or `collections.abc.Mapping[str, object]` instead?")
-                    }
-                    InvalidTypeExpression::TypeAlias => {
-                        f.write_str(
-                            "`typing.TypeAlias` is only allowed as the sole annotation on an annotated assignment",
-                        )
-                    }
+                    InvalidTypeExpression::ConstraintSet => f.write_str(
+                        "`ty_extensions.ConstraintSet` is not allowed in type expressions",
+                    ),
+                    InvalidTypeExpression::GenericContext => f.write_str(
+                        "`ty_extensions.GenericContext` is not allowed in type expressions",
+                    ),
+                    InvalidTypeExpression::Specialization => f.write_str(
+                        "`ty_extensions.GenericContext` is not allowed in type expressions",
+                    ),
+                    InvalidTypeExpression::TypedDict => f.write_str(
+                        "The special form `typing.TypedDict` \
+                            is not allowed in type expressions",
+                    ),
+                    InvalidTypeExpression::TypeAlias => f.write_str(
+                        "`typing.TypeAlias` is only allowed \
+                            as the sole annotation on an annotated assignment",
+                    ),
                     InvalidTypeExpression::TypeQualifier(qualifier) => write!(
                         f,
                         "Type qualifier `{qualifier}` is not allowed in type expressions \
@@ -8625,6 +8534,11 @@ impl<'db> InvalidTypeExpression<'db> {
                         f,
                         "Type qualifier `{qualifier}` is not allowed in type expressions \
                         (only in annotation expressions, and only with exactly one argument)",
+                    ),
+                    InvalidTypeExpression::InvalidType(Type::ModuleLiteral(module), _) => write!(
+                        f,
+                        "Module `{module}` is not valid in a type expression",
+                        module = module.module(self.db).name(self.db)
                     ),
                     InvalidTypeExpression::InvalidType(ty, _) => write!(
                         f,
@@ -8639,35 +8553,39 @@ impl<'db> InvalidTypeExpression<'db> {
     }
 
     fn add_subdiagnostics(self, db: &'db dyn Db, mut diagnostic: LintDiagnosticGuard) {
-        let InvalidTypeExpression::InvalidType(ty, scope) = self else {
-            return;
-        };
-        let Type::ModuleLiteral(module_type) = ty else {
-            return;
-        };
-        let module = module_type.module(db);
-        let Some(module_name_final_part) = module.name(db).components().next_back() else {
-            return;
-        };
-        let Some(module_member_with_same_name) = ty
-            .member(db, module_name_final_part)
-            .place
-            .ignore_possibly_undefined()
-        else {
-            return;
-        };
-        if module_member_with_same_name
-            .in_type_expression(db, scope, None)
-            .is_err()
-        {
-            return;
-        }
+        if let InvalidTypeExpression::InvalidType(ty, scope) = self {
+            let Type::ModuleLiteral(module_type) = ty else {
+                return;
+            };
+            let module = module_type.module(db);
+            let Some(module_name_final_part) = module.name(db).components().next_back() else {
+                return;
+            };
+            let Some(module_member_with_same_name) = ty
+                .member(db, module_name_final_part)
+                .place
+                .ignore_possibly_undefined()
+            else {
+                return;
+            };
+            if module_member_with_same_name
+                .in_type_expression(db, scope, None)
+                .is_err()
+            {
+                return;
+            }
 
-        // TODO: showing a diff (and even having an autofix) would be even better
-        diagnostic.info(format_args!(
-            "Did you mean to use the module's member \
-            `{module_name_final_part}.{module_name_final_part}` instead?"
-        ));
+            // TODO: showing a diff (and even having an autofix) would be even better
+            diagnostic.set_primary_message(format_args!(
+                "Did you mean to use the module's member \
+                `{module_name_final_part}.{module_name_final_part}`?"
+            ));
+        } else if let InvalidTypeExpression::TypedDict = self {
+            diagnostic.help(
+                "You might have meant to use a concrete TypedDict \
+                or `collections.abc.Mapping[str, object]`",
+            );
+        }
     }
 }
 

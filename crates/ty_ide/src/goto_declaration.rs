@@ -16,9 +16,9 @@ pub fn goto_declaration(
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
     let module = parsed_module(db, file).load(db);
-    let goto_target = find_goto_target(&module, offset)?;
-
     let model = SemanticModel::new(db, file);
+    let goto_target = find_goto_target(&model, &module, offset)?;
+
     let declaration_targets = goto_target
         .get_definition_targets(&model, ImportAliasResolution::ResolveAliases)?
         .declaration_targets(db)?;
@@ -890,6 +890,190 @@ def another_helper(path):
     }
 
     #[test]
+    fn goto_declaration_string_annotation1() {
+        let test = cursor_test(
+            r#"
+        a: "MyCla<CURSOR>ss" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> main.py:4:7
+          |
+        2 | a: "MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       ^^^^^^^
+        5 |     """some docs"""
+          |
+        info: Source
+         --> main.py:2:5
+          |
+        2 | a: "MyClass" = 1
+          |     ^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation2() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyCl<CURSOR>ass" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> main.py:4:7
+          |
+        2 | a: "None | MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       ^^^^^^^
+        5 |     """some docs"""
+          |
+        info: Source
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation3() {
+        let test = cursor_test(
+            r#"
+        a: "None |<CURSOR> MyClass" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation4() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyClass<CURSOR>" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> main.py:4:7
+          |
+        2 | a: "None | MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       ^^^^^^^
+        5 |     """some docs"""
+          |
+        info: Source
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation5() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyClass"<CURSOR> = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_dangling1() {
+        let test = cursor_test(
+            r#"
+        a: "MyCl<CURSOR>ass |" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_dangling2() {
+        let test = cursor_test(
+            r#"
+        a: "MyCl<CURSOR>ass | No" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> main.py:4:7
+          |
+        2 | a: "MyClass | No" = 1
+        3 |
+        4 | class MyClass:
+          |       ^^^^^^^
+        5 |     """some docs"""
+          |
+        info: Source
+         --> main.py:2:5
+          |
+        2 | a: "MyClass | No" = 1
+          |     ^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_dangling3() {
+        let test = cursor_test(
+            r#"
+        a: "MyClass | N<CURSOR>o" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"No goto target found");
+    }
+
+    #[test]
     fn goto_declaration_nested_instance_attribute() {
         let test = cursor_test(
             "
@@ -1071,6 +1255,45 @@ def outer():
     }
 
     #[test]
+    fn goto_declaration_nonlocal_stmt() {
+        let test = cursor_test(
+            r#"
+def outer():
+    xy = "outer_value"
+    
+    def inner():
+        nonlocal x<CURSOR>y
+        xy = "modified"
+        return x  # Should find the nonlocal x declaration in outer scope
+    
+    return inner
+"#,
+        );
+
+        // Should find the variable declaration in the outer scope, not the nonlocal statement
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> main.py:3:5
+          |
+        2 | def outer():
+        3 |     xy = "outer_value"
+          |     ^^
+        4 |
+        5 |     def inner():
+          |
+        info: Source
+         --> main.py:6:18
+          |
+        5 |     def inner():
+        6 |         nonlocal xy
+          |                  ^^
+        7 |         xy = "modified"
+        8 |         return x  # Should find the nonlocal x declaration in outer scope
+          |
+        "#);
+    }
+
+    #[test]
     fn goto_declaration_global_binding() {
         let test = cursor_test(
             r#"
@@ -1100,6 +1323,41 @@ def function():
         6 |     global_var = "modified"
         7 |     return global_var  # Should find the global variable declaration
           |            ^^^^^^^^^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_global_stmt() {
+        let test = cursor_test(
+            r#"
+global_var = "global_value"
+
+def function():
+    global global_<CURSOR>var
+    global_var = "modified"
+    return global_var  # Should find the global variable declaration
+"#,
+        );
+
+        // Should find the global variable declaration, not the global statement
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> main.py:2:1
+          |
+        2 | global_var = "global_value"
+          | ^^^^^^^^^^
+        3 |
+        4 | def function():
+          |
+        info: Source
+         --> main.py:5:12
+          |
+        4 | def function():
+        5 |     global global_var
+          |            ^^^^^^^^^^
+        6 |     global_var = "modified"
+        7 |     return global_var  # Should find the global variable declaration
           |
         "#);
     }

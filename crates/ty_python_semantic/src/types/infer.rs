@@ -37,9 +37,8 @@
 //! be considered a bug.)
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
 use salsa::plumbing::AsId;
 
@@ -204,24 +203,6 @@ fn infer_expression_types_impl<'db>(
         &module,
     )
     .finish_expression()
-}
-
-/// Infer the type of an expression in isolation.
-///
-/// The type returned by this function may be different than the type of the expression
-/// if it was inferred within its region, as it does not account for surrounding type context.
-/// This can be useful to re-infer the type of an expression for diagnostics.
-pub(crate) fn infer_isolated_expression<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    expr: &ast::Expr,
-) -> Type<'db> {
-    let file = scope.file(db);
-    let module = parsed_module(db, file).load(db);
-    let index = semantic_index(db, file);
-
-    TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index, &module)
-        .infer_isolated_expression(expr)
 }
 
 fn expression_cycle_recover<'db>(
@@ -554,6 +535,9 @@ pub(crate) struct ScopeInference<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
 struct ScopeInferenceExtra<'db> {
+    /// String annotations found in this region
+    string_annotations: FxHashSet<ExpressionNodeKey>,
+
     /// Is this a cycle-recovery inference result, and if so, what kind?
     cycle_recovery: Option<CycleRecovery<'db>>,
 
@@ -598,6 +582,16 @@ impl<'db> ScopeInference<'db> {
             .as_ref()
             .and_then(|extra| extra.cycle_recovery.map(CycleRecovery::fallback_type))
     }
+
+    /// Returns whether the given expression is a string annotation
+    /// (the string in `x: "int | None"`).
+    pub(crate) fn is_string_annotation(&self, expression: impl Into<ExpressionNodeKey>) -> bool {
+        let Some(extra) = &self.extra else {
+            return false;
+        };
+
+        extra.string_annotations.contains(&expression.into())
+    }
 }
 
 /// The inferred types for a definition region.
@@ -629,6 +623,9 @@ pub(crate) struct DefinitionInference<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
 struct DefinitionInferenceExtra<'db> {
+    /// String annotations found in this region
+    string_annotations: FxHashSet<ExpressionNodeKey>,
+
     /// Is this a cycle-recovery inference result, and if so, what kind?
     cycle_recovery: Option<CycleRecovery<'db>>,
 
@@ -765,6 +762,9 @@ pub(crate) struct ExpressionInference<'db> {
 /// Extra data that only exists for few inferred expression regions.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize, Default)]
 struct ExpressionInferenceExtra<'db> {
+    /// String annotations found in this region
+    string_annotations: FxHashSet<ExpressionNodeKey>,
+
     /// The types of every binding in this expression region.
     ///
     /// Only very few expression regions have bindings (around 0.1%).
