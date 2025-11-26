@@ -1037,12 +1037,21 @@ impl<'db> Node<'db> {
             Node::Interior(_) => {}
         }
 
+        let q = self.display(db).to_string();
+        eprintln!("==> sat? {q}");
         let mut inferable_domain = Node::AlwaysTrue;
         let mut noninferable_domain = Node::AlwaysTrue;
         let mut gradual_domain = Node::AlwaysTrue;
         let mut gradual_bounds_typevars = Vec::default();
         let mut add_typevar = |bound_typevar: BoundTypeVarInstance<'db>| {
             let valid = bound_typevar.valid_specializations(db, inferable);
+            eprintln!(
+                " -> typevar {} inferable? {}",
+                bound_typevar.identity(db).display(db),
+                bound_typevar.is_inferable(db, inferable)
+            );
+            eprintln!("    valid {}", valid.valid.display(db));
+            eprintln!("    grad  {}", valid.gradual_bounds.display(db));
             if bound_typevar.is_inferable(db, inferable) {
                 inferable_domain = inferable_domain.and(db, valid.valid);
             } else {
@@ -1061,15 +1070,22 @@ impl<'db> Node<'db> {
             }
         });
 
+        eprintln!(" -> dom_inf  {}", inferable_domain.display(db));
+        eprintln!("    dom_non  {}", noninferable_domain.display(db));
+        eprintln!("    dom_grad {}", gradual_domain.display(db));
         let restricted = self.and(db, inferable_domain);
+        eprintln!(" -> G    {}", restricted.display(db));
         let inferable_abstracted = restricted.exists(db, inferable.iter());
+        eprintln!(" -> E    {}", inferable_abstracted.display(db));
         let implies = noninferable_domain.implies(db, inferable_abstracted);
+        eprintln!(" -> imp  {}", implies.display(db));
         let gradual_abstracted = implies.exists(
             db,
             gradual_bounds_typevars
                 .iter()
                 .map(|bound_typevar| bound_typevar.identity(db)),
         );
+        eprintln!(" -> imp' {}", gradual_abstracted.display(db));
         gradual_abstracted.is_always_satisfied(db)
     }
 
