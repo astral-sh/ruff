@@ -409,6 +409,10 @@ impl<'db> ConstraintSet<'db> {
         Self { node }
     }
 
+    pub(crate) fn for_each_path(self, db: &'db dyn Db, f: impl FnMut(&PathAssignments<'db>)) {
+        self.node.for_each_path(db, f);
+    }
+
     pub(crate) fn range(
         db: &'db dyn Db,
         lower: Type<'db>,
@@ -822,6 +826,40 @@ impl<'db> Node<'db> {
         match self {
             Node::Interior(interior) => Some(interior.constraint(db)),
             _ => None,
+        }
+    }
+
+    fn for_each_path(self, db: &'db dyn Db, mut f: impl FnMut(&PathAssignments<'db>)) {
+        match self {
+            Node::AlwaysTrue => {}
+            Node::AlwaysFalse => {}
+            Node::Interior(interior) => {
+                let map = interior.sequent_map(db);
+                let mut path = PathAssignments::default();
+                self.for_each_path_inner(db, &mut f, map, &mut path);
+            }
+        }
+    }
+
+    fn for_each_path_inner(
+        self,
+        db: &'db dyn Db,
+        f: &mut dyn FnMut(&PathAssignments<'db>),
+        map: &SequentMap<'db>,
+        path: &mut PathAssignments<'db>,
+    ) {
+        match self {
+            Node::AlwaysTrue => f(path),
+            Node::AlwaysFalse => {}
+            Node::Interior(interior) => {
+                let constraint = interior.constraint(db);
+                path.walk_edge(map, constraint.when_true(), |path, _| {
+                    interior.if_true(db).for_each_path_inner(db, f, map, path);
+                });
+                path.walk_edge(map, constraint.when_false(), |path, _| {
+                    interior.if_false(db).for_each_path_inner(db, f, map, path);
+                });
+            }
         }
     }
 
@@ -2147,7 +2185,7 @@ fn sequent_map_cycle_initial<'db>(
 /// An assignment of one BDD variable to either `true` or `false`. (When evaluating a BDD, we
 /// must provide an assignment for each variable present in the BDD.)
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum ConstraintAssignment<'db> {
+pub(crate) enum ConstraintAssignment<'db> {
     Positive(ConstrainedTypeVar<'db>),
     Negative(ConstrainedTypeVar<'db>),
 }
@@ -2694,7 +2732,7 @@ impl<'db> SequentMap<'db> {
 /// The collection of constraints that we know to be true or false at a certain point when
 /// traversing a BDD.
 #[derive(Debug, Default)]
-struct PathAssignments<'db> {
+pub(crate) struct PathAssignments<'db> {
     assignments: FxOrderSet<ConstraintAssignment<'db>>,
 }
 
@@ -2751,6 +2789,17 @@ impl<'db> PathAssignments<'db> {
         // single instance for the entire BDD traversal.
         self.assignments.truncate(start);
         result
+    }
+
+    pub(crate) fn positive_constraints(
+        &self,
+    ) -> impl Iterator<Item = ConstrainedTypeVar<'db>> + '_ {
+        self.assignments
+            .iter()
+            .filter_map(|assignment| match assignment {
+                ConstraintAssignment::Positive(constraint) => Some(*constraint),
+                ConstraintAssignment::Negative(_) => None,
+            })
     }
 
     fn assignment_holds(&self, assignment: ConstraintAssignment<'db>) -> bool {
