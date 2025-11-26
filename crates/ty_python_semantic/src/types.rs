@@ -1643,9 +1643,7 @@ impl<'db> Type<'db> {
                     .recursive_type_normalized_impl(db, div, nested, visitor)
                     .map(Type::SubclassOf)
             }),
-            Type::TypeVar(bound_typevar) => {
-                visitor.try_visit(self, || Some(Type::TypeVar(bound_typevar)))
-            }
+            Type::TypeVar(_) => Some(self),
             Type::KnownInstance(known_instance) => visitor.try_visit(self, || {
                 known_instance
                     .recursive_type_normalized_impl(db, div, nested, visitor)
