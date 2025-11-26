@@ -2529,6 +2529,22 @@ impl<'db> SequentMap<'db> {
                 (bound_constraint.lower(db), constrained_upper)
             }
 
+            // (CL ≤ C ≤ pivot) ∧ (pivot ≤ B ≤ BU) → (CL ≤ C ≤ B)
+            (constrained_lower, constrained_upper)
+                if !matches!(constrained_upper, Type::TypeVar(_))
+                    && constrained_upper == bound_constraint.lower(db) =>
+            {
+                (constrained_lower, Type::TypeVar(bound_typevar))
+            }
+
+            // (pivot ≤ C ≤ CU) ∧ (BL ≤ B ≤ pivot) → (B ≤ C ≤ CU)
+            (constrained_lower, constrained_upper)
+                if !matches!(constrained_lower, Type::TypeVar(_))
+                    && constrained_lower == bound_constraint.upper(db) =>
+            {
+                (Type::TypeVar(bound_typevar), constrained_upper)
+            }
+
             _ => return,
         };
 
