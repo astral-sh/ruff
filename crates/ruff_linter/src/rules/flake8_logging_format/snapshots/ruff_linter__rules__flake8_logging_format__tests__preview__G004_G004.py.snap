@@ -273,5 +273,57 @@ G004 Logging statement uses f-string
 65 | x = 1
 66 | logging.error(f"{x} -> %s", x)
    |               ^^^^^^^^^^^^
+67 |
+68 | # https://github.com/astral-sh/ruff/issues/20151
    |
 help: Convert to lazy `%` formatting
+
+G004 [*] Logging statement uses f-string
+  --> G004.py:69:17
+   |
+68 | # https://github.com/astral-sh/ruff/issues/20151
+69 | logging.warning(fr"\'{x}")
+   |                 ^^^^^^^^^
+70 | logging.warning(f"{x}" "!")
+71 | logging.warning((f"{x}"))
+   |
+help: Convert to lazy `%` formatting
+66 | logging.error(f"{x} -> %s", x)
+67 | 
+68 | # https://github.com/astral-sh/ruff/issues/20151
+   - logging.warning(fr"\'{x}")
+69 + logging.warning(r"\'%s", x)
+70 | logging.warning(f"{x}" "!")
+71 | logging.warning((f"{x}"))
+
+G004 [*] Logging statement uses f-string
+  --> G004.py:70:17
+   |
+68 | # https://github.com/astral-sh/ruff/issues/20151
+69 | logging.warning(fr"\'{x}")
+70 | logging.warning(f"{x}" "!")
+   |                 ^^^^^^^^^^
+71 | logging.warning((f"{x}"))
+   |
+help: Convert to lazy `%` formatting
+67 | 
+68 | # https://github.com/astral-sh/ruff/issues/20151
+69 | logging.warning(fr"\'{x}")
+   - logging.warning(f"{x}" "!")
+70 + logging.warning("%s!", x)
+71 | logging.warning((f"{x}"))
+
+G004 [*] Logging statement uses f-string
+  --> G004.py:71:18
+   |
+69 | logging.warning(fr"\'{x}")
+70 | logging.warning(f"{x}" "!")
+71 | logging.warning((f"{x}"))
+   |                  ^^^^^^
+   |
+help: Convert to lazy `%` formatting
+68 | # https://github.com/astral-sh/ruff/issues/20151
+69 | logging.warning(fr"\'{x}")
+70 | logging.warning(f"{x}" "!")
+   - logging.warning((f"{x}"))
+71 + logging.warning("%s", x)

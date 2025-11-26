@@ -64,3 +64,8 @@ import logging
 
 x = 1
 logging.error(f"{x} -> %s", x)
+
+# https://github.com/astral-sh/ruff/issues/20151
+logging.warning(fr"\'{x}")
+logging.warning(f"{x}" "!")
+logging.warning((f"{x}"))
