@@ -1,7 +1,6 @@
 use compact_str::{CompactString, ToCompactString};
 use infer::nearest_enclosing_class;
-use itertools::{Either, Itertools};
-use ruff_db::parsed::parsed_module;
+use itertools::Either;
 
 use std::borrow::Cow;
 use std::time::Duration;
