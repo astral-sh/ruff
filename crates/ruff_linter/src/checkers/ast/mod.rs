@@ -77,7 +77,7 @@ use crate::rules::pylint::rules::{
     AwaitOutsideAsync, LoadBeforeGlobalDeclaration, NonlocalWithoutBinding,
     YieldFromInAsyncFunction,
 };
-use crate::rules::{flake8_bugbear, flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
+use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::rule_table::RuleTable;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::{Edit, Violation};
