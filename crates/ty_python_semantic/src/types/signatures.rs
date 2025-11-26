@@ -1197,9 +1197,7 @@ impl<'db> Signature<'db> {
                             break;
                         }
 
-                        _ => {
-                            return ConstraintSet::from(false);
-                        }
+                        _ => return ConstraintSet::from(false),
                     }
                 }
             }
