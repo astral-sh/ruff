@@ -13,10 +13,10 @@ use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BindingContext, CallableType, DynamicType, GenericAlias, GenericContext, IntersectionBuilder,
-    KnownClass, KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType,
-    SubclassOfType, Type, TypeAliasType, TypeContext, TypeInContext, TypeIsType, TypeMapping,
-    UnionBuilder, UnionType, todo_type,
+    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
+    KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType,
+    Type, TypeAliasType, TypeContext, TypeInContext, TypeIsType, TypeMapping, UnionBuilder,
+    UnionType, todo_type,
 };
 
 /// Type expressions
@@ -713,20 +713,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             match class_literal.generic_context(self.db()) {
                                 Some(generic_context) => {
                                     let db = self.db();
-                                    let typevar_binding_context = self.typevar_binding_context;
                                     let specialize = |types: &[Option<Type<'db>>]| {
                                         SubclassOfType::from(
                                             db,
-                                            class_literal.apply_specialization(
-                                                db,
-                                                |_| {
-                                                    generic_context.specialize_partial(
-                                                        db,
-                                                        types.iter().copied(),
-                                                    )
-                                                },
-                                                typevar_binding_context,
-                                            ),
+                                            class_literal.apply_specialization(db, |_| {
+                                                generic_context
+                                                    .specialize_partial(db, types.iter().copied())
+                                            }),
                                         )
                                     };
                                     self.infer_explicit_callable_specialization(
@@ -810,12 +803,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             } else {
                 // Update the binding context
                 match specialized {
-                    Type::GenericAlias(alias) => Type::GenericAlias(GenericAlias::new(
-                        db,
-                        alias.origin(db),
-                        alias.specialization(db),
-                        current_typevar_binding_context,
-                    )),
+                    // Type::GenericAlias(alias) => Type::GenericAlias(GenericAlias::new(
+                    //     db,
+                    //     alias.origin(db),
+                    //     alias.specialization(db),
+                    //     current_typevar_binding_context,
+                    // )),
                     Type::KnownInstance(KnownInstanceType::TypeGenericAlias(instance)) => {
                         Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
                             TypeInContext::new(
@@ -995,7 +988,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         true,
                     ),
                 KnownInstanceType::Annotated(instance)
-                | KnownInstanceType::TypeGenericAlias(instance) => self
+                | KnownInstanceType::TypeGenericAlias(instance)
+                | KnownInstanceType::GenericAlias(instance) => self
                     .infer_explicitly_specialized_type_alias(
                         subscript,
                         value_ty,
@@ -1049,12 +1043,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
             }
-            Type::GenericAlias(alias) => self.infer_explicitly_specialized_type_alias(
-                subscript,
-                value_ty,
-                alias.binding_context(self.db()),
-                true,
-            ),
+            // Type::GenericAlias(alias) => {
+            //     self.infer_explicitly_specialized_type_alias(subscript, value_ty, None, true)
+            // }
             Type::StringLiteral(_) => {
                 self.infer_type_expression(slice);
                 // For stringified TypeAlias; remove once properly supported
@@ -1063,6 +1054,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             _ => {
                 self.infer_type_expression(slice);
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                    dbg!(&value_ty);
                     builder.into_diagnostic(format_args!(
                         "Invalid subscript of object of type `{}` in type expression",
                         value_ty.display(self.db())

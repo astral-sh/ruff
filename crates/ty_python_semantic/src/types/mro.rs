@@ -51,7 +51,7 @@ impl<'db> Mro<'db> {
         class_literal: ClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Result<Self, MroError<'db>> {
-        let class = class_literal.apply_optional_specialization(db, specialization, None);
+        let class = class_literal.apply_optional_specialization(db, specialization);
         // Special-case `NotImplementedType`: typeshed says that it inherits from `Any`,
         // but this causes more problems than it fixes.
         if class_literal.is_known(db, KnownClass::NotImplementedType) {
@@ -100,7 +100,13 @@ impl<'db> Mro<'db> {
             if original_bases.contains(&Type::SpecialForm(SpecialFormType::Protocol)) {
                 return;
             }
-            if remaining_bases.iter().any(Type::is_generic_alias) {
+            if remaining_bases.iter().any(|ty| {
+                matches!(
+                    ty,
+                    Type::GenericAlias(..)
+                        | Type::KnownInstance(KnownInstanceType::GenericAlias(_))
+                )
+            }) {
                 return;
             }
             resolved_bases.push(ClassBase::Generic);
@@ -412,11 +418,10 @@ impl<'db> Iterator for MroIterator<'db> {
     fn next(&mut self) -> Option<Self::Item> {
         if !self.first_element_yielded {
             self.first_element_yielded = true;
-            return Some(ClassBase::Class(self.class.apply_optional_specialization(
-                self.db,
-                self.specialization,
-                None,
-            )));
+            return Some(ClassBase::Class(
+                self.class
+                    .apply_optional_specialization(self.db, self.specialization),
+            ));
         }
         self.full_mro_except_first_element().next()
     }

@@ -906,12 +906,12 @@ impl<'db> Type<'db> {
         matches!(self, Type::GenericAlias(_))
     }
 
-    pub(crate) fn as_generic_alias(&self) -> Option<GenericAlias<'db>> {
-        match self {
-            Type::GenericAlias(alias) => Some(*alias),
-            _ => None,
-        }
-    }
+    // pub(crate) fn as_generic_alias(&self) -> Option<GenericAlias<'db>> {
+    //     match self {
+    //         Type::GenericAlias(alias) => Some(*alias),
+    //         _ => None,
+    //     }
+    // }
 
     const fn is_dynamic(&self) -> bool {
         matches!(self, Type::Dynamic(_))
@@ -6599,7 +6599,7 @@ impl<'db> Type<'db> {
                     .map(|specialization| {
                         Type::instance(
                             db,
-                            generic_origin.apply_specialization(db, |_| specialization, None),
+                            generic_origin.apply_specialization(db, |_| specialization),
                         )
                     })
                     .unwrap_or(instance_ty);
@@ -6824,6 +6824,7 @@ impl<'db> Type<'db> {
                         Ok(ty.to_meta_type(db))
                     }
                 }
+                KnownInstanceType::GenericAlias(instance) => Ok(instance.inner(db)),
                 KnownInstanceType::Callable(instance) => {
                     Ok(Type::Callable(instance.callable_type(db)))
                 }
@@ -7111,11 +7112,7 @@ impl<'db> Type<'db> {
     pub(crate) fn dunder_class(self, db: &'db dyn Db) -> Type<'db> {
         if self.is_typed_dict() {
             return KnownClass::Dict
-                .to_specialized_class_type(
-                    db,
-                    [KnownClass::Str.to_instance(db), Type::object()],
-                    None,
-                )
+                .to_specialized_class_type(db, [KnownClass::Str.to_instance(db), Type::object()])
                 .map(Type::from)
                 // Guard against user-customized typesheds with a broken `dict` class
                 .unwrap_or_else(Type::unknown);
@@ -7265,6 +7262,15 @@ impl<'db> Type<'db> {
                 },
                 KnownInstanceType::TypeGenericAlias(instance) => {
                     Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
+                        TypeInContext::new(
+                            db,
+                            instance.inner(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                            instance.binding_context(db),
+                        )
+                    ))
+                },
+                KnownInstanceType::GenericAlias(instance) => {
+                    Type::KnownInstance(KnownInstanceType::GenericAlias(
                         TypeInContext::new(
                             db,
                             instance.inner(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -7614,6 +7620,10 @@ impl<'db> Type<'db> {
                     );
                 }
                 KnownInstanceType::TypeGenericAlias(ty) => {
+                    ty.inner(db)
+                        .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                }
+                KnownInstanceType::GenericAlias(ty) => {
                     ty.inner(db)
                         .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
                 }
@@ -8205,6 +8215,8 @@ pub enum KnownInstanceType<'db> {
     /// An instance of `typing.GenericAlias` representing a `type[...]` expression.
     TypeGenericAlias(TypeInContext<'db>),
 
+    GenericAlias(TypeInContext<'db>),
+
     /// An instance of `typing.GenericAlias` representing a `Callable[...]` expression.
     Callable(CallableTypeInstance<'db>),
 
@@ -8248,7 +8260,9 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
                 visitor.visit_type(db, *union_type);
             }
         }
-        KnownInstanceType::Annotated(instance) | KnownInstanceType::TypeGenericAlias(instance) => {
+        KnownInstanceType::Annotated(instance)
+        | KnownInstanceType::TypeGenericAlias(instance)
+        | KnownInstanceType::GenericAlias(instance) => {
             visitor.visit_type(db, instance.inner(db));
         }
         KnownInstanceType::Literal(ty) | KnownInstanceType::LiteralStringAlias(ty) => {
@@ -8294,6 +8308,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Literal(ty) => Self::Literal(ty.normalized_impl(db, visitor)),
             Self::Annotated(ty) => Self::Annotated(ty.normalized_impl(db, visitor)),
             Self::TypeGenericAlias(ty) => Self::TypeGenericAlias(ty.normalized_impl(db, visitor)),
+            Self::GenericAlias(ty) => Self::GenericAlias(ty.normalized_impl(db, visitor)),
             Self::Callable(callable) => Self::Callable(callable.normalized_impl(db, visitor)),
             Self::LiteralStringAlias(ty) => {
                 Self::LiteralStringAlias(ty.normalized_impl(db, visitor))
@@ -8332,6 +8347,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Literal(_)
             | Self::Annotated(_)
             | Self::TypeGenericAlias(_)
+            | Self::GenericAlias(_)
             | Self::Callable(_) => KnownClass::GenericAlias,
             Self::LiteralStringAlias(_) => KnownClass::Str,
             Self::NewType(_) => KnownClass::NewType,
@@ -8437,6 +8453,7 @@ impl<'db> KnownInstanceType<'db> {
                     KnownInstanceType::TypeGenericAlias(_) | KnownInstanceType::Callable(_) => {
                         f.write_str("GenericAlias")
                     }
+                    KnownInstanceType::GenericAlias(_) => f.write_str("GenericAlias(…)"), //TODO
                     KnownInstanceType::LiteralStringAlias(_) => f.write_str("str"),
                     KnownInstanceType::NewType(declaration) => {
                         write!(f, "<NewType pseudo-class '{}'>", declaration.name(self.db))

@@ -185,6 +185,9 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::TypeGenericAlias(_) => {
                     Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
                 }
+                KnownInstanceType::GenericAlias(instance) => {
+                    Self::try_from_type(db, instance.inner(db), subclass)
+                }
                 KnownInstanceType::Annotated(ty) => {
                     // Unions are not supported in this position, so we only need to support
                     // something like `class C(Annotated[Base, "metadata"]): ...`, which we
@@ -239,7 +242,7 @@ impl<'db> ClassBase<'db> {
                             db,
                             fields.values().map(|field| field.declared_ty),
                         )?
-                        .to_class_type(db, None)
+                        .to_class_type(db)
                         .into(),
                         subclass,
                     )

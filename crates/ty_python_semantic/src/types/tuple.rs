@@ -202,27 +202,19 @@ impl<'db> TupleType<'db> {
     // `static-frame` as part of a mypy_primer run! This is because it's called
     // from `NominalInstanceType::class()`, which is a very hot method.
     #[salsa::tracked(cycle_initial=to_class_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn to_class_type(
-        self,
-        db: &'db dyn Db,
-        binding_context: Option<Definition<'db>>,
-    ) -> ClassType<'db> {
+    pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
         let tuple_class = KnownClass::Tuple
             .try_to_class_literal(db)
             .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
 
-        tuple_class.apply_specialization(
-            db,
-            |generic_context| {
-                if generic_context.variables(db).len() == 1 {
-                    let element_type = self.tuple(db).homogeneous_element_type(db);
-                    generic_context.specialize_tuple(db, element_type, self)
-                } else {
-                    generic_context.default_specialization(db, Some(KnownClass::Tuple))
-                }
-            },
-            binding_context,
-        )
+        tuple_class.apply_specialization(db, |generic_context| {
+            if generic_context.variables(db).len() == 1 {
+                let element_type = self.tuple(db).homogeneous_element_type(db);
+                generic_context.specialize_tuple(db, element_type, self)
+            } else {
+                generic_context.default_specialization(db, Some(KnownClass::Tuple))
+            }
+        })
     }
 
     /// Return a normalized version of `self`.
@@ -302,23 +294,18 @@ fn to_class_type_cycle_initial<'db>(
     db: &'db dyn Db,
     _id: salsa::Id,
     self_: TupleType<'db>,
-    binding_context: Option<Definition<'db>>,
 ) -> ClassType<'db> {
     let tuple_class = KnownClass::Tuple
         .try_to_class_literal(db)
         .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
 
-    tuple_class.apply_specialization(
-        db,
-        |generic_context| {
-            if generic_context.variables(db).len() == 1 {
-                generic_context.specialize_tuple(db, Type::Never, self_)
-            } else {
-                generic_context.default_specialization(db, Some(KnownClass::Tuple))
-            }
-        },
-        binding_context,
-    )
+    tuple_class.apply_specialization(db, |generic_context| {
+        if generic_context.variables(db).len() == 1 {
+            generic_context.specialize_tuple(db, Type::Never, self_)
+        } else {
+            generic_context.default_specialization(db, Some(KnownClass::Tuple))
+        }
+    })
 }
 
 /// A tuple spec describes the contents of a tuple type, which might be fixed- or variable-length.
