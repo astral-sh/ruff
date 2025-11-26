@@ -15,6 +15,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use std::fmt::Display;
+
 #[derive(Debug, Default)]
 pub struct SemanticSyntaxChecker {
     /// The checker has traversed past the `__future__` import boundary.
