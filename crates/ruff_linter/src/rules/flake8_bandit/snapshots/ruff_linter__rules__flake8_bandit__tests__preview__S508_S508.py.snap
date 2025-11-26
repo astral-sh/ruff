@@ -1,26 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
- --> S508.py:3:25
-  |
-1 | from pysnmp.hlapi import CommunityData
-2 |
-3 | CommunityData("public", mpModel=0)  # S508
-  |                         ^^^^^^^^^
-4 | CommunityData("public", mpModel=1)  # S508
-  |
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
 
-S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
- --> S508.py:4:25
-  |
-3 | CommunityData("public", mpModel=0)  # S508
-4 | CommunityData("public", mpModel=1)  # S508
-  |                         ^^^^^^^^^
-5 |
-6 | CommunityData("public", mpModel=2)  # OK
-  |
+--- Summary ---
+Removed: 0
+Added: 8
 
+--- Added ---
 S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
   --> S508.py:18:46
    |
@@ -32,6 +21,7 @@ S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
 20 | pysnmp.hlapi.v1arch.asyncio.CommunityData("public", mpModel=0)  # S508
    |
 
+
 S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
   --> S508.py:19:58
    |
@@ -41,6 +31,7 @@ S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
 20 | pysnmp.hlapi.v1arch.asyncio.CommunityData("public", mpModel=0)  # S508
 21 | pysnmp.hlapi.v1arch.CommunityData("public", mpModel=0)  # S508
    |
+
 
 S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
   --> S508.py:20:53
@@ -53,6 +44,7 @@ S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
 22 | pysnmp.hlapi.v3arch.asyncio.auth.CommunityData("public", mpModel=0)  # S508
    |
 
+
 S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
   --> S508.py:21:45
    |
@@ -63,6 +55,7 @@ S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
 22 | pysnmp.hlapi.v3arch.asyncio.auth.CommunityData("public", mpModel=0)  # S508
 23 | pysnmp.hlapi.v3arch.asyncio.CommunityData("public", mpModel=0)  # S508
    |
+
 
 S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
   --> S508.py:22:58
@@ -75,6 +68,7 @@ S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
 24 | pysnmp.hlapi.v3arch.CommunityData("public", mpModel=0)  # S508
    |
 
+
 S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
   --> S508.py:23:53
    |
@@ -86,6 +80,7 @@ S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
 25 | pysnmp.hlapi.auth.CommunityData("public", mpModel=0)  # S508
    |
 
+
 S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
   --> S508.py:24:45
    |
@@ -95,6 +90,7 @@ S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
    |                                             ^^^^^^^^^
 25 | pysnmp.hlapi.auth.CommunityData("public", mpModel=0)  # S508
    |
+
 
 S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
   --> S508.py:25:43
