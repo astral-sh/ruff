@@ -144,8 +144,8 @@ pub(super) enum TypeKind<'db> {
     NonAtomic(NonAtomicType<'db>),
 }
 
-impl<'db> From<Type<'db>> for TypeKind<'db> {
-    fn from(ty: Type<'db>) -> Self {
+impl<'db> TypeKind<'db> {
+    pub(super) fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Self {
         match ty {
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -180,7 +180,9 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
                 TypeKind::NonAtomic(NonAtomicType::MethodWrapper(method_wrapper))
             }
             Type::Callable(callable) => TypeKind::NonAtomic(NonAtomicType::Callable(callable)),
-            Type::GenericAlias(alias) => TypeKind::NonAtomic(NonAtomicType::GenericAlias(alias)),
+            Type::GenericAlias(instance) => {
+                TypeKind::NonAtomic(NonAtomicType::GenericAlias(instance.alias(db)))
+            }
             Type::KnownInstance(known_instance) => {
                 TypeKind::NonAtomic(NonAtomicType::KnownInstance(known_instance))
             }
@@ -260,7 +262,7 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
     visitor: &impl TypeVisitor<'db>,
     recursion_guard: &TypeCollector<'db>,
 ) {
-    match TypeKind::from(ty) {
+    match TypeKind::from_type(db, ty) {
         TypeKind::Atomic => {}
         TypeKind::NonAtomic(non_atomic_type) => {
             if recursion_guard.type_was_already_seen(ty) {
@@ -349,7 +351,7 @@ fn specialization_depth(db: &dyn Db, ty: Type<'_>) -> usize {
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-            match TypeKind::from(ty) {
+            match TypeKind::from_type(db, ty) {
                 TypeKind::Atomic => {
                     if ty.is_divergent() {
                         self.max_depth.set(usize::MAX);

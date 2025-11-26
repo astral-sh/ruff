@@ -207,7 +207,7 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
     nominal: NominalInstanceType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, nominal.class(db).into());
+    visitor.visit_type(db, nominal.class(db).into_type(db));
 }
 
 impl<'db> NominalInstanceType<'db> {
@@ -279,7 +279,7 @@ impl<'db> NominalInstanceType<'db> {
                         }
                         KnownClass::Tuple => Some(
                             class
-                                .into_generic_alias()
+                                .into_generic_alias(db)
                                 .and_then(|alias| {
                                     Some(Cow::Borrowed(alias.specialization(db).tuple(db)?))
                                 })

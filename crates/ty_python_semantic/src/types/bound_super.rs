@@ -76,9 +76,11 @@ impl<'db> BoundSuperError<'db> {
             BoundSuperError::InvalidPivotClassType { pivot_class } => {
                 if let Some(builder) = context.report_lint(&INVALID_SUPER_ARGUMENT, node) {
                     match pivot_class {
-                        Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
+                        Type::GenericAlias(instance) => builder.into_diagnostic(format_args!(
                             "`types.GenericAlias` instance `{}` is not a valid class",
-                            alias.display_with(context.db(), DisplaySettings::default()),
+                            instance
+                                .alias(context.db())
+                                .display_with(context.db(), DisplaySettings::default()),
                         )),
                         _ => builder.into_diagnostic(format_args!(
                             "`{pivot_class}` is not a valid class",
@@ -209,13 +211,11 @@ impl<'db> SuperOwnerKind<'db> {
             SuperOwnerKind::Instance(instance) => Some(instance.class(db)),
         }
     }
-}
 
-impl<'db> From<SuperOwnerKind<'db>> for Type<'db> {
-    fn from(owner: SuperOwnerKind<'db>) -> Self {
-        match owner {
+    pub fn into_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
             SuperOwnerKind::Dynamic(dynamic) => Type::Dynamic(dynamic),
-            SuperOwnerKind::Class(class) => class.into(),
+            SuperOwnerKind::Class(class) => class.into_type(db),
             SuperOwnerKind::Instance(instance) => instance.into(),
         }
     }
@@ -236,8 +236,8 @@ pub(super) fn walk_bound_super_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     bound_super: BoundSuperType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, Type::from(bound_super.pivot_class(db)));
-    visitor.visit_type(db, Type::from(bound_super.owner(db)));
+    visitor.visit_type(db, bound_super.pivot_class(db).into_type(db));
+    visitor.visit_type(db, bound_super.owner(db).into_type(db));
 }
 
 impl<'db> BoundSuperType<'db> {
@@ -515,12 +515,12 @@ impl<'db> BoundSuperType<'db> {
                     db,
                     attribute,
                     Type::none(db),
-                    Type::from(owner),
+                    owner.into_type(db),
                 )
                 .0,
             ),
             SuperOwnerKind::Instance(_) => {
-                let owner = Type::from(owner);
+                let owner = owner.into_type(db);
                 Some(
                     Type::try_call_dunder_get_on_attribute(
                         db,

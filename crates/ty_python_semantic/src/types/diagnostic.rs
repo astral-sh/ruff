@@ -2506,9 +2506,9 @@ pub(super) fn report_possibly_missing_attribute(
             "Attribute `{attribute}` may be missing on class `{}`",
             class.name(db),
         )),
-        Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
+        Type::GenericAlias(instance) => builder.into_diagnostic(format_args!(
             "Attribute `{attribute}` may be missing on class `{}`",
-            alias.display(db),
+            instance.alias(db).display(db),
         )),
         _ => builder.into_diagnostic(format_args!(
             "Attribute `{attribute}` may be missing on object of type `{}`",

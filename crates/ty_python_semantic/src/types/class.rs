@@ -233,8 +233,6 @@ impl<'db> CodeGeneratorKind<'db> {
 pub struct GenericAlias<'db> {
     pub(crate) origin: ClassLiteral<'db>,
     pub(crate) specialization: Specialization<'db>,
-
-    pub(crate) binding_context: Option<Definition<'db>>,
 }
 
 pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -254,7 +252,6 @@ impl<'db> GenericAlias<'db> {
             db,
             self.origin(db),
             self.specialization(db).normalized_impl(db, visitor),
-            self.binding_context(db),
         )
     }
 
@@ -280,7 +277,6 @@ impl<'db> GenericAlias<'db> {
             self.origin(db),
             self.specialization(db)
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            self.binding_context(db),
         )
     }
 
@@ -300,9 +296,60 @@ impl<'db> GenericAlias<'db> {
     }
 }
 
-impl<'db> From<GenericAlias<'db>> for Type<'db> {
-    fn from(alias: GenericAlias<'db>) -> Type<'db> {
-        Type::GenericAlias(alias)
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct GenericAliasInstance<'db> {
+    pub alias: GenericAlias<'db>,
+    pub binding_context: Option<Definition<'db>>,
+}
+
+impl get_size2::GetSize for GenericAliasInstance<'_> {}
+
+impl<'db> GenericAliasInstance<'db> {
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        Self::new(
+            db,
+            self.alias(db).normalized_impl(db, visitor),
+            self.binding_context(db),
+        )
+    }
+
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+        self.alias(db).definition(db)
+    }
+
+    pub(crate) fn origin(self, db: &'db dyn Db) -> ClassLiteral<'db> {
+        self.alias(db).origin(db)
+    }
+
+    pub(crate) fn specialization(self, db: &'db dyn Db) -> Specialization<'db> {
+        self.alias(db).specialization(db)
+    }
+
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.alias(db)
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            self.binding_context(db),
+        )
+    }
+
+    pub(super) fn find_legacy_typevars_impl(
+        self,
+        db: &'db dyn Db,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
+    ) {
+        self.alias(db)
+            .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
     }
 }
 
@@ -372,7 +419,7 @@ pub enum ClassType<'db> {
     // should use `ClassLiteral::default_specialization` instead of assuming
     // `ClassType::NonGeneric`.
     NonGeneric(ClassLiteral<'db>),
-    Generic(GenericAlias<'db>),
+    Generic(GenericAliasInstance<'db>),
 }
 
 #[salsa::tracked]
@@ -389,10 +436,17 @@ impl<'db> ClassType<'db> {
         matches!(self, Self::Generic(_))
     }
 
-    pub(super) const fn into_generic_alias(self) -> Option<GenericAlias<'db>> {
+    pub(super) fn into_generic_alias(self, db: &'db dyn Db) -> Option<GenericAlias<'db>> {
         match self {
             Self::NonGeneric(_) => None,
-            Self::Generic(generic) => Some(generic),
+            Self::Generic(instance) => Some(instance.alias(db)),
+        }
+    }
+
+    pub(super) fn into_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Self::NonGeneric(class) => class.into(),
+            Self::Generic(generic) => Type::GenericAlias(generic),
         }
     }
 
@@ -1062,7 +1116,7 @@ impl<'db> ClassType<'db> {
     /// constructor signature of this class.
     #[salsa::tracked(cycle_initial=into_callable_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn into_callable(self, db: &'db dyn Db) -> CallableTypes<'db> {
-        let self_ty = Type::from(self);
+        let self_ty = self.into_type(db);
         let metaclass_dunder_call_function_symbol = self_ty
             .member_lookup_with_policy(
                 db,
@@ -1226,18 +1280,9 @@ fn into_callable_cycle_initial<'db>(
     CallableTypes::one(CallableType::bottom(db))
 }
 
-impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
-    fn from(generic: GenericAlias<'db>) -> ClassType<'db> {
+impl<'db> From<GenericAliasInstance<'db>> for ClassType<'db> {
+    fn from(generic: GenericAliasInstance<'db>) -> ClassType<'db> {
         ClassType::Generic(generic)
-    }
-}
-
-impl<'db> From<ClassType<'db>> for Type<'db> {
-    fn from(class: ClassType<'db>) -> Type<'db> {
-        match class {
-            ClassType::NonGeneric(non_generic) => non_generic.into(),
-            ClassType::Generic(generic) => generic.into(),
-        }
     }
 }
 
@@ -1245,7 +1290,7 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         match self {
             Self::NonGeneric(class) => class.variance_of(db, typevar),
-            Self::Generic(generic) => generic.variance_of(db, typevar),
+            Self::Generic(generic) => generic.alias(db).variance_of(db, typevar),
         }
     }
 }
@@ -1550,7 +1595,11 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
 
-                ClassType::Generic(GenericAlias::new(db, self, specialization, binding_context))
+                ClassType::Generic(GenericAliasInstance::new(
+                    db,
+                    GenericAlias::new(db, self, specialization),
+                    binding_context,
+                ))
             }
         }
     }
@@ -1646,7 +1695,7 @@ impl<'db> ClassLiteral<'db> {
 
             Box::new([
                 definition_expression_type(db, class_definition, &class_stmt.bases()[0]),
-                Type::from(tuple_type.to_class_type(db, None)),
+                tuple_type.to_class_type(db, None).into_type(db),
             ])
         } else {
             class_stmt
@@ -1983,7 +2032,7 @@ impl<'db> ClassLiteral<'db> {
 
         let (metaclass_literal, _) = candidate.metaclass.class_literal(db);
         Ok((
-            candidate.metaclass.into(),
+            candidate.metaclass.into_type(db),
             metaclass_literal.dataclass_transformer_params(db),
         ))
     }
@@ -2061,7 +2110,7 @@ impl<'db> ClassLiteral<'db> {
                     // Note: calling `Type::from(superclass).member()` would be incorrect here.
                     // What we'd really want is a `Type::Any.own_class_member()` method,
                     // but adding such a method wouldn't make much sense -- it would always return `Any`!
-                    dynamic_type_to_intersect_with.get_or_insert(Type::from(superclass));
+                    dynamic_type_to_intersect_with.get_or_insert(superclass.into_type(db));
                 }
                 ClassBase::Class(class) => {
                     let known = class.known(db);
@@ -4855,7 +4904,7 @@ impl KnownClass {
             "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
         );
         self.to_specialized_class_type(db, specialization, None)
-            .and_then(|class_type| Type::from(class_type).to_instance(db))
+            .and_then(|class_type| class_type.into_type(db).to_instance(db))
             .unwrap_or_else(Type::unknown)
     }
 

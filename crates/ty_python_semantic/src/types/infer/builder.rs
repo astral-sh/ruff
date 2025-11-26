@@ -7502,7 +7502,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let class_type =
             class_literal.apply_specialization(self.db(), |_| builder.build(generic_context), None);
 
-        Type::from(class_type).to_instance(self.db())
+        class_type.into_type(self.db()).to_instance(self.db())
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
@@ -9147,9 +9147,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         "Class `{}` has no attribute `{attr_name}`",
                         class.name(db),
                     )),
-                    Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
+                    Type::GenericAlias(instance) => builder.into_diagnostic(format_args!(
                         "Class `{}` has no attribute `{attr_name}`",
-                        alias.display(db),
+                        instance.alias(db).display(db),
                     )),
                     Type::FunctionLiteral(function) => builder.into_diagnostic(format_args!(
                         "Function `{}` has no attribute `{attr_name}`",
@@ -10813,11 +10813,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If we have an implicit type alias like `MyList = list[T]`, and if `MyList` is being
         // used in another implicit type alias like `Numbers = MyList[int]`, then we infer the
         // right hand side as a value expression, and need to handle the specialization here.
-        if let Some(alias) = value_ty.as_generic_alias() {
+        if let Some(instance) = value_ty.as_generic_alias() {
             let return_ty = self.infer_explicitly_specialized_type_alias(
                 subscript,
                 value_ty,
-                alias.binding_context(self.db()),
+                // alias.binding_context(self.db()),
+                instance.binding_context(self.db()),
                 false,
             );
 
@@ -10864,7 +10865,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let typevar_binding_context = self.typevar_binding_context;
         let tuple_generic_alias = |tuple: Option<TupleType<'db>>| {
             let tuple = tuple.unwrap_or_else(|| TupleType::homogeneous(db, Type::unknown()));
-            Type::from(tuple.to_class_type(db, typevar_binding_context))
+            tuple
+                .to_class_type(db, typevar_binding_context)
+                .into_type(db)
         };
 
         match value_ty {
@@ -11075,7 +11078,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         [element_ty],
                         self.typevar_binding_context,
                     )
-                    .map(Type::from)
+                    .map(|class_type| class_type.into_type(self.db()))
                     .unwrap_or_else(Type::unknown);
             }
             // `typing` special forms with two generic arguments
@@ -11137,7 +11140,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         [first_ty, second_ty],
                         self.typevar_binding_context,
                     )
-                    .map(Type::from)
+                    .map(|class_type| class_type.into_type(self.db()))
                     .unwrap_or_else(Type::unknown);
             }
             Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
@@ -11185,11 +11188,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let typevar_binding_context = self.typevar_binding_context;
         let specialize = |types: &[Option<Type<'db>>]| {
-            Type::from(generic_class.apply_specialization(
-                db,
-                |_| generic_context.specialize_partial(db, types.iter().copied()),
-                typevar_binding_context,
-            ))
+            generic_class
+                .apply_specialization(
+                    db,
+                    |_| generic_context.specialize_partial(db, types.iter().copied()),
+                    typevar_binding_context,
+                )
+                .into_type(db)
         };
 
         self.infer_explicit_callable_specialization(

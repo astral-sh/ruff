@@ -45,6 +45,7 @@ use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
+use crate::types::class::GenericAliasInstance;
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
     ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension,
@@ -759,7 +760,7 @@ pub enum Type<'db> {
     /// A specific class object
     ClassLiteral(ClassLiteral<'db>),
     /// A specialization of a generic class
-    GenericAlias(GenericAlias<'db>),
+    GenericAlias(GenericAliasInstance<'db>),
     /// The set of all class objects that are subclasses of the given class (C), spelled `type[C]`.
     SubclassOf(SubclassOfType<'db>),
     /// The set of Python objects with the given class in their __class__'s method resolution order.
@@ -906,7 +907,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::GenericAlias(_))
     }
 
-    pub(crate) fn as_generic_alias(&self) -> Option<GenericAlias<'db>> {
+    pub(crate) fn as_generic_alias(&self) -> Option<GenericAliasInstance<'db>> {
         match self {
             Type::GenericAlias(alias) => Some(*alias),
             _ => None,
@@ -3822,13 +3823,20 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::GenericAlias(alias) if alias.is_typed_dict(db) => {
-                Some(alias.origin(db).typed_dict_member(db, None, name, policy))
-            }
+            Type::GenericAlias(instance) if instance.alias(db).is_typed_dict(db) => Some(
+                instance
+                    .alias(db)
+                    .origin(db)
+                    .typed_dict_member(db, None, name, policy),
+            ),
 
-            Type::GenericAlias(alias) => {
-                let attr = Some(ClassType::from(*alias).class_member(db, name, policy));
-                match alias.specialization(db).materialization_kind(db) {
+            Type::GenericAlias(instance) => {
+                let attr = Some(ClassType::from(*instance).class_member(db, name, policy));
+                match instance
+                    .alias(db)
+                    .specialization(db)
+                    .materialization_kind(db)
+                {
                     None => attr,
                     Some(materialization_kind) => attr.map(|attr| {
                         attr.materialize(
@@ -5039,7 +5047,9 @@ impl<'db> Type<'db> {
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Dynamic(_) => Truthiness::Ambiguous,
                 SubclassOfInner::Class(class) => {
-                    Type::from(class).try_bool_impl(db, allow_short_circuit, visitor)?
+                    class
+                        .into_type(db)
+                        .try_bool_impl(db, allow_short_circuit, visitor)?
                 }
             },
 
@@ -5770,7 +5780,7 @@ impl<'db> Type<'db> {
                 // getting the signature here. This signature can still be used in some cases (e.g.
                 // evaluating callable subtyping). TODO improve this definition (intersection of
                 // `__new__` and `__init__` signatures? and respect metaclass `__call__`).
-                SubclassOfInner::Class(class) => Type::from(class).bindings(db),
+                SubclassOfInner::Class(class) => class.into_type(db).bindings(db),
             },
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) | Type::NewTypeInstance(_) => {
@@ -5972,7 +5982,7 @@ impl<'db> Type<'db> {
             match ty {
                 Type::NominalInstance(nominal) => nominal.tuple_spec(db),
                 Type::NewTypeInstance(newtype) => non_async_special_case(db, Type::instance(db, newtype.base_class_type(db))),
-                Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
+                Type::GenericAlias(instance) if instance.alias(db).origin(db).is_tuple(db) => {
                     Some(Cow::Owned(TupleSpec::homogeneous(todo_type!(
                         "*tuple[] annotations"
                     ))))
@@ -6418,7 +6428,7 @@ impl<'db> Type<'db> {
                     // It is important that identity_specialization specializes the class with
                     // _inferable_ typevars, so that our specialization inference logic will
                     // try to find a specialization for them.
-                    Type::from(class.identity_specialization(db)),
+                    class.identity_specialization(db).into_type(db),
                 ),
                 _ => (None, None, self),
             },
@@ -6714,8 +6724,10 @@ impl<'db> Type<'db> {
                 };
                 Ok(ty)
             }
-            Type::GenericAlias(alias) if alias.is_typed_dict(db) => Ok(Type::typed_dict(*alias)),
-            Type::GenericAlias(alias) => Ok(Type::instance(db, ClassType::from(*alias))),
+            Type::GenericAlias(instance) if instance.alias(db).is_typed_dict(db) => {
+                Ok(Type::typed_dict(*instance))
+            }
+            Type::GenericAlias(instance) => Ok(Type::instance(db, ClassType::from(*instance))),
 
             Type::SubclassOf(_)
             | Type::BooleanLiteral(_)
@@ -7098,7 +7110,7 @@ impl<'db> Type<'db> {
             // understand a more specific meta type in order to correctly handle `__getitem__`.
             Type::TypedDict(typed_dict) => SubclassOfType::from(db, typed_dict.defining_class()),
             Type::TypeAlias(alias) => alias.value_type(db).to_meta_type(db),
-            Type::NewTypeInstance(newtype) => Type::from(newtype.base_class_type(db)),
+            Type::NewTypeInstance(newtype) => newtype.base_class_type(db).into_type(db),
         }
     }
 
@@ -7116,7 +7128,7 @@ impl<'db> Type<'db> {
                     [KnownClass::Str.to_instance(db), Type::object()],
                     None,
                 )
-                .map(Type::from)
+                .map(|class| class.into_type(db))
                 // Guard against user-customized typesheds with a broken `dict` class
                 .unwrap_or_else(Type::unknown);
         }
@@ -7874,7 +7886,7 @@ impl<'db> Type<'db> {
 
     pub(crate) fn generic_origin(self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
         match self {
-            Type::GenericAlias(generic) => Some(generic.origin(db)),
+            Type::GenericAlias(instance) => Some(instance.origin(db)),
             Type::NominalInstance(instance) => {
                 if let ClassType::Generic(generic) = instance.class(db) {
                     Some(generic.origin(db))
@@ -7934,7 +7946,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::NominalInstance(nominal_instance_type) => {
                 nominal_instance_type.variance_of(db, typevar)
             }
-            Type::GenericAlias(generic_alias) => generic_alias.variance_of(db, typevar),
+            Type::GenericAlias(instance) => instance.alias(db).variance_of(db, typevar),
             Type::Callable(callable_type) => callable_type.signatures(db).variance_of(db, typevar),
             // A type variable is always covariant in itself.
             Type::TypeVar(other_typevar) if other_typevar == typevar => {
@@ -8259,7 +8271,7 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         }
         KnownInstanceType::NewType(newtype) => {
             if let ClassType::Generic(generic_alias) = newtype.base_class_type(db) {
-                visitor.visit_generic_alias_type(db, generic_alias);
+                visitor.visit_generic_alias_type(db, generic_alias.alias(db));
             }
         }
     }

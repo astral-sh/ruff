@@ -150,7 +150,7 @@ impl<'db> AllMembers<'db> {
                 self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
             }
 
-            Type::GenericAlias(generic_alias) if generic_alias.is_typed_dict(db) => {
+            Type::GenericAlias(instance) if instance.alias(db).is_typed_dict(db) => {
                 self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
             }
 

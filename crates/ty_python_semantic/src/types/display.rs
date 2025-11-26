@@ -416,11 +416,11 @@ impl<'db> super::visitor::TypeVisitor<'db> for AmbiguousClassCollector<'db> {
             Type::ProtocolInstance(ProtocolInstanceType {
                 inner: Protocol::FromClass(class),
                 ..
-            }) => return self.visit_type(db, Type::from(class)),
+            }) => return self.visit_type(db, class.into_type(db)),
             _ => {}
         }
 
-        if let visitor::TypeKind::NonAtomic(t) = visitor::TypeKind::from(ty) {
+        if let visitor::TypeKind::NonAtomic(t) = visitor::TypeKind::from_type(db, ty) {
             if !self.visited_types.borrow_mut().insert(ty) {
                 // If we have already seen this type, we can skip it.
                 return;
@@ -599,7 +599,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     (ClassType::NonGeneric(class), _) => {
                         class.display_with(self.db, self.settings.clone()).fmt_detailed(f)
                     },
-                    (ClassType::Generic(alias), _) => alias.display_with(self.db, self.settings.clone()).fmt_detailed(f),
+                    (ClassType::Generic(instance), _) => instance.alias(self.db).display_with(self.db, self.settings.clone()).fmt_detailed(f),
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner {
@@ -607,7 +607,8 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     ClassType::NonGeneric(class) => class
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f),
-                    ClassType::Generic(alias) => alias
+                    ClassType::Generic(instance) => instance
+                        .alias(self.db)
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f),
                 },
@@ -653,6 +654,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 let mut f = f.with_type(self.ty);
                 f.write_str("<class '")?;
                 generic
+                    .alias(self.db)
                     .display_with(self.db, self.settings.clone())
                     .fmt_detailed(&mut f)?;
                 f.write_str("'>")
@@ -667,11 +669,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .fmt_detailed(f)?;
                     f.write_char(']')
                 }
-                SubclassOfInner::Class(ClassType::Generic(alias)) => {
+                SubclassOfInner::Class(ClassType::Generic(instance)) => {
                     f.with_type(KnownClass::Type.to_class_literal(self.db))
                         .write_str("type")?;
                     f.write_char('[')?;
-                    alias
+                    instance
+                        .alias(self.db)
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f)?;
                     f.write_char(']')
@@ -861,11 +864,15 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::BoundSuper(bound_super) => {
                 f.set_invalid_syntax();
                 f.write_str("<super: ")?;
-                Type::from(bound_super.pivot_class(self.db))
+                bound_super
+                    .pivot_class(self.db)
+                    .into_type(self.db)
                     .display_with(self.db, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(", ")?;
-                Type::from(bound_super.owner(self.db))
+                bound_super
+                    .owner(self.db)
+                    .into_type(self.db)
                     .display_with(self.db, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(">")

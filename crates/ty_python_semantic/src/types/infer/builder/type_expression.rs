@@ -4,6 +4,7 @@ use ruff_python_ast as ast;
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::FxOrderSet;
 use crate::semantic_index::definition::Definition;
+use crate::types::class::GenericAliasInstance;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NON_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_callable,
@@ -810,10 +811,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             } else {
                 // Update the binding context
                 match specialized {
-                    Type::GenericAlias(alias) => Type::GenericAlias(GenericAlias::new(
+                    Type::GenericAlias(alias) => Type::GenericAlias(GenericAliasInstance::new(
                         db,
-                        alias.origin(db),
-                        alias.specialization(db),
+                        GenericAlias::new(db, alias.origin(db), alias.specialization(db)),
                         current_typevar_binding_context,
                     )),
                     Type::KnownInstance(KnownInstanceType::TypeGenericAlias(instance)) => {

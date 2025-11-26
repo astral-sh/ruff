@@ -253,7 +253,7 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     typed_dict: TypedDictType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, typed_dict.defining_class.into());
+    visitor.visit_type(db, typed_dict.defining_class.into_type(db));
 }
 
 pub(super) fn typed_dict_params_from_class_def(class_stmt: &StmtClassDef) -> TypedDictParams {

@@ -154,7 +154,7 @@ pub(crate) fn enum_metadata<'db>(
                                             .skip(1)
                                             .filter_map(ClassBase::into_class)
                                             .filter(|class| {
-                                                !Type::from(*class).is_subtype_of(
+                                                !class.into_type(db).is_subtype_of(
                                                     db,
                                                     KnownClass::Enum.to_subclass_of(db),
                                                 )

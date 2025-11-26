@@ -26,7 +26,7 @@ pub(super) fn walk_subclass_of_type<'db, V: super::visitor::TypeVisitor<'db> + ?
     subclass_of: SubclassOfType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, Type::from(subclass_of.subclass_of));
+    visitor.visit_type(db, subclass_of.subclass_of.into_type(db));
 }
 
 impl<'db> SubclassOfType<'db> {
@@ -47,7 +47,7 @@ impl<'db> SubclassOfType<'db> {
             SubclassOfInner::Dynamic(_) => Type::SubclassOf(Self { subclass_of }),
             SubclassOfInner::Class(class) => {
                 if class.is_final(db) {
-                    Type::from(class)
+                    class.into_type(db)
                 } else if class.is_object(db) {
                     KnownClass::Type.to_instance(db)
                 } else {
@@ -129,7 +129,9 @@ impl<'db> SubclassOfType<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> Option<PlaceAndQualifiers<'db>> {
-        Type::from(self.subclass_of).find_name_in_mro_with_policy(db, name, policy)
+        self.subclass_of
+            .into_type(db)
+            .find_name_in_mro_with_policy(db, name, policy)
     }
 
     /// Return `true` if `self` has a certain relation to `other`.
@@ -276,6 +278,13 @@ impl<'db> SubclassOfInner<'db> {
             _ => None,
         }
     }
+
+    pub(crate) fn into_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic),
+            SubclassOfInner::Class(class) => class.into_type(db),
+        }
+    }
 }
 
 impl<'db> From<ClassType<'db>> for SubclassOfInner<'db> {
@@ -293,14 +302,5 @@ impl<'db> From<DynamicType<'db>> for SubclassOfInner<'db> {
 impl<'db> From<ProtocolClass<'db>> for SubclassOfInner<'db> {
     fn from(value: ProtocolClass<'db>) -> Self {
         SubclassOfInner::Class(*value)
-    }
-}
-
-impl<'db> From<SubclassOfInner<'db>> for Type<'db> {
-    fn from(value: SubclassOfInner<'db>) -> Self {
-        match value {
-            SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic),
-            SubclassOfInner::Class(class) => class.into(),
-        }
     }
 }

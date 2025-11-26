@@ -144,6 +144,10 @@ impl<'db> ProtocolClass<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
         )
     }
+
+    pub(super) fn into_type(self, db: &'db dyn Db) -> Type<'db> {
+        self.0.into_type(db)
+    }
 }
 
 impl<'db> Deref for ProtocolClass<'db> {
@@ -151,12 +155,6 @@ impl<'db> Deref for ProtocolClass<'db> {
 
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-impl<'db> From<ProtocolClass<'db>> for Type<'db> {
-    fn from(value: ProtocolClass<'db>) -> Self {
-        Self::from(value.0)
     }
 }
 

@@ -240,7 +240,7 @@ impl<'db> ClassBase<'db> {
                             fields.values().map(|field| field.declared_ty),
                         )?
                         .to_class_type(db, None)
-                        .into(),
+                        .into_type(db),
                         subclass,
                     )
                 }
@@ -383,7 +383,7 @@ impl<'db> ClassBase<'db> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.base {
                     ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
-                    ClassBase::Class(class) => Type::from(class).display(self.db).fmt(f),
+                    ClassBase::Class(class) => class.into_type(self.db).display(self.db).fmt(f),
                     ClassBase::Protocol => f.write_str("typing.Protocol"),
                     ClassBase::Generic => f.write_str("typing.Generic"),
                     ClassBase::TypedDict => f.write_str("typing.TypedDict"),
@@ -393,19 +393,11 @@ impl<'db> ClassBase<'db> {
 
         ClassBaseDisplay { db, base: self }
     }
-}
 
-impl<'db> From<ClassType<'db>> for ClassBase<'db> {
-    fn from(value: ClassType<'db>) -> Self {
-        ClassBase::Class(value)
-    }
-}
-
-impl<'db> From<ClassBase<'db>> for Type<'db> {
-    fn from(value: ClassBase<'db>) -> Self {
-        match value {
+    pub fn into_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
             ClassBase::Dynamic(dynamic) => Type::Dynamic(dynamic),
-            ClassBase::Class(class) => class.into(),
+            ClassBase::Class(class) => class.into_type(db),
             ClassBase::Protocol => Type::SpecialForm(SpecialFormType::Protocol),
             ClassBase::Generic => Type::SpecialForm(SpecialFormType::Generic),
             ClassBase::TypedDict => Type::SpecialForm(SpecialFormType::TypedDict),
@@ -413,9 +405,9 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
     }
 }
 
-impl<'db> From<&ClassBase<'db>> for Type<'db> {
-    fn from(value: &ClassBase<'db>) -> Self {
-        Self::from(*value)
+impl<'db> From<ClassType<'db>> for ClassBase<'db> {
+    fn from(value: ClassType<'db>) -> Self {
+        ClassBase::Class(value)
     }
 }
 
