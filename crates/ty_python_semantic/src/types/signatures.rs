@@ -839,6 +839,22 @@ impl<'db> Signature<'db> {
         result
     }
 
+    pub(crate) fn when_constraint_set_assignable_to(
+        &self,
+        db: &'db dyn Db,
+        other: &Signature<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> ConstraintSet<'db> {
+        self.has_relation_to_impl(
+            db,
+            other,
+            inferable,
+            TypeRelation::ConstraintSetAssignability,
+            &HasRelationToVisitor::default(),
+            &IsDisjointVisitor::default(),
+        )
+    }
+
     /// Implementation of subtyping and assignability for signature.
     fn has_relation_to_impl(
         &self,
@@ -1175,7 +1191,9 @@ impl<'db> Signature<'db> {
                             break;
                         }
 
-                        _ => return ConstraintSet::from(false),
+                        _ => {
+                            return ConstraintSet::from(false);
+                        }
                     }
                 }
             }

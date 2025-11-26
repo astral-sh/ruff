@@ -1677,22 +1677,38 @@ impl<'db> SpecializationBuilder<'db> {
             }
 
             (Type::Callable(formal_callable), _) => {
-                if let Some(actual_callable) = actual
+                let Some(actual_callable) = actual
                     .try_upcast_to_callable(self.db)
                     .and_then(CallableTypes::exactly_one)
-                {
-                    for formal_signature in &formal_callable.signatures(self.db).overloads {
-                        for actual_signature in &actual_callable.signatures(self.db).overloads {
-                            if let Some(formal_return_ty) = formal_signature.return_ty
-                                && let Some(actual_return_ty) = actual_signature.return_ty
-                            {
-                                self.infer_map_impl(
-                                    formal_return_ty,
-                                    actual_return_ty,
-                                    polarity,
-                                    &mut f,
-                                )?;
-                            }
+                else {
+                    return Ok(());
+                };
+
+                let [formal_signature] = formal_callable.signatures(self.db).overloads.as_slice()
+                else {
+                    return Ok(());
+                };
+                let [actual_signature] = actual_callable.signatures(self.db).overloads.as_slice()
+                else {
+                    return Ok(());
+                };
+
+                let when = formal_signature.when_constraint_set_assignable_to(
+                    self.db,
+                    actual_signature,
+                    self.inferable,
+                );
+                for formal_signature in &formal_callable.signatures(self.db).overloads {
+                    for actual_signature in &actual_callable.signatures(self.db).overloads {
+                        if let Some(formal_return_ty) = formal_signature.return_ty
+                            && let Some(actual_return_ty) = actual_signature.return_ty
+                        {
+                            self.infer_map_impl(
+                                formal_return_ty,
+                                actual_return_ty,
+                                polarity,
+                                &mut f,
+                            )?;
                         }
                     }
                 }
