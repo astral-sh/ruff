@@ -47,7 +47,7 @@ impl Violation for PropertyWithoutReturn {
     }
 }
 
-/// RUF069
+/// RUF066
 pub(crate) fn property_without_return(checker: &Checker, function_def: &StmtFunctionDef) {
     let semantic = checker.semantic();
 
