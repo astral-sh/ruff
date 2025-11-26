@@ -6894,11 +6894,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Infer the type of each argument once with each distinct parameter type as type context.
                 let parameter_types = overloads_with_binding
                     .iter()
-                    .filter_map(|(overload, binding)| parameter_type(overload, binding))
-                    // ensure we remove duplicates; sometimes there can be a lot of them
-                    .collect::<FxIndexSet<_>>();
+                    .filter_map(|(overload, binding)| parameter_type(overload, binding));
+
+                let mut seen = FxHashSet::default();
 
                 for parameter_type in parameter_types {
+                    if !seen.insert(parameter_type) {
+                        continue;
+                    }
                     let inferred_ty =
                         self.infer_expression(ast_argument, TypeContext::new(Some(parameter_type)));
 
