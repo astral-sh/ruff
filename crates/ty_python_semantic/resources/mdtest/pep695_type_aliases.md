@@ -113,6 +113,22 @@ def _(cond: bool):
 
     def _(x: Generic[int]):
         reveal_type(x)  # revealed: list[int] | set[int] | tuple[int]
+
+try:
+    class Foo[T]:
+        x: T
+        def foo(self) -> T:
+            return self.x
+
+    ...
+except Exception:
+    class Foo[T]:
+        x: T
+        def foo(self) -> T:
+            return self.x
+
+def f(x: Foo[int]):
+    reveal_type(x.foo())  # revealed: int
 ```
 
 ## In unions and intersections
@@ -284,6 +300,14 @@ type I[T] = H[T]
 
 # It's not possible to create an element of this type, but it's not an error for now
 type DirectRecursiveList[T] = list[DirectRecursiveList[T]]
+
+# TODO: this should probably be a cyclic-type-alias-definition error
+type Foo[T] = list[T] | Bar[T]
+type Bar[T] = int | Foo[T]
+
+def _(x: Bar[int]):
+    # TODO: should be `int | list[int]`
+    reveal_type(x)  # revealed: int | list[int] | Any
 ```
 
 ### With legacy generic
