@@ -71,6 +71,7 @@ Settings: Settings {
         "invalid-super-argument": Error (Default),
         "invalid-syntax-in-forward-annotation": Error (Default),
         "invalid-type-alias-type": Error (Default),
+        "invalid-type-arguments": Error (Default),
         "invalid-type-checking-constant": Error (Default),
         "invalid-type-form": Error (Default),
         "invalid-type-guard-call": Error (Default),

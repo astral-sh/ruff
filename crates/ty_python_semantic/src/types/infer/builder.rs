@@ -1,6 +1,6 @@
 use std::iter;
 
-use itertools::{Either, Itertools};
+use itertools::{Either, EitherOrBoth, Itertools};
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
@@ -49,7 +49,7 @@ use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
 };
 use crate::subscript::{PyIndex, PySlice};
-use crate::types::call::bind::MatchingOverloadIndex;
+use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind, MethodDecorator};
 use crate::types::context::{InNoTypeCheck, InferContext};
@@ -60,12 +60,12 @@ use crate::types::diagnostic::{
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
     INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS,
     INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT,
-    INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NON_SUBSCRIPTABLE,
-    POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
-    SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
-    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
-    hint_if_stdlib_attribute_exists_on_other_versions,
+    INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM,
+    INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases,
+    NON_SUBSCRIPTABLE, POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL,
+    POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR,
+    USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_cannot_pop_required_field_on_typed_dict,
     report_duplicate_bases, report_implicit_return_type, report_index_out_of_bounds,
@@ -106,9 +106,9 @@ use crate::types::{
     KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
     PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType, SubclassOfType,
     TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
-    UnionTypeInstance, binding_type, liskov, todo_type,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
+    TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
+    TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type, liskov, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -11167,45 +11167,167 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         generic_context: GenericContext<'db>,
         specialize: impl FnOnce(&[Option<Type<'db>>]) -> Type<'db>,
     ) -> Type<'db> {
+        let db = self.db();
         let slice_node = subscript.slice.as_ref();
-        let call_argument_types = match slice_node {
+
+        // Extract type arguments from the subscript
+        let type_arguments: Vec<Type<'db>> = match slice_node {
             ast::Expr::Tuple(tuple) => {
-                let arguments = CallArguments::positional(
-                    tuple.elts.iter().map(|elt| self.infer_type_expression(elt)),
-                );
+                let types: Vec<_> = tuple
+                    .elts
+                    .iter()
+                    .map(|elt| self.infer_type_expression(elt))
+                    .collect();
                 self.store_expression_type(
                     slice_node,
-                    Type::heterogeneous_tuple(self.db(), arguments.iter_types()),
+                    Type::heterogeneous_tuple(db, types.iter().copied()),
                 );
-                arguments
+                types
             }
-            _ => CallArguments::positional([self.infer_type_expression(slice_node)]),
+            _ => vec![self.infer_type_expression(slice_node)],
         };
-        let binding = Binding::single(value_ty, generic_context.signature(self.db()));
-        let bindings = match Bindings::from(binding)
-            .match_parameters(self.db(), &call_argument_types)
-            .check_types(
-                self.db(),
-                &call_argument_types,
-                TypeContext::default(),
-                &self.dataclass_field_specifiers,
-            ) {
-            Ok(bindings) => bindings,
-            Err(CallError(_, bindings)) => {
-                bindings.report_diagnostics(&self.context, subscript.into());
-                return Type::unknown();
-            }
-        };
-        let callable = bindings
-            .into_iter()
-            .next()
-            .expect("valid bindings should have one callable");
-        let (_, overload) = callable
-            .matching_overloads()
-            .next()
-            .expect("valid bindings should have matching overload");
 
-        specialize(overload.parameter_types())
+        let typevars = generic_context.variables(db);
+        let typevars_len = typevars.len();
+
+        let mut specialization_types = Vec::with_capacity(typevars_len);
+        let mut typevar_with_defaults = 0;
+        let mut missing_typevars = vec![];
+        let mut first_excess_type_argument_index = None;
+
+        // Helper to get the AST node corresponding to the type argument at `index`.
+        let get_node = |index: usize| -> ast::AnyNodeRef<'_> {
+            match slice_node {
+                ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
+                    .get(index)
+                    .expect("type argument index should not be out of range")
+                    .into(),
+                _ => slice_node.into(),
+            }
+        };
+
+        for (index, item) in typevars.zip_longest(type_arguments.iter()).enumerate() {
+            match item {
+                EitherOrBoth::Both(typevar, &provided_type) => {
+                    if typevar.default_type(db).is_some() {
+                        typevar_with_defaults += 1;
+                    }
+                    match typevar.typevar(db).bound_or_constraints(db) {
+                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                            if provided_type
+                                .when_assignable_to(db, bound, InferableTypeVars::None)
+                                .is_never_satisfied(db)
+                            {
+                                let node = get_node(index);
+                                if let Some(builder) =
+                                    self.context.report_lint(&INVALID_TYPE_ARGUMENTS, node)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "Type `{}` is not assignable to upper bound `{}` \
+                                            of type variable `{}`",
+                                        provided_type.display(db),
+                                        bound.display(db),
+                                        typevar.identity(db).display(db),
+                                    ));
+                                }
+                                return Type::unknown();
+                            }
+                        }
+                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                            if provided_type
+                                .when_assignable_to(
+                                    db,
+                                    Type::Union(constraints),
+                                    InferableTypeVars::None,
+                                )
+                                .is_never_satisfied(db)
+                            {
+                                let node = get_node(index);
+                                if let Some(builder) =
+                                    self.context.report_lint(&INVALID_TYPE_ARGUMENTS, node)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "Type `{}` does not satisfy constraints `{}` \
+                                            of type variable `{}`",
+                                        provided_type.display(db),
+                                        constraints
+                                            .elements(db)
+                                            .iter()
+                                            .map(|c| c.display(db))
+                                            .join("`, `"),
+                                        typevar.identity(db).display(db),
+                                    ));
+                                }
+                                return Type::unknown();
+                            }
+                        }
+                        None => {}
+                    }
+                    specialization_types.push(Some(provided_type));
+                }
+                EitherOrBoth::Left(typevar) => {
+                    if typevar.default_type(db).is_none() {
+                        missing_typevars.push(typevar);
+                    } else {
+                        typevar_with_defaults += 1;
+                    }
+                    specialization_types.push(None);
+                }
+                EitherOrBoth::Right(_) => {
+                    if first_excess_type_argument_index.is_none() {
+                        first_excess_type_argument_index = Some(index);
+                    }
+                }
+            }
+        }
+
+        if !missing_typevars.is_empty() {
+            if let Some(builder) = self.context.report_lint(&INVALID_TYPE_ARGUMENTS, subscript) {
+                let description = CallableDescription::new(db, value_ty);
+                let s = if missing_typevars.len() > 1 { "s" } else { "" };
+                builder.into_diagnostic(format_args!(
+                    "No type argument{s} provided for required type variable{s} `{}`{}",
+                    missing_typevars
+                        .iter()
+                        .map(|tv| tv.typevar(db).name(db))
+                        .join("`, `"),
+                    if let Some(CallableDescription { kind, name }) = description {
+                        format!(" of {kind} `{name}`")
+                    } else {
+                        String::new()
+                    }
+                ));
+            }
+            return Type::unknown();
+        }
+
+        if let Some(first_excess_type_argument_index) = first_excess_type_argument_index {
+            let node = get_node(first_excess_type_argument_index);
+            if let Some(builder) = self.context.report_lint(&INVALID_TYPE_ARGUMENTS, node) {
+                let description = CallableDescription::new(db, value_ty);
+                builder.into_diagnostic(format_args!(
+                    "Too many type arguments{}: expected {}, got {}",
+                    if let Some(CallableDescription { kind, name }) = description {
+                        format!(" to {kind} `{name}`")
+                    } else {
+                        String::new()
+                    },
+                    if typevar_with_defaults == 0 {
+                        format!("{typevars_len}")
+                    } else {
+                        format!(
+                            "between {} and {}",
+                            typevars_len - typevar_with_defaults,
+                            typevars_len
+                        )
+                    },
+                    type_arguments.len(),
+                ));
+            }
+            return Type::unknown();
+        }
+
+        specialize(&specialization_types)
     }
 
     fn infer_subscript_expression_types(

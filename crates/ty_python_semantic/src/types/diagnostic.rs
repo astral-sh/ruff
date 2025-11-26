@@ -83,6 +83,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_NAMED_TUPLE);
     registry.register_lint(&INVALID_RAISE);
     registry.register_lint(&INVALID_SUPER_ARGUMENT);
+    registry.register_lint(&INVALID_TYPE_ARGUMENTS);
     registry.register_lint(&INVALID_TYPE_CHECKING_CONSTANT);
     registry.register_lint(&INVALID_TYPE_FORM);
     registry.register_lint(&INVALID_TYPE_GUARD_DEFINITION);
@@ -1379,6 +1380,47 @@ declare_lint! {
     pub(crate) static NON_SUBSCRIPTABLE = {
         summary: "detects subscripting objects that do not support subscripting",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for invalid type arguments in explicit type specialization.
+    ///
+    /// ## Why is this bad?
+    /// Providing the wrong number of type arguments or type arguments that don't
+    /// satisfy the type variable's bounds or constraints will lead to incorrect
+    /// type inference and may indicate a misunderstanding of the generic type's
+    /// interface.
+    ///
+    /// ## Examples
+    ///
+    /// Using legacy type variables:
+    /// ```python
+    /// from typing import TypeVar
+    ///
+    /// T1 = TypeVar('T1', int, str)
+    /// T2 = TypeVar('T2', bound=int)
+    ///
+    /// class Foo1(Generic[T1]): ...
+    /// class Foo2(Generic[T2]): ...
+    ///
+    /// Foo1[bytes]  # error: bytes does not satisfy T1's constraints
+    /// Foo2[str]  # error: str does not satisfy T2's bound
+    /// ```
+    ///
+    /// Using PEP 695 type variables:
+    /// ```python
+    /// class Foo[T]: ...
+    /// class Bar[T, U]: ...
+    ///
+    /// Foo[int, str]  # error: too many arguments
+    /// Bar[int]  # error: too few arguments
+    /// ```
+    pub(crate) static INVALID_TYPE_ARGUMENTS = {
+        summary: "detects invalid type arguments in generic specialization",
+        status: LintStatus::stable("0.0.1-alpha.29"),
         default_level: Level::Error,
     }
 }

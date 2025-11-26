@@ -135,7 +135,7 @@ reveal_type(C[Literal[5]]())  # revealed: C[Literal[5]]
 The specialization must match the generic types:
 
 ```py
-# error: [too-many-positional-arguments] "Too many positional arguments to class `C`: expected 1, got 2"
+# error: [invalid-type-arguments] "Too many type arguments to class `C`: expected 1, got 2"
 reveal_type(C[int, int]())  # revealed: Unknown
 ```
 
@@ -150,11 +150,11 @@ reveal_type(Bounded[int]())  # revealed: Bounded[int]
 reveal_type(Bounded[IntSubclass]())  # revealed: Bounded[IntSubclass]
 
 # TODO: update this diagnostic to talk about type parameters and specializations
-# error: [invalid-argument-type] "Argument to class `Bounded` is incorrect: Expected `int`, found `str`"
+# error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `T@Bounded`"
 reveal_type(Bounded[str]())  # revealed: Unknown
 
 # TODO: update this diagnostic to talk about type parameters and specializations
-# error: [invalid-argument-type] "Argument to class `Bounded` is incorrect: Expected `int`, found `int | str`"
+# error: [invalid-type-arguments] "Type `int | str` is not assignable to upper bound `int` of type variable `T@Bounded`"
 reveal_type(Bounded[int | str]())  # revealed: Unknown
 
 reveal_type(BoundedByUnion[int]())  # revealed: BoundedByUnion[int]
@@ -181,7 +181,7 @@ reveal_type(Constrained[str]())  # revealed: Constrained[str]
 reveal_type(Constrained[int | str]())  # revealed: Constrained[int | str]
 
 # TODO: update this diagnostic to talk about type parameters and specializations
-# error: [invalid-argument-type] "Argument to class `Constrained` is incorrect: Expected `int | str`, found `object`"
+# error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `T@Constrained`"
 reveal_type(Constrained[object]())  # revealed: Unknown
 ```
 
