@@ -299,3 +299,16 @@ class B:
 class C(B):
     def method(self): ...  # no diagnostic
 ```
+
+## Constructor methods are also checked
+
+```py
+from typing import final
+
+class A:
+    @final
+    def __init__(self) -> None: ...
+
+class B(A):
+    def __init__(self) -> None: ...  # error: [override-of-final-method]
+```

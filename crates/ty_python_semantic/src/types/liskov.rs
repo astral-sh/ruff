@@ -49,23 +49,8 @@ fn check_class_declaration<'db>(
         return;
     };
 
-    // Constructor methods are not checked for Liskov compliance
-    if matches!(
-        &*member.name,
-        "__init__" | "__new__" | "__post_init__" | "__init_subclass__"
-    ) {
-        return;
-    }
-
     let (literal, specialization) = class.class_literal(db);
     let class_kind = CodeGeneratorKind::from_class(db, literal, specialization);
-
-    // Synthesized `__replace__` methods on dataclasses are not checked
-    if &member.name == "__replace__"
-        && matches!(class_kind, Some(CodeGeneratorKind::DataclassLike(_)))
-    {
-        return;
-    }
 
     let Place::Defined(type_on_subclass_instance, _, _) =
         Type::instance(db, class).member(db, &member.name).place
@@ -160,6 +145,11 @@ fn check_class_declaration<'db>(
             }
         });
 
+        // **********************************************************
+        // Everything below this point in the loop
+        // is about Liskov Substitution Principle checks
+        // **********************************************************
+
         // Only one Liskov diagnostic should be emitted per each invalid override,
         // even if it overrides multiple superclasses incorrectly!
         if liskov_diagnostic_emitted {
@@ -170,6 +160,21 @@ fn check_class_declaration<'db>(
         let Type::FunctionLiteral(subclass_function) = member.ty else {
             continue;
         };
+
+        // Constructor methods are not checked for Liskov compliance
+        if matches!(
+            &*member.name,
+            "__init__" | "__new__" | "__post_init__" | "__init_subclass__"
+        ) {
+            continue;
+        }
+
+        // Synthesized `__replace__` methods on dataclasses are not checked
+        if &member.name == "__replace__"
+            && matches!(class_kind, Some(CodeGeneratorKind::DataclassLike(_)))
+        {
+            continue;
+        }
 
         let Some(superclass_type_as_callable) = superclass_type
             .try_upcast_to_callable(db)
