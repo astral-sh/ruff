@@ -1066,6 +1066,17 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
             }
         }
     }
+
+    fn visit_comprehension(&mut self, comp: &ast::Comprehension) {
+        self.in_target_creating_definition = true;
+        self.visit_expr(&comp.target);
+        self.in_target_creating_definition = false;
+
+        self.visit_expr(&comp.iter);
+        for if_clause in &comp.ifs {
+            self.visit_expr(if_clause);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -2641,6 +2652,50 @@ with open("file.txt") as f:
         "f" @ 26..27: Variable [definition]
         "f" @ 33..34: Variable
         "read" @ 35..39: Method
+        "#);
+    }
+
+    #[test]
+    fn test_comprehensions() {
+        let test = SemanticTokenTest::new(
+            r#"
+list_comp = [x for x in range(10) if x % 2 == 0]
+set_comp = {x for x in range(10)}
+dict_comp = {k: v for k, v in zip(["a", "b"], [1, 2])}
+generator = (x for x in range(10))
+"#,
+        );
+
+        let tokens = test.highlight_file();
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "list_comp" @ 1..10: Variable [definition]
+        "x" @ 14..15: Variable
+        "x" @ 20..21: Variable [definition]
+        "range" @ 25..30: Class
+        "10" @ 31..33: Number
+        "x" @ 38..39: Variable
+        "2" @ 42..43: Number
+        "0" @ 47..48: Number
+        "set_comp" @ 50..58: Variable [definition]
+        "x" @ 62..63: Variable
+        "x" @ 68..69: Variable [definition]
+        "range" @ 73..78: Class
+        "10" @ 79..81: Number
+        "dict_comp" @ 84..93: Variable [definition]
+        "k" @ 97..98: Variable
+        "v" @ 100..101: Variable
+        "k" @ 106..107: Variable [definition]
+        "v" @ 109..110: Variable [definition]
+        "zip" @ 114..117: Class
+        "\"a\"" @ 119..122: String
+        "\"b\"" @ 124..127: String
+        "1" @ 131..132: Number
+        "2" @ 134..135: Number
+        "generator" @ 139..148: Variable [definition]
+        "x" @ 152..153: Variable
+        "x" @ 158..159: Variable [definition]
+        "range" @ 163..168: Class
+        "10" @ 169..171: Number
         "#);
     }
 
