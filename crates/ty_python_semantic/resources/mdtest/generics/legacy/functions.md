@@ -379,10 +379,10 @@ T = TypeVar("T")
 def invoke(fn: Callable[[A], B], value: A) -> B:
     return fn(value)
 
-def identity(x: T) -> T:
+def identity(x: T, /) -> T:
     return x
 
-def head(xs: list[T]) -> T:
+def head(xs: list[T], /) -> T:
     return xs[0]
 
 # TODO: this should be `Literal[1]`

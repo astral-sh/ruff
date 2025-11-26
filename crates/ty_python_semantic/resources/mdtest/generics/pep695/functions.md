@@ -334,10 +334,10 @@ from typing import Callable
 def invoke[A, B](fn: Callable[[A], B], value: A) -> B:
     return fn(value)
 
-def identity[T](x: T) -> T:
+def identity[T](x: T, /) -> T:
     return x
 
-def head[T](xs: list[T]) -> T:
+def head[T](xs: list[T], /) -> T:
     return xs[0]
 
 # TODO: this should be `Literal[1]`
