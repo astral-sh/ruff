@@ -144,17 +144,46 @@ def _(x: IntOrStr):
 ## Cyclic
 
 ```py
-from typing import TypeAlias
+from typing import TypeAlias, TypeVar, Union
+from types import UnionType
 
 RecursiveTuple: TypeAlias = tuple[int | "RecursiveTuple", str]
 
 def _(rec: RecursiveTuple):
+    # TODO should be `tuple[int | RecursiveTuple, str]`
     reveal_type(rec)  # revealed: tuple[Divergent, str]
 
 RecursiveHomogeneousTuple: TypeAlias = tuple[int | "RecursiveHomogeneousTuple", ...]
 
 def _(rec: RecursiveHomogeneousTuple):
+    # TODO should be `tuple[int | RecursiveHomogeneousTuple, ...]`
     reveal_type(rec)  # revealed: tuple[Divergent, ...]
+
+ClassInfo: TypeAlias = type | UnionType | tuple["ClassInfo", ...]
+reveal_type(ClassInfo)  # revealed: types.UnionType
+
+def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
+    # TODO should be `type | UnionType | tuple[ClassInfo, ...]`
+    reveal_type(classinfo)  # revealed: type | UnionType | tuple[Divergent, ...]
+    return isinstance(obj, classinfo)
+
+K = TypeVar("K")
+V = TypeVar("V")
+NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
+
+def _(nested: NestedDict[str, int]):
+    # TODO should be `dict[str, int | NestedDict[str, int]]`
+    reveal_type(nested)  # revealed: @Todo(specialized generic alias in type expression)
+
+my_isinstance(1, int)
+my_isinstance(1, int | str)
+my_isinstance(1, (int, str))
+my_isinstance(1, (int, (str, float)))
+my_isinstance(1, (int, (str | float)))
+# error: [invalid-argument-type]
+my_isinstance(1, 1)
+# TODO should be an invalid-argument-type error
+my_isinstance(1, (int, (str, 1)))
 ```
 
 ## Conditionally imported on Python < 3.10

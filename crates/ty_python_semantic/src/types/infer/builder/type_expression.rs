@@ -6,20 +6,24 @@ use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NON_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_callable,
 };
-use crate::types::signatures::Signature;
+use crate::types::infer::builder::InnerExpressionInferenceState;
+use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     CallableType, DynamicType, IntersectionBuilder, KnownClass, KnownInstanceType,
-    LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType, Type,
-    TypeAliasType, TypeContext, TypeIsType, UnionBuilder, UnionType, todo_type,
+    LintDiagnosticGuard, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext,
+    TypeIsType, UnionBuilder, UnionType, todo_type,
 };
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer the type of a type expression.
     pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        if self.inner_expression_inference_state.is_get() {
+            return self.expression_type(expression);
+        }
         let previous_deferred_state = self.deferred_state;
 
         // `DeferredExpressionState::InStringAnnotation` takes precedence over other states.
@@ -33,13 +37,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             DeferredExpressionState::InStringAnnotation(_) | DeferredExpressionState::Deferred => {}
         }
-        let mut ty = self.infer_type_expression_no_store(expression);
-        self.deferred_state = previous_deferred_state;
 
-        let divergent = Type::divergent(Some(self.scope()));
-        if ty.has_divergent_type(self.db(), divergent) {
-            ty = divergent;
-        }
+        let ty = self.infer_type_expression_no_store(expression);
+        self.deferred_state = previous_deferred_state;
         self.store_expression_type(expression, ty);
         ty
     }
@@ -82,6 +82,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Infer the type of a type expression without storing the result.
     pub(super) fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
+        if self.inner_expression_inference_state.is_get() {
+            return self.expression_type(expression);
+        }
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         match expression {
             ast::Expr::Name(name) => match name.ctx {
@@ -605,7 +608,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             // TODO: emit a diagnostic
                         }
                     } else {
-                        element_types.push(element_ty.fallback_to_divergent(self.db()));
+                        element_types.push(element_ty);
                     }
                 }
 
@@ -959,6 +962,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_type_expression(slice);
                 // For stringified TypeAlias; remove once properly supported
                 todo_type!("string literal subscripted in type expression")
+            }
+            Type::Union(union) => {
+                self.infer_type_expression(slice);
+                let previous_slice_inference_state = std::mem::replace(
+                    &mut self.inner_expression_inference_state,
+                    InnerExpressionInferenceState::Get,
+                );
+                let union = union
+                    .elements(self.db())
+                    .iter()
+                    .fold(UnionBuilder::new(self.db()), |builder, elem| {
+                        builder.add(self.infer_subscript_type_expression(subscript, *elem))
+                    })
+                    .build();
+                self.inner_expression_inference_state = previous_slice_inference_state;
+                union
             }
             _ => {
                 self.infer_type_expression(slice);
