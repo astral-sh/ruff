@@ -452,9 +452,9 @@ impl<'db> BoundTypeVarInstance<'db> {
 /// lower and upper bound.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct ConstrainedTypeVar<'db> {
-    typevar: BoundTypeVarInstance<'db>,
-    lower: Type<'db>,
-    upper: Type<'db>,
+    pub(crate) typevar: BoundTypeVarInstance<'db>,
+    pub(crate) lower: Type<'db>,
+    pub(crate) upper: Type<'db>,
 }
 
 // The Salsa heap is tracked separately.
@@ -663,7 +663,7 @@ impl<'db> ConstrainedTypeVar<'db> {
         Some(Self::new(db, self.typevar(db), lower, upper))
     }
 
-    fn display(self, db: &'db dyn Db) -> impl Display {
+    pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         self.display_inner(db, false)
     }
 
@@ -2265,7 +2265,7 @@ impl<'db> ConstraintAssignment<'db> {
     // Keep this for future debugging needs, even though it's not currently used when rendering
     // constraint sets.
     #[expect(dead_code)]
-    fn display(self, db: &'db dyn Db) -> impl Display {
+    pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         struct DisplayConstraintAssignment<'db> {
             constraint: ConstraintAssignment<'db>,
             db: &'db dyn Db,

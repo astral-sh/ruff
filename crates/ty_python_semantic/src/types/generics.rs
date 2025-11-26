@@ -1406,7 +1406,7 @@ impl<'db> SpecializationBuilder<'db> {
             .map(|(identity, _)| self.types.get(identity).copied());
 
         // TODO Infer the tuple spec for a tuple type
-        generic_context.specialize_partial(self.db, types)
+        generic_context.specialize_recursive(self.db, types)
     }
 
     fn add_type_mapping(
@@ -1698,20 +1698,24 @@ impl<'db> SpecializationBuilder<'db> {
                     actual_signature,
                     self.inferable,
                 );
-                for formal_signature in &formal_callable.signatures(self.db).overloads {
-                    for actual_signature in &actual_callable.signatures(self.db).overloads {
-                        if let Some(formal_return_ty) = formal_signature.return_ty
-                            && let Some(actual_return_ty) = actual_signature.return_ty
-                        {
-                            self.infer_map_impl(
-                                formal_return_ty,
-                                actual_return_ty,
+                when.for_each_path(self.db, |path| {
+                    for constraint in path.positive_constraints() {
+                        let typevar = constraint.typevar(self.db);
+                        let lower = constraint.lower(self.db);
+                        let upper = constraint.upper(self.db);
+                        if !upper.is_object() {
+                            self.add_type_mapping(typevar, upper, polarity, &mut f);
+                        }
+                        if let Type::TypeVar(lower_bound_typevar) = lower {
+                            self.add_type_mapping(
+                                lower_bound_typevar,
+                                Type::TypeVar(typevar),
                                 polarity,
                                 &mut f,
-                            )?;
+                            );
                         }
                     }
-                }
+                });
             }
 
             // TODO: Add more forms that we can structurally induct into: type[C], callables

@@ -1011,7 +1011,13 @@ impl<'db> Signature<'db> {
         // If either of the parameter lists is gradual (`...`), then it is assignable to and from
         // any other parameter list, but not a subtype or supertype of any other parameter list.
         if self.parameters.is_gradual() || other.parameters.is_gradual() {
-            return ConstraintSet::from(relation.is_assignability());
+            result.intersect(
+                db,
+                ConstraintSet::from(
+                    relation.is_assignability() || relation.is_constraint_set_assignability(),
+                ),
+            );
+            return result;
         }
 
         let mut parameters = ParametersZip {
