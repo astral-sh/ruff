@@ -100,6 +100,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&POSSIBLY_MISSING_IMPORT);
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
+    registry.register_lint(&OVERRIDE_OF_FINAL_METHOD);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
     registry.register_lint(&TOO_MANY_POSITIONAL_ARGUMENTS);
     registry.register_lint(&UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS);
@@ -1609,6 +1610,33 @@ declare_lint! {
     pub(crate) static SUBCLASS_OF_FINAL_CLASS = {
         summary: "detects subclasses of final classes",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for methods on subclasses that override superclass methods decorated with `@final`.
+    ///
+    /// ## Why is this bad?
+    /// Decorating a method with `@final` declares to the type checker that it should not be
+    /// overridden on any subclass.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from typing import final
+    ///
+    /// class A:
+    ///     @final
+    ///     def foo(self): ...
+    ///
+    /// class B(A):
+    ///     def foo(self): ...  # Error raised here
+    /// ```
+    pub(crate) static OVERRIDE_OF_FINAL_METHOD = {
+        summary: "detects subclasses of final classes",
+        status: LintStatus::stable("0.0.1-alpha.29"),
         default_level: Level::Error,
     }
 }
@@ -3620,7 +3648,7 @@ pub(super) fn report_invalid_method_override<'db>(
     let overridden_method = if class_name == superclass_name {
         format!(
             "{superclass}.{member}",
-            superclass = superclass.class_literal(db).0.qualified_name(db),
+            superclass = superclass.qualified_name(db),
         )
     } else {
         format!("{superclass_name}.{member}")
@@ -3761,6 +3789,68 @@ pub(super) fn report_invalid_method_override<'db>(
             diagnostic.help(subdiag);
         }
     }
+}
+
+pub(super) fn report_overridden_final_method<'db>(
+    context: &InferContext<'db, '_>,
+    member: &str,
+    subclass_definition: Definition<'db>,
+    superclass: ClassType<'db>,
+    subclass: ClassType<'db>,
+    superclass_method: FunctionType<'db>,
+) {
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(
+        &OVERRIDE_OF_FINAL_METHOD,
+        subclass_definition.focus_range(db, context.module()),
+    ) else {
+        return;
+    };
+
+    let superclass_name = if superclass.name(db) == subclass.name(db) {
+        superclass.qualified_name(db).to_string()
+    } else {
+        superclass.name(db).to_string()
+    };
+
+    let mut diagnostic =
+        builder.into_diagnostic(format_args!("Cannot override `{superclass_name}.{member}`"));
+    diagnostic.set_primary_message(format_args!(
+        "Override of `{member}` from superclass `{superclass_name}`"
+    ));
+    diagnostic.set_concise_message(format_args!(
+        "Cannot override final member `{member}` from superclass `{superclass_name}`"
+    ));
+
+    let mut sub = SubDiagnostic::new(
+        SubDiagnosticSeverity::Info,
+        format_args!(
+            "`{superclass_name}.{member}` is decorated with `@final`, forbidding overrides"
+        ),
+    );
+
+    let superclass_function_literal = if superclass_method.file(db).is_stub(db) {
+        superclass_method.first_overload(db)
+    } else {
+        superclass_method.literal(db).last_definition(db)
+    };
+
+    sub.annotate(
+        Annotation::secondary(Span::from(
+            superclass_function_literal
+                .focus_range(db, &parsed_module(db, superclass_method.file(db)).load(db)),
+        ))
+        .message(format_args!("`{superclass_name}.{member}` defined here")),
+    );
+
+    if let Some(decorator_span) =
+        superclass_function_literal.find_known_decorator_span(db, KnownFunction::Final)
+    {
+        sub.annotate(Annotation::secondary(decorator_span));
+    }
+
+    diagnostic.sub(sub);
 }
 
 /// This function receives an unresolved `from foo import bar` import,

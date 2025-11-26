@@ -83,6 +83,7 @@ Settings: Settings {
         "no-matching-overload": Error (Default),
         "non-subscriptable": Error (Default),
         "not-iterable": Error (Default),
+        "override-of-final-method": Error (Default),
         "parameter-already-assigned": Error (Default),
         "positional-only-parameter-as-kwarg": Error (Default),
         "possibly-missing-attribute": Warning (Default),

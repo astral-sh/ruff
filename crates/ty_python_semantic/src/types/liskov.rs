@@ -7,13 +7,15 @@ use rustc_hash::FxHashSet;
 
 use crate::{
     place::Place,
-    semantic_index::place_table,
+    semantic_index::{place_table, use_def_map},
     types::{
         ClassBase, ClassLiteral, ClassType, KnownClass, Type,
         class::CodeGeneratorKind,
         context::InferContext,
-        definition_expression_type,
-        diagnostic::{INVALID_EXPLICIT_OVERRIDE, report_invalid_method_override},
+        diagnostic::{
+            INVALID_EXPLICIT_OVERRIDE, report_invalid_method_override,
+            report_overridden_final_method,
+        },
         function::{FunctionDecorators, KnownFunction},
         ide_support::{MemberWithDefinition, all_declarations_and_bindings},
     },
@@ -42,11 +44,6 @@ fn check_class_declaration<'db>(
     let db = context.db();
 
     let MemberWithDefinition { member, definition } = member;
-
-    // TODO: Check Liskov on non-methods too
-    let Type::FunctionLiteral(function) = member.ty else {
-        return;
-    };
 
     let Some(definition) = definition else {
         return;
@@ -80,6 +77,7 @@ fn check_class_declaration<'db>(
     let mut has_dynamic_superclass = false;
     let mut has_typeddict_in_mro = false;
     let mut liskov_diagnostic_emitted = false;
+    let mut overridden_final_method = None;
 
     for class_base in class.iter_mro(db).skip(1) {
         let superclass = match class_base {
@@ -96,11 +94,15 @@ fn check_class_declaration<'db>(
         };
 
         let (superclass_literal, superclass_specialization) = superclass.class_literal(db);
-        let superclass_symbol_table = place_table(db, superclass_literal.body_scope(db));
+        let superclass_scope = superclass_literal.body_scope(db);
+        let superclass_symbol_table = place_table(db, superclass_scope);
+        let superclass_symbol_id = superclass_symbol_table.symbol_id(&member.name);
+
         let mut method_kind = MethodKind::default();
 
         // If the member is not defined on the class itself, skip it
-        if let Some(superclass_symbol) = superclass_symbol_table.symbol_by_name(&member.name) {
+        if let Some(id) = superclass_symbol_id {
+            let superclass_symbol = superclass_symbol_table.symbol(id);
             if !(superclass_symbol.is_bound() || superclass_symbol.is_declared()) {
                 continue;
             }
@@ -119,18 +121,54 @@ fn check_class_declaration<'db>(
 
         subclass_overrides_superclass_declaration = true;
 
-        // Only one Liskov diagnostic should be emitted per each invalid override,
-        // even if it overrides multiple superclasses incorrectly!
-        if liskov_diagnostic_emitted {
-            continue;
-        }
-
         let Place::Defined(superclass_type, _, _) = Type::instance(db, superclass)
             .member(db, &member.name)
             .place
         else {
             // If not defined on any superclass, no point in continuing to walk up the MRO
             break;
+        };
+
+        overridden_final_method = overridden_final_method.or_else(|| {
+            let superclass_symbol_id = superclass_symbol_id?;
+
+            // TODO: `@final` should be more like a type qualifier:
+            // we should also recognise `@final`-decorated methods that don't end up
+            // as being function- or property-types (because they're wrapped by other
+            // decorators that transform the type into something else).
+            let underlying_function = match superclass
+                .own_class_member(db, None, &member.name)
+                .ignore_possibly_undefined()?
+            {
+                Type::BoundMethod(method) => method.function(db),
+                Type::FunctionLiteral(function) => function,
+                Type::PropertyInstance(property) => property.getter(db)?.as_function_literal()?,
+                _ => return None,
+            };
+
+            if underlying_function.has_known_decorator(db, FunctionDecorators::FINAL) {
+                use_def_map(db, superclass_scope)
+                    .end_of_scope_symbol_bindings(superclass_symbol_id)
+                    .next()?
+                    .binding
+                    .definition()?
+                    .kind(db)
+                    .is_function_def()
+                    .then_some((superclass, underlying_function))
+            } else {
+                None
+            }
+        });
+
+        // Only one Liskov diagnostic should be emitted per each invalid override,
+        // even if it overrides multiple superclasses incorrectly!
+        if liskov_diagnostic_emitted {
+            continue;
+        }
+
+        // TODO: Check Liskov on non-methods too
+        let Type::FunctionLiteral(subclass_function) = member.ty else {
+            continue;
         };
 
         let Some(superclass_type_as_callable) = superclass_type
@@ -149,7 +187,7 @@ fn check_class_declaration<'db>(
             &member.name,
             class,
             *definition,
-            function,
+            subclass_function,
             superclass,
             superclass_type,
             method_kind,
@@ -187,13 +225,11 @@ fn check_class_declaration<'db>(
         && function.has_known_decorator(db, FunctionDecorators::OVERRIDE)
     {
         let function_literal = if context.in_stub() {
-            function
-                .iter_overloads_and_implementation(db)
-                .next()
-                .expect("There should always be at least one overload or implementation")
+            function.first_overload(db)
         } else {
             function.literal(db).last_definition(db)
         };
+
         if let Some(builder) = context.report_lint(
             &INVALID_EXPLICIT_OVERRIDE,
             function_literal.focus_range(db, context.module()),
@@ -202,17 +238,10 @@ fn check_class_declaration<'db>(
                 "Method `{}` is decorated with `@override` but does not override anything",
                 member.name
             ));
-            if let Some(decorator) = function_literal
-                .node(db, context.file(), context.module())
-                .decorator_list
-                .iter()
-                .find(|decorator| {
-                    definition_expression_type(db, *definition, &decorator.expression)
-                        .as_function_literal()
-                        .is_some_and(|function| function.is_known(db, KnownFunction::Override))
-                })
+            if let Some(decorator_span) =
+                function_literal.find_known_decorator_span(db, KnownFunction::Override)
             {
-                diagnostic.annotate(Annotation::secondary(context.span(decorator)));
+                diagnostic.annotate(Annotation::secondary(decorator_span));
             }
             diagnostic.info(format_args!(
                 "No `{member}` definitions were found on any superclasses of `{class}`",
@@ -220,6 +249,17 @@ fn check_class_declaration<'db>(
                 class = class.name(db)
             ));
         }
+    }
+
+    if let Some((superclass, superclass_method)) = overridden_final_method {
+        report_overridden_final_method(
+            context,
+            &member.name,
+            *definition,
+            superclass,
+            class,
+            superclass_method,
+        );
     }
 }
 

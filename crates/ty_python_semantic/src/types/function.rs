@@ -83,7 +83,7 @@ use crate::types::{
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
     NormalizedVisitor, SpecialFormType, Truthiness, Type, TypeContext, TypeMapping, TypeRelation,
-    UnionBuilder, binding_type, walk_signature,
+    UnionBuilder, binding_type, definition_expression_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -278,7 +278,7 @@ impl<'db> OverloadLiteral<'db> {
             || is_implicit_classmethod(self.name(db))
     }
 
-    pub(super) fn node<'ast>(
+    fn node<'ast>(
         self,
         db: &dyn Db,
         file: File,
@@ -292,6 +292,41 @@ impl<'db> OverloadLiteral<'db> {
         );
 
         self.body_scope(db).node(db).expect_function().node(module)
+    }
+
+    /// Iterate through the decorators on this function, returning the span of the first one
+    /// that matches the given predicate.
+    pub(super) fn find_decorator_span(
+        self,
+        db: &'db dyn Db,
+        predicate: impl Fn(Type<'db>) -> bool,
+    ) -> Option<Span> {
+        let definition = self.definition(db);
+        let file = definition.file(db);
+        self.node(db, file, &parsed_module(db, file).load(db))
+            .decorator_list
+            .iter()
+            .find(|decorator| {
+                predicate(definition_expression_type(
+                    db,
+                    definition,
+                    &decorator.expression,
+                ))
+            })
+            .map(|decorator| Span::from(file).with_range(decorator.range))
+    }
+
+    /// Iterate through the decorators on this function, returning the span of the first one
+    /// that matches the given [`KnownFunction`].
+    pub(super) fn find_known_decorator_span(
+        self,
+        db: &'db dyn Db,
+        needle: KnownFunction,
+    ) -> Option<Span> {
+        self.find_decorator_span(db, |ty| {
+            ty.as_function_literal()
+                .is_some_and(|f| f.is_known(db, needle))
+        })
     }
 
     /// Returns the [`FileRange`] of the function's name.
@@ -903,6 +938,12 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
     ) -> impl Iterator<Item = OverloadLiteral<'db>> + 'db {
         self.literal(db).iter_overloads_and_implementation(db)
+    }
+
+    pub(crate) fn first_overload(self, db: &'db dyn Db) -> OverloadLiteral<'db> {
+        self.iter_overloads_and_implementation(db)
+            .next()
+            .expect("A function must have at least one overload/implementation")
     }
 
     /// Typed externally-visible signature for this function.

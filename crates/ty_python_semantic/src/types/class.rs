@@ -497,6 +497,11 @@ impl<'db> ClassType<'db> {
         class_literal.name(db)
     }
 
+    pub(super) fn qualified_name(self, db: &'db dyn Db) -> QualifiedClassName<'db> {
+        let (class_literal, _) = self.class_literal(db);
+        class_literal.qualified_name(db)
+    }
+
     pub(crate) fn known(self, db: &'db dyn Db) -> Option<KnownClass> {
         let (class_literal, _) = self.class_literal(db);
         class_literal.known(db)
