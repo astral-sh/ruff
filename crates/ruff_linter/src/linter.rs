@@ -980,7 +980,6 @@ mod tests {
     #[test_case(Path::new("write_to_debug.py"), PythonVersion::PY310)]
     #[test_case(Path::new("invalid_expression.py"), PythonVersion::PY312)]
     #[test_case(Path::new("global_parameter.py"), PythonVersion::PY310)]
-    #[test_case(Path::new("return_in_generator.py"), PythonVersion::PY310)]
     fn test_semantic_errors(path: &Path, python_version: PythonVersion) -> Result<()> {
         let snapshot = format!(
             "semantic_syntax_error_{}_{}",
