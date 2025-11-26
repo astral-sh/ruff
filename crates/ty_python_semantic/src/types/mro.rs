@@ -51,7 +51,7 @@ impl<'db> Mro<'db> {
         class_literal: ClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Result<Self, MroError<'db>> {
-        let class = class_literal.apply_optional_specialization(db, specialization);
+        let class = class_literal.apply_optional_specialization(db, specialization, None);
         // Special-case `NotImplementedType`: typeshed says that it inherits from `Any`,
         // but this causes more problems than it fixes.
         if class_literal.is_known(db, KnownClass::NotImplementedType) {
@@ -412,10 +412,11 @@ impl<'db> Iterator for MroIterator<'db> {
     fn next(&mut self) -> Option<Self::Item> {
         if !self.first_element_yielded {
             self.first_element_yielded = true;
-            return Some(ClassBase::Class(
-                self.class
-                    .apply_optional_specialization(self.db, self.specialization),
-            ));
+            return Some(ClassBase::Class(self.class.apply_optional_specialization(
+                self.db,
+                self.specialization,
+                None,
+            )));
         }
         self.full_mro_except_first_element().next()
     }

@@ -442,8 +442,6 @@ def _(
 Generic implicit type aliases can be partially specialized:
 
 ```py
-U = TypeVar("U")
-
 DictStrTo = MyDict[str, U]
 
 reveal_type(DictStrTo)  # revealed: <class 'dict[str, U@DictStrTo]'>

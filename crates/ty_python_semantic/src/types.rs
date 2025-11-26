@@ -6599,7 +6599,7 @@ impl<'db> Type<'db> {
                     .map(|specialization| {
                         Type::instance(
                             db,
-                            generic_origin.apply_specialization(db, |_| specialization),
+                            generic_origin.apply_specialization(db, |_| specialization, None),
                         )
                     })
                     .unwrap_or(instance_ty);
@@ -7111,7 +7111,11 @@ impl<'db> Type<'db> {
     pub(crate) fn dunder_class(self, db: &'db dyn Db) -> Type<'db> {
         if self.is_typed_dict() {
             return KnownClass::Dict
-                .to_specialized_class_type(db, [KnownClass::Str.to_instance(db), Type::object()])
+                .to_specialized_class_type(
+                    db,
+                    [KnownClass::Str.to_instance(db), Type::object()],
+                    None,
+                )
                 .map(Type::from)
                 // Guard against user-customized typesheds with a broken `dict` class
                 .unwrap_or_else(Type::unknown);

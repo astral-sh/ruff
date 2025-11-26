@@ -4740,8 +4740,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             TargetKind::Single => {
                 // This could be an implicit type alias (OptionalList = list[T] | None). Use the definition
-                // of `OptionalList` as the typevar binding context while inferring the RHS (`list[T] | None`),
-                // in order to bind `T@OptionalList`.
+                // of `OptionalList` as the binding context while inferring the RHS (`list[T] | None`), in
+                // order to bind `T` to `OptionalList`.
                 let previous_typevar_binding_context =
                     self.typevar_binding_context.replace(definition);
 
@@ -5531,8 +5531,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.deferred_state = DeferredExpressionState::Deferred;
             }
 
-            let previous_typevar_binding_context = self.typevar_binding_context;
-            self.typevar_binding_context = Some(definition);
+            // This might be a PEP-613 type alias (`OptionalList: TypeAlias = list[T] | None`). Use
+            // the definition of `OptionalList` as the binding context while inferring the
+            // RHS (`list[T] | None`), in order to bind `T` to `OptionalList`.
+            let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
 
             let inferred_ty = self.infer_maybe_standalone_expression(
                 value,
@@ -7498,7 +7500,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let class_type =
-            class_literal.apply_specialization(self.db(), |_| builder.build(generic_context));
+            class_literal.apply_specialization(self.db(), |_| builder.build(generic_context), None);
 
         Type::from(class_type).to_instance(self.db())
     }
@@ -10808,13 +10810,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_subscript_load(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
         let value_ty = self.infer_expression(&subscript.value, TypeContext::default());
 
+        // If we have an implicit type alias like `MyList = list[T]`, and if `MyList` is being
+        // used in another implicit type alias like `Numbers = MyList[int]`, then we infer the
+        // right hand side as a value expression, and need to handle the specialization here.
         if let Some(alias) = value_ty.as_generic_alias() {
-            return self.infer_explicitly_specialized_type_alias(
+            let return_ty = self.infer_explicitly_specialized_type_alias(
                 subscript,
                 value_ty,
-                Some(alias.definition(self.db())),
+                alias.binding_context(self.db()),
                 false,
             );
+
+            return return_ty;
         }
 
         self.infer_subscript_load_impl(value_ty, subscript)
@@ -10853,9 +10860,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let tuple_generic_alias = |db: &'db dyn Db, tuple: Option<TupleType<'db>>| {
+        let db = self.db();
+        let typevar_binding_context = self.typevar_binding_context;
+        let tuple_generic_alias = |tuple: Option<TupleType<'db>>| {
             let tuple = tuple.unwrap_or_else(|| TupleType::homogeneous(db, Type::unknown()));
-            Type::from(tuple.to_class_type(db))
+            Type::from(tuple.to_class_type(db, typevar_binding_context))
         };
 
         match value_ty {
@@ -10867,7 +10876,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // updating all of the subscript logic below to use custom callables for all of the _other_
                 // special cases, too.
                 if class.is_tuple(self.db()) {
-                    return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(slice));
+                    return tuple_generic_alias(self.infer_tuple_type_expression(slice));
                 } else if class.is_known(self.db(), KnownClass::Type) {
                     let argument_ty = self.infer_type_expression(slice);
                     return Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
@@ -10895,7 +10904,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
             Type::SpecialForm(SpecialFormType::Tuple) => {
-                return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(slice));
+                return tuple_generic_alias(self.infer_tuple_type_expression(slice));
             }
             Type::SpecialForm(SpecialFormType::Literal) => {
                 match self.infer_literal_parameter_type(slice) {
@@ -11061,7 +11070,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .expect("A known stdlib class is available");
 
                 return class
-                    .to_specialized_class_type(self.db(), [element_ty])
+                    .to_specialized_class_type(
+                        self.db(),
+                        [element_ty],
+                        self.typevar_binding_context,
+                    )
                     .map(Type::from)
                     .unwrap_or_else(Type::unknown);
             }
@@ -11119,7 +11132,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .expect("Stdlib class available");
 
                 return class
-                    .to_specialized_class_type(self.db(), [first_ty, second_ty])
+                    .to_specialized_class_type(
+                        self.db(),
+                        [first_ty, second_ty],
+                        self.typevar_binding_context,
+                    )
                     .map(Type::from)
                     .unwrap_or_else(Type::unknown);
             }
@@ -11166,10 +11183,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         generic_context: GenericContext<'db>,
     ) -> Type<'db> {
         let db = self.db();
+        let typevar_binding_context = self.typevar_binding_context;
         let specialize = |types: &[Option<Type<'db>>]| {
-            Type::from(generic_class.apply_specialization(db, |_| {
-                generic_context.specialize_partial(db, types.iter().copied())
-            }))
+            Type::from(generic_class.apply_specialization(
+                db,
+                |_| generic_context.specialize_partial(db, types.iter().copied()),
+                typevar_binding_context,
+            ))
         };
 
         self.infer_explicit_callable_specialization(

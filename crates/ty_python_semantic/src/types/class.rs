@@ -103,7 +103,7 @@ fn try_mro_cycle_initial<'db>(
 ) -> Result<Mro<'db>, MroError<'db>> {
     Err(MroError::cycle(
         db,
-        self_.apply_optional_specialization(db, specialization),
+        self_.apply_optional_specialization(db, specialization, None),
     ))
 }
 
@@ -233,6 +233,8 @@ impl<'db> CodeGeneratorKind<'db> {
 pub struct GenericAlias<'db> {
     pub(crate) origin: ClassLiteral<'db>,
     pub(crate) specialization: Specialization<'db>,
+
+    pub(crate) binding_context: Option<Definition<'db>>,
 }
 
 pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -252,6 +254,7 @@ impl<'db> GenericAlias<'db> {
             db,
             self.origin(db),
             self.specialization(db).normalized_impl(db, visitor),
+            self.binding_context(db),
         )
     }
 
@@ -277,6 +280,7 @@ impl<'db> GenericAlias<'db> {
             self.origin(db),
             self.specialization(db)
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            self.binding_context(db),
         )
     }
 
@@ -1529,6 +1533,7 @@ impl<'db> ClassLiteral<'db> {
         self,
         db: &'db dyn Db,
         f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
+        binding_context: Option<Definition<'db>>,
     ) -> ClassType<'db> {
         match self.generic_context(db) {
             None => ClassType::NonGeneric(self),
@@ -1545,7 +1550,7 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
 
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
+                ClassType::Generic(GenericAlias::new(db, self, specialization, binding_context))
             }
         }
     }
@@ -1554,48 +1559,63 @@ impl<'db> ClassLiteral<'db> {
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
+        binding_context: Option<Definition<'db>>,
     ) -> ClassType<'db> {
-        self.apply_specialization(db, |generic_context| {
-            specialization
-                .unwrap_or_else(|| generic_context.default_specialization(db, self.known(db)))
-        })
+        self.apply_specialization(
+            db,
+            |generic_context| {
+                specialization
+                    .unwrap_or_else(|| generic_context.default_specialization(db, self.known(db)))
+            },
+            binding_context,
+        )
     }
 
     pub(crate) fn top_materialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        self.apply_specialization(db, |generic_context| {
-            generic_context
-                .default_specialization(db, self.known(db))
-                .materialize_impl(
-                    db,
-                    MaterializationKind::Top,
-                    &ApplyTypeMappingVisitor::default(),
-                )
-        })
+        self.apply_specialization(
+            db,
+            |generic_context| {
+                generic_context
+                    .default_specialization(db, self.known(db))
+                    .materialize_impl(
+                        db,
+                        MaterializationKind::Top,
+                        &ApplyTypeMappingVisitor::default(),
+                    )
+            },
+            None,
+        )
     }
 
     /// Returns the default specialization of this class. For non-generic classes, the class is
     /// returned unchanged. For a non-specialized generic class, we return a generic alias that
     /// applies the default specialization to the class's typevars.
     pub(crate) fn default_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        self.apply_specialization(db, |generic_context| {
-            generic_context.default_specialization(db, self.known(db))
-        })
+        self.apply_specialization(
+            db,
+            |generic_context| generic_context.default_specialization(db, self.known(db)),
+            None,
+        )
     }
 
     /// Returns the unknown specialization of this class. For non-generic classes, the class is
     /// returned unchanged. For a non-specialized generic class, we return a generic alias that
     /// maps each of the class's typevars to `Unknown`.
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        self.apply_specialization(db, |generic_context| {
-            generic_context.unknown_specialization(db)
-        })
+        self.apply_specialization(
+            db,
+            |generic_context| generic_context.unknown_specialization(db),
+            None,
+        )
     }
 
     /// Returns a specialization of this class where each typevar is mapped to itself.
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        self.apply_specialization(db, |generic_context| {
-            generic_context.identity_specialization(db)
-        })
+        self.apply_specialization(
+            db,
+            |generic_context| generic_context.identity_specialization(db),
+            None,
+        )
     }
 
     /// Return an iterator over the inferred types of this class's *explicit* bases.
@@ -1626,7 +1646,7 @@ impl<'db> ClassLiteral<'db> {
 
             Box::new([
                 definition_expression_type(db, class_definition, &class_stmt.bases()[0]),
-                Type::from(tuple_type.to_class_type(db)),
+                Type::from(tuple_type.to_class_type(db, None)),
             ])
         } else {
             class_stmt
@@ -2271,8 +2291,10 @@ impl<'db> ClassLiteral<'db> {
                 || transformer_params.is_some_and(|params| params.flags(db).contains(param))
         };
 
-        let instance_ty =
-            Type::instance(db, self.apply_optional_specialization(db, specialization));
+        let instance_ty = Type::instance(
+            db,
+            self.apply_optional_specialization(db, specialization, None),
+        );
 
         let signature_from_fields = |mut parameters: Vec<_>, return_ty: Option<Type<'db>>| {
             for (field_name, field) in self.fields(db, specialization, field_policy) {
@@ -4787,6 +4809,7 @@ impl KnownClass {
         self,
         db: &'db dyn Db,
         specialization: impl IntoIterator<Item = Type<'db>>,
+        binding_context: Option<Definition<'db>>,
     ) -> Option<ClassType<'db>> {
         let Type::ClassLiteral(class_literal) = self.to_class_literal(db) else {
             return None;
@@ -4808,7 +4831,11 @@ impl KnownClass {
             return Some(class_literal.default_specialization(db));
         }
 
-        Some(class_literal.apply_specialization(db, |_| generic_context.specialize(db, types)))
+        Some(class_literal.apply_specialization(
+            db,
+            |_| generic_context.specialize(db, types),
+            binding_context,
+        ))
     }
 
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
@@ -4827,7 +4854,7 @@ impl KnownClass {
             KnownClass::Tuple,
             "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
         );
-        self.to_specialized_class_type(db, specialization)
+        self.to_specialized_class_type(db, specialization, None)
             .and_then(|class_type| Type::from(class_type).to_instance(db))
             .unwrap_or_else(Type::unknown)
     }
