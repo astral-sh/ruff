@@ -11206,6 +11206,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
+        let mut has_error = false;
+
         for (index, item) in typevars.zip_longest(type_arguments.iter()).enumerate() {
             match item {
                 EitherOrBoth::Both(typevar, &provided_type) => {
@@ -11230,7 +11232,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         typevar.identity(db).display(db),
                                     ));
                                 }
-                                return Type::unknown();
+                                has_error = true;
+                                continue;
                             }
                         }
                         Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
@@ -11258,7 +11261,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         typevar.identity(db).display(db),
                                     ));
                                 }
-                                return Type::unknown();
+                                has_error = true;
+                                continue;
                             }
                         }
                         None => {}
@@ -11298,7 +11302,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 ));
             }
-            return Type::unknown();
+            has_error = true;
         }
 
         if let Some(first_excess_type_argument_index) = first_excess_type_argument_index {
@@ -11324,6 +11328,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     type_arguments.len(),
                 ));
             }
+            has_error = true;
+        }
+
+        if has_error {
             return Type::unknown();
         }
 
