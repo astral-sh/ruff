@@ -6811,6 +6811,14 @@ impl<'db> Type<'db> {
                     let ty = instance.inner(db);
 
                     if ty.is_type_var() {
+                        // TODO:
+                        // This is a temporary workaround until we have proper support for type[T].
+                        // If we pass a typevar to `.to_meta_type()`, we currently get `type[B]`,
+                        // where `B` is the upper bound of `T`. However, we really need `type[T]`
+                        // here. Otherwise, when we specialize a generic implicit type alias like
+                        // `TypeOrList[T] = type[T] | list[T]` using `TypeOrList[Any]`, we would get
+                        // `type[B] | list[Any]`, which leads to a lot of false positives for numpy-
+                        // users.
                         Ok(todo_type!("type[T] for typevar T"))
                     } else {
                         Ok(ty.to_meta_type(db))
@@ -7233,11 +7241,11 @@ impl<'db> Type<'db> {
                         Type::KnownInstance(KnownInstanceType::UnionType(
                             UnionTypeInstance::new(
                                 db,
-                                instance.binding_context(db),
                                 instance._value_expr_types(db),
-                                Ok(union_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                                Ok(union_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+                                instance.binding_context(db),
                             )
-                        )))
+                        ))
                     } else {
                         self
                     }
@@ -7278,7 +7286,7 @@ impl<'db> Type<'db> {
                 KnownInstanceType::Literal(_) |
                 KnownInstanceType::LiteralStringAlias(_) |
                 KnownInstanceType::NewType(_) => {
-                    // TODO: ?
+                    // TODO: For some of these, we may need to apply the type mapping to inner types.
                     self
                 },
             }
@@ -7617,7 +7625,7 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::Literal(_)
                 | KnownInstanceType::LiteralStringAlias(_)
                 | KnownInstanceType::NewType(_) => {
-                    // TODO?
+                    // TODO: For some of these, we may need to try to find legacy typevars in inner types.
                 }
             },
 
@@ -9592,8 +9600,6 @@ impl InferredAs {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct UnionTypeInstance<'db> {
-    binding_context: Option<Definition<'db>>,
-
     /// The types of the elements of this union, as they were inferred in a value
     /// expression context. For `int | str`, this would contain `<class 'int'>` and
     /// `<class 'str'>`. For `Union[int, str]`, this field is `None`, as we infer
@@ -9609,6 +9615,11 @@ pub struct UnionTypeInstance<'db> {
     /// contains the first encountered error.
     #[returns(ref)]
     union_type: Result<Type<'db>, InvalidTypeExpressionError<'db>>,
+
+    /// The typevar binding context in which this union type instance was created.
+    /// For an implicit type alias like `ListOrSet = list[T] | set[T]`, this would
+    /// be the definition of `ListOrSet`.
+    binding_context: Option<Definition<'db>>,
 }
 
 impl get_size2::GetSize for UnionTypeInstance<'_> {}
@@ -9630,9 +9641,9 @@ impl<'db> UnionTypeInstance<'db> {
                     return Type::KnownInstance(KnownInstanceType::UnionType(
                         UnionTypeInstance::new(
                             db,
-                            typevar_binding_context,
                             Some(value_expr_types),
                             Err(error),
+                            typevar_binding_context,
                         ),
                     ));
                 }
@@ -9641,9 +9652,9 @@ impl<'db> UnionTypeInstance<'db> {
 
         Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::new(
             db,
-            typevar_binding_context,
             Some(value_expr_types),
             Ok(builder.build()),
+            typevar_binding_context,
         )))
     }
 
@@ -9689,7 +9700,7 @@ impl<'db> UnionTypeInstance<'db> {
             .clone()
             .map(|ty| ty.normalized_impl(db, visitor));
 
-        Self::new(db, self.binding_context(db), value_expr_types, union_type)
+        Self::new(db, value_expr_types, union_type, self.binding_context(db))
     }
 }
 
@@ -9712,7 +9723,7 @@ impl<'db> InternedType<'db> {
     }
 }
 
-/// A salsa-interned `Type` with an associated typevar binding context.
+/// A salsa-interned `Type` with an associated binding context for type variables.
 ///
 /// # Ordering
 /// Ordering is based on the context's salsa-assigned id and not on its values.
@@ -9721,6 +9732,7 @@ impl<'db> InternedType<'db> {
 #[derive(PartialOrd, Ord)]
 pub struct TypeInContext<'db> {
     inner: Type<'db>,
+    /// The typevar binding context in which this type was inferred.
     binding_context: Option<Definition<'db>>,
 }
 
@@ -9745,6 +9757,7 @@ impl<'db> TypeInContext<'db> {
 #[derive(PartialOrd, Ord)]
 pub struct CallableTypeInstance<'db> {
     callable_type: CallableType<'db>,
+    /// The binding context in which this callable type instance was inferred.
     binding_context: Option<Definition<'db>>,
 }
 

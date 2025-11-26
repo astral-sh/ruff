@@ -10994,9 +10994,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let union_type = Type::KnownInstance(KnownInstanceType::UnionType(
                             UnionTypeInstance::new(
                                 db,
-                                typevar_binding_context,
                                 None,
                                 Ok(UnionType::from_elements(db, elements)),
+                                typevar_binding_context,
                             ),
                         ));
 
