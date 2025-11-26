@@ -120,6 +120,10 @@ impl Suppressions {
 
     /// Check if a diagnostic is suppressed by any known range suppressions
     pub(crate) fn check_diagnostic(&self, diagnostic: &Diagnostic) -> bool {
+        if self.valid.is_empty() {
+            return false;
+        }
+
         let Some(code) = diagnostic.secondary_code() else {
             return false;
         };
