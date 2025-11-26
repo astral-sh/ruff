@@ -1570,6 +1570,10 @@ impl<'db> Type<'db> {
     /// ]
     /// => tuple[Divergent, Literal[1]]
     /// ```
+    /// Generic nominal types such as `list[T]` and `tuple[T]` should send `nested=true` for `T`. This is necessary for normalization.
+    /// Structural types such as union and intersection do not need to send `nested=true` for element types; that is, types that are "flat" from the perspective of recursive types. `T | U` should send `nested` as is for `T`, `U`.
+    /// For other types, the decision depends on whether they are interpreted as nominal or structural.
+    /// For example, `KnownInstanceType::UnionType` should simply send `nested` as is.
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -1651,11 +1655,11 @@ impl<'db> Type<'db> {
                 let ty = if nested {
                     type_is
                         .return_type(db)
-                        .recursive_type_normalized_impl(db, div, nested, visitor)?
+                        .recursive_type_normalized_impl(db, div, true, visitor)?
                 } else {
                     type_is
                         .return_type(db)
-                        .recursive_type_normalized_impl(db, div, nested, visitor)
+                        .recursive_type_normalized_impl(db, div, true, visitor)
                         .unwrap_or(div)
                 };
                 Some(type_is.with_type(db, ty))
