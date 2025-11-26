@@ -1,24 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-S509 You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure.
- --> S509.py:4:12
-  |
-4 | insecure = UsmUserData("securityName")  # S509
-  |            ^^^^^^^^^^^
-5 | auth_no_priv = UsmUserData("securityName", "authName")  # S509
-  |
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
 
-S509 You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure.
- --> S509.py:5:16
-  |
-4 | insecure = UsmUserData("securityName")  # S509
-5 | auth_no_priv = UsmUserData("securityName", "authName")  # S509
-  |                ^^^^^^^^^^^
-6 |
-7 | less_insecure = UsmUserData("securityName", "authName", "privName")  # OK
-  |
+--- Summary ---
+Removed: 0
+Added: 4
 
+--- Added ---
 S509 You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure.
   --> S509.py:15:1
    |
@@ -30,6 +21,7 @@ S509 You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv`
 17 | pysnmp.hlapi.v3arch.asyncio.auth.UsmUserData("user")  # S509
    |
 
+
 S509 You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure.
   --> S509.py:16:1
    |
@@ -40,6 +32,7 @@ S509 You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv`
 18 | pysnmp.hlapi.auth.UsmUserData("user")  # S509
    |
 
+
 S509 You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure.
   --> S509.py:17:1
    |
@@ -49,6 +42,7 @@ S509 You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv`
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 18 | pysnmp.hlapi.auth.UsmUserData("user")  # S509
    |
+
 
 S509 You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure.
   --> S509.py:18:1
