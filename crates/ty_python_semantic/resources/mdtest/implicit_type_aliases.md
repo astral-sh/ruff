@@ -443,8 +443,6 @@ def _(
 Generic implicit type aliases can be partially specialized:
 
 ```py
-U = TypeVar("U")
-
 DictStrTo = MyDict[str, U]
 
 reveal_type(DictStrTo)  # revealed: <class 'dict[str, U@DictStrTo]'>
@@ -653,10 +651,22 @@ def this_does_not_work() -> TypeOf[IntOrStr]:
     raise NotImplementedError()
 
 def _(
+    # TODO: Better error message (of kind `invalid-type-form`)?
     # error: [too-many-positional-arguments] "Too many positional arguments: expected 0, got 1"
     specialized: this_does_not_work()[int],
 ):
     reveal_type(specialized)  # revealed: Unknown
+```
+
+Similarly, if you try to specialize a union type without a binding context, we emit an error:
+
+```py
+# TODO: Better error message (of kind `invalid-type-form`)?
+# error: [too-many-positional-arguments] "Too many positional arguments: expected 0, got 1"
+x: (list[T] | set[T])[int]
+
+def _():
+    reveal_type(x)  # revealed: Unknown
 ```
 
 ### Multiple definitions

@@ -2,6 +2,7 @@ use itertools::Either;
 use ruff_python_ast as ast;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
+use crate::FxOrderSet;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NON_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_callable,
@@ -16,7 +17,6 @@ use crate::types::{
     KnownInstanceType, LintDiagnosticGuard, SpecialFormType, SubclassOfType, Type, TypeAliasType,
     TypeContext, TypeIsType, TypeMapping, UnionBuilder, UnionType, todo_type,
 };
-use crate::{FxOrderSet, ResolvedDefinition, definitions_for_attribute, definitions_for_name};
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -759,7 +759,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let generic_context = GenericContext::from_typevar_instances(db, variables);
 
         let scope_id = self.scope();
-        let typevar_binding_context = self.typevar_binding_context;
+        let current_typevar_binding_context = self.typevar_binding_context;
         let specialize = |types: &[Option<Type<'db>>]| {
             let specialized = value_ty.apply_specialization(
                 db,
@@ -768,7 +768,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             if in_type_expression {
                 specialized
-                    .in_type_expression(db, scope_id, typevar_binding_context)
+                    .in_type_expression(db, scope_id, current_typevar_binding_context)
                     .unwrap_or_else(|_| Type::unknown())
             } else {
                 specialized

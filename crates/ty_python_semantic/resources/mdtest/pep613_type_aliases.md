@@ -124,9 +124,6 @@ T = TypeVar("T")
 Alias1: TypeAlias = list[T] | set[T]
 MyAlias: TypeAlias = int | Alias1[str]
 
-def _():
-    reveal_type(Alias1)  # revealed: types.UnionType
-
 def _(x: MyAlias):
     reveal_type(x)  # revealed: int | list[str] | set[str]
 ```

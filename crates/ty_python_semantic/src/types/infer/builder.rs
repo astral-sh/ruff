@@ -4797,8 +4797,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             TargetKind::Single => {
                 // This could be an implicit type alias (OptionalList = list[T] | None). Use the definition
-                // of `OptionalList` as the typevar binding context while inferring the RHS (`list[T] | None`),
-                // in order to bind `T@OptionalList`.
+                // of `OptionalList` as the binding context while inferring the RHS (`list[T] | None`), in
+                // order to bind `T` to `OptionalList`.
                 let previous_typevar_binding_context =
                     self.typevar_binding_context.replace(definition);
 
@@ -5588,8 +5588,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.deferred_state = DeferredExpressionState::Deferred;
             }
 
-            let previous_typevar_binding_context = self.typevar_binding_context;
-            self.typevar_binding_context = Some(definition);
+            // This might be a PEP-613 type alias (`OptionalList: TypeAlias = list[T] | None`). Use
+            // the definition of `OptionalList` as the binding context while inferring the
+            // RHS (`list[T] | None`), in order to bind `T` to `OptionalList`.
+            let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
 
             let inferred_ty = self.infer_maybe_standalone_expression(
                 value,
@@ -10874,6 +10876,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_subscript_load(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
         let value_ty = self.infer_expression(&subscript.value, TypeContext::default());
 
+        // If we have an implicit type alias like `MyList = list[T]`, and if `MyList` is being
+        // used in another implicit type alias like `Numbers = MyList[int]`, then we infer the
+        // right hand side as a value expression, and need to handle the specialization here.
         if value_ty.is_generic_alias() {
             return self.infer_explicitly_specialized_type_alias(subscript, value_ty, false);
         }

@@ -7231,6 +7231,14 @@ impl<'db> Type<'db> {
                     let ty = instance.inner(db);
 
                     if ty.is_type_var() {
+                        // TODO:
+                        // This is a temporary workaround until we have proper support for type[T].
+                        // If we pass a typevar to `.to_meta_type()`, we currently get `type[B]`,
+                        // where `B` is the upper bound of `T`. However, we really need `type[T]`
+                        // here. Otherwise, when we specialize a generic implicit type alias like
+                        // `TypeOrList[T] = type[T] | list[T]` using `TypeOrList[Any]`, we would get
+                        // `type[B] | list[Any]`, which leads to a lot of false positives for numpy-
+                        // users.
                         Ok(todo_type!("type[T] for typevar T"))
                     } else {
                         Ok(ty.to_meta_type(db))
@@ -7646,7 +7654,7 @@ impl<'db> Type<'db> {
                 KnownInstanceType::Literal(_) |
                 KnownInstanceType::LiteralStringAlias(_) |
                 KnownInstanceType::NewType(_) => {
-                    // TODO: ?
+                    // TODO: For some of these, we may need to apply the type mapping to inner types.
                     self
                 },
             }
@@ -7985,7 +7993,7 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::Literal(_)
                 | KnownInstanceType::LiteralStringAlias(_)
                 | KnownInstanceType::NewType(_) => {
-                    // TODO?
+                    // TODO: For some of these, we may need to try to find legacy typevars in inner types.
                 }
             },
 
