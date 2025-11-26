@@ -1054,7 +1054,7 @@ fn suspicious_function(
                     }
                 })
             }
-            // Ex) "foo" + "bar"
+            // Ex) "foo" + "bar" or "a" + "b" + "c" (recursive concatenation)
             Expr::BinOp(ast::ExprBinOp {
                 op: Operator::Add,
                 left,
@@ -1156,19 +1156,24 @@ fn suspicious_function(
         // URLOpen (`Request`)
         ["urllib", "request", "Request"] | ["six", "moves", "urllib", "request", "Request"] => {
             if let Some(arguments) = arguments {
-                // If the `url` argument is a string literal or an f-string, allow `http` and `https` schemes.
+                // If the `url` argument is a string literal (including resolved bindings), allow `http` and `https` schemes.
                 if arguments.args.iter().all(|arg| !arg.is_starred_expr())
                     && arguments
                         .keywords
                         .iter()
                         .all(|keyword| keyword.arg.is_some())
                 {
-                    if arguments
-                        .find_argument_value("url", 0)
-                        .and_then(leading_chars)
-                        .is_some_and(has_http_prefix)
-                    {
-                        return;
+                    if let Some(url_expr) = arguments.find_argument_value("url", 0) {
+                        let url_expr = if is_s310_resolve_string_literal_bindings_enabled(
+                            checker.settings(),
+                        ) {
+                            resolve_name(url_expr, checker.semantic())
+                        } else {
+                            url_expr
+                        };
+                        if leading_chars(url_expr).is_some_and(has_http_prefix) {
+                            return;
+                        }
                     }
                 }
             }
