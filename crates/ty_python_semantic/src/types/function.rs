@@ -1578,7 +1578,7 @@ impl KnownFunction {
                 let mut good_argument = true;
                 let classes = match param_type {
                     Type::ClassLiteral(class) => vec![ClassType::NonGeneric(*class)],
-                    Type::GenericAlias(generic_alias) => vec![ClassType::Generic(*generic_alias)],
+                    Type::GenericAlias(generic) => vec![ClassType::Generic(generic.alias(db))],
                     Type::Union(union) => {
                         let elements = union.elements(db);
                         let mut classes = Vec::with_capacity(elements.len());
@@ -1587,8 +1587,8 @@ impl KnownFunction {
                                 Type::ClassLiteral(class) => {
                                     classes.push(ClassType::NonGeneric(*class));
                                 }
-                                Type::GenericAlias(generic_alias) => {
-                                    classes.push(ClassType::Generic(*generic_alias));
+                                Type::GenericAlias(generic) => {
+                                    classes.push(ClassType::Generic(generic.alias(db)));
                                 }
                                 _ => {
                                     good_argument = false;

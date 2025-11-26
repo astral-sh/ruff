@@ -273,7 +273,7 @@ impl<'db> SubclassOfInner<'db> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
             Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
-            Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
+            Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic.alias(db)))),
             Type::SpecialForm(SpecialFormType::Any) => Some(Self::Dynamic(DynamicType::Any)),
             _ => None,
         }

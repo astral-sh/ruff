@@ -419,7 +419,7 @@ pub enum ClassType<'db> {
     // should use `ClassLiteral::default_specialization` instead of assuming
     // `ClassType::NonGeneric`.
     NonGeneric(ClassLiteral<'db>),
-    Generic(GenericAliasInstance<'db>),
+    Generic(GenericAlias<'db>),
 }
 
 #[salsa::tracked]
@@ -439,14 +439,16 @@ impl<'db> ClassType<'db> {
     pub(super) fn into_generic_alias(self, db: &'db dyn Db) -> Option<GenericAlias<'db>> {
         match self {
             Self::NonGeneric(_) => None,
-            Self::Generic(instance) => Some(instance.alias(db)),
+            Self::Generic(alias) => Some(alias),
         }
     }
 
     pub(super) fn into_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Self::NonGeneric(class) => class.into(),
-            Self::Generic(generic) => Type::GenericAlias(generic),
+            Self::Generic(instance) => {
+                Type::GenericAlias(GenericAliasInstance::new(db, instance, None))
+            }
         }
     }
 
@@ -1280,17 +1282,11 @@ fn into_callable_cycle_initial<'db>(
     CallableTypes::one(CallableType::bottom(db))
 }
 
-impl<'db> From<GenericAliasInstance<'db>> for ClassType<'db> {
-    fn from(generic: GenericAliasInstance<'db>) -> ClassType<'db> {
-        ClassType::Generic(generic)
-    }
-}
-
 impl<'db> VarianceInferable<'db> for ClassType<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         match self {
             Self::NonGeneric(class) => class.variance_of(db, typevar),
-            Self::Generic(generic) => generic.alias(db).variance_of(db, typevar),
+            Self::Generic(alias) => alias.variance_of(db, typevar),
         }
     }
 }
@@ -1595,11 +1591,7 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
 
-                ClassType::Generic(GenericAliasInstance::new(
-                    db,
-                    GenericAlias::new(db, self, specialization),
-                    binding_context,
-                ))
+                ClassType::Generic(GenericAlias::new(db, self, specialization))
             }
         }
     }

@@ -686,7 +686,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         continue;
                     }
                     Type::ClassLiteral(class) => ClassType::NonGeneric(*class),
-                    Type::GenericAlias(class) => ClassType::Generic(*class),
+                    Type::GenericAlias(generic) => ClassType::Generic(generic.alias(self.db())),
                     _ => continue,
                 };
 
@@ -8085,7 +8085,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let class = match callable_type {
             Type::ClassLiteral(class) => Some(ClassType::NonGeneric(class)),
-            Type::GenericAlias(generic) => Some(ClassType::Generic(generic)),
+            Type::GenericAlias(generic) => Some(ClassType::Generic(generic.alias(self.db()))),
             Type::SubclassOf(subclass) => subclass.subclass_of().into_class(),
             _ => None,
         };

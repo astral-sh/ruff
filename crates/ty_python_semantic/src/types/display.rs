@@ -599,7 +599,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     (ClassType::NonGeneric(class), _) => {
                         class.display_with(self.db, self.settings.clone()).fmt_detailed(f)
                     },
-                    (ClassType::Generic(instance), _) => instance.alias(self.db).display_with(self.db, self.settings.clone()).fmt_detailed(f),
+                    (ClassType::Generic(instance), _) => instance.display_with(self.db, self.settings.clone()).fmt_detailed(f),
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner {
@@ -608,7 +608,6 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f),
                     ClassType::Generic(instance) => instance
-                        .alias(self.db)
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f),
                 },
@@ -674,7 +673,6 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .write_str("type")?;
                     f.write_char('[')?;
                     instance
-                        .alias(self.db)
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f)?;
                     f.write_char(']')

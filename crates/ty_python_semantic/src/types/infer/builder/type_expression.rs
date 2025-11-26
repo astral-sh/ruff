@@ -1049,10 +1049,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
             }
-            Type::GenericAlias(alias) => self.infer_explicitly_specialized_type_alias(
+            Type::GenericAlias(instance) => self.infer_explicitly_specialized_type_alias(
                 subscript,
                 value_ty,
-                alias.binding_context(self.db()),
+                instance.binding_context(self.db()),
                 true,
             ),
             Type::StringLiteral(_) => {

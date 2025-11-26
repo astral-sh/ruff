@@ -79,7 +79,9 @@ impl<'db> ClassBase<'db> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
             Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
-            Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
+            Type::GenericAlias(instance) => {
+                Some(Self::Class(ClassType::Generic(instance.alias(db))))
+            }
             Type::NominalInstance(instance)
                 if instance.has_known_class(db, KnownClass::GenericAlias) =>
             {
