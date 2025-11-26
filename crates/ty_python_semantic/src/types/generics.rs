@@ -630,15 +630,6 @@ impl<'db> GenericContext<'db> {
         Self::from_typevar_instances(db, variables)
     }
 
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        _db: &'db dyn Db,
-        _div: Type<'db>,
-        _visitor: &NormalizedVisitor<'db>,
-    ) -> Self {
-        self
-    }
-
     fn heap_size(
         (variables,): &(FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>,),
     ) -> usize {
@@ -1107,9 +1098,7 @@ impl<'db> Specialization<'db> {
             Some(tuple) => Some(tuple.recursive_type_normalized_impl(db, div, nested, visitor)?),
             None => None,
         };
-        let context = self
-            .generic_context(db)
-            .recursive_type_normalized_impl(db, div, visitor);
+        let context = self.generic_context(db);
         Some(Self::new(
             db,
             context,

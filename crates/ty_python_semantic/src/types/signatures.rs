@@ -588,9 +588,7 @@ impl<'db> Signature<'db> {
             None => None,
         };
         Some(Self {
-            generic_context: self
-                .generic_context
-                .map(|ctx| ctx.recursive_type_normalized_impl(db, div, visitor)),
+            generic_context: self.generic_context,
             definition: self.definition,
             parameters: self
                 .parameters
