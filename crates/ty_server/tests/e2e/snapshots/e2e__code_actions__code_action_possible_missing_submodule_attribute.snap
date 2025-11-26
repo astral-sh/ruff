@@ -1,0 +1,5 @@
+---
+source: crates/ty_server/tests/e2e/code_actions.rs
+expression: code_actions
+---
+null

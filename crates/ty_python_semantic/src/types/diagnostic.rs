@@ -1844,7 +1844,7 @@ declare_lint! {
     /// ```python
     /// print(x)  # NameError: name 'x' is not defined
     /// ```
-    pub(crate) static UNRESOLVED_REFERENCE = {
+    pub static UNRESOLVED_REFERENCE = {
         summary: "detects references to names that are not defined",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,

@@ -47,7 +47,7 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
             diagnostic.source.as_deref() == Some(DIAGNOSTIC_NAME)
                 && range_intersect(&diagnostic.range, &params.range)
         }) {
-            // If the diagnostic already encoded a fix, just use that
+            // If the diagnostic includes fixes, offer those up as options.
             if let Some(data) = diagnostic.data.take() {
                 let data: DiagnosticData = match serde_json::from_value(data) {
                     Ok(data) => data,
@@ -60,7 +60,7 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
                 actions.push(CodeActionOrCommand::CodeAction(lsp_types::CodeAction {
                     title: data.fix_title,
                     kind: Some(CodeActionKind::QUICKFIX),
-                    diagnostics: Some(vec![diagnostic]),
+                    diagnostics: Some(vec![diagnostic.clone()]),
                     edit: Some(lsp_types::WorkspaceEdit {
                         changes: Some(data.edits),
                         document_changes: None,
@@ -71,10 +71,13 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
                     disabled: None,
                     data: None,
                 }));
-                continue;
             }
 
-            // Try to find actions to resolve this diagnostic
+            // Try to find other applicable actions.
+            //
+            // This is only for actions that are messy to compute at the time of the diagnostic.
+            // For instance, suggesting imports requires finding symbols for the entire project,
+            // which is dubious when you're in the middle of resolving symbols.
             let Some(NumberOrString::String(diagnostic_id)) = &diagnostic.code else {
                 continue;
             };
