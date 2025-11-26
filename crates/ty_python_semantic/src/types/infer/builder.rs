@@ -6894,8 +6894,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Infer the type of each argument once with each distinct parameter type as type context.
                 let parameter_types = overloads_with_binding
                     .iter()
-                    .filter_map(|(overload, binding)| parameter_type(overload, binding))
-                    .collect::<FxHashSet<_>>();
+                    .filter_map(|(overload, binding)| parameter_type(overload, binding));
 
                 for parameter_type in parameter_types {
                     let inferred_ty =
