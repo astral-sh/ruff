@@ -18,11 +18,13 @@ use crate::rules::pygrep_hooks;
 use crate::rules::ruff;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::LinterSettings;
+use crate::suppression::Suppressions;
 use crate::{Edit, Fix, Locator};
 
 use super::ast::LintContext;
 
 /// RUF100
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn check_noqa(
     context: &mut LintContext,
     path: &Path,
@@ -31,6 +33,7 @@ pub(crate) fn check_noqa(
     noqa_line_for: &NoqaMapping,
     analyze_directives: bool,
     settings: &LinterSettings,
+    suppressions: &Suppressions,
 ) -> Vec<usize> {
     // Identify any codes that are globally exempted (within the current file).
     let file_noqa_directives =
@@ -60,11 +63,19 @@ pub(crate) fn check_noqa(
             continue;
         }
 
+        // Apply file-level suppressions first
         if exemption.contains_secondary_code(code) {
             ignored_diagnostics.push(index);
             continue;
         }
 
+        // Apply ranged suppressions next
+        if suppressions.check_diagnostic(diagnostic) {
+            ignored_diagnostics.push(index);
+            continue;
+        }
+
+        // Apply end-of-line noqa suppressions last
         let noqa_offsets = diagnostic
             .parent()
             .into_iter()

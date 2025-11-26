@@ -1,5 +1,6 @@
 use compact_str::CompactString;
 use core::fmt;
+use ruff_db::diagnostic::Diagnostic;
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::whitespace::indentation;
 use std::{error::Error, fmt::Formatter};
@@ -8,8 +9,6 @@ use thiserror::Error;
 use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize, TextSlice};
 use smallvec::{SmallVec, smallvec};
-
-use crate::checkers::ast::LintContext;
 
 #[allow(unused)]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -119,33 +118,24 @@ impl Suppressions {
         builder.load_from_tokens(tokens)
     }
 
-    /// Check reported diagnostics against the set of valid range suppressions, and remove any
-    /// diagnostics from the context that should be suppressed by those ranges.
-    pub(crate) fn filter_diagnostics(&self, context: &mut LintContext) {
-        let mut ignored: Vec<usize> = vec![];
+    /// Check if a diagnostic is suppressed by any known range suppressions
+    pub(crate) fn check_diagnostic(&self, diagnostic: &Diagnostic) -> bool {
+        let Some(code) = diagnostic.secondary_code() else {
+            return false;
+        };
+        let Some(span) = diagnostic.primary_span() else {
+            return false;
+        };
+        let Some(range) = span.range() else {
+            return false;
+        };
 
-        'outer: for (index, diagnostic) in context.iter().enumerate() {
-            let Some(code) = diagnostic.secondary_code() else {
-                continue;
-            };
-            let Some(span) = diagnostic.primary_span() else {
-                continue;
-            };
-            let Some(range) = span.range() else {
-                continue;
-            };
-
-            for suppression in &self.valid {
-                if *code == suppression.code.as_str() && suppression.range.contains_range(range) {
-                    ignored.push(index);
-                    continue 'outer;
-                }
+        for suppression in &self.valid {
+            if *code == suppression.code.as_str() && suppression.range.contains_range(range) {
+                return true;
             }
         }
-
-        for index in ignored.iter().rev() {
-            context.as_mut_vec().swap_remove(*index);
-        }
+        false
     }
 }
 

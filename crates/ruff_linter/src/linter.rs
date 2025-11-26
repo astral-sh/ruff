@@ -326,20 +326,13 @@ pub fn check_path(
         }
     }
 
-    // Apply range suppressions before noqa, so that #noqa on a line already covered by a range
-    // will be reported as unused noqa rather than unused range.
-    // TODO: check if enabled?
-    {
-        let suppressions = Suppressions::from_tokens(locator.contents(), tokens);
-        suppressions.filter_diagnostics(&mut context);
-    }
-
     // Enforce `noqa` directives.
     if noqa.is_enabled()
         || context
             .iter_enabled_rules()
             .any(|rule_code| rule_code.lint_source().is_noqa())
     {
+        let suppressions = Suppressions::from_tokens(locator.contents(), tokens);
         let ignored = check_noqa(
             &mut context,
             path,
@@ -348,6 +341,7 @@ pub fn check_path(
             &directives.noqa_line_for,
             parsed.has_valid_syntax(),
             settings,
+            &suppressions,
         );
         if noqa.is_enabled() {
             for index in ignored.iter().rev() {
