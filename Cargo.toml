@@ -195,7 +195,7 @@ typed-arena = { version = "2.0.2" }
 unic-ucd-category = { version = "0.9" }
 unicode-ident = { version = "1.0.12" }
 unicode-width = { version = "0.2.0" }
-unicode_names2 = { version = "1.2.2" }
+unicode_names2 = { version = "2.0.0" }
 unicode-normalization = { version = "0.1.23" }
 url = { version = "2.5.0" }
 uuid = { version = "1.6.1", features = ["v4", "fast-rng", "macro-diagnostics"] }
