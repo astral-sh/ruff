@@ -739,72 +739,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(crate) fn infer_explicitly_specialized_type_alias(
         &mut self,
         subscript: &ast::ExprSubscript,
-        value_ty: Type<'db>,
+        mut value_ty: Type<'db>,
         in_type_expression: bool,
     ) -> Type<'db> {
         let db = self.db();
 
-        if self
-            .index
-            .try_expression_scope_id(&ast::ExprRef::from(subscript))
-            .is_none()
+        if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_ty
+            && let Some(definition) = typevar.definition(db)
         {
-            return todo_type!("Specialization of generic type alias in stringified annotation");
+            value_ty = value_ty.apply_type_mapping(
+                db,
+                &TypeMapping::BindLegacyTypevars(BindingContext::Definition(definition)),
+                TypeContext::default(),
+            );
         }
 
-        let definitions = match &*subscript.value {
-            ast::Expr::Name(id) => {
-                // TODO: This is an expensive call to an API that was never meant to be called from
-                // type inference. We plan to rework how `in_type_expression` works in the future.
-                // This new approach will make this call unnecessary, so for now, we accept the hit
-                // in performance.
-                definitions_for_name(self.db(), self.file(), id)
-            }
-            ast::Expr::Attribute(attribute) => {
-                // TODO: See above
-                definitions_for_attribute(self.db(), self.file(), attribute)
-            }
-            _ => {
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                    builder.into_diagnostic(
-                    "Only name- and attribute expressions can be specialized in type expressions",
-                );
-                }
-                return Type::unknown();
-            }
-        };
-
-        // TODO: If an implicit type alias is defined multiple times, we arbitrarily pick the
-        // first definition here. Instead, we should do proper name resolution to find the
-        // definition that is actually being referenced. Similar to the comments above, this
-        // should soon be addressed by a rework of how `in_type_expression` works. In the
-        // meantime, we seem to be doing okay in practice (see "Multiple definitions" tests in
-        // `implicit_type_aliases.md`).
-        let Some(type_alias_definition) =
-            definitions.iter().find_map(ResolvedDefinition::definition)
-        else {
-            if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                builder.into_diagnostic(
-                    "Cannot specialize implicit type alias with unknown definition",
-                );
-            }
-            return Type::unknown();
-        };
-
-        let generic_type_alias = value_ty.apply_type_mapping(
-            db,
-            &TypeMapping::BindLegacyTypevars(BindingContext::Definition(type_alias_definition)),
-            TypeContext::default(),
-        );
-
         let mut variables = FxOrderSet::default();
-        generic_type_alias.find_legacy_typevars(db, None, &mut variables);
+        value_ty.find_legacy_typevars(db, None, &mut variables);
         let generic_context = GenericContext::from_typevar_instances(db, variables);
 
         let scope_id = self.scope();
         let typevar_binding_context = self.typevar_binding_context;
         let specialize = |types: &[Option<Type<'db>>]| {
-            let specialized = generic_type_alias.apply_specialization(
+            let specialized = value_ty.apply_specialization(
                 db,
                 generic_context.specialize_partial(db, types.iter().copied()),
             );

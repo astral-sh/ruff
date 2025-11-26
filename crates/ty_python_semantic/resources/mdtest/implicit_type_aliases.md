@@ -605,7 +605,7 @@ MyList = list[T]
 def _(
     list_of_ints: "MyList[int]",
 ):
-    reveal_type(list_of_ints)  # revealed: @Todo(Specialization of generic type alias in stringified annotation)
+    reveal_type(list_of_ints)  # revealed: list[int]
 ```
 
 ### Error cases
@@ -653,7 +653,7 @@ def this_does_not_work() -> TypeOf[IntOrStr]:
     raise NotImplementedError()
 
 def _(
-    # error: [invalid-type-form] "Only name- and attribute expressions can be specialized in type expressions"
+    # error: [too-many-positional-arguments] "Too many positional arguments: expected 0, got 1"
     specialized: this_does_not_work()[int],
 ):
     reveal_type(specialized)  # revealed: Unknown
