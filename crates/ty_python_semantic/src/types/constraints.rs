@@ -194,7 +194,7 @@ impl<'db> ConstraintSet<'db> {
                 lower.top_materialization(db),
                 upper.bottom_materialization(db),
             ),
-            TypeRelation::Assignability => (
+            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => (
                 lower.bottom_materialization(db),
                 upper.top_materialization(db),
             ),
