@@ -137,7 +137,7 @@ impl FileOpen<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub(super) enum OpenArgument<'a> {
     /// The filename argument to `open`, e.g. "foo.txt" in:
     ///

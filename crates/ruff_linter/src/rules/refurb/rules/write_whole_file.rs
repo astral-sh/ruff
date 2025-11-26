@@ -42,43 +42,40 @@ use crate::{FixAvailability, Locator, Violation};
 /// - [Python documentation: `Path.write_text`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.write_text)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.3.6")]
-pub(crate) struct WriteWholeFile {
+pub(crate) struct WriteWholeFile<'a> {
     filename: SourceCodeSnippet,
     suggestion: SourceCodeSnippet,
-    is_path_open: bool,
+    argument: OpenArgument<'a>,
 }
 
-impl Violation for WriteWholeFile {
+impl Violation for WriteWholeFile<'_> {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         let filename = self.filename.truncated_display();
         let suggestion = self.suggestion.truncated_display();
-        if self.is_path_open {
-            format!(
-                "`Path.open()` followed by `write()` can be replaced by `{filename}.{suggestion}`"
-            )
-        } else {
-            format!("`open` and `write` should be replaced by `Path({filename}).{suggestion}`")
+        match self.argument {
+            OpenArgument::Pathlib { .. } => {
+                format!(
+                    "`Path.open()` followed by `write()` can be replaced by `{filename}.{suggestion}`"
+                )
+            }
+            OpenArgument::Builtin { .. } => {
+                format!("`open` and `write` should be replaced by `Path({filename}).{suggestion}`")
+            }
         }
     }
     fn fix_title(&self) -> Option<String> {
-        let formatted = if self.is_path_open {
-            format!(
-                "Replace with `{}.{}`",
-                self.filename.truncated_display(),
-                self.suggestion.truncated_display(),
-            )
-        } else {
-            format!(
-                "Replace with `Path({}).{}`",
-                self.filename.truncated_display(),
-                self.suggestion.truncated_display(),
-            )
-        };
+        let filename = self.filename.truncated_display();
+        let suggestion = self.suggestion.truncated_display();
 
-        Some(formatted)
+        match self.argument {
+            OpenArgument::Pathlib { .. } => Some(format!("Replace with `{filename}.{suggestion}`")),
+            OpenArgument::Builtin { .. } => {
+                Some(format!("Replace with `Path({filename}).{suggestion}`"))
+            }
+        }
     }
 }
 
@@ -150,7 +147,7 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
                         WriteWholeFile {
                             filename: SourceCodeSnippet::from_str(filename_display),
                             suggestion: SourceCodeSnippet::from_str(&suggestion),
-                            is_path_open: matches!(open.argument, OpenArgument::Pathlib { .. }),
+                            argument: open.argument,
                         },
                         open.item.range(),
                     );
