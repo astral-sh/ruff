@@ -11088,6 +11088,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ));
             }
             Type::SpecialForm(SpecialFormType::Callable) => {
+                // TODO: Remove this once we support ParamSpec properly. This is necessary to avoid
+                // a lot of false positives downstream, because we can't represent the specialized
+                // `Callable[P, _]` type yet.
+                if let Some(first_arg) = subscript
+                    .slice
+                    .as_ref()
+                    .as_tuple_expr()
+                    .and_then(|args| args.elts.first())
+                    && first_arg.is_name_expr()
+                {
+                    let first_arg_ty = self.infer_expression(first_arg, TypeContext::default());
+
+                    if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = first_arg_ty
+                        && typevar.kind(self.db()).is_paramspec()
+                    {
+                        return todo_type!("Callable[..] specialized with ParamSpec");
+                    }
+
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "The first argument to `Callable` must be either a list of types, \
+                                 ParamSpec, Concatenate, or `...`",
+                        ));
+                    }
+                    return Type::KnownInstance(KnownInstanceType::Callable(
+                        CallableType::unknown(self.db())
+                            .as_callable()
+                            .expect("always returns Type::Callable"),
+                    ));
+                }
+
                 let callable = self
                     .infer_callable_type(subscript)
                     .as_callable()

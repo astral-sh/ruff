@@ -977,7 +977,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             },
             Type::Dynamic(_) => {
-                self.infer_type_expression(slice);
+                // Infer slice as a value expression to avoid false-positive
+                // `invalid-type-form` diagnostics, when we have e.g.
+                // `MyCallable[[int, str], None]` but `MyCallable` is dynamic.
+                self.infer_expression(slice, TypeContext::default());
                 value_ty
             }
             Type::ClassLiteral(class) => {
