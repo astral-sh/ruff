@@ -3084,10 +3084,30 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(false)
             }
 
+            // `type[T]` is disjoint from a callable or protocol instance if its upper bound or
+            // constraints are.
+            (Type::SubclassOf(subclass_of), Type::Callable(_) | Type::ProtocolInstance(_))
+            | (Type::Callable(_) | Type::ProtocolInstance(_), Type::SubclassOf(subclass_of))
+                if subclass_of.is_type_var() =>
+            {
+                let type_var = subclass_of
+                    .subclass_of()
+                    .with_transposed_type_var(db)
+                    .into_type_var()
+                    .unwrap();
+
+                Type::TypeVar(type_var).is_disjoint_from_impl(
+                    db,
+                    other,
+                    inferable,
+                    disjointness_visitor,
+                    relation_visitor,
+                )
+            }
+
             // `type[T]` is disjoint from a class object `A` if every instance of `T` is disjoint from an instance of `A`.
             (Type::SubclassOf(subclass_of), other) | (other, Type::SubclassOf(subclass_of))
-                if subclass_of.is_type_var()
-                    && !matches!(other, Type::Callable(_) | Type::ProtocolInstance(_)) =>
+                if subclass_of.is_type_var() =>
             {
                 let this_instance = Type::TypeVar(subclass_of.into_type_var().unwrap());
                 let other_instance = match other {
