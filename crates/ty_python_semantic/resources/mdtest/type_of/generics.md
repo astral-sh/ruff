@@ -198,3 +198,15 @@ def f3[T](x: type[T]) -> T:
 reveal_type(f3(int))  # revealed: int
 reveal_type(f3(object))  # revealed: object
 ```
+
+## Default Parameter
+
+```py
+from typing import Any
+
+class Foo[T]: ...
+
+# TODO: This should not error.
+# error: [invalid-parameter-default] "Default value of type `<class 'Foo'>` is not assignable to annotated parameter type `type[T@f]`"
+def f[T: Foo[Any]](x: type[T] = Foo): ...
+```
