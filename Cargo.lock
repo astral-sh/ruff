@@ -4602,6 +4602,7 @@ dependencies = [
  "js-sys",
  "log",
  "ruff_db",
+ "ruff_diagnostics",
  "ruff_notebook",
  "ruff_python_formatter",
  "ruff_source_file",
