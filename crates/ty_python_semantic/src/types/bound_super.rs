@@ -455,13 +455,15 @@ impl<'db> BoundSuperType<'db> {
         let pivot_class = match pivot_class_type {
             Type::ClassLiteral(class) => ClassBase::Class(ClassType::NonGeneric(class)),
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
-                SubclassOfInner::Class(class) => ClassBase::Class(class),
                 SubclassOfInner::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
-                SubclassOfInner::TypeVar(_) => {
-                    return Err(BoundSuperError::InvalidPivotClassType {
-                        pivot_class: pivot_class_type,
-                    });
-                }
+                _ => match subclass_of.subclass_of().into_class(db) {
+                    Some(class) => ClassBase::Class(class),
+                    None => {
+                        return Err(BoundSuperError::InvalidPivotClassType {
+                            pivot_class: pivot_class_type,
+                        });
+                    }
+                },
             },
             Type::SpecialForm(SpecialFormType::Protocol) => ClassBase::Protocol,
             Type::SpecialForm(SpecialFormType::Generic) => ClassBase::Generic,
