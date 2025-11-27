@@ -753,6 +753,16 @@
             }
           ]
         },
+        "invalid-type-arguments": {
+          "title": "detects invalid type arguments in generic specialization",
+          "description": "## What it does\nChecks for invalid type arguments in explicit type specialization.\n\n## Why is this bad?\nProviding the wrong number of type arguments or type arguments that don't\nsatisfy the type variable's bounds or constraints will lead to incorrect\ntype inference and may indicate a misunderstanding of the generic type's\ninterface.\n\n## Examples\n\nUsing legacy type variables:\n```python\nfrom typing import Generic, TypeVar\n\nT1 = TypeVar('T1', int, str)\nT2 = TypeVar('T2', bound=int)\n\nclass Foo1(Generic[T1]): ...\nclass Foo2(Generic[T2]): ...\n\nFoo1[bytes]  # error: bytes does not satisfy T1's constraints\nFoo2[str]  # error: str does not satisfy T2's bound\n```\n\nUsing PEP 695 type variables:\n```python\nclass Foo[T]: ...\nclass Bar[T, U]: ...\n\nFoo[int, str]  # error: too many arguments\nBar[int]  # error: too few arguments\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-type-checking-constant": {
           "title": "detects invalid `TYPE_CHECKING` constant assignments",
           "description": "## What it does\nChecks for a value other than `False` assigned to the `TYPE_CHECKING` variable, or an\nannotation not assignable from `bool`.\n\n## Why is this bad?\nThe name `TYPE_CHECKING` is reserved for a flag that can be used to provide conditional\ncode seen only by the type checker, and not at runtime. Normally this flag is imported from\n`typing` or `typing_extensions`, but it can also be defined locally. If defined locally, it\nmust be assigned the value `False` at runtime; the type checker will consider its value to\nbe `True`. If annotated, it must be annotated as a type that can accept `bool` values.\n\n## Examples\n```python\nTYPE_CHECKING: str\nTYPE_CHECKING = ''\n```",
