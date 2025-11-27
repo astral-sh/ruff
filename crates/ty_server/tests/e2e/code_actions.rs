@@ -132,10 +132,43 @@ x: Literal[1] = 1
 ";
 
     let ty_toml = SystemPath::new("ty.toml");
-    let ty_toml_content = "\
-[rules]
-unused-ignore-comment = \"warn\"
+    let ty_toml_content = "";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(ty_toml, ty_toml_content)?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, &foo_content, 1);
+
+    // Wait for diagnostics to be computed.
+    let diagnostics = server.document_diagnostic_request(foo, None);
+    let range = full_range(foo_content);
+    let code_action_params = code_actions_at(&server, diagnostics, foo, range);
+
+    // Get code actions
+    let code_action_id = server.send_request::<CodeActionRequest>(code_action_params);
+    let code_actions = server.await_response::<CodeActionRequest>(&code_action_id);
+
+    insta::assert_json_snapshot!(code_actions);
+
+    Ok(())
+}
+
+// `Literal` is available from two places so we should suggest two possible imports
+#[test]
+fn code_action_undefined_reveal_type() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+reveal_type(1)
 ";
+
+    let ty_toml = SystemPath::new("ty.toml");
+    let ty_toml_content = "";
 
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
