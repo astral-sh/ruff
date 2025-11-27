@@ -61,8 +61,7 @@ async def main():
 
     result = await task
 
-    # TODO: this should be `int`
-    reveal_type(result)  # revealed: Unknown
+    reveal_type(result)  # revealed: int
 ```
 
 ### `asyncio.gather`

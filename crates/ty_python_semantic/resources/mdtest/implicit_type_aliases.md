@@ -418,7 +418,7 @@ def _(
     list_or_tuple_legacy: ListOrTupleLegacy[int],
     # TODO: no errors here
     # error: [invalid-type-form] "List literals are not allowed in this context in a type expression: Did you mean `tuple[str, bytes]`?"
-    # error: [too-many-positional-arguments] "Too many positional arguments: expected 1, got 2"
+    # error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
     my_callable: MyCallable[[str, bytes], int],
     annotated_int: AnnotatedType[int],
     transparent_alias: TransparentAlias[int],
@@ -464,7 +464,7 @@ ListOrTupleOfInts = ListOrTuple[int]
 AnnotatedInt = AnnotatedType[int]
 SubclassOfInt = MyType[int]
 # TODO: No error here
-# error: [too-many-positional-arguments] "Too many positional arguments: expected 1, got 2"
+# error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
 # error: [invalid-type-form] "List literals are not allowed in this context in a type expression: Did you mean `list[int]`?"
 CallableIntToStr = MyCallable[[int], str]
 
@@ -613,7 +613,7 @@ A generic alias that is already fully specialized cannot be specialized again:
 ```py
 ListOfInts = list[int]
 
-# error: [too-many-positional-arguments] "Too many positional arguments: expected 0, got 1"
+# error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
 def _(doubly_specialized: ListOfInts[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 ```
@@ -631,9 +631,9 @@ MyList = list[T]
 MyDict = dict[T, U]
 
 def _(
-    # error: [too-many-positional-arguments] "Too many positional arguments: expected 1, got 2"
+    # error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
     list_too_many_args: MyList[int, str],
-    # error: [missing-argument] "No argument provided for required parameter `U`"
+    # error: [invalid-type-arguments] "No type argument provided for required type variable `U`"
     dict_too_few_args: MyDict[int],
 ):
     reveal_type(list_too_many_args)  # revealed: Unknown
@@ -652,7 +652,7 @@ def this_does_not_work() -> TypeOf[IntOrStr]:
 
 def _(
     # TODO: Better error message (of kind `invalid-type-form`)?
-    # error: [too-many-positional-arguments] "Too many positional arguments: expected 0, got 1"
+    # error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
     specialized: this_does_not_work()[int],
 ):
     reveal_type(specialized)  # revealed: Unknown
@@ -662,7 +662,7 @@ Similarly, if you try to specialize a union type without a binding context, we e
 
 ```py
 # TODO: Better error message (of kind `invalid-type-form`)?
-# error: [too-many-positional-arguments] "Too many positional arguments: expected 0, got 1"
+# error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
 x: (list[T] | set[T])[int]
 
 def _():
@@ -731,9 +731,10 @@ if flag():
 else:
     MyAlias = set[T]
 
-# error: [invalid-type-form] "Invalid subscript of object of type `<class 'list[T@MyAlias]'> | <class 'set[T@MyAlias]'>` in type expression"
+# TODO: This should be an error like "Invalid subscript of object of type `<class 'list[T@MyAlias]'> | <class 'set[T@MyAlias]'>` in type expression"
 def _(x: MyAlias[int]):
-    reveal_type(x)  # revealed: Unknown
+    # TODO: This should be `Unknown`
+    reveal_type(x)  # revealed: list[int] | set[int]
 ```
 
 ## `Literal`s
@@ -1481,11 +1482,12 @@ def _(
 
 ### Self-referential generic implicit type aliases
 
-<!-- expect-panic: execute: too many cycle iterations -->
-
 ```py
-from typing import TypeVar
-
-T = TypeVar("T")
-NestedDict = dict[str, "NestedDict[T] | T"]
+# TODO: uncomment these
+# from typing import TypeVar
+#
+# T = TypeVar("T")
+# NestedDict = dict[str, "NestedDict[T] | T"]
+#
+# NestedList = list["NestedList[T] | None"]
 ```

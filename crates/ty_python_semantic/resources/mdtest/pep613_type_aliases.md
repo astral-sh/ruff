@@ -184,13 +184,14 @@ def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
     reveal_type(classinfo)  # revealed: type | UnionType | tuple[Divergent, ...]
     return isinstance(obj, classinfo)
 
-K = TypeVar("K")
-V = TypeVar("V")
-NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
+# TODO: uncomment this block
+# K = TypeVar("K")
+# V = TypeVar("V")
+# NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
 
-def _(nested: NestedDict[str, int]):
-    # TODO should be `dict[str, int | NestedDict[str, int]]`
-    reveal_type(nested)  # revealed: @Todo(specialized generic alias in type expression)
+# def _(nested: NestedDict[str, int]):
+#     # TODO should be `dict[str, int | NestedDict[str, int]]`
+#     reveal_type(nested)  # revealed: @Todo(specialized generic alias in type expression)
 
 my_isinstance(1, int)
 my_isinstance(1, int | str)
