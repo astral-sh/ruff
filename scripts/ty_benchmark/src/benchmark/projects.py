@@ -1,24 +1,10 @@
+from __future__ import annotations
+
 import logging
 import subprocess
 import sys
 from pathlib import Path
 from typing import Final, Literal, NamedTuple
-
-
-class LspTestConfig(NamedTuple):
-    """Configuration for LSP profiling tests."""
-
-    main_file: str
-    """The main file to open for LSP profiling benchmarks."""
-
-    affected_file: str
-    """An affected file to open alongside the main file for LSP profiling benchmarks."""
-
-    type_change_old: str
-    """The original code snippet to find and replace in the main file."""
-
-    type_change_new: str
-    """The new code snippet to replace with in the main file."""
 
 
 class Project(NamedTuple):
@@ -48,8 +34,7 @@ class Project(NamedTuple):
     exclude: list[str] = []
     """The directories and files to exclude from checks."""
 
-    lsp_test_config: LspTestConfig | None = None
-    """Configuration for LSP profiling tests."""
+    edit: IncrementalEdit | None = None
 
     def clone(self, checkout_dir: Path) -> None:
         # Skip cloning if the project has already been cloned (the script doesn't yet support updating)
@@ -114,6 +99,33 @@ class Project(NamedTuple):
         logging.info(f"Cloned {self.name} to {checkout_dir}.")
 
 
+class IncrementalEdit(NamedTuple):
+    """Description of an edit to measure incremental performance"""
+
+    main_file: str
+    """The file to which to apply the edit."""
+
+    affected_file: str
+    """A file other than the main file that's affected by the edit."""
+
+    replace_text: str
+    """The original code snippet to find and replace in the main file."""
+
+    replacement: str
+    """The new code snippet to insert in place of `replace_text`"""
+
+    def apply_to(self, text: str) -> str | None:
+        """Applies the edit to the given text.
+
+        Returns:
+            The modified text or None if the edit couldn't be applied"""
+
+        if self.replace_text not in text:
+            return None
+
+        return text.replace(self.replace_text, self.replacement, 1)
+
+
 # Selection of projects taken from
 # [mypy-primer](https://github.com/hauntsaninja/mypy_primer/blob/0ea6cc614b3e91084059b9a3acc58f94c066a211/mypy_primer/projects.py#L71).
 # May require frequent updating, especially the dependencies list
@@ -135,11 +147,11 @@ ALL: Final = [
             "--extra",
             "d",
         ],
-        lsp_test_config=LspTestConfig(
+        edit=IncrementalEdit(
             main_file="src/black/nodes.py",
             affected_file="src/black/linegen.py",
-            type_change_old="LN = Union[Leaf, Node]",
-            type_change_new="LN = Union[Leaf, Node, str]",
+            replace_text="LN = Union[Leaf, Node]",
+            replacement="LN = Union[Leaf, Node, int]",
         ),
     ),
     Project(
@@ -153,11 +165,11 @@ ALL: Final = [
             "pyproject.toml",
             "typing_extensions>=4.3,<5",
         ],
-        lsp_test_config=LspTestConfig(
-            main_file="discord/utils.py",
-            affected_file="discord/abc.py",
-            type_change_old="MISSING: Any = _MissingSentinel()",
-            type_change_new="MISSING: str = _MissingSentinel()",
+        edit=IncrementalEdit(
+            main_file="discord/abc.py",
+            affected_file="discord/channel.py",
+            replace_text="id: int",
+            replacement="id: str",
         ),
     ),
     # Fairly chunky project, requires the pydantic mypy plugin.
@@ -177,11 +189,11 @@ ALL: Final = [
             "-r",
             "requirements.txt",
         ],
-        lsp_test_config=LspTestConfig(
+        edit=IncrementalEdit(
             main_file="homeassistant/core.py",
             affected_file="homeassistant/helpers/event.py",
-            type_change_old="type CALLBACK_TYPE = Callable[[], None]",
-            type_change_new="type CALLBACK_TYPE = Callable[[str], None]",
+            replace_text="type CALLBACK_TYPE = Callable[[], None]",
+            replacement="type CALLBACK_TYPE = Callable[[str], None]",
         ),
     ),
     Project(
@@ -191,11 +203,11 @@ ALL: Final = [
         python_version="3.11",
         include=["isort"],
         install_arguments=["types-colorama", "colorama"],
-        lsp_test_config=LspTestConfig(
+        edit=IncrementalEdit(
             main_file="isort/settings.py",
-            affected_file="isort/main.py",
-            type_change_old="def is_supported_filetype(self, file_name: str) -> bool:",
-            type_change_new="def is_supported_filetype(self, file_name: str) -> str:",
+            affected_file="isort/files.py",
+            replace_text="def is_skipped(self, file_path: Path) -> bool:",
+            replacement="def is_skipped(self, file_path: str) -> bool:",
         ),
     ),
     Project(
@@ -205,11 +217,11 @@ ALL: Final = [
         python_version="3.10",
         include=["src"],
         install_arguments=["-r", "pyproject.toml"],
-        lsp_test_config=LspTestConfig(
+        edit=IncrementalEdit(
             main_file="src/jinja2/environment.py",
             affected_file="src/jinja2/loaders.py",
-            type_change_old="def render(self, *args: t.Any, **kwargs: t.Any) -> str:",
-            type_change_new="def render(self, *args: t.Any, **kwargs: t.Any) -> list[str]:",
+            replace_text="def render(self, *args: t.Any, **kwargs: t.Any) -> str:",
+            replacement="def render(self, *args: t.Any, **kwargs: t.Any) -> list[str]:",
         ),
     ),
     Project(
@@ -223,11 +235,11 @@ ALL: Final = [
             "-r",
             "requirements-dev.txt",
         ],
-        lsp_test_config=LspTestConfig(
+        edit=IncrementalEdit(
             main_file="pandas/_typing.py",
             affected_file="pandas/core/frame.py",
-            type_change_old='Axis: TypeAlias = AxisInt | Literal["index", "columns", "rows"]',
-            type_change_new='Axis: TypeAlias = Literal["index", "columns", "rows"]',
+            replace_text='Axis: TypeAlias = AxisInt | Literal["index", "columns", "rows"]',
+            replacement='Axis: TypeAlias = Literal["index", "columns", "rows"]',
         ),
     ),
     Project(
@@ -251,11 +263,11 @@ ALL: Final = [
             "scipy >=1.9.1",
             "scipy-stubs >=1.15.3.0",
         ],
-        lsp_test_config=LspTestConfig(
+        edit=IncrementalEdit(
             main_file="pandas-stubs/core/frame.pyi",
             affected_file="pandas-stubs/core/series.pyi",
-            type_change_old="def loc(self) -> _LocIndexerFrame[Self]:",
-            type_change_new="def loc(self) -> str:",
+            replace_text="def loc(self) -> _LocIndexerFrame[Self]:",
+            replacement="def loc(self) -> str:",
         ),
     ),
     Project(
@@ -276,11 +288,11 @@ ALL: Final = [
             "--group",
             "dev",
         ],
-        lsp_test_config=LspTestConfig(
+        edit=IncrementalEdit(
             main_file="src/prefect/server/schemas/core.py",
             affected_file="src/prefect/server/models/flow_runs.py",
-            type_change_old='flow_id: UUID = Field(default=..., description="The id of the flow being run.")',
-            type_change_new='flow_id: str = Field(default=..., description="The id of the flow being run.")',
+            replace_text='flow_id: UUID = Field(default=..., description="The id of the flow being run.")',
+            replacement='flow_id: str = Field(default=..., description="The id of the flow being run.")',
         ),
     ),
     Project(
@@ -350,11 +362,11 @@ ALL: Final = [
             "mypy==1.16.0",  # pytorch pins mypy,
         ],
         python_version="3.11",
-        lsp_test_config=LspTestConfig(
+        edit=IncrementalEdit(
             main_file="torch/types.py",
             affected_file="torch/nn/modules/module.py",
-            type_change_old="Device: TypeAlias = Union[_device, str, int, None]",
-            type_change_new="Device: TypeAlias = str",
+            replace_text="Device: TypeAlias = Union[_device, str, int, None]",
+            replacement="Device: TypeAlias = str",
         ),
     ),
 ]

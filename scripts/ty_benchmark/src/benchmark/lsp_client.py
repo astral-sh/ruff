@@ -3,160 +3,173 @@
 from __future__ import annotations
 
 import asyncio
-from concurrent.futures import Future
+import logging
+from asyncio import Future
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple, cast, override
 
 from lsprotocol import types as lsp
-from pygls.client import JsonRPCClient
-from pygls.protocol import JsonRPCProtocol
+from pygls.lsp.client import LanguageClient
 
 
-class LSPProtocol(JsonRPCProtocol):
-    """Custom protocol with notification waiting capability."""
+def _register_notebook_structure_hooks(converter):
+    """Register structure hooks for notebook document types to work around cattrs deserialization issues."""
 
-    def __init__(self, *args: Any, **kwargs: Any):
-        super().__init__(*args, **kwargs)
-        self._notification_futures: dict[str, Future[Any]] = {}
-        self.log_messages: list[str] = []
+    # Define a union type that cattrs struggles with.
+    notebook_filter_union = (
+        str
+        | lsp.NotebookDocumentFilterNotebookType
+        | lsp.NotebookDocumentFilterScheme
+        | lsp.NotebookDocumentFilterPattern
+        | None
+    )
 
-    def _handle_notification(self, method_name: str, params: Any) -> None:
-        """Override to support notification futures."""
-        # Capture log messages from the server.
-        if method_name == "window/logMessage":
-            self.log_messages.append(params.message if hasattr(params, "message") else str(params))
+    def structure_notebook_filter(obj: Any, _type):
+        """Structure a notebook filter field from various possible types."""
+        if obj is None:
+            return None
+        if isinstance(obj, str):
+            return obj
+        if isinstance(obj, dict):
+            # Try to structure it as one of the known types.
+            if "notebookType" in obj:
+                return converter.structure(obj, lsp.NotebookDocumentFilterNotebookType)
+            elif "scheme" in obj:
+                return converter.structure(obj, lsp.NotebookDocumentFilterScheme)
+            elif "pattern" in obj:
+                return converter.structure(obj, lsp.NotebookDocumentFilterPattern)
+        return obj
 
-        # Check if there's a pending future for this notification.
-        if method_name in self._notification_futures:
-            future = self._notification_futures.pop(method_name)
-            future.set_result(params)
-
-        # Call the parent handler to execute registered feature handlers.
-        super()._handle_notification(method_name, params)
-
-    def wait_for_notification(self, method: str) -> Future[Any]:
-        """Wait for a notification with the given method name."""
-        future: Future[Any] = Future()
-        self._notification_futures[method] = future
-        return future
-
-    def wait_for_notification_async(self, method: str) -> asyncio.Future[Any]:
-        """Async version of wait_for_notification."""
-        future = self.wait_for_notification(method)
-        return asyncio.wrap_future(future)
+    converter.register_structure_hook(notebook_filter_union, structure_notebook_filter)
 
 
-class LSPClient(JsonRPCClient):
+class LSPClient(LanguageClient):
     """A minimal LSP client for benchmarking purposes."""
 
-    def __init__(self):
-        super().__init__(protocol_cls=LSPProtocol)
+    server_capabilities: lsp.ServerCapabilities
+    diagnostics: dict[str, Future[lsp.PublishDiagnosticsParams]]
 
-    async def initialize_async(
-        self, root_uri: Path, initialization_options: dict[str, Any] | None = None
-    ) -> lsp.InitializeResult:
-        """Initialize the LSP server."""
-        result = await self.protocol.send_request_async(
-            lsp.INITIALIZE,
-            lsp.InitializeParams(
-                process_id=None,
-                root_uri=root_uri.as_uri(),
-                workspace_folders=[
-                    lsp.WorkspaceFolder(uri=root_uri.as_uri(), name=root_uri.name)
-                ],
-                capabilities=lsp.ClientCapabilities(
-                    text_document=lsp.TextDocumentClientCapabilities(
-                        diagnostic=lsp.DiagnosticClientCapabilities(
-                            dynamic_registration=False,
-                            related_document_support=True,
-                        )
-                    )
-                ),
-                initialization_options=initialization_options,
-            ),
+    def __init__(
+        self,
+    ):
+        super().__init__(
+            "ty_benchmark",
+            "v1",
         )
-        self.protocol.notify(lsp.INITIALIZED, lsp.InitializedParams())
 
-        # Send configuration via workspace/didChangeConfiguration.
-        if initialization_options:
-            self.protocol.notify(
-                "workspace/didChangeConfiguration",
-                {"settings": initialization_options},
+        # Register custom structure hooks to work around lsprotocol/cattrs issues.
+        _register_notebook_structure_hooks(self.protocol._converter)
+
+        self.diagnostics = {}
+
+        @self.feature(lsp.TEXT_DOCUMENT_PUBLISH_DIAGNOSTICS)
+        def publish_diagnostics(
+            client: LSPClient, params: lsp.PublishDiagnosticsParams
+        ):
+            logging.info(
+                f"Received publish_diagnostics for {params.uri} with version={params.version}, diagnostics count={len(params.diagnostics)}"
+            )
+            future = self.diagnostics.get(params.uri, None)
+
+            if future is None or future.done():
+                future = asyncio.Future()
+                self.diagnostics[params.uri] = future
+
+            future.set_result(params)
+
+        @self.feature(lsp.WINDOW_LOG_MESSAGE)
+        def log_message(client: LSPClient, params: lsp.LogMessageParams):
+            if params.type == lsp.MessageType.Error:
+                logging.error(f"server error: {params.message}")
+            elif params.type == lsp.MessageType.Warning:
+                logging.warning(f"server warning: {params.message}")
+            else:
+                logging.info(f"server info: {params.message}")
+
+    @override
+    async def initialize_async(
+        self, params: lsp.InitializeParams
+    ) -> lsp.InitializeResult:
+        result = await super().initialize_async(params)
+
+        self.server_capabilities = result.capabilities
+
+        logging.info(
+            f"Pull diagnostic support: {self.server_supports_pull_diagnostics}"
+        )
+
+        return result
+
+    def clear_pending_publish_diagnostics(self):
+        self.diagnostics.clear()
+
+    @property
+    def server_supports_pull_diagnostics(self) -> bool:
+        diagnostic_provider = self.server_capabilities.diagnostic_provider
+
+        return diagnostic_provider is not None
+
+    async def text_document_diagnostics_async(self, path: Path) -> list[lsp.Diagnostic]:
+        """
+        Returns the diagnostics for `path`
+
+        Uses pull diagnostics if the server supports it or waits for a publish diagnostics
+        request if not.
+        """
+        if self.server_supports_pull_diagnostics:
+            pull_diagnostics = await self.text_document_diagnostic_async(
+                lsp.DocumentDiagnosticParams(
+                    text_document=lsp.TextDocumentIdentifier(uri=path.as_uri())
+                )
             )
 
-        return result
+            assert isinstance(
+                pull_diagnostics, lsp.RelatedFullDocumentDiagnosticReport
+            ), "Expected a full diagnostic report"
 
-    def did_open(self, file_path: Path, language_id: str = "python") -> None:
-        """Notify the server that a file was opened."""
-        content = file_path.read_text()
-        self.protocol.notify(
-            lsp.TEXT_DOCUMENT_DID_OPEN,
-            lsp.DidOpenTextDocumentParams(
-                text_document=lsp.TextDocumentItem(
-                    uri=file_path.as_uri(),
-                    language_id=language_id,
-                    version=1,
-                    text=content,
-                )
-            ),
+            return list(pull_diagnostics.items)
+
+        # Use publish diagnostics otherwise.
+        # Pyrefly doesn't support pull diagnostics as of today (27th of November 2025)
+        publish_diagnostics = await self.wait_for_push_diagnostics_async(path)
+        return list(publish_diagnostics.diagnostics)
+
+    async def text_documents_diagnostics(
+        self, files: list[Path]
+    ) -> list[FileDiagnostics]:
+        responses = await asyncio.gather(
+            *[self.text_document_diagnostics_async(f) for f in files]
         )
 
-    def did_change(self, file_path: Path, new_content: str, version: int) -> None:
-        """Notify the server that a file was changed."""
-        self.protocol.notify(
-            lsp.TEXT_DOCUMENT_DID_CHANGE,
-            lsp.DidChangeTextDocumentParams(
-                text_document=lsp.VersionedTextDocumentIdentifier(
-                    uri=file_path.as_uri(),
-                    version=version,
-                ),
-                content_changes=[
-                    lsp.TextDocumentContentChangeWholeDocument(text=new_content)
-                ],
-            ),
+        responses = cast(
+            list[lsp.Diagnostic],
+            responses,
         )
 
-    def did_save(self, file_path: Path, version: int) -> None:
-        """Notify the server that a file was changed."""
-        self.protocol.notify(
-            lsp.TEXT,
-            lsp.DidChangeTextDocumentParams(
-                text_document=lsp.VersionedTextDocumentIdentifier(
-                    uri=file_path.as_uri(),
-                    version=version,
-                ),
-                content_changes=[
-                    lsp.TextDocumentContentChangeWholeDocument(text=new_content)
-                ],
-            ),
-        )
+        return [
+            FileDiagnostics(file, diagnostics=list(response))
+            for file, response in zip(files, responses)
+        ]
 
-    async def wait_for_diagnostics_async(
-        self, timeout: float = 30.0
+    async def wait_for_push_diagnostics_async(
+        self, path: Path, timeout: float = 30
     ) -> lsp.PublishDiagnosticsParams:
-        """Wait for diagnostics to be published (push diagnostics)."""
-        assert isinstance(self.protocol, LSPProtocol)
-        future = self.protocol.wait_for_notification_async(
-            lsp.TEXT_DOCUMENT_PUBLISH_DIAGNOSTICS
-        )
-        return await asyncio.wait_for(future, timeout=timeout)
+        future = self.diagnostics.get(path.as_uri(), None)
 
-    async def request_diagnostics_async(
-        self, file_path: Path, timeout: float = 30.0
-    ) -> lsp.DocumentDiagnosticReport:
-        """Request diagnostics for a file (pull diagnostics)."""
-        result = await asyncio.wait_for(
-            self.protocol.send_request_async(
-                lsp.TEXT_DOCUMENT_DIAGNOSTIC,
-                lsp.DocumentDiagnosticParams(
-                    text_document=lsp.TextDocumentIdentifier(uri=file_path.as_uri())
-                ),
-            ),
-            timeout=timeout,
-        )
+        if future is None:
+            future = asyncio.Future()
+            self.diagnostics[path.as_uri()] = future
+
+        try:
+            logging.info(f"Waiting for push diagnostics for {path}")
+            result = await asyncio.wait_for(future, timeout)
+            logging.info(f"Awaited push diagnostics for {path}")
+        finally:
+            self.diagnostics.pop(path.as_uri())
+
         return result
 
-    async def shutdown_async(self) -> None:
-        """Shutdown the LSP server."""
-        await self.protocol.send_request_async(lsp.SHUTDOWN, None)
-        self.protocol.notify(lsp.EXIT, None)
+
+class FileDiagnostics(NamedTuple):
+    file: Path
+    diagnostics: list[lsp.Diagnostic]

@@ -19,21 +19,26 @@ This document contains recommended type changes for profiling LSP performance ac
   - `src/black/brackets.py` - bracket matching
   - `src/black/comments.py` - comment handling
 
-### 2. **discord.py** - Sentinel Type
-- **File**: `bench/discord.py/discord/utils.py:139`
-- **Current**: `MISSING: Any = _MissingSentinel()`
-- **Change to**: `MISSING: str = _MissingSentinel()`  # Narrow to incompatible type
-- **Impact**: 288 uses across 20+ files
-- **Why**: MISSING sentinel is used as default value throughout entire API
+### 2. **discord.py** - Snowflake Protocol ID Type
+- **File**: `bench/discord.py/discord/abc.py:246`
+- **Current**: `id: int`  # Inside the Snowflake Protocol
+- **Change to**: `id: str`  # Change from int to str
+- **Impact**: 172 type annotations across 20 files
+- **Why**: Snowflake is used as a type bound in function signatures throughout the API
+- **Alternative High-Impact Change**:
+  - **File**: `bench/discord.py/discord/abc.py:119`
+  - **Current**: `SnowflakeTime = Union['Snowflake', datetime]`
+  - **Change to**: `SnowflakeTime = datetime`  # Remove Snowflake from union
+  - **Impact**: 32 uses across 6 files in function parameters
 - **Affected Files**:
-  - `discord/abc.py` - 20 uses in base classes
-  - `discord/guild.py` - 114 uses in Guild methods
-  - `discord/message.py` - 17 uses in Message class
-  - `discord/member.py` - 13 uses in Member class
-  - `discord/channel.py` - 17 uses in Channel classes
-  - `discord/role.py` - 20 uses in Role class
-  - `discord/app_commands/commands.py` - 34 uses
-  - All modules using optional parameters
+  - `discord/abc.py` - 26 uses in type annotations
+  - `discord/guild.py` - 64 uses in method signatures
+  - `discord/state.py` - channel/user lookups
+  - `discord/member.py` - 6 uses in member operations
+  - `discord/utils.py` - utility functions with Snowflake parameters
+  - `discord/threads.py` - 17 uses in thread operations
+  - `discord/message.py` - message handling functions
+  - Any code that type-checks ID parameters
 
 ### 3. **homeassistant** - Callback Type
 - **File**: `bench/homeassistant/homeassistant/core.py:126`
@@ -49,18 +54,22 @@ This document contains recommended type changes for profiling LSP performance ac
   - Service callbacks
   - Config entry unload callbacks
 
-### 4. **isort** - File Type Check Return
-- **File**: `bench/isort/isort/settings.py`
-- **Method**: `Config.is_supported_filetype()`
-- **Current**: `def is_supported_filetype(self, file_name: str) -> bool:`
-- **Change to**: `def is_supported_filetype(self, file_name: str) -> str:`
-- **Impact**: Called before processing every file
-- **Why**: Core file filtering logic
+### 4. **isort** - DEFAULT_CONFIG Type
+- **File**: `bench/isort/isort/settings.py:932`
+- **Current**: `DEFAULT_CONFIG = Config()`
+- **Change to**: `DEFAULT_CONFIG: str = Config()`  # Type annotation mismatch
+- **Alternative approach**: Change line to `DEFAULT_CONFIG = None`  # Break default parameter
+- **Impact**: 33 uses across 9 core files as default parameter
+- **Why**: DEFAULT_CONFIG is the default config used in all public API functions
 - **Affected Files**:
-  - `isort/main.py` - file filtering logic
-  - `isort/api.py` - public API methods
-  - `isort/files.py` - file discovery
-  - All file processing code
+  - `isort/api.py` - 14 uses in public API functions (sort_code_string, sort_file, etc.)
+  - `isort/core.py` - 3 uses in core processing
+  - `isort/parse.py` - 3 uses in import parsing
+  - `isort/place.py` - 3 uses in module placement
+  - `isort/output.py` - 2 uses in output formatting
+  - `isort/wrap.py` - 3 uses in line wrapping
+  - `isort/literal.py` - 2 uses in literal handling
+  - `isort/identify.py` - 2 uses in import identification
 
 ### 5. **jinja** - Template Render Return
 - **File**: `bench/jinja/src/jinja2/environment.py`
@@ -131,7 +140,7 @@ This document contains recommended type changes for profiling LSP performance ac
 | Project | Type Changed | Usage Count | Files Affected | Impact Level |
 |---------|-------------|-------------|----------------|--------------|
 | **black** | `LN` type alias | 29 uses | 6 core files | 🔴 EXTREME |
-| **discord.py** | `MISSING` sentinel type | 288 uses | 20+ files | 🔴 EXTREME |
+| **discord.py** | `Snowflake.id` type | 172 uses | 20 files | 🔴 EXTREME |
 | **homeassistant** | `CALLBACK_TYPE` type alias | Hundreds | Entire codebase | 🔴 EXTREME |
 | **isort** | `is_supported_filetype()` return | Every file check | 4+ core files | 🟠 HIGH |
 | **jinja** | `Template.render()` return | Every template use | All template users | 🔴 EXTREME |
