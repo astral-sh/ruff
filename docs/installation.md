@@ -91,11 +91,11 @@ On **Docker**, it is published as `ghcr.io/astral-sh/ruff`, tagged for each rele
 the latest release.
 
 ```console
-$ docker run -v .:/io --rm ghcr.io/astral-sh/ruff check
-$ docker run -v .:/io --rm ghcr.io/astral-sh/ruff:0.3.0 check
+$ docker run -v .:/io -u "$(id -u):$(id -g)" --rm ghcr.io/astral-sh/ruff check
+$ docker run -v .:/io -u "$(id -u):$(id -g)" --rm ghcr.io/astral-sh/ruff:0.11.2 check
 
 $ # Or, for Podman on SELinux.
-$ docker run -v .:/io:Z --rm ghcr.io/astral-sh/ruff check
+$ docker run -v .:/io:Z -u "$(id -u):$(id -g)" --rm ghcr.io/astral-sh/ruff check
 ```
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/ruff-python-linter.svg?exclude_unsupported=1)](https://repology.org/project/ruff-python-linter/versions)
