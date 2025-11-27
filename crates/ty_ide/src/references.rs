@@ -219,6 +219,11 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                     self.check_identifier_reference(name);
                 }
             }
+            AnyNodeRef::PatternMatchStar(pattern_star) if self.should_include_declaration() => {
+                if let Some(name) = &pattern_star.name {
+                    self.check_identifier_reference(name);
+                }
+            }
             AnyNodeRef::PatternMatchMapping(pattern_mapping)
                 if self.should_include_declaration() =>
             {

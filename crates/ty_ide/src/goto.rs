@@ -212,16 +212,9 @@ pub(crate) enum GotoTarget<'a> {
 
 /// The resolved definitions for a `GotoTarget`
 #[derive(Debug, Clone)]
-pub(crate) enum DefinitionsOrTargets<'db> {
-    /// We computed actual Definitions we can do followup queries on.
-    Definitions(Vec<ResolvedDefinition<'db>>),
-    /// We directly computed a navigation.
-    ///
-    /// We can't get docs or usefully compute goto-definition for this.
-    Targets(crate::NavigationTargets),
-}
+pub(crate) struct Definitions<'db>(pub Vec<ResolvedDefinition<'db>>);
 
-impl<'db> DefinitionsOrTargets<'db> {
+impl<'db> Definitions<'db> {
     pub(crate) fn from_ty(db: &'db dyn crate::Db, ty: Type<'db>) -> Option<Self> {
         let ty_def = ty.definition(db)?;
         let resolved = match ty_def {
@@ -237,7 +230,7 @@ impl<'db> DefinitionsOrTargets<'db> {
                 ResolvedDefinition::Definition(definition)
             }
         };
-        Some(DefinitionsOrTargets::Definitions(vec![resolved]))
+        Some(Definitions(vec![resolved]))
     }
 
     /// Get the "goto-declaration" interpretation of this definition
@@ -247,12 +240,7 @@ impl<'db> DefinitionsOrTargets<'db> {
         self,
         db: &'db dyn ty_python_semantic::Db,
     ) -> Option<crate::NavigationTargets> {
-        match self {
-            DefinitionsOrTargets::Definitions(definitions) => {
-                definitions_to_navigation_targets(db, None, definitions)
-            }
-            DefinitionsOrTargets::Targets(targets) => Some(targets),
-        }
+        definitions_to_navigation_targets(db, None, self.0)
     }
 
     /// Get the "goto-definition" interpretation of this definition
@@ -263,12 +251,7 @@ impl<'db> DefinitionsOrTargets<'db> {
         self,
         db: &'db dyn ty_python_semantic::Db,
     ) -> Option<crate::NavigationTargets> {
-        match self {
-            DefinitionsOrTargets::Definitions(definitions) => {
-                definitions_to_navigation_targets(db, Some(&StubMapper::new(db)), definitions)
-            }
-            DefinitionsOrTargets::Targets(targets) => Some(targets),
-        }
+        definitions_to_navigation_targets(db, Some(&StubMapper::new(db)), self.0)
     }
 
     /// Get the docstring for this definition
@@ -277,13 +260,7 @@ impl<'db> DefinitionsOrTargets<'db> {
     /// so this will check both the goto-declarations and goto-definitions (in that order)
     /// and return the first one found.
     pub(crate) fn docstring(self, db: &'db dyn crate::Db) -> Option<Docstring> {
-        let definitions = match self {
-            DefinitionsOrTargets::Definitions(definitions) => definitions,
-            // Can't find docs for these
-            // (make more cases DefinitionOrTargets::Definitions to get more docs!)
-            DefinitionsOrTargets::Targets(_) => return None,
-        };
-        for definition in &definitions {
+        for definition in &self.0 {
             // If we got a docstring from the original definition, use it
             if let Some(docstring) = definition.docstring(db) {
                 return Some(Docstring::new(docstring));
@@ -296,7 +273,7 @@ impl<'db> DefinitionsOrTargets<'db> {
         let stub_mapper = StubMapper::new(db);
 
         // Try to find the corresponding implementation definition
-        for definition in stub_mapper.map_definitions(definitions) {
+        for definition in stub_mapper.map_definitions(self.0) {
             if let Some(docstring) = definition.docstring(db) {
                 return Some(Docstring::new(docstring));
             }
@@ -399,37 +376,39 @@ impl GotoTarget<'_> {
         &self,
         model: &SemanticModel<'db>,
         alias_resolution: ImportAliasResolution,
-    ) -> Option<DefinitionsOrTargets<'db>> {
-        use crate::NavigationTarget;
+    ) -> Option<Definitions<'db>> {
         match self {
-            GotoTarget::Expression(expression) => definitions_for_expression(model, *expression)
-                .map(DefinitionsOrTargets::Definitions),
+            GotoTarget::Expression(expression) => {
+                definitions_for_expression(model, *expression).map(Definitions)
+            }
             // For already-defined symbols, they are their own definitions
-            GotoTarget::FunctionDef(function) => Some(DefinitionsOrTargets::Definitions(vec![
-                ResolvedDefinition::Definition(function.definition(model)),
-            ])),
+            GotoTarget::FunctionDef(function) => {
+                Some(Definitions(vec![ResolvedDefinition::Definition(
+                    function.definition(model),
+                )]))
+            }
 
-            GotoTarget::ClassDef(class) => Some(DefinitionsOrTargets::Definitions(vec![
-                ResolvedDefinition::Definition(class.definition(model)),
-            ])),
+            GotoTarget::ClassDef(class) => Some(Definitions(vec![ResolvedDefinition::Definition(
+                class.definition(model),
+            )])),
 
-            GotoTarget::Parameter(parameter) => Some(DefinitionsOrTargets::Definitions(vec![
-                ResolvedDefinition::Definition(parameter.definition(model)),
-            ])),
+            GotoTarget::Parameter(parameter) => {
+                Some(Definitions(vec![ResolvedDefinition::Definition(
+                    parameter.definition(model),
+                )]))
+            }
 
             // For import aliases (offset within 'y' or 'z' in "from x import y as z")
             GotoTarget::ImportSymbolAlias {
                 alias, import_from, ..
             } => {
                 let symbol_name = alias.name.as_str();
-                Some(DefinitionsOrTargets::Definitions(
-                    definitions_for_imported_symbol(
-                        model,
-                        import_from,
-                        symbol_name,
-                        alias_resolution,
-                    ),
-                ))
+                Some(Definitions(definitions_for_imported_symbol(
+                    model,
+                    import_from,
+                    symbol_name,
+                    alias_resolution,
+                )))
             }
 
             GotoTarget::ImportModuleComponent {
@@ -448,14 +427,13 @@ impl GotoTarget<'_> {
                 if alias_resolution == ImportAliasResolution::ResolveAliases {
                     definitions_for_module(model, Some(alias.name.as_str()), 0)
                 } else {
-                    let alias_range = alias.asname.as_ref().unwrap().range;
-                    Some(DefinitionsOrTargets::Targets(
-                        crate::NavigationTargets::single(NavigationTarget {
-                            file: model.file(),
-                            focus_range: alias_range,
-                            full_range: alias.range(),
-                        }),
-                    ))
+                    alias.asname.as_ref().map(|name| {
+                        Definitions(definitions_for_name(
+                            model,
+                            name.as_str(),
+                            AnyNodeRef::Identifier(name),
+                        ))
+                    })
                 }
             }
 
@@ -463,45 +441,56 @@ impl GotoTarget<'_> {
             GotoTarget::KeywordArgument {
                 keyword,
                 call_expression,
-            } => Some(DefinitionsOrTargets::Definitions(
-                definitions_for_keyword_argument(model, keyword, call_expression),
-            )),
+            } => Some(Definitions(definitions_for_keyword_argument(
+                model,
+                keyword,
+                call_expression,
+            ))),
 
             // For exception variables, they are their own definitions (like parameters)
             GotoTarget::ExceptVariable(except_handler) => {
-                Some(DefinitionsOrTargets::Definitions(vec![
-                    ResolvedDefinition::Definition(except_handler.definition(model)),
-                ]))
+                Some(Definitions(vec![ResolvedDefinition::Definition(
+                    except_handler.definition(model),
+                )]))
             }
 
-            // For pattern match rest variables, they are their own definitions
+            // Patterns are glorified assignments but we have to look them up by ident
+            // because they're not expressions
             GotoTarget::PatternMatchRest(pattern_mapping) => {
-                if let Some(rest_name) = &pattern_mapping.rest {
-                    let range = rest_name.range;
-                    Some(DefinitionsOrTargets::Targets(
-                        crate::NavigationTargets::single(NavigationTarget::new(
-                            model.file(),
-                            range,
-                        )),
+                pattern_mapping.rest.as_ref().map(|name| {
+                    Definitions(definitions_for_name(
+                        model,
+                        name.as_str(),
+                        AnyNodeRef::Identifier(name),
                     ))
-                } else {
-                    None
-                }
+                })
             }
 
-            // For pattern match as names, they are their own definitions
-            GotoTarget::PatternMatchAsName(pattern_as) => {
-                if let Some(name) = &pattern_as.name {
-                    let range = name.range;
-                    Some(DefinitionsOrTargets::Targets(
-                        crate::NavigationTargets::single(NavigationTarget::new(
-                            model.file(),
-                            range,
-                        )),
+            GotoTarget::PatternMatchAsName(pattern_as) => pattern_as.name.as_ref().map(|name| {
+                Definitions(definitions_for_name(
+                    model,
+                    name.as_str(),
+                    AnyNodeRef::Identifier(name),
+                ))
+            }),
+
+            GotoTarget::PatternKeywordArgument(pattern_keyword) => {
+                let name = &pattern_keyword.attr;
+                Some(Definitions(definitions_for_name(
+                    model,
+                    name.as_str(),
+                    AnyNodeRef::Identifier(name),
+                )))
+            }
+
+            GotoTarget::PatternMatchStarName(pattern_star) => {
+                pattern_star.name.as_ref().map(|name| {
+                    Definitions(definitions_for_name(
+                        model,
+                        name.as_str(),
+                        AnyNodeRef::Identifier(name),
                     ))
-                } else {
-                    None
-                }
+                })
             }
 
             // For callables, both the definition of the callable and the actual function impl are relevant.
@@ -516,7 +505,7 @@ impl GotoTarget<'_> {
                 if definitions.is_empty() {
                     None
                 } else {
-                    Some(DefinitionsOrTargets::Definitions(definitions))
+                    Some(Definitions(definitions))
                 }
             }
 
@@ -524,14 +513,14 @@ impl GotoTarget<'_> {
                 let (definitions, _) =
                     ty_python_semantic::definitions_for_bin_op(model, expression)?;
 
-                Some(DefinitionsOrTargets::Definitions(definitions))
+                Some(Definitions(definitions))
             }
 
             GotoTarget::UnaryOp { expression, .. } => {
                 let (definitions, _) =
                     ty_python_semantic::definitions_for_unary_op(model, expression)?;
 
-                Some(DefinitionsOrTargets::Definitions(definitions))
+                Some(Definitions(definitions))
             }
 
             // String annotations sub-expressions require us to recurse into the sub-AST
@@ -544,23 +533,46 @@ impl GotoTarget<'_> {
                 let subexpr = covering_node(subast.syntax().into(), *subrange)
                     .node()
                     .as_expr_ref()?;
-                definitions_for_expression(&submodel, subexpr)
-                    .map(DefinitionsOrTargets::Definitions)
+                definitions_for_expression(&submodel, subexpr).map(Definitions)
             }
+
+            // nonlocal and global are essentially loads, but again they're statements,
+            // so we need to look them up by ident
             GotoTarget::NonLocal { identifier } | GotoTarget::Globals { identifier } => {
-                Some(DefinitionsOrTargets::Definitions(definitions_for_name(
+                Some(Definitions(definitions_for_name(
                     model,
                     identifier.as_str(),
                     AnyNodeRef::Identifier(identifier),
                 )))
             }
 
-            // TODO: implement these
-            GotoTarget::PatternKeywordArgument(..)
-            | GotoTarget::PatternMatchStarName(..)
-            | GotoTarget::TypeParamTypeVarName(..)
-            | GotoTarget::TypeParamParamSpecName(..)
-            | GotoTarget::TypeParamTypeVarTupleName(..) => None,
+            // These are declarations of sorts, but they're stmts and not exprs, so look up by ident.
+            GotoTarget::TypeParamTypeVarName(type_var) => {
+                let name = &type_var.name;
+                Some(Definitions(definitions_for_name(
+                    model,
+                    name.as_str(),
+                    AnyNodeRef::Identifier(name),
+                )))
+            }
+
+            GotoTarget::TypeParamParamSpecName(name) => {
+                let name = &name.name;
+                Some(Definitions(definitions_for_name(
+                    model,
+                    name.as_str(),
+                    AnyNodeRef::Identifier(name),
+                )))
+            }
+
+            GotoTarget::TypeParamTypeVarTupleName(name) => {
+                let name = &name.name;
+                Some(Definitions(definitions_for_name(
+                    model,
+                    name.as_str(),
+                    AnyNodeRef::Identifier(name),
+                )))
+            }
         }
     }
 
@@ -1050,12 +1062,10 @@ fn definitions_for_module<'db>(
     model: &SemanticModel<'db>,
     module: Option<&str>,
     level: u32,
-) -> Option<DefinitionsOrTargets<'db>> {
+) -> Option<Definitions<'db>> {
     let module = model.resolve_module(module, level)?;
     let file = module.file(model.db())?;
-    Some(DefinitionsOrTargets::Definitions(vec![
-        ResolvedDefinition::Module(file),
-    ]))
+    Some(Definitions(vec![ResolvedDefinition::Module(file)]))
 }
 
 /// Helper function to extract module component information from a dotted module name
