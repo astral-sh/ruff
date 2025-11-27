@@ -608,6 +608,9 @@ class PlaygroundServer
   ): languages.ProviderResult<languages.CodeActionList> {
     const actions: languages.CodeAction[] = [];
     const fileHandle = this.getFileHandleForModel(model);
+    if (fileHandle == null) {
+      return undefined;
+    }
 
     for (const diagnostic of this.diagnostics) {
       const diagnosticRange = diagnostic.range;
@@ -629,7 +632,7 @@ class PlaygroundServer
         actions.push({
           title: codeAction.title,
           kind: "quickfix",
-          isPreferred: true,
+          isPreferred: codeAction.preferred,
           edit: {
             edits: codeAction.edits.map((edit) => ({
               resource: model.uri,
