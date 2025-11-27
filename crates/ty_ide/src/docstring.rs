@@ -194,9 +194,9 @@ fn render_markdown(docstring: &str) -> String {
     let mut starting_literal = None;
     let mut in_literal = false;
     let mut in_any_code = false;
+    let mut _line;
     for untrimmed_line in docstring.lines() {
         // We can assume leading whitespace has been normalized
-        let mut _line;
         let mut line = untrimmed_line.trim_start_matches(' ');
         let line_indent = untrimmed_line.len() - line.len();
 
@@ -251,7 +251,15 @@ fn render_markdown(docstring: &str) -> String {
         }
 
         // If we're not in a codeblock and we see something that signals a literal block, start one
-        if !in_any_code && let Some(without_lit) = line.strip_suffix("::") {
+        let parsed_lit = line
+            .strip_suffix("::")
+            .map(|prefix| (prefix, None))
+            .or_else(|| {
+                let (prefix, lang) = line.rsplit_once(' ')?;
+                let prefix = prefix.trim_end().strip_suffix("::")?;
+                Some((prefix, Some(lang)))
+            });
+        if !in_any_code && let Some((without_lit, lang)) = parsed_lit {
             let mut without_directive = without_lit;
             let mut directive = None;
             // Parse out a directive like `.. warning::`
@@ -293,11 +301,11 @@ fn render_markdown(docstring: &str) -> String {
                     None
                 }
                 // Things that just mean "it's code"
-                Some("code-block" | "sourcecode" | "code") => Some("python"),
+                Some("code-block" | "sourcecode" | "code") => lang.or(Some("python")),
                 // Unknown (python I guess?)
-                Some(_) => Some("python"),
+                Some(_) => lang.or(Some("python")),
                 // default to python
-                None => Some("python"),
+                None => lang.or(Some("python")),
             };
         }
 
@@ -1011,6 +1019,110 @@ mod tests {
         &nbsp;&nbsp;&nbsp;&nbsp;- Hard  
           
         &nbsp;&nbsp;&nbsp;&nbsp;Ok!?!?!?
+        "#);
+    }
+
+    // `.. code::` is a literal block and the `.. code::` should be deleted
+    #[test]
+    fn code_block() {
+        let docstring = r#"
+        Here's some code!
+
+        .. code::
+            def main() {
+                print("hello world!")
+            }
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        Here's some code!  
+          
+          
+        ```python
+            def main() {
+                print("hello world!")
+            }
+        ```
+        "#);
+    }
+
+    // `.. code:: rust` is a literal block with rust syntax highlighting
+    #[test]
+    fn code_block_lang() {
+        let docstring = r#"
+        Here's some Rust code!
+
+        .. code:: rust
+            fn main() {
+                println!("hello world!");
+            }
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        Here's some Rust code!  
+          
+          
+        ```rust
+            fn main() {
+                println!("hello world!");
+            }
+        ```
+        "#);
+    }
+
+    // `.. asdgfhjkl-unknown::` is treated the same as `.. code::`
+    #[test]
+    fn unknown_block() {
+        let docstring = r#"
+        Here's some code!
+
+        .. asdgfhjkl-unknown::
+            fn main() {
+                println!("hello world!");
+            }
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        Here's some code!  
+          
+          
+        ```python
+            fn main() {
+                println!("hello world!");
+            }
+        ```
+        "#);
+    }
+
+    // `.. asdgfhjkl-unknown:: rust` is treated the same as `.. code:: rust`
+    #[test]
+    fn unknown_block_lang() {
+        let docstring = r#"
+        Here's some Rust code!
+
+        .. asdgfhjkl-unknown::   rust
+            fn main() {
+                print("hello world!")
+            }
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        Here's some Rust code!  
+          
+          
+        ```rust
+            fn main() {
+                print("hello world!")
+            }
+        ```
         "#);
     }
 
