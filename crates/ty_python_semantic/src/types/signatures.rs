@@ -1034,10 +1034,7 @@ impl<'db> Signature<'db> {
                 };
             }
             (ParametersKind::ParamSpec(typevar), _) => {
-                let paramspec_value = Type::paramspec_value_callable(
-                    db,
-                    Signature::new(other.parameters.clone(), None),
-                );
+                let paramspec_value = Type::paramspec_value_callable(db, other.parameters.clone());
                 return ConstraintSet::constrain_typevar(
                     db,
                     typevar,
@@ -1047,10 +1044,7 @@ impl<'db> Signature<'db> {
                 );
             }
             (_, ParametersKind::ParamSpec(typevar)) => {
-                let paramspec_value = Type::paramspec_value_callable(
-                    db,
-                    Signature::new(self.parameters.clone(), None),
-                );
+                let paramspec_value = Type::paramspec_value_callable(db, self.parameters.clone());
                 return ConstraintSet::constrain_typevar(
                     db,
                     typevar,

@@ -11503,9 +11503,9 @@ impl<'db> Type<'db> {
     /// type variable.
     pub(crate) fn paramspec_value_callable(
         db: &'db dyn Db,
-        signature: Signature<'db>,
+        parameters: Parameters<'db>,
     ) -> Type<'db> {
-        Type::Callable(CallableType::paramspec_value(db, signature))
+        Type::Callable(CallableType::paramspec_value(db, parameters))
     }
 }
 
@@ -11526,10 +11526,13 @@ impl<'db> CallableType<'db> {
         )
     }
 
-    pub(crate) fn paramspec_value(db: &'db dyn Db, signature: Signature<'db>) -> CallableType<'db> {
+    pub(crate) fn paramspec_value(
+        db: &'db dyn Db,
+        parameters: Parameters<'db>,
+    ) -> CallableType<'db> {
         CallableType::new(
             db,
-            CallableSignature::single(signature),
+            CallableSignature::single(Signature::new(parameters, None)),
             CallableTypeKind::ParamSpecValue,
         )
     }

@@ -3419,7 +3419,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         match expr {
             ast::Expr::EllipsisLiteral(_) => Some(Type::paramspec_value_callable(
                 self.db(),
-                Signature::new(Parameters::gradual_form(), None),
+                Parameters::gradual_form(),
             )),
             ast::Expr::List(ast::ExprList { elts, .. }) => {
                 let mut parameter_types = Vec::with_capacity(elts.len());
@@ -3450,10 +3450,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     )
                 };
 
-                Some(Type::paramspec_value_callable(
-                    self.db(),
-                    Signature::new(parameters, None),
-                ))
+                Some(Type::paramspec_value_callable(self.db(), parameters))
             }
             ast::Expr::Subscript(subscript)
                 if matches!(position, ParamSpecValuePosition::ExplicitSpecialization) =>
@@ -3463,7 +3460,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // TODO: Support `Concatenate[...]`
                 Some(Type::paramspec_value_callable(
                     self.db(),
-                    Signature::new(Parameters::todo(), None),
+                    Parameters::todo(),
                 ))
             }
             ast::Expr::Name(name) => {
