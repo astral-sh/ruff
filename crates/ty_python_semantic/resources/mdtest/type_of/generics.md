@@ -12,8 +12,6 @@ python-version = "3.13"
 The meta-type of a typevar is `type[T]`.
 
 ```py
-from typing import reveal_type
-
 def _[T](x: T):
     reveal_type(type(x))  # revealed: type[T@_]
 ```
@@ -25,7 +23,7 @@ def unbounded[T](x: type[T]) -> T:
     reveal_type(x)  # revealed: type[T@unbounded]
     reveal_type(x.__repr__)  # revealed: def __repr__(self) -> str
     reveal_type(x.__init__)  # revealed: def __init__(self) -> None
-    reveal_type(x())  # revealed: Any
+    reveal_type(x())  # revealed: T@unbounded
 
     return x()
 ```
@@ -59,12 +57,8 @@ upper_bound(C)
 ```py
 def constrained[T: (int, str)](x: type[T]) -> T:
     reveal_type(x)  # revealed: type[T@constrained]
+    reveal_type(x("hello"))  # revealed: T@constrained
 
-    # TODO: This should reveal `T`.
-    reveal_type(x("hello"))  # revealed: int | Literal["hello"]
-
-    # TODO
-    # error: [invalid-return-type] "Return type does not match returned value: expected `T@constrained`, found `int | Literal["hello"]`"
     return x("hello")
 
 reveal_type(constrained(int))  # revealed: int
@@ -72,6 +66,21 @@ reveal_type(constrained(str))  # revealed: str
 
 # error: [invalid-argument-type] "Argument to function `constrained` is incorrect: Argument type `A` does not satisfy constraints (`int`, `str`) of type variable `T`"
 constrained(A)
+```
+
+## Union
+
+```py
+from ty_extensions import Intersection, Unknown
+
+def _[T: int](x: type | type[T]):
+    reveal_type(x())  # revealed: Any
+
+def _[T: int](x: type[int] | type[T]):
+    reveal_type(x())  # revealed: int
+
+def _[T](x: type[int] | type[T]):
+    reveal_type(x())  # revealed: int | T@_
 ```
 
 ## Subtyping

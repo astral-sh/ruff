@@ -6047,10 +6047,7 @@ impl<'db> Type<'db> {
                 .into()
             }
 
-            Type::SubclassOf(subclass_of_type) => match subclass_of_type
-                .subclass_of()
-                .with_transposed_type_var(db)
-            {
+            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 SubclassOfInner::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type).bindings(db),
 
                 // Most type[] constructor calls are handled by `try_call_constructor` and not via
@@ -6059,9 +6056,13 @@ impl<'db> Type<'db> {
                 // `__new__` and `__init__` signatures? and respect metaclass `__call__`).
                 SubclassOfInner::Class(class) => Type::from(class).bindings(db),
 
-                SubclassOfInner::TypeVar(bound_typevar) => {
-                    Type::TypeVar(bound_typevar).bindings(db)
-                }
+                // TODO annotated return type on `__new__` or metaclass `__call__`
+                // TODO check call vs signatures of `__new__` and/or `__init__`
+                SubclassOfInner::TypeVar(_) => Binding::single(
+                    self,
+                    Signature::new(Parameters::gradual_form(), self.to_instance(db)),
+                )
+                .into(),
             },
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) | Type::NewTypeInstance(_) => {
