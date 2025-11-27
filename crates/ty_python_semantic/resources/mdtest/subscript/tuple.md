@@ -329,6 +329,16 @@ reveal_type(tuple[int, str])  # revealed: <class 'tuple[int, str]'>
 reveal_type(tuple[int, ...])  # revealed: <class 'tuple[int, ...]'>
 ```
 
+```py
+from typing import Any
+
+def _(a: type[tuple], b: type[tuple[int]], c: type[tuple[int, ...]], d: type[tuple[Any, ...]]) -> None:
+    reveal_type(a)  # revealed: type[tuple[Unknown, ...]]
+    reveal_type(b)  # revealed: type[tuple[int]]
+    reveal_type(c)  # revealed: type[tuple[int, ...]]
+    reveal_type(d)  # revealed: type[tuple[Any, ...]]
+```
+
 ## Inheritance
 
 ```toml
@@ -392,7 +402,7 @@ class C(Tuple): ...
 reveal_mro(C)
 ```
 
-### Union subscript access
+## Union subscript access
 
 ```py
 def test(val: tuple[str] | tuple[int]):
@@ -402,7 +412,7 @@ def test2(val: tuple[str, None] | list[int | float]):
     reveal_type(val[0])  # revealed: str | int | float
 ```
 
-### Union subscript access with non-indexable type
+## Union subscript access with non-indexable type
 
 ```py
 def test3(val: tuple[str] | tuple[int] | int):
@@ -410,7 +420,7 @@ def test3(val: tuple[str] | tuple[int] | int):
     reveal_type(val[0])  # revealed: str | int | Unknown
 ```
 
-### Intersection subscript access
+## Intersection subscript access
 
 ```py
 from ty_extensions import Intersection
