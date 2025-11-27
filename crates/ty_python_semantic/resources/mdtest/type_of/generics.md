@@ -91,7 +91,8 @@ def _[T](x: type[int] | type[T]):
 A class `A` is a subtype of `type[T]` if any instance of `A` is a subtype of `T`.
 
 ```py
-from ty_extensions import is_subtype_of, static_assert, is_disjoint_from
+from typing import Callable
+from ty_extensions import is_assignable_to, is_subtype_of, is_disjoint_from, static_assert
 
 def _[T](_: T):
     static_assert(not is_disjoint_from(type[T], T))
@@ -101,6 +102,10 @@ def _[T](_: T):
     static_assert(not is_subtype_of(T, type[T]))
 
     static_assert(is_subtype_of(type[T], type[T]))
+    static_assert(not is_disjoint_from(type[T], type[T]))
+
+    static_assert(is_assignable_to(type[T], Callable[..., T]))
+    static_assert(not is_disjoint_from(type[T], Callable[..., T]))
 
 def _[T: int](_: T):
     static_assert(is_disjoint_from(type[T], T))
@@ -116,6 +121,10 @@ def _[T: int](_: T):
     static_assert(is_subtype_of(type[T], type[int]))
 
     static_assert(is_subtype_of(type[T], type[T]))
+    static_assert(not is_disjoint_from(type[T], type[T]))
+
+    static_assert(is_assignable_to(type[T], Callable[..., T]))
+    static_assert(not is_disjoint_from(type[T], Callable[..., T]))
 
     static_assert(is_subtype_of(type[T], type[T] | None))
     static_assert(not is_disjoint_from(type[T], type[T] | None))
@@ -130,6 +139,10 @@ def _[T: (int, str)](_: T):
     static_assert(not is_subtype_of(T, type[T]))
 
     static_assert(is_subtype_of(type[T], type[T]))
+    static_assert(not is_disjoint_from(type[T], type[T]))
+
+    static_assert(is_assignable_to(type[T], Callable[..., T]))
+    static_assert(not is_disjoint_from(type[T], Callable[..., T]))
 
     static_assert(is_subtype_of(type[T], type[T] | None))
     static_assert(not is_disjoint_from(type[T], type[T] | None))

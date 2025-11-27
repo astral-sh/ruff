@@ -2111,7 +2111,9 @@ impl<'db> Type<'db> {
 
             // `type[T]` is a subtype of the class object `A` if every instance of `T` is a subtype of an instance
             // of `A`, and vice versa.
-            (Type::SubclassOf(subclass_of), _) if subclass_of.is_type_var() => {
+            (Type::SubclassOf(subclass_of), _)
+                if subclass_of.is_type_var() && !target.is_callable_type() =>
+            {
                 let this_instance = Type::TypeVar(subclass_of.into_type_var().unwrap());
                 let other_instance = match target {
                     Type::Union(union) => Some(
@@ -3083,7 +3085,7 @@ impl<'db> Type<'db> {
 
             // `type[T]` is disjoint from a class object `A` if every instance of `T` is disjoint from an instance of `A`.
             (Type::SubclassOf(subclass_of), other) | (other, Type::SubclassOf(subclass_of))
-                if subclass_of.is_type_var() =>
+                if subclass_of.is_type_var() && !other.is_callable_type() =>
             {
                 let this_instance = Type::TypeVar(subclass_of.into_type_var().unwrap());
                 let other_instance = match other {
@@ -3472,27 +3474,31 @@ impl<'db> Type<'db> {
             // for `type[Any]`/`type[Unknown]`/`type[Todo]`, we know the type cannot be any larger than `type`,
             // so although the type is dynamic we can still determine disjointedness in some situations
             (Type::SubclassOf(subclass_of_ty), other)
-            | (other, Type::SubclassOf(subclass_of_ty)) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Dynamic(_) => {
-                    KnownClass::Type.to_instance(db).is_disjoint_from_impl(
-                        db,
-                        other,
-                        inferable,
-                        disjointness_visitor,
-                        relation_visitor,
-                    )
+            | (other, Type::SubclassOf(subclass_of_ty))
+                if !subclass_of_ty.is_type_var() =>
+            {
+                match subclass_of_ty.subclass_of() {
+                    SubclassOfInner::Dynamic(_) => {
+                        KnownClass::Type.to_instance(db).is_disjoint_from_impl(
+                            db,
+                            other,
+                            inferable,
+                            disjointness_visitor,
+                            relation_visitor,
+                        )
+                    }
+                    SubclassOfInner::Class(class) => {
+                        class.metaclass_instance_type(db).is_disjoint_from_impl(
+                            db,
+                            other,
+                            inferable,
+                            disjointness_visitor,
+                            relation_visitor,
+                        )
+                    }
+                    SubclassOfInner::TypeVar(_) => unreachable!(),
                 }
-                SubclassOfInner::Class(class) => {
-                    class.metaclass_instance_type(db).is_disjoint_from_impl(
-                        db,
-                        other,
-                        inferable,
-                        disjointness_visitor,
-                        relation_visitor,
-                    )
-                }
-                SubclassOfInner::TypeVar(_) => unreachable!(),
-            },
+            }
 
             (Type::SpecialForm(special_form), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::SpecialForm(special_form)) => {
@@ -3753,6 +3759,11 @@ impl<'db> Type<'db> {
                     disjointness_visitor,
                     relation_visitor,
                 )
+            }
+
+            (Type::SubclassOf(_), _) | (_, Type::SubclassOf(_)) => {
+                // All cases should have been handled above.
+                unreachable!()
             }
         }
     }
