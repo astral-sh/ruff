@@ -919,8 +919,7 @@ from typing import TYPE_CHECKING
 from mypackage.conflicted.other1 import x as x1
 import mypackage.conflicted.b.c
 
-# error: [possibly-missing-attribute]
-reveal_type(mypackage.conflicted.b.c.y)  # revealed: Unknown
+reveal_type(mypackage.conflicted.b.c.y)  # revealed: int
 ```
 
 ## Re-export Nameclash Problems In Functions
