@@ -1,6 +1,7 @@
 use compact_str::{CompactString, ToCompactString};
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
+use ruff_diagnostics::{Edit, Fix};
 
 use std::borrow::Cow;
 use std::time::Duration;
@@ -8752,7 +8753,7 @@ impl<'db> InvalidTypeExpressionError<'db> {
                     continue;
                 };
                 let diagnostic = builder.into_diagnostic(error.reason(context.db()));
-                error.add_subdiagnostics(context.db(), diagnostic);
+                error.add_subdiagnostics(context.db(), diagnostic, node);
             }
         }
         fallback_type
@@ -8878,7 +8879,12 @@ impl<'db> InvalidTypeExpression<'db> {
         Display { error: self, db }
     }
 
-    fn add_subdiagnostics(self, db: &'db dyn Db, mut diagnostic: LintDiagnosticGuard) {
+    fn add_subdiagnostics(
+        self,
+        db: &'db dyn Db,
+        mut diagnostic: LintDiagnosticGuard,
+        node: &impl Ranged,
+    ) {
         if let InvalidTypeExpression::InvalidType(Type::Never, _) = self {
             diagnostic.help(
                 "The variable may have been inferred as `Never` because \
@@ -8910,6 +8916,10 @@ impl<'db> InvalidTypeExpression<'db> {
                 "Did you mean to use the module's member \
                 `{module_name_final_part}.{module_name_final_part}`?"
             ));
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+                format!(".{module_name_final_part}"),
+                node.end(),
+            )));
         } else if let InvalidTypeExpression::TypedDict = self {
             diagnostic.help(
                 "You might have meant to use a concrete TypedDict \
