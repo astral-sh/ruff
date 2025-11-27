@@ -190,6 +190,26 @@ def f(x: type[E[str]]):
     static_assert(has_member(x, "FOO"))
 ```
 
+### `type[Any]` and `Any``
+
+`type[Any]` has all members of `type`.
+
+```py
+from typing import Any
+from ty_extensions import has_member, static_assert
+
+def f(x: type[Any]):
+    static_assert(has_member(x, "__base__"))
+    static_assert(has_member(x, "__qualname__"))
+```
+
+`Any` has all members of `object`, since it is a subtype of `object`:
+
+```py
+def f(x: Any):
+    static_assert(has_member(x, "__repr__"))
+```
+
 ### Other instance-like types
 
 ```py

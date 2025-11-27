@@ -13,7 +13,7 @@ use crate::semantic_index::{
 use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::generics::Specialization;
 use crate::types::signatures::Signature;
-use crate::types::{CallDunderError, UnionType};
+use crate::types::{CallDunderError, SubclassOfInner, UnionType};
 use crate::types::{
     CallableTypes, ClassBase, ClassLiteral, KnownClass, KnownInstanceType, Type, TypeContext,
     TypeVarBoundOrConstraints, class::CodeGeneratorKind,
@@ -175,8 +175,8 @@ impl<'db> AllMembers<'db> {
                 }
             }
 
-            Type::SubclassOf(subclass_of_type) => {
-                if let Some(class_type) = subclass_of_type.subclass_of().into_class() {
+            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
+                SubclassOfInner::Class(class_type) => {
                     let (class_literal, specialization) = class_type.class_literal(db);
                     self.extend_with_class_members(db, ty, class_literal);
                     self.extend_with_synthetic_members(db, ty, class_literal, specialization);
@@ -184,9 +184,14 @@ impl<'db> AllMembers<'db> {
                         self.extend_with_class_members(db, ty, metaclass);
                     }
                 }
-            }
+                SubclassOfInner::Dynamic(_) => {
+                    self.extend_with_type(db, KnownClass::Type.to_instance(db));
+                }
+            },
 
-            Type::Dynamic(_) | Type::Never | Type::AlwaysTruthy | Type::AlwaysFalsy => {}
+            Type::Dynamic(_) | Type::Never | Type::AlwaysTruthy | Type::AlwaysFalsy => {
+                self.extend_with_type(db, Type::object());
+            }
 
             Type::TypeAlias(alias) => self.extend_with_type(db, alias.value_type(db)),
 
