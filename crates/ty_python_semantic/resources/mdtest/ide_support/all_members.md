@@ -190,7 +190,7 @@ def f(x: type[E[str]]):
     static_assert(has_member(x, "FOO"))
 ```
 
-### `type[Any]` and `Any``
+### `type[Any]` and `Any`
 
 `type[Any]` has all members of `type`.
 
