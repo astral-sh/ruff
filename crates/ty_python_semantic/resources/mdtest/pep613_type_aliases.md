@@ -186,15 +186,11 @@ def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
 
 K = TypeVar("K")
 V = TypeVar("V")
-# TODO: No error here
-# error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
 NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
 
-# TODO: No error here
-# error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
 def _(nested: NestedDict[str, int]):
     # TODO should be `dict[str, int | NestedDict[str, int]]`
-    reveal_type(nested)  # revealed: dict[Unknown, Divergent]
+    reveal_type(nested)  # revealed: dict[@Todo(specialized recursive generic type alias), Divergent]
 
 my_isinstance(1, int)
 my_isinstance(1, int | str)

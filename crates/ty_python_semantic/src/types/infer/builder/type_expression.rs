@@ -760,6 +760,36 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let scope_id = self.scope();
         let current_typevar_binding_context = self.typevar_binding_context;
+
+        // TODO
+        // If we explicitly specialize a recursive generic (PEP-613 or implicit) type alias,
+        // we currently miscount the number of type variables. For example, for a nested
+        // dictionary type alias `NestedDict = dict[K, "V | NestedDict[K, V]"]]`, we might
+        // infer `<class 'dict[K, Divergent]'>`, and therefore count just one type variable
+        // instead of two. So until we properly support these, specialize all remaining type
+        // variables with a `@Todo` type (since we don't know which of the type arguments
+        // belongs to the remaining type variables).
+        if any_over_type(self.db(), value_ty, &|ty| ty.is_divergent(), true) {
+            let value_ty = value_ty.apply_specialization(
+                db,
+                generic_context.specialize(
+                    db,
+                    std::iter::repeat_n(
+                        todo_type!("specialized recursive generic type alias"),
+                        generic_context.len(db),
+                    )
+                    .collect(),
+                ),
+            );
+            return if in_type_expression {
+                value_ty
+                    .in_type_expression(db, scope_id, current_typevar_binding_context)
+                    .unwrap_or_else(|_| Type::unknown())
+            } else {
+                value_ty
+            };
+        }
+
         let specialize = |types: &[Option<Type<'db>>]| {
             let specialized = value_ty.apply_specialization(
                 db,

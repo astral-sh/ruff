@@ -1525,17 +1525,11 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
-# TODO: No errors
-# error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
 NestedDict = dict[str, "NestedDict[T] | T"]
-# error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
 NestedList = list["NestedList[T] | None"]
 
 def _(
-    # TODO: No errors
-    # error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
     nested_dict_int: NestedDict[int],
-    # error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
     nested_list_str: NestedList[str],
 ):
     reveal_type(nested_dict_int)  # revealed: dict[str, Divergent]
