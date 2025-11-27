@@ -1,18 +1,24 @@
-"""Benchmark LSP diagnostic response times for type checkers."""
+"""
+Benchmarks for LSP servers
+
+When debugging test failures, run pytest with `-s -v --log-cli-level=DEBUG`
+"""
 
 from __future__ import annotations
 
 import asyncio
 import tempfile
+from abc import ABC, abstractmethod
 from collections.abc import Generator
 from pathlib import Path
-from typing import Final
+from typing import Any, Final, NewType, override
 
 import pytest
+from lsprotocol import types as lsp
 
-from benchmark.lsp_client import LSPClient
+from benchmark.lsp_client import FileDiagnostics, LSPClient
 from benchmark.projects import ALL as ALL_PROJECTS
-from benchmark.projects import Project
+from benchmark.projects import IncrementalEdit, Project
 from benchmark.tool import Pyrefly, Pyright, Tool, Ty
 from benchmark.venv import Venv
 
@@ -23,11 +29,13 @@ TOOLS_TO_BENCHMARK: Final = [
     Pyrefly(),
 ]
 
+SEVERITY_LABELS = {1: "Error", 2: "Warning", 3: "Info", 4: "Hint"}
+
 
 @pytest.fixture(scope="module", params=ALL_PROJECTS, ids=lambda p: p.name)
 def project_setup(
     request,
-) -> Generator[tuple[Project, Path, Venv], None, None]:
+) -> Generator[tuple[Project, Venv], None, None]:
     """Set up a project and its venv once per module (shared across all tests for this project)."""
     project: Project = request.param
 
@@ -38,274 +46,430 @@ def project_setup(
         venv = Venv.create(cwd, project.python_version)
         venv.install(project.install_arguments)
 
-        yield project, cwd, venv
+        yield project, venv
 
 
 @pytest.fixture(
     scope="function",
     params=TOOLS_TO_BENCHMARK,
-    ids=lambda t: t.name if hasattr(t, "name") else t.__class__.__name__,
+    ids=lambda t: t.name,
 )
 def tool(request) -> Tool:
     """Provide each tool to test."""
     return request.param
 
 
-def find_central_file(project: Project, cwd: Path) -> Path:
-    """Find a central file to modify for the benchmark."""
-    # Use the first include path, or a common file.
-    if project.include:
-        first_include = cwd / project.include[0]
-        if first_include.is_file():
-            return first_include
-        elif first_include.is_dir():
-            # Find the first Python file in the directory.
-            python_files = list(first_include.rglob("*.py"))
-            if python_files:
-                return python_files[0]
+def test_fetch_diagnostics(
+    request, benchmark, project_setup: tuple[Project, Venv], tool: Tool
+):
+    """Benchmark the time to receive initial diagnostics after starting the server."""
 
-    # Fallback: find any Python file.
-    python_files = list(cwd.rglob("*.py"))
-    if python_files:
-        return python_files[0]
+    project, venv = project_setup
 
-    raise RuntimeError(f"No Python file found in {cwd}")
+    run_lsp_test_benchmark(
+        request,
+        benchmark,
+        FetchDiagnostics,
+        project,
+        tool,
+        venv,
+    )
+
+
+def test_incremental_edit(
+    request, benchmark, project_setup: tuple[Project, Venv], tool: Tool
+):
+    """Benchmark the time to receive diagnostics after making an edit to a file."""
+
+    project, venv = project_setup
+
+    run_lsp_test_benchmark(request, benchmark, IncrementalEditTest, project, tool, venv)
+
+
+def run_lsp_test_benchmark[T: LspTest](
+    request: Any,
+    benchmark: Any,
+    Test: type[T],
+    project: Project,
+    tool: Tool,
+    venv: Venv,
+):
+    # Set benchmark group to project name for better readability.
+    benchmark.group = project.name
+    verbose = request.config.getoption("verbose") > 0
+
+    main_file_backup: Path | None = None
+
+    # some make changes to the main file. Create a backup and restore it before each test
+    # and once the entire suite is done.
+    if project.edit:
+        main_file_path = venv.project_path / project.edit.main_file
+        main_file_backup = main_file_path.with_name(main_file_path.name + ".bak")
+        main_file_path.copy(main_file_backup)
+
+    try:
+        tool.write_config(project, venv)
+
+        # Use asyncio.Runner to keep the same event loop alive across setup and measure.
+        with asyncio.Runner() as runner:
+
+            def setup():
+                if main_file_backup:
+                    main_file_backup.copy(main_file_backup.with_suffix(""))
+
+                test = Test(project, tool, venv)
+
+                runner.run(test.setup())
+                return (test,), {}
+
+            def run(test: T) -> None:
+                runner.run(test.run())
+
+            def teardown(test: T) -> None:
+                nonlocal verbose
+
+                test.assert_output(verbose=verbose)
+                runner.run(test.teardown())
+                verbose = False
+
+            # Run the benchmark using pedantic mode.
+            benchmark.pedantic(
+                run,
+                setup=setup,
+                teardown=teardown,
+                rounds=10,
+                iterations=1,
+                warmup_rounds=3,
+            )
+    finally:
+        if main_file_backup:
+            main_file_backup.copy(main_file_backup.with_suffix(""))
+
+
+class LspTest(ABC):
+    client: LSPClient
+    venv: Venv
+    project: Project
+    tool: Tool
+    edit: IncrementalEdit
+
+    def __init__(self, project: Project, tool: Tool, venv: Venv):
+        # Skip if no LSP test config.
+        edit = project.edit
+        if not edit:
+            pytest.skip(f"{project.name} does not have an incremental edit")
+            return
+
+        self.project = project
+        self.venv = venv
+        self.tool = tool
+        self.client = LSPClient()
+        self.edit = edit
+
+    @property
+    def cwd(self) -> Path:
+        return self.venv.project_path
+
+    @property
+    def main_file_path(self) -> Path:
+        return self.cwd / self.edit.main_file
+
+    @property
+    def affected_file_path(self) -> Path:
+        return self.cwd / self.edit.affected_file
+
+    def files_to_check(self) -> list[Path]:
+        return [self.main_file_path, self.affected_file_path]
+
+    def open_file_async(self, path: Path):
+        self.client.text_document_did_open(
+            lsp.DidOpenTextDocumentParams(
+                text_document=lsp.TextDocumentItem(
+                    uri=path.as_uri(),
+                    language_id="python",
+                    version=1,
+                    text=path.read_text(),
+                )
+            )
+        )
+
+    async def initialize(self):
+        lsp_cmd = self.tool.lsp_command(self.project, self.venv)
+        if lsp_cmd is None:
+            pytest.skip(f"{self.tool.name()} doesn't support LSP")
+            return
+
+        await self.client.start_io(*lsp_cmd, cwd=self.cwd)
+
+        await self.client.initialize_async(
+            lsp.InitializeParams(
+                root_uri=self.cwd.as_uri(),
+                workspace_folders=[
+                    lsp.WorkspaceFolder(uri=self.cwd.as_uri(), name=self.cwd.name)
+                ],
+                capabilities=lsp.ClientCapabilities(
+                    text_document=lsp.TextDocumentClientCapabilities(
+                        diagnostic=lsp.DiagnosticClientCapabilities(
+                            data_support=True, dynamic_registration=False
+                        ),
+                        synchronization=lsp.TextDocumentSyncClientCapabilities(
+                            did_save=True,
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        self.client.initialized(lsp.InitializedParams())
+
+    @abstractmethod
+    async def setup(self): ...
+
+    @abstractmethod
+    async def run(self): ...
+
+    @abstractmethod
+    def assert_output(self, verbose=False): ...
+
+    async def teardown(self):
+        await self.client.shutdown_async(None)
+        self.client.exit(None)
+        await self.client.stop()
+
+
+class FetchDiagnostics(LspTest):
+    diagnostics: list[FileDiagnostics] | None = None
+
+    @override
+    async def setup(self):
+        await self.initialize()
+        self.open_file_async(
+            self.main_file_path,
+        )
+        self.open_file_async(
+            self.affected_file_path,
+        )
+
+    @override
+    async def run(self):
+        self.diagnostics = await self.client.text_documents_diagnostics(
+            self.files_to_check()
+        )
+
+    @override
+    def assert_output(self, verbose=False):
+        if self.diagnostics is None:
+            pytest.fail("No diagnostics were fetched")
+            return
+
+        if verbose:
+            for file, diagnostics in self.diagnostics:
+                if diagnostics:
+                    print_diagnostics(file, diagnostics, self.venv.project_path)
+
+
+class IncrementalEditTest(LspTest):
+    before_edit_diagnostics: list[FileDiagnostics] | None = None
+    after_edit_diagnostics: list[FileDiagnostics] | None = None
+    new_content: str
+
+    def __init__(self, project: Project, tool: Tool, venv: Venv):
+        super().__init__(project, tool, venv)
+        new_content = self.edit.apply_to(self.main_file_path.read_text())
+
+        if new_content is None:
+            pytest.fail(
+                f"Could not find expected text in {self.main_file_path}:\n"
+                f"Expected to find: {self.edit.replace_text}\n"
+                f"This may indicate the project has been updated or the configuration is incorrect."
+            )
+            return
+
+        self.new_content = new_content
+
+    @override
+    async def setup(self):
+        await self.initialize()
+
+        self.open_file_async(self.main_file_path)
+        self.open_file_async(self.affected_file_path)
+
+        self.before_edit_diagnostics = await self.client.text_documents_diagnostics(
+            self.files_to_check()
+        )
+
+        # Give the server some time to do whatever indexing it needs
+        # This helps Pyrefly a ton on the homeassistant benchmark. It goes from 13s to 1 to 2s.
+        # It also seems that this indexing is only triggered after opening a file, which is why
+        # we wait here rather than after calling `initialize`
+        await asyncio.sleep(20)
+
+        if not self.client.server_supports_pull_diagnostics:
+            # Pyrefly sometimes sends more than one publish diagnostic per file,
+            # and it doesn't support versioned publish diagnostics, making it impossible
+            # for the client to tell if we already received the newest publish diagnostic
+            # notification or not. Because of that, sleep, clear all publish diagnostic
+            # notifications before sending the change notification.
+            self.client.clear_pending_publish_diagnostics()
+
+    @override
+    async def run(self):
+        self.client.text_document_did_change(
+            lsp.DidChangeTextDocumentParams(
+                text_document=lsp.VersionedTextDocumentIdentifier(
+                    uri=self.main_file_path.as_uri(),
+                    version=2,
+                ),
+                content_changes=[
+                    lsp.TextDocumentContentChangeWholeDocument(text=self.new_content)
+                ],
+            ),
+        )
+
+        all_files = self.files_to_check()
+
+        # wait for the didChange publish notifications or pull the new diagnostics
+        self.after_edit_diagnostics = await self.client.text_documents_diagnostics(
+            all_files
+        )
+
+        after_did_change_sum = sum(
+            len(diagnostics) for f, diagnostics in self.after_edit_diagnostics
+        )
+
+        # IMPORTANT: Write the file back to disk!
+        # Pyrefly, as of Nov 27, requires that the content on disk
+        # is updated to show cross-file diagnostics.
+        self.main_file_path.write_text(self.new_content)
+
+        self.client.text_document_did_save(
+            lsp.DidSaveTextDocumentParams(
+                text_document=lsp.TextDocumentIdentifier(
+                    uri=self.main_file_path.as_uri(),
+                ),
+            )
+        )
+
+        # Pyrefly only publishes cross-file diagnostics after did_save.
+        if isinstance(self.tool, Pyrefly):
+            after_did_save_sum = after_did_change_sum
+
+            # Pyrefly sometimes publishes multiple publish diagnostics after a `didSave`.
+            # Especially if checking takes long, as it, e.g., is the case for homeassistant.
+            # We need to wait until pyrefly sends us the cross-file diagnostics.
+            # For now, we use a very simple heuristics where we simply check if the diagnostic
+            # count between the `didChange` (not cross-file) and `didSave` (cross-file) is different.
+            while after_did_save_sum == after_did_change_sum:
+                self.after_edit_diagnostics = (
+                    await self.client.text_documents_diagnostics(all_files)
+                )
+
+                after_did_save_sum = sum(
+                    len(diagnostics) for f, diagnostics in self.after_edit_diagnostics
+                )
+
+    @override
+    def assert_output(self, verbose=False):
+        assert self.before_edit_diagnostics is not None, (
+            "The before edit diagnostics should be initialized. Did you forget to call `setup`?"
+        )
+        assert self.after_edit_diagnostics is not None, (
+            "The after edit diagnostics should be initialized if the test ran at least once. Did you forget to call `run`?"
+        )
+
+        before_edit_count = sum(
+            len(diagnostics) for _, diagnostics in self.before_edit_diagnostics
+        )
+
+        after_edit_count = sum(
+            len(diagnostics) for _, diagnostics in self.after_edit_diagnostics
+        )
+
+        assert after_edit_count > before_edit_count, (
+            f"Expected more diagnostics after the change. "
+            f"Initial: {before_edit_count}, After change: {after_edit_count}"
+        )
+
+        if verbose:
+            print_diagnostic_diff(
+                self.before_edit_diagnostics,
+                self.after_edit_diagnostics,
+                self.project.name,
+                self.tool.name(),
+                self.venv.project_path,
+            )
 
 
 def print_diagnostics(
-    results: list, files: list[Path], project_name: str, tool_name: str
-) -> None:
-    """Print diagnostic summary for multiple files."""
-    severity_map = {1: "Error", 2: "Warning", 3: "Info", 4: "Hint"}
-    total_diagnostics = 0
+    file: Path, diagnostics: list[lsp.Diagnostic], cwd: Path, label: str | None = None
+):
+    file = file.relative_to(cwd)
 
-    for file_idx, result in enumerate(results):
-        # Extract diagnostics from the result.
-        diagnostics = []
-        if hasattr(result, "items"):
-            # Full document diagnostic report.
-            diagnostics = result.items
-        elif hasattr(result, "kind"):
-            # Could be different report types.
-            if result.kind == "full" and hasattr(result, "items"):
-                diagnostics = result.items
+    if label:
+        print(f"\n{file}: {len(diagnostics)} {label}")
+    else:
+        print(f"\n{file}: {len(diagnostics)} diagnostics")
 
-        total_diagnostics += len(diagnostics)
-
-        file_name = files[file_idx].name
+    for diag in diagnostics:
+        severity = SEVERITY_LABELS.get(diag.severity, f"Unknown({diag.severity})")
         print(
-            f"\n{'=' * 80}\n{project_name} - {tool_name} - {file_name}: {len(diagnostics)} diagnostics"
-        )
-        if len(diagnostics) > 0:
-            # Show first few diagnostics.
-            for i, diag in enumerate(diagnostics[:5]):
-                if hasattr(diag, "severity"):
-                    severity = severity_map.get(
-                        diag.severity, f"Unknown({diag.severity})"
-                    )
-                else:
-                    severity = "Unknown"
-                # Truncate long messages.
-                msg = diag.message[:100] if len(diag.message) > 100 else diag.message
-                print(f"  [{severity}] {msg}")
-            if len(diagnostics) > 5:
-                print(f"  ... and {len(diagnostics) - 5} more")
-
-    print(f"\nTotal diagnostics across all files: {total_diagnostics}")
-
-
-def test_lsp_diagnostic_response_time(
-    benchmark, project_setup: tuple[Project, Path, Venv], tool: Tool
-):
-    """Benchmark the time to receive diagnostics after making a file change."""
-    project, cwd, venv = project_setup
-
-    # Set benchmark group to project name for better readability.
-    benchmark.group = project.name
-
-    # Skip if the tool doesn't support LSP.
-    lsp_cmd = tool.lsp_command(project, venv)
-    if lsp_cmd is None:
-        pytest.skip(f"{tool.__class__.__name__} doesn't support LSP")
-
-    # Skip if no LSP test config.
-    if project.lsp_test_config is None:
-        pytest.skip(f"{project.name} does not have LSP test configuration")
-
-    tool.write_config(project, venv)
-
-    # Get the files to modify and check.
-    main_file = cwd / project.lsp_test_config.main_file
-    affected_file = cwd / project.lsp_test_config.affected_file
-    files_to_check = [main_file, affected_file]
-
-    # Read original content and apply the type change.
-    original_content = main_file.read_text()
-
-    # Apply the configured type change.
-    old_text = project.lsp_test_config.type_change_old
-    new_text = project.lsp_test_config.type_change_new
-
-    if old_text not in original_content:
-        pytest.fail(
-            f"Could not find expected text in {main_file}:\n"
-            f"Expected to find: {old_text!r}\n"
-            f"This may indicate the project has been updated or the configuration is incorrect."
-        )
-
-    changed_content = original_content.replace(old_text, new_text, 1)
-
-    # Use asyncio.Runner to keep the same event loop alive across setup and measure.
-    with asyncio.Runner() as runner:
-
-        def setup():
-            """Setup for each benchmark iteration: start server, warmup, make change."""
-
-            async def async_setup():
-                # Start LSP server and client.
-                client = LSPClient()
-                await client.start_io(*lsp_cmd, cwd=str(cwd))
-                await client.initialize_async(cwd)
-                # Open both files.
-                for file_path in files_to_check:
-                    client.did_open(file_path)
-                # Warmup: request initial diagnostics for both files (pull diagnostics).
-                await asyncio.gather(
-                    *[client.request_diagnostics_async(f) for f in files_to_check]
-                )
-                # Make the change to the main file (version 2).
-                client.did_change(main_file, changed_content, version=2)
-                return client
-
-            client = runner.run(async_setup())
-            return (client,), {}
-
-        def measure_diagnostic_response(client: LSPClient) -> None:
-            """The function to benchmark: request diagnostics after the change."""
-
-            async def measure():
-                # Request diagnostics for both files in parallel (pull diagnostics).
-                results = await asyncio.gather(
-                    *[client.request_diagnostics_async(f) for f in files_to_check]
-                )
-                # Verify all responses deserialized successfully (not None/error).
-                for i, result in enumerate(results):
-                    assert result is not None, (
-                        f"Diagnostic request for file {i} returned None"
-                    )
-
-            runner.run(measure())
-
-        def teardown(client: LSPClient) -> None:
-            """Cleanup after each benchmark iteration."""
-
-            async def cleanup():
-                await client.shutdown_async()
-                await client.stop()
-
-            runner.run(cleanup())
-
-        # Run the benchmark using pedantic mode.
-        benchmark.pedantic(
-            measure_diagnostic_response,
-            setup=setup,
-            teardown=teardown,
-            rounds=10,
-            iterations=1,
-            warmup_rounds=3,
+            f"{file}:{diag.range.start.line + 1}:{diag.range.start.character + 1} [{severity}] {diag.message}"
         )
 
 
-def test_lsp_initial_diagnostics(
-    benchmark, project_setup: tuple[Project, Path, Venv], tool: Tool
-):
-    """Benchmark the time to receive initial diagnostics after starting the server."""
-    project, cwd, venv = project_setup
+DiagnosticKey = NewType("DiagnosticKey", object)
 
-    # Set benchmark group to project name for better readability.
-    benchmark.group = project.name
 
-    # Skip if the tool doesn't support LSP.
-    lsp_cmd = tool.lsp_command(project, venv)
-    if lsp_cmd is None:
-        pytest.skip(f"{tool.__class__.__name__} doesn't support LSP")
-
-    tool.write_config(project, venv)
-
-    # Determine which files to open.
-    if project.lsp_test_config is None:
-        pytest.skip(f"{project.name} does not have LSP test configuration")
-
-    main_file = cwd / project.lsp_test_config.main_file
-    affected_file = cwd / project.lsp_test_config.affected_file
-    files_to_check = [main_file, affected_file]
-
-    # Store diagnostics from the last round for validation.
-    captured_diagnostics = None
-
-    # Use asyncio.Runner to keep the same event loop alive across setup and measure.
-    with asyncio.Runner() as runner:
-
-        def setup():
-            """Setup for each benchmark iteration: start server and initialize."""
-
-            async def async_setup():
-                # Start LSP server and client.
-                client = LSPClient()
-                await client.start_io(*lsp_cmd, cwd=str(cwd))
-                await client.initialize_async(cwd)
-                # Open all files.
-                for file_path in files_to_check:
-                    client.did_open(file_path)
-                return client
-
-            client = runner.run(async_setup())
-            return (client,), {}
-
-        def measure_initial_diagnostics(client: LSPClient) -> None:
-            """The function to benchmark: request initial diagnostics."""
-            nonlocal captured_diagnostics
-
-            async def measure():
-                # Request diagnostics for all files in parallel.
-                results = await asyncio.gather(
-                    *[client.request_diagnostics_async(f) for f in files_to_check]
-                )
-                # Verify all responses deserialized successfully (not None/error).
-                for i, result in enumerate(results):
-                    assert result is not None, (
-                        f"Diagnostic request for file {i} returned None"
-                    )
-                # Store diagnostics for validation.
-                nonlocal captured_diagnostics
-                captured_diagnostics = results
-
-            runner.run(measure())
-
-        def teardown(client: LSPClient) -> None:
-            """Cleanup after each benchmark iteration."""
-
-            async def cleanup():
-                await client.shutdown_async()
-                await client.stop()
-
-            runner.run(cleanup())
-
-        # Run the benchmark using pedantic mode.
-        benchmark.pedantic(
-            measure_initial_diagnostics,
-            setup=setup,
-            teardown=teardown,
-            rounds=10,
-            iterations=1,
-            warmup_rounds=3,
+def diagnostic_key(file: Path, diagnostic: lsp.Diagnostic) -> DiagnosticKey:
+    """Create a unique key for a diagnostic."""
+    return DiagnosticKey(
+        (
+            file,
+            diagnostic.range.start.line,
+            diagnostic.range.start.character,
+            diagnostic.code,
+            diagnostic.message,
         )
+    )
 
-        # Validate the captured diagnostics after benchmarking.
-        if captured_diagnostics is not None:
-            print_diagnostics(
-                captured_diagnostics,
-                files_to_check,
-                project.name,
-                tool.__class__.__name__,
-            )
+
+def print_diagnostic_diff(
+    before_diagnostics: list[FileDiagnostics],
+    after_diagnostics: list[FileDiagnostics],
+    project_name: str,
+    tool_name: str,
+    cwd: Path,
+) -> None:
+    """Print the difference in diagnostics before and after a change."""
+
+    total_before = sum(len(diagnostics) for _, diagnostics in before_diagnostics)
+    total_after = sum(len(diagnostics) for _, diagnostics in after_diagnostics)
+
+    print(f"\n{'=' * 80}")
+    print(f"Diagnostic Diff: {project_name} - {tool_name}")
+    print(f"{'=' * 80}")
+    print(f"Before change: {total_before} diagnostics")
+    print(f"After change:  {total_after} diagnostics")
+    print(f"Difference:    {total_after - total_before:+d} diagnostics")
+
+    before_keys = {
+        diagnostic_key(file, diagnostic)
+        for file, diagnostics in before_diagnostics
+        for diagnostic in diagnostics
+    }
+
+    # Find new diagnostics by comparing before and after.
+    # Create sets of diagnostic keys.
+    for file, diagnostics in after_diagnostics:
+        new_diagnostics = [
+            diagnostic
+            for diagnostic in diagnostics
+            if diagnostic_key(file, diagnostic) not in before_keys
+        ]
+
+        if new_diagnostics:
+            print_diagnostics(file, new_diagnostics, cwd, "new diagnostic(s)")
+        else:
+            print_diagnostics(file, diagnostics, cwd, "returned diagnostic(s)")
+
+    print(f"{'=' * 80}")

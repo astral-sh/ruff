@@ -27,6 +27,9 @@ def which_tool(name: str, path: Path | None = None) -> Path:
 
 
 class Tool(abc.ABC):
+    @abc.abstractmethod
+    def name(self) -> str: ...
+
     def write_config(self, project: Project, venv: Venv) -> None:
         """Write the tool's configuration file."""
 
@@ -55,10 +58,10 @@ class Tool(abc.ABC):
 
 class Ty(Tool):
     path: Path
-    name: str
+    _name: str
 
     def __init__(self, *, path: Path | None = None):
-        self.name = str(path) if path else "ty"
+        self._name = str(path) if path else "ty"
         executable = "ty.exe" if sys.platform == "win32" else "ty"
         self.path = (
             path or (Path(__file__) / "../../../../../target/release" / executable)
@@ -67,6 +70,10 @@ class Ty(Tool):
         assert self.path.is_file(), (
             f"ty not found at '{self.path}'. Run `cargo build --release --bin ty`."
         )
+
+    @override
+    def name(self) -> str:
+        return self._name
 
     @override
     def config(self, project: Project, venv: Venv):
@@ -95,7 +102,7 @@ class Ty(Tool):
         for exclude in project.exclude:
             command.extend(["--exclude", exclude])
 
-        return Command(name=self.name, command=command)
+        return Command(name=self._name, command=command)
 
     @override
     def lsp_command(self, project: Project, venv: Venv) -> list[str] | None:
@@ -109,6 +116,10 @@ class Mypy(Tool):
     def __init__(self, *, warm: bool, path: Path | None = None):
         self.path = path
         self.warm = warm
+
+    @override
+    def name(self) -> str:
+        return "mypy"
 
     @override
     def command(self, project: Project, venv: Venv, single_threaded: bool) -> Command:
@@ -178,6 +189,10 @@ class Pyright(Tool):
                 )
 
     @override
+    def name(self) -> str:
+        return "pyright"
+
+    @override
     def config(self, project: Project, venv: Venv):
         return (
             Path("pyrightconfig.json"),
@@ -225,6 +240,10 @@ class Pyrefly(Tool):
 
     def __init__(self, *, path: Path | None = None):
         self.path = path or which_tool("pyrefly")
+
+    @override
+    def name(self) -> str:
+        return "pyrefly"
 
     @override
     def config(self, project: Project, venv: Venv):
