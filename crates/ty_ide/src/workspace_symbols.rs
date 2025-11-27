@@ -12,7 +12,7 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
 
     let project = db.project();
 
-    let query = QueryPattern::new(query);
+    let query = QueryPattern::fuzzy(query);
     let files = project.files(db);
     let results = std::sync::Mutex::new(Vec::new());
     {
