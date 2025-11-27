@@ -432,7 +432,7 @@ def _(
     reveal_type(list_or_tuple)  # revealed: list[int] | tuple[int, ...]
     reveal_type(list_or_tuple_legacy)  # revealed: list[int] | tuple[int, ...]
     # TODO: This should be `(str, bytes) -> int`
-    reveal_type(my_callable)  # revealed: Unknown
+    reveal_type(my_callable)  # revealed: (...) -> Unknown
     reveal_type(annotated_int)  # revealed: int
     reveal_type(transparent_alias)  # revealed: int
     reveal_type(optional_int)  # revealed: int | None
@@ -472,7 +472,7 @@ reveal_type(ListOfPairs)  # revealed: <class 'list[tuple[str, str]]'>
 reveal_type(ListOrTupleOfInts)  # revealed: types.UnionType
 reveal_type(AnnotatedInt)  # revealed: <typing.Annotated special form>
 reveal_type(SubclassOfInt)  # revealed: GenericAlias
-reveal_type(CallableIntToStr)  # revealed: Unknown
+reveal_type(CallableIntToStr)  # revealed: GenericAlias
 
 def _(
     ints_or_none: IntsOrNone,
@@ -490,7 +490,7 @@ def _(
     reveal_type(annotated_int)  # revealed: int
     reveal_type(subclass_of_int)  # revealed: type[int]
     # TODO: This should be `(int, /) -> str`
-    reveal_type(callable_int_to_str)  # revealed: Unknown
+    reveal_type(callable_int_to_str)  # revealed: (...) -> Unknown
 ```
 
 A generic implicit type alias can also be used in another generic implicit type alias:
@@ -653,7 +653,7 @@ ListOfInts = list[int]
 
 # error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
 def _(doubly_specialized: ListOfInts[int]):
-    reveal_type(doubly_specialized)  # revealed: Unknown
+    reveal_type(doubly_specialized)  # revealed: list[int]
 ```
 
 Specializing a generic implicit type alias with an incorrect number of type arguments also results
@@ -674,8 +674,8 @@ def _(
     # error: [invalid-type-arguments] "No type argument provided for required type variable `U`"
     dict_too_few_args: MyDict[int],
 ):
-    reveal_type(list_too_many_args)  # revealed: Unknown
-    reveal_type(dict_too_few_args)  # revealed: Unknown
+    reveal_type(list_too_many_args)  # revealed: list[Unknown]
+    reveal_type(dict_too_few_args)  # revealed: dict[Unknown, Unknown]
 ```
 
 Trying to specialize a non-name node results in an error:
@@ -693,7 +693,7 @@ def _(
     # error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
     specialized: this_does_not_work()[int],
 ):
-    reveal_type(specialized)  # revealed: Unknown
+    reveal_type(specialized)  # revealed: int | str
 ```
 
 Similarly, if you try to specialize a union type without a binding context, we emit an error:
@@ -704,7 +704,7 @@ Similarly, if you try to specialize a union type without a binding context, we e
 x: (list[T] | set[T])[int]
 
 def _():
-    reveal_type(x)  # revealed: Unknown
+    reveal_type(x)  # revealed: list[typing.TypeVar] | set[typing.TypeVar]
 ```
 
 ### Multiple definitions
@@ -1521,11 +1521,23 @@ def _(
 ### Self-referential generic implicit type aliases
 
 ```py
-# TODO: uncomment these
-# from typing import TypeVar
-#
-# T = TypeVar("T")
-# NestedDict = dict[str, "NestedDict[T] | T"]
-#
-# NestedList = list["NestedList[T] | None"]
+from typing import TypeVar
+
+T = TypeVar("T")
+
+# TODO: No errors
+# error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
+NestedDict = dict[str, "NestedDict[T] | T"]
+# error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
+NestedList = list["NestedList[T] | None"]
+
+def _(
+    # TODO: No errors
+    # error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
+    nested_dict_int: NestedDict[int],
+    # error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
+    nested_list_str: NestedList[str],
+):
+    reveal_type(nested_dict_int)  # revealed: dict[str, Divergent]
+    reveal_type(nested_list_str)  # revealed: list[Divergent]
 ```

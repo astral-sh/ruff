@@ -184,14 +184,17 @@ def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
     reveal_type(classinfo)  # revealed: type | UnionType | tuple[Divergent, ...]
     return isinstance(obj, classinfo)
 
-# TODO: uncomment this block
-# K = TypeVar("K")
-# V = TypeVar("V")
-# NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
+K = TypeVar("K")
+V = TypeVar("V")
+# TODO: No error here
+# error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
+NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
 
-# def _(nested: NestedDict[str, int]):
-#     # TODO should be `dict[str, int | NestedDict[str, int]]`
-#     reveal_type(nested)  # revealed: @Todo(specialized generic alias in type expression)
+# TODO: No error here
+# error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
+def _(nested: NestedDict[str, int]):
+    # TODO should be `dict[str, int | NestedDict[str, int]]`
+    reveal_type(nested)  # revealed: dict[Unknown, Divergent]
 
 my_isinstance(1, int)
 my_isinstance(1, int | str)
