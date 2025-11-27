@@ -444,6 +444,22 @@ class G(Generic[T]):
 reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
 ```
 
+An invalid specialization in a recursive bound doesn't cause a panic:
+
+```py
+from typing import TypeVar, Generic
+
+# error: [invalid-type-arguments]
+T = TypeVar("T", bound="Node[int]")
+
+class Node(Generic[T]):
+    pass
+
+# error: [invalid-type-arguments]
+def _(n: Node[str]):
+    reveal_type(n)  # revealed: Node[Unknown]
+```
+
 ### Defaults
 
 ```toml
