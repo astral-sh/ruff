@@ -52,7 +52,7 @@ def project_setup(
 @pytest.fixture(
     scope="function",
     params=TOOLS_TO_BENCHMARK,
-    ids=lambda t: t.name,
+    ids=lambda t: t.name(),
 )
 def tool(request) -> Tool:
     """Provide each tool to test."""
@@ -252,7 +252,7 @@ class FetchDiagnostics(LspTest):
 
     @override
     async def run(self):
-        self.diagnostics = await self.client.text_documents_diagnostics(
+        self.diagnostics = await self.client.text_documents_diagnostics_async(
             self.files_to_check()
         )
 
@@ -294,8 +294,8 @@ class IncrementalEditTest(LspTest):
         self.open_file_async(self.main_file_path)
         self.open_file_async(self.affected_file_path)
 
-        self.before_edit_diagnostics = await self.client.text_documents_diagnostics(
-            self.files_to_check()
+        self.before_edit_diagnostics = (
+            await self.client.text_documents_diagnostics_async(self.files_to_check())
         )
 
         # Give the server some time to do whatever indexing it needs
@@ -329,8 +329,8 @@ class IncrementalEditTest(LspTest):
         all_files = self.files_to_check()
 
         # wait for the didChange publish notifications or pull the new diagnostics
-        self.after_edit_diagnostics = await self.client.text_documents_diagnostics(
-            all_files
+        self.after_edit_diagnostics = (
+            await self.client.text_documents_diagnostics_async(all_files)
         )
 
         after_did_change_sum = sum(
@@ -361,7 +361,7 @@ class IncrementalEditTest(LspTest):
             # count between the `didChange` (not cross-file) and `didSave` (cross-file) is different.
             while after_did_save_sum == after_did_change_sum:
                 self.after_edit_diagnostics = (
-                    await self.client.text_documents_diagnostics(all_files)
+                    await self.client.text_documents_diagnostics_async(all_files)
                 )
 
                 after_did_save_sum = sum(

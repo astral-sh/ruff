@@ -134,7 +134,7 @@ class LSPClient(LanguageClient):
         publish_diagnostics = await self.wait_for_push_diagnostics_async(path)
         return list(publish_diagnostics.diagnostics)
 
-    async def text_documents_diagnostics(
+    async def text_documents_diagnostics_async(
         self, files: list[Path]
     ) -> list[FileDiagnostics]:
         responses = await asyncio.gather(
@@ -152,7 +152,7 @@ class LSPClient(LanguageClient):
         ]
 
     async def wait_for_push_diagnostics_async(
-        self, path: Path, timeout: float = 30
+        self, path: Path, timeout: float = 60
     ) -> lsp.PublishDiagnosticsParams:
         future = self.diagnostics.get(path.as_uri(), None)
 
