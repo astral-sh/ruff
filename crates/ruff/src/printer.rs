@@ -19,15 +19,6 @@ use ruff_linter::settings::types::{OutputFormat, UnsafeFixes};
 
 use crate::diagnostics::{Diagnostics, FixMap};
 
-/// Display mode for the summary text output.
-#[derive(Debug, Clone, Copy)]
-enum SummaryMode {
-    /// Default summary format without legend.
-    Default,
-    /// Statistics summary format with fixability legend.
-    Statistics,
-}
-
 bitflags! {
     #[derive(Default, Debug, Copy, Clone)]
     pub(crate) struct Flags: u8 {
@@ -92,12 +83,7 @@ impl Printer {
         }
     }
 
-    fn write_summary_text(
-        &self,
-        writer: &mut dyn Write,
-        diagnostics: &Diagnostics,
-        mode: SummaryMode,
-    ) -> Result<()> {
+    fn write_summary_text(&self, writer: &mut dyn Write, diagnostics: &Diagnostics) -> Result<()> {
         if self.log_level >= LogLevel::Default {
             let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
@@ -124,13 +110,7 @@ impl Printer {
                 }
 
                 if let Some(fixables) = fixables {
-                    let (prefix, suffix) = match mode {
-                        SummaryMode::Statistics => (
-                            String::new(),
-                            format!(" ([{}] all, [{}] some)", "*".cyan(), "-".cyan()),
-                        ),
-                        SummaryMode::Default => (format!("[{}] ", "*".cyan()), String::new()),
-                    };
+                    let fix_prefix = format!("[{}]", "*".cyan());
 
                     if self.unsafe_fixes.is_hint() {
                         if fixables.applicable > 0 && fixables.inapplicable_unsafe > 0 {
@@ -141,14 +121,14 @@ impl Printer {
                             };
                             writeln!(
                                 writer,
-                                "{prefix}{} fixable with the `--fix` option{suffix} ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
+                                "{fix_prefix} {} fixable with the `--fix` option ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
                                 fixables.applicable, fixables.inapplicable_unsafe
                             )?;
                         } else if fixables.applicable > 0 {
                             // Only applicable fixes
                             writeln!(
                                 writer,
-                                "{prefix}{} fixable with the `--fix` option{suffix}.",
+                                "{fix_prefix} {} fixable with the `--fix` option.",
                                 fixables.applicable,
                             )?;
                         } else {
@@ -168,7 +148,7 @@ impl Printer {
                         if fixables.applicable > 0 {
                             writeln!(
                                 writer,
-                                "{prefix}{} fixable with the --fix option{suffix}.",
+                                "{fix_prefix} {} fixable with the --fix option.",
                                 fixables.applicable
                             )?;
                         }
@@ -249,7 +229,7 @@ impl Printer {
                         writeln!(writer)?;
                     }
                 }
-                self.write_summary_text(writer, diagnostics, SummaryMode::Default)?;
+                self.write_summary_text(writer, diagnostics)?;
             }
             return Ok(());
         }
@@ -278,7 +258,7 @@ impl Printer {
                     writeln!(writer)?;
                 }
             }
-            self.write_summary_text(writer, diagnostics, SummaryMode::Default)?;
+            self.write_summary_text(writer, diagnostics)?;
         }
 
         writer.flush()?;
@@ -386,7 +366,7 @@ impl Printer {
                     )?;
                 }
 
-                self.write_summary_text(writer, diagnostics, SummaryMode::Statistics)?;
+                self.write_summary_text(writer, diagnostics)?;
                 return Ok(());
             }
             OutputFormat::Json => {
