@@ -40,8 +40,8 @@ impl Server {
 
                     let task = match msg {
                         Message::Request(req) => {
-
-                            .request_queue_mut()
+                            self.session
+                                .request_queue_mut()
                                 .incoming_mut()
                                 .register(req.id.clone(), req.method.clone());
 
