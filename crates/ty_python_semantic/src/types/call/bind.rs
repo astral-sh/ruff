@@ -36,11 +36,11 @@ use crate::types::generics::{
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
-    BoundMethodType, BoundTypeVarIdentity, ClassLiteral, DATACLASS_FLAGS, DataclassFlags,
-    DataclassParams, FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType,
-    TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, ide_support, todo_type,
+    BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableTypeKind, ClassLiteral,
+    DATACLASS_FLAGS, DataclassFlags, DataclassParams, FieldInstance, KnownBoundMethodType,
+    KnownClass, KnownInstanceType, MemberLookupPolicy, NominalInstanceType, PropertyInstanceType,
+    SpecialFormType, TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance,
+    UnionBuilder, UnionType, WrapperDescriptorKind, enums, ide_support, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
@@ -2757,6 +2757,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
 
 struct ArgumentTypeChecker<'a, 'db> {
     db: &'db dyn Db,
+    signature_type: Type<'db>,
     signature: &'a Signature<'db>,
     arguments: &'a CallArguments<'a, 'db>,
     argument_matches: &'a [MatchedArgument<'db>],
@@ -2774,6 +2775,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     #[expect(clippy::too_many_arguments)]
     fn new(
         db: &'db dyn Db,
+        signature_type: Type<'db>,
         signature: &'a Signature<'db>,
         arguments: &'a CallArguments<'a, 'db>,
         argument_matches: &'a [MatchedArgument<'db>],
@@ -2785,6 +2787,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     ) -> Self {
         Self {
             db,
+            signature_type,
             signature,
             arguments,
             argument_matches,
@@ -3033,9 +3036,23 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     }
 
     fn check_argument_types(&mut self) {
+        let paramspec = self
+            .signature
+            .parameters()
+            .find_paramspec_from_args_kwargs(self.db);
+
         for (argument_index, adjusted_argument_index, argument, argument_type) in
             self.enumerate_argument_types()
         {
+            if let Some(paramspec) = paramspec {
+                if self.try_paramspec_evaluation_at(argument_index, paramspec) {
+                    // Once we find an argument that matches the `ParamSpec`, we can stop checking
+                    // the remaining arguments since `ParamSpec` should always be the last
+                    // parameter.
+                    return;
+                }
+            }
+
             match argument {
                 Argument::Variadic => self.check_variadic_argument_type(
                     argument_index,
@@ -3061,6 +3078,87 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 }
             }
         }
+
+        if let Some(paramspec) = paramspec {
+            // If we reach here, none of the arguments matched the `ParamSpec` parameter, but the
+            // `ParamSpec` could specialize to a parameter list containing some parameters.
+            self.evaluate_paramspec_sub_call(None, paramspec);
+        }
+    }
+
+    /// Try to evaluate a `ParamSpec` sub-call at the given argument index.
+    ///
+    /// If the argument at the given index matches a parameter which is a `ParamSpec`, invoke
+    /// a sub-call starting from that argument index and return `true`. Otherwise, return `false`.
+    fn try_paramspec_evaluation_at(
+        &mut self,
+        argument_index: usize,
+        paramspec: BoundTypeVarInstance<'db>,
+    ) -> bool {
+        let [parameter_index] = self.argument_matches[argument_index].parameters.as_slice() else {
+            return false;
+        };
+
+        if !self.signature.parameters()[*parameter_index]
+            .annotated_type()
+            .is_some_and(|ty| matches!(ty, Type::TypeVar(typevar) if typevar.is_paramspec(self.db)))
+        {
+            return false;
+        }
+
+        self.evaluate_paramspec_sub_call(Some(argument_index), paramspec)
+    }
+
+    /// Invoke a sub-call for the given `ParamSpec` type variable, using the remaining arguments.
+    ///
+    /// The remaining arguments start from `argument_index` if provided, otherwise no arguments
+    /// are passed.
+    ///
+    /// Returns `false` if the specialization does not contain a mapping for the given `paramspec`.
+    fn evaluate_paramspec_sub_call(
+        &mut self,
+        argument_index: Option<usize>,
+        paramspec: BoundTypeVarInstance<'db>,
+    ) -> bool {
+        let Some(Type::Callable(callable)) = self
+            .specialization
+            .and_then(|specialization| specialization.get(self.db, paramspec))
+        else {
+            return false;
+        };
+
+        if !matches!(callable.kind(self.db), CallableTypeKind::ParamSpecValue) {
+            return false;
+        }
+
+        // TODO: Support overloads?
+        let [signature] = callable.signatures(self.db).overloads.as_slice() else {
+            return false;
+        };
+
+        let sub_arguments = if let Some(argument_index) = argument_index {
+            self.arguments.start_from(argument_index)
+        } else {
+            CallArguments::none()
+        };
+
+        // TODO: What should be the `signature_type` here?
+        let bindings = match Bindings::from(Binding::single(self.signature_type, signature.clone()))
+            .match_parameters(self.db, &sub_arguments)
+            .check_types(self.db, &sub_arguments, self.call_expression_tcx, &[])
+        {
+            Ok(bindings) => Box::new(bindings),
+            Err(CallError(_, bindings)) => bindings,
+        };
+
+        // SAFETY: `bindings` was created from a single binding above.
+        let [binding] = bindings.single_element().unwrap().overloads.as_slice() else {
+            unreachable!("ParamSpec sub-call should only contain a single binding");
+        };
+
+        self.errors.extend(binding.errors.iter().cloned());
+
+        true
     }
 
     fn check_variadic_argument_type(
@@ -3349,6 +3447,7 @@ impl<'db> Binding<'db> {
     ) {
         let mut checker = ArgumentTypeChecker::new(
             db,
+            self.signature_type,
             &self.signature,
             arguments,
             &self.argument_matches,

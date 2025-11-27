@@ -18,11 +18,11 @@ use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature,
-    CallableType, CallableTypeKind, ClassLiteral, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind,
-    NormalizedVisitor, Signature, Type, TypeContext, TypeMapping, TypeRelation,
-    TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
-    UnionType, declaration_type, walk_bound_type_var_type,
+    CallableType, CallableTypeKind, CallableTypes, ClassLiteral, FindLegacyTypeVarsVisitor,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
+    MaterializationKind, NormalizedVisitor, Signature, Type, TypeContext, TypeMapping,
+    TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind,
+    TypeVarVariance, UnionType, declaration_type, walk_bound_type_var_type,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -135,10 +135,6 @@ impl<'db> BoundTypeVarInstance<'db> {
         db: &'db dyn Db,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> bool {
-        if self.is_paramspec(db) {
-            tracing::debug!("bound type var: {}", self.identity(db).display(db));
-            tracing::debug!("inferrable type vars: {}", inferable.display(db));
-        }
         match inferable {
             InferableTypeVars::None => false,
             InferableTypeVars::One(typevars) => typevars.contains(&self.identity(db)),
@@ -1648,8 +1644,9 @@ impl<'db> SpecializationBuilder<'db> {
             }
 
             (Type::Callable(formal_callable), _) => {
-                if let Some(callable_types) = actual.try_upcast_to_callable(self.db)
-                    && let Some(actual_callable) = callable_types.exactly_one()
+                if let Some(actual_callable) = actual
+                    .try_upcast_to_callable(self.db)
+                    .and_then(CallableTypes::exactly_one)
                 {
                     // We're only interested in a formal callable of the form `Callable[P, ...]` for
                     // now where `P` is a `ParamSpec`.

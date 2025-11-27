@@ -1409,6 +1409,8 @@ pub(crate) enum ParametersKind<'db> {
     ///
     /// Note that this is distinct from a parameter list _containing_ a `ParamSpec` which is
     /// considered a standard parameter list that just contains a `ParamSpec`.
+    // TODO: Maybe we should use `find_paramspec_from_args_kwargs` instead of storing the typevar
+    // here?
     ParamSpec(BoundTypeVarInstance<'db>),
 }
 
@@ -1553,6 +1555,44 @@ impl<'db> Parameters<'db> {
             ],
             kind: ParametersKind::Standard,
         }
+    }
+
+    /// Returns the bound `ParamSpec` type variable if the parameters contain a `ParamSpec`.
+    pub(crate) fn find_paramspec_from_args_kwargs(
+        &self,
+        db: &'db dyn Db,
+    ) -> Option<BoundTypeVarInstance<'db>> {
+        let [.., maybe_args, maybe_kwargs] = self.value.as_slice() else {
+            return None;
+        };
+
+        if !maybe_args.is_variadic() || !maybe_kwargs.is_keyword_variadic() {
+            return None;
+        }
+
+        let (Type::TypeVar(args_typevar), Type::TypeVar(kwargs_typevar)) =
+            (maybe_args.annotated_type()?, maybe_kwargs.annotated_type()?)
+        else {
+            return None;
+        };
+
+        if matches!(
+            (
+                args_typevar.paramspec_attr(db),
+                kwargs_typevar.paramspec_attr(db)
+            ),
+            (
+                Some(ParamSpecAttrKind::Args),
+                Some(ParamSpecAttrKind::Kwargs)
+            )
+        ) {
+            let typevar = args_typevar.without_paramspec_attr(db);
+            if typevar.is_same_typevar_as(db, kwargs_typevar.without_paramspec_attr(db)) {
+                return Some(typevar);
+            }
+        }
+
+        None
     }
 
     fn from_parameters(
