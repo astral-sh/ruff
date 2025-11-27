@@ -148,7 +148,7 @@ impl Printer {
                         if fixables.applicable > 0 {
                             writeln!(
                                 writer,
-                                "{fix_prefix} {} fixable with the --fix option.",
+                                "{fix_prefix} {} fixable with the `--fix` option.",
                                 fixables.applicable
                             )?;
                         }

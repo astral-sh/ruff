@@ -1043,7 +1043,7 @@ def mvce(keys, values):
     ----- stdout -----
     1	C416	[*] unnecessary-comprehension
     Found 1 error.
-    [*] 1 fixable with the --fix option.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     ");
@@ -1860,7 +1860,7 @@ fn check_no_hint_for_hidden_unsafe_fixes_when_disabled() {
     --> -:1:1
 
     Found 2 errors.
-    [*] 1 fixable with the --fix option.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     ");
@@ -1903,7 +1903,7 @@ fn check_shows_unsafe_fixes_with_opt_in() {
     --> -:1:1
 
     Found 2 errors.
-    [*] 2 fixable with the --fix option.
+    [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
     ");
