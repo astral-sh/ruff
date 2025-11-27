@@ -8879,11 +8879,15 @@ impl<'db> InvalidTypeExpression<'db> {
     }
 
     fn add_subdiagnostics(self, db: &'db dyn Db, mut diagnostic: LintDiagnosticGuard) {
-        if let InvalidTypeExpression::InvalidType(ty, scope) = self {
-            let Type::ModuleLiteral(module_type) = ty else {
-                return;
-            };
-            let module = module_type.module(db);
+        if let InvalidTypeExpression::InvalidType(Type::Never, _) = self {
+            diagnostic.help(
+                "The variable may have been inferred as `Never` because \
+                its definition was inferred as being unreachable",
+            );
+        } else if let InvalidTypeExpression::InvalidType(ty @ Type::ModuleLiteral(module), scope) =
+            self
+        {
+            let module = module.module(db);
             let Some(module_name_final_part) = module.name(db).components().next_back() else {
                 return;
             };
