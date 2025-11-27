@@ -252,8 +252,10 @@ fn render_markdown(docstring: &str) -> String {
 
         // If we're not in a codeblock and we see something that signals a literal block, start one
         let parsed_lit = line
+            // first check for a line ending with `::`
             .strip_suffix("::")
             .map(|prefix| (prefix, None))
+            // if that fails, look for a line ending with `:: lang`
             .or_else(|| {
                 let (prefix, lang) = line.rsplit_once(' ')?;
                 let prefix = prefix.trim_end().strip_suffix("::")?;
@@ -298,13 +300,15 @@ fn render_markdown(docstring: &str) -> String {
                     | "versionchanged" | "version-changed" | "version-deprecated" | "deprecated"
                     | "version-removed" | "versionremoved",
                 ) => {
+                    // Render the argument of things like `.. version-added:: 4.0`
                     let suffix = if let Some(lang) = lang {
                         format!(" *{lang}*")
                     } else {
                         String::new()
                     };
+                    // We prepend without_directive here out of caution for preserving input.
+                    // This is probably gibberish/invalid syntax? But it's a no-op in normal cases.
                     _line = format!("**{without_directive}{}:**{suffix}", directive.unwrap());
-                    // Render the argument of things like `.. version-added:: 4.0`
 
                     line = _line.as_str();
                     None
