@@ -2112,7 +2112,8 @@ impl<'db> Type<'db> {
             // `type[T]` is a subtype of the class object `A` if every instance of `T` is a subtype of an instance
             // of `A`, and vice versa.
             (Type::SubclassOf(subclass_of), _)
-                if subclass_of.is_type_var() && !target.is_callable_type() =>
+                if subclass_of.is_type_var()
+                    && !matches!(target, Type::Callable(_) | Type::ProtocolInstance(_)) =>
             {
                 let this_instance = Type::TypeVar(subclass_of.into_type_var().unwrap());
                 let other_instance = match target {
@@ -3085,7 +3086,8 @@ impl<'db> Type<'db> {
 
             // `type[T]` is disjoint from a class object `A` if every instance of `T` is disjoint from an instance of `A`.
             (Type::SubclassOf(subclass_of), other) | (other, Type::SubclassOf(subclass_of))
-                if subclass_of.is_type_var() && !other.is_callable_type() =>
+                if subclass_of.is_type_var()
+                    && !matches!(other, Type::Callable(_) | Type::ProtocolInstance(_)) =>
             {
                 let this_instance = Type::TypeVar(subclass_of.into_type_var().unwrap());
                 let other_instance = match other {

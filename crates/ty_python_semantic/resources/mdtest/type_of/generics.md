@@ -99,8 +99,11 @@ class Foo:
 A class `A` is a subtype of `type[T]` if any instance of `A` is a subtype of `T`.
 
 ```py
-from typing import Callable
+from typing import Callable, Protocol
 from ty_extensions import is_assignable_to, is_subtype_of, is_disjoint_from, static_assert
+
+class Callback(Protocol):
+    def __call__(self, *args, **kwargs) -> int: ...
 
 def _[T](_: T):
     static_assert(not is_disjoint_from(type[T], T))
@@ -114,6 +117,9 @@ def _[T](_: T):
 
     static_assert(is_assignable_to(type[T], Callable[..., T]))
     static_assert(not is_disjoint_from(type[T], Callable[..., T]))
+
+    static_assert(is_assignable_to(type[T], Callback[..., T]))
+    static_assert(not is_disjoint_from(type[T], Callback[..., T]))
 
 def _[T: int](_: T):
     static_assert(is_disjoint_from(type[T], T))
@@ -134,6 +140,9 @@ def _[T: int](_: T):
     static_assert(is_assignable_to(type[T], Callable[..., T]))
     static_assert(not is_disjoint_from(type[T], Callable[..., T]))
 
+    static_assert(is_assignable_to(type[T], Callback[..., T]))
+    static_assert(not is_disjoint_from(type[T], Callback[..., T]))
+
     static_assert(is_subtype_of(type[T], type[T] | None))
     static_assert(not is_disjoint_from(type[T], type[T] | None))
 
@@ -151,6 +160,9 @@ def _[T: (int, str)](_: T):
 
     static_assert(is_assignable_to(type[T], Callable[..., T]))
     static_assert(not is_disjoint_from(type[T], Callable[..., T]))
+
+    static_assert(is_assignable_to(type[T], Callback[..., T]))
+    static_assert(not is_disjoint_from(type[T], Callback[..., T]))
 
     static_assert(is_subtype_of(type[T], type[T] | None))
     static_assert(not is_disjoint_from(type[T], type[T] | None))
