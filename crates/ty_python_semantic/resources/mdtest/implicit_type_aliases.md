@@ -403,7 +403,6 @@ reveal_type(ListOrTuple)  # revealed: types.UnionType
 reveal_type(ListOrTupleLegacy)  # revealed: types.UnionType
 reveal_type(MyCallable)  # revealed: GenericAlias
 reveal_type(AnnotatedType)  # revealed: <typing.Annotated special form>
-# TODO: This should ideally be `T@TransparentAlias`
 reveal_type(TransparentAlias)  # revealed: typing.TypeVar
 reveal_type(MyOptional)  # revealed: types.UnionType
 
@@ -431,7 +430,6 @@ def _(
     reveal_type(pair_of_ints)  # revealed: tuple[int, int]
     reveal_type(int_and_bytes)  # revealed: tuple[int, bytes]
     reveal_type(list_or_tuple)  # revealed: list[int] | tuple[int, ...]
-    reveal_type(list_or_tuple_legacy)  # revealed: list[int] | tuple[int, ...]
     reveal_type(list_or_tuple_legacy)  # revealed: list[int] | tuple[int, ...]
     # TODO: This should be `(str, bytes) -> int`
     reveal_type(my_callable)  # revealed: Unknown
@@ -521,21 +519,61 @@ def _(
     reveal_type(type_or_list)  # revealed: @Todo(type[T] for typevar T) | list[Any]
 ```
 
-If a generic implicit type alias is used unspecialized in a type expression, we treat it as an
-`Unknown` specialization:
+If a generic implicit type alias is used unspecialized in a type expression, we use the default
+specialization. For type variables without defaults, this is `Unknown`:
 
 ```py
 def _(
-    my_list: MyList,
-    my_dict: MyDict,
+    list_unknown: MyList,
+    dict_unknown: MyDict,
+    subclass_of_unknown: MyType,
+    int_and_unknown: IntAndType,
+    pair_of_unknown: Pair,
+    unknown_and_unknown: Sum,
+    list_or_tuple: ListOrTuple,
+    list_or_tuple_legacy: ListOrTupleLegacy,
     my_callable: MyCallable,
+    annotated_unknown: AnnotatedType,
+    optional_unknown: MyOptional,
 ):
-    # TODO: Should be `list[Unknown]`
-    reveal_type(my_list)  # revealed: list[T@MyList]
-    # TODO: Should be `dict[Unknown, Unknown]`
-    reveal_type(my_dict)  # revealed: dict[T@MyDict, U@MyDict]
+    # TODO: This should be `list[Unknown]`
+    reveal_type(list_unknown)  # revealed: list[T@MyList]
+    # TODO: This should be `dict[Unknown, Unknown]`
+    reveal_type(dict_unknown)  # revealed: dict[T@MyDict, U@MyDict]
+    # TODO: Should be `type[Unknown]`
+    reveal_type(subclass_of_unknown)  # revealed: @Todo(type[T] for typevar T)
+    # TODO: Should be `tuple[int, Unknown]`
+    reveal_type(int_and_unknown)  # revealed: tuple[int, T@IntAndType]
+    # TODO: Should be `tuple[Unknown, Unknown]`
+    reveal_type(pair_of_unknown)  # revealed: tuple[T@Pair, T@Pair]
+    # TODO: Should be `tuple[Unknown, Unknown]`
+    reveal_type(unknown_and_unknown)  # revealed: tuple[T@Sum, U@Sum]
+    # TODO: Should be `list[Unknown] | tuple[Unknown, ...]`
+    reveal_type(list_or_tuple)  # revealed: list[T@ListOrTuple] | tuple[T@ListOrTuple, ...]
+    # TODO: Should be `list[Unknown] | tuple[Unknown, ...]`
+    reveal_type(list_or_tuple_legacy)  # revealed: list[T@ListOrTupleLegacy] | tuple[T@ListOrTupleLegacy, ...]
     # TODO: Should be `(...) -> Unknown`
     reveal_type(my_callable)  # revealed: (...) -> T@MyCallable
+    # TODO: Should be `Unknown`
+    reveal_type(annotated_unknown)  # revealed: T@AnnotatedType
+    # TODO: Should be `Unknown | None`
+    reveal_type(optional_unknown)  # revealed: T@MyOptional | None
+```
+
+For a type variable with a default, we use that:
+
+```py
+T_default = TypeVar("T_default", default=int)
+
+MyListWithDefault = list[T_default]
+
+def _(
+    list_of_str: MyListWithDefault[str],
+    list_of_int: MyListWithDefault,
+):
+    reveal_type(list_of_str)  # revealed: list[str]
+    # TODO: this should be `list[int]`
+    reveal_type(list_of_int)  # revealed: list[T_default@MyListWithDefault]
 ```
 
 (Generic) implicit type aliases can be used as base classes:
