@@ -386,6 +386,8 @@ impl<'db> TypeContext<'db> {
             .is_some_and(|ty| ty.is_typealias_special_form())
     }
 
+    // TODO: we could just always use `Iterable[<expected_element_type>]`
+    // as the type context once <https://github.com/astral-sh/ty/issues/1576> is fixed.
     pub(crate) fn for_starred_expression(
         db: &'db dyn Db,
         expected_element_type: Type<'db>,
@@ -401,8 +403,6 @@ impl<'db> TypeContext<'db> {
             ast::Expr::Tuple(_) => {
                 Self::new(Some(Type::homogeneous_tuple(db, expected_element_type)))
             }
-            // `Iterable[<expected_element_type>]` would work well for an arbitrary other node
-            // if <https://github.com/astral-sh/ty/issues/1576> is implemented.
             _ => Self::default(),
         }
     }
