@@ -272,14 +272,11 @@ fn render_markdown(docstring: &str) -> String {
                 without_directive = without_directive_str;
             }
 
+            // Whether the `::` should become `:` or be erased
             let include_colon = if let Some(character) = without_directive.chars().next_back() {
-                if character.is_whitespace() {
-                    // Remove the marker completely
-                    false
-                } else {
-                    // Only remove the first `:`
-                    true
-                }
+                // If lang is set then we're either deleting the whole line or
+                // the special rendering below will add it itself
+                lang.is_none() && !character.is_whitespace()
             } else {
                 // Delete whole line
                 false
@@ -1155,16 +1152,12 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r#"
-        Here's some code!  
-          
-          
-        ```python
-            def main() {
-                print("hello world!")
-            }
+        assert_snapshot!(docstring.render_markdown(), @r"
+        wow this is some code  
+        ```abc
+            x = 2
         ```
-        "#);
+        ");
     }
 
     // `.. asdgfhjkl-unknown::` is treated the same as `.. code::`
