@@ -231,6 +231,15 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                     self.check_identifier_reference(rest_name);
                 }
             }
+            AnyNodeRef::TypeParamParamSpec(param_spec) if self.should_include_declaration() => {
+                self.check_identifier_reference(&param_spec.name);
+            }
+            AnyNodeRef::TypeParamTypeVarTuple(param_tuple) if self.should_include_declaration() => {
+                self.check_identifier_reference(&param_tuple.name);
+            }
+            AnyNodeRef::TypeParamTypeVar(param_var) if self.should_include_declaration() => {
+                self.check_identifier_reference(&param_var.name);
+            }
             AnyNodeRef::ExprStringLiteral(string_expr) if self.should_include_declaration() => {
                 // Highlight the sub-AST of a string annotation
                 if let Some((sub_ast, sub_model)) = self.model.enter_string_annotation(string_expr)
