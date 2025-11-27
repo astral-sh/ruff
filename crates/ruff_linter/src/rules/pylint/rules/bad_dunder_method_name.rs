@@ -21,7 +21,7 @@ use crate::rules::pylint::helpers::is_known_dunder_method;
 ///
 /// This rule will detect all methods starting and ending with at least
 /// one underscore (e.g., `_str_`), but ignores known dunder methods (like
-/// `__init__`), as well as methods that are marked with `@override`.
+/// `__init__`), as well as methods that are marked with [`@override`][override].
 ///
 /// Additional dunder methods names can be allowed via the
 /// [`lint.pylint.allow-dunder-method-names`] setting.
@@ -42,6 +42,8 @@ use crate::rules::pylint::helpers::is_known_dunder_method;
 ///
 /// ## Options
 /// - `lint.pylint.allow-dunder-method-names`
+///
+/// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.0.285")]
 pub(crate) struct BadDunderMethodName {
