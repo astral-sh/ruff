@@ -5,7 +5,7 @@
 ```py
 import a.b
 
-reveal_type(a.b)  # revealed: <module 'a.b'>
+reveal_type(a.b)  # revealed: int
 ```
 
 `a/__init__.py`:
@@ -44,8 +44,8 @@ b: int = 42
 import a.b
 from a import b
 
-reveal_type(b)  # revealed: <module 'a.b'>
-reveal_type(a.b)  # revealed: <module 'a.b'>
+reveal_type(b)  # revealed: int
+reveal_type(a.b)  # revealed: int
 ```
 
 `a/__init__.py`:
@@ -73,8 +73,8 @@ from a import b
 import a.b
 
 # Python would say `int` for `b`
-reveal_type(b)  # revealed: <module 'a.b'>
-reveal_type(a.b)  # revealed: <module 'a.b'>
+reveal_type(b)  # revealed: int
+reveal_type(a.b)  # revealed: int
 ```
 
 `a/__init__.py`:
