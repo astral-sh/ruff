@@ -11478,7 +11478,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if has_error {
-            return Type::unknown();
+            let unknowns = generic_context
+                .variables(self.db())
+                .map(|_| Some(Type::unknown()))
+                .collect::<Vec<_>>();
+            return specialize(&unknowns);
         }
 
         specialize(&specialization_types)

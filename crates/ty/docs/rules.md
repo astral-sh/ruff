@@ -1012,7 +1012,28 @@ classes in Python do indeed behave this way, the strongly held convention is tha
 be avoided wherever possible. As part of this check, therefore, ty enforces that `__eq__`
 and `__ne__` methods accept `object` as their second argument.
 
+**Why does ty disagree with Ruff about how to write my method?**
+
+
+Ruff has several rules that will encourage you to rename a parameter, or change its type
+signature, if it thinks you're falling into a certain anti-pattern. For example, Ruff's
+[ARG002](https://docs.astral.sh/ruff/rules/unused-method-argument/) rule recommends that an
+unused parameter should either be removed or renamed to start with `_`. Applying either of
+these suggestions can cause ty to start reporting an `invalid-method-override` error if
+the function in question is a method on a subclass that overrides a method on a superclass,
+and the change would cause the subclass method to no longer accept all argument combinations
+that the superclass method accepts.
+
+This can usually be resolved by adding [`@typing.override`][override] to your method
+definition. Ruff knows that a method decorated with `@typing.override` is intended to
+override a method by the same name on a superclass, and avoids reporting rules like ARG002
+for such methods; it knows that the changes recommended by ARG002 would violate the Liskov
+Substitution Principle.
+
+Correct use of `@override` is enforced by ty's `invalid-explicit-override` rule.
+
 [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
+[override]: https://docs.python.org/3/library/typing.html#typing.override
 
 ## `invalid-named-tuple`
 

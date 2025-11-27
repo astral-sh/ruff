@@ -189,8 +189,11 @@ class PlaygroundServer
     languages.DocumentSemanticTokensProvider,
     languages.DocumentRangeSemanticTokensProvider,
     languages.SignatureHelpProvider,
-    languages.DocumentHighlightProvider
+    languages.DocumentHighlightProvider,
+    languages.CodeActionProvider
 {
+  private diagnostics: Diagnostic[] = [];
+
   private typeDefinitionProviderDisposable: IDisposable;
   private declarationProviderDisposable: IDisposable;
   private definitionProviderDisposable: IDisposable;
@@ -204,6 +207,7 @@ class PlaygroundServer
   private rangeSemanticTokensDisposable: IDisposable;
   private signatureHelpDisposable: IDisposable;
   private documentHighlightDisposable: IDisposable;
+  private codeActionDisposable: IDisposable;
   private inVendoredFileCondition: editor.IContextKey<boolean>;
   // Cache for vendored file handles
   private vendoredFileHandles = new Map<string, FileHandle>();
@@ -253,6 +257,10 @@ class PlaygroundServer
       monaco.languages.registerSignatureHelpProvider("python", this);
     this.documentHighlightDisposable =
       monaco.languages.registerDocumentHighlightProvider("python", this);
+    this.codeActionDisposable = monaco.languages.registerCodeActionProvider(
+      "python",
+      this,
+    );
 
     this.inVendoredFileCondition = editor.createContextKey<boolean>(
       "inVendoredFile",
@@ -455,6 +463,10 @@ class PlaygroundServer
           column: hint.position.column,
         },
         kind: mapInlayHintKind(hint.kind),
+        textEdits: hint.text_edits.map((edit: TextEdit) => ({
+          range: tyRangeToMonacoRange(edit.range),
+          text: edit.new_text,
+        })),
       })),
     };
   }
@@ -534,6 +546,8 @@ class PlaygroundServer
   }
 
   updateDiagnostics(diagnostics: Array<Diagnostic>) {
+    this.diagnostics = diagnostics;
+
     if (this.props.files.selected == null) {
       return;
     }
@@ -582,6 +596,59 @@ class PlaygroundServer
         };
       }),
     );
+  }
+
+  provideCodeActions(
+    model: editor.ITextModel,
+    range: Range,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _context: languages.CodeActionContext,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _token: CancellationToken,
+  ): languages.ProviderResult<languages.CodeActionList> {
+    const actions: languages.CodeAction[] = [];
+
+    for (const diagnostic of this.diagnostics) {
+      const diagnosticRange = diagnostic.range;
+      if (diagnosticRange == null) {
+        continue;
+      }
+
+      const monacoRange = tyRangeToMonacoRange(diagnosticRange);
+      if (!Range.areIntersecting(range, monacoRange)) {
+        continue;
+      }
+
+      const codeAction = diagnostic.raw.codeAction(this.props.workspace);
+      if (codeAction == null) {
+        continue;
+      }
+
+      actions.push({
+        title: codeAction.title,
+        kind: "quickfix",
+        isPreferred: true,
+        edit: {
+          edits: codeAction.edits.map((edit) => ({
+            resource: model.uri,
+            textEdit: {
+              range: tyRangeToMonacoRange(edit.range),
+              text: edit.new_text,
+            },
+            versionId: model.getVersionId(),
+          })),
+        },
+      });
+    }
+
+    if (actions.length === 0) {
+      return undefined;
+    }
+
+    return {
+      actions,
+      dispose: () => {},
+    };
   }
 
   provideHover(
@@ -836,6 +903,7 @@ class PlaygroundServer
     this.completionDisposable.dispose();
     this.signatureHelpDisposable.dispose();
     this.documentHighlightDisposable.dispose();
+    this.codeActionDisposable.dispose();
   }
 }
 

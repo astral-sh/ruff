@@ -11,6 +11,7 @@ use ruff_db::system::{
     SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
 };
 use ruff_db::vendored::VendoredPath;
+use ruff_diagnostics::Applicability;
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
@@ -492,6 +493,19 @@ impl Workspace {
                     self.position_encoding,
                 ),
                 kind: hint.kind.into(),
+                text_edits: hint
+                    .text_edits
+                    .into_iter()
+                    .map(|edit| TextEdit {
+                        range: Range::from_text_range(
+                            edit.range,
+                            &index,
+                            &source,
+                            self.position_encoding,
+                        ),
+                        new_text: edit.new_text,
+                    })
+                    .collect(),
             })
             .collect())
     }
@@ -732,6 +746,53 @@ impl Diagnostic {
             .to_string()
             .into()
     }
+
+    /// Returns the code action for this diagnostic, if it has a fix.
+    #[wasm_bindgen(js_name = "codeAction")]
+    pub fn code_action(&self, workspace: &Workspace) -> Option<CodeAction> {
+        let fix = self
+            .inner
+            .fix()
+            .filter(|fix| fix.applies(Applicability::Unsafe))?;
+
+        let primary_span = self.inner.primary_span()?;
+        let file = primary_span.expect_ty_file();
+
+        let source = source_text(&workspace.db, file);
+        let index = line_index(&workspace.db, file);
+
+        let edits: Vec<TextEdit> = fix
+            .edits()
+            .iter()
+            .map(|edit| TextEdit {
+                range: Range::from_text_range(
+                    edit.range(),
+                    &index,
+                    &source,
+                    workspace.position_encoding,
+                ),
+                new_text: edit.content().unwrap_or_default().to_string(),
+            })
+            .collect();
+
+        let title = self
+            .inner
+            .first_help_text()
+            .map(ToString::to_string)
+            .unwrap_or_else(|| format!("Fix {}", self.inner.id()));
+
+        Some(CodeAction { title, edits })
+    }
+}
+
+/// A code action that can be applied to fix a diagnostic.
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodeAction {
+    #[wasm_bindgen(getter_with_clone)]
+    pub title: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub edits: Vec<TextEdit>,
 }
 
 #[wasm_bindgen]
@@ -1062,6 +1123,9 @@ pub struct InlayHint {
     pub position: Position,
 
     pub kind: InlayHintKind,
+
+    #[wasm_bindgen(getter_with_clone)]
+    pub text_edits: Vec<TextEdit>,
 }
 
 #[wasm_bindgen]
