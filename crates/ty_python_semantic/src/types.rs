@@ -8910,8 +8910,6 @@ impl<'db> InvalidTypeExpression<'db> {
             {
                 return;
             }
-
-            // TODO: showing a diff (and even having an autofix) would be even better
             diagnostic.set_primary_message(format_args!(
                 "Did you mean to use the module's member \
                 `{module_name_final_part}.{module_name_final_part}`?"
