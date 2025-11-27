@@ -1,0 +1,45 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: unreachable.md - Unreachable code - `Never`-inferred variables in type expressions
+mdtest path: crates/ty_python_semantic/resources/mdtest/unreachable.md
+---
+
+# Python source files
+
+## module.py
+
+```
+1 | import sys
+2 | 
+3 | if sys.version_info >= (3, 14):
+4 |     raise RuntimeError("this library doesn't support 3.14 yet!!!")
+5 | 
+6 | class AwesomeAPI: ...
+```
+
+## main.py
+
+```
+1 | import module
+2 | 
+3 | def f(x: module.AwesomeAPI): ...  # error: [invalid-type-form]
+```
+
+# Diagnostics
+
+```
+error[invalid-type-form]: Variable of type `Never` is not allowed in a type expression
+ --> src/main.py:3:10
+  |
+1 | import module
+2 |
+3 | def f(x: module.AwesomeAPI): ...  # error: [invalid-type-form]
+  |          ^^^^^^^^^^^^^^^^^
+  |
+help: The variable may have been inferred as `Never` because its definition was inferred as being unreachable
+info: rule `invalid-type-form` is enabled by default
+
+```
