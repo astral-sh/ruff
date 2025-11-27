@@ -623,7 +623,10 @@ class PlaygroundServer
         continue;
       }
 
-      const codeActions = this.props.workspace.codeActions(fileHandle, diagnostic.raw);
+      const codeActions = this.props.workspace.codeActions(
+        fileHandle,
+        diagnostic.raw,
+      );
       if (codeActions == null) {
         continue;
       }
@@ -646,7 +649,6 @@ class PlaygroundServer
         });
       }
     }
-
 
     if (actions.length === 0) {
       return undefined;
