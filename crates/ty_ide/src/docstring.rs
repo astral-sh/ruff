@@ -294,14 +294,25 @@ fn render_markdown(docstring: &str) -> String {
                 #[allow(clippy::used_underscore_binding)]
                 Some(
                     "attention" | "caution" | "danger" | "error" | "hint" | "important" | "note"
-                    | "tip" | "warning" | "admonition",
+                    | "tip" | "warning" | "admonition" | "versionadded" | "version-added"
+                    | "versionchanged" | "version-changed" | "version-deprecated" | "deprecated"
+                    | "version-removed" | "versionremoved",
                 ) => {
-                    _line = format!("**{without_directive}{}:**", directive.unwrap());
+                    let suffix = if let Some(lang) = lang {
+                        format!(" *{lang}*")
+                    } else {
+                        String::new()
+                    };
+                    _line = format!("**{without_directive}{}:**{suffix}", directive.unwrap());
+                    // Render the argument of things like `.. version-added:: 4.0`
+
                     line = _line.as_str();
                     None
                 }
                 // Things that just mean "it's code"
-                Some("code-block" | "sourcecode" | "code") => lang.or(Some("python")),
+                Some(
+                    "code-block" | "sourcecode" | "code" | "testcode" | "testsetup" | "testcleanup",
+                ) => lang.or(Some("python")),
                 // Unknown (python I guess?)
                 Some(_) => lang.or(Some("python")),
                 // default to python
@@ -1022,6 +1033,62 @@ mod tests {
         "#);
     }
 
+    // `warning` and several other directives are special languages that should actually
+    // still be shown as text and not ```code```.
+    #[test]
+    fn version_blocks() {
+        let docstring = r#"
+        Some much-updated docs
+
+        .. version-added:: 3.0
+           Function added
+
+        .. version-changed:: 4.0
+           The `spam` argument was added
+        .. version-changed:: 4.1
+           The `spam` argument is considered evil now.
+
+           You really shouldnt use it
+
+        And that's the docs
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        Some much-updated docs  
+          
+        **version-added:** *3.0*  
+        &nbsp;&nbsp;&nbsp;Function added  
+          
+        **version-changed:** *4.0*  
+        &nbsp;&nbsp;&nbsp;The `spam` argument was added  
+        **version-changed:** *4.1*  
+        &nbsp;&nbsp;&nbsp;The `spam` argument is considered evil now.  
+          
+        &nbsp;&nbsp;&nbsp;You really shouldnt use it  
+          
+        And that's the docs
+        ");
+    }
+
+    // I don't know if this is valid syntax but we preserve stuff before non-code blocks like
+    // `..deprecated ::`
+    #[test]
+    fn deprecated_prefix_gunk() {
+        let docstring = r#"
+        wow this is some changes .. deprecated:: 1.2.3
+            x = 2
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        **wow this is some changes deprecated:** *1.2.3*  
+        &nbsp;&nbsp;&nbsp;&nbsp;x = 2
+        ");
+    }
+
     // `.. code::` is a literal block and the `.. code::` should be deleted
     #[test]
     fn code_block() {
@@ -1069,6 +1136,28 @@ mod tests {
         ```rust
             fn main() {
                 println!("hello world!");
+            }
+        ```
+        "#);
+    }
+
+    // I don't know if this is valid syntax but we preserve stuff before `..code ::`
+    #[test]
+    fn code_block_prefix_gunk() {
+        let docstring = r#"
+        wow this is some code.. code:: abc
+            x = 2
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        Here's some code!  
+          
+          
+        ```python
+            def main() {
+                print("hello world!")
             }
         ```
         "#);
