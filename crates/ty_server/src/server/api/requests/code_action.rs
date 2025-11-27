@@ -78,44 +78,36 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
             // This is only for actions that are messy to compute at the time of the diagnostic.
             // For instance, suggesting imports requires finding symbols for the entire project,
             // which is dubious when you're in the middle of resolving symbols.
-            let Some(NumberOrString::String(diagnostic_id)) = &diagnostic.code else {
-                continue;
-            };
-
-            let Some(range) =
-                diagnostic
-                    .range
-                    .to_text_range(db, file, snapshot.url(), snapshot.encoding())
-            else {
-                continue;
-            };
-            let Some(fixes) = code_actions(db, file, range, diagnostic_id) else {
-                continue;
-            };
-
-            for action in fixes {
-                actions.push(CodeActionOrCommand::CodeAction(lsp_types::CodeAction {
-                    title: action.title,
-                    kind: Some(CodeActionKind::QUICKFIX),
-                    diagnostics: Some(vec![diagnostic.clone()]),
-                    edit: Some(lsp_types::WorkspaceEdit {
-                        changes: to_lsp_edits(db, file, snapshot.encoding(), action.edits),
-                        document_changes: None,
-                        change_annotations: None,
-                    }),
-                    is_preferred: Some(action.preferred),
-                    command: None,
-                    disabled: None,
-                    data: None,
-                }));
+            let url = snapshot.url();
+            let encoding = snapshot.encoding();
+            if let Some(NumberOrString::String(diagnostic_id)) = &diagnostic.code
+                && let Some(range) = diagnostic.range.to_text_range(db, file, url, encoding)
+                && let Some(fixes) = code_actions(db, file, range, diagnostic_id)
+            {
+                for action in fixes {
+                    actions.push(CodeActionOrCommand::CodeAction(lsp_types::CodeAction {
+                        title: action.title,
+                        kind: Some(CodeActionKind::QUICKFIX),
+                        diagnostics: Some(vec![diagnostic.clone()]),
+                        edit: Some(lsp_types::WorkspaceEdit {
+                            changes: to_lsp_edits(db, file, encoding, action.edits),
+                            document_changes: None,
+                            change_annotations: None,
+                        }),
+                        is_preferred: Some(action.preferred),
+                        command: None,
+                        disabled: None,
+                        data: None,
+                    }));
+                }
             }
         }
 
         if actions.is_empty() {
-            return Ok(None);
+            Ok(None)
+        } else {
+            Ok(Some(actions))
         }
-
-        Ok(Some(actions))
     }
 }
 
