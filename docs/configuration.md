@@ -618,10 +618,10 @@ Options:
           `ipynb`, `pyi`). For example, to treat `.ipy` files as IPython
           notebooks, use `--extension ipy:ipynb`
       --statistics
-          Show counts for every rule with at least one violation.
-          When combined with `--output-format json`, the output includes
-          `fixable_count` (the number of fixable violations) and `fixable`
-          (true if all violations are fixable).
+          Show counts for every rule with at least one violation. When combined
+          with `--output-format json`, the output includes `fixable_count` (the
+          number of fixable violations) and `fixable` (true if all violations
+          are fixable)
       --add-noqa[=<REASON>]
           Enable automatic additions of `noqa` directives to failing lines.
           Optionally provide a reason to append after the codes
