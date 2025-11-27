@@ -6,8 +6,9 @@ use ruff_db::diagnostic::Annotation;
 use rustc_hash::FxHashSet;
 
 use crate::{
+    Db,
     place::Place,
-    semantic_index::{place_table, use_def_map},
+    semantic_index::{place_table, scope::ScopeId, symbol::ScopedSymbolId, use_def_map},
     types::{
         ClassBase, ClassLiteral, ClassType, KnownClass, Type,
         class::CodeGeneratorKind,
@@ -41,6 +42,46 @@ fn check_class_declaration<'db>(
     class: ClassType<'db>,
     member: &MemberWithDefinition<'db>,
 ) {
+    /// Salsa-tracked query to check whether a symbol in a superclas scope is a function definition.
+    ///
+    /// We need to know this for compatibility with pyright and mypy, neither of which emit an error
+    /// on `C.f` here:
+    ///
+    /// ```python
+    /// from typing import final
+    ///
+    /// class A:
+    ///     @final
+    ///     def f(self) -> None: ...
+    ///
+    /// class B:
+    ///     f = A.f
+    ///
+    /// class C(B):
+    ///     def f(self) -> None: ...  # no error here
+    /// ```
+    ///
+    /// This is a Salsa-tracked query because it has to look at the AST node for the definition,
+    /// which might be in a different Python module. If this weren't a tracked query, we could
+    /// introduce cross-module dependencies and over-invalidation.
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn is_function_definition<'db>(
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        symbol: ScopedSymbolId,
+    ) -> bool {
+        let Some(binding) = use_def_map(db, scope)
+            .end_of_scope_symbol_bindings(symbol)
+            .next()
+        else {
+            return false;
+        };
+        let Some(definition) = binding.binding.definition() else {
+            return false;
+        };
+        definition.kind(db).is_function_def()
+    }
+
     let db = context.db();
 
     let MemberWithDefinition { member, definition } = member;
@@ -131,15 +172,10 @@ fn check_class_declaration<'db>(
                 _ => return None,
             };
 
-            if underlying_function.has_known_decorator(db, FunctionDecorators::FINAL) {
-                use_def_map(db, superclass_scope)
-                    .end_of_scope_symbol_bindings(superclass_symbol_id)
-                    .next()?
-                    .binding
-                    .definition()?
-                    .kind(db)
-                    .is_function_def()
-                    .then_some((superclass, underlying_function))
+            if underlying_function.has_known_decorator(db, FunctionDecorators::FINAL)
+                && is_function_definition(db, superclass_scope, superclass_symbol_id)
+            {
+                Some((superclass, underlying_function))
             } else {
                 None
             }
