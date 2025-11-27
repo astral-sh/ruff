@@ -10,12 +10,13 @@ use ty_python_semantic::types::UNRESOLVED_REFERENCE;
 pub struct QuickFix {
     pub title: String,
     pub edit: Edit,
+    pub preferred: bool,
 }
 
 pub fn code_actions(
     db: &dyn Db,
     file: File,
-    range: TextRange,
+    diagnostic_range: TextRange,
     diagnostic_id: &str,
 ) -> Option<Vec<QuickFix>> {
     let registry = db.lint_registry();
@@ -24,7 +25,7 @@ pub fn code_actions(
     };
     if lint_id.name() == UNRESOLVED_REFERENCE.name() {
         let parsed = parsed_module(db, file).load(db);
-        let node = covering_node(parsed.syntax().into(), range).node();
+        let node = covering_node(parsed.syntax().into(), diagnostic_range).node();
         let symbol = &node.expr_name()?.id;
 
         let fixes = completion::missing_imports(db, file, &parsed, symbol, node)
@@ -32,6 +33,7 @@ pub fn code_actions(
             .map(|import| QuickFix {
                 title: import.label,
                 edit: import.edit,
+                preferred: true,
             })
             .collect();
         Some(fixes)

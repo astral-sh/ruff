@@ -103,7 +103,7 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
                         document_changes: None,
                         change_annotations: None,
                     }),
-                    is_preferred: Some(true),
+                    is_preferred: Some(action.preferred),
                     command: None,
                     disabled: None,
                     data: None,
