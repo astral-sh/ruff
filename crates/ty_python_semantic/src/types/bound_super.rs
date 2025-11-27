@@ -157,7 +157,7 @@ impl<'db> BoundSuperError<'db> {
                         .map(|c| c.display(db))
                         .join(", ")
                 ));
-                Type::Union(constraints)
+                constraints.as_type(db)
             }
             None => {
                 diagnostic.info(format_args!(
@@ -370,7 +370,7 @@ impl<'db> BoundSuperType<'db> {
                         delegate_with_error_mapped(bound, Some(type_var))
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        delegate_with_error_mapped(Type::Union(constraints), Some(type_var))
+                        delegate_with_error_mapped(constraints.as_type(db), Some(type_var))
                     }
                     None => delegate_with_error_mapped(Type::object(), Some(type_var)),
                 };

@@ -194,7 +194,7 @@ impl ClassInfoConstraintFunction {
                         self.generate_constraint(db, bound)
                     }
                     TypeVarBoundOrConstraints::Constraints(constraints) => {
-                        self.generate_constraint(db, Type::Union(constraints))
+                        self.generate_constraint(db, constraints.as_type(db))
                     }
                 }
             }

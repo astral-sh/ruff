@@ -66,7 +66,7 @@ pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::newtype::NewType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
-use crate::types::tuple::{TupleSpec, TupleSpecBuilder};
+use crate::types::tuple::{Tuple, TupleSpec, TupleSpecBuilder};
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
@@ -5257,9 +5257,9 @@ impl<'db> Type<'db> {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         bound.try_bool_impl(db, allow_short_circuit, visitor)?
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        try_union(constraints)?
-                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                        .as_type(db)
+                        .try_bool_impl(db, allow_short_circuit, visitor)?,
                 }
             }
 
@@ -6226,7 +6226,7 @@ impl<'db> Type<'db> {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
                         non_async_special_case(db, bound)
                     }
-                    TypeVarBoundOrConstraints::Constraints(union) => non_async_special_case(db, Type::Union(union)),
+                    TypeVarBoundOrConstraints::Constraints(constraints) => non_async_special_case(db, constraints.as_type(db)),
                 },
                 Type::Union(union) => {
                     let elements = union.elements(db);
@@ -7259,7 +7259,9 @@ impl<'db> Type<'db> {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         // TODO: If we add a proper `OneOf` connector, we should use that here instead
                         // of union. (Using a union here doesn't break anything, but it is imprecise.)
-                        constraints.map(db, |constraint| constraint.to_meta_type(db))
+                        constraints
+                            .map(db, |constraint| constraint.to_meta_type(db))
+                            .as_type(db)
                     }
                 }
             }
@@ -9264,7 +9266,7 @@ impl<'db> TypeVarInstance<'db> {
                 TypeVarBoundOrConstraints::UpperBound(upper_bound.to_instance(db)?)
             }
             TypeVarBoundOrConstraints::Constraints(constraints) => {
-                TypeVarBoundOrConstraints::Constraints(constraints.to_instance(db)?.as_union()?)
+                TypeVarBoundOrConstraints::Constraints(constraints.to_instance(db)?)
             }
         };
         let identity = TypeVarIdentity::new(
@@ -9313,22 +9315,30 @@ impl<'db> TypeVarInstance<'db> {
     fn lazy_constraints(self, db: &'db dyn Db) -> Option<TypeVarBoundOrConstraints<'db>> {
         let definition = self.definition(db)?;
         let module = parsed_module(db, definition.file(db)).load(db);
-        let ty = match definition.kind(db) {
+        let constraints = match definition.kind(db) {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
                 let typevar_node = typevar.node(&module);
-                definition_expression_type(db, definition, typevar_node.bound.as_ref()?)
-                    .as_union()?
+                let bound =
+                    definition_expression_type(db, definition, typevar_node.bound.as_ref()?);
+                let constraints = if let Some(tuple) = bound
+                    .as_nominal_instance()
+                    .and_then(|instance| instance.tuple_spec(db))
+                {
+                    if let Tuple::Fixed(tuple) = tuple.into_owned() {
+                        tuple.owned_elements()
+                    } else {
+                        vec![Type::unknown()].into_boxed_slice()
+                    }
+                } else {
+                    vec![Type::unknown()].into_boxed_slice()
+                };
+                TypeVarConstraints::new(db, constraints)
             }
             // legacy typevar
             DefinitionKind::Assignment(assignment) => {
                 let call_expr = assignment.value(&module).as_call_expr()?;
-                // We don't use `UnionType::from_elements` or `UnionBuilder` here,
-                // because we don't want to simplify the list of constraints as we would with
-                // an actual union type.
-                // TODO: We probably shouldn't use `UnionType` to store these at all? TypeVar
-                // constraints are not a union.
-                UnionType::new(
+                TypeVarConstraints::new(
                     db,
                     call_expr
                         .arguments
@@ -9341,7 +9351,7 @@ impl<'db> TypeVarInstance<'db> {
             }
             _ => return None,
         };
-        Some(TypeVarBoundOrConstraints::Constraints(ty))
+        Some(TypeVarBoundOrConstraints::Constraints(constraints))
     }
 
     #[salsa::tracked(cycle_fn=lazy_default_cycle_recover, cycle_initial=lazy_default_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
@@ -9671,10 +9681,133 @@ impl<'db> From<TypeVarBoundOrConstraints<'db>> for TypeVarBoundOrConstraintsEval
     }
 }
 
+/// Type variable constraints (e.g. `T: (int, str)`).
+/// This is structurally identical to [`UnionType`], except that it does not perform simplification and preserves the element types.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct TypeVarConstraints<'db> {
+    #[returns(ref)]
+    elements: Box<[Type<'db>]>,
+}
+
+impl get_size2::GetSize for TypeVarConstraints<'_> {}
+
+fn walk_type_var_constraints<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    constraints: TypeVarConstraints<'db>,
+    visitor: &V,
+) {
+    for ty in constraints.elements(db) {
+        visitor.visit_type(db, *ty);
+    }
+}
+
+impl<'db> TypeVarConstraints<'db> {
+    fn as_type(self, db: &'db dyn Db) -> Type<'db> {
+        let mut builder = UnionBuilder::new(db);
+        for ty in self.elements(db) {
+            builder = builder.add(*ty);
+        }
+        builder.build()
+    }
+
+    fn to_instance(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
+        let mut instance_elements = Vec::new();
+        for ty in self.elements(db) {
+            instance_elements.push(ty.to_instance(db)?);
+        }
+        Some(TypeVarConstraints::new(
+            db,
+            instance_elements.into_boxed_slice(),
+        ))
+    }
+
+    fn map(self, db: &'db dyn Db, transform_fn: impl FnMut(&Type<'db>) -> Type<'db>) -> Self {
+        let mapped = self
+            .elements(db)
+            .iter()
+            .map(transform_fn)
+            .collect::<Box<_>>();
+        TypeVarConstraints::new(db, mapped)
+    }
+
+    pub(crate) fn map_with_boundness_and_qualifiers(
+        self,
+        db: &'db dyn Db,
+        mut transform_fn: impl FnMut(&Type<'db>) -> PlaceAndQualifiers<'db>,
+    ) -> PlaceAndQualifiers<'db> {
+        let mut builder = UnionBuilder::new(db);
+        let mut qualifiers = TypeQualifiers::empty();
+
+        let mut all_unbound = true;
+        let mut possibly_unbound = false;
+        let mut origin = TypeOrigin::Declared;
+        for ty in self.elements(db) {
+            let PlaceAndQualifiers {
+                place: ty_member,
+                qualifiers: new_qualifiers,
+            } = transform_fn(ty);
+            qualifiers |= new_qualifiers;
+            match ty_member {
+                Place::Undefined => {
+                    possibly_unbound = true;
+                }
+                Place::Defined(ty_member, member_origin, member_boundness) => {
+                    origin = origin.merge(member_origin);
+                    if member_boundness == Definedness::PossiblyUndefined {
+                        possibly_unbound = true;
+                    }
+
+                    all_unbound = false;
+                    builder = builder.add(ty_member);
+                }
+            }
+        }
+        PlaceAndQualifiers {
+            place: if all_unbound {
+                Place::Undefined
+            } else {
+                Place::Defined(
+                    builder.build(),
+                    origin,
+                    if possibly_unbound {
+                        Definedness::PossiblyUndefined
+                    } else {
+                        Definedness::AlwaysDefined
+                    },
+                )
+            },
+            qualifiers,
+        }
+    }
+
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        let normalized = self
+            .elements(db)
+            .iter()
+            .map(|ty| ty.normalized_impl(db, visitor))
+            .collect::<Box<_>>();
+        TypeVarConstraints::new(db, normalized)
+    }
+
+    fn materialize_impl(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let materialized = self
+            .elements(db)
+            .iter()
+            .map(|ty| ty.materialize(db, materialization_kind, visitor))
+            .collect::<Box<_>>();
+        TypeVarConstraints::new(db, materialized)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum TypeVarBoundOrConstraints<'db> {
     UpperBound(Type<'db>),
-    Constraints(UnionType<'db>),
+    Constraints(TypeVarConstraints<'db>),
 }
 
 fn walk_type_var_bounds<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -9685,7 +9818,7 @@ fn walk_type_var_bounds<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     match bounds {
         TypeVarBoundOrConstraints::UpperBound(bound) => visitor.visit_type(db, bound),
         TypeVarBoundOrConstraints::Constraints(constraints) => {
-            visitor.visit_union_type(db, constraints);
+            walk_type_var_constraints(db, constraints, visitor);
         }
     }
 }
@@ -9700,14 +9833,7 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
                 // Constraints are a non-normalized union by design (it's not really a union at
                 // all, we are just using a union to store the types). Normalize the types but not
                 // the containing union.
-                TypeVarBoundOrConstraints::Constraints(UnionType::new(
-                    db,
-                    constraints
-                        .elements(db)
-                        .iter()
-                        .map(|ty| ty.normalized_impl(db, visitor))
-                        .collect::<Box<_>>(),
-                ))
+                TypeVarBoundOrConstraints::Constraints(constraints.normalized_impl(db, visitor))
             }
         }
     }
@@ -9723,14 +9849,10 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
                 bound.materialize(db, materialization_kind, visitor),
             ),
             TypeVarBoundOrConstraints::Constraints(constraints) => {
-                TypeVarBoundOrConstraints::Constraints(UnionType::new(
+                TypeVarBoundOrConstraints::Constraints(constraints.materialize_impl(
                     db,
-                    constraints
-                        .elements(db)
-                        .iter()
-                        .map(|ty| ty.materialize(db, materialization_kind, visitor))
-                        .collect::<Vec<_>>()
-                        .into_boxed_slice(),
+                    materialization_kind,
+                    visitor,
                 ))
             }
         }

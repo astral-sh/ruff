@@ -3259,18 +3259,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             std::mem::replace(&mut self.deferred_state, DeferredExpressionState::Deferred);
         match bound.as_deref() {
             Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
-                // We don't use UnionType::from_elements or UnionBuilder here, because we don't
-                // want to simplify the list of constraints like we do with the elements of an
-                // actual union type.
-                // TODO: Consider using a new `OneOfType` connective here instead, since that
-                // more accurately represents the actual semantics of typevar constraints.
-                let ty = Type::Union(UnionType::new(
+                // Here, we interpret `bound` as a heterogeneous tuple and convert it to `TypeVarConstraints` in `TypeVarInstance::lazy_constraints`.
+                let tuple_ty = Type::heterogeneous_tuple(
                     self.db(),
                     elts.iter()
                         .map(|expr| self.infer_type_expression(expr))
                         .collect::<Box<[_]>>(),
-                ));
-                self.store_expression_type(expr, ty);
+                );
+                self.store_expression_type(expr, tuple_ty);
             }
             Some(expr) => {
                 self.infer_type_expression(expr);
@@ -11294,7 +11290,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             if provided_type
                                 .when_assignable_to(
                                     db,
-                                    Type::Union(constraints),
+                                    constraints.as_type(db),
                                     InferableTypeVars::None,
                                 )
                                 .is_never_satisfied(db)
