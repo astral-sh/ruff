@@ -463,6 +463,10 @@ class PlaygroundServer
           column: hint.position.column,
         },
         kind: mapInlayHintKind(hint.kind),
+        textEdits: hint.text_edits.map((edit: TextEdit) => ({
+          range: tyRangeToMonacoRange(edit.range),
+          text: edit.new_text,
+        })),
       })),
     };
   }

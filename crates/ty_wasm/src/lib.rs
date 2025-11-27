@@ -493,6 +493,19 @@ impl Workspace {
                     self.position_encoding,
                 ),
                 kind: hint.kind.into(),
+                text_edits: hint
+                    .text_edits
+                    .into_iter()
+                    .map(|edit| TextEdit {
+                        range: Range::from_text_range(
+                            edit.range,
+                            &index,
+                            &source,
+                            self.position_encoding,
+                        ),
+                        new_text: edit.new_text,
+                    })
+                    .collect(),
             })
             .collect())
     }
@@ -1110,6 +1123,9 @@ pub struct InlayHint {
     pub position: Position,
 
     pub kind: InlayHintKind,
+
+    #[wasm_bindgen(getter_with_clone)]
+    pub text_edits: Vec<TextEdit>,
 }
 
 #[wasm_bindgen]
