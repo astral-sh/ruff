@@ -11257,7 +11257,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             .elements(db)
                                             .iter()
                                             .map(|c| c.display(db))
-                                            .join("`, `"),
+                                            .format("`, `"),
                                         typevar.identity(db).display(db),
                                     ));
                                 }
@@ -11278,9 +11278,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     specialization_types.push(None);
                 }
                 EitherOrBoth::Right(_) => {
-                    if first_excess_type_argument_index.is_none() {
-                        first_excess_type_argument_index = Some(index);
-                    }
+                    first_excess_type_argument_index.get_or_insert(index);
                 }
             }
         }
@@ -11294,7 +11292,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     missing_typevars
                         .iter()
                         .map(|tv| tv.typevar(db).name(db))
-                        .join("`, `"),
+                        .format("`, `"),
                     if let Some(CallableDescription { kind, name }) = description {
                         format!(" of {kind} `{name}`")
                     } else {
