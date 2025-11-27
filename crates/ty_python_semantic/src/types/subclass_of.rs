@@ -79,19 +79,7 @@ impl<'db> SubclassOfType<'db> {
 
     /// Given an instance of the class or type variable `T`, returns a [`Type`] instance representing `type[T]`.
     pub(crate) fn try_from_instance(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
-        let subclass_of = match ty {
-            Type::NominalInstance(instance) => SubclassOfInner::Class(instance.class(db)),
-            Type::TypedDict(typed_dict) => SubclassOfInner::Class(typed_dict.defining_class()),
-            Type::TypeVar(bound_typevar) => SubclassOfInner::TypeVar(bound_typevar),
-            Type::Dynamic(DynamicType::Any) => SubclassOfInner::Dynamic(DynamicType::Any),
-            Type::Dynamic(DynamicType::Unknown) => SubclassOfInner::Dynamic(DynamicType::Unknown),
-            Type::ProtocolInstance(_) => {
-                SubclassOfInner::Dynamic(todo_type!("type[T] for protocols").expect_dynamic())
-            }
-            _ => return None,
-        };
-
-        Some(Self::from(db, subclass_of))
+        SubclassOfInner::try_from_instance(db, ty).map(|subclass_of| Self::from(db, subclass_of))
     }
 
     /// Return a [`Type`] instance representing the type `type[Unknown]`.
@@ -353,22 +341,23 @@ impl<'db> SubclassOfInner<'db> {
     }
 
     pub(crate) fn into_class(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
-        match self.with_transposed_type_var(db) {
+        match self {
             Self::Dynamic(_) => None,
             Self::Class(class) => Some(class),
             Self::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(Type::SubclassOf(subclass_of))) => {
-                        subclass_of.subclass_of().into_class(db)
+                    None => Some(ClassType::object(db)),
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        Self::try_from_instance(db, bound)
+                            .and_then(|subclass_of| subclass_of.into_class(db))
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        if let [Type::SubclassOf(subclass_of)] = constraints.elements(db) {
-                            subclass_of.subclass_of().into_class(db)
-                        } else {
-                            None
+                        match constraints.elements(db) {
+                            [bound] => Self::try_from_instance(db, *bound)
+                                .and_then(|subclass_of| subclass_of.into_class(db)),
+                            _ => Some(ClassType::object(db)),
                         }
                     }
-                    _ => None,
                 }
             }
         }
@@ -386,6 +375,20 @@ impl<'db> SubclassOfInner<'db> {
             Self::Class(_) | Self::Dynamic(_) => None,
             Self::TypeVar(bound_typevar) => Some(bound_typevar),
         }
+    }
+
+    pub(crate) fn try_from_instance(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+        Some(match ty {
+            Type::NominalInstance(instance) => SubclassOfInner::Class(instance.class(db)),
+            Type::TypedDict(typed_dict) => SubclassOfInner::Class(typed_dict.defining_class()),
+            Type::TypeVar(bound_typevar) => SubclassOfInner::TypeVar(bound_typevar),
+            Type::Dynamic(DynamicType::Any) => SubclassOfInner::Dynamic(DynamicType::Any),
+            Type::Dynamic(DynamicType::Unknown) => SubclassOfInner::Dynamic(DynamicType::Unknown),
+            Type::ProtocolInstance(_) => {
+                SubclassOfInner::Dynamic(todo_type!("type[T] for protocols").expect_dynamic())
+            }
+            _ => return None,
+        })
     }
 
     /// Transposes `type[T]` with a type variable `T` into `T: type[...]`.

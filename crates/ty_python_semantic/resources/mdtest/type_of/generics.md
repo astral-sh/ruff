@@ -23,6 +23,7 @@ def unbounded[T](x: type[T]) -> T:
     reveal_type(x)  # revealed: type[T@unbounded]
     reveal_type(x.__repr__)  # revealed: def __repr__(self) -> str
     reveal_type(x.__init__)  # revealed: def __init__(self) -> None
+    reveal_type(x.__qualname__)  # revealed: str
     reveal_type(x())  # revealed: T@unbounded
 
     return x()
@@ -41,6 +42,7 @@ class C: ...
 
 def upper_bound[T: A](x: type[T]) -> T:
     reveal_type(x)  # revealed: type[T@upper_bound]
+    reveal_type(x.__qualname__)  # revealed: str
     reveal_type(x("hello"))  # revealed: T@upper_bound
 
     return x("hello")
@@ -57,6 +59,7 @@ upper_bound(C)
 ```py
 def constrained[T: (int, str)](x: type[T]) -> T:
     reveal_type(x)  # revealed: type[T@constrained]
+    reveal_type(x.__qualname__)  # revealed: str
     reveal_type(x("hello"))  # revealed: T@constrained
 
     return x("hello")
