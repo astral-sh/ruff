@@ -414,9 +414,6 @@ pub struct CheckCommand {
     #[arg(long, help_heading = "Miscellaneous", conflicts_with = "exit_zero")]
     pub exit_non_zero_on_fix: bool,
     /// Show counts for every rule with at least one violation.
-    /// When combined with `--output-format json`, the output includes
-    /// `fixable_count` (the number of fixable violations)
-    /// and `fixable` (true if all violations are fixable).
     #[arg(
         long,
         // Unsupported default-command arguments.

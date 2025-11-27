@@ -34,15 +34,12 @@ struct ExpandedStatistics<'a> {
     code: Option<&'a SecondaryCode>,
     name: &'static str,
     count: usize,
-    fixable: bool,
+    #[serde(rename = "fixable")]
+    all_fixable: bool,
     fixable_count: usize,
 }
 
 impl ExpandedStatistics<'_> {
-    fn all_fixable(&self) -> bool {
-        self.fixable_count == self.count
-    }
-
     fn any_fixable(&self) -> bool {
         self.fixable_count > 0
     }
@@ -275,29 +272,25 @@ impl Printer {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .inner
             .iter()
-            .map(|message| {
-                let is_fixable = message
+            .sorted_by_key(|diagnostic| diagnostic.secondary_code())
+            .fold(vec![], |mut acc: Vec<DiagnosticGroup>, diagnostic| {
+                let is_fixable = diagnostic
                     .fix()
                     .is_some_and(|fix| fix.applies(required_applicability));
-                (message.secondary_code(), message, is_fixable)
-            })
-            .sorted_by_key(|(code, _, _)| *code)
-            .fold(
-                vec![],
-                |mut acc: Vec<DiagnosticGroup>, (code, message, is_fixable)| {
-                    if let Some((prev_code, _prev_message, count, fixable_count)) = acc.last_mut() {
-                        if *prev_code == code {
-                            *count += 1;
-                            if is_fixable {
-                                *fixable_count += 1;
-                            }
-                            return acc;
+                let code = diagnostic.secondary_code();
+
+                if let Some((prev_code, _prev_message, count, fixable_count)) = acc.last_mut() {
+                    if *prev_code == code {
+                        *count += 1;
+                        if is_fixable {
+                            *fixable_count += 1;
                         }
+                        return acc;
                     }
-                    acc.push((code, message, 1, usize::from(is_fixable)));
-                    acc
-                },
-            )
+                }
+                acc.push((code, diagnostic, 1, usize::from(is_fixable)));
+                acc
+            })
             .iter()
             .map(
                 |&(code, message, count, fixable_count)| ExpandedStatistics {
@@ -306,7 +299,7 @@ impl Printer {
                     count,
                     // Backward compatibility: `fixable` is true only when all violations are fixable.
                     // See: https://github.com/astral-sh/ruff/pull/21513
-                    fixable: fixable_count == count,
+                    all_fixable: fixable_count == count,
                     fixable_count,
                 },
             )
@@ -352,7 +345,7 @@ impl Printer {
                             .red()
                             .bold(),
                         if any_fixable {
-                            if statistic.all_fixable() {
+                            if statistic.all_fixable {
                                 &all_fixable
                             } else if statistic.any_fixable() {
                                 &partially_fixable
