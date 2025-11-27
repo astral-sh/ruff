@@ -880,6 +880,49 @@ from mypackage import funcmod
 x = funcmod(1)
 ```
 
+## A Tale of Two Modules
+
+`from typing import TYPE_CHECKING` has side-effects???
+
+### In Stub
+
+`mypackage/__init__.py`:
+
+```py
+from .conflicted.b import x
+```
+
+`mypackage/conflicted/__init__.py`:
+
+`mypackage/conflicted/other1/__init__.py`:
+
+```py
+x: int = 1
+```
+
+`mypackage/conflicted/b/__init__.py`:
+
+```py
+x: int = 1
+```
+
+`mypackage/conflicted/b/c/__init__.py`:
+
+```py
+y: int = 2
+```
+
+`main.py`:
+
+```py
+from typing import TYPE_CHECKING
+from mypackage.conflicted.other1 import x as x1
+import mypackage.conflicted.b.c
+
+# error: [possibly-missing-attribute]
+reveal_type(mypackage.conflicted.b.c.y)  # revealed: Unknown
+```
+
 ## Re-export Nameclash Problems In Functions
 
 `from` imports in an `__init__.py` at file scope should be visible to functions defined in the file:
