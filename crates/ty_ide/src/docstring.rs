@@ -233,9 +233,6 @@ fn render_markdown(docstring: &str) -> String {
             in_any_code = true;
             block_indent = line_indent;
             // TODO: I hope people don't have literal blocks about markdown code fence syntax
-            // TODO: should we not be this aggressive? Let it autodetect?
-            // TODO: respect `.. code-block::` directives:
-            // <https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block>
             output.push_str("\n```");
             output.push_str(literal);
             output.push('\n');
