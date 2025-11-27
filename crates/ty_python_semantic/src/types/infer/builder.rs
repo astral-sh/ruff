@@ -11242,7 +11242,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => {
                 bindings.report_diagnostics(&self.context, subscript.into());
-                return Type::unknown();
+                let unknowns = generic_context
+                    .variables(self.db())
+                    .map(|_| Some(Type::unknown()))
+                    .collect::<Vec<_>>();
+                return specialize(&unknowns);
             }
         };
         let callable = bindings

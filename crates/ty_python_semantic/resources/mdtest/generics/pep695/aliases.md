@@ -62,7 +62,7 @@ The specialization must match the generic types:
 
 ```py
 # error: [too-many-positional-arguments] "Too many positional arguments: expected 1, got 2"
-reveal_type(C[int, int])  # revealed: Unknown
+reveal_type(C[int, int])  # revealed: C[Unknown]
 ```
 
 And non-generic types cannot be specialized:
@@ -90,11 +90,11 @@ reveal_type(Bounded[IntSubclass])  # revealed: Bounded[IntSubclass]
 
 # TODO: update this diagnostic to talk about type parameters and specializations
 # error: [invalid-argument-type] "Argument is incorrect: Expected `int`, found `str`"
-reveal_type(Bounded[str])  # revealed: Unknown
+reveal_type(Bounded[str])  # revealed: Bounded[Unknown]
 
 # TODO: update this diagnostic to talk about type parameters and specializations
 # error: [invalid-argument-type] "Argument is incorrect: Expected `int`, found `int | str`"
-reveal_type(Bounded[int | str])  # revealed: Unknown
+reveal_type(Bounded[int | str])  # revealed: Bounded[Unknown]
 
 reveal_type(BoundedByUnion[int])  # revealed: BoundedByUnion[int]
 reveal_type(BoundedByUnion[IntSubclass])  # revealed: BoundedByUnion[IntSubclass]
@@ -121,7 +121,7 @@ reveal_type(Constrained[int | str])  # revealed: Constrained[int | str]
 
 # TODO: update this diagnostic to talk about type parameters and specializations
 # error: [invalid-argument-type] "Argument is incorrect: Expected `int | str`, found `object`"
-reveal_type(Constrained[object])  # revealed: Unknown
+reveal_type(Constrained[object])  # revealed: Constrained[Unknown]
 ```
 
 If the type variable has a default, it can be omitted:

@@ -1230,6 +1230,9 @@ pub enum KnownFunction {
     /// `builtins.__import__`, which returns the top-level module.
     #[strum(serialize = "__import__")]
     DunderImport,
+    /// `collections.namedtuple`
+    #[strum(serialize = "namedtuple")]
+    NamedTuple,
     /// `importlib.import_module`, which returns the submodule.
     ImportModule,
     /// `typing(_extensions).final`
@@ -1370,6 +1373,7 @@ impl KnownFunction {
             Self::ImportModule => module.is_importlib(),
 
             Self::TypeCheckOnly => matches!(module, KnownModule::Typing),
+            Self::NamedTuple => matches!(module, KnownModule::Collections),
         }
     }
 
@@ -1902,6 +1906,7 @@ pub(crate) mod tests {
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,
+                KnownFunction::NamedTuple => KnownModule::Collections,
             };
 
             let function_definition = known_module_symbol(&db, module, function_name)
