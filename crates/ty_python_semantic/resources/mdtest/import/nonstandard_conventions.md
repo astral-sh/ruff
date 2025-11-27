@@ -883,7 +883,7 @@ x = funcmod(1)
 ## A Tale of Two Modules
 
 This is a nonsensical regression test for some incredibly cursed interaction in `ty` where we get
-confused `mypackage.conflicted`. The worst part is that resolving an import
+confused about `mypackage.conflicted`. The worst part is that resolving an import
 `from typing import <anything that resolves>` is load-bearing, and `typing` seems to be special
 here. There is no known reason why `typing` should be special here.
 
