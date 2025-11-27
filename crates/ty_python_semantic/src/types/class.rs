@@ -6,7 +6,7 @@ use super::TypeVarVariance;
 use super::{
     BoundTypeVarInstance, IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator,
     SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
-    function::FunctionType, infer_expression_type, infer_unpack_types,
+    function::FunctionType,
 };
 use crate::module_resolver::KnownModule;
 use crate::place::TypeOrigin;
@@ -25,7 +25,7 @@ use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, walk_generic_context, walk_specialization,
 };
-use crate::types::infer::nearest_enclosing_class;
+use crate::types::infer::{infer_expression_type, infer_unpack_types, nearest_enclosing_class};
 use crate::types::member::{Member, class_member};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
@@ -37,8 +37,7 @@ use crate::types::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType,
     ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
     StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation, TypedDictParams,
-    UnionBuilder, VarianceInferable, declaration_type, determine_upper_bound,
-    exceeds_max_specialization_depth, infer_definition_types,
+    UnionBuilder, VarianceInferable, binding_type, declaration_type, determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -87,12 +86,30 @@ fn inheritance_cycle_initial<'db>(
 
 fn implicit_attribute_initial<'db>(
     _db: &'db dyn Db,
-    _id: salsa::Id,
+    id: salsa::Id,
     _class_body_scope: ScopeId<'db>,
     _name: String,
     _target_method_decorator: MethodDecorator,
 ) -> Member<'db> {
-    Member::unbound()
+    Member {
+        inner: Place::bound(Type::divergent(id)).into(),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn implicit_attribute_cycle_recover<'db>(
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous_member: &Member<'db>,
+    member: Member<'db>,
+    _class_body_scope: ScopeId<'db>,
+    _name: String,
+    _target_method_decorator: MethodDecorator,
+) -> Member<'db> {
+    let inner = member
+        .inner
+        .cycle_normalized(db, previous_member.inner, cycle);
+    Member { inner }
 }
 
 fn try_mro_cycle_initial<'db>(
@@ -107,7 +124,6 @@ fn try_mro_cycle_initial<'db>(
     ))
 }
 
-#[allow(clippy::unnecessary_wraps)]
 fn is_typed_dict_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,
@@ -125,6 +141,14 @@ fn try_metaclass_cycle_initial<'db>(
     Err(MetaclassError {
         kind: MetaclassErrorKind::Cycle,
     })
+}
+
+fn decorators_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: ClassLiteral<'db>,
+) -> Box<[Type<'db>]> {
+    Box::default()
 }
 
 fn fields_cycle_initial<'db>(
@@ -253,6 +277,21 @@ impl<'db> GenericAlias<'db> {
             self.origin(db),
             self.specialization(db).normalized_impl(db, visitor),
         )
+    }
+
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Option<Self> {
+        Some(Self::new(
+            db,
+            self.origin(db),
+            self.specialization(db)
+                .recursive_type_normalized_impl(db, div, nested, visitor)?,
+        ))
     }
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
@@ -396,6 +435,21 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(_) => self,
             Self::Generic(generic) => Self::Generic(generic.normalized_impl(db, visitor)),
+        }
+    }
+
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Option<Self> {
+        match self {
+            Self::NonGeneric(_) => Some(self),
+            Self::Generic(generic) => Some(Self::Generic(
+                generic.recursive_type_normalized_impl(db, div, nested, visitor)?,
+            )),
         }
     }
 
@@ -1533,17 +1587,7 @@ impl<'db> ClassLiteral<'db> {
         match self.generic_context(db) {
             None => ClassType::NonGeneric(self),
             Some(generic_context) => {
-                let mut specialization = f(generic_context);
-
-                for (idx, ty) in specialization.types(db).iter().enumerate() {
-                    if exceeds_max_specialization_depth(db, *ty) {
-                        specialization = specialization.with_replaced_type(
-                            db,
-                            idx,
-                            Type::divergent(Some(self.body_scope(db))),
-                        );
-                    }
-                }
+                let specialization = f(generic_context);
 
                 ClassType::Generic(GenericAlias::new(db, self, specialization))
             }
@@ -1698,7 +1742,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Return the types of the decorators on this class
-    #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(deref), cycle_initial=decorators_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::decorators: {}", self.name(db));
 
@@ -3136,10 +3180,12 @@ impl<'db> ClassLiteral<'db> {
         )
     }
 
-    #[salsa::tracked(cycle_initial=implicit_attribute_initial,
+    #[salsa::tracked(
+        cycle_fn=implicit_attribute_cycle_recover,
+        cycle_initial=implicit_attribute_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
-    fn implicit_attribute_inner(
+    pub(super) fn implicit_attribute_inner(
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
         name: String,
@@ -3159,7 +3205,6 @@ impl<'db> ClassLiteral<'db> {
         let index = semantic_index(db, file);
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
-
         let is_valid_scope = |method_scope: &Scope| {
             if let Some(method_def) = method_scope.node().as_function() {
                 let method_name = method_def.node(&module).name.as_str();
@@ -5468,8 +5513,7 @@ impl KnownClass {
                         };
 
                         let definition = index.expect_single_definition(first_param);
-                        let first_param =
-                            infer_definition_types(db, definition).binding_type(definition);
+                        let first_param = binding_type(db, definition);
 
                         let bound_super = BoundSuperType::build(
                             db,

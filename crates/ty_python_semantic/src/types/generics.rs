@@ -1040,6 +1040,41 @@ impl<'db> Specialization<'db> {
         )
     }
 
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Option<Self> {
+        let types = if nested {
+            self.types(db)
+                .iter()
+                .map(|ty| ty.recursive_type_normalized_impl(db, div, true, visitor))
+                .collect::<Option<Box<[_]>>>()?
+        } else {
+            self.types(db)
+                .iter()
+                .map(|ty| {
+                    ty.recursive_type_normalized_impl(db, div, true, visitor)
+                        .unwrap_or(div)
+                })
+                .collect::<Box<[_]>>()
+        };
+        let tuple_inner = match self.tuple_inner(db) {
+            Some(tuple) => Some(tuple.recursive_type_normalized_impl(db, div, nested, visitor)?),
+            None => None,
+        };
+        let context = self.generic_context(db);
+        Some(Self::new(
+            db,
+            context,
+            types,
+            self.materialization_kind(db),
+            tuple_inner,
+        ))
+    }
+
     pub(super) fn materialize_impl(
         self,
         db: &'db dyn Db,
@@ -1247,25 +1282,6 @@ impl<'db> Specialization<'db> {
         }
         // A tuple's specialization will include all of its element types, so we don't need to also
         // look in `self.tuple`.
-    }
-
-    /// Returns a copy of this specialization with the type at a given index replaced.
-    pub(crate) fn with_replaced_type(
-        self,
-        db: &'db dyn Db,
-        index: usize,
-        new_type: Type<'db>,
-    ) -> Self {
-        let mut new_types: Box<[_]> = self.types(db).to_vec().into_boxed_slice();
-        new_types[index] = new_type;
-
-        Self::new(
-            db,
-            self.generic_context(db),
-            new_types,
-            self.materialization_kind(db),
-            self.tuple_inner(db),
-        )
     }
 }
 

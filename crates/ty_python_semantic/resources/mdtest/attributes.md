@@ -2383,6 +2383,34 @@ class B:
 
 reveal_type(B().x)  # revealed: Unknown | Literal[1]
 reveal_type(A().x)  # revealed: Unknown | Literal[1]
+
+class Base:
+    def flip(self) -> "Sub":
+        return Sub()
+
+class Sub(Base):
+    # error: [invalid-method-override]
+    def flip(self) -> "Base":
+        return Base()
+
+class C2:
+    def __init__(self, x: Sub):
+        self.x = x
+
+    def replace_with(self, other: "C2"):
+        self.x = other.x.flip()
+
+reveal_type(C2(Sub()).x)  # revealed: Unknown | Base
+
+class C3:
+    def __init__(self, x: Sub):
+        self.x = [x]
+
+    def replace_with(self, other: "C3"):
+        self.x = [self.x[0].flip()]
+
+# TODO: should be `Unknown | list[Unknown | Sub] | list[Unknown | Base]`
+reveal_type(C3(Sub()).x)  # revealed: Unknown | list[Unknown | Sub] | list[Divergent]
 ```
 
 And cycles between many attributes:
@@ -2432,6 +2460,30 @@ class ManyCycles:
         reveal_type(self.x5)  # revealed: Unknown | int
         reveal_type(self.x6)  # revealed: Unknown | int
         reveal_type(self.x7)  # revealed: Unknown | int
+
+class ManyCycles2:
+    def __init__(self: "ManyCycles2"):
+        self.x1 = [0]
+        self.x2 = [1]
+        self.x3 = [1]
+
+    def f1(self: "ManyCycles2"):
+        # TODO: should be Unknown | list[Unknown | int] | list[Divergent]
+        reveal_type(self.x3)  # revealed: Unknown | list[Unknown | int] | list[Divergent] | list[Divergent]
+
+        self.x1 = [self.x2] + [self.x3]
+        self.x2 = [self.x1] + [self.x3]
+        self.x3 = [self.x1] + [self.x2]
+
+    def f2(self: "ManyCycles2"):
+        self.x1 = self.x2 + self.x3
+        self.x2 = self.x1 + self.x3
+        self.x3 = self.x1 + self.x2
+
+    def f3(self: "ManyCycles2"):
+        self.x1 = self.x2 + self.x3
+        self.x2 = self.x1 + self.x3
+        self.x3 = self.x1 + self.x2
 ```
 
 This case additionally tests our union/intersection simplification logic:
@@ -2611,12 +2663,18 @@ reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Unknown]
 
 ## Divergent inferred implicit instance attribute types
 
+If an implicit attribute is defined recursively and type inference diverges, the divergent part is
+filled in with the dynamic type `Divergent`. Types containing `Divergent` can be seen as "cheap"
+recursive types: they are not true recursive types based on recursive type theory, so no unfolding
+is performed when you use them.
+
 ```py
 class C:
     def f(self, other: "C"):
         self.x = (other.x, 1)
 
 reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
+reveal_type(C().x[0])  # revealed: Unknown | Divergent
 ```
 
 This also works if the tuple is not constructed directly:
@@ -2655,11 +2713,11 @@ And it also works for homogeneous tuples:
 def make_homogeneous_tuple(x: T) -> tuple[T, ...]:
     return (x, x)
 
-class E:
-    def f(self, other: "E"):
+class F:
+    def f(self, other: "F"):
         self.x = make_homogeneous_tuple(other.x)
 
-reveal_type(E().x)  # revealed: Unknown | tuple[Divergent, ...]
+reveal_type(F().x)  # revealed: Unknown | tuple[Divergent, ...]
 ```
 
 ## Attributes of standard library modules that aren't yet defined

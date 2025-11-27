@@ -35,6 +35,7 @@ Settings: Settings {
         "conflicting-declarations": Error (Default),
         "conflicting-metaclass": Error (Default),
         "cyclic-class-definition": Error (Default),
+        "cyclic-type-alias-definition": Error (Default),
         "deprecated": Warning (Default),
         "duplicate-base": Error (Default),
         "duplicate-kw-only": Error (Default),

@@ -54,6 +54,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&CONFLICTING_METACLASS);
     registry.register_lint(&CYCLIC_CLASS_DEFINITION);
+    registry.register_lint(&CYCLIC_TYPE_ALIAS_DEFINITION);
     registry.register_lint(&DEPRECATED);
     registry.register_lint(&DIVISION_BY_ZERO);
     registry.register_lint(&DUPLICATE_BASE);
@@ -271,6 +272,28 @@ declare_lint! {
     pub(crate) static CYCLIC_CLASS_DEFINITION = {
         summary: "detects cyclic class definitions",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for type alias definitions that (directly or mutually) refer to themselves.
+    ///
+    /// ## Why is it bad?
+    /// Although it is permitted to define a recursive type alias, it is not meaningful
+    /// to have a type alias whose expansion can only result in itself, and is therefore not allowed.
+    ///
+    /// ## Examples
+    /// ```python
+    /// type Itself = Itself
+    ///
+    /// type A = B
+    /// type B = A
+    /// ```
+    pub(crate) static CYCLIC_TYPE_ALIAS_DEFINITION = {
+        summary: "detects cyclic type alias definitions",
+        status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
 }
