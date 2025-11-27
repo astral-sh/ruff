@@ -670,8 +670,6 @@ class PlaygroundServer
       new TyPosition(position.lineNumber, position.column),
     );
 
-    console.log(links);
-
     return this.mapNavigationTargets(links);
   }
 
