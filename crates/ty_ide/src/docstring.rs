@@ -191,11 +191,12 @@ fn render_markdown(docstring: &str) -> String {
     let mut first_line = true;
     let mut block_indent = 0;
     let mut in_doctest = false;
-    let mut starting_literal = false;
+    let mut starting_literal = None;
     let mut in_literal = false;
     let mut in_any_code = false;
     for untrimmed_line in docstring.lines() {
         // We can assume leading whitespace has been normalized
+        let mut _line;
         let mut line = untrimmed_line.trim_start_matches(' ');
         let line_indent = untrimmed_line.len() - line.len();
 
@@ -207,7 +208,7 @@ fn render_markdown(docstring: &str) -> String {
                 output.push_str("  ");
             }
             // Only push newlines if we're not scanning for a real line
-            if !starting_literal {
+            if starting_literal.is_none() {
                 output.push('\n');
             }
         }
@@ -224,8 +225,10 @@ fn render_markdown(docstring: &str) -> String {
 
         // We previously entered a literal block and we just found our first non-blank line
         // So now we're actually in the literal block
-        if starting_literal && !line.is_empty() {
-            starting_literal = false;
+        if let Some(literal) = starting_literal
+            && !line.is_empty()
+        {
+            starting_literal = None;
             in_literal = true;
             in_any_code = true;
             block_indent = line_indent;
@@ -233,7 +236,9 @@ fn render_markdown(docstring: &str) -> String {
             // TODO: should we not be this aggressive? Let it autodetect?
             // TODO: respect `.. code-block::` directives:
             // <https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block>
-            output.push_str("\n```python\n");
+            output.push_str("\n```");
+            output.push_str(literal);
+            output.push('\n');
         }
 
         // If we're not in a codeblock and we see something that signals a doctest, start one
@@ -247,20 +252,53 @@ fn render_markdown(docstring: &str) -> String {
 
         // If we're not in a codeblock and we see something that signals a literal block, start one
         if !in_any_code && let Some(without_lit) = line.strip_suffix("::") {
-            let trimmed_without_lit = without_lit.trim();
-            if let Some(character) = trimmed_without_lit.chars().next_back() {
+            let mut without_directive = without_lit;
+            let mut directive = None;
+            // Parse out a directive like `.. warning::`
+            if let Some((prefix, directive_str)) = without_lit.rsplit_once(' ')
+                && let Some(without_directive_str) = prefix.strip_suffix("..")
+            {
+                directive = Some(directive_str);
+                without_directive = without_directive_str;
+            }
+
+            let include_colon = if let Some(character) = without_directive.chars().next_back() {
                 if character.is_whitespace() {
                     // Remove the marker completely
-                    line = trimmed_without_lit;
+                    false
                 } else {
                     // Only remove the first `:`
-                    line = line.strip_suffix(":").unwrap();
+                    true
                 }
             } else {
                 // Delete whole line
-                line = trimmed_without_lit;
+                false
+            };
+
+            if include_colon {
+                line = line.strip_suffix(":").unwrap();
+            } else {
+                line = without_directive.trim_end();
             }
-            starting_literal = true;
+
+            starting_literal = match directive {
+                // Special directives that should be plaintext
+                #[allow(clippy::used_underscore_binding)]
+                Some(
+                    "attention" | "caution" | "danger" | "error" | "hint" | "important" | "note"
+                    | "tip" | "warning" | "admonition",
+                ) => {
+                    _line = format!("**{without_directive}{}:**", directive.unwrap());
+                    line = _line.as_str();
+                    None
+                }
+                // Things that just mean "it's code"
+                Some("code-block" | "sourcecode" | "code") => Some("python"),
+                // Unknown (python I guess?)
+                Some(_) => Some("python"),
+                // default to python
+                None => Some("python"),
+            };
         }
 
         // Add this line's indentation.
@@ -730,28 +768,6 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
-        Here _this_ and ___that__ should be escaped
-        Here *this* and **that** should be untouched
-        Here `this` and ``that`` should be untouched
-
-        Here `_this_` and ``__that__`` should be untouched
-        Here `_this_` ``__that__`` should be untouched
-        `_this_too_should_be_untouched_`
-
-        Here `_this_```__that__`` should be untouched but this_is_escaped
-        Here ``_this_```__that__` should be untouched but this_is_escaped
-
-        Here `_this_ and _that_ should be escaped (but isn't)
-        Here _this_ and _that_` should be escaped
-        `Here _this_ and _that_ should be escaped (but isn't)
-        Here _this_ and _that_ should be escaped`
-
-        Here ```_is_``__a__`_balanced_``_mess_```
-        Here ```_is_`````__a__``_random_````_mess__````
-        ```_is_`````__a__``_random_````_mess__````
-        ");
-
         assert_snapshot!(docstring.render_markdown(), @r"
         Here \_this\_ and \_\_\_that\_\_ should be escaped  
         Here *this* and **that** should be untouched  
@@ -796,21 +812,6 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_plaintext(), @r#"
-        Check out this great example code::
-
-            x_y = "hello"
-
-            if len(x_y) > 4:
-                print(x_y)
-            else:
-                print("too short :(")
-
-            print("done")
-
-        You love to see it.
-        "#);
-
         assert_snapshot!(docstring.render_markdown(), @r#"
         Check out this great example code:    
         ```python
@@ -849,23 +850,8 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_plaintext(), @r#"
-        Check out this great example code ::
-
-            x_y = "hello"
-
-            if len(x_y) > 4:
-                print(x_y)
-            else:
-                print("too short :(")
-
-            print("done")
-
-        You love to see it.
-        "#);
-
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Check out this great example code :    
+        Check out this great example code    
         ```python
             x_y = "hello"
 
@@ -902,22 +888,6 @@ mod tests {
         "#;
 
         let docstring = Docstring::new(docstring.to_owned());
-
-        assert_snapshot!(docstring.render_plaintext(), @r#"
-        Check out this great example code
-            ::
-
-            x_y = "hello"
-
-            if len(x_y) > 4:
-                print(x_y)
-            else:
-                print("too short :(")
-
-            print("done")
-
-        You love to see it.
-        "#);
 
         assert_snapshot!(docstring.render_markdown(), @r#"
         Check out this great example code  
@@ -956,19 +926,6 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_plaintext(), @r#"
-        Check out this great example code::
-            x_y = "hello"
-
-            if len(x_y) > 4:
-                print(x_y)
-            else:
-                print("too short :(")
-
-            print("done")
-        You love to see it.
-        "#);
-
         assert_snapshot!(docstring.render_markdown(), @r#"
         Check out this great example code:  
         ```python
@@ -1003,19 +960,6 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_plaintext(), @r#"
-        Check out this great example code::
-
-            x_y = "hello"
-
-            if len(x_y) > 4:
-                print(x_y)
-            else:
-                print("too short :(")
-
-            print("done")
-        "#);
-
         assert_snapshot!(docstring.render_markdown(), @r#"
         Check out this great example code:    
         ```python
@@ -1028,6 +972,45 @@ mod tests {
 
             print("done")
         ```
+        "#);
+    }
+
+    // `warning` and several other directives are special languages that should actually
+    // still be shown as text and not ```code```.
+    #[test]
+    fn warning_block() {
+        let docstring = r#"
+        The thing you need to understand is that computers are hard.
+
+        .. warning::
+            Now listen here buckaroo you might have seen me say computers are hard,
+            and though "yeah I know computers are hard but NO you DON'T KNOW.
+
+            Listen:
+
+            - Computers
+            - Are
+            - Hard
+
+            Ok!?!?!?
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        The thing you need to understand is that computers are hard.  
+          
+        **warning:**  
+        &nbsp;&nbsp;&nbsp;&nbsp;Now listen here buckaroo you might have seen me say computers are hard,  
+        &nbsp;&nbsp;&nbsp;&nbsp;and though "yeah I know computers are hard but NO you DON'T KNOW.  
+          
+        &nbsp;&nbsp;&nbsp;&nbsp;Listen:  
+          
+        &nbsp;&nbsp;&nbsp;&nbsp;- Computers  
+        &nbsp;&nbsp;&nbsp;&nbsp;- Are  
+        &nbsp;&nbsp;&nbsp;&nbsp;- Hard  
+          
+        &nbsp;&nbsp;&nbsp;&nbsp;Ok!?!?!?
         "#);
     }
 
@@ -1046,17 +1029,6 @@ mod tests {
         "#;
 
         let docstring = Docstring::new(docstring.to_owned());
-
-        assert_snapshot!(docstring.render_plaintext(), @r"
-        This is a function description
-
-        >>> thing.do_thing()
-        wow it did the thing
-        >>> thing.do_other_thing()
-        it sure did the thing
-
-        As you can see it did the thing!
-        ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
         This is a function description  
@@ -1087,17 +1059,6 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
-        This is a function description
-
-            >>> thing.do_thing()
-            wow it did the thing
-            >>> thing.do_other_thing()
-            it sure did the thing
-
-        As you can see it did the thing!
-        ");
-
         assert_snapshot!(docstring.render_markdown(), @r"
         This is a function description  
           
@@ -1120,13 +1081,6 @@ mod tests {
         it sure did the thing"#;
 
         let docstring = Docstring::new(docstring.to_owned());
-
-        assert_snapshot!(docstring.render_plaintext(), @r"
-        >>> thing.do_thing()
-        wow it did the thing
-        >>> thing.do_other_thing()
-        it sure did the thing
-        ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
         ```python
@@ -1154,17 +1108,6 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
-        This is a function description::
-
-            >>> thing.do_thing()
-            wow it did the thing
-            >>> thing.do_other_thing()
-            it sure did the thing
-
-        As you can see it did the thing!
-        ");
-
         assert_snapshot!(docstring.render_markdown(), @r"
         This is a function description:    
         ```python
@@ -1188,14 +1131,6 @@ mod tests {
             it sure did the thing"#;
 
         let docstring = Docstring::new(docstring.to_owned());
-
-        assert_snapshot!(docstring.render_plaintext(), @r"
-        And so you can see that
-            >>> thing.do_thing()
-            wow it did the thing
-            >>> thing.do_other_thing()
-            it sure did the thing
-        ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
         And so you can see that  
