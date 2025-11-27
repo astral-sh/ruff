@@ -10880,7 +10880,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // used in another implicit type alias like `Numbers = MyList[int]`, then we infer the
         // right hand side as a value expression, and need to handle the specialization here.
         if value_ty.is_generic_alias() {
-            return self.infer_explicitly_specialized_type_alias(subscript, value_ty, false);
+            return self.infer_explicit_type_alias_specialization(subscript, value_ty, false);
         }
 
         self.infer_subscript_load_impl(value_ty, subscript)
@@ -10952,7 +10952,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
                 if let Some(generic_context) = type_alias.generic_context(self.db()) {
-                    return self.infer_explicit_type_alias_specialization(
+                    return self.infer_explicit_type_alias_type_specialization(
                         subscript,
                         value_ty,
                         type_alias,
@@ -11190,7 +11190,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | KnownInstanceType::Callable(_)
                 | KnownInstanceType::TypeGenericAlias(_),
             ) => {
-                return self.infer_explicitly_specialized_type_alias(subscript, value_ty, false);
+                return self.infer_explicit_type_alias_specialization(subscript, value_ty, false);
             }
             _ => {}
         }
@@ -11222,7 +11222,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )
     }
 
-    fn infer_explicit_type_alias_specialization(
+    fn infer_explicit_type_alias_type_specialization(
         &mut self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,

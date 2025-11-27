@@ -736,7 +736,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     /// Infer the type of an explicitly specialized generic type alias (implicit or PEP 613).
-    pub(crate) fn infer_explicitly_specialized_type_alias(
+    pub(crate) fn infer_explicit_type_alias_specialization(
         &mut self,
         subscript: &ast::ExprSubscript,
         mut value_ty: Type<'db>,
@@ -877,7 +877,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     match type_alias.generic_context(self.db()) {
                         Some(generic_context) => {
                             let specialized_type_alias = self
-                                .infer_explicit_type_alias_specialization(
+                                .infer_explicit_type_alias_type_specialization(
                                     subscript,
                                     value_ty,
                                     type_alias,
@@ -926,14 +926,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
                 KnownInstanceType::TypeVar(_) => {
-                    self.infer_explicitly_specialized_type_alias(subscript, value_ty, false)
+                    self.infer_explicit_type_alias_specialization(subscript, value_ty, false)
                 }
 
                 KnownInstanceType::UnionType(_)
                 | KnownInstanceType::Callable(_)
                 | KnownInstanceType::Annotated(_)
                 | KnownInstanceType::TypeGenericAlias(_) => {
-                    self.infer_explicitly_specialized_type_alias(subscript, value_ty, true)
+                    self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
                 }
                 KnownInstanceType::NewType(newtype) => {
                     self.infer_type_expression(&subscript.slice);
@@ -976,7 +976,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
             Type::GenericAlias(_) => {
-                self.infer_explicitly_specialized_type_alias(subscript, value_ty, true)
+                self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
             }
             Type::StringLiteral(_) => {
                 self.infer_type_expression(slice);
