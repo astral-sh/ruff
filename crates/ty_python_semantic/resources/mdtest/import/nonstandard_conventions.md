@@ -915,7 +915,7 @@ y: int = 2
 `main.py`:
 
 ```py
-from typing import TYPE_CHECKING
+from typing import List
 from mypackage.conflicted.other1 import x as x1
 import mypackage.conflicted.b.c
 
