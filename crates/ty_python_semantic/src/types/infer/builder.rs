@@ -7334,12 +7334,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut builder = TupleSpecBuilder::with_capacity(elts.len());
 
         for element in elts {
-            if element.is_starred_expr() {
+            if let ast::Expr::Starred(starred) = element {
                 let element_type = infer_element(element);
                 // Fine to use `iterate` rather than `try_iterate` here:
                 // errors from iterating over something not iterable will have been
                 // emitted in the `infer_element` call above.
-                builder = builder.concat(db, &element_type.iterate(db));
+                let mut spec = element_type.iterate(db).into_owned();
+
+                let known_length = match &*starred.value {
+                    ast::Expr::List(ast::ExprList { elts, .. })
+                    | ast::Expr::Set(ast::ExprSet { elts, .. }) => elts
+                        .iter()
+                        .all(|elt| !elt.is_starred_expr())
+                        .then_some(elts.len()),
+                    ast::Expr::Dict(ast::ExprDict { items, .. }) => items
+                        .iter()
+                        .all(|item| item.key.is_some())
+                        .then_some(items.len()),
+                    _ => None,
+                };
+
+                if let Some(known_length) = known_length {
+                    spec = spec
+                        .resize(db, TupleLength::Fixed(known_length))
+                        .unwrap_or(spec);
+                }
+
+                builder = builder.concat(db, &spec);
             } else {
                 builder.push(infer_element(element));
             }
