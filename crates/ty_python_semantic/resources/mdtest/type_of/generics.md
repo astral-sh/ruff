@@ -86,14 +86,6 @@ def _[T](x: type[int] | type[T]):
     reveal_type(x())  # revealed: int | T@_
 ```
 
-## Pivot Class
-
-```py
-class Foo:
-    def method(self):
-        super(self.__class__, self)
-```
-
 ## Subtyping
 
 A class `A` is a subtype of `type[T]` if any instance of `A` is a subtype of `T`.

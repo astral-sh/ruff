@@ -393,6 +393,14 @@ class E(Enum):
 reveal_type(super(E, E.X))  # revealed: <super: <class 'E'>, E>
 ```
 
+## `type[Self]`
+
+```py
+class Foo:
+    def method(self):
+        super(self.__class__, self)
+```
+
 ## Descriptor Behavior with Super
 
 Accessing attributes through `super` still invokes descriptor protocol. However, the behavior can
