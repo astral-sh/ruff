@@ -1421,7 +1421,7 @@ declare_lint! {
     ///
     /// Using legacy type variables:
     /// ```python
-    /// from typing import TypeVar
+    /// from typing import Generic, TypeVar
     ///
     /// T1 = TypeVar('T1', int, str)
     /// T2 = TypeVar('T2', bound=int)
