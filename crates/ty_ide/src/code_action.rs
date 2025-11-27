@@ -9,7 +9,7 @@ use ty_python_semantic::types::UNRESOLVED_REFERENCE;
 #[derive(Debug, Clone)]
 pub struct QuickFix {
     pub title: String,
-    pub edit: Edit,
+    pub edits: Vec<Edit>,
     pub preferred: bool,
 }
 
@@ -32,7 +32,7 @@ pub fn code_actions(
             .into_iter()
             .map(|import| QuickFix {
                 title: import.label,
-                edit: import.edit,
+                edits: vec![import.edit],
                 preferred: true,
             })
             .collect();

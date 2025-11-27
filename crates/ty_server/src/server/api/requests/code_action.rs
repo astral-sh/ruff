@@ -99,7 +99,7 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
                     kind: Some(CodeActionKind::QUICKFIX),
                     diagnostics: Some(vec![diagnostic.clone()]),
                     edit: Some(lsp_types::WorkspaceEdit {
-                        changes: to_lsp_edits(db, file, snapshot.encoding(), vec![action.edit]),
+                        changes: to_lsp_edits(db, file, snapshot.encoding(), action.edits),
                         document_changes: None,
                         change_annotations: None,
                     }),
