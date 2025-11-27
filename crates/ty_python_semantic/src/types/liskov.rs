@@ -2,11 +2,13 @@
 //!
 //! [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 
+use bitflags::bitflags;
 use ruff_db::diagnostic::Annotation;
 use rustc_hash::FxHashSet;
 
 use crate::{
     Db,
+    lint::LintId,
     place::Place,
     semantic_index::{place_table, scope::ScopeId, symbol::ScopedSymbolId, use_def_map},
     types::{
@@ -14,8 +16,8 @@ use crate::{
         class::CodeGeneratorKind,
         context::InferContext,
         diagnostic::{
-            INVALID_EXPLICIT_OVERRIDE, report_invalid_method_override,
-            report_overridden_final_method,
+            INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, OVERRIDE_OF_FINAL_METHOD,
+            report_invalid_method_override, report_overridden_final_method,
         },
         function::{FunctionDecorators, KnownFunction},
         ide_support::{MemberWithDefinition, all_declarations_and_bindings},
@@ -24,7 +26,8 @@ use crate::{
 
 pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: ClassLiteral<'db>) {
     let db = context.db();
-    if class.is_known(db, KnownClass::Object) {
+    let configuration = OverrideRulesConfig::from(context);
+    if configuration.no_rules_enabled() {
         return;
     }
 
@@ -33,12 +36,13 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: ClassLite
         all_declarations_and_bindings(db, class.body_scope(db)).collect();
 
     for member in own_class_members {
-        check_class_declaration(context, class_specialized, &member);
+        check_class_declaration(context, configuration, class_specialized, &member);
     }
 }
 
 fn check_class_declaration<'db>(
     context: &InferContext<'db, '_>,
+    configuration: OverrideRulesConfig,
     class: ClassType<'db>,
     member: &MemberWithDefinition<'db>,
 ) {
@@ -155,31 +159,35 @@ fn check_class_declaration<'db>(
             break;
         };
 
-        overridden_final_method = overridden_final_method.or_else(|| {
-            let superclass_symbol_id = superclass_symbol_id?;
+        if configuration.check_final_method_overridden() {
+            overridden_final_method = overridden_final_method.or_else(|| {
+                let superclass_symbol_id = superclass_symbol_id?;
 
-            // TODO: `@final` should be more like a type qualifier:
-            // we should also recognise `@final`-decorated methods that don't end up
-            // as being function- or property-types (because they're wrapped by other
-            // decorators that transform the type into something else).
-            let underlying_function = match superclass
-                .own_class_member(db, None, &member.name)
-                .ignore_possibly_undefined()?
-            {
-                Type::BoundMethod(method) => method.function(db),
-                Type::FunctionLiteral(function) => function,
-                Type::PropertyInstance(property) => property.getter(db)?.as_function_literal()?,
-                _ => return None,
-            };
+                // TODO: `@final` should be more like a type qualifier:
+                // we should also recognise `@final`-decorated methods that don't end up
+                // as being function- or property-types (because they're wrapped by other
+                // decorators that transform the type into something else).
+                let underlying_function = match superclass
+                    .own_class_member(db, None, &member.name)
+                    .ignore_possibly_undefined()?
+                {
+                    Type::BoundMethod(method) => method.function(db),
+                    Type::FunctionLiteral(function) => function,
+                    Type::PropertyInstance(property) => {
+                        property.getter(db)?.as_function_literal()?
+                    }
+                    _ => return None,
+                };
 
-            if underlying_function.has_known_decorator(db, FunctionDecorators::FINAL)
-                && is_function_definition(db, superclass_scope, superclass_symbol_id)
-            {
-                Some((superclass, underlying_function))
-            } else {
-                None
-            }
-        });
+                if underlying_function.has_known_decorator(db, FunctionDecorators::FINAL)
+                    && is_function_definition(db, superclass_scope, superclass_symbol_id)
+                {
+                    Some((superclass, underlying_function))
+                } else {
+                    None
+                }
+            });
+        }
 
         // **********************************************************
         // Everything below this point in the loop
@@ -189,6 +197,10 @@ fn check_class_declaration<'db>(
         // Only one Liskov diagnostic should be emitted per each invalid override,
         // even if it overrides multiple superclasses incorrectly!
         if liskov_diagnostic_emitted {
+            continue;
+        }
+
+        if !configuration.check_method_liskov_violations() {
             continue;
         }
 
@@ -307,4 +319,49 @@ pub(super) enum MethodKind<'db> {
     Synthesized(CodeGeneratorKind<'db>),
     #[default]
     NotSynthesized,
+}
+
+bitflags! {
+    /// Bitflags representing which override-related rules have been enabled.
+    #[derive(Default, Debug, Copy, Clone)]
+    struct OverrideRulesConfig: u8 {
+        const LISKOV_METHODS = 1 << 0;
+        const EXPLICIT_OVERRIDE = 1 << 1;
+        const FINAL_METHOD_OVERRIDDEN = 1 << 2;
+    }
+}
+
+impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
+    fn from(value: &InferContext<'_, '_>) -> Self {
+        let db = value.db();
+        let rule_selection = db.rule_selection(value.file());
+
+        let mut config = OverrideRulesConfig::empty();
+
+        if rule_selection.is_enabled(LintId::of(&INVALID_METHOD_OVERRIDE)) {
+            config |= OverrideRulesConfig::LISKOV_METHODS;
+        }
+        if rule_selection.is_enabled(LintId::of(&INVALID_EXPLICIT_OVERRIDE)) {
+            config |= OverrideRulesConfig::EXPLICIT_OVERRIDE;
+        }
+        if rule_selection.is_enabled(LintId::of(&OVERRIDE_OF_FINAL_METHOD)) {
+            config |= OverrideRulesConfig::FINAL_METHOD_OVERRIDDEN;
+        }
+
+        config
+    }
+}
+
+impl OverrideRulesConfig {
+    const fn no_rules_enabled(self) -> bool {
+        self.is_empty()
+    }
+
+    const fn check_method_liskov_violations(self) -> bool {
+        self.contains(OverrideRulesConfig::LISKOV_METHODS)
+    }
+
+    const fn check_final_method_overridden(self) -> bool {
+        self.contains(OverrideRulesConfig::FINAL_METHOD_OVERRIDDEN)
+    }
 }
