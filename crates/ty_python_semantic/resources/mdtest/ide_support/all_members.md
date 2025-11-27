@@ -153,6 +153,12 @@ static_assert(has_member(D, "meta_base_attr"))
 static_assert(has_member(D, "meta_attr"))
 static_assert(has_member(D, "base_attr"))
 static_assert(has_member(D, "class_attr"))
+
+def f(x: type[D]):
+    static_assert(has_member(x, "meta_base_attr"))
+    static_assert(has_member(x, "meta_attr"))
+    static_assert(has_member(x, "base_attr"))
+    static_assert(has_member(x, "class_attr"))
 ```
 
 ### Generic classes
@@ -168,6 +174,20 @@ class C(Generic[T]):
 
 static_assert(has_member(C[int], "base_attr"))
 static_assert(has_member(C[int](), "base_attr"))
+```
+
+Generic classes can also have metaclasses:
+
+```py
+class Meta(type):
+    FOO = 42
+
+class E(Generic[T], metaclass=Meta): ...
+
+static_assert(has_member(E[int], "FOO"))
+
+def f(x: type[E[str]]):
+    static_assert(has_member(x, "FOO"))
 ```
 
 ### Other instance-like types

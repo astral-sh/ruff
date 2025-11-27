@@ -161,16 +161,14 @@ impl<'db> AllMembers<'db> {
             Type::ClassLiteral(class_literal) => {
                 self.extend_with_class_members(db, ty, class_literal);
                 self.extend_with_synthetic_members(db, ty, class_literal, None);
-
-                if let Type::ClassLiteral(meta_class_literal) = ty.to_meta_type(db) {
-                    self.extend_with_class_members(db, ty, meta_class_literal);
-                }
+                self.extend_with_type(db, class_literal.metaclass_instance_type(db));
             }
 
             Type::GenericAlias(generic_alias) => {
                 let class_literal = generic_alias.origin(db);
                 self.extend_with_class_members(db, ty, class_literal);
                 self.extend_with_synthetic_members(db, ty, class_literal, None);
+                self.extend_with_type(db, class_literal.metaclass_instance_type(db));
             }
 
             Type::SubclassOf(subclass_of_type) => {
@@ -178,6 +176,7 @@ impl<'db> AllMembers<'db> {
                     let (class_literal, specialization) = class_type.class_literal(db);
                     self.extend_with_class_members(db, ty, class_literal);
                     self.extend_with_synthetic_members(db, ty, class_literal, specialization);
+                    self.extend_with_type(db, class_literal.metaclass_instance_type(db));
                 }
             }
 
