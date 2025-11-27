@@ -116,6 +116,21 @@ class LSPClient(JsonRPCClient):
             ),
         )
 
+    def did_save(self, file_path: Path, version: int) -> None:
+        """Notify the server that a file was changed."""
+        self.protocol.notify(
+            lsp.TEXT,
+            lsp.DidChangeTextDocumentParams(
+                text_document=lsp.VersionedTextDocumentIdentifier(
+                    uri=file_path.as_uri(),
+                    version=version,
+                ),
+                content_changes=[
+                    lsp.TextDocumentContentChangeWholeDocument(text=new_content)
+                ],
+            ),
+        )
+
     async def wait_for_diagnostics_async(
         self, timeout: float = 30.0
     ) -> lsp.PublishDiagnosticsParams:
