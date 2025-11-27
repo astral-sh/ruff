@@ -4561,6 +4561,7 @@ dependencies = [
  "path-slash",
  "regex",
  "ruff_db",
+ "ruff_diagnostics",
  "ruff_index",
  "ruff_notebook",
  "ruff_python_ast",

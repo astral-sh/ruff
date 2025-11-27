@@ -146,7 +146,7 @@ The specialization must match the generic types:
 
 ```py
 # error: [invalid-type-arguments] "Too many type arguments to class `C`: expected 1, got 2"
-reveal_type(C[int, int]())  # revealed: Unknown
+reveal_type(C[int, int]())  # revealed: C[Unknown]
 ```
 
 If the type variable has an upper bound, the specialized type must satisfy that bound:
@@ -165,10 +165,10 @@ reveal_type(Bounded[int]())  # revealed: Bounded[int]
 reveal_type(Bounded[IntSubclass]())  # revealed: Bounded[IntSubclass]
 
 # error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`"
-reveal_type(Bounded[str]())  # revealed: Unknown
+reveal_type(Bounded[str]())  # revealed: Bounded[Unknown]
 
 # error:  [invalid-type-arguments] "Type `int | str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`"
-reveal_type(Bounded[int | str]())  # revealed: Unknown
+reveal_type(Bounded[int | str]())  # revealed: Bounded[Unknown]
 
 reveal_type(BoundedByUnion[int]())  # revealed: BoundedByUnion[int]
 reveal_type(BoundedByUnion[IntSubclass]())  # revealed: BoundedByUnion[IntSubclass]
@@ -196,7 +196,7 @@ reveal_type(Constrained[str]())  # revealed: Constrained[str]
 reveal_type(Constrained[int | str]())  # revealed: Constrained[int | str]
 
 # error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `ConstrainedT@Constrained`"
-reveal_type(Constrained[object]())  # revealed: Unknown
+reveal_type(Constrained[object]())  # revealed: Constrained[Unknown]
 ```
 
 If the type variable has a default, it can be omitted:

@@ -34,8 +34,20 @@ struct ExpandedStatistics<'a> {
     code: Option<&'a SecondaryCode>,
     name: &'static str,
     count: usize,
-    fixable: bool,
+    #[serde(rename = "fixable")]
+    all_fixable: bool,
+    fixable_count: usize,
 }
+
+impl ExpandedStatistics<'_> {
+    fn any_fixable(&self) -> bool {
+        self.fixable_count > 0
+    }
+}
+
+/// Accumulator type for grouping diagnostics by code.
+/// Format: (`code`, `representative_diagnostic`, `total_count`, `fixable_count`)
+type DiagnosticGroup<'a> = (Option<&'a SecondaryCode>, &'a Diagnostic, usize, usize);
 
 pub(crate) struct Printer {
     format: OutputFormat,
@@ -133,7 +145,7 @@ impl Printer {
                         if fixables.applicable > 0 {
                             writeln!(
                                 writer,
-                                "{fix_prefix} {} fixable with the --fix option.",
+                                "{fix_prefix} {} fixable with the `--fix` option.",
                                 fixables.applicable
                             )?;
                         }
@@ -256,35 +268,41 @@ impl Printer {
         diagnostics: &Diagnostics,
         writer: &mut dyn Write,
     ) -> Result<()> {
+        let required_applicability = self.unsafe_fixes.required_applicability();
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .inner
             .iter()
-            .map(|message| (message.secondary_code(), message))
-            .sorted_by_key(|(code, message)| (*code, message.fixable()))
-            .fold(
-                vec![],
-                |mut acc: Vec<((Option<&SecondaryCode>, &Diagnostic), usize)>, (code, message)| {
-                    if let Some(((prev_code, _prev_message), count)) = acc.last_mut() {
-                        if *prev_code == code {
-                            *count += 1;
-                            return acc;
+            .sorted_by_key(|diagnostic| diagnostic.secondary_code())
+            .fold(vec![], |mut acc: Vec<DiagnosticGroup>, diagnostic| {
+                let is_fixable = diagnostic
+                    .fix()
+                    .is_some_and(|fix| fix.applies(required_applicability));
+                let code = diagnostic.secondary_code();
+
+                if let Some((prev_code, _prev_message, count, fixable_count)) = acc.last_mut() {
+                    if *prev_code == code {
+                        *count += 1;
+                        if is_fixable {
+                            *fixable_count += 1;
                         }
+                        return acc;
                     }
-                    acc.push(((code, message), 1));
-                    acc
+                }
+                acc.push((code, diagnostic, 1, usize::from(is_fixable)));
+                acc
+            })
+            .iter()
+            .map(
+                |&(code, message, count, fixable_count)| ExpandedStatistics {
+                    code,
+                    name: message.name(),
+                    count,
+                    // Backward compatibility: `fixable` is true only when all violations are fixable.
+                    // See: https://github.com/astral-sh/ruff/pull/21513
+                    all_fixable: fixable_count == count,
+                    fixable_count,
                 },
             )
-            .iter()
-            .map(|&((code, message), count)| ExpandedStatistics {
-                code,
-                name: message.name(),
-                count,
-                fixable: if let Some(fix) = message.fix() {
-                    fix.applies(self.unsafe_fixes.required_applicability())
-                } else {
-                    false
-                },
-            })
             .sorted_by_key(|statistic| Reverse(statistic.count))
             .collect();
 
@@ -308,13 +326,14 @@ impl Printer {
                     .map(|statistic| statistic.code.map_or(0, |s| s.len()))
                     .max()
                     .unwrap();
-                let any_fixable = statistics.iter().any(|statistic| statistic.fixable);
+                let any_fixable = statistics.iter().any(ExpandedStatistics::any_fixable);
 
-                let fixable = format!("[{}] ", "*".cyan());
+                let all_fixable = format!("[{}] ", "*".cyan());
+                let partially_fixable = format!("[{}] ", "-".cyan());
                 let unfixable = "[ ] ";
 
                 // By default, we mimic Flake8's `--statistics` format.
-                for statistic in statistics {
+                for statistic in &statistics {
                     writeln!(
                         writer,
                         "{:>count_width$}\t{:<code_width$}\t{}{}",
@@ -326,8 +345,10 @@ impl Printer {
                             .red()
                             .bold(),
                         if any_fixable {
-                            if statistic.fixable {
-                                &fixable
+                            if statistic.all_fixable {
+                                &all_fixable
+                            } else if statistic.any_fixable() {
+                                &partially_fixable
                             } else {
                                 unfixable
                             }

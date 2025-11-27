@@ -1397,7 +1397,7 @@ msg = Message(id=1, content="Hello")
 # No errors for yet-unsupported features (`closed`):
 OtherMessage = TypedDict("OtherMessage", {"id": int, "content": str}, closed=True)
 
-reveal_type(Message.__required_keys__)  # revealed: @Todo(Support for `TypedDict`)
+reveal_type(Message.__required_keys__)  # revealed: @Todo(Support for functional `TypedDict`)
 
 # TODO: this should be an error
 msg.content

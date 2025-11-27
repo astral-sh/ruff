@@ -834,6 +834,18 @@ class G[T: list[G]]:
 reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
 ```
 
+An invalid specialization in a recursive bound doesn't cause a panic:
+
+```py
+# error: [invalid-type-arguments]
+class Node[T: "Node[int]"]:
+    pass
+
+# error: [invalid-type-arguments]
+def _(n: Node[str]):
+    reveal_type(n)  # revealed: Node[Unknown]
+```
+
 ### Defaults
 
 Defaults can be generic, but can only refer to earlier typevars:

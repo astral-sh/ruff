@@ -143,7 +143,7 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
 
     impl CursorTest {
         fn all_symbols(&self, query: &str) -> String {
-            let symbols = all_symbols(&self.db, &QueryPattern::new(query));
+            let symbols = all_symbols(&self.db, &QueryPattern::fuzzy(query));
 
             if symbols.is_empty() {
                 return "No symbols found".to_string();
