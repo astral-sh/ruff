@@ -1,0 +1,2 @@
+src/prefect/events/cli/automations.py:429: error: Argument 1 to "loads" has incompatible type "str | None"; expected "bytes | bytearray | memoryview[int] | str"  [arg-type]
+Found 1 error in 1 file (checked 58 source files)

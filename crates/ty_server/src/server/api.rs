@@ -32,6 +32,9 @@ pub(super) fn request(req: server::Request) -> Task {
 
     match req.method.as_str() {
         requests::ExecuteCommand::METHOD => sync_request_task::<requests::ExecuteCommand>(req),
+        requests::CodeActionRequestHandler::METHOD => background_document_request_task::<
+            requests::CodeActionRequestHandler,
+        >(req, BackgroundSchedule::Worker),
         requests::DocumentDiagnosticRequestHandler::METHOD => background_document_request_task::<
             requests::DocumentDiagnosticRequestHandler,
         >(

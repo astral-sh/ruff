@@ -8,6 +8,7 @@ use crate::types::diagnostic::{
     report_invalid_arguments_to_callable,
 };
 use crate::types::generics::bind_typevar;
+use crate::types::infer::builder::InnerExpressionInferenceState;
 use crate::types::signatures::Signature;
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
@@ -22,6 +23,9 @@ use crate::types::{
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer the type of a type expression.
     pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        if self.inner_expression_inference_state.is_get() {
+            return self.expression_type(expression);
+        }
         let previous_deferred_state = self.deferred_state;
 
         // `DeferredExpressionState::InStringAnnotation` takes precedence over other states.
@@ -35,13 +39,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             DeferredExpressionState::InStringAnnotation(_) | DeferredExpressionState::Deferred => {}
         }
-        let mut ty = self.infer_type_expression_no_store(expression);
-        self.deferred_state = previous_deferred_state;
 
-        let divergent = Type::divergent(Some(self.scope()));
-        if ty.has_divergent_type(self.db(), divergent) {
-            ty = divergent;
-        }
+        let ty = self.infer_type_expression_no_store(expression);
+        self.deferred_state = previous_deferred_state;
         self.store_expression_type(expression, ty);
         ty
     }
@@ -84,6 +84,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Infer the type of a type expression without storing the result.
     pub(super) fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
+        if self.inner_expression_inference_state.is_get() {
+            return self.expression_type(expression);
+        }
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         match expression {
             ast::Expr::Name(name) => match name.ctx {
@@ -150,15 +153,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // anything else is an invalid annotation:
                     op => {
                         self.infer_binary_expression(binary, TypeContext::default());
-                        if let Some(mut diag) = self.report_invalid_type_expression(
+                        self.report_invalid_type_expression(
                             expression,
                             format_args!(
                                 "Invalid binary operator `{}` in type annotation",
                                 op.as_str()
                             ),
-                        ) {
-                            diag.info("Did you mean to use `|`?");
-                        }
+                        );
                         Type::unknown()
                     }
                 }
@@ -526,6 +527,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         match parse_string_annotation(&self.context, string) {
             Some(parsed) => {
+                self.string_annotations
+                    .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
                 // String annotations are always evaluated in the deferred context.
                 self.infer_type_expression_with_state(
                     parsed.expr(),
@@ -607,7 +610,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             // TODO: emit a diagnostic
                         }
                     } else {
-                        element_types.push(element_ty.fallback_to_divergent(self.db()));
+                        element_types.push(element_ty);
                     }
                 }
 
@@ -961,6 +964,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_type_expression(slice);
                 // For stringified TypeAlias; remove once properly supported
                 todo_type!("string literal subscripted in type expression")
+            }
+            Type::Union(union) => {
+                self.infer_type_expression(slice);
+                let previous_slice_inference_state = std::mem::replace(
+                    &mut self.inner_expression_inference_state,
+                    InnerExpressionInferenceState::Get,
+                );
+                let union = union
+                    .elements(self.db())
+                    .iter()
+                    .fold(UnionBuilder::new(self.db()), |builder, elem| {
+                        builder.add(self.infer_subscript_type_expression(subscript, *elem))
+                    })
+                    .build();
+                self.inner_expression_inference_state = previous_slice_inference_state;
+                union
             }
             _ => {
                 self.infer_type_expression(slice);
@@ -1448,13 +1467,40 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
             SpecialFormType::LiteralString => {
-                self.infer_type_expression(arguments_slice);
+                let arguments = self.infer_expression(arguments_slice, TypeContext::default());
 
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                    let mut diag = builder.into_diagnostic(format_args!(
-                        "Type `{special_form}` expected no type parameter",
-                    ));
-                    diag.info("Did you mean to use `Literal[...]` instead?");
+                    let mut diag =
+                        builder.into_diagnostic("`LiteralString` expects no type parameter");
+
+                    let arguments_as_tuple = arguments.exact_tuple_instance_spec(db);
+
+                    let mut argument_elements = arguments_as_tuple
+                        .as_ref()
+                        .map(|tup| Either::Left(tup.all_elements().copied()))
+                        .unwrap_or(Either::Right(std::iter::once(arguments)));
+
+                    let probably_meant_literal = argument_elements.all(|ty| match ty {
+                        Type::StringLiteral(_)
+                        | Type::BytesLiteral(_)
+                        | Type::EnumLiteral(_)
+                        | Type::BooleanLiteral(_) => true,
+                        Type::NominalInstance(instance) => {
+                            instance.has_known_class(db, KnownClass::NoneType)
+                        }
+                        _ => false,
+                    });
+
+                    if probably_meant_literal {
+                        diag.annotate(
+                            self.context
+                                .secondary(&*subscript.value)
+                                .message("Did you mean `Literal`?"),
+                        );
+                        diag.set_concise_message(
+                            "`LiteralString` expects no type parameter - did you mean `Literal`?",
+                        );
+                    }
                 }
                 Type::unknown()
             }

@@ -1,0 +1,7 @@
+src/jinja2/runtime.py:370: error: Unused "type: ignore" comment  [unused-ignore]
+src/jinja2/runtime.py:384: error: Unused "type: ignore" comment  [unused-ignore]
+src/jinja2/environment.py:1290: error: Unused "type: ignore" comment  [unused-ignore]
+src/jinja2/environment.py:1311: error: Unused "type: ignore" comment  [unused-ignore]
+src/jinja2/nativetypes.py:108: error: Unused "type: ignore" comment  [unused-ignore]
+src/jinja2/nativetypes.py:123: error: Unused "type: ignore" comment  [unused-ignore]
+Found 6 errors in 3 files (checked 25 source files)

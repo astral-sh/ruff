@@ -1,11 +1,12 @@
 use lsp_types::{
-    ClientCapabilities, CompletionOptions, DeclarationCapability, DiagnosticOptions,
-    DiagnosticServerCapabilities, HoverProviderCapability, InlayHintOptions,
-    InlayHintServerCapabilities, MarkupKind, NotebookCellSelector, NotebookSelector, OneOf,
-    RenameOptions, SelectionRangeProviderCapability, SemanticTokensFullOptions,
-    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
-    ServerCapabilities, SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TypeDefinitionProviderCapability, WorkDoneProgressOptions,
+    ClientCapabilities, CodeActionKind, CodeActionOptions, CompletionOptions,
+    DeclarationCapability, DiagnosticOptions, DiagnosticServerCapabilities,
+    HoverProviderCapability, InlayHintOptions, InlayHintServerCapabilities, MarkupKind,
+    NotebookCellSelector, NotebookSelector, OneOf, RenameOptions, SelectionRangeProviderCapability,
+    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
+    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TypeDefinitionProviderCapability, WorkDoneProgressOptions,
 };
 
 use crate::PositionEncoding;
@@ -376,6 +377,13 @@ pub(crate) fn server_capabilities(
 
     ServerCapabilities {
         position_encoding: Some(position_encoding.into()),
+        code_action_provider: Some(types::CodeActionProviderCapability::Options(
+            CodeActionOptions {
+                code_action_kinds: Some(vec![CodeActionKind::QUICKFIX]),
+                ..CodeActionOptions::default()
+            },
+        )),
+
         execute_command_provider: Some(types::ExecuteCommandOptions {
             commands: SupportedCommand::all()
                 .map(|command| command.identifier().to_string())

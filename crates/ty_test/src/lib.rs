@@ -641,7 +641,9 @@ fn create_diagnostic_snapshot(
     test: &parser::MarkdownTest,
     diagnostics: impl IntoIterator<Item = Diagnostic>,
 ) -> String {
-    let display_config = DisplayDiagnosticConfig::default().color(false);
+    let display_config = DisplayDiagnosticConfig::default()
+        .color(false)
+        .show_fix_diff(true);
 
     let mut snapshot = String::new();
     writeln!(snapshot).unwrap();

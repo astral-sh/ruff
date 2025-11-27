@@ -2,6 +2,7 @@
 //!
 //! [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 
+use ruff_db::diagnostic::Annotation;
 use rustc_hash::FxHashSet;
 
 use crate::{
@@ -11,7 +12,9 @@ use crate::{
         ClassBase, ClassLiteral, ClassType, KnownClass, Type,
         class::CodeGeneratorKind,
         context::InferContext,
-        diagnostic::report_invalid_method_override,
+        definition_expression_type,
+        diagnostic::{INVALID_EXPLICIT_OVERRIDE, report_invalid_method_override},
+        function::{FunctionDecorators, KnownFunction},
         ide_support::{MemberWithDefinition, all_declarations_and_bindings},
     },
 };
@@ -57,12 +60,12 @@ fn check_class_declaration<'db>(
         return;
     }
 
+    let (literal, specialization) = class.class_literal(db);
+    let class_kind = CodeGeneratorKind::from_class(db, literal, specialization);
+
     // Synthesized `__replace__` methods on dataclasses are not checked
     if &member.name == "__replace__"
-        && matches!(
-            CodeGeneratorKind::from_class(db, class.class_literal(db).0, None),
-            Some(CodeGeneratorKind::DataclassLike(_))
-        )
+        && matches!(class_kind, Some(CodeGeneratorKind::DataclassLike(_)))
     {
         return;
     }
@@ -73,11 +76,28 @@ fn check_class_declaration<'db>(
         return;
     };
 
-    for superclass in class.iter_mro(db).skip(1).filter_map(ClassBase::into_class) {
-        let superclass_symbol_table =
-            place_table(db, superclass.class_literal(db).0.body_scope(db));
+    let mut subclass_overrides_superclass_declaration = false;
+    let mut has_dynamic_superclass = false;
+    let mut has_typeddict_in_mro = false;
+    let mut liskov_diagnostic_emitted = false;
 
-        let mut method_kind = MethodKind::NotSynthesized;
+    for class_base in class.iter_mro(db).skip(1) {
+        let superclass = match class_base {
+            ClassBase::Protocol | ClassBase::Generic => continue,
+            ClassBase::Dynamic(_) => {
+                has_dynamic_superclass = true;
+                continue;
+            }
+            ClassBase::TypedDict => {
+                has_typeddict_in_mro = true;
+                continue;
+            }
+            ClassBase::Class(class) => class,
+        };
+
+        let (superclass_literal, superclass_specialization) = superclass.class_literal(db);
+        let superclass_symbol_table = place_table(db, superclass_literal.body_scope(db));
+        let mut method_kind = MethodKind::default();
 
         // If the member is not defined on the class itself, skip it
         if let Some(superclass_symbol) = superclass_symbol_table.symbol_by_name(&member.name) {
@@ -85,39 +105,31 @@ fn check_class_declaration<'db>(
                 continue;
             }
         } else {
-            let (superclass_literal, superclass_specialization) = superclass.class_literal(db);
             if superclass_literal
                 .own_synthesized_member(db, superclass_specialization, None, &member.name)
                 .is_none()
             {
                 continue;
             }
-            let class_kind =
-                CodeGeneratorKind::from_class(db, superclass_literal, superclass_specialization);
+            method_kind =
+                CodeGeneratorKind::from_class(db, superclass_literal, superclass_specialization)
+                    .map(MethodKind::Synthesized)
+                    .unwrap_or_default();
+        }
 
-            method_kind = match class_kind {
-                Some(CodeGeneratorKind::NamedTuple) => {
-                    MethodKind::Synthesized(SynthesizedMethodKind::NamedTuple)
-                }
-                Some(CodeGeneratorKind::DataclassLike(_)) => {
-                    MethodKind::Synthesized(SynthesizedMethodKind::Dataclass)
-                }
-                // It's invalid to define a method on a `TypedDict` (and this should be
-                // reported elsewhere), but it's valid to override other things on a
-                // `TypedDict`, so this case isn't relevant right now but may become
-                // so when we expand Liskov checking in the future
-                Some(CodeGeneratorKind::TypedDict) => {
-                    MethodKind::Synthesized(SynthesizedMethodKind::TypedDict)
-                }
-                None => MethodKind::NotSynthesized,
-            };
+        subclass_overrides_superclass_declaration = true;
+
+        // Only one Liskov diagnostic should be emitted per each invalid override,
+        // even if it overrides multiple superclasses incorrectly!
+        if liskov_diagnostic_emitted {
+            continue;
         }
 
         let Place::Defined(superclass_type, _, _) = Type::instance(db, superclass)
             .member(db, &member.name)
             .place
         else {
-            // If not defined on any superclass, nothing to check
+            // If not defined on any superclass, no point in continuing to walk up the MRO
             break;
         };
 
@@ -143,23 +155,77 @@ fn check_class_declaration<'db>(
             method_kind,
         );
 
-        // Only one diagnostic should be emitted per each invalid override,
-        // even if it overrides multiple superclasses incorrectly!
-        // It's possible `report_invalid_method_override` didn't emit a diagnostic because there's a
-        // suppression comment, but that too should cause us to exit early here.
-        break;
+        liskov_diagnostic_emitted = true;
+    }
+
+    if !subclass_overrides_superclass_declaration && !has_dynamic_superclass {
+        if has_typeddict_in_mro {
+            if !KnownClass::TypedDictFallback
+                .to_instance(db)
+                .member(db, &member.name)
+                .place
+                .is_undefined()
+            {
+                subclass_overrides_superclass_declaration = true;
+            }
+        } else if class_kind == Some(CodeGeneratorKind::NamedTuple) {
+            if !KnownClass::NamedTupleFallback
+                .to_instance(db)
+                .member(db, &member.name)
+                .place
+                .is_undefined()
+            {
+                subclass_overrides_superclass_declaration = true;
+            }
+        }
+    }
+
+    if !subclass_overrides_superclass_declaration
+        && !has_dynamic_superclass
+        && definition.kind(db).is_function_def()
+        && let Type::FunctionLiteral(function) = member.ty
+        && function.has_known_decorator(db, FunctionDecorators::OVERRIDE)
+    {
+        let function_literal = if context.in_stub() {
+            function
+                .iter_overloads_and_implementation(db)
+                .next()
+                .expect("There should always be at least one overload or implementation")
+        } else {
+            function.literal(db).last_definition(db)
+        };
+        if let Some(builder) = context.report_lint(
+            &INVALID_EXPLICIT_OVERRIDE,
+            function_literal.focus_range(db, context.module()),
+        ) {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Method `{}` is decorated with `@override` but does not override anything",
+                member.name
+            ));
+            if let Some(decorator) = function_literal
+                .node(db, context.file(), context.module())
+                .decorator_list
+                .iter()
+                .find(|decorator| {
+                    definition_expression_type(db, *definition, &decorator.expression)
+                        .as_function_literal()
+                        .is_some_and(|function| function.is_known(db, KnownFunction::Override))
+                })
+            {
+                diagnostic.annotate(Annotation::secondary(context.span(decorator)));
+            }
+            diagnostic.info(format_args!(
+                "No `{member}` definitions were found on any superclasses of `{class}`",
+                member = &member.name,
+                class = class.name(db)
+            ));
+        }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum MethodKind {
-    Synthesized(SynthesizedMethodKind),
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(super) enum MethodKind<'db> {
+    Synthesized(CodeGeneratorKind<'db>),
+    #[default]
     NotSynthesized,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum SynthesizedMethodKind {
-    NamedTuple,
-    Dataclass,
-    TypedDict,
 }

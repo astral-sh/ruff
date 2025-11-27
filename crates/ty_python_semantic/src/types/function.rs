@@ -278,7 +278,7 @@ impl<'db> OverloadLiteral<'db> {
             || is_implicit_classmethod(self.name(db))
     }
 
-    fn node<'ast>(
+    pub(super) fn node<'ast>(
         self,
         db: &dyn Db,
         file: File,
@@ -1052,6 +1052,34 @@ impl<'db> FunctionType<'db> {
             updated_signature,
             updated_last_definition_signature,
         )
+    }
+
+    pub(crate) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Option<Self> {
+        let literal = self.literal(db);
+        let updated_signature = match self.updated_signature(db) {
+            Some(signature) => {
+                Some(signature.recursive_type_normalized_impl(db, div, nested, visitor)?)
+            }
+            None => None,
+        };
+        let updated_last_definition_signature = match self.updated_last_definition_signature(db) {
+            Some(signature) => {
+                Some(signature.recursive_type_normalized_impl(db, div, nested, visitor)?)
+            }
+            None => None,
+        };
+        Some(Self::new(
+            db,
+            literal,
+            updated_signature,
+            updated_last_definition_signature,
+        ))
     }
 }
 

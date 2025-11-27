@@ -135,7 +135,7 @@ reveal_type(C[Literal[5]]())  # revealed: C[Literal[5]]
 The specialization must match the generic types:
 
 ```py
-# error: [too-many-positional-arguments] "Too many positional arguments to class `C`: expected 1, got 2"
+# error: [invalid-type-arguments] "Too many type arguments to class `C`: expected 1, got 2"
 reveal_type(C[int, int]())  # revealed: Unknown
 ```
 
@@ -149,12 +149,10 @@ class IntSubclass(int): ...
 reveal_type(Bounded[int]())  # revealed: Bounded[int]
 reveal_type(Bounded[IntSubclass]())  # revealed: Bounded[IntSubclass]
 
-# TODO: update this diagnostic to talk about type parameters and specializations
-# error: [invalid-argument-type] "Argument to class `Bounded` is incorrect: Expected `int`, found `str`"
+# error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `T@Bounded`"
 reveal_type(Bounded[str]())  # revealed: Unknown
 
-# TODO: update this diagnostic to talk about type parameters and specializations
-# error: [invalid-argument-type] "Argument to class `Bounded` is incorrect: Expected `int`, found `int | str`"
+# error: [invalid-type-arguments] "Type `int | str` is not assignable to upper bound `int` of type variable `T@Bounded`"
 reveal_type(Bounded[int | str]())  # revealed: Unknown
 
 reveal_type(BoundedByUnion[int]())  # revealed: BoundedByUnion[int]
@@ -180,8 +178,7 @@ reveal_type(Constrained[str]())  # revealed: Constrained[str]
 # TODO: revealed: Unknown
 reveal_type(Constrained[int | str]())  # revealed: Constrained[int | str]
 
-# TODO: update this diagnostic to talk about type parameters and specializations
-# error: [invalid-argument-type] "Argument to class `Constrained` is incorrect: Expected `int | str`, found `object`"
+# error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `T@Constrained`"
 reveal_type(Constrained[object]())  # revealed: Unknown
 ```
 
@@ -249,7 +246,7 @@ class C[T]:
 
 reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -263,7 +260,7 @@ class C[T]:
 
 reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -280,7 +277,7 @@ class C[T]:
 
 reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -297,7 +294,7 @@ class C[T]:
 
 reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 
 class D[T]:
@@ -310,7 +307,7 @@ class D[T]:
 
 reveal_type(D(1))  # revealed: D[int]
 
-# error: [invalid-assignment] "Object of type `D[str]` is not assignable to `D[int]`"
+# error: [invalid-assignment] "Object of type `D[int | str]` is not assignable to `D[int]`"
 wrong_innards: D[int] = D("five")
 ```
 
@@ -395,7 +392,7 @@ reveal_type(C(1, 1))  # revealed: C[int]
 reveal_type(C(1, "string"))  # revealed: C[int]
 reveal_type(C(1, True))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five", 1)
 ```
 

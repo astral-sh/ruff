@@ -3,6 +3,7 @@ use crate::references::{ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
 use ruff_db::files::File;
 use ruff_text_size::TextSize;
+use ty_python_semantic::SemanticModel;
 
 /// Find all references to a symbol at the given position.
 /// Search for references across all files in the project.
@@ -14,9 +15,10 @@ pub fn goto_references(
 ) -> Option<Vec<ReferenceTarget>> {
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
+    let model = SemanticModel::new(db, file);
 
     // Get the definitions for the symbol at the cursor position
-    let goto_target = find_goto_target(&module, offset)?;
+    let goto_target = find_goto_target(&model, &module, offset)?;
 
     let mode = if include_declaration {
         ReferencesMode::References
@@ -147,7 +149,6 @@ result = calculate_sum(value=42)
     }
 
     #[test]
-    #[ignore] // TODO: Enable when nonlocal support is fully implemented in goto.rs
     fn test_nonlocal_variable_references() {
         let test = cursor_test(
             "
@@ -181,7 +182,7 @@ def outer_function():
         2 | def outer_function():
         3 |     counter = 0
           |     ^^^^^^^
-        4 |     
+        4 |
         5 |     def increment():
           |
 
@@ -212,7 +213,7 @@ def outer_function():
          7 |         counter += 1
          8 |         return counter
            |                ^^^^^^^
-         9 |     
+         9 |
         10 |     def decrement():
            |
 
@@ -243,7 +244,7 @@ def outer_function():
         12 |         counter -= 1
         13 |         return counter
            |                ^^^^^^^
-        14 |     
+        14 |
         15 |     # Use counter in outer scope
            |
 
@@ -264,14 +265,13 @@ def outer_function():
         18 |     decrement()
         19 |     final = counter
            |             ^^^^^^^
-        20 |     
+        20 |
         21 |     return increment, decrement
            |
         ");
     }
 
     #[test]
-    #[ignore] // TODO: Enable when global support is fully implemented in goto.rs
     fn test_global_variable_references() {
         let test = cursor_test(
             "
@@ -708,6 +708,194 @@ cls = MyClass
            |       ^^^^^^^
            |
         ");
+    }
+
+    #[test]
+    fn references_string_annotation1() {
+        let test = cursor_test(
+            r#"
+        a: "MyCla<CURSOR>ss" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Reference 1
+         --> main.py:2:5
+          |
+        2 | a: "MyClass" = 1
+          |     ^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+
+        info[references]: Reference 2
+         --> main.py:4:7
+          |
+        2 | a: "MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       ^^^^^^^
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn references_string_annotation2() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyCl<CURSOR>ass" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Reference 1
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+
+        info[references]: Reference 2
+         --> main.py:4:7
+          |
+        2 | a: "None | MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       ^^^^^^^
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn references_string_annotation3() {
+        let test = cursor_test(
+            r#"
+        a: "None |<CURSOR> MyClass" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
+    fn references_string_annotation4() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyClass<CURSOR>" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Reference 1
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+
+        info[references]: Reference 2
+         --> main.py:4:7
+          |
+        2 | a: "None | MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       ^^^^^^^
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn references_string_annotation5() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyClass"<CURSOR> = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
+    fn references_string_annotation_dangling1() {
+        let test = cursor_test(
+            r#"
+        a: "MyCl<CURSOR>ass |" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
+    fn references_string_annotation_dangling2() {
+        let test = cursor_test(
+            r#"
+        a: "MyCl<CURSOR>ass | No" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Reference 1
+         --> main.py:2:5
+          |
+        2 | a: "MyClass | No" = 1
+          |     ^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+
+        info[references]: Reference 2
+         --> main.py:4:7
+          |
+        2 | a: "MyClass | No" = 1
+        3 |
+        4 | class MyClass:
+          |       ^^^^^^^
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn references_string_annotation_dangling3() {
+        let test = cursor_test(
+            r#"
+        a: "MyClass | N<CURSOR>o" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.references(), @"No references found");
     }
 
     #[test]

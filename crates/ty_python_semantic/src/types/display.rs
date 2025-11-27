@@ -24,8 +24,9 @@ use crate::types::tuple::TupleSpec;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
     BoundTypeVarIdentity, CallableType, CallableTypeKind, IntersectionType, KnownBoundMethodType,
-    KnownClass, MaterializationKind, Protocol, ProtocolInstanceType, SpecialFormType,
-    StringLiteralType, SubclassOfInner, Type, UnionType, WrapperDescriptorKind, visitor,
+    KnownClass, KnownInstanceType, MaterializationKind, Protocol, ProtocolInstanceType,
+    SpecialFormType, StringLiteralType, SubclassOfInner, Type, UnionType, WrapperDescriptorKind,
+    visitor,
 };
 
 /// Settings for displaying types and signatures
@@ -584,7 +585,12 @@ impl Display for DisplayRepresentation<'_> {
 impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         match self.ty {
-            Type::Dynamic(dynamic) => write!(f.with_type(self.ty), "{dynamic}"),
+            Type::Dynamic(dynamic) => {
+                if dynamic.is_todo() {
+                    f.set_invalid_syntax();
+                }
+                write!(f.with_type(self.ty), "{dynamic}")
+            }
             Type::Never => f.with_type(self.ty).write_str("Never"),
             Type::NominalInstance(instance) => {
                 let class = instance.class(self.db);
@@ -689,9 +695,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::SpecialForm(special_form) => {
                 write!(f.with_type(self.ty), "{special_form}")
             }
-            Type::KnownInstance(known_instance) => {
-                write!(f.with_type(self.ty), "{}", known_instance.repr(self.db))
-            }
+            Type::KnownInstance(known_instance) => known_instance
+                .display_with(self.db, self.settings.clone())
+                .fmt_detailed(f),
             Type::FunctionLiteral(function) => function
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
@@ -2199,6 +2205,111 @@ impl Display for DisplayStringLiteralType<'_> {
             }?;
         }
         f.write_char('"')
+    }
+}
+
+pub(crate) struct DisplayKnownInstanceRepr<'db> {
+    pub(crate) known_instance: KnownInstanceType<'db>,
+    pub(crate) db: &'db dyn Db,
+}
+
+impl<'db> KnownInstanceType<'db> {
+    pub(crate) fn display_with(
+        self,
+        db: &'db dyn Db,
+        _settings: DisplaySettings<'db>,
+    ) -> DisplayKnownInstanceRepr<'db> {
+        DisplayKnownInstanceRepr {
+            known_instance: self,
+            db,
+        }
+    }
+}
+
+impl Display for DisplayKnownInstanceRepr<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.fmt_detailed(&mut TypeWriter::Formatter(f))
+    }
+}
+
+impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
+    fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let ty = Type::KnownInstance(self.known_instance);
+        match self.known_instance {
+            KnownInstanceType::SubscriptedProtocol(generic_context) => {
+                f.with_type(ty).write_str("typing.Protocol")?;
+                f.write_str(&generic_context.display(self.db).to_string())
+            }
+            KnownInstanceType::SubscriptedGeneric(generic_context) => {
+                f.with_type(ty).write_str("typing.Generic")?;
+                f.write_str(&generic_context.display(self.db).to_string())
+            }
+            KnownInstanceType::TypeAliasType(alias) => {
+                if let Some(specialization) = alias.specialization(self.db) {
+                    f.write_str(alias.name(self.db))?;
+                    f.write_str(
+                        &specialization
+                            .display_short(
+                                self.db,
+                                TupleSpecialization::No,
+                                DisplaySettings::default(),
+                            )
+                            .to_string(),
+                    )
+                } else {
+                    f.with_type(ty).write_str("typing.TypeAliasType")
+                }
+            }
+            // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
+            // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
+            // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
+            KnownInstanceType::TypeVar(typevar_instance) => {
+                if typevar_instance.kind(self.db).is_paramspec() {
+                    f.write_str("typing.ParamSpec")
+                } else {
+                    f.write_str("typing.TypeVar")
+                }
+            }
+            KnownInstanceType::Deprecated(_) => f.write_str("warnings.deprecated"),
+            KnownInstanceType::Field(field) => {
+                f.with_type(ty).write_str("dataclasses.Field")?;
+                if let Some(default_ty) = field.default_type(self.db) {
+                    write!(f, "[{}]", default_ty.display(self.db))?;
+                }
+                Ok(())
+            }
+            KnownInstanceType::ConstraintSet(tracked_set) => {
+                let constraints = tracked_set.constraints(self.db);
+                f.with_type(ty).write_str("ty_extensions.ConstraintSet")?;
+                write!(f, "[{}]", constraints.display(self.db))
+            }
+            KnownInstanceType::GenericContext(generic_context) => {
+                f.with_type(ty).write_str("ty_extensions.GenericContext")?;
+                write!(f, "{}", generic_context.display_full(self.db))
+            }
+            KnownInstanceType::Specialization(specialization) => {
+                // Normalize for consistent output across CI platforms
+                f.with_type(ty).write_str("ty_extensions.Specialization")?;
+                write!(f, "{}", specialization.display_full(self.db))
+            }
+            KnownInstanceType::UnionType(_) => f.with_type(ty).write_str("types.UnionType"),
+            KnownInstanceType::Literal(_) => {
+                f.set_invalid_syntax();
+                f.write_str("<typing.Literal special form>")
+            }
+            KnownInstanceType::Annotated(_) => {
+                f.set_invalid_syntax();
+                f.write_str("<typing.Annotated special form>")
+            }
+            KnownInstanceType::TypeGenericAlias(_) | KnownInstanceType::Callable(_) => {
+                f.with_type(ty).write_str("GenericAlias")
+            }
+            KnownInstanceType::LiteralStringAlias(_) => f.write_str("str"),
+            KnownInstanceType::NewType(declaration) => {
+                f.set_invalid_syntax();
+                write!(f, "<NewType pseudo-class '{}'>", declaration.name(self.db))
+            }
+        }
     }
 }
 

@@ -373,6 +373,16 @@
             }
           ]
         },
+        "cyclic-type-alias-definition": {
+          "title": "detects cyclic type alias definitions",
+          "description": "## What it does\nChecks for type alias definitions that (directly or mutually) refer to themselves.\n\n## Why is it bad?\nAlthough it is permitted to define a recursive type alias, it is not meaningful\nto have a type alias whose expansion can only result in itself, and is therefore not allowed.\n\n## Examples\n```python\ntype Itself = Itself\n\ntype A = B\ntype B = A\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "deprecated": {
           "title": "detects uses of deprecated items",
           "description": "## What it does\nChecks for uses of deprecated items\n\n## Why is this bad?\nDeprecated items should no longer be used.\n\n## Examples\n```python\n@warnings.deprecated(\"use new_func instead\")\ndef old_func(): ...\n\nold_func()  # emits [deprecated] diagnostic\n```",
@@ -563,6 +573,16 @@
             }
           ]
         },
+        "invalid-explicit-override": {
+          "title": "detects methods that are decorated with `@override` but do not override any method in a superclass",
+          "description": "## What it does\nChecks for methods that are decorated with `@override` but do not override any method in a superclass.\n\n## Why is this bad?\nDecorating a method with `@override` declares to the type checker that the intention is that it should\noverride a method from a superclass.\n\n## Example\n\n```python\nfrom typing import override\n\nclass A:\n    @override\n    def foo(self): ...  # Error raised here\n\nclass B(A):\n    @override\n    def ffooo(self): ...  # Error raised here\n\nclass C:\n    @override\n    def __repr__(self): ...  # fine: overrides `object.__repr__`\n\nclass D(A):\n    @override\n    def foo(self): ...  # fine: overrides `A.foo`\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-generic-class": {
           "title": "detects invalid generic classes",
           "description": "## What it does\nChecks for the creation of invalid generic classes\n\n## Why is this bad?\nThere are several requirements that you must follow when defining a generic class.\n\n## Examples\n```python\nfrom typing import Generic, TypeVar\n\nT = TypeVar(\"T\")  # okay\n\n# error: class uses both PEP-695 syntax and legacy syntax\nclass C[U](Generic[T]): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
@@ -726,6 +746,16 @@
         "invalid-type-alias-type": {
           "title": "detects invalid TypeAliasType definitions",
           "description": "## What it does\nChecks for the creation of invalid `TypeAliasType`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a `TypeAliasType`.\n\n## Examples\n```python\nfrom typing import TypeAliasType\n\nIntOrStr = TypeAliasType(\"IntOrStr\", int | str)  # okay\nNewAlias = TypeAliasType(get_name(), int)        # error: TypeAliasType name must be a string literal\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-type-arguments": {
+          "title": "detects invalid type arguments in generic specialization",
+          "description": "## What it does\nChecks for invalid type arguments in explicit type specialization.\n\n## Why is this bad?\nProviding the wrong number of type arguments or type arguments that don't\nsatisfy the type variable's bounds or constraints will lead to incorrect\ntype inference and may indicate a misunderstanding of the generic type's\ninterface.\n\n## Examples\n\nUsing legacy type variables:\n```python\nfrom typing import Generic, TypeVar\n\nT1 = TypeVar('T1', int, str)\nT2 = TypeVar('T2', bound=int)\n\nclass Foo1(Generic[T1]): ...\nclass Foo2(Generic[T2]): ...\n\nFoo1[bytes]  # error: bytes does not satisfy T1's constraints\nFoo2[str]  # error: str does not satisfy T2's bound\n```\n\nUsing PEP 695 type variables:\n```python\nclass Foo[T]: ...\nclass Bar[T, U]: ...\n\nFoo[int, str]  # error: too many arguments\nBar[int]  # error: too few arguments\n```",
           "default": "error",
           "oneOf": [
             {

@@ -1,7 +1,8 @@
 use ruff_db::files::{File, FilePath};
-use ruff_db::source::line_index;
-use ruff_python_ast as ast;
+use ruff_db::source::{line_index, source_text};
+use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
 use ruff_python_ast::{Expr, ExprRef, HasNodeIndex, name::Name};
+use ruff_python_parser::Parsed;
 use ruff_source_file::LineIndex;
 use rustc_hash::FxHashMap;
 
@@ -11,22 +12,37 @@ use crate::module_resolver::{KnownModule, Module, list_modules, resolve_module};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
-use crate::types::ide_support::all_declarations_and_bindings;
-use crate::types::ide_support::{Member, all_members};
+use crate::types::ide_support::{Member, all_declarations_and_bindings, all_members};
 use crate::types::{Type, binding_type, infer_scope_types};
 
+/// The primary interface the LSP should use for querying semantic information about a [`File`].
+///
+/// Although you can in principle freely construct this type given a `db` and `file`, you should
+/// try to construct this at the start of your analysis and thread the same instance through
+/// the full analysis.
+///
+/// The primary reason for this is that it manages traversing into the sub-ASTs of string
+/// annotations (see [`Self::enter_string_annotation`]). When you do this you will be handling
+/// AST nodes that don't belong to the file's AST (or *any* file's AST). These kinds of nodes
+/// will result in panics and confusing results if handed to the wrong subsystem. `SemanticModel`
+/// methods will automatically handle using the string literal's AST node when necessary.
 pub struct SemanticModel<'db> {
     db: &'db dyn Db,
     file: File,
+    /// If `Some` then this `SemanticModel` is for analyzing the sub-AST of a string annotation.
+    /// This expression will be used as a witness to the scope/location we're analyzing.
+    in_string_annotation_expr: Option<Box<Expr>>,
 }
 
 impl<'db> SemanticModel<'db> {
     pub fn new(db: &'db dyn Db, file: File) -> Self {
-        Self { db, file }
+        Self {
+            db,
+            file,
+            in_string_annotation_expr: None,
+        }
     }
 
-    // TODO we don't actually want to expose the Db directly to lint rules, but we need to find a
-    // solution for exposing information from types
     pub fn db(&self) -> &'db dyn Db {
         self.db
     }
@@ -213,10 +229,10 @@ impl<'db> SemanticModel<'db> {
         completions
     }
 
-    fn scope(&self, node: ast::AnyNodeRef<'_>) -> Option<FileScopeId> {
+    /// Get the scope of the given node (handles string annotations)
+    pub fn scope(&self, node: ast::AnyNodeRef<'_>) -> Option<FileScopeId> {
         let index = semantic_index(self.db, self.file);
-
-        match node {
+        match self.node_in_ast(node) {
             ast::AnyNodeRef::Identifier(identifier) => index.try_expression_scope_id(identifier),
             node => match node.as_expr_ref() {
                 // If we couldn't identify a specific
@@ -226,6 +242,82 @@ impl<'db> SemanticModel<'db> {
                 Some(expr) => index.try_expression_scope_id(&expr),
             },
         }
+    }
+
+    /// Get a "safe" [`ast::AnyNodeRef`] to use for referring to the given (sub-)AST node.
+    ///
+    /// If we're analyzing a string annotation, it will return the string literal's node.
+    /// Otherwise it will return the input.
+    pub fn node_in_ast<'a>(&'a self, node: ast::AnyNodeRef<'a>) -> ast::AnyNodeRef<'a> {
+        if let Some(string_annotation) = &self.in_string_annotation_expr {
+            (&**string_annotation).into()
+        } else {
+            node
+        }
+    }
+
+    /// Get a "safe" [`Expr`] to use for referring to the given (sub-)expression.
+    ///
+    /// If we're analyzing a string annotation, it will return the string literal's expression.
+    /// Otherwise it will return the input.
+    pub fn expr_in_ast<'a>(&'a self, expr: &'a Expr) -> &'a Expr {
+        if let Some(string_annotation) = &self.in_string_annotation_expr {
+            string_annotation
+        } else {
+            expr
+        }
+    }
+
+    /// Get a "safe" [`ExprRef`] to use for referring to the given (sub-)expression.
+    ///
+    /// If we're analyzing a string annotation, it will return the string literal's expression.
+    /// Otherwise it will return the input.
+    pub fn expr_ref_in_ast<'a>(&'a self, expr: ExprRef<'a>) -> ExprRef<'a> {
+        if let Some(string_annotation) = &self.in_string_annotation_expr {
+            ExprRef::from(string_annotation)
+        } else {
+            expr
+        }
+    }
+
+    /// Given a string expression, determine if it's a string annotation, and if it is,
+    /// yield the parsed sub-AST and a sub-model that knows it's analyzing a sub-AST.
+    ///
+    /// Analysis of the sub-AST should only be done with the sub-model, or else things
+    /// may return nonsense results or even panic!
+    pub fn enter_string_annotation(
+        &self,
+        string_expr: &ExprStringLiteral,
+    ) -> Option<(Parsed<ModExpression>, Self)> {
+        // String annotations can't contain string annotations
+        if self.in_string_annotation_expr.is_some() {
+            return None;
+        }
+
+        // Ask the inference engine whether this is actually a string annotation
+        let expr = ExprRef::StringLiteral(string_expr);
+        let index = semantic_index(self.db, self.file);
+        let file_scope = index.expression_scope_id(&expr);
+        let scope = file_scope.to_scope_id(self.db, self.file);
+        if !infer_scope_types(self.db, scope).is_string_annotation(expr) {
+            return None;
+        }
+
+        // Parse the sub-AST and create a semantic model that knows it's in a sub-AST
+        //
+        // The string_annotation will be used as the expr/node for any query that needs
+        // to look up a node in the AST to prevent panics, because these sub-AST nodes
+        // are not in the File's AST!
+        let source = source_text(self.db, self.file);
+        let string_literal = string_expr.as_single_part_string()?;
+        let ast =
+            ruff_python_parser::parse_string_annotation(source.as_str(), string_literal).ok()?;
+        let model = Self {
+            db: self.db,
+            file: self.file,
+            in_string_annotation_expr: Some(Box::new(Expr::StringLiteral(string_expr.clone()))),
+        };
+        Some((ast, model))
     }
 }
 
@@ -315,7 +407,13 @@ pub trait HasDefinition {
 impl HasType for ast::ExprRef<'_> {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
-        let file_scope = index.expression_scope_id(self);
+        // TODO(#1637): semantic tokens is making this crash even with
+        // `try_expr_ref_in_ast` guarding this, for now just use `try_expression_scope_id`.
+        // The problematic input is `x: "float` (with a dangling quote). I imagine the issue
+        // is we're too eagerly setting `is_string_annotation` in inference.
+        let Some(file_scope) = index.try_expression_scope_id(&model.expr_ref_in_ast(*self)) else {
+            return Type::unknown();
+        };
         let scope = file_scope.to_scope_id(model.db, model.file);
 
         infer_scope_types(model.db, scope).expression_type(*self)
