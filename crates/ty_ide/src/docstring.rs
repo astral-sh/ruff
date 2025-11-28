@@ -182,6 +182,11 @@ fn documentation_trim(docs: &str) -> String {
 /// </code>
 /// ```
 fn render_markdown(docstring: &str) -> String {
+    // Here lies a monumemnt to robust parsing and escaping:
+    // a codefence with SO MANY backticks that surely no one will ever accidentally
+    // break out of it, even if they're writing python documentation about markdown
+    // code fences and are showing off how you can use more than 3 backticks.
+    const FENCE: &str = "```````````";
     // TODO: there is a convention that `singletick` is for items that can
     // be looked up in-scope while ``multitick`` is for opaque inline code.
     // While rendering this we should make note of all the `singletick` locations
@@ -194,7 +199,7 @@ fn render_markdown(docstring: &str) -> String {
     let mut starting_literal = None;
     let mut in_literal = false;
     let mut in_any_code = false;
-    let mut _line;
+    let mut temp_owned_line;
     for untrimmed_line in docstring.lines() {
         // We can assume leading whitespace has been normalized
         let mut line = untrimmed_line.trim_start_matches(' ');
@@ -220,7 +225,8 @@ fn render_markdown(docstring: &str) -> String {
             in_literal = false;
             in_any_code = false;
             block_indent = 0;
-            output.push_str("```\n");
+            output.push_str(FENCE);
+            output.push('\n');
         }
 
         // We previously entered a literal block and we just found our first non-blank line
@@ -232,8 +238,8 @@ fn render_markdown(docstring: &str) -> String {
             in_literal = true;
             in_any_code = true;
             block_indent = line_indent;
-            // TODO: I hope people don't have literal blocks about markdown code fence syntax
-            output.push_str("\n```");
+            output.push('\n');
+            output.push_str(FENCE);
             output.push_str(literal);
             output.push('\n');
         }
@@ -244,7 +250,8 @@ fn render_markdown(docstring: &str) -> String {
             in_doctest = true;
             in_any_code = true;
             // TODO: is there something more specific? `pycon`?
-            output.push_str("```python\n");
+            output.push_str(FENCE);
+            output.push_str("python\n");
         }
 
         // If we're not in a codeblock and we see something that signals a literal block, start one
@@ -287,7 +294,6 @@ fn render_markdown(docstring: &str) -> String {
 
             starting_literal = match directive {
                 // Special directives that should be plaintext
-                #[allow(clippy::used_underscore_binding)]
                 Some(
                     "attention" | "caution" | "danger" | "error" | "hint" | "important" | "note"
                     | "tip" | "warning" | "admonition" | "versionadded" | "version-added"
@@ -302,9 +308,10 @@ fn render_markdown(docstring: &str) -> String {
                     };
                     // We prepend without_directive here out of caution for preserving input.
                     // This is probably gibberish/invalid syntax? But it's a no-op in normal cases.
-                    _line = format!("**{without_directive}{}:**{suffix}", directive.unwrap());
+                    temp_owned_line =
+                        format!("**{without_directive}{}:**{suffix}", directive.unwrap());
 
-                    line = _line.as_str();
+                    line = temp_owned_line.as_str();
                     None
                 }
                 // Things that just mean "it's code"
@@ -404,7 +411,7 @@ fn render_markdown(docstring: &str) -> String {
                 block_indent = 0;
                 in_any_code = false;
                 in_literal = false;
-                output.push_str("```");
+                output.push_str(FENCE);
             }
         } else {
             // Print the line verbatim, it's in code
@@ -415,7 +422,8 @@ fn render_markdown(docstring: &str) -> String {
     }
     // Flush codeblock
     if in_any_code {
-        output.push_str("\n```");
+        output.push('\n');
+        output.push_str(FENCE);
     }
 
     output
@@ -831,7 +839,7 @@ mod tests {
 
         assert_snapshot!(docstring.render_markdown(), @r#"
         Check out this great example code:    
-        ```python
+        ```````````python
             x_y = "hello"
 
             if len(x_y) > 4:
@@ -841,7 +849,7 @@ mod tests {
 
             print("done")
 
-        ```
+        ```````````
         You love to see it.
         "#);
     }
@@ -869,7 +877,7 @@ mod tests {
 
         assert_snapshot!(docstring.render_markdown(), @r#"
         Check out this great example code    
-        ```python
+        ```````````python
             x_y = "hello"
 
             if len(x_y) > 4:
@@ -879,7 +887,7 @@ mod tests {
 
             print("done")
 
-        ```
+        ```````````
         You love to see it.
         "#);
     }
@@ -909,7 +917,7 @@ mod tests {
         assert_snapshot!(docstring.render_markdown(), @r#"
         Check out this great example code  
         &nbsp;&nbsp;&nbsp;&nbsp;    
-        ```python
+        ```````````python
             x_y = "hello"
 
             if len(x_y) > 4:
@@ -919,7 +927,7 @@ mod tests {
 
             print("done")
 
-        ```
+        ```````````
         You love to see it.
         "#);
     }
@@ -945,7 +953,7 @@ mod tests {
 
         assert_snapshot!(docstring.render_markdown(), @r#"
         Check out this great example code:  
-        ```python
+        ```````````python
             x_y = "hello"
 
             if len(x_y) > 4:
@@ -954,7 +962,7 @@ mod tests {
                 print("too short :(")
 
             print("done")
-        ```
+        ```````````
         You love to see it.
         "#);
     }
@@ -979,7 +987,7 @@ mod tests {
 
         assert_snapshot!(docstring.render_markdown(), @r#"
         Check out this great example code:    
-        ```python
+        ```````````python
             x_y = "hello"
 
             if len(x_y) > 4:
@@ -988,7 +996,7 @@ mod tests {
                 print("too short :(")
 
             print("done")
-        ```
+        ```````````
         "#);
     }
 
@@ -1105,11 +1113,11 @@ mod tests {
         Here's some code!  
           
           
-        ```python
+        ```````````python
             def main() {
                 print("hello world!")
             }
-        ```
+        ```````````
         "#);
     }
 
@@ -1131,11 +1139,11 @@ mod tests {
         Here's some Rust code!  
           
           
-        ```rust
+        ```````````rust
             fn main() {
                 println!("hello world!");
             }
-        ```
+        ```````````
         "#);
     }
 
@@ -1151,9 +1159,9 @@ mod tests {
 
         assert_snapshot!(docstring.render_markdown(), @r"
         wow this is some code  
-        ```abc
+        ```````````abc
             x = 2
-        ```
+        ```````````
         ");
     }
 
@@ -1175,11 +1183,11 @@ mod tests {
         Here's some code!  
           
           
-        ```python
+        ```````````python
             fn main() {
                 println!("hello world!");
             }
-        ```
+        ```````````
         "#);
     }
 
@@ -1201,11 +1209,11 @@ mod tests {
         Here's some Rust code!  
           
           
-        ```rust
+        ```````````rust
             fn main() {
                 print("hello world!")
             }
-        ```
+        ```````````
         "#);
     }
 
@@ -1228,12 +1236,12 @@ mod tests {
         assert_snapshot!(docstring.render_markdown(), @r"
         This is a function description  
           
-        ```python
+        ```````````python
         >>> thing.do_thing()
         wow it did the thing
         >>> thing.do_other_thing()
         it sure did the thing
-        ```  
+        ```````````  
         As you can see it did the thing!
         ");
     }
@@ -1257,12 +1265,12 @@ mod tests {
         assert_snapshot!(docstring.render_markdown(), @r"
         This is a function description  
           
-        ```python
+        ```````````python
             >>> thing.do_thing()
             wow it did the thing
             >>> thing.do_other_thing()
             it sure did the thing
-        ```  
+        ```````````  
         As you can see it did the thing!
         ");
     }
@@ -1278,12 +1286,12 @@ mod tests {
         let docstring = Docstring::new(docstring.to_owned());
 
         assert_snapshot!(docstring.render_markdown(), @r"
-        ```python
+        ```````````python
         >>> thing.do_thing()
         wow it did the thing
         >>> thing.do_other_thing()
         it sure did the thing
-        ```
+        ```````````
         ");
     }
 
@@ -1305,13 +1313,13 @@ mod tests {
 
         assert_snapshot!(docstring.render_markdown(), @r"
         This is a function description:    
-        ```python
+        ```````````python
             >>> thing.do_thing()
             wow it did the thing
             >>> thing.do_other_thing()
             it sure did the thing
 
-        ```
+        ```````````
         As you can see it did the thing!
         ");
     }
@@ -1329,12 +1337,12 @@ mod tests {
 
         assert_snapshot!(docstring.render_markdown(), @r"
         And so you can see that  
-        ```python
+        ```````````python
             >>> thing.do_thing()
             wow it did the thing
             >>> thing.do_other_thing()
             it sure did the thing
-        ```
+        ```````````
         ");
     }
 
@@ -1513,14 +1521,14 @@ mod tests {
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
         'param3' -- A parameter without type annotation  
           
-        ```python
+        ```````````python
         >>> print repr(foo.__doc__)
         '\n    This is the second line of the docstring.\n    '
         >>> foo.__doc__.splitlines()
         ['', '    This is the second line of the docstring.', '    ']
         >>> trim(foo.__doc__)
         'This is the second line of the docstring.'
-        ```
+        ```````````
         ");
     }
 
