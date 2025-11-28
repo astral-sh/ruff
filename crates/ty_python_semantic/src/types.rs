@@ -3726,7 +3726,7 @@ impl<'db> Type<'db> {
                     dunder_call
                         .has_relation_to_impl(
                             db,
-                            CallableType::unknown(db),
+                            Type::Callable(CallableType::unknown(db)),
                             inferable,
                             TypeRelation::Assignability,
                             relation_visitor,
@@ -7258,7 +7258,7 @@ impl<'db> Type<'db> {
                 SpecialFormType::OrderedDict => Ok(KnownClass::OrderedDict.to_instance(db)),
 
                 // TODO: Use an opt-in rule for a bare `Callable`
-                SpecialFormType::Callable => Ok(CallableType::unknown(db)),
+                SpecialFormType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
 
                 // Special case: `NamedTuple` in a type expression is understood to describe the type
                 // `tuple[object, ...] & <a protocol that any `NamedTuple` class would satisfy>`.
@@ -11684,8 +11684,8 @@ impl<'db> CallableType<'db> {
     }
 
     /// Create a callable type which accepts any parameters and returns an `Unknown` type.
-    pub(crate) fn unknown(db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(Self::single(db, Signature::unknown()))
+    pub(crate) fn unknown(db: &'db dyn Db) -> CallableType<'db> {
+        Self::single(db, Signature::unknown())
     }
 
     pub(crate) fn bind_self(

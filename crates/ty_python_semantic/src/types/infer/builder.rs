@@ -11113,9 +11113,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
                     return Type::KnownInstance(KnownInstanceType::Callable(
-                        CallableType::unknown(self.db())
-                            .as_callable()
-                            .expect("always returns Type::Callable"),
+                        CallableType::unknown(self.db()),
                     ));
                 }
 

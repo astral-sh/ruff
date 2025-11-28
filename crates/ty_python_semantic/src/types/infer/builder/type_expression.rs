@@ -1121,7 +1121,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             Type::single_callable(db, Signature::new(parameters, Some(return_type)))
         } else {
-            CallableType::unknown(db)
+            Type::Callable(CallableType::unknown(db))
         };
 
         // `Signature` / `Parameters` are not a `Type` variant, so we're storing
