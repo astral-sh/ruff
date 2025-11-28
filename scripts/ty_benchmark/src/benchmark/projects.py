@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import subprocess
 import sys
-from enum import Enum
 from pathlib import Path
 from typing import Final, Literal, NamedTuple
 
@@ -25,8 +24,6 @@ class Project(NamedTuple):
     """
 
     python_version: Literal["3.13", "3.14", "3.12", "3.11", "3.10", "3.9", "3.8"]
-
-    size: ProjectSize
 
     skip: str | None = None
     """The project is skipped from benchmarking if not `None`."""
@@ -129,12 +126,6 @@ class IncrementalEdit(NamedTuple):
         return text.replace(self.replace_text, self.replacement, 1)
 
 
-class ProjectSize(Enum):
-    Small = 1
-    Medium = 2
-    Large = 3
-
-
 # Selection of projects taken from
 # [mypy-primer](https://github.com/hauntsaninja/mypy_primer/blob/0ea6cc614b3e91084059b9a3acc58f94c066a211/mypy_primer/projects.py#L71).
 # May require frequent updating, especially the dependencies list
@@ -156,7 +147,6 @@ ALL: Final = [
             "--extra",
             "d",
         ],
-        size=ProjectSize.Small,
         edit=IncrementalEdit(
             edited_file="src/black/nodes.py",
             replace_text="LN = Union[Leaf, Node]",
@@ -175,7 +165,6 @@ ALL: Final = [
             "pyproject.toml",
             "typing_extensions>=4.3,<5",
         ],
-        size=ProjectSize.Medium,
         edit=IncrementalEdit(
             edited_file="discord/abc.py",
             replace_text="id: int",
@@ -200,7 +189,6 @@ ALL: Final = [
             "-r",
             "requirements.txt",
         ],
-        size=ProjectSize.Large,
         edit=IncrementalEdit(
             edited_file="homeassistant/core.py",
             affected_files=["homeassistant/helpers/event.py"],
@@ -215,7 +203,6 @@ ALL: Final = [
         python_version="3.11",
         include=["isort"],
         install_arguments=["types-colorama", "colorama"],
-        size=ProjectSize.Small,
         edit=IncrementalEdit(
             edited_file="isort/settings.py",
             replace_text="def is_skipped(self, file_path: Path) -> bool:",
@@ -230,7 +217,6 @@ ALL: Final = [
         python_version="3.10",
         include=["src"],
         install_arguments=["-r", "pyproject.toml"],
-        size=ProjectSize.Small,
         edit=IncrementalEdit(
             edited_file="src/jinja2/nodes.py",
             replace_text="""def iter_child_nodes(
@@ -261,7 +247,6 @@ ALL: Final = [
             "-r",
             "requirements-dev.txt",
         ],
-        size=ProjectSize.Large,
         edit=IncrementalEdit(
             edited_file="pandas/_typing.py",
             replace_text='Axis: TypeAlias = AxisInt | Literal["index", "columns", "rows"]',
@@ -290,7 +275,6 @@ ALL: Final = [
             "scipy >=1.9.1",
             "scipy-stubs >=1.15.3.0",
         ],
-        size=ProjectSize.Medium,
         edit=None,  # Tricky in a stubs only project as there are no actual method calls.
     ),
     Project(
@@ -311,7 +295,6 @@ ALL: Final = [
             "--group",
             "dev",
         ],
-        size=ProjectSize.Medium,
         edit=IncrementalEdit(
             edited_file="src/prefect/server/models/events.py",
             replace_text="""async def deployment_status_event(
@@ -396,7 +379,6 @@ ALL: Final = [
             "mypy==1.16.0",  # pytorch pins mypy,
         ],
         python_version="3.11",
-        size=ProjectSize.Large,
         edit=IncrementalEdit(
             edited_file="torch/nn/__init__.py",
             replace_text="""from torch.nn.parameter import (  # usort: skip

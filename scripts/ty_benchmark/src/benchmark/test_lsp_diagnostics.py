@@ -19,7 +19,7 @@ from lsprotocol import types as lsp
 
 from benchmark.lsp_client import FileDiagnostics, LSPClient
 from benchmark.projects import ALL as ALL_PROJECTS
-from benchmark.projects import IncrementalEdit, Project, ProjectSize
+from benchmark.projects import IncrementalEdit, Project
 from benchmark.tool import Pyrefly, Pyright, Tool, Ty
 from benchmark.venv import Venv
 
@@ -304,24 +304,13 @@ class IncrementalEditTest(LspTest):
             )
         )
 
-        # Give the server some time to do whatever indexing it needs
-        # This helps Pyrefly a ton on the homeassistant benchmark. It goes from 13s to 1 to 2s.
-        # It also seems that this indexing is only triggered after opening a file, which is why
-        # we wait here rather than after calling `initialize`
-        match self.project.size:
-            case ProjectSize.Small:
-                await asyncio.sleep(1)
-            case ProjectSize.Medium:
-                await asyncio.sleep(10)
-            case ProjectSize.Large:
-                await asyncio.sleep(20)
-
         if not self.client.server_supports_pull_diagnostics:
             # Pyrefly sometimes sends more than one publish diagnostic per file,
             # and it doesn't support versioned publish diagnostics, making it impossible
             # for the client to tell if we already received the newest publish diagnostic
             # notification or not. Because of that, sleep, clear all publish diagnostic
             # notifications before sending the change notification.
+            await asyncio.sleep(1)
             self.client.clear_pending_publish_diagnostics()
 
     @override

@@ -279,7 +279,9 @@ class Pyrefly(Tool):
     @override
     def lsp_command(self, project: Project, venv: Venv) -> list[str] | None:
         # Pyrefly LSP server.
-        return [str(self.path), "lsp"]
+        # Turn-off pyrefly's indexing mode as it results in significant load after opening the first file,
+        # skewing benchmark results and we don't use any of the features that require indexing.
+        return [str(self.path), "lsp", "--indexing-mode", "none"]
 
 
 def npm_bin_path(name: str) -> Path:
