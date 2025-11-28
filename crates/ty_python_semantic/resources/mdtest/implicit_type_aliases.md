@@ -719,6 +719,7 @@ Similarly, if you try to specialize a union type without a binding context, we e
 x: (list[T] | set[T])[int]
 
 def _():
+    # TODO: `list[Unknown] | set[Unknown]` might be better
     reveal_type(x)  # revealed: list[typing.TypeVar] | set[typing.TypeVar]
 ```
 
