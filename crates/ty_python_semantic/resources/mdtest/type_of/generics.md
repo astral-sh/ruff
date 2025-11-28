@@ -106,6 +106,18 @@ def narrow_a[B: A](a: A, b: B):
         reveal_type(type_of_a)  # revealed: type[B@narrow_a]
 ```
 
+## `__class__`
+
+```py
+from typing import Self
+
+class A:
+    def copy(self: Self) -> Self:
+        reveal_type(self.__class__)  # revealed: type[Self@copy]
+        reveal_type(self.__class__())  # revealed: Self@copy
+        return self.__class__()
+```
+
 ## Subtyping
 
 A class `A` is a subtype of `type[T]` if any instance of `A` is a subtype of `T`.
