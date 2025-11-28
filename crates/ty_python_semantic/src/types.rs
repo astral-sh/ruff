@@ -7228,21 +7228,7 @@ impl<'db> Type<'db> {
                     // (`int` -> instance of `int` -> subclass of `int`) can be lossy, but it is
                     // okay for all valid arguments to `type[…]`.
 
-                    let ty = instance.inner(db);
-
-                    if ty.is_type_var() {
-                        // TODO:
-                        // This is a temporary workaround until we have proper support for type[T].
-                        // If we pass a typevar to `.to_meta_type()`, we currently get `type[B]`,
-                        // where `B` is the upper bound of `T`. However, we really need `type[T]`
-                        // here. Otherwise, when we specialize a generic implicit type alias like
-                        // `TypeOrList[T] = type[T] | list[T]` using `TypeOrList[Any]`, we would get
-                        // `type[B] | list[Any]`, which leads to a lot of false positives for numpy-
-                        // users.
-                        Ok(todo_type!("type[T] for typevar T"))
-                    } else {
-                        Ok(ty.to_meta_type(db))
-                    }
+                    Ok(instance.inner(db).to_meta_type(db))
                 }
                 KnownInstanceType::Callable(callable) => Ok(Type::Callable(*callable)),
                 KnownInstanceType::LiteralStringAlias(ty) => Ok(ty.inner(db)),

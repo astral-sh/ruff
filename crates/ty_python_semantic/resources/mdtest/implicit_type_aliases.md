@@ -509,8 +509,7 @@ def _(
 ):
     reveal_type(list_of_ints)  # revealed: list[int]
     reveal_type(subclass_of_int)  # revealed: type[int]
-    # TODO: Should be `type[Any] | list[Any]`
-    reveal_type(type_or_list)  # revealed: @Todo(type[T] for typevar T) | list[Any]
+    reveal_type(type_or_list)  # revealed: type[Any] | list[Any]
 ```
 
 If a generic implicit type alias is used unspecialized in a type expression, we use the default
@@ -535,7 +534,7 @@ def _(
     # TODO: This should be `dict[Unknown, Unknown]`
     reveal_type(dict_unknown)  # revealed: dict[T@MyDict, U@MyDict]
     # TODO: Should be `type[Unknown]`
-    reveal_type(subclass_of_unknown)  # revealed: @Todo(type[T] for typevar T)
+    reveal_type(subclass_of_unknown)  # revealed: type[T@MyType]
     # TODO: Should be `tuple[int, Unknown]`
     reveal_type(int_and_unknown)  # revealed: tuple[int, T@IntAndType]
     # TODO: Should be `tuple[Unknown, Unknown]`
