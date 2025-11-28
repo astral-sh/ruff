@@ -319,6 +319,13 @@ impl<'db> GenericContext<'db> {
         self.variables_inner(db).values().copied()
     }
 
+    /// Returns `true` if this generic context contains exactly one `ParamSpec` type variable.
+    pub(crate) fn exactly_one_paramspec(self, db: &'db dyn Db) -> bool {
+        self.variables(db)
+            .exactly_one()
+            .is_ok_and(|bound_typevar| bound_typevar.is_paramspec(db))
+    }
+
     fn variable_from_type_param(
         db: &'db dyn Db,
         index: &'db SemanticIndex<'db>,

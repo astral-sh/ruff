@@ -7030,14 +7030,6 @@ impl<'db> Type<'db> {
                     // TODO: A `ParamSpec` type variable cannot be used in type expressions. This
                     // requires storing additional context as it's allowed in some places
                     // (`Concatenate`, `Callable`) but not others.
-                    // if typevar.kind(db).is_paramspec() {
-                    //     return Err(InvalidTypeExpressionError {
-                    //         invalid_expressions: smallvec::smallvec_inline![
-                    //             InvalidTypeExpression::InvalidType(*self, scope_id)
-                    //         ],
-                    //         fallback_type: Type::unknown(),
-                    //     });
-                    // }
                     let index = semantic_index(db, scope_id.file(db));
                     Ok(bind_typevar(
                         db,
@@ -7264,12 +7256,6 @@ impl<'db> Type<'db> {
                 Some(KnownClass::TypeVar) => Ok(todo_type!(
                     "Support for `typing.TypeVar` instances in type expressions"
                 )),
-                Some(KnownClass::ParamSpecArgs) => {
-                    Ok(todo_type!("Support for `typing.ParamSpecArgs`"))
-                }
-                Some(KnownClass::ParamSpecKwargs) => {
-                    Ok(todo_type!("Support for `typing.ParamSpecKwargs`"))
-                }
                 Some(KnownClass::TypeVarTuple) => Ok(todo_type!(
                     "Support for `typing.TypeVarTuple` instances in type expressions"
                 )),
@@ -9444,6 +9430,32 @@ impl<'db> TypeVarInstance<'db> {
 
     #[salsa::tracked(cycle_fn=lazy_default_cycle_recover, cycle_initial=lazy_default_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn lazy_default(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        fn convert_type_to_paramspec_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+            let parameters = match ty {
+                Type::NominalInstance(nominal_instance)
+                    if nominal_instance.has_known_class(db, KnownClass::EllipsisType) =>
+                {
+                    Parameters::gradual_form()
+                }
+                Type::NominalInstance(nominal_instance) => nominal_instance
+                    .own_tuple_spec(db)
+                    .map_or_else(Parameters::unknown, |tuple_spec| {
+                        Parameters::new(
+                            db,
+                            tuple_spec.all_elements().map(|ty| {
+                                Parameter::positional_only(None).with_annotated_type(*ty)
+                            }),
+                        )
+                    }),
+                Type::Dynamic(DynamicType::Todo(_)) => Parameters::todo(),
+                Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
+                    Parameters::paramspec(db, typevar)
+                }
+                _ => Parameters::unknown(),
+            };
+            Type::paramspec_value_callable(db, parameters)
+        }
+
         let definition = self.definition(db)?;
         let module = parsed_module(db, definition.file(db)).load(db);
         match definition.kind(db) {
@@ -9456,27 +9468,35 @@ impl<'db> TypeVarInstance<'db> {
                     typevar_node.default.as_ref()?,
                 ))
             }
-            // legacy typevar
+            // legacy typevar / ParamSpec
             DefinitionKind::Assignment(assignment) => {
                 let call_expr = assignment.value(&module).as_call_expr()?;
+                let func_ty = definition_expression_type(db, definition, &call_expr.func);
+                let known_class = func_ty.as_class_literal().and_then(|cls| cls.known(db));
                 let expr = &call_expr.arguments.find_keyword("default")?.value;
-                Some(definition_expression_type(db, definition, expr))
+                let default_type = definition_expression_type(db, definition, expr);
+                if matches!(known_class, Some(KnownClass::ParamSpec)) {
+                    Some(convert_type_to_paramspec_value(db, default_type))
+                } else {
+                    Some(default_type)
+                }
             }
             // PEP 695 ParamSpec
             DefinitionKind::ParamSpec(paramspec) => {
                 let paramspec_node = paramspec.node(&module);
-                Some(definition_expression_type(
-                    db,
-                    definition,
-                    paramspec_node.default.as_ref()?,
-                ))
+                let default_ty =
+                    definition_expression_type(db, definition, paramspec_node.default.as_ref()?);
+                Some(convert_type_to_paramspec_value(db, default_ty))
             }
             _ => None,
         }
     }
 
     pub fn bind_pep695(self, db: &'db dyn Db) -> Option<BoundTypeVarInstance<'db>> {
-        if self.identity(db).kind(db) != TypeVarKind::Pep695 {
+        if !matches!(
+            self.identity(db).kind(db),
+            TypeVarKind::Pep695 | TypeVarKind::Pep695ParamSpec
+        ) {
             return None;
         }
         let typevar_definition = self.definition(db)?;
