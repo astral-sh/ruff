@@ -117,6 +117,11 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SubclassOfInner::Dynamic(left), SubclassOfInner::Dynamic(right)) => {
                     dynamic_elements_ordering(left, right)
                 }
+                (SubclassOfInner::TypeVar(left), SubclassOfInner::TypeVar(right)) => {
+                    left.as_id().cmp(&right.as_id())
+                }
+                (SubclassOfInner::TypeVar(_), _) => Ordering::Less,
+                (_, SubclassOfInner::TypeVar(_)) => Ordering::Greater,
             }
         }
 

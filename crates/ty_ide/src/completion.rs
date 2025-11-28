@@ -2898,7 +2898,7 @@ Answer.<CURSOR>
                 __itemsize__ :: int
                 __iter__ :: bound method <class 'Answer'>.__iter__[_EnumMemberT]() -> Iterator[_EnumMemberT@__iter__]
                 __len__ :: bound method <class 'Answer'>.__len__() -> int
-                __members__ :: MappingProxyType[str, Unknown]
+                __members__ :: MappingProxyType[str, Answer]
                 __module__ :: str
                 __mro__ :: tuple[type, ...]
                 __name__ :: str

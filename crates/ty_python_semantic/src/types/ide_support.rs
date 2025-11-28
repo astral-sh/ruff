@@ -176,16 +176,18 @@ impl<'db> AllMembers<'db> {
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                SubclassOfInner::Class(class_type) => {
-                    let (class_literal, specialization) = class_type.class_literal(db);
-                    self.extend_with_class_members(db, ty, class_literal);
-                    self.extend_with_synthetic_members(db, ty, class_literal, specialization);
-                    if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
-                        self.extend_with_class_members(db, ty, metaclass);
-                    }
-                }
                 SubclassOfInner::Dynamic(_) => {
                     self.extend_with_type(db, KnownClass::Type.to_instance(db));
+                }
+                _ => {
+                    if let Some(class_type) = subclass_of_type.subclass_of().into_class(db) {
+                        let (class_literal, specialization) = class_type.class_literal(db);
+                        self.extend_with_class_members(db, ty, class_literal);
+                        self.extend_with_synthetic_members(db, ty, class_literal, specialization);
+                        if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
+                            self.extend_with_class_members(db, ty, metaclass);
+                        }
+                    }
                 }
             },
 
@@ -241,7 +243,7 @@ impl<'db> AllMembers<'db> {
                     self.extend_with_class_members(db, ty, class_literal);
                 }
                 Type::SubclassOf(subclass_of) => {
-                    if let Some(class) = subclass_of.subclass_of().into_class() {
+                    if let Some(class) = subclass_of.subclass_of().into_class(db) {
                         self.extend_with_class_members(db, ty, class.class_literal(db).0);
                     }
                 }
@@ -777,7 +779,7 @@ pub fn definitions_for_attribute<'db>(
         };
         let class_literal = match meta_type {
             Type::ClassLiteral(class_literal) => class_literal,
-            Type::SubclassOf(subclass) => match subclass.subclass_of().into_class() {
+            Type::SubclassOf(subclass) => match subclass.subclass_of().into_class(db) {
                 Some(cls) => cls.class_literal(db).0,
                 None => continue,
             },

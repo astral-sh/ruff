@@ -1557,9 +1557,16 @@ impl<'db> SpecializationBuilder<'db> {
                             argument: ty,
                         });
                     }
-                    _ => {
-                        self.add_type_mapping(bound_typevar, ty, polarity, f);
-                    }
+                    _ => self.add_type_mapping(bound_typevar, ty, polarity, f),
+                }
+            }
+
+            (Type::SubclassOf(subclass_of), ty) | (ty, Type::SubclassOf(subclass_of))
+                if subclass_of.is_type_var() =>
+            {
+                let formal_instance = Type::TypeVar(subclass_of.into_type_var().unwrap());
+                if let Some(actual_instance) = ty.to_instance(self.db) {
+                    return self.infer_map_impl(formal_instance, actual_instance, polarity, f);
                 }
             }
 
