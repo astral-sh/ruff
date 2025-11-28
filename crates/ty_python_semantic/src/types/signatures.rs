@@ -18,8 +18,8 @@ use ruff_python_ast::ParameterWithDefault;
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{
-    DynamicType, Type, TypeVarVariance, definition_expression_type, infer_definition_types,
-    semantic_index,
+    ClassType, DynamicType, Type, TypeVarVariance, definition_expression_type,
+    infer_definition_types, semantic_index,
 };
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
@@ -31,8 +31,8 @@ use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableTypeKind, ClassLiteral,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, MaterializationKind, NormalizedVisitor, ParamSpecAttrKind, TypeContext,
-    TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    KnownClass, MaterializationKind, NormalizedVisitor, ParamSpecAttrKind, SubclassOfInner,
+    SubclassOfType, TypeContext, TypeMapping, TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -1675,8 +1675,8 @@ impl<'db> Parameters<'db> {
         };
 
         let method_info = infer_method_information(db, definition);
-        let is_static_or_classmethod =
-            method_info.is_some_and(|f| f.is_staticmethod || f.is_classmethod);
+        let is_staticmethod = method_info.is_some_and(|f| f.is_staticmethod);
+        let is_classmethod = method_info.is_some_and(|f| f.is_classmethod);
 
         let inferred_annotation = |arg: &ParameterWithDefault| {
             if let Some(MethodInformation {
@@ -1685,7 +1685,7 @@ impl<'db> Parameters<'db> {
                 class_is_generic,
                 ..
             }) = method_info
-                && !is_static_or_classmethod
+                && !is_staticmethod
                 && arg.parameter.annotation().is_none()
                 && parameters.index(arg.name().id()) == Some(0)
             {
@@ -1700,16 +1700,30 @@ impl<'db> Parameters<'db> {
                     let index = semantic_index(db, scope_id.file(db));
                     let class = nearest_enclosing_class(db, index, scope_id).unwrap();
 
-                    Some(
-                        typing_self(db, scope_id, typevar_binding_context, class)
-                            .map(Type::TypeVar)
-                            .expect("We should always find the surrounding class for an implicit self: Self annotation"),
-                    )
+                    let typing_self = typing_self(db, scope_id, typevar_binding_context, class)
+                        .expect("We should always find the surrounding class for an implicit self: Self annotation");
+
+                    if is_classmethod {
+                        Some(SubclassOfType::from(
+                            db,
+                            SubclassOfInner::TypeVar(typing_self),
+                        ))
+                    } else {
+                        Some(Type::TypeVar(typing_self))
+                    }
                 } else {
                     // For methods of non-generic classes that are not otherwise generic (e.g. return `Self` or
-                    // have additional type parameters), the implicit `Self` type of the `self` parameter would
-                    // be the only type variable, so we can just use the class directly.
-                    Some(class_literal.to_non_generic_instance(db))
+                    // have additional type parameters), the implicit `Self` type of the `self`, or the implicit
+                    // `type[Self]` type of the `cls` parameter, would be the only type variable, so we can just
+                    // use the class directly.
+                    if is_classmethod {
+                        Some(SubclassOfType::from(
+                            db,
+                            SubclassOfInner::Class(ClassType::NonGeneric(class_literal)),
+                        ))
+                    } else {
+                        Some(class_literal.to_non_generic_instance(db))
+                    }
                 }
             } else {
                 None
