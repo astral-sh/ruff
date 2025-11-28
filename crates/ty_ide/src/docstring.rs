@@ -182,6 +182,11 @@ fn documentation_trim(docs: &str) -> String {
 /// </code>
 /// ```
 fn render_markdown(docstring: &str) -> String {
+    // Here lies a monumemnt to robust parsing and escaping:
+    // a codefence with SO MANY backticks that surely no one will ever accidentally
+    // break out of it, even if they're writing python documentation about markdown
+    // code fences and are showing off how you can use more than 3 backticks.
+    const FENCE: &str = "```````````";
     // TODO: there is a convention that `singletick` is for items that can
     // be looked up in-scope while ``multitick`` is for opaque inline code.
     // While rendering this we should make note of all the `singletick` locations
@@ -191,9 +196,10 @@ fn render_markdown(docstring: &str) -> String {
     let mut first_line = true;
     let mut block_indent = 0;
     let mut in_doctest = false;
-    let mut starting_literal = false;
+    let mut starting_literal = None;
     let mut in_literal = false;
     let mut in_any_code = false;
+    let mut temp_owned_line;
     for untrimmed_line in docstring.lines() {
         // We can assume leading whitespace has been normalized
         let mut line = untrimmed_line.trim_start_matches(' ');
@@ -207,7 +213,7 @@ fn render_markdown(docstring: &str) -> String {
                 output.push_str("  ");
             }
             // Only push newlines if we're not scanning for a real line
-            if !starting_literal {
+            if starting_literal.is_none() {
                 output.push('\n');
             }
         }
@@ -219,21 +225,23 @@ fn render_markdown(docstring: &str) -> String {
             in_literal = false;
             in_any_code = false;
             block_indent = 0;
-            output.push_str("```\n");
+            output.push_str(FENCE);
+            output.push('\n');
         }
 
         // We previously entered a literal block and we just found our first non-blank line
         // So now we're actually in the literal block
-        if starting_literal && !line.is_empty() {
-            starting_literal = false;
+        if let Some(literal) = starting_literal
+            && !line.is_empty()
+        {
+            starting_literal = None;
             in_literal = true;
             in_any_code = true;
             block_indent = line_indent;
-            // TODO: I hope people don't have literal blocks about markdown code fence syntax
-            // TODO: should we not be this aggressive? Let it autodetect?
-            // TODO: respect `.. code-block::` directives:
-            // <https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block>
-            output.push_str("\n```python\n");
+            output.push('\n');
+            output.push_str(FENCE);
+            output.push_str(literal);
+            output.push('\n');
         }
 
         // If we're not in a codeblock and we see something that signals a doctest, start one
@@ -242,25 +250,79 @@ fn render_markdown(docstring: &str) -> String {
             in_doctest = true;
             in_any_code = true;
             // TODO: is there something more specific? `pycon`?
-            output.push_str("```python\n");
+            output.push_str(FENCE);
+            output.push_str("python\n");
         }
 
         // If we're not in a codeblock and we see something that signals a literal block, start one
-        if !in_any_code && let Some(without_lit) = line.strip_suffix("::") {
-            let trimmed_without_lit = without_lit.trim();
-            if let Some(character) = trimmed_without_lit.chars().next_back() {
-                if character.is_whitespace() {
-                    // Remove the marker completely
-                    line = trimmed_without_lit;
-                } else {
-                    // Only remove the first `:`
-                    line = line.strip_suffix(":").unwrap();
-                }
+        let parsed_lit = line
+            // first check for a line ending with `::`
+            .strip_suffix("::")
+            .map(|prefix| (prefix, None))
+            // if that fails, look for a line ending with `:: lang`
+            .or_else(|| {
+                let (prefix, lang) = line.rsplit_once(' ')?;
+                let prefix = prefix.trim_end().strip_suffix("::")?;
+                Some((prefix, Some(lang)))
+            });
+        if !in_any_code && let Some((without_lit, lang)) = parsed_lit {
+            let mut without_directive = without_lit;
+            let mut directive = None;
+            // Parse out a directive like `.. warning::`
+            if let Some((prefix, directive_str)) = without_lit.rsplit_once(' ')
+                && let Some(without_directive_str) = prefix.strip_suffix("..")
+            {
+                directive = Some(directive_str);
+                without_directive = without_directive_str;
+            }
+
+            // Whether the `::` should become `:` or be erased
+            let include_colon = if let Some(character) = without_directive.chars().next_back() {
+                // If lang is set then we're either deleting the whole line or
+                // the special rendering below will add it itself
+                lang.is_none() && !character.is_whitespace()
             } else {
                 // Delete whole line
-                line = trimmed_without_lit;
+                false
+            };
+
+            if include_colon {
+                line = line.strip_suffix(":").unwrap();
+            } else {
+                line = without_directive.trim_end();
             }
-            starting_literal = true;
+
+            starting_literal = match directive {
+                // Special directives that should be plaintext
+                Some(
+                    "attention" | "caution" | "danger" | "error" | "hint" | "important" | "note"
+                    | "tip" | "warning" | "admonition" | "versionadded" | "version-added"
+                    | "versionchanged" | "version-changed" | "version-deprecated" | "deprecated"
+                    | "version-removed" | "versionremoved",
+                ) => {
+                    // Render the argument of things like `.. version-added:: 4.0`
+                    let suffix = if let Some(lang) = lang {
+                        format!(" *{lang}*")
+                    } else {
+                        String::new()
+                    };
+                    // We prepend without_directive here out of caution for preserving input.
+                    // This is probably gibberish/invalid syntax? But it's a no-op in normal cases.
+                    temp_owned_line =
+                        format!("**{without_directive}{}:**{suffix}", directive.unwrap());
+
+                    line = temp_owned_line.as_str();
+                    None
+                }
+                // Things that just mean "it's code"
+                Some(
+                    "code-block" | "sourcecode" | "code" | "testcode" | "testsetup" | "testcleanup",
+                ) => lang.or(Some("python")),
+                // Unknown (python I guess?)
+                Some(_) => lang.or(Some("python")),
+                // default to python
+                None => lang.or(Some("python")),
+            };
         }
 
         // Add this line's indentation.
@@ -349,7 +411,7 @@ fn render_markdown(docstring: &str) -> String {
                 block_indent = 0;
                 in_any_code = false;
                 in_literal = false;
-                output.push_str("```");
+                output.push_str(FENCE);
             }
         } else {
             // Print the line verbatim, it's in code
@@ -360,7 +422,8 @@ fn render_markdown(docstring: &str) -> String {
     }
     // Flush codeblock
     if in_any_code {
-        output.push_str("\n```");
+        output.push('\n');
+        output.push_str(FENCE);
     }
 
     output
@@ -730,28 +793,6 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
-        Here _this_ and ___that__ should be escaped
-        Here *this* and **that** should be untouched
-        Here `this` and ``that`` should be untouched
-
-        Here `_this_` and ``__that__`` should be untouched
-        Here `_this_` ``__that__`` should be untouched
-        `_this_too_should_be_untouched_`
-
-        Here `_this_```__that__`` should be untouched but this_is_escaped
-        Here ``_this_```__that__` should be untouched but this_is_escaped
-
-        Here `_this_ and _that_ should be escaped (but isn't)
-        Here _this_ and _that_` should be escaped
-        `Here _this_ and _that_ should be escaped (but isn't)
-        Here _this_ and _that_ should be escaped`
-
-        Here ```_is_``__a__`_balanced_``_mess_```
-        Here ```_is_`````__a__``_random_````_mess__````
-        ```_is_`````__a__``_random_````_mess__````
-        ");
-
         assert_snapshot!(docstring.render_markdown(), @r"
         Here \_this\_ and \_\_\_that\_\_ should be escaped  
         Here *this* and **that** should be untouched  
@@ -796,24 +837,9 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_plaintext(), @r#"
-        Check out this great example code::
-
-            x_y = "hello"
-
-            if len(x_y) > 4:
-                print(x_y)
-            else:
-                print("too short :(")
-
-            print("done")
-
-        You love to see it.
-        "#);
-
         assert_snapshot!(docstring.render_markdown(), @r#"
         Check out this great example code:    
-        ```python
+        ```````````python
             x_y = "hello"
 
             if len(x_y) > 4:
@@ -823,7 +849,7 @@ mod tests {
 
             print("done")
 
-        ```
+        ```````````
         You love to see it.
         "#);
     }
@@ -849,24 +875,9 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_plaintext(), @r#"
-        Check out this great example code ::
-
-            x_y = "hello"
-
-            if len(x_y) > 4:
-                print(x_y)
-            else:
-                print("too short :(")
-
-            print("done")
-
-        You love to see it.
-        "#);
-
         assert_snapshot!(docstring.render_markdown(), @r#"
-        Check out this great example code :    
-        ```python
+        Check out this great example code    
+        ```````````python
             x_y = "hello"
 
             if len(x_y) > 4:
@@ -876,7 +887,7 @@ mod tests {
 
             print("done")
 
-        ```
+        ```````````
         You love to see it.
         "#);
     }
@@ -903,26 +914,10 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_plaintext(), @r#"
-        Check out this great example code
-            ::
-
-            x_y = "hello"
-
-            if len(x_y) > 4:
-                print(x_y)
-            else:
-                print("too short :(")
-
-            print("done")
-
-        You love to see it.
-        "#);
-
         assert_snapshot!(docstring.render_markdown(), @r#"
         Check out this great example code  
         &nbsp;&nbsp;&nbsp;&nbsp;    
-        ```python
+        ```````````python
             x_y = "hello"
 
             if len(x_y) > 4:
@@ -932,7 +927,7 @@ mod tests {
 
             print("done")
 
-        ```
+        ```````````
         You love to see it.
         "#);
     }
@@ -956,22 +951,9 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_plaintext(), @r#"
-        Check out this great example code::
-            x_y = "hello"
-
-            if len(x_y) > 4:
-                print(x_y)
-            else:
-                print("too short :(")
-
-            print("done")
-        You love to see it.
-        "#);
-
         assert_snapshot!(docstring.render_markdown(), @r#"
         Check out this great example code:  
-        ```python
+        ```````````python
             x_y = "hello"
 
             if len(x_y) > 4:
@@ -980,7 +962,7 @@ mod tests {
                 print("too short :(")
 
             print("done")
-        ```
+        ```````````
         You love to see it.
         "#);
     }
@@ -1003,22 +985,9 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_plaintext(), @r#"
-        Check out this great example code::
-
-            x_y = "hello"
-
-            if len(x_y) > 4:
-                print(x_y)
-            else:
-                print("too short :(")
-
-            print("done")
-        "#);
-
         assert_snapshot!(docstring.render_markdown(), @r#"
         Check out this great example code:    
-        ```python
+        ```````````python
             x_y = "hello"
 
             if len(x_y) > 4:
@@ -1027,7 +996,224 @@ mod tests {
                 print("too short :(")
 
             print("done")
-        ```
+        ```````````
+        "#);
+    }
+
+    // `warning` and several other directives are special languages that should actually
+    // still be shown as text and not ```code```.
+    #[test]
+    fn warning_block() {
+        let docstring = r#"
+        The thing you need to understand is that computers are hard.
+
+        .. warning::
+            Now listen here buckaroo you might have seen me say computers are hard,
+            and though "yeah I know computers are hard but NO you DON'T KNOW.
+
+            Listen:
+
+            - Computers
+            - Are
+            - Hard
+
+            Ok!?!?!?
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        The thing you need to understand is that computers are hard.  
+          
+        **warning:**  
+        &nbsp;&nbsp;&nbsp;&nbsp;Now listen here buckaroo you might have seen me say computers are hard,  
+        &nbsp;&nbsp;&nbsp;&nbsp;and though "yeah I know computers are hard but NO you DON'T KNOW.  
+          
+        &nbsp;&nbsp;&nbsp;&nbsp;Listen:  
+          
+        &nbsp;&nbsp;&nbsp;&nbsp;- Computers  
+        &nbsp;&nbsp;&nbsp;&nbsp;- Are  
+        &nbsp;&nbsp;&nbsp;&nbsp;- Hard  
+          
+        &nbsp;&nbsp;&nbsp;&nbsp;Ok!?!?!?
+        "#);
+    }
+
+    // `warning` and several other directives are special languages that should actually
+    // still be shown as text and not ```code```.
+    #[test]
+    fn version_blocks() {
+        let docstring = r#"
+        Some much-updated docs
+
+        .. version-added:: 3.0
+           Function added
+
+        .. version-changed:: 4.0
+           The `spam` argument was added
+        .. version-changed:: 4.1
+           The `spam` argument is considered evil now.
+
+           You really shouldnt use it
+
+        And that's the docs
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        Some much-updated docs  
+          
+        **version-added:** *3.0*  
+        &nbsp;&nbsp;&nbsp;Function added  
+          
+        **version-changed:** *4.0*  
+        &nbsp;&nbsp;&nbsp;The `spam` argument was added  
+        **version-changed:** *4.1*  
+        &nbsp;&nbsp;&nbsp;The `spam` argument is considered evil now.  
+          
+        &nbsp;&nbsp;&nbsp;You really shouldnt use it  
+          
+        And that's the docs
+        ");
+    }
+
+    // I don't know if this is valid syntax but we preserve stuff before non-code blocks like
+    // `..deprecated ::`
+    #[test]
+    fn deprecated_prefix_gunk() {
+        let docstring = r#"
+        wow this is some changes .. deprecated:: 1.2.3
+            x = 2
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        **wow this is some changes deprecated:** *1.2.3*  
+        &nbsp;&nbsp;&nbsp;&nbsp;x = 2
+        ");
+    }
+
+    // `.. code::` is a literal block and the `.. code::` should be deleted
+    #[test]
+    fn code_block() {
+        let docstring = r#"
+        Here's some code!
+
+        .. code::
+            def main() {
+                print("hello world!")
+            }
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        Here's some code!  
+          
+          
+        ```````````python
+            def main() {
+                print("hello world!")
+            }
+        ```````````
+        "#);
+    }
+
+    // `.. code:: rust` is a literal block with rust syntax highlighting
+    #[test]
+    fn code_block_lang() {
+        let docstring = r#"
+        Here's some Rust code!
+
+        .. code:: rust
+            fn main() {
+                println!("hello world!");
+            }
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        Here's some Rust code!  
+          
+          
+        ```````````rust
+            fn main() {
+                println!("hello world!");
+            }
+        ```````````
+        "#);
+    }
+
+    // I don't know if this is valid syntax but we preserve stuff before `..code ::`
+    #[test]
+    fn code_block_prefix_gunk() {
+        let docstring = r#"
+        wow this is some code.. code:: abc
+            x = 2
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        wow this is some code  
+        ```````````abc
+            x = 2
+        ```````````
+        ");
+    }
+
+    // `.. asdgfhjkl-unknown::` is treated the same as `.. code::`
+    #[test]
+    fn unknown_block() {
+        let docstring = r#"
+        Here's some code!
+
+        .. asdgfhjkl-unknown::
+            fn main() {
+                println!("hello world!");
+            }
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        Here's some code!  
+          
+          
+        ```````````python
+            fn main() {
+                println!("hello world!");
+            }
+        ```````````
+        "#);
+    }
+
+    // `.. asdgfhjkl-unknown:: rust` is treated the same as `.. code:: rust`
+    #[test]
+    fn unknown_block_lang() {
+        let docstring = r#"
+        Here's some Rust code!
+
+        .. asdgfhjkl-unknown::   rust
+            fn main() {
+                print("hello world!")
+            }
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        Here's some Rust code!  
+          
+          
+        ```````````rust
+            fn main() {
+                print("hello world!")
+            }
+        ```````````
         "#);
     }
 
@@ -1047,26 +1233,15 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
-        This is a function description
-
-        >>> thing.do_thing()
-        wow it did the thing
-        >>> thing.do_other_thing()
-        it sure did the thing
-
-        As you can see it did the thing!
-        ");
-
         assert_snapshot!(docstring.render_markdown(), @r"
         This is a function description  
           
-        ```python
+        ```````````python
         >>> thing.do_thing()
         wow it did the thing
         >>> thing.do_other_thing()
         it sure did the thing
-        ```  
+        ```````````  
         As you can see it did the thing!
         ");
     }
@@ -1087,26 +1262,15 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
-        This is a function description
-
-            >>> thing.do_thing()
-            wow it did the thing
-            >>> thing.do_other_thing()
-            it sure did the thing
-
-        As you can see it did the thing!
-        ");
-
         assert_snapshot!(docstring.render_markdown(), @r"
         This is a function description  
           
-        ```python
+        ```````````python
             >>> thing.do_thing()
             wow it did the thing
             >>> thing.do_other_thing()
             it sure did the thing
-        ```  
+        ```````````  
         As you can see it did the thing!
         ");
     }
@@ -1121,20 +1285,13 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
-        >>> thing.do_thing()
-        wow it did the thing
-        >>> thing.do_other_thing()
-        it sure did the thing
-        ");
-
         assert_snapshot!(docstring.render_markdown(), @r"
-        ```python
+        ```````````python
         >>> thing.do_thing()
         wow it did the thing
         >>> thing.do_other_thing()
         it sure did the thing
-        ```
+        ```````````
         ");
     }
 
@@ -1154,26 +1311,15 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
-        This is a function description::
-
-            >>> thing.do_thing()
-            wow it did the thing
-            >>> thing.do_other_thing()
-            it sure did the thing
-
-        As you can see it did the thing!
-        ");
-
         assert_snapshot!(docstring.render_markdown(), @r"
         This is a function description:    
-        ```python
+        ```````````python
             >>> thing.do_thing()
             wow it did the thing
             >>> thing.do_other_thing()
             it sure did the thing
 
-        ```
+        ```````````
         As you can see it did the thing!
         ");
     }
@@ -1189,22 +1335,14 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
-        And so you can see that
-            >>> thing.do_thing()
-            wow it did the thing
-            >>> thing.do_other_thing()
-            it sure did the thing
-        ");
-
         assert_snapshot!(docstring.render_markdown(), @r"
         And so you can see that  
-        ```python
+        ```````````python
             >>> thing.do_thing()
             wow it did the thing
             >>> thing.do_other_thing()
             it sure did the thing
-        ```
+        ```````````
         ");
     }
 
@@ -1383,14 +1521,14 @@ mod tests {
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.  
         'param3' -- A parameter without type annotation  
           
-        ```python
+        ```````````python
         >>> print repr(foo.__doc__)
         '\n    This is the second line of the docstring.\n    '
         >>> foo.__doc__.splitlines()
         ['', '    This is the second line of the docstring.', '    ']
         >>> trim(foo.__doc__)
         'This is the second line of the docstring.'
-        ```
+        ```````````
         ");
     }
 

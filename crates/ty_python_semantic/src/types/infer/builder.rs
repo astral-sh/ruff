@@ -1044,7 +1044,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Check that the overloaded function has at least two overloads
-            if let [single_overload] = overloads.as_ref() {
+            if let [single_overload] = overloads {
                 let function_node = function.node(self.db(), self.file(), self.module());
                 if let Some(builder) = self
                     .context
@@ -1164,7 +1164,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 (FunctionDecorators::OVERRIDE, "override"),
             ] {
                 if let Some(implementation) = implementation {
-                    for overload in overloads.as_ref() {
+                    for overload in overloads {
                         if !overload.has_known_decorator(self.db(), decorator) {
                             continue;
                         }
@@ -3357,9 +3357,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // TODO: `Unpack`
                     Parameters::todo()
                 } else {
-                    Parameters::new(parameter_types.iter().map(|param_type| {
-                        Parameter::positional_only(None).with_annotated_type(*param_type)
-                    }))
+                    Parameters::new(
+                        self.db(),
+                        parameter_types.iter().map(|param_type| {
+                            Parameter::positional_only(None).with_annotated_type(*param_type)
+                        }),
+                    )
                 };
 
                 Type::single_callable(self.db(), Signature::new(parameters, None))
@@ -7989,6 +7992,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|param| Parameter::keyword_variadic(param.name().id.clone()));
 
             Parameters::new(
+                self.db(),
                 positional_only
                     .into_iter()
                     .chain(positional_or_keyword)
@@ -8129,7 +8133,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let class = match callable_type {
             Type::ClassLiteral(class) => Some(ClassType::NonGeneric(class)),
             Type::GenericAlias(generic) => Some(ClassType::Generic(generic)),
-            Type::SubclassOf(subclass) => subclass.subclass_of().into_class(),
+            Type::SubclassOf(subclass) => subclass.subclass_of().into_class(self.db()),
             _ => None,
         };
 
@@ -9108,7 +9112,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         let attr_name = &attr.id;
-
         let resolved_type = fallback_place.unwrap_with_diagnostic(|lookup_err| match lookup_err {
             LookupError::Undefined(_) => {
                 let fallback = || {
@@ -9136,6 +9139,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 "Attribute lookup on a dynamic `SubclassOf` type \
                                     should always return a bound symbol"
                             ),
+                            SubclassOfInner::TypeVar(_) => false,
                         }
                     }
                     _ => false,
@@ -11380,7 +11384,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if has_error {
-            return Type::unknown();
+            let unknowns = generic_context
+                .variables(self.db())
+                .map(|_| Some(Type::unknown()))
+                .collect::<Vec<_>>();
+            return specialize(&unknowns);
         }
 
         specialize(&specialization_types)

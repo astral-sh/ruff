@@ -558,11 +558,12 @@ impl<'db> Signature<'db> {
             // Discard the definition when normalizing, so that two equivalent signatures
             // with different `Definition`s share the same Salsa ID when normalized
             definition: None,
-            parameters: self
-                .parameters
-                .iter()
-                .map(|param| param.normalized_impl(db, visitor))
-                .collect(),
+            parameters: Parameters::new(
+                db,
+                self.parameters
+                    .iter()
+                    .map(|param| param.normalized_impl(db, visitor)),
+            ),
             return_ty: self
                 .return_ty
                 .map(|return_ty| return_ty.normalized_impl(db, visitor)),
@@ -587,14 +588,17 @@ impl<'db> Signature<'db> {
             ),
             None => None,
         };
+        let parameters = {
+            let mut parameters = Vec::with_capacity(self.parameters.len());
+            for param in &self.parameters {
+                parameters.push(param.recursive_type_normalized_impl(db, div, nested, visitor)?);
+            }
+            Parameters::new(db, parameters)
+        };
         Some(Self {
             generic_context: self.generic_context,
             definition: self.definition,
-            parameters: self
-                .parameters
-                .iter()
-                .map(|param| param.recursive_type_normalized_impl(db, div, nested, visitor))
-                .collect::<Option<_>>()?,
+            parameters,
             return_ty,
         })
     }
@@ -662,7 +666,7 @@ impl<'db> Signature<'db> {
             parameters.next();
         }
 
-        let mut parameters = Parameters::new(parameters);
+        let mut parameters = Parameters::new(db, parameters);
         let mut return_ty = self.return_ty;
         if let Some(self_type) = self_type {
             parameters = parameters.apply_type_mapping_impl(
@@ -1344,7 +1348,10 @@ pub(crate) struct Parameters<'db> {
 }
 
 impl<'db> Parameters<'db> {
-    pub(crate) fn new(parameters: impl IntoIterator<Item = Parameter<'db>>) -> Self {
+    pub(crate) fn new(
+        _db: &'db dyn Db,
+        parameters: impl IntoIterator<Item = Parameter<'db>>,
+    ) -> Self {
         let value: Vec<Parameter<'db>> = parameters.into_iter().collect();
         let is_gradual = value.len() == 2
             && value
@@ -1598,6 +1605,7 @@ impl<'db> Parameters<'db> {
         });
 
         Self::new(
+            db,
             positional_only
                 .into_iter()
                 .chain(positional_or_keyword)
@@ -1712,12 +1720,6 @@ impl<'db, 'a> IntoIterator for &'a Parameters<'db> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.value.iter()
-    }
-}
-
-impl<'db> FromIterator<Parameter<'db>> for Parameters<'db> {
-    fn from_iter<T: IntoIterator<Item = Parameter<'db>>>(iter: T) -> Self {
-        Self::new(iter)
     }
 }
 

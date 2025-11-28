@@ -1060,6 +1060,16 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     );
                 }
             }
+            ast::Pattern::MatchStar(pattern_star) => {
+                // Just the one ident here
+                if let Some(rest_name) = &pattern_star.name {
+                    self.add_token(
+                        rest_name.range(),
+                        SemanticTokenType::Variable,
+                        SemanticTokenModifier::empty(),
+                    );
+                }
+            }
             _ => {
                 // For all other pattern types, use the default walker
                 ruff_python_ast::visitor::source_order::walk_pattern(self, pattern);
@@ -2485,6 +2495,7 @@ def process_data(data):
         "rest" @ 154..158: Variable
         "person" @ 181..187: Variable
         "first" @ 202..207: Variable
+        "remaining" @ 210..219: Variable
         "sequence" @ 224..232: Variable
         "print" @ 246..251: Function
         "First: " @ 254..261: String

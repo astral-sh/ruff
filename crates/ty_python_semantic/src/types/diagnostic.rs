@@ -17,7 +17,7 @@ use crate::types::call::CallError;
 use crate::types::class::{
     CodeGeneratorKind, DisjointBase, DisjointBaseKind, Field, MethodDecorator,
 };
-use crate::types::function::{FunctionType, KnownFunction};
+use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral};
 use crate::types::liskov::MethodKind;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
@@ -37,9 +37,10 @@ use ruff_db::{
     parsed::parsed_module,
     source::source_text,
 };
+use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parentheses_iterator;
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast::{self as ast, AnyNodeRef, StringFlags};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
@@ -100,6 +101,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&POSSIBLY_MISSING_IMPORT);
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
+    registry.register_lint(&OVERRIDE_OF_FINAL_METHOD);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
     registry.register_lint(&TOO_MANY_POSITIONAL_ARGUMENTS);
     registry.register_lint(&UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS);
@@ -1615,6 +1617,33 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for methods on subclasses that override superclass methods decorated with `@final`.
+    ///
+    /// ## Why is this bad?
+    /// Decorating a method with `@final` declares to the type checker that it should not be
+    /// overridden on any subclass.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from typing import final
+    ///
+    /// class A:
+    ///     @final
+    ///     def foo(self): ...
+    ///
+    /// class B(A):
+    ///     def foo(self): ...  # Error raised here
+    /// ```
+    pub(crate) static OVERRIDE_OF_FINAL_METHOD = {
+        summary: "detects overrides of final methods",
+        status: LintStatus::stable("0.0.1-alpha.29"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for methods that are decorated with `@override` but do not override any method in a superclass.
     ///
     /// ## Why is this bad?
@@ -1844,7 +1873,7 @@ declare_lint! {
     /// ```python
     /// print(x)  # NameError: name 'x' is not defined
     /// ```
-    pub(crate) static UNRESOLVED_REFERENCE = {
+    pub static UNRESOLVED_REFERENCE = {
         summary: "detects references to names that are not defined",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
@@ -3121,7 +3150,7 @@ pub(crate) fn report_undeclared_protocol_member(
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Class(class) => class,
                 SubclassOfInner::Dynamic(DynamicType::Any) => return true,
-                SubclassOfInner::Dynamic(_) => return false,
+                SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => return false,
             },
             Type::NominalInstance(instance) => instance.class(db),
             Type::Union(union) => {
@@ -3427,9 +3456,17 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 
                 let existing_keys = items.keys();
                 if let Some(suggestion) = did_you_mean(existing_keys, key) {
-                    if key_node.is_expr_string_literal() {
+                    if let AnyNodeRef::ExprStringLiteral(literal) = key_node {
+                        let quoted_suggestion = format!(
+                            "{quote}{suggestion}{quote}",
+                            quote = literal.value.first_literal_flags().quote_str()
+                        );
                         diagnostic
-                            .set_primary_message(format_args!("Did you mean \"{suggestion}\"?"));
+                            .set_primary_message(format_args!("Did you mean {quoted_suggestion}?"));
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                            quoted_suggestion,
+                            key_node.range(),
+                        )));
                     } else {
                         diagnostic.set_primary_message(format_args!(
                             "Unknown key \"{key}\" - did you mean \"{suggestion}\"?",
@@ -3620,7 +3657,7 @@ pub(super) fn report_invalid_method_override<'db>(
     let overridden_method = if class_name == superclass_name {
         format!(
             "{superclass}.{member}",
-            superclass = superclass.class_literal(db).0.qualified_name(db),
+            superclass = superclass.qualified_name(db),
         )
     } else {
         format!("{superclass_name}.{member}")
@@ -3760,6 +3797,125 @@ pub(super) fn report_invalid_method_override<'db>(
         for subdiag in eq_subdiagnostics {
             diagnostic.help(subdiag);
         }
+    }
+}
+
+pub(super) fn report_overridden_final_method<'db>(
+    context: &InferContext<'db, '_>,
+    member: &str,
+    subclass_definition: Definition<'db>,
+    subclass_type: Type<'db>,
+    superclass: ClassType<'db>,
+    subclass: ClassType<'db>,
+    superclass_method_defs: &[FunctionType<'db>],
+) {
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(
+        &OVERRIDE_OF_FINAL_METHOD,
+        subclass_definition.focus_range(db, context.module()),
+    ) else {
+        return;
+    };
+
+    let superclass_name = if superclass.name(db) == subclass.name(db) {
+        superclass.qualified_name(db).to_string()
+    } else {
+        superclass.name(db).to_string()
+    };
+
+    let mut diagnostic =
+        builder.into_diagnostic(format_args!("Cannot override `{superclass_name}.{member}`"));
+    diagnostic.set_primary_message(format_args!(
+        "Overrides a definition from superclass `{superclass_name}`"
+    ));
+    diagnostic.set_concise_message(format_args!(
+        "Cannot override final member `{member}` from superclass `{superclass_name}`"
+    ));
+
+    let mut sub = SubDiagnostic::new(
+        SubDiagnosticSeverity::Info,
+        format_args!(
+            "`{superclass_name}.{member}` is decorated with `@final`, forbidding overrides"
+        ),
+    );
+
+    let first_final_superclass_definition = superclass_method_defs
+        .iter()
+        .find(|function| function.has_known_decorator(db, FunctionDecorators::FINAL))
+        .expect(
+            "At least one function definition in the superclass should be decorated with `@final`",
+        );
+
+    let superclass_function_literal = if first_final_superclass_definition.file(db).is_stub(db) {
+        first_final_superclass_definition.first_overload_or_implementation(db)
+    } else {
+        first_final_superclass_definition
+            .literal(db)
+            .last_definition(db)
+    };
+
+    sub.annotate(
+        Annotation::secondary(Span::from(superclass_function_literal.focus_range(
+            db,
+            &parsed_module(db, first_final_superclass_definition.file(db)).load(db),
+        )))
+        .message(format_args!("`{superclass_name}.{member}` defined here")),
+    );
+
+    if let Some(decorator_span) =
+        superclass_function_literal.find_known_decorator_span(db, KnownFunction::Final)
+    {
+        sub.annotate(Annotation::secondary(decorator_span));
+    }
+
+    diagnostic.sub(sub);
+
+    let underlying_function = match subclass_type {
+        Type::FunctionLiteral(function) => Some(function),
+        Type::BoundMethod(method) => Some(method.function(db)),
+        _ => None,
+    };
+
+    if let Some(function) = underlying_function {
+        let overload_deletion = |overload: &OverloadLiteral<'db>| {
+            Edit::range_deletion(overload.node(db, context.file(), context.module()).range())
+        };
+
+        match function.overloads_and_implementation(db) {
+            ([first_overload, rest @ ..], None) => {
+                diagnostic.help(format_args!("Remove all overloads for `{member}`"));
+                diagnostic.set_fix(Fix::unsafe_edits(
+                    overload_deletion(first_overload),
+                    rest.iter().map(overload_deletion),
+                ));
+            }
+            ([first_overload, rest @ ..], Some(implementation)) => {
+                diagnostic.help(format_args!(
+                    "Remove all overloads and the implementation for `{member}`"
+                ));
+                diagnostic.set_fix(Fix::unsafe_edits(
+                    overload_deletion(first_overload),
+                    rest.iter().chain([&implementation]).map(overload_deletion),
+                ));
+            }
+            ([], Some(implementation)) => {
+                diagnostic.help(format_args!("Remove the override of `{member}`"));
+                diagnostic.set_fix(Fix::unsafe_edit(overload_deletion(&implementation)));
+            }
+            ([], None) => {
+                // Should be impossible to get here: how would we even infer a function as a function
+                // if it has 0 overloads and no implementation?
+                unreachable!(
+                    "A function should always have an implementation and/or >=1 overloads"
+                );
+            }
+        }
+    } else {
+        diagnostic.help(format_args!("Remove the override of `{member}`"));
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(
+            subclass_definition.full_range(db, context.module()).range(),
+        )));
     }
 }
 

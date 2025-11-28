@@ -607,6 +607,10 @@ class PlaygroundServer
     _token: CancellationToken,
   ): languages.ProviderResult<languages.CodeActionList> {
     const actions: languages.CodeAction[] = [];
+    const fileHandle = this.getFileHandleForModel(model);
+    if (fileHandle == null) {
+      return undefined;
+    }
 
     for (const diagnostic of this.diagnostics) {
       const diagnosticRange = diagnostic.range;
@@ -619,26 +623,31 @@ class PlaygroundServer
         continue;
       }
 
-      const codeAction = diagnostic.raw.codeAction(this.props.workspace);
-      if (codeAction == null) {
+      const codeActions = this.props.workspace.codeActions(
+        fileHandle,
+        diagnostic.raw,
+      );
+      if (codeActions == null) {
         continue;
       }
 
-      actions.push({
-        title: codeAction.title,
-        kind: "quickfix",
-        isPreferred: true,
-        edit: {
-          edits: codeAction.edits.map((edit) => ({
-            resource: model.uri,
-            textEdit: {
-              range: tyRangeToMonacoRange(edit.range),
-              text: edit.new_text,
-            },
-            versionId: model.getVersionId(),
-          })),
-        },
-      });
+      for (const codeAction of codeActions) {
+        actions.push({
+          title: codeAction.title,
+          kind: "quickfix",
+          isPreferred: codeAction.preferred,
+          edit: {
+            edits: codeAction.edits.map((edit) => ({
+              resource: model.uri,
+              textEdit: {
+                range: tyRangeToMonacoRange(edit.range),
+                text: edit.new_text,
+              },
+              versionId: model.getVersionId(),
+            })),
+          },
+        });
+      }
     }
 
     if (actions.length === 0) {

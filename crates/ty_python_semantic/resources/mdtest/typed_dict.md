@@ -1397,7 +1397,7 @@ msg = Message(id=1, content="Hello")
 # No errors for yet-unsupported features (`closed`):
 OtherMessage = TypedDict("OtherMessage", {"id": int, "content": str}, closed=True)
 
-reveal_type(Message.__required_keys__)  # revealed: @Todo(Support for `TypedDict`)
+reveal_type(Message.__required_keys__)  # revealed: @Todo(Support for functional `TypedDict`)
 
 # TODO: this should be an error
 msg.content
@@ -1500,6 +1500,14 @@ class Employee(TypedDict):
 
 def write_to_readonly_key(employee: Employee):
     employee["id"] = 42  # error: [invalid-assignment]
+```
+
+If the key uses single quotes, the autofix preserves that quoting style:
+
+```py
+def write_to_non_existing_key_single_quotes(person: Person):
+    # error: [invalid-key]
+    person['naem'] = "Alice"  # fmt: skip
 ```
 
 ## Import aliases

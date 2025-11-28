@@ -110,6 +110,11 @@ static_assert(not has_member(C(), "non_existent"))
 
 ### Class objects
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 Class-level attributes can also be accessed through the class itself:
 
 ```py
@@ -153,6 +158,18 @@ static_assert(has_member(D, "meta_base_attr"))
 static_assert(has_member(D, "meta_attr"))
 static_assert(has_member(D, "base_attr"))
 static_assert(has_member(D, "class_attr"))
+
+def _(x: type[D]):
+    static_assert(has_member(x, "meta_base_attr"))
+    static_assert(has_member(x, "meta_attr"))
+    static_assert(has_member(x, "base_attr"))
+    static_assert(has_member(x, "class_attr"))
+
+def _[T: D](x: type[T]):
+    static_assert(has_member(x, "meta_base_attr"))
+    static_assert(has_member(x, "meta_attr"))
+    static_assert(has_member(x, "base_attr"))
+    static_assert(has_member(x, "class_attr"))
 ```
 
 ### Generic classes
@@ -168,6 +185,40 @@ class C(Generic[T]):
 
 static_assert(has_member(C[int], "base_attr"))
 static_assert(has_member(C[int](), "base_attr"))
+```
+
+Generic classes can also have metaclasses:
+
+```py
+class Meta(type):
+    FOO = 42
+
+class E(Generic[T], metaclass=Meta): ...
+
+static_assert(has_member(E[int], "FOO"))
+
+def f(x: type[E[str]]):
+    static_assert(has_member(x, "FOO"))
+```
+
+### `type[Any]` and `Any`
+
+`type[Any]` has all members of `type`.
+
+```py
+from typing import Any
+from ty_extensions import has_member, static_assert
+
+def f(x: type[Any]):
+    static_assert(has_member(x, "__base__"))
+    static_assert(has_member(x, "__qualname__"))
+```
+
+`Any` has all members of `object`, since it is a subtype of `object`:
+
+```py
+def f(x: Any):
+    static_assert(has_member(x, "__repr__"))
 ```
 
 ### Other instance-like types

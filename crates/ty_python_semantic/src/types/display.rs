@@ -688,6 +688,11 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     write!(f.with_type(Type::Dynamic(dynamic)), "{dynamic}")?;
                     f.write_char(']')
                 }
+                SubclassOfInner::TypeVar(bound_typevar) => write!(
+                    f,
+                    "type[{}]",
+                    bound_typevar.identity(self.db).display(self.db)
+                ),
             },
             Type::SpecialForm(special_form) => {
                 write!(f.with_type(self.ty), "{special_form}")
@@ -2297,21 +2302,21 @@ mod tests {
     }
 
     fn display_signature<'db>(
-        db: &dyn Db,
+        db: &'db dyn Db,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
         return_ty: Option<Type<'db>>,
     ) -> String {
-        Signature::new(Parameters::new(parameters), return_ty)
+        Signature::new(Parameters::new(db, parameters), return_ty)
             .display(db)
             .to_string()
     }
 
     fn display_signature_multiline<'db>(
-        db: &dyn Db,
+        db: &'db dyn Db,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
         return_ty: Option<Type<'db>>,
     ) -> String {
-        Signature::new(Parameters::new(parameters), return_ty)
+        Signature::new(Parameters::new(db, parameters), return_ty)
             .display_with(db, super::DisplaySettings::default().multiline())
             .to_string()
     }

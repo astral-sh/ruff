@@ -219,12 +219,26 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                     self.check_identifier_reference(name);
                 }
             }
+            AnyNodeRef::PatternMatchStar(pattern_star) if self.should_include_declaration() => {
+                if let Some(name) = &pattern_star.name {
+                    self.check_identifier_reference(name);
+                }
+            }
             AnyNodeRef::PatternMatchMapping(pattern_mapping)
                 if self.should_include_declaration() =>
             {
                 if let Some(rest_name) = &pattern_mapping.rest {
                     self.check_identifier_reference(rest_name);
                 }
+            }
+            AnyNodeRef::TypeParamParamSpec(param_spec) if self.should_include_declaration() => {
+                self.check_identifier_reference(&param_spec.name);
+            }
+            AnyNodeRef::TypeParamTypeVarTuple(param_tuple) if self.should_include_declaration() => {
+                self.check_identifier_reference(&param_tuple.name);
+            }
+            AnyNodeRef::TypeParamTypeVar(param_var) if self.should_include_declaration() => {
+                self.check_identifier_reference(&param_var.name);
             }
             AnyNodeRef::ExprStringLiteral(string_expr) if self.should_include_declaration() => {
                 // Highlight the sub-AST of a string annotation

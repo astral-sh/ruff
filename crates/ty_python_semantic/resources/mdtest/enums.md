@@ -15,10 +15,8 @@ reveal_type(Color.RED)  # revealed: Literal[Color.RED]
 reveal_type(Color.RED.name)  # revealed: Literal["RED"]
 reveal_type(Color.RED.value)  # revealed: Literal[1]
 
-# TODO: Should be `Color` or `Literal[Color.RED]`
-reveal_type(Color["RED"])  # revealed: Unknown
-
 # TODO: Could be `Literal[Color.RED]` to be more precise
+reveal_type(Color["RED"])  # revealed: Color
 reveal_type(Color(1))  # revealed: Color
 
 reveal_type(Color.RED in Color)  # revealed: bool

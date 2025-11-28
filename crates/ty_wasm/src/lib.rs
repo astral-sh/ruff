@@ -11,14 +11,14 @@ use ruff_db::system::{
     SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
 };
 use ruff_db::vendored::VendoredPath;
-use ruff_diagnostics::Applicability;
+use ruff_diagnostics::{Applicability, Edit};
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{
-    InlayHintSettings, MarkupKind, RangedValue, document_highlights, goto_declaration,
-    goto_definition, goto_references, goto_type_definition, hover, inlay_hints,
+    InlayHintSettings, MarkupKind, RangedValue, document_highlights, find_references,
+    goto_declaration, goto_definition, goto_type_definition, hover, inlay_hints,
 };
 use ty_ide::{NavigationTarget, NavigationTargets, signature_help};
 use ty_project::metadata::options::Options;
@@ -351,7 +351,7 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = goto_references(&self.db, file_id.file, offset, true) else {
+        let Some(targets) = find_references(&self.db, file_id.file, offset, true) else {
             return Ok(Vec::new());
         };
 
@@ -556,6 +556,51 @@ impl Workspace {
         Ok(result)
     }
 
+    #[wasm_bindgen(js_name = "codeActions")]
+    pub fn code_actions(
+        &self,
+        file_id: &FileHandle,
+        diagnostic: &Diagnostic,
+    ) -> Option<Vec<CodeAction>> {
+        // If the diagnostic includes fixes, offer those up as options.
+        let mut actions = Vec::new();
+        if let Some(action) = diagnostic.code_action(self) {
+            actions.push(action);
+        }
+
+        // Try to find other applicable actions.
+        //
+        // This is only for actions that are messy to compute at the time of the diagnostic.
+        // For instance, suggesting imports requires finding symbols for the entire project,
+        // which is dubious when you're in the middle of resolving symbols.
+        if let Some(range) = diagnostic.inner.range()
+            && let Some(fixes) = ty_ide::code_actions(
+                &self.db,
+                file_id.file,
+                range,
+                diagnostic.inner.id().as_str(),
+            )
+        {
+            for action in fixes {
+                actions.push(CodeAction {
+                    title: action.title,
+                    preferred: action.preferred,
+                    edits: action
+                        .edits
+                        .into_iter()
+                        .map(|edit| edit_to_text_edit(self, file_id.file, &edit))
+                        .collect(),
+                });
+            }
+        }
+
+        if actions.is_empty() {
+            None
+        } else {
+            Some(actions)
+        }
+    }
+
     #[wasm_bindgen(js_name = "signatureHelp")]
     pub fn signature_help(
         &self,
@@ -758,21 +803,10 @@ impl Diagnostic {
         let primary_span = self.inner.primary_span()?;
         let file = primary_span.expect_ty_file();
 
-        let source = source_text(&workspace.db, file);
-        let index = line_index(&workspace.db, file);
-
         let edits: Vec<TextEdit> = fix
             .edits()
             .iter()
-            .map(|edit| TextEdit {
-                range: Range::from_text_range(
-                    edit.range(),
-                    &index,
-                    &source,
-                    workspace.position_encoding,
-                ),
-                new_text: edit.content().unwrap_or_default().to_string(),
-            })
+            .map(|edit| edit_to_text_edit(workspace, file, edit))
             .collect();
 
         let title = self
@@ -781,7 +815,21 @@ impl Diagnostic {
             .map(ToString::to_string)
             .unwrap_or_else(|| format!("Fix {}", self.inner.id()));
 
-        Some(CodeAction { title, edits })
+        Some(CodeAction {
+            title,
+            edits,
+            preferred: true,
+        })
+    }
+}
+
+fn edit_to_text_edit(workspace: &Workspace, file: File, edit: &Edit) -> TextEdit {
+    let source = source_text(&workspace.db, file);
+    let index = line_index(&workspace.db, file);
+
+    TextEdit {
+        range: Range::from_text_range(edit.range(), &index, &source, workspace.position_encoding),
+        new_text: edit.content().unwrap_or_default().to_string(),
     }
 }
 
@@ -793,6 +841,7 @@ pub struct CodeAction {
     pub title: String,
     #[wasm_bindgen(getter_with_clone)]
     pub edits: Vec<TextEdit>,
+    pub preferred: bool,
 }
 
 #[wasm_bindgen]
