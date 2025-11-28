@@ -3,6 +3,7 @@ use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprSubscript};
 
 use crate::expression::CallChainLayout;
+use crate::expression::expr_attribute::AttributeOptions;
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized, parenthesized,
@@ -51,7 +52,13 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
                 value.format().with_options(Parentheses::Always).fmt(f)
             } else {
                 match value.as_ref() {
-                    Expr::Attribute(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+                    Expr::Attribute(expr) => expr
+                        .format()
+                        .with_options(AttributeOptions {
+                            call_chain_layout,
+                            prefer_own_line: true,
+                        })
+                        .fmt(f),
                     Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f),
                     Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f),
                     _ => value.format().with_options(Parentheses::Never).fmt(f),
