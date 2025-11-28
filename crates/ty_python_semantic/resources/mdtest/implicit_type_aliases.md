@@ -553,7 +553,7 @@ def _(
     reveal_type(optional_unknown)  # revealed: T@MyOptional | None
 ```
 
-For a type variable with a default, we use that:
+For a type variable with a default, we use the default type:
 
 ```py
 T_default = TypeVar("T_default", default=int)
