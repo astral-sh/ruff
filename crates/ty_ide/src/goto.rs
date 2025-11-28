@@ -377,38 +377,32 @@ impl GotoTarget<'_> {
         model: &SemanticModel<'db>,
         alias_resolution: ImportAliasResolution,
     ) -> Option<Definitions<'db>> {
-        match self {
-            GotoTarget::Expression(expression) => {
-                definitions_for_expression(model, *expression).map(Definitions)
-            }
+        let definitions = match self {
+            GotoTarget::Expression(expression) => definitions_for_expression(model, *expression),
             // For already-defined symbols, they are their own definitions
-            GotoTarget::FunctionDef(function) => {
-                Some(Definitions(vec![ResolvedDefinition::Definition(
-                    function.definition(model),
-                )]))
-            }
+            GotoTarget::FunctionDef(function) => Some(vec![ResolvedDefinition::Definition(
+                function.definition(model),
+            )]),
 
-            GotoTarget::ClassDef(class) => Some(Definitions(vec![ResolvedDefinition::Definition(
+            GotoTarget::ClassDef(class) => Some(vec![ResolvedDefinition::Definition(
                 class.definition(model),
-            )])),
+            )]),
 
-            GotoTarget::Parameter(parameter) => {
-                Some(Definitions(vec![ResolvedDefinition::Definition(
-                    parameter.definition(model),
-                )]))
-            }
+            GotoTarget::Parameter(parameter) => Some(vec![ResolvedDefinition::Definition(
+                parameter.definition(model),
+            )]),
 
             // For import aliases (offset within 'y' or 'z' in "from x import y as z")
             GotoTarget::ImportSymbolAlias {
                 alias, import_from, ..
             } => {
                 let symbol_name = alias.name.as_str();
-                Some(Definitions(definitions_for_imported_symbol(
+                Some(definitions_for_imported_symbol(
                     model,
                     import_from,
                     symbol_name,
                     alias_resolution,
-                )))
+                ))
             }
 
             GotoTarget::ImportModuleComponent {
@@ -428,11 +422,7 @@ impl GotoTarget<'_> {
                     definitions_for_module(model, Some(alias.name.as_str()), 0)
                 } else {
                     alias.asname.as_ref().map(|name| {
-                        Definitions(definitions_for_name(
-                            model,
-                            name.as_str(),
-                            AnyNodeRef::Identifier(name),
-                        ))
+                        definitions_for_name(model, name.as_str(), AnyNodeRef::Identifier(name))
                     })
                 }
             }
@@ -441,55 +431,43 @@ impl GotoTarget<'_> {
             GotoTarget::KeywordArgument {
                 keyword,
                 call_expression,
-            } => Some(Definitions(definitions_for_keyword_argument(
+            } => Some(definitions_for_keyword_argument(
                 model,
                 keyword,
                 call_expression,
-            ))),
+            )),
 
             // For exception variables, they are their own definitions (like parameters)
             GotoTarget::ExceptVariable(except_handler) => {
-                Some(Definitions(vec![ResolvedDefinition::Definition(
+                Some(vec![ResolvedDefinition::Definition(
                     except_handler.definition(model),
-                )]))
+                )])
             }
 
             // Patterns are glorified assignments but we have to look them up by ident
             // because they're not expressions
             GotoTarget::PatternMatchRest(pattern_mapping) => {
                 pattern_mapping.rest.as_ref().map(|name| {
-                    Definitions(definitions_for_name(
-                        model,
-                        name.as_str(),
-                        AnyNodeRef::Identifier(name),
-                    ))
+                    definitions_for_name(model, name.as_str(), AnyNodeRef::Identifier(name))
                 })
             }
 
             GotoTarget::PatternMatchAsName(pattern_as) => pattern_as.name.as_ref().map(|name| {
-                Definitions(definitions_for_name(
-                    model,
-                    name.as_str(),
-                    AnyNodeRef::Identifier(name),
-                ))
+                definitions_for_name(model, name.as_str(), AnyNodeRef::Identifier(name))
             }),
 
             GotoTarget::PatternKeywordArgument(pattern_keyword) => {
                 let name = &pattern_keyword.attr;
-                Some(Definitions(definitions_for_name(
+                Some(definitions_for_name(
                     model,
                     name.as_str(),
                     AnyNodeRef::Identifier(name),
-                )))
+                ))
             }
 
             GotoTarget::PatternMatchStarName(pattern_star) => {
                 pattern_star.name.as_ref().map(|name| {
-                    Definitions(definitions_for_name(
-                        model,
-                        name.as_str(),
-                        AnyNodeRef::Identifier(name),
-                    ))
+                    definitions_for_name(model, name.as_str(), AnyNodeRef::Identifier(name))
                 })
             }
 
@@ -505,7 +483,7 @@ impl GotoTarget<'_> {
                 if definitions.is_empty() {
                     None
                 } else {
-                    Some(Definitions(definitions))
+                    Some(definitions)
                 }
             }
 
@@ -513,14 +491,14 @@ impl GotoTarget<'_> {
                 let (definitions, _) =
                     ty_python_semantic::definitions_for_bin_op(model, expression)?;
 
-                Some(Definitions(definitions))
+                Some(definitions)
             }
 
             GotoTarget::UnaryOp { expression, .. } => {
                 let (definitions, _) =
                     ty_python_semantic::definitions_for_unary_op(model, expression)?;
 
-                Some(Definitions(definitions))
+                Some(definitions)
             }
 
             // String annotations sub-expressions require us to recurse into the sub-AST
@@ -533,47 +511,48 @@ impl GotoTarget<'_> {
                 let subexpr = covering_node(subast.syntax().into(), *subrange)
                     .node()
                     .as_expr_ref()?;
-                definitions_for_expression(&submodel, subexpr).map(Definitions)
+                definitions_for_expression(&submodel, subexpr)
             }
 
             // nonlocal and global are essentially loads, but again they're statements,
             // so we need to look them up by ident
             GotoTarget::NonLocal { identifier } | GotoTarget::Globals { identifier } => {
-                Some(Definitions(definitions_for_name(
+                Some(definitions_for_name(
                     model,
                     identifier.as_str(),
                     AnyNodeRef::Identifier(identifier),
-                )))
+                ))
             }
 
             // These are declarations of sorts, but they're stmts and not exprs, so look up by ident.
             GotoTarget::TypeParamTypeVarName(type_var) => {
                 let name = &type_var.name;
-                Some(Definitions(definitions_for_name(
+                Some(definitions_for_name(
                     model,
                     name.as_str(),
                     AnyNodeRef::Identifier(name),
-                )))
+                ))
             }
 
             GotoTarget::TypeParamParamSpecName(name) => {
                 let name = &name.name;
-                Some(Definitions(definitions_for_name(
+                Some(definitions_for_name(
                     model,
                     name.as_str(),
                     AnyNodeRef::Identifier(name),
-                )))
+                ))
             }
 
             GotoTarget::TypeParamTypeVarTupleName(name) => {
                 let name = &name.name;
-                Some(Definitions(definitions_for_name(
+                Some(definitions_for_name(
                     model,
                     name.as_str(),
                     AnyNodeRef::Identifier(name),
-                )))
+                ))
             }
-        }
+        };
+        definitions.map(Definitions)
     }
 
     /// Returns the text representation of this goto target.
@@ -1062,10 +1041,10 @@ fn definitions_for_module<'db>(
     model: &SemanticModel<'db>,
     module: Option<&str>,
     level: u32,
-) -> Option<Definitions<'db>> {
+) -> Option<Vec<ResolvedDefinition<'db>>> {
     let module = model.resolve_module(module, level)?;
     let file = module.file(model.db())?;
-    Some(Definitions(vec![ResolvedDefinition::Module(file)]))
+    Some(vec![ResolvedDefinition::Module(file)])
 }
 
 /// Helper function to extract module component information from a dotted module name
