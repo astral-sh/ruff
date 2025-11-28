@@ -1173,6 +1173,9 @@ pub enum OutputFormat {
     ///
     /// [GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
     Github,
+    /// Print diagnostics as a JUnit-style XML report, commonly used by test &
+    /// Continuous-Integration tools
+    Junit,
 }
 
 impl OutputFormat {
@@ -1193,6 +1196,7 @@ impl From<OutputFormat> for DiagnosticFormat {
             OutputFormat::Concise => Self::Concise,
             OutputFormat::Gitlab => Self::Gitlab,
             OutputFormat::Github => Self::Github,
+            OutputFormat::Junit => Self::Junit,
         }
     }
 }
@@ -1228,7 +1232,7 @@ pub struct TerminalOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"full"#,
-        value_type = "full | concise",
+        value_type = "full | concise | github | gitlab | junit",
         example = r#"
             output-format = "concise"
         "#

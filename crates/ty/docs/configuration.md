@@ -801,7 +801,7 @@ Defaults to `full`.
 
 **Default value**: `full`
 
-**Type**: `full | concise`
+**Type**: `full | concise | github | gitlab | junit`
 
 **Example usage**:
 
