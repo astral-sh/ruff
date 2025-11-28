@@ -785,9 +785,11 @@ if flag():
 else:
     MyAlias = set[T]
 
-# TODO: This should be an error like "Invalid subscript of object of type `<class 'list[T@MyAlias]'> | <class 'set[T@MyAlias]'>` in type expression"
+# It is questionable whether this should be supported or not. It might also be reasonable to
+# emit an error here (e.g. "Invalid subscript of object of type `<class 'list[T@MyAlias]'> |
+# <class 'set[T@MyAlias]'>` in type expression"). If we ever choose to do so, the revealed
+# type should probably be `Unknown`.
 def _(x: MyAlias[int]):
-    # TODO: This should be `Unknown`
     reveal_type(x)  # revealed: list[int] | set[int]
 ```
 
