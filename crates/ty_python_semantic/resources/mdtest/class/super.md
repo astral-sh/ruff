@@ -174,8 +174,7 @@ class B(A):
 
     @classmethod
     def f(cls):
-        # TODO: Once `cls` is supported, this should be `<super: <class 'B'>, <class 'B'>>`
-        reveal_type(super())  # revealed: <super: <class 'B'>, Unknown>
+        reveal_type(super())  # revealed: <super: <class 'B'>, <class 'B'>>
         super().f()
 
 super(B, B(42)).__init__(42)
