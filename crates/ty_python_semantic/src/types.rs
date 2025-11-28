@@ -9449,7 +9449,12 @@ impl<'db> TypeVarInstance<'db> {
                     }),
                 Type::Dynamic(DynamicType::Todo(_)) => Parameters::todo(),
                 Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
-                    Parameters::paramspec(db, typevar)
+                    return ty;
+                }
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                    if typevar.is_paramspec(db) =>
+                {
+                    return ty;
                 }
                 _ => Parameters::unknown(),
             };

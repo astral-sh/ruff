@@ -1666,20 +1666,16 @@ impl<'db> SpecializationBuilder<'db> {
                     let ParametersKind::ParamSpec(typevar) = formal_parameters.kind() else {
                         return Ok(());
                     };
-                    self.add_type_mapping(
-                        typevar,
-                        Type::Callable(CallableType::new(
-                            self.db,
-                            CallableSignature::from_overloads(
-                                actual_callable.signatures(self.db).iter().map(|signature| {
-                                    Signature::new(signature.parameters().clone(), None)
-                                }),
-                            ),
-                            CallableTypeKind::ParamSpecValue,
-                        )),
-                        polarity,
-                        &mut f,
-                    );
+                    let paramspec_value = Type::Callable(CallableType::new(
+                        self.db,
+                        CallableSignature::from_overloads(
+                            actual_callable.signatures(self.db).iter().map(|signature| {
+                                Signature::new(signature.parameters().clone(), None)
+                            }),
+                        ),
+                        CallableTypeKind::ParamSpecValue,
+                    ));
+                    self.add_type_mapping(typevar, paramspec_value, polarity, &mut f);
                 }
             }
 

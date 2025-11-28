@@ -3472,11 +3472,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::Tuple(ast::ExprTuple { elts, .. })
             | ast::Expr::List(ast::ExprList { elts, .. }) => {
                 // This should be taken care by the caller.
-                debug_assert!(
-                    expr.is_tuple_expr() && exactly_one_paramspec,
-                    "Inferring ParamSpec value during explicit specialization for a \
+                if expr.is_tuple_expr() {
+                    debug_assert!(
+                        exactly_one_paramspec,
+                        "Inferring ParamSpec value during explicit specialization for a \
                     tuple expression should only happen when it contains exactly one ParamSpec"
-                );
+                    );
+                }
 
                 let mut parameter_types = Vec::with_capacity(elts.len());
 
