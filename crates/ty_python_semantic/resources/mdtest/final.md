@@ -42,27 +42,35 @@ def lossy_decorator(fn: Callable) -> Callable: ...
 class Parent:
     @final
     def foo(self): ...
+
     @final
     @property
     def my_property1(self) -> int: ...
+
     @property
     @final
     def my_property2(self) -> int: ...
+
     @final
     @classmethod
     def class_method1(cls) -> int: ...
+
     @staticmethod
     @final
     def static_method1() -> int: ...
+
     @final
     @classmethod
     def class_method2(cls) -> int: ...
+
     @staticmethod
     @final
     def static_method2() -> int: ...
+
     @lossy_decorator
     @final
     def decorated_1(self): ...
+    
     @final
     @lossy_decorator
     def decorated_2(self): ...
