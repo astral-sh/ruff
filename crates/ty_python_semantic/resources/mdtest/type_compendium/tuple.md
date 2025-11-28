@@ -37,7 +37,7 @@ reveal_type(().__class__())  # revealed: tuple[()]
 reveal_type((1, 2).__class__((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
 
 class LiskovUncompliantIterable(Iterable[int]):
-    # TODO we should emit an error here about the Liskov violation
+    # error: [invalid-method-override]
     __iter__ = None
 
 def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never], bb: LiskovUncompliantIterable):

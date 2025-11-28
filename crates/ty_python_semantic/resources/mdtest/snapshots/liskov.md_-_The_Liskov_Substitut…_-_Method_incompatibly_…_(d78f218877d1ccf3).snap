@@ -1,0 +1,270 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: liskov.md - The Liskov Substitution Principle - Method incompatibly overridden by a non-method
+mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
+---
+
+# Python source files
+
+## mdtest_snippet.pyi
+
+```
+ 1 | from typing import ClassVar, Final, Callable, Any
+ 2 | 
+ 3 | class Parent:
+ 4 |     def method(self): ...
+ 5 | 
+ 6 | class Child1(Parent):
+ 7 |     method = None  # error: [invalid-method-override]
+ 8 | 
+ 9 | class Child2(Parent):
+10 |     method: ClassVar = None  # error: [invalid-method-override]
+11 | 
+12 | class Child3(Parent):
+13 |     method: None = None  # error: [invalid-method-override]
+14 | 
+15 | class Child4(Parent):
+16 |     # error: [invalid-assignment] "Object of type `None` is not assignable to `(...) -> Unknown`"
+17 |     # error: [invalid-method-override]
+18 |     method: Callable = None
+19 | 
+20 | class Child5(Parent):
+21 |     method: Callable | None = None  # error: [invalid-method-override]
+22 | 
+23 | class Child6(Parent):
+24 |     method: Final = None  # error: [invalid-method-override]
+25 | 
+26 | class Child7(Parent):
+27 |     method: None  # error: [invalid-method-override]
+28 | 
+29 | class Child8(Parent):
+30 |     # A `Callable` type is insufficient for the type to be assignable to
+31 |     # the superclass definition: the definition on the superclass is a
+32 |     # *function-like* callable, which can be used as a method descriptor,
+33 |     # and which has `types.FunctionType` attributes such as `__name__`,
+34 |     # `__kwdefaults__`, etc.
+35 |     method: Callable  # error: [invalid-method-override]
+36 | 
+37 | class Child9(Parent):
+38 |     method: Any
+39 | 
+40 | class Child10(Parent):
+41 |     # fine: although the local-narrowed type is `None`,
+42 |     # the type as accessed on the class object or on instances of the class
+43 |     # will be `Any`, which is assignable to the declared type on the superclass
+44 |     method: Any = None
+```
+
+# Diagnostics
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+ --> src/mdtest_snippet.pyi:4:9
+  |
+3 | class Parent:
+4 |     def method(self): ...
+  |         ------------ `Parent.method` defined here
+5 |
+6 | class Child1(Parent):
+7 |     method = None  # error: [invalid-method-override]
+  |     ^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
+8 |
+9 | class Child2(Parent):
+  |
+info: `Child1.method` has type `None`, which is not callable
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:10:5
+   |
+ 9 | class Child2(Parent):
+10 |     method: ClassVar = None  # error: [invalid-method-override]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
+11 |
+12 | class Child3(Parent):
+   |
+  ::: src/mdtest_snippet.pyi:4:9
+   |
+ 3 | class Parent:
+ 4 |     def method(self): ...
+   |         ------------ `Parent.method` defined here
+ 5 |
+ 6 | class Child1(Parent):
+   |
+info: `Child2.method` has type `Unknown | None`, which is not callable
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:13:5
+   |
+12 | class Child3(Parent):
+13 |     method: None = None  # error: [invalid-method-override]
+   |     ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
+14 |
+15 | class Child4(Parent):
+   |
+  ::: src/mdtest_snippet.pyi:4:9
+   |
+ 3 | class Parent:
+ 4 |     def method(self): ...
+   |         ------------ `Parent.method` defined here
+ 5 |
+ 6 | class Child1(Parent):
+   |
+info: `Child3.method` has type `None`, which is not callable
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:18:5
+   |
+16 |     # error: [invalid-assignment] "Object of type `None` is not assignable to `(...) -> Unknown`"
+17 |     # error: [invalid-method-override]
+18 |     method: Callable = None
+   |     ^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
+19 |
+20 | class Child5(Parent):
+   |
+  ::: src/mdtest_snippet.pyi:4:9
+   |
+ 3 | class Parent:
+ 4 |     def method(self): ...
+   |         ------------ `Parent.method` defined here
+ 5 |
+ 6 | class Child1(Parent):
+   |
+info: `Child4.method` has type `(...) -> Unknown`
+info: `(...) -> Unknown` is a callable type with the correct signature, but objects with this type cannot necessarily be used as method descriptors
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-assignment]: Object of type `None` is not assignable to `(...) -> Unknown`
+  --> src/mdtest_snippet.pyi:18:13
+   |
+16 |     # error: [invalid-assignment] "Object of type `None` is not assignable to `(...) -> Unknown`"
+17 |     # error: [invalid-method-override]
+18 |     method: Callable = None
+   |             --------   ^^^^ Incompatible value of type `None`
+   |             |
+   |             Declared type
+19 |
+20 | class Child5(Parent):
+   |
+info: rule `invalid-assignment` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:21:5
+   |
+20 | class Child5(Parent):
+21 |     method: Callable | None = None  # error: [invalid-method-override]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
+22 |
+23 | class Child6(Parent):
+   |
+  ::: src/mdtest_snippet.pyi:4:9
+   |
+ 3 | class Parent:
+ 4 |     def method(self): ...
+   |         ------------ `Parent.method` defined here
+ 5 |
+ 6 | class Child1(Parent):
+   |
+info: `Child5.method` has type `((...) -> Unknown) | None`, which is not callable
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:24:5
+   |
+23 | class Child6(Parent):
+24 |     method: Final = None  # error: [invalid-method-override]
+   |     ^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
+25 |
+26 | class Child7(Parent):
+   |
+  ::: src/mdtest_snippet.pyi:4:9
+   |
+ 3 | class Parent:
+ 4 |     def method(self): ...
+   |         ------------ `Parent.method` defined here
+ 5 |
+ 6 | class Child1(Parent):
+   |
+info: `Child6.method` has type `None`, which is not callable
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:27:5
+   |
+26 | class Child7(Parent):
+27 |     method: None  # error: [invalid-method-override]
+   |     ^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
+28 |
+29 | class Child8(Parent):
+   |
+  ::: src/mdtest_snippet.pyi:4:9
+   |
+ 3 | class Parent:
+ 4 |     def method(self): ...
+   |         ------------ `Parent.method` defined here
+ 5 |
+ 6 | class Child1(Parent):
+   |
+info: `Child7.method` has type `None`, which is not callable
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:35:5
+   |
+33 |     # and which has `types.FunctionType` attributes such as `__name__`,
+34 |     # `__kwdefaults__`, etc.
+35 |     method: Callable  # error: [invalid-method-override]
+   |     ^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
+36 |
+37 | class Child9(Parent):
+   |
+  ::: src/mdtest_snippet.pyi:4:9
+   |
+ 3 | class Parent:
+ 4 |     def method(self): ...
+   |         ------------ `Parent.method` defined here
+ 5 |
+ 6 | class Child1(Parent):
+   |
+info: `Child8.method` has type `(...) -> Unknown`
+info: `(...) -> Unknown` is a callable type with the correct signature, but objects with this type cannot necessarily be used as method descriptors
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```

@@ -9,7 +9,7 @@ use crate::{
     place::Place,
     semantic_index::place_table,
     types::{
-        ClassBase, ClassLiteral, ClassType, KnownClass, Type,
+        ClassBase, ClassLiteral, ClassType, Type,
         class::CodeGeneratorKind,
         context::InferContext,
         definition_expression_type,
@@ -21,10 +21,6 @@ use crate::{
 
 pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: ClassLiteral<'db>) {
     let db = context.db();
-    if class.is_known(db, KnownClass::Object) {
-        return;
-    }
-
     let class_specialized = class.identity_specialization(db);
     let own_class_members: FxHashSet<_> =
         all_declarations_and_bindings(db, class.body_scope(db)).collect();
@@ -42,11 +38,6 @@ fn check_class_declaration<'db>(
     let db = context.db();
 
     let MemberWithDefinition { member, definition } = member;
-
-    // TODO: Check Liskov on non-methods too
-    let Type::FunctionLiteral(function) = member.ty else {
-        return;
-    };
 
     let Some(definition) = definition else {
         return;
@@ -133,14 +124,17 @@ fn check_class_declaration<'db>(
             break;
         };
 
-        let Some(superclass_type_as_callable) = superclass_type
-            .try_upcast_to_callable(db)
-            .map(|callables| callables.into_type(db))
-        else {
-            continue;
+        let superclass_type_as_callable = match superclass_type {
+            Type::FunctionLiteral(function) => function.into_callable_type(db),
+            Type::BoundMethod(method) => method.into_callable_type(db),
+            Type::Callable(callable) => callable,
+            // TODO: check subclass overrides even if the definition on the superclass is not a method
+            _ => continue,
         };
 
-        if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_callable) {
+        if type_on_subclass_instance
+            .is_assignable_to(db, Type::Callable(superclass_type_as_callable))
+        {
             continue;
         }
 
@@ -149,7 +143,7 @@ fn check_class_declaration<'db>(
             &member.name,
             class,
             *definition,
-            function,
+            type_on_subclass_instance,
             superclass,
             superclass_type,
             method_kind,

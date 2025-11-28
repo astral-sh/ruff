@@ -2666,7 +2666,7 @@ violates the Liskov principle (this also matches the behaviour of other type che
 from typing import Iterable
 
 class Foo(Iterable[int]):
-    __iter__ = None
+    __iter__ = None  # error: [invalid-method-override]
 
 static_assert(is_subtype_of(Foo, Iterable[int]))
 

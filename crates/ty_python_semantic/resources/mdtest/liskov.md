@@ -583,3 +583,54 @@ class GoodChild2(Parent):
     @staticmethod
     def static_method(x: object) -> bool: ...
 ```
+
+## Method incompatibly overridden by a non-method
+
+<!-- snapshot-diagnostics -->
+
+```pyi
+from typing import ClassVar, Final, Callable, Any
+
+class Parent:
+    def method(self): ...
+
+class Child1(Parent):
+    method = None  # error: [invalid-method-override]
+
+class Child2(Parent):
+    method: ClassVar = None  # error: [invalid-method-override]
+
+class Child3(Parent):
+    method: None = None  # error: [invalid-method-override]
+
+class Child4(Parent):
+    # error: [invalid-assignment] "Object of type `None` is not assignable to `(...) -> Unknown`"
+    # error: [invalid-method-override]
+    method: Callable = None
+
+class Child5(Parent):
+    method: Callable | None = None  # error: [invalid-method-override]
+
+class Child6(Parent):
+    method: Final = None  # error: [invalid-method-override]
+
+class Child7(Parent):
+    method: None  # error: [invalid-method-override]
+
+class Child8(Parent):
+    # A `Callable` type is insufficient for the type to be assignable to
+    # the superclass definition: the definition on the superclass is a
+    # *function-like* callable, which can be used as a method descriptor,
+    # and which has `types.FunctionType` attributes such as `__name__`,
+    # `__kwdefaults__`, etc.
+    method: Callable  # error: [invalid-method-override]
+
+class Child9(Parent):
+    method: Any
+
+class Child10(Parent):
+    # fine: although the local-narrowed type is `None`,
+    # the type as accessed on the class object or on instances of the class
+    # will be `Any`, which is assignable to the declared type on the superclass
+    method: Any = None
+```
