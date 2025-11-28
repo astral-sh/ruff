@@ -1636,7 +1636,7 @@ declare_lint! {
     ///     def foo(self): ...  # Error raised here
     /// ```
     pub(crate) static OVERRIDE_OF_FINAL_METHOD = {
-        summary: "detects subclasses of final classes",
+        summary: "detects overrides of final methods",
         status: LintStatus::stable("0.0.1-alpha.29"),
         default_level: Level::Error,
     }
