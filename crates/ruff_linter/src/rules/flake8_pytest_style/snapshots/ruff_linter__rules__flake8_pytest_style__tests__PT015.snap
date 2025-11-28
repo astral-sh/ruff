@@ -174,3 +174,14 @@ PT015 Assertion always fails, replace with `pytest.fail()`
    |     ^^^^^^^^^^^^^^^^^
 25 |     assert tuple("")
    |
+
+PT015 Assertion always fails, replace with `pytest.fail()`
+  --> PT015.py:25:5
+   |
+23 |     assert list([])
+24 |     assert set(set())
+25 |     assert tuple("")
+   |     ^^^^^^^^^^^^^^^^
+26 |
+27 | # https://github.com/astral-sh/ruff/issues/19935
+   |
