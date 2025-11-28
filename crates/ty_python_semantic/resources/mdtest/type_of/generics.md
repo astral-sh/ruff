@@ -86,6 +86,26 @@ def _[T](x: type[int] | type[T]):
     reveal_type(x())  # revealed: int | T@_
 ```
 
+## Narrowing
+
+```py
+from typing import TypeVar
+
+class A: ...
+
+def narrow_a[B: A](a: A, b: B):
+    type_of_a = type(a)
+
+    reveal_type(a)  # revealed: A
+    reveal_type(type_of_a)  # revealed: type[A]
+
+    if isinstance(a, type(b)):
+        reveal_type(a)  # revealed: B@narrow_a
+
+    if issubclass(type_of_a, type(b)):
+        reveal_type(type_of_a)  # revealed: type[B@narrow_a]
+```
+
 ## Subtyping
 
 A class `A` is a subtype of `type[T]` if any instance of `A` is a subtype of `T`.
