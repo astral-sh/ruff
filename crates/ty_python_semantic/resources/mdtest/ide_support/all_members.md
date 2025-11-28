@@ -110,6 +110,11 @@ static_assert(not has_member(C(), "non_existent"))
 
 ### Class objects
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 Class-level attributes can also be accessed through the class itself:
 
 ```py
@@ -154,7 +159,13 @@ static_assert(has_member(D, "meta_attr"))
 static_assert(has_member(D, "base_attr"))
 static_assert(has_member(D, "class_attr"))
 
-def f(x: type[D]):
+def _(x: type[D]):
+    static_assert(has_member(x, "meta_base_attr"))
+    static_assert(has_member(x, "meta_attr"))
+    static_assert(has_member(x, "base_attr"))
+    static_assert(has_member(x, "class_attr"))
+
+def _[T: D](x: type[T]):
     static_assert(has_member(x, "meta_base_attr"))
     static_assert(has_member(x, "meta_attr"))
     static_assert(has_member(x, "base_attr"))
