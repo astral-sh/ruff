@@ -83,7 +83,7 @@ use crate::types::{
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
     NormalizedVisitor, SpecialFormType, Truthiness, Type, TypeContext, TypeMapping, TypeRelation,
-    UnionBuilder, binding_type, walk_signature,
+    UnionBuilder, binding_type, definition_expression_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -278,7 +278,7 @@ impl<'db> OverloadLiteral<'db> {
             || is_implicit_classmethod(self.name(db))
     }
 
-    pub(super) fn node<'ast>(
+    pub(crate) fn node<'ast>(
         self,
         db: &dyn Db,
         file: File,
@@ -292,6 +292,41 @@ impl<'db> OverloadLiteral<'db> {
         );
 
         self.body_scope(db).node(db).expect_function().node(module)
+    }
+
+    /// Iterate through the decorators on this function, returning the span of the first one
+    /// that matches the given predicate.
+    pub(super) fn find_decorator_span(
+        self,
+        db: &'db dyn Db,
+        predicate: impl Fn(Type<'db>) -> bool,
+    ) -> Option<Span> {
+        let definition = self.definition(db);
+        let file = definition.file(db);
+        self.node(db, file, &parsed_module(db, file).load(db))
+            .decorator_list
+            .iter()
+            .find(|decorator| {
+                predicate(definition_expression_type(
+                    db,
+                    definition,
+                    &decorator.expression,
+                ))
+            })
+            .map(|decorator| Span::from(file).with_range(decorator.range))
+    }
+
+    /// Iterate through the decorators on this function, returning the span of the first one
+    /// that matches the given [`KnownFunction`].
+    pub(super) fn find_known_decorator_span(
+        self,
+        db: &'db dyn Db,
+        needle: KnownFunction,
+    ) -> Option<Span> {
+        self.find_decorator_span(db, |ty| {
+            ty.as_function_literal()
+                .is_some_and(|f| f.is_known(db, needle))
+        })
     }
 
     /// Returns the [`FileRange`] of the function's name.
@@ -584,32 +619,44 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition(db).spans(db)
     }
 
-    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size, cycle_initial=overloads_and_implementation_cycle_initial)]
     fn overloads_and_implementation(
         self,
         db: &'db dyn Db,
-    ) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
-        let self_overload = self.last_definition(db);
-        let mut current = self_overload;
-        let mut overloads = vec![];
+    ) -> (&'db [OverloadLiteral<'db>], Option<OverloadLiteral<'db>>) {
+        #[salsa::tracked(
+            returns(ref),
+            heap_size=ruff_memory_usage::heap_size,
+            cycle_initial=overloads_and_implementation_cycle_initial
+        )]
+        fn overloads_and_implementation_inner<'db>(
+            db: &'db dyn Db,
+            function: FunctionLiteral<'db>,
+        ) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
+            let self_overload = function.last_definition(db);
+            let mut current = self_overload;
+            let mut overloads = vec![];
 
-        while let Some(previous) = current.previous_overload(db) {
-            let overload = previous.last_definition(db);
-            overloads.push(overload);
-            current = overload;
+            while let Some(previous) = current.previous_overload(db) {
+                let overload = previous.last_definition(db);
+                overloads.push(overload);
+                current = overload;
+            }
+
+            // Overloads are inserted in reverse order, from bottom to top.
+            overloads.reverse();
+
+            let implementation = if self_overload.is_overload(db) {
+                overloads.push(self_overload);
+                None
+            } else {
+                Some(self_overload)
+            };
+
+            (overloads.into_boxed_slice(), implementation)
         }
 
-        // Overloads are inserted in reverse order, from bottom to top.
-        overloads.reverse();
-
-        let implementation = if self_overload.is_overload(db) {
-            overloads.push(self_overload);
-            None
-        } else {
-            Some(self_overload)
-        };
-
-        (overloads.into_boxed_slice(), implementation)
+        let (overloads, implementation) = overloads_and_implementation_inner(db, self);
+        (overloads.as_ref(), *implementation)
     }
 
     fn iter_overloads_and_implementation(
@@ -617,7 +664,7 @@ impl<'db> FunctionLiteral<'db> {
         db: &'db dyn Db,
     ) -> impl Iterator<Item = OverloadLiteral<'db>> + 'db {
         let (implementation, overloads) = self.overloads_and_implementation(db);
-        overloads.iter().chain(implementation).copied()
+        overloads.into_iter().chain(implementation.iter().copied())
     }
 
     /// Typed externally-visible signature for this function.
@@ -773,7 +820,7 @@ impl<'db> FunctionType<'db> {
     }
 
     /// Returns the AST node for this function.
-    pub(crate) fn node<'ast>(
+    pub(super) fn node<'ast>(
         self,
         db: &dyn Db,
         file: File,
@@ -892,7 +939,7 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn overloads_and_implementation(
         self,
         db: &'db dyn Db,
-    ) -> &'db (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
+    ) -> (&'db [OverloadLiteral<'db>], Option<OverloadLiteral<'db>>) {
         self.literal(db).overloads_and_implementation(db)
     }
 
@@ -903,6 +950,12 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
     ) -> impl Iterator<Item = OverloadLiteral<'db>> + 'db {
         self.literal(db).iter_overloads_and_implementation(db)
+    }
+
+    pub(crate) fn first_overload_or_implementation(self, db: &'db dyn Db) -> OverloadLiteral<'db> {
+        self.iter_overloads_and_implementation(db)
+            .next()
+            .expect("A function must have at least one overload/implementation")
     }
 
     /// Typed externally-visible signature for this function.
