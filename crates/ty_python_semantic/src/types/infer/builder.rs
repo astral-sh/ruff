@@ -8327,7 +8327,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let class = match callable_type {
             Type::ClassLiteral(class) => Some(ClassType::NonGeneric(class)),
             Type::GenericAlias(generic) => Some(ClassType::Generic(generic)),
-            Type::SubclassOf(subclass) => subclass.subclass_of().into_class(),
+            Type::SubclassOf(subclass) => subclass.subclass_of().into_class(self.db()),
             _ => None,
         };
 
@@ -9319,7 +9319,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         let attr_name = &attr.id;
-
         let resolved_type = fallback_place.unwrap_with_diagnostic(|lookup_err| match lookup_err {
             LookupError::Undefined(_) => {
                 let fallback = || {
@@ -9347,6 +9346,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 "Attribute lookup on a dynamic `SubclassOf` type \
                                     should always return a bound symbol"
                             ),
+                            SubclassOfInner::TypeVar(_) => false,
                         }
                     }
                     _ => false,

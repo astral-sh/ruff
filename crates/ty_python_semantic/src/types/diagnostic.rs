@@ -37,6 +37,7 @@ use ruff_db::{
     parsed::parsed_module,
     source::source_text,
 };
+use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parentheses_iterator;
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -1844,7 +1845,7 @@ declare_lint! {
     /// ```python
     /// print(x)  # NameError: name 'x' is not defined
     /// ```
-    pub(crate) static UNRESOLVED_REFERENCE = {
+    pub static UNRESOLVED_REFERENCE = {
         summary: "detects references to names that are not defined",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
@@ -3121,7 +3122,7 @@ pub(crate) fn report_undeclared_protocol_member(
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Class(class) => class,
                 SubclassOfInner::Dynamic(DynamicType::Any) => return true,
-                SubclassOfInner::Dynamic(_) => return false,
+                SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => return false,
             },
             Type::NominalInstance(instance) => instance.class(db),
             Type::Union(union) => {
@@ -3430,6 +3431,10 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                     if key_node.is_expr_string_literal() {
                         diagnostic
                             .set_primary_message(format_args!("Did you mean \"{suggestion}\"?"));
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                            format!("\"{suggestion}\""),
+                            key_node.range(),
+                        )));
                     } else {
                         diagnostic.set_primary_message(format_args!(
                             "Unknown key \"{key}\" - did you mean \"{suggestion}\"?",

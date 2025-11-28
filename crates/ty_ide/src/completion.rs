@@ -4,8 +4,8 @@ use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::source_text;
 use ruff_diagnostics::Edit;
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{Token, TokenAt, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -37,10 +37,19 @@ impl<'db> Completions<'db> {
     /// the user has typed as part of the next symbol they are writing.
     /// This collection will treat it as a query when present, and only
     /// add completions that match it.
-    fn new(db: &'db dyn Db, typed: Option<&str>) -> Completions<'db> {
+    fn fuzzy(db: &'db dyn Db, typed: Option<&str>) -> Completions<'db> {
         let query = typed
-            .map(QueryPattern::new)
+            .map(QueryPattern::fuzzy)
             .unwrap_or_else(QueryPattern::matches_all_symbols);
+        Completions {
+            db,
+            items: vec![],
+            query,
+        }
+    }
+
+    fn exactly(db: &'db dyn Db, symbol: &str) -> Completions<'db> {
+        let query = QueryPattern::exactly(symbol);
         Completions {
             db,
             items: vec![],
@@ -55,6 +64,21 @@ impl<'db> Completions<'db> {
         self.items
             .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
         self.items
+    }
+
+    fn into_imports(mut self) -> Vec<ImportEdit> {
+        self.items.sort_by(compare_suggestions);
+        self.items
+            .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
+        self.items
+            .into_iter()
+            .filter_map(|item| {
+                Some(ImportEdit {
+                    label: format!("import {}.{}", item.module_name?, item.name),
+                    edit: item.import?,
+                })
+            })
+            .collect()
     }
 
     /// Attempts to adds the given completion to this collection.
@@ -369,7 +393,7 @@ pub fn completion<'db>(
         return vec![];
     }
 
-    let mut completions = Completions::new(db, typed.as_deref());
+    let mut completions = Completions::fuzzy(db, typed.as_deref());
 
     if let Some(import) = ImportStatement::detect(db, file, &parsed, tokens, typed.as_deref()) {
         import.add_completions(db, file, &mut completions);
@@ -415,6 +439,25 @@ pub fn completion<'db>(
     }
 
     completions.into_completions()
+}
+
+pub(crate) struct ImportEdit {
+    pub label: String,
+    pub edit: Edit,
+}
+
+pub(crate) fn missing_imports(
+    db: &dyn Db,
+    file: File,
+    parsed: &ParsedModuleRef,
+    symbol: &str,
+    node: AnyNodeRef,
+) -> Vec<ImportEdit> {
+    let mut completions = Completions::exactly(db, symbol);
+    let scoped = ScopedTarget { node };
+    add_unimported_completions(db, file, parsed, scoped, &mut completions);
+
+    completions.into_imports()
 }
 
 /// Adds completions derived from keywords.
@@ -2855,7 +2898,7 @@ Answer.<CURSOR>
                 __itemsize__ :: int
                 __iter__ :: bound method <class 'Answer'>.__iter__[_EnumMemberT]() -> Iterator[_EnumMemberT@__iter__]
                 __len__ :: bound method <class 'Answer'>.__len__() -> int
-                __members__ :: MappingProxyType[str, Unknown]
+                __members__ :: MappingProxyType[str, Answer]
                 __module__ :: str
                 __mro__ :: tuple[type, ...]
                 __name__ :: str

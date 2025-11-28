@@ -643,27 +643,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn infer_subclass_of_type_expression(&mut self, slice: &ast::Expr) -> Type<'db> {
         match slice {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
-                let name_ty = self.infer_expression(slice, TypeContext::default());
-                match name_ty {
-                    Type::ClassLiteral(class_literal) => {
-                        if class_literal.is_protocol(self.db()) {
-                            SubclassOfType::from(
-                                self.db(),
-                                todo_type!("type[T] for protocols").expect_dynamic(),
-                            )
-                        } else {
-                            SubclassOfType::from(
-                                self.db(),
-                                class_literal.default_specialization(self.db()),
-                            )
-                        }
-                    }
-                    Type::SpecialForm(SpecialFormType::Any) => SubclassOfType::subclass_of_any(),
-                    Type::SpecialForm(SpecialFormType::Unknown) => {
-                        SubclassOfType::subclass_of_unknown()
-                    }
-                    _ => todo_type!("unsupported type[X] special form"),
-                }
+                SubclassOfType::try_from_instance(self.db(), self.infer_type_expression(slice))
+                    .unwrap_or(todo_type!("unsupported type[X] special form"))
             }
             ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
                 let union_ty = UnionType::from_elements_leave_aliases(
