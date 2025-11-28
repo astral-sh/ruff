@@ -667,6 +667,7 @@ ListOfInts = list[int]
 
 # error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
 def _(doubly_specialized: ListOfInts[int]):
+    # TODO: This should ideally be `list[Unknown]` or `Unknown`
     reveal_type(doubly_specialized)  # revealed: list[int]
 ```
 
