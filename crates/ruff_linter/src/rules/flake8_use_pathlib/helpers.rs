@@ -47,9 +47,9 @@ pub(crate) fn is_pure_path_subclass_with_preview(checker: &Checker, segments: &[
     false
 }
 
-/// We check functions that take only 1 argument,  this does not apply to functions
-/// with `dir_fd` argument, because `dir_fd` is not supported by pathlib,
-/// so check if it's set to non-default values
+/// We check functions that take only 1 argument.
+/// The caller is responsible for checking that `dir_fd` is not set to a non-default value
+/// (since `dir_fd` is not supported by pathlib), but this helper allows `dir_fd=None` to pass through.
 pub(crate) fn check_os_pathlib_single_arg_calls(
     checker: &Checker,
     call: &ExprCall,
@@ -59,7 +59,17 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
     violation: impl Violation,
     applicability: Option<Applicability>,
 ) {
-    if call.arguments.len() != 1 {
+    // Check that we have exactly 1 positional argument OR the argument is passed as a keyword
+    // This allows: func(arg), func(name=arg), and func(arg, dir_fd=None)
+    let has_positional_arg = call.arguments.args.len() == 1;
+    let has_keyword_arg = call.arguments.find_keyword(fn_argument).is_some();
+
+    if !has_positional_arg && !has_keyword_arg {
+        return;
+    }
+
+    // If we have both positional and keyword for the main argument, that's invalid
+    if has_positional_arg && has_keyword_arg {
         return;
     }
 
