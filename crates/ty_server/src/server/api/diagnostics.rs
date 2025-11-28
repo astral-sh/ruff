@@ -6,7 +6,7 @@ use lsp_types::{
     CodeDescription, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag,
     NumberOrString, PublishDiagnosticsParams, Url,
 };
-use ruff_diagnostics::{Applicability, Fix};
+use ruff_diagnostics::Applicability;
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 
@@ -428,38 +428,29 @@ impl DiagnosticData {
         let primary_span = diagnostic.primary_span()?;
         let file = primary_span.expect_ty_file();
 
+        let mut lsp_edits: HashMap<Url, Vec<lsp_types::TextEdit>> = HashMap::new();
+
+        for edit in fix.edits() {
+            let location = edit
+                .range()
+                .to_lsp_range(db, file, encoding)?
+                .to_location()?;
+
+            lsp_edits
+                .entry(location.uri)
+                .or_default()
+                .push(lsp_types::TextEdit {
+                    range: location.range,
+                    new_text: edit.content().unwrap_or_default().to_string(),
+                });
+        }
+
         Some(Self {
             fix_title: diagnostic
                 .first_help_text()
                 .map(ToString::to_string)
                 .unwrap_or_else(|| format!("Fix {}", diagnostic.id())),
-            edits: fix_to_lsp_edits(db, fix, file, encoding)?,
+            edits: lsp_edits,
         })
     }
-}
-
-pub(super) fn fix_to_lsp_edits(
-    db: &dyn Db,
-    fix: &Fix,
-    file: File,
-    encoding: PositionEncoding,
-) -> Option<HashMap<Url, Vec<lsp_types::TextEdit>>> {
-    let mut lsp_edits: HashMap<Url, Vec<lsp_types::TextEdit>> = HashMap::new();
-
-    for edit in fix.edits() {
-        let location = edit
-            .range()
-            .to_lsp_range(db, file, encoding)?
-            .to_location()?;
-
-        lsp_edits
-            .entry(location.uri)
-            .or_default()
-            .push(lsp_types::TextEdit {
-                range: location.range,
-                new_text: edit.content().unwrap_or_default().to_string(),
-            });
-    }
-
-    Some(lsp_edits)
 }
