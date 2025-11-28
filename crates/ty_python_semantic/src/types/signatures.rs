@@ -605,11 +605,11 @@ impl<'db> Signature<'db> {
             None => None,
         };
         let parameters = {
-            let mut new_params = Vec::with_capacity(self.parameters.len());
+            let mut parameters = Vec::with_capacity(self.parameters.len());
             for param in &self.parameters {
-                new_params.push(param.recursive_type_normalized_impl(db, div, nested, visitor)?);
+                parameters.push(param.recursive_type_normalized_impl(db, div, nested, visitor)?);
             }
-            Parameters::new(db, new_params)
+            Parameters::new(db, parameters)
         };
         Some(Self {
             generic_context: self.generic_context,
