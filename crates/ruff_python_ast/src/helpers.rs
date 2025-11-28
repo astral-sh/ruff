@@ -1330,20 +1330,18 @@ impl Truthiness {
                                 // Return Unknown for types with definite truthiness that might result
                                 // in empty iterables or will raise a type error:
                                 // - Non-iterable types (numbers, booleans, None, etc.) raise TypeError
-                                // - String types: can't reliably determine truthiness of tuple("") from ""
-                                //   (tuple("") creates empty tuple, but tuple("a") creates non-empty tuple)
+                                // - TString: always truthy but might result in empty iterables
                                 // - Lambda/Generator: always truthy but might result in empty iterables
                                 Expr::NumberLiteral(_)
                                 | Expr::BooleanLiteral(_)
                                 | Expr::NoneLiteral(_)
                                 | Expr::EllipsisLiteral(_)
-                                | Expr::StringLiteral(_)
                                 | Expr::TString(_)
-                                | Expr::FString(_)
-                                | Expr::BytesLiteral(_)
                                 | Expr::Lambda(_)
                                 | Expr::Generator(_) => Self::Unknown,
                                 // Recurse for all other types - collections, comprehensions, variables, etc.
+                                // StringLiteral, FString, and BytesLiteral recurse because Self::from_expr
+                                // correctly handles their truthiness (checking if empty or not).
                                 _ => Self::from_expr(argument, is_builtin),
                             }
                         } else {
