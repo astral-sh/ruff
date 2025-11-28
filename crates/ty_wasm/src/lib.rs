@@ -574,13 +574,15 @@ impl Workspace {
         // For instance, suggesting imports requires finding symbols for the entire project,
         // which is dubious when you're in the middle of resolving symbols.
         if let Some(range) = diagnostic.inner.range() {
-            for action in ty_ide::code_actions(
-                &self.db,
-                file_id.file,
-                range,
-                diagnostic.inner.id().as_str(),
-            ) {
-                actions.push(CodeAction {
+            actions.extend(
+                ty_ide::code_actions(
+                    &self.db,
+                    file_id.file,
+                    range,
+                    diagnostic.inner.id().as_str(),
+                )
+                .into_iter()
+                .map(|action| CodeAction {
                     title: action.title,
                     preferred: action.preferred,
                     edits: action
@@ -588,8 +590,8 @@ impl Workspace {
                         .into_iter()
                         .map(|edit| edit_to_text_edit(self, file_id.file, &edit))
                         .collect(),
-                });
-            }
+                }),
+            );
         }
 
         if actions.is_empty() {
