@@ -1502,6 +1502,14 @@ def write_to_readonly_key(employee: Employee):
     employee["id"] = 42  # error: [invalid-assignment]
 ```
 
+If the key uses single quotes, the autofix preserves that quoting style:
+
+```py
+def write_to_non_existing_key_single_quotes(person: Person):
+    # error: [invalid-key]
+    person['naem'] = "Alice"  # fmt: skip
+```
+
 ## Import aliases
 
 `TypedDict` can be imported with aliases and should work correctly:

@@ -40,7 +40,7 @@ use ruff_db::{
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parentheses_iterator;
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast::{self as ast, AnyNodeRef, StringFlags};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
@@ -3456,11 +3456,15 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 
                 let existing_keys = items.keys();
                 if let Some(suggestion) = did_you_mean(existing_keys, key) {
-                    if key_node.is_expr_string_literal() {
+                    if let AnyNodeRef::ExprStringLiteral(literal) = key_node {
+                        let quoted_suggestion = format!(
+                            "{quote}{suggestion}{quote}",
+                            quote = literal.value.first_literal_flags().quote_str()
+                        );
                         diagnostic
-                            .set_primary_message(format_args!("Did you mean \"{suggestion}\"?"));
+                            .set_primary_message(format_args!("Did you mean {quoted_suggestion}?"));
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                            format!("\"{suggestion}\""),
+                            quoted_suggestion,
                             key_node.range(),
                         )));
                     } else {
