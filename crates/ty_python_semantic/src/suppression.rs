@@ -17,7 +17,6 @@ use ruff_db::{files::File, parsed::parsed_module, source::source_text};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_parser::TokenKind;
 use ruff_python_trivia::Cursor;
-use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 declare_lint! {
@@ -394,6 +393,7 @@ pub fn create_suppression_fix(db: &dyn Db, file: File, id: LintId, range: TextRa
     // If there's an existing `ty: ignore[]` comment, append the code to it instead of creating a new suppression comment.
     if let Some(existing) = existing_suppressions.next() {
         let comment_text = &source[existing.comment_range];
+        // Only add to the existing ignore comment if it has no reason.
         if let Some(before_closing_paren) = comment_text.trim_end().strip_suffix(']') {
             let up_to_last_code = before_closing_paren.trim_end();
 
@@ -414,7 +414,23 @@ pub fn create_suppression_fix(db: &dyn Db, file: File, id: LintId, range: TextRa
 
     // Always insert a new suppression at the end of the range to avoid having to deal with multiline strings
     // etc.
-    let line_end = source.line_end(range.end());
+    let parsed = parsed_module(db, file).load(db);
+    let tokens_after = parsed.tokens().after(range.end());
+
+    // Same as for `line_end` when building up the `suppressions`: Ignore newlines
+    // in multiline-strings, inside f-strings, or after a line continuation because we can't
+    // place a comment on those lines.
+    let line_end = tokens_after
+        .iter()
+        .find(|token| {
+            matches!(
+                token.kind(),
+                TokenKind::Newline | TokenKind::NonLogicalNewline
+            )
+        })
+        .map(Ranged::start)
+        .unwrap_or(source.text_len());
+
     let up_to_line_end = &source[..line_end.to_usize()];
     let up_to_first_content = up_to_line_end.trim_end();
     let trailing_whitespace_len = up_to_line_end.text_len() - up_to_first_content.text_len();

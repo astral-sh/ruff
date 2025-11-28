@@ -140,51 +140,5 @@ expression: code_actions
       }
     },
     "isPreferred": false
-  },
-  {
-    "title": "Ignore 'invalid-type-form' for this line",
-    "kind": "quickfix",
-    "diagnostics": [
-      {
-        "range": {
-          "start": {
-            "line": 0,
-            "character": 11
-          },
-          "end": {
-            "line": 0,
-            "character": 12
-          }
-        },
-        "severity": 1,
-        "code": "invalid-type-form",
-        "codeDescription": {
-          "href": "https://ty.dev/rules#invalid-type-form"
-        },
-        "source": "ty",
-        "message": "Int literals are not allowed in this context in a type expression",
-        "relatedInformation": []
-      }
-    ],
-    "edit": {
-      "changes": {
-        "file://<temp_dir>/src/foo.py": [
-          {
-            "range": {
-              "start": {
-                "line": 0,
-                "character": 17
-              },
-              "end": {
-                "line": 0,
-                "character": 17
-              }
-            },
-            "newText": "  # ty:ignore[invalid-type-form]"
-          }
-        ]
-      }
-    },
-    "isPreferred": false
   }
 ]

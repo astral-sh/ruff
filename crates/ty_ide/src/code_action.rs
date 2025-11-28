@@ -75,7 +75,6 @@ mod tests {
             LintName, Span, SubDiagnostic,
         },
         files::{File, system_path_to_file},
-        source::source_text,
         system::{DbWithWritableSystem, SystemPathBuf},
     };
     use ruff_diagnostics::Fix;
@@ -96,7 +95,344 @@ mod tests {
           |
           - b = a / 10
         1 + b = a / 10  # ty:ignore[unresolved-reference]
-        ")
+        ");
+    }
+
+    #[test]
+    fn add_ignore_existing_comment() {
+        let test = CodeActionTest::with_source(r#"b = <START>a<END> / 10  # fmt: off"#);
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:1:5
+          |
+        1 | b = a / 10  # fmt: off
+          |     ^
+          |
+          - b = a / 10  # fmt: off
+        1 + b = a / 10  # fmt: off  # ty:ignore[unresolved-reference]
+        ");
+    }
+
+    #[test]
+    fn add_ignore_trailing_whitespace() {
+        let test = CodeActionTest::with_source(r#"b = <START>a<END> / 10  "#);
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:1:5
+          |
+        1 | b = a / 10  
+          |     ^
+          |
+          - b = a / 10  
+        1 + b = a / 10  # ty:ignore[unresolved-reference]
+        ");
+    }
+
+    #[test]
+    fn add_code_existing_ignore() {
+        let test = CodeActionTest::with_source(
+            r#"
+            b = <START>a<END> / 0  # ty:ignore[division-by-zero]
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:2:17
+          |
+        2 |             b = a / 0  # ty:ignore[division-by-zero]
+          |                 ^
+          |
+        1 | 
+          -             b = a / 0  # ty:ignore[division-by-zero]
+        2 +             b = a / 0  # ty:ignore[division-by-zero, unresolved-reference]
+        3 |
+        ");
+    }
+
+    #[test]
+    fn add_code_existing_ignore_trailing_comma() {
+        let test = CodeActionTest::with_source(
+            r#"
+            b = <START>a<END> / 0  # ty:ignore[division-by-zero,]
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:2:17
+          |
+        2 |             b = a / 0  # ty:ignore[division-by-zero,]
+          |                 ^
+          |
+        1 | 
+          -             b = a / 0  # ty:ignore[division-by-zero,]
+        2 +             b = a / 0  # ty:ignore[division-by-zero, unresolved-reference]
+        3 |
+        ");
+    }
+
+    #[test]
+    fn add_code_existing_ignore_trailing_whitespace() {
+        let test = CodeActionTest::with_source(
+            r#"
+            b = <START>a<END> / 0  # ty:ignore[division-by-zero   ]
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:2:17
+          |
+        2 |             b = a / 0  # ty:ignore[division-by-zero   ]
+          |                 ^
+          |
+        1 | 
+          -             b = a / 0  # ty:ignore[division-by-zero   ]
+        2 +             b = a / 0  # ty:ignore[division-by-zero, unresolved-reference   ]
+        3 |
+        ");
+    }
+
+    #[test]
+    fn add_code_existing_ignore_with_reason() {
+        let test = CodeActionTest::with_source(
+            r#"
+            b = <START>a<END> / 0  # ty:ignore[division-by-zero] some explanation
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:2:17
+          |
+        2 |             b = a / 0  # ty:ignore[division-by-zero] some explanation
+          |                 ^
+          |
+        1 | 
+          -             b = a / 0  # ty:ignore[division-by-zero] some explanation
+        2 +             b = a / 0  # ty:ignore[division-by-zero] some explanation  # ty:ignore[unresolved-reference]
+        3 |
+        ");
+    }
+
+    #[test]
+    fn add_code_existing_ignore_start_line() {
+        let test = CodeActionTest::with_source(
+            r#"
+            b = (
+                    <START>a  # ty:ignore[division-by-zero]
+                    /
+                    0<END>
+            )
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:3:21
+          |
+        2 |               b = (
+        3 | /                     a  # ty:ignore[division-by-zero]
+        4 | |                     /
+        5 | |                     0
+          | |_____________________^
+        6 |               )
+          |
+        1 | 
+        2 |             b = (
+          -                     a  # ty:ignore[division-by-zero]
+        3 +                     a  # ty:ignore[division-by-zero, unresolved-reference]
+        4 |                     /
+        5 |                     0
+        6 |             )
+        ");
+    }
+
+    #[test]
+    fn add_code_existing_ignore_end_line() {
+        let test = CodeActionTest::with_source(
+            r#"
+            b = (
+                    <START>a
+                    /
+                    0<END>  # ty:ignore[division-by-zero]
+            )
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:3:21
+          |
+        2 |               b = (
+        3 | /                     a
+        4 | |                     /
+        5 | |                     0  # ty:ignore[division-by-zero]
+          | |_____________________^
+        6 |               )
+          |
+        2 |             b = (
+        3 |                     a
+        4 |                     /
+          -                     0  # ty:ignore[division-by-zero]
+        5 +                     0  # ty:ignore[division-by-zero, unresolved-reference]
+        6 |             )
+        7 |
+        ");
+    }
+
+    #[test]
+    fn add_code_existing_ignores() {
+        let test = CodeActionTest::with_source(
+            r#"
+            b = (
+                    <START>a  # ty:ignore[division-by-zero]
+                    /
+                    0<END>  # ty:ignore[division-by-zero]
+            )
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:3:21
+          |
+        2 |               b = (
+        3 | /                     a  # ty:ignore[division-by-zero]
+        4 | |                     /
+        5 | |                     0  # ty:ignore[division-by-zero]
+          | |_____________________^
+        6 |               )
+          |
+        1 | 
+        2 |             b = (
+          -                     a  # ty:ignore[division-by-zero]
+        3 +                     a  # ty:ignore[division-by-zero, unresolved-reference]
+        4 |                     /
+        5 |                     0  # ty:ignore[division-by-zero]
+        6 |             )
+        ");
+    }
+
+    #[test]
+    fn add_code_interpolated_string() {
+        let test = CodeActionTest::with_source(
+            r#"
+            b = f"""
+                {<START>a<END>}
+                more text
+            """
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:3:18
+          |
+        2 |             b = f"""
+        3 |                 {a}
+          |                  ^
+        4 |                 more text
+        5 |             """
+          |
+        2 |             b = f"""
+        3 |                 {a}
+        4 |                 more text
+          -             """
+        5 +             """  # ty:ignore[unresolved-reference]
+        6 |
+        "#);
+    }
+
+    #[test]
+    fn add_code_multiline_interpolation() {
+        let test = CodeActionTest::with_source(
+            r#"
+            b = f"""
+                {
+                <START>a<END>
+                }
+                more text
+            """
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:4:17
+          |
+        2 |             b = f"""
+        3 |                 {
+        4 |                 a
+          |                 ^
+        5 |                 }
+        6 |                 more text
+          |
+        1 | 
+        2 |             b = f"""
+        3 |                 {
+          -                 a
+        4 +                 a  # ty:ignore[unresolved-reference]
+        5 |                 }
+        6 |                 more text
+        7 |             """
+        "#);
+    }
+
+    #[test]
+    fn add_code_followed_by_multiline_string() {
+        let test = CodeActionTest::with_source(
+            r#"
+            b = <START>a<END> + """
+                more text
+            """
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:2:17
+          |
+        2 |             b = a + """
+          |                 ^
+        3 |                 more text
+        4 |             """
+          |
+        1 | 
+        2 |             b = a + """
+        3 |                 more text
+          -             """
+        4 +             """  # ty:ignore[unresolved-reference]
+        5 |
+        "#);
+    }
+
+    #[test]
+    fn add_code_followed_by_continuation() {
+        let test = CodeActionTest::with_source(
+            r#"
+            b = <START>a<END> \
+            + "test"
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:2:17
+          |
+        2 |             b = a \
+          |                 ^
+        3 |             + "test"
+          |
+        1 | 
+        2 |             b = a \
+          -             + "test"
+        3 +             + "test"  # ty:ignore[unresolved-reference]
+        4 |
+        "#);
     }
 
     pub(super) struct CodeActionTest {
@@ -127,9 +463,7 @@ mod tests {
 
             cleansed.replace_range(end..end + "<END>".len(), "");
 
-            if end < start {
-                panic!("<START> marker should be before <END> marker");
-            }
+            assert!(start <= end, "<START> marker should be before <END> marker");
 
             db.write_file("main.py", cleansed)
                 .expect("write to memory file system to be successful");
