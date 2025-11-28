@@ -7,7 +7,7 @@ use ty_python_semantic::SemanticModel;
 
 /// Find all references to a symbol at the given position.
 /// Search for references across all files in the project.
-pub fn goto_references(
+pub fn find_references(
     db: &dyn Db,
     file: File,
     offset: TextSize,
@@ -41,7 +41,7 @@ mod tests {
     impl CursorTest {
         fn references(&self) -> String {
             let Some(mut reference_results) =
-                goto_references(&self.db, self.cursor.file, self.cursor.offset, true)
+                find_references(&self.db, self.cursor.file, self.cursor.offset, true)
             else {
                 return "No references found".to_string();
             };
@@ -84,7 +84,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parameter_references_in_function() {
+    fn parameter_references_in_function() {
         let test = cursor_test(
             "
 def calculate_sum(<CURSOR>value: int) -> int:
@@ -149,28 +149,28 @@ result = calculate_sum(value=42)
     }
 
     #[test]
-    fn test_nonlocal_variable_references() {
+    fn nonlocal_variable_references() {
         let test = cursor_test(
             "
 def outer_function():
     coun<CURSOR>ter = 0
-    
+
     def increment():
         nonlocal counter
         counter += 1
         return counter
-    
+
     def decrement():
         nonlocal counter
         counter -= 1
         return counter
-    
+
     # Use counter in outer scope
     initial = counter
     increment()
     decrement()
     final = counter
-    
+
     return increment, decrement
 ",
         );
@@ -272,7 +272,7 @@ def outer_function():
     }
 
     #[test]
-    fn test_global_variable_references() {
+    fn global_variable_references() {
         let test = cursor_test(
             "
 glo<CURSOR>bal_counter = 0
@@ -389,7 +389,7 @@ final_value = global_counter
     }
 
     #[test]
-    fn test_except_handler_variable_references() {
+    fn except_handler_variable_references() {
         let test = cursor_test(
             "
 try:
@@ -450,7 +450,7 @@ except ValueError as err:
     }
 
     #[test]
-    fn test_pattern_match_as_references() {
+    fn pattern_match_as_references() {
         let test = cursor_test(
             "
 match x:
@@ -498,7 +498,7 @@ match x:
     }
 
     #[test]
-    fn test_pattern_match_mapping_rest_references() {
+    fn pattern_match_mapping_rest_references() {
         let test = cursor_test(
             "
 match data:
@@ -553,7 +553,7 @@ match data:
     }
 
     #[test]
-    fn test_function_definition_references() {
+    fn function_definition_references() {
         let test = cursor_test(
             "
 def my_func<CURSOR>tion():
@@ -632,7 +632,7 @@ value = my_function
     }
 
     #[test]
-    fn test_class_definition_references() {
+    fn class_definition_references() {
         let test = cursor_test(
             "
 class My<CURSOR>Class:
@@ -1105,7 +1105,7 @@ cls = MyClass
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Click(x, button=a<CURSOR>b):
@@ -1144,7 +1144,7 @@ cls = MyClass
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Click(x, button=ab):
@@ -1183,7 +1183,7 @@ cls = MyClass
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Cl<CURSOR>ick(x, button=ab):
@@ -1233,7 +1233,7 @@ cls = MyClass
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Click(x, but<CURSOR>ton=ab):
@@ -1445,7 +1445,7 @@ cls = MyClass
     }
 
     #[test]
-    fn test_multi_file_function_references() {
+    fn multi_file_function_references() {
         let test = CursorTest::builder()
             .source(
                 "utils.py",
@@ -1471,7 +1471,7 @@ from utils import func
 class DataProcessor:
     def __init__(self):
         self.multiplier = func
-    
+
     def process(self, value):
         return func(value)
 ",
@@ -1535,14 +1535,14 @@ class DataProcessor:
     }
 
     #[test]
-    fn test_multi_file_class_attribute_references() {
+    fn multi_file_class_attribute_references() {
         let test = CursorTest::builder()
             .source(
                 "models.py",
                 "
 class MyModel:
     a<CURSOR>ttr = 42
-        
+
     def get_attribute(self):
         return MyModel.attr
 ",
@@ -1613,7 +1613,7 @@ def process_model():
     }
 
     #[test]
-    fn test_import_alias_references_should_not_resolve_to_original() {
+    fn import_alias_references_should_not_resolve_to_original() {
         let test = CursorTest::builder()
             .source(
                 "original.py",

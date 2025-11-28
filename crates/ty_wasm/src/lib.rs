@@ -17,8 +17,8 @@ use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{
-    InlayHintSettings, MarkupKind, RangedValue, document_highlights, goto_declaration,
-    goto_definition, goto_references, goto_type_definition, hover, inlay_hints,
+    InlayHintSettings, MarkupKind, RangedValue, document_highlights, find_references,
+    goto_declaration, goto_definition, goto_type_definition, hover, inlay_hints,
 };
 use ty_ide::{NavigationTarget, NavigationTargets, signature_help};
 use ty_project::metadata::options::Options;
@@ -351,7 +351,7 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = goto_references(&self.db, file_id.file, offset, true) else {
+        let Some(targets) = find_references(&self.db, file_id.file, offset, true) else {
             return Ok(Vec::new());
         };
 
