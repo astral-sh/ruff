@@ -1947,6 +1947,131 @@ mod tests {
     }
 
     #[test]
+    fn test_match_name_binding() {
+        let mut test = inlay_hint_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", ab]:
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        def my_func(command: str):
+            match command.split():
+                case ["get", ab]:
+                    x[: @Todo] = ab
+        "#);
+    }
+
+    #[test]
+    fn test_match_rest_binding() {
+        let mut test = inlay_hint_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", *ab]:
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        def my_func(command: str):
+            match command.split():
+                case ["get", *ab]:
+                    x[: @Todo] = ab
+        "#);
+    }
+
+    #[test]
+    fn test_match_as_binding() {
+        let mut test = inlay_hint_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", ("a" | "b") as ab]:
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        def my_func(command: str):
+            match command.split():
+                case ["get", ("a" | "b") as ab]:
+                    x[: @Todo] = ab
+        "#);
+    }
+
+    #[test]
+    fn test_match_keyword_binding() {
+        let mut test = inlay_hint_test(
+            r#"
+            class Click:
+                __match_args__ = ("position", "button")
+                def __init__(self, pos, btn):
+                    self.position: int = pos
+                    self.button: str = btn
+            
+            def my_func(event: Click):
+                match event:
+                    case Click(x, button=ab):
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        class Click:
+            __match_args__ = ("position", "button")
+            def __init__(self, pos, btn):
+                self.position: int = pos
+                self.button: str = btn
+
+        def my_func(event: Click):
+            match event:
+                case Click(x, button=ab):
+                    x[: @Todo] = ab
+        "#);
+    }
+
+    #[test]
+    fn test_typevar_name_binding() {
+        let mut test = inlay_hint_test(
+            r#"
+            type Alias1[AB: int = bool] = tuple[AB, list[AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"type Alias1[AB: int = bool] = tuple[AB, list[AB]]");
+    }
+
+    #[test]
+    fn test_typevar_spec_binding() {
+        let mut test = inlay_hint_test(
+            r#"
+            from typing import Callable
+            type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        from typing import Callable
+        type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+        ");
+    }
+
+    #[test]
+    fn test_typevar_tuple_binding() {
+        let mut test = inlay_hint_test(
+            r#"
+            type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]");
+    }
+
+    #[test]
     fn test_many_literals() {
         let mut test = inlay_hint_test(
             r#"
