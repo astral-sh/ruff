@@ -3421,7 +3421,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .iter()
                     .map(|elt| self.infer_type_expression(elt))
                     .collect::<Vec<_>>();
-                // N.B. We cannot represent a hetrogeneous list of types in our type system, so we
+                // N.B. We cannot represent a heterogeneous list of types in our type system, so we
                 // use a heterogeneous tuple type to represent the list of types instead.
                 self.store_expression_type(
                     default_expr,
@@ -3496,7 +3496,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     parameter_types.push(param_type);
                 }
 
-                // N.B. We cannot represent a hetrogeneous list of types in our type system, so we
+                // N.B. We cannot represent a heterogeneous list of types in our type system, so we
                 // use a heterogeneous tuple type to represent the list of types instead.
                 self.store_expression_type(
                     expr,
