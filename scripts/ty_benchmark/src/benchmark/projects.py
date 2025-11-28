@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import subprocess
 import sys
+from enum import Enum
 from pathlib import Path
 from typing import Final, Literal, NamedTuple
 
@@ -24,6 +25,8 @@ class Project(NamedTuple):
     """
 
     python_version: Literal["3.13", "3.14", "3.12", "3.11", "3.10", "3.9", "3.8"]
+
+    size: ProjectSize
 
     skip: str | None = None
     """The project is skipped from benchmarking if not `None`."""
@@ -102,11 +105,11 @@ class Project(NamedTuple):
 class IncrementalEdit(NamedTuple):
     """Description of an edit to measure incremental performance"""
 
-    main_file: str
+    edited_file: str
     """The file to which to apply the edit."""
 
-    affected_file: str
-    """A file other than the main file that's affected by the edit."""
+    affected_files: list[str]
+    """Files other than the main file that's affected by the edit."""
 
     replace_text: str
     """The original code snippet to find and replace in the main file."""
@@ -124,6 +127,12 @@ class IncrementalEdit(NamedTuple):
             return None
 
         return text.replace(self.replace_text, self.replacement, 1)
+
+
+class ProjectSize(Enum):
+    Small = 1
+    Medium = 2
+    Large = 3
 
 
 # Selection of projects taken from
@@ -147,11 +156,12 @@ ALL: Final = [
             "--extra",
             "d",
         ],
+        size=ProjectSize.Small,
         edit=IncrementalEdit(
-            main_file="src/black/nodes.py",
-            affected_file="src/black/linegen.py",
+            edited_file="src/black/nodes.py",
             replace_text="LN = Union[Leaf, Node]",
             replacement="LN = Union[Leaf, Node, int]",
+            affected_files=["src/black/linegen.py"],
         ),
     ),
     Project(
@@ -165,11 +175,12 @@ ALL: Final = [
             "pyproject.toml",
             "typing_extensions>=4.3,<5",
         ],
+        size=ProjectSize.Medium,
         edit=IncrementalEdit(
-            main_file="discord/abc.py",
-            affected_file="discord/channel.py",
+            edited_file="discord/abc.py",
             replace_text="id: int",
             replacement="id: str",
+            affected_files=["discord/channel.py"],
         ),
     ),
     # Fairly chunky project, requires the pydantic mypy plugin.
@@ -189,9 +200,10 @@ ALL: Final = [
             "-r",
             "requirements.txt",
         ],
+        size=ProjectSize.Large,
         edit=IncrementalEdit(
-            main_file="homeassistant/core.py",
-            affected_file="homeassistant/helpers/event.py",
+            edited_file="homeassistant/core.py",
+            affected_files=["homeassistant/helpers/event.py"],
             replace_text="type CALLBACK_TYPE = Callable[[], None]",
             replacement="type CALLBACK_TYPE = Callable[[str], None]",
         ),
@@ -203,11 +215,12 @@ ALL: Final = [
         python_version="3.11",
         include=["isort"],
         install_arguments=["types-colorama", "colorama"],
+        size=ProjectSize.Small,
         edit=IncrementalEdit(
-            main_file="isort/settings.py",
-            affected_file="isort/files.py",
+            edited_file="isort/settings.py",
             replace_text="def is_skipped(self, file_path: Path) -> bool:",
             replacement="def is_skipped(self, file_path: str) -> bool:",
+            affected_files=["isort/files.py"],
         ),
     ),
     Project(
@@ -217,11 +230,24 @@ ALL: Final = [
         python_version="3.10",
         include=["src"],
         install_arguments=["-r", "pyproject.toml"],
+        size=ProjectSize.Small,
         edit=IncrementalEdit(
-            main_file="src/jinja2/environment.py",
-            affected_file="src/jinja2/loaders.py",
-            replace_text="def render(self, *args: t.Any, **kwargs: t.Any) -> str:",
-            replacement="def render(self, *args: t.Any, **kwargs: t.Any) -> list[str]:",
+            edited_file="src/jinja2/nodes.py",
+            replace_text="""def iter_child_nodes(
+        self,
+        exclude: t.Container[str] | None = None,
+        only: t.Container[str] | None = None,
+    ) -> t.Iterator["Node"]""",
+            replacement="""def iter_child_nodes(
+        self,
+        exclude: t.Container[str] | None = None,
+        only: t.Container[str] | None = None,
+    ) -> t.Iterator[str]""",
+            affected_files=[
+                "src/jinja2/compiler.py",
+                "src/jinja2/idtracking.py",
+                "src/jinja2/visitor.py",
+            ],
         ),
     ),
     Project(
@@ -235,11 +261,12 @@ ALL: Final = [
             "-r",
             "requirements-dev.txt",
         ],
+        size=ProjectSize.Large,
         edit=IncrementalEdit(
-            main_file="pandas/_typing.py",
-            affected_file="pandas/core/frame.py",
+            edited_file="pandas/_typing.py",
             replace_text='Axis: TypeAlias = AxisInt | Literal["index", "columns", "rows"]',
             replacement='Axis: TypeAlias = Literal["index", "columns", "rows"]',
+            affected_files=["pandas/core/frame.py"],
         ),
     ),
     Project(
@@ -263,12 +290,8 @@ ALL: Final = [
             "scipy >=1.9.1",
             "scipy-stubs >=1.15.3.0",
         ],
-        edit=IncrementalEdit(
-            main_file="pandas-stubs/core/frame.pyi",
-            affected_file="pandas-stubs/core/series.pyi",
-            replace_text="def loc(self) -> _LocIndexerFrame[Self]:",
-            replacement="def loc(self) -> str:",
-        ),
+        size=ProjectSize.Medium,
+        edit=None,  # Tricky in a stubs only project as there are no actual method calls.
     ),
     Project(
         name="prefect",
@@ -288,11 +311,22 @@ ALL: Final = [
             "--group",
             "dev",
         ],
+        size=ProjectSize.Medium,
         edit=IncrementalEdit(
-            main_file="src/prefect/server/schemas/core.py",
-            affected_file="src/prefect/server/models/flow_runs.py",
-            replace_text='flow_id: UUID = Field(default=..., description="The id of the flow being run.")',
-            replacement='flow_id: str = Field(default=..., description="The id of the flow being run.")',
+            edited_file="src/prefect/server/models/events.py",
+            replace_text="""async def deployment_status_event(
+    session: AsyncSession,
+    deployment_id: UUID,
+    status: DeploymentStatus,
+    occurred: DateTime,
+) -> Event:""",
+            replacement="""async def deployment_status_event(
+    session: AsyncSession,
+    deployment_id: UUID,
+    status: DeploymentStatus,
+    occurred: DateTime,
+) -> int:""",
+            affected_files=["src/prefect/server/models/deployments.py"],
         ),
     ),
     Project(
@@ -362,11 +396,23 @@ ALL: Final = [
             "mypy==1.16.0",  # pytorch pins mypy,
         ],
         python_version="3.11",
+        size=ProjectSize.Large,
         edit=IncrementalEdit(
-            main_file="torch/types.py",
-            affected_file="torch/nn/modules/module.py",
-            replace_text="Device: TypeAlias = Union[_device, str, int, None]",
-            replacement="Device: TypeAlias = str",
+            edited_file="torch/nn/__init__.py",
+            replace_text="""from torch.nn.parameter import (  # usort: skip
+    Buffer as Buffer,
+    Parameter as Parameter,
+    UninitializedBuffer as UninitializedBuffer,
+    UninitializedParameter as UninitializedParameter,
+)""",
+            replacement="""from torch.nn.parameter import (  # usort: skip
+    Buffer as Buffer,
+    UninitializedBuffer as UninitializedBuffer,
+    UninitializedParameter as UninitializedParameter,
+)""",
+            affected_files=[
+                "torch/distributed/pipelining/_backward.py",
+            ],
         ),
     ),
 ]

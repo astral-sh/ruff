@@ -9,16 +9,17 @@ from __future__ import annotations
 import asyncio
 import tempfile
 from abc import ABC, abstractmethod
+from collections import Counter
 from collections.abc import Generator
 from pathlib import Path
-from typing import Any, Final, NewType, override
+from typing import Any, Callable, Final, override
 
 import pytest
 from lsprotocol import types as lsp
 
 from benchmark.lsp_client import FileDiagnostics, LSPClient
 from benchmark.projects import ALL as ALL_PROJECTS
-from benchmark.projects import IncrementalEdit, Project
+from benchmark.projects import IncrementalEdit, Project, ProjectSize
 from benchmark.tool import Pyrefly, Pyright, Tool, Ty
 from benchmark.venv import Venv
 
@@ -66,13 +67,13 @@ def test_fetch_diagnostics(
 
     project, venv = project_setup
 
-    run_lsp_test_benchmark(
+    run_benchmark(
         request,
         benchmark,
-        FetchDiagnostics,
         project,
         tool,
         venv,
+        FetchDiagnostics,
     )
 
 
@@ -83,29 +84,29 @@ def test_incremental_edit(
 
     project, venv = project_setup
 
-    run_lsp_test_benchmark(request, benchmark, IncrementalEditTest, project, tool, venv)
+    run_benchmark(request, benchmark, project, tool, venv, IncrementalEditTest)
 
 
-def run_lsp_test_benchmark[T: LspTest](
+def run_benchmark(
     request: Any,
     benchmark: Any,
-    Test: type[T],
     project: Project,
     tool: Tool,
     venv: Venv,
+    init_test: Callable[[Project, Tool, Venv], LspTest],
 ):
     # Set benchmark group to project name for better readability.
     benchmark.group = project.name
     verbose = request.config.getoption("verbose") > 0
 
-    main_file_backup: Path | None = None
+    edited_file_backup: Path | None = None
 
     # some make changes to the main file. Create a backup and restore it before each test
     # and once the entire suite is done.
     if project.edit:
-        main_file_path = venv.project_path / project.edit.main_file
-        main_file_backup = main_file_path.with_name(main_file_path.name + ".bak")
-        main_file_path.copy(main_file_backup)
+        edited_file_path = venv.project_path / project.edit.edited_file
+        edited_file_backup = edited_file_path.with_name(edited_file_path.name + ".bak")
+        edited_file_path.copy(edited_file_backup)
 
     try:
         tool.write_config(project, venv)
@@ -114,22 +115,25 @@ def run_lsp_test_benchmark[T: LspTest](
         with asyncio.Runner() as runner:
 
             def setup():
-                if main_file_backup:
-                    main_file_backup.copy(main_file_backup.with_suffix(""))
+                if edited_file_backup:
+                    edited_file_backup.copy(edited_file_backup.with_suffix(""))
 
-                test = Test(project, tool, venv)
+                test = init_test(project, tool, venv)
 
                 runner.run(test.setup())
                 return (test,), {}
 
-            def run(test: T) -> None:
+            def run(test: LspTest) -> None:
                 runner.run(test.run())
 
-            def teardown(test: T) -> None:
+            def teardown(test: LspTest) -> None:
                 nonlocal verbose
 
                 test.assert_output(verbose=verbose)
                 runner.run(test.teardown())
+
+                # Only do verbose output on the first (warm-up) run to avoid
+                # that the printing changes the benchmark result.
                 verbose = False
 
             # Run the benchmark using pedantic mode.
@@ -137,13 +141,14 @@ def run_lsp_test_benchmark[T: LspTest](
                 run,
                 setup=setup,
                 teardown=teardown,
+                # total executions = rounds * iterations
+                warmup_rounds=2,
                 rounds=10,
                 iterations=1,
-                warmup_rounds=3,
             )
     finally:
-        if main_file_backup:
-            main_file_backup.copy(main_file_backup.with_suffix(""))
+        if edited_file_backup:
+            edited_file_backup.copy(edited_file_backup.with_suffix(""))
 
 
 class LspTest(ABC):
@@ -171,17 +176,23 @@ class LspTest(ABC):
         return self.venv.project_path
 
     @property
-    def main_file_path(self) -> Path:
-        return self.cwd / self.edit.main_file
+    def edited_file_path(self) -> Path:
+        return self.absolute_file_path(self.edit.edited_file)
 
-    @property
-    def affected_file_path(self) -> Path:
-        return self.cwd / self.edit.affected_file
+    def absolute_file_path(self, file_path: str) -> Path:
+        return self.cwd / file_path
 
-    def files_to_check(self) -> list[Path]:
-        return [self.main_file_path, self.affected_file_path]
+    def files_to_check(self) -> Generator[Path, None, None]:
+        yield self.edited_file_path
 
-    def open_file_async(self, path: Path):
+        for file in self.edit.affected_files:
+            yield self.absolute_file_path(file)
+
+    def open_all_files(self):
+        for file_path in self.files_to_check():
+            self.open_file(file_path)
+
+    def open_file(self, path: Path):
         self.client.text_document_did_open(
             lsp.DidOpenTextDocumentParams(
                 text_document=lsp.TextDocumentItem(
@@ -243,17 +254,12 @@ class FetchDiagnostics(LspTest):
     @override
     async def setup(self):
         await self.initialize()
-        self.open_file_async(
-            self.main_file_path,
-        )
-        self.open_file_async(
-            self.affected_file_path,
-        )
+        self.open_all_files()
 
     @override
     async def run(self):
         self.diagnostics = await self.client.text_documents_diagnostics_async(
-            self.files_to_check()
+            list(self.files_to_check())
         )
 
     @override
@@ -275,11 +281,11 @@ class IncrementalEditTest(LspTest):
 
     def __init__(self, project: Project, tool: Tool, venv: Venv):
         super().__init__(project, tool, venv)
-        new_content = self.edit.apply_to(self.main_file_path.read_text())
+        new_content = self.edit.apply_to(self.edited_file_path.read_text())
 
         if new_content is None:
             pytest.fail(
-                f"Could not find expected text in {self.main_file_path}:\n"
+                f"Could not find expected text in {self.edited_file_path}:\n"
                 f"Expected to find: {self.edit.replace_text}\n"
                 f"This may indicate the project has been updated or the configuration is incorrect."
             )
@@ -291,18 +297,25 @@ class IncrementalEditTest(LspTest):
     async def setup(self):
         await self.initialize()
 
-        self.open_file_async(self.main_file_path)
-        self.open_file_async(self.affected_file_path)
+        self.open_all_files()
 
         self.before_edit_diagnostics = (
-            await self.client.text_documents_diagnostics_async(self.files_to_check())
+            await self.client.text_documents_diagnostics_async(
+                list(self.files_to_check())
+            )
         )
 
         # Give the server some time to do whatever indexing it needs
         # This helps Pyrefly a ton on the homeassistant benchmark. It goes from 13s to 1 to 2s.
         # It also seems that this indexing is only triggered after opening a file, which is why
         # we wait here rather than after calling `initialize`
-        await asyncio.sleep(20)
+        match self.project.size:
+            case ProjectSize.Small:
+                await asyncio.sleep(1)
+            case ProjectSize.Medium:
+                await asyncio.sleep(10)
+            case ProjectSize.Large:
+                await asyncio.sleep(20)
 
         if not self.client.server_supports_pull_diagnostics:
             # Pyrefly sometimes sends more than one publish diagnostic per file,
@@ -317,7 +330,7 @@ class IncrementalEditTest(LspTest):
         self.client.text_document_did_change(
             lsp.DidChangeTextDocumentParams(
                 text_document=lsp.VersionedTextDocumentIdentifier(
-                    uri=self.main_file_path.as_uri(),
+                    uri=self.edited_file_path.as_uri(),
                     version=2,
                 ),
                 content_changes=[
@@ -326,7 +339,7 @@ class IncrementalEditTest(LspTest):
             ),
         )
 
-        all_files = self.files_to_check()
+        all_files = list(self.files_to_check())
 
         # wait for the didChange publish notifications or pull the new diagnostics
         self.after_edit_diagnostics = (
@@ -340,12 +353,12 @@ class IncrementalEditTest(LspTest):
         # IMPORTANT: Write the file back to disk!
         # Pyrefly, as of Nov 27, requires that the content on disk
         # is updated to show cross-file diagnostics.
-        self.main_file_path.write_text(self.new_content)
+        self.edited_file_path.write_text(self.new_content)
 
         self.client.text_document_did_save(
             lsp.DidSaveTextDocumentParams(
                 text_document=lsp.TextDocumentIdentifier(
-                    uri=self.main_file_path.as_uri(),
+                    uri=self.edited_file_path.as_uri(),
                 ),
             )
         )
@@ -417,20 +430,44 @@ def print_diagnostics(
         )
 
 
-DiagnosticKey = NewType("DiagnosticKey", object)
+DiagnosticSignature = tuple[Path, str | int | None, str]
 
 
-def diagnostic_key(file: Path, diagnostic: lsp.Diagnostic) -> DiagnosticKey:
-    """Create a unique key for a diagnostic."""
-    return DiagnosticKey(
-        (
-            file,
-            diagnostic.range.start.line,
-            diagnostic.range.start.character,
-            diagnostic.code,
-            diagnostic.message,
-        )
+def diagnostic_signature(file: Path, diagnostic: lsp.Diagnostic) -> DiagnosticSignature:
+    """Create a signature for a diagnostic based on file, code, and message (ignoring position)."""
+    return (file, diagnostic.code, diagnostic.message)
+
+
+def count_diagnostic_signatures(
+    diagnostics_list: list[FileDiagnostics],
+) -> Counter[DiagnosticSignature]:
+    """Count occurrences of each diagnostic signature."""
+    return Counter(
+        diagnostic_signature(file, diagnostic)
+        for file, diagnostics in diagnostics_list
+        for diagnostic in diagnostics
     )
+
+
+def new_diagnostics(
+    old: list[FileDiagnostics],
+    new: list[FileDiagnostics],
+) -> list[FileDiagnostics]:
+    """Return diagnostics in `new` that aren't in `old`."""
+    diff_counts = count_diagnostic_signatures(new) - count_diagnostic_signatures(old)
+
+    result: list[FileDiagnostics] = []
+    for file, diagnostics in new:
+        new_for_file = []
+        for d in diagnostics:
+            sig = diagnostic_signature(file, d)
+            if diff_counts[sig] > 0:
+                diff_counts[sig] -= 1
+                new_for_file.append(d)
+        if new_for_file:
+            result.append(FileDiagnostics(file, new_for_file))
+
+    return result
 
 
 def print_diagnostic_diff(
@@ -442,34 +479,22 @@ def print_diagnostic_diff(
 ) -> None:
     """Print the difference in diagnostics before and after a change."""
 
-    total_before = sum(len(diagnostics) for _, diagnostics in before_diagnostics)
-    total_after = sum(len(diagnostics) for _, diagnostics in after_diagnostics)
+    added = new_diagnostics(before_diagnostics, after_diagnostics)
+    removed = new_diagnostics(after_diagnostics, before_diagnostics)
+
+    total_added = sum(len(diagnostics) for _, diagnostics in added)
+    total_removed = sum(len(diagnostics) for _, diagnostics in removed)
 
     print(f"\n{'=' * 80}")
     print(f"Diagnostic Diff: {project_name} - {tool_name}")
     print(f"{'=' * 80}")
-    print(f"Before change: {total_before} diagnostics")
-    print(f"After change:  {total_after} diagnostics")
-    print(f"Difference:    {total_after - total_before:+d} diagnostics")
+    print(f"Added:   {total_added} diagnostic(s)")
+    print(f"Removed: {total_removed} diagnostic(s)")
 
-    before_keys = {
-        diagnostic_key(file, diagnostic)
-        for file, diagnostics in before_diagnostics
-        for diagnostic in diagnostics
-    }
+    for file, diagnostics in added:
+        print_diagnostics(file, diagnostics, cwd, "added")
 
-    # Find new diagnostics by comparing before and after.
-    # Create sets of diagnostic keys.
-    for file, diagnostics in after_diagnostics:
-        new_diagnostics = [
-            diagnostic
-            for diagnostic in diagnostics
-            if diagnostic_key(file, diagnostic) not in before_keys
-        ]
-
-        if new_diagnostics:
-            print_diagnostics(file, new_diagnostics, cwd, "new diagnostic(s)")
-        else:
-            print_diagnostics(file, diagnostics, cwd, "returned diagnostic(s)")
+    for file, diagnostics in removed:
+        print_diagnostics(file, diagnostics, cwd, "removed")
 
     print(f"{'=' * 80}")
