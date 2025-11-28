@@ -17,7 +17,7 @@ use crate::types::call::CallError;
 use crate::types::class::{
     CodeGeneratorKind, DisjointBase, DisjointBaseKind, Field, MethodDecorator,
 };
-use crate::types::function::{FunctionType, KnownFunction};
+use crate::types::function::{FunctionType, KnownFunction, OverloadLiteral};
 use crate::types::liskov::MethodKind;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
@@ -3800,6 +3800,7 @@ pub(super) fn report_overridden_final_method<'db>(
     context: &InferContext<'db, '_>,
     member: &str,
     subclass_definition: Definition<'db>,
+    subclass_type: Type<'db>,
     superclass: ClassType<'db>,
     subclass: ClassType<'db>,
     superclass_method: FunctionType<'db>,
@@ -3836,7 +3837,7 @@ pub(super) fn report_overridden_final_method<'db>(
     );
 
     let superclass_function_literal = if superclass_method.file(db).is_stub(db) {
-        superclass_method.first_overload(db)
+        superclass_method.first_overload_or_implementation(db)
     } else {
         superclass_method.literal(db).last_definition(db)
     };
@@ -3856,6 +3857,53 @@ pub(super) fn report_overridden_final_method<'db>(
     }
 
     diagnostic.sub(sub);
+
+    let underlying_function = match subclass_type {
+        Type::FunctionLiteral(function) => Some(function),
+        Type::BoundMethod(method) => Some(method.function(db)),
+        _ => None,
+    };
+
+    if let Some(function) = underlying_function {
+        let overload_deletion = |overload: &OverloadLiteral<'db>| {
+            Edit::range_deletion(overload.node(db, context.file(), context.module()).range())
+        };
+
+        match function.overloads_and_implementation(db) {
+            ([first_overload, rest @ ..], None) => {
+                diagnostic.help(format_args!("Remove all overloads for `{member}`"));
+                diagnostic.set_fix(Fix::unsafe_edits(
+                    overload_deletion(first_overload),
+                    rest.iter().map(overload_deletion),
+                ));
+            }
+            ([first_overload, rest @ ..], Some(implementation)) => {
+                diagnostic.help(format_args!(
+                    "Remove all overloads and the implementation for `{member}`"
+                ));
+                diagnostic.set_fix(Fix::unsafe_edits(
+                    overload_deletion(first_overload),
+                    rest.iter().chain([&implementation]).map(overload_deletion),
+                ));
+            }
+            ([], Some(implementation)) => {
+                diagnostic.help(format_args!("Remove the override of `{member}`"));
+                diagnostic.set_fix(Fix::unsafe_edit(overload_deletion(&implementation)));
+            }
+            ([], None) => {
+                // Should be impossible to get here: how would we even infer a function as a function
+                // if it has 0 overloads and no implementation?
+                unreachable!(
+                    "A function should always have an implementation and/or >=1 overloads"
+                );
+            }
+        }
+    } else {
+        diagnostic.help(format_args!("Remove the override of `{member}`"));
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(
+            subclass_definition.full_range(db, context.module()).range(),
+        )));
+    }
 }
 
 /// This function receives an unresolved `from foo import bar` import,

@@ -278,7 +278,7 @@ impl<'db> OverloadLiteral<'db> {
             || is_implicit_classmethod(self.name(db))
     }
 
-    fn node<'ast>(
+    pub(crate) fn node<'ast>(
         self,
         db: &dyn Db,
         file: File,
@@ -619,32 +619,40 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition(db).spans(db)
     }
 
-    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size, cycle_initial=overloads_and_implementation_cycle_initial)]
     fn overloads_and_implementation(
         self,
         db: &'db dyn Db,
-    ) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
-        let self_overload = self.last_definition(db);
-        let mut current = self_overload;
-        let mut overloads = vec![];
+    ) -> (&'db [OverloadLiteral<'db>], Option<OverloadLiteral<'db>>) {
+        #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size, cycle_initial=overloads_and_implementation_cycle_initial)]
+        fn overloads_and_implementation_inner<'db>(
+            db: &'db dyn Db,
+            function: FunctionLiteral<'db>,
+        ) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
+            let self_overload = function.last_definition(db);
+            let mut current = self_overload;
+            let mut overloads = vec![];
 
-        while let Some(previous) = current.previous_overload(db) {
-            let overload = previous.last_definition(db);
-            overloads.push(overload);
-            current = overload;
+            while let Some(previous) = current.previous_overload(db) {
+                let overload = previous.last_definition(db);
+                overloads.push(overload);
+                current = overload;
+            }
+
+            // Overloads are inserted in reverse order, from bottom to top.
+            overloads.reverse();
+
+            let implementation = if self_overload.is_overload(db) {
+                overloads.push(self_overload);
+                None
+            } else {
+                Some(self_overload)
+            };
+
+            (overloads.into_boxed_slice(), implementation)
         }
 
-        // Overloads are inserted in reverse order, from bottom to top.
-        overloads.reverse();
-
-        let implementation = if self_overload.is_overload(db) {
-            overloads.push(self_overload);
-            None
-        } else {
-            Some(self_overload)
-        };
-
-        (overloads.into_boxed_slice(), implementation)
+        let (overloads, implementation) = overloads_and_implementation_inner(db, self);
+        (overloads.as_ref(), *implementation)
     }
 
     fn iter_overloads_and_implementation(
@@ -652,7 +660,7 @@ impl<'db> FunctionLiteral<'db> {
         db: &'db dyn Db,
     ) -> impl Iterator<Item = OverloadLiteral<'db>> + 'db {
         let (implementation, overloads) = self.overloads_and_implementation(db);
-        overloads.iter().chain(implementation).copied()
+        overloads.into_iter().chain(implementation.iter().copied())
     }
 
     /// Typed externally-visible signature for this function.
@@ -927,7 +935,7 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn overloads_and_implementation(
         self,
         db: &'db dyn Db,
-    ) -> &'db (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
+    ) -> (&'db [OverloadLiteral<'db>], Option<OverloadLiteral<'db>>) {
         self.literal(db).overloads_and_implementation(db)
     }
 
@@ -940,7 +948,7 @@ impl<'db> FunctionType<'db> {
         self.literal(db).iter_overloads_and_implementation(db)
     }
 
-    pub(crate) fn first_overload(self, db: &'db dyn Db) -> OverloadLiteral<'db> {
+    pub(crate) fn first_overload_or_implementation(self, db: &'db dyn Db) -> OverloadLiteral<'db> {
         self.iter_overloads_and_implementation(db)
             .next()
             .expect("A function must have at least one overload/implementation")

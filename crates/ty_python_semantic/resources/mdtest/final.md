@@ -55,13 +55,13 @@ class Parent:
     @classmethod
     def class_method1(cls) -> int: ...
 
-    @staticmethod
+    @classmethod
     @final
-    def static_method1() -> int: ...
+    def class_method2(cls) -> int: ...
 
     @final
-    @classmethod
-    def class_method2(cls) -> int: ...
+    @staticmethod
+    def static_method1() -> int: ...
 
     @staticmethod
     @final
@@ -70,7 +70,7 @@ class Parent:
     @lossy_decorator
     @final
     def decorated_1(self): ...
-    
+
     @final
     @lossy_decorator
     def decorated_2(self): ...

@@ -276,7 +276,7 @@ fn check_class_declaration<'db>(
         && function.has_known_decorator(db, FunctionDecorators::OVERRIDE)
     {
         let function_literal = if context.in_stub() {
-            function.first_overload(db)
+            function.first_overload_or_implementation(db)
         } else {
             function.literal(db).last_definition(db)
         };
@@ -307,6 +307,7 @@ fn check_class_declaration<'db>(
             context,
             &member.name,
             *definition,
+            type_on_subclass_instance,
             superclass,
             class,
             superclass_method,
