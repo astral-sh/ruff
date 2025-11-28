@@ -31,7 +31,7 @@ pub fn code_actions(
     if lint_id.name() == UNRESOLVED_REFERENCE.name()
         && let Some(import_quick_fix) = create_import_symbol_quick_fix(db, file, diagnostic_range)
     {
-        actions.extend(import_quick_fix)
+        actions.extend(import_quick_fix);
     }
 
     actions.push(QuickFix {
@@ -61,4 +61,126 @@ fn create_import_symbol_quick_fix(
                 preferred: true,
             }),
     )
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::code_actions;
+
+    use insta::assert_snapshot;
+    use ruff_db::{
+        diagnostic::{
+            Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
+            LintName, Span, SubDiagnostic,
+        },
+        files::{File, system_path_to_file},
+        source::source_text,
+        system::{DbWithWritableSystem, SystemPathBuf},
+    };
+    use ruff_diagnostics::Fix;
+    use ruff_text_size::{TextRange, TextSize};
+    use ty_project::ProjectMetadata;
+    use ty_python_semantic::{lint::LintMetadata, types::UNRESOLVED_REFERENCE};
+
+    #[test]
+    fn add_ignore() {
+        let test = CodeActionTest::with_source(r#"b = <START>a<END> / 10"#);
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:1:5
+          |
+        1 | b = a / 10
+          |     ^
+          |
+          - b = a / 10
+        1 + b = a / 10  # ty:ignore[unresolved-reference]
+        ")
+    }
+
+    pub(super) struct CodeActionTest {
+        pub(super) db: ty_project::TestDb,
+        pub(super) file: File,
+        pub(super) diagnostic_range: TextRange,
+    }
+
+    impl CodeActionTest {
+        pub(super) fn with_source(source: &str) -> Self {
+            let mut db = ty_project::TestDb::new(ProjectMetadata::new(
+                "test".into(),
+                SystemPathBuf::from("/"),
+            ));
+
+            db.init_program().unwrap();
+
+            let mut cleansed = source.to_string();
+
+            let start = cleansed
+                .find("<START>")
+                .expect("source text should contain a `<START>` marker");
+            cleansed.replace_range(start..start + "<START>".len(), "");
+
+            let end = cleansed
+                .find("<END>")
+                .expect("source text should contain a `<END>` marker");
+
+            cleansed.replace_range(end..end + "<END>".len(), "");
+
+            if end < start {
+                panic!("<START> marker should be before <END> marker");
+            }
+
+            db.write_file("main.py", cleansed)
+                .expect("write to memory file system to be successful");
+
+            let file = system_path_to_file(&db, "main.py").expect("newly written file to existing");
+
+            Self {
+                db,
+                file,
+                diagnostic_range: TextRange::new(
+                    TextSize::try_from(start).unwrap(),
+                    TextSize::try_from(end).unwrap(),
+                ),
+            }
+        }
+
+        pub(super) fn code_actions(&self, lint: &'static LintMetadata) -> String {
+            use std::fmt::Write;
+
+            let mut buf = String::new();
+
+            let config = DisplayDiagnosticConfig::default()
+                .color(false)
+                .show_fix_diff(true)
+                .format(DiagnosticFormat::Full);
+
+            for mut action in code_actions(&self.db, self.file, self.diagnostic_range, &lint.name) {
+                let mut diagnostic = Diagnostic::new(
+                    DiagnosticId::Lint(LintName::of("code-action")),
+                    ruff_db::diagnostic::Severity::Info,
+                    action.title,
+                );
+
+                diagnostic.annotate(Annotation::primary(
+                    Span::from(self.file).with_range(self.diagnostic_range),
+                ));
+
+                if action.preferred {
+                    diagnostic.sub(SubDiagnostic::new(
+                        ruff_db::diagnostic::SubDiagnosticSeverity::Help,
+                        "This is a preferred code action",
+                    ));
+                }
+
+                let first_edit = action.edits.remove(0);
+                diagnostic.set_fix(Fix::safe_edits(first_edit, action.edits));
+
+                write!(buf, "{}", diagnostic.display(&self.db, &config)).unwrap();
+            }
+
+            buf
+        }
+    }
 }
