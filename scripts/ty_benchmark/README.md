@@ -45,7 +45,7 @@ Measures how long it takes for a newly started LSP to return the diagnostics for
 Run with:
 
 ```bash
-uv run --python 3.14 pytest src/benchmark/test_lsp_diagnostics.py::fetch_diagnostics
+uv run --python 3.14 pytest src/benchmark/test_lsp_diagnostics.py::test_fetch_diagnostics
 ```
 
 **Note**: Use `-v -s` to see the set of diagnostics returned by each type checker.
