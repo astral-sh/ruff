@@ -2468,6 +2468,26 @@ impl<'db> Type<'db> {
                 })
             }
 
+            // `type[Any]` is assignable to arbitrary protocols as it has arbitrary attributes
+            // (this is handled by a lower-down branch), but it is only a subtype of a given
+            // protocol if `type` is a subtype of that protocol. Similarly, `type[T]` will
+            // always be assignable to any protocol if `type[<upper bound of T>]` is assignable
+            // to that protocol (handled lower down), but it is only a subtype of that protocol
+            // if `type` is a subtype of that protocol.
+            (Type::SubclassOf(self_subclass_ty), Type::ProtocolInstance(_))
+                if (self_subclass_ty.is_dynamic() || self_subclass_ty.is_type_var())
+                    && !relation.is_assignability() =>
+            {
+                KnownClass::Type.to_instance(db).has_relation_to_impl(
+                    db,
+                    target,
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+            }
+
             (_, Type::ProtocolInstance(protocol)) => {
                 relation_visitor.visit((self, target, relation), || {
                     self.satisfies_protocol(
