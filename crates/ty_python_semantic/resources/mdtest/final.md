@@ -76,20 +76,31 @@ class Parent:
     def decorated_2(self): ...
 
 class Child(Parent):
-    def foo(self): ...  # error: [override-of-final-method]
+    # explicitly test the concise diagnostic message,
+    # which is different to the verbose diagnostic summary message:
+    #
+    # error: [override-of-final-method] "Cannot override final member `foo` from superclass `Parent`"
+    def foo(self): ...
     @property
     def my_property1(self) -> int: ...  # error: [override-of-final-method]
+
     @property
     def my_property2(self) -> int: ...  # error: [override-of-final-method]
+
     @classmethod
     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
+
     @staticmethod
     def static_method1() -> int: ...  # error: [override-of-final-method]
+
     @classmethod
     def class_method2(cls) -> int: ...  # error: [override-of-final-method]
+
     @staticmethod
     def static_method2() -> int: ...  # error: [override-of-final-method]
+
     def decorated_1(self): ...  # TODO: should emit [override-of-final-method]
+
     @lossy_decorator
     def decorated_2(self): ...  # TODO: should emit [override-of-final-method]
 
@@ -181,6 +192,7 @@ class Good:
     def bar(self, x: str) -> str: ...
     @overload
     def bar(self, x: int) -> int: ...
+
     @final
     @overload
     def baz(self, x: str) -> str: ...
@@ -192,6 +204,7 @@ class ChildOfGood(Good):
     def bar(self, x: str) -> str: ...
     @overload
     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
+
     @overload
     def baz(self, x: str) -> str: ...
     @overload
@@ -204,6 +217,7 @@ class Bad:
     @final
     # error: [invalid-overload]
     def bar(self, x: int) -> int: ...
+
     @overload
     def baz(self, x: str) -> str: ...
     @final
@@ -216,6 +230,7 @@ class ChildOfBad(Bad):
     def bar(self, x: str) -> str: ...
     @overload
     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
+    
     @overload
     def baz(self, x: str) -> str: ...
     @overload

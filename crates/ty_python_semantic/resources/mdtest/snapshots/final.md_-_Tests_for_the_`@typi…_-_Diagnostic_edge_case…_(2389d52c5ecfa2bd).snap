@@ -36,7 +36,7 @@ error[override-of-final-method]: Cannot override `module1.Foo.f`
   |
 3 | class Foo(module1.Foo):
 4 |     def f(self): ...  # error: [override-of-final-method]
-  |         ^ Override of `f` from superclass `module1.Foo`
+  |         ^ Overrides a definition from superclass `module1.Foo`
   |
 info: `module1.Foo.f` is decorated with `@final`, forbidding overrides
  --> src/module1.py:4:5

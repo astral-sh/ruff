@@ -3823,7 +3823,7 @@ pub(super) fn report_overridden_final_method<'db>(
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Cannot override `{superclass_name}.{member}`"));
     diagnostic.set_primary_message(format_args!(
-        "Override of `{member}` from superclass `{superclass_name}`"
+        "Overrides a definition from superclass `{superclass_name}`"
     ));
     diagnostic.set_concise_message(format_args!(
         "Cannot override final member `{member}` from superclass `{superclass_name}`"

@@ -623,7 +623,11 @@ impl<'db> FunctionLiteral<'db> {
         self,
         db: &'db dyn Db,
     ) -> (&'db [OverloadLiteral<'db>], Option<OverloadLiteral<'db>>) {
-        #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size, cycle_initial=overloads_and_implementation_cycle_initial)]
+        #[salsa::tracked(
+            returns(ref),
+            heap_size=ruff_memory_usage::heap_size,
+            cycle_initial=overloads_and_implementation_cycle_initial
+        )]
         fn overloads_and_implementation_inner<'db>(
             db: &'db dyn Db,
             function: FunctionLiteral<'db>,
@@ -816,7 +820,7 @@ impl<'db> FunctionType<'db> {
     }
 
     /// Returns the AST node for this function.
-    pub(crate) fn node<'ast>(
+    pub(super) fn node<'ast>(
         self,
         db: &dyn Db,
         file: File,

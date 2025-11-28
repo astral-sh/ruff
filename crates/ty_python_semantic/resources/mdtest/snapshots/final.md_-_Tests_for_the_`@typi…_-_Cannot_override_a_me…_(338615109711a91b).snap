@@ -53,57 +53,57 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
  39 |     def decorated_2(self): ...
  40 | 
  41 | class Child(Parent):
- 42 |     def foo(self): ...  # error: [override-of-final-method]
- 43 |     @property
- 44 |     def my_property1(self) -> int: ...  # error: [override-of-final-method]
- 45 |     @property
- 46 |     def my_property2(self) -> int: ...  # error: [override-of-final-method]
- 47 |     @classmethod
- 48 |     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
- 49 |     @staticmethod
- 50 |     def static_method1() -> int: ...  # error: [override-of-final-method]
- 51 |     @classmethod
- 52 |     def class_method2(cls) -> int: ...  # error: [override-of-final-method]
- 53 |     @staticmethod
- 54 |     def static_method2() -> int: ...  # error: [override-of-final-method]
- 55 |     def decorated_1(self): ...  # TODO: should emit [override-of-final-method]
- 56 |     @lossy_decorator
- 57 |     def decorated_2(self): ...  # TODO: should emit [override-of-final-method]
+ 42 |     # explicitly test the concise diagnostic message,
+ 43 |     # which is different to the verbose diagnostic summary message:
+ 44 |     #
+ 45 |     # error: [override-of-final-method] "Cannot override final member `foo` from superclass `Parent`"
+ 46 |     def foo(self): ...
+ 47 |     @property
+ 48 |     def my_property1(self) -> int: ...  # error: [override-of-final-method]
+ 49 | 
+ 50 |     @property
+ 51 |     def my_property2(self) -> int: ...  # error: [override-of-final-method]
+ 52 | 
+ 53 |     @classmethod
+ 54 |     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
+ 55 | 
+ 56 |     @staticmethod
+ 57 |     def static_method1() -> int: ...  # error: [override-of-final-method]
  58 | 
- 59 | class OtherChild(Parent): ...
- 60 | 
- 61 | class Grandchild(OtherChild):
+ 59 |     @classmethod
+ 60 |     def class_method2(cls) -> int: ...  # error: [override-of-final-method]
+ 61 | 
  62 |     @staticmethod
- 63 |     # TODO: we should emit a Liskov violation here too
- 64 |     # error: [override-of-final-method]
- 65 |     def foo(): ...
- 66 |     @property
- 67 |     # TODO: we should emit a Liskov violation here too
- 68 |     # error: [override-of-final-method]
- 69 |     def my_property1(self) -> str: ...
- 70 |     # TODO: we should emit a Liskov violation here too
- 71 |     # error: [override-of-final-method]
- 72 |     class_method1 = None
- 73 | 
- 74 | # Diagnostic edge case: `final` is very far away from the method definition in the source code:
- 75 | 
- 76 | T = TypeVar("T")
- 77 | 
- 78 | def identity(x: T) -> T: ...
- 79 | 
- 80 | class Foo:
- 81 |     @final
- 82 |     @identity
- 83 |     @identity
- 84 |     @identity
- 85 |     @identity
- 86 |     @identity
- 87 |     @identity
- 88 |     @identity
- 89 |     @identity
- 90 |     @identity
- 91 |     @identity
- 92 |     @identity
+ 63 |     def static_method2() -> int: ...  # error: [override-of-final-method]
+ 64 | 
+ 65 |     def decorated_1(self): ...  # TODO: should emit [override-of-final-method]
+ 66 | 
+ 67 |     @lossy_decorator
+ 68 |     def decorated_2(self): ...  # TODO: should emit [override-of-final-method]
+ 69 | 
+ 70 | class OtherChild(Parent): ...
+ 71 | 
+ 72 | class Grandchild(OtherChild):
+ 73 |     @staticmethod
+ 74 |     # TODO: we should emit a Liskov violation here too
+ 75 |     # error: [override-of-final-method]
+ 76 |     def foo(): ...
+ 77 |     @property
+ 78 |     # TODO: we should emit a Liskov violation here too
+ 79 |     # error: [override-of-final-method]
+ 80 |     def my_property1(self) -> str: ...
+ 81 |     # TODO: we should emit a Liskov violation here too
+ 82 |     # error: [override-of-final-method]
+ 83 |     class_method1 = None
+ 84 | 
+ 85 | # Diagnostic edge case: `final` is very far away from the method definition in the source code:
+ 86 | 
+ 87 | T = TypeVar("T")
+ 88 | 
+ 89 | def identity(x: T) -> T: ...
+ 90 | 
+ 91 | class Foo:
+ 92 |     @final
  93 |     @identity
  94 |     @identity
  95 |     @identity
@@ -111,23 +111,35 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
  97 |     @identity
  98 |     @identity
  99 |     @identity
-100 |     def bar(self): ...
-101 | 
-102 | class Baz(Foo):
-103 |     def bar(self): ...  # error: [override-of-final-method]
+100 |     @identity
+101 |     @identity
+102 |     @identity
+103 |     @identity
+104 |     @identity
+105 |     @identity
+106 |     @identity
+107 |     @identity
+108 |     @identity
+109 |     @identity
+110 |     @identity
+111 |     def bar(self): ...
+112 | 
+113 | class Baz(Foo):
+114 |     def bar(self): ...  # error: [override-of-final-method]
 ```
 
 # Diagnostics
 
 ```
 error[override-of-final-method]: Cannot override `Parent.foo`
-  --> src/mdtest_snippet.pyi:42:9
+  --> src/mdtest_snippet.pyi:46:9
    |
-41 | class Child(Parent):
-42 |     def foo(self): ...  # error: [override-of-final-method]
-   |         ^^^ Override of `foo` from superclass `Parent`
-43 |     @property
-44 |     def my_property1(self) -> int: ...  # error: [override-of-final-method]
+44 |     #
+45 |     # error: [override-of-final-method] "Cannot override final member `foo` from superclass `Parent`"
+46 |     def foo(self): ...
+   |         ^^^ Overrides a definition from superclass `Parent`
+47 |     @property
+48 |     def my_property1(self) -> int: ...  # error: [override-of-final-method]
    |
 info: `Parent.foo` is decorated with `@final`, forbidding overrides
  --> src/mdtest_snippet.pyi:6:5
@@ -142,28 +154,28 @@ info: `Parent.foo` is decorated with `@final`, forbidding overrides
   |
 help: Remove the override of `foo`
 info: rule `override-of-final-method` is enabled by default
-39 |     def decorated_2(self): ...
-40 | 
-41 | class Child(Parent):
-   -     def foo(self): ...  # error: [override-of-final-method]
-42 +       # error: [override-of-final-method]
-43 |     @property
-44 |     def my_property1(self) -> int: ...  # error: [override-of-final-method]
-45 |     @property
+43 |     # which is different to the verbose diagnostic summary message:
+44 |     #
+45 |     # error: [override-of-final-method] "Cannot override final member `foo` from superclass `Parent`"
+   -     def foo(self): ...
+46 +     
+47 |     @property
+48 |     def my_property1(self) -> int: ...  # error: [override-of-final-method]
+49 | 
 note: This is an unsafe fix and may change runtime behavior
 
 ```
 
 ```
 error[override-of-final-method]: Cannot override `Parent.my_property1`
-  --> src/mdtest_snippet.pyi:44:9
+  --> src/mdtest_snippet.pyi:48:9
    |
-42 |     def foo(self): ...  # error: [override-of-final-method]
-43 |     @property
-44 |     def my_property1(self) -> int: ...  # error: [override-of-final-method]
-   |         ^^^^^^^^^^^^ Override of `my_property1` from superclass `Parent`
-45 |     @property
-46 |     def my_property2(self) -> int: ...  # error: [override-of-final-method]
+46 |     def foo(self): ...
+47 |     @property
+48 |     def my_property1(self) -> int: ...  # error: [override-of-final-method]
+   |         ^^^^^^^^^^^^ Overrides a definition from superclass `Parent`
+49 |
+50 |     @property
    |
 info: `Parent.my_property1` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.pyi:9:5
@@ -180,29 +192,28 @@ info: `Parent.my_property1` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `my_property1`
 info: rule `override-of-final-method` is enabled by default
-40 | 
-41 | class Child(Parent):
-42 |     def foo(self): ...  # error: [override-of-final-method]
+44 |     #
+45 |     # error: [override-of-final-method] "Cannot override final member `foo` from superclass `Parent`"
+46 |     def foo(self): ...
    -     @property
    -     def my_property1(self) -> int: ...  # error: [override-of-final-method]
-43 +       # error: [override-of-final-method]
-44 |     @property
-45 |     def my_property2(self) -> int: ...  # error: [override-of-final-method]
-46 |     @classmethod
+47 +       # error: [override-of-final-method]
+48 | 
+49 |     @property
+50 |     def my_property2(self) -> int: ...  # error: [override-of-final-method]
 note: This is an unsafe fix and may change runtime behavior
 
 ```
 
 ```
 error[override-of-final-method]: Cannot override `Parent.my_property2`
-  --> src/mdtest_snippet.pyi:46:9
+  --> src/mdtest_snippet.pyi:51:9
    |
-44 |     def my_property1(self) -> int: ...  # error: [override-of-final-method]
-45 |     @property
-46 |     def my_property2(self) -> int: ...  # error: [override-of-final-method]
-   |         ^^^^^^^^^^^^ Override of `my_property2` from superclass `Parent`
-47 |     @classmethod
-48 |     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
+50 |     @property
+51 |     def my_property2(self) -> int: ...  # error: [override-of-final-method]
+   |         ^^^^^^^^^^^^ Overrides a definition from superclass `Parent`
+52 |
+53 |     @classmethod
    |
 info: `Parent.my_property2` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.pyi:14:5
@@ -217,29 +228,28 @@ info: `Parent.my_property2` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `my_property2`
 info: rule `override-of-final-method` is enabled by default
-42 |     def foo(self): ...  # error: [override-of-final-method]
-43 |     @property
-44 |     def my_property1(self) -> int: ...  # error: [override-of-final-method]
+47 |     @property
+48 |     def my_property1(self) -> int: ...  # error: [override-of-final-method]
+49 | 
    -     @property
    -     def my_property2(self) -> int: ...  # error: [override-of-final-method]
-45 +       # error: [override-of-final-method]
-46 |     @classmethod
-47 |     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
-48 |     @staticmethod
+50 +       # error: [override-of-final-method]
+51 | 
+52 |     @classmethod
+53 |     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
 note: This is an unsafe fix and may change runtime behavior
 
 ```
 
 ```
 error[override-of-final-method]: Cannot override `Parent.class_method1`
-  --> src/mdtest_snippet.pyi:48:9
+  --> src/mdtest_snippet.pyi:54:9
    |
-46 |     def my_property2(self) -> int: ...  # error: [override-of-final-method]
-47 |     @classmethod
-48 |     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
-   |         ^^^^^^^^^^^^^ Override of `class_method1` from superclass `Parent`
-49 |     @staticmethod
-50 |     def static_method1() -> int: ...  # error: [override-of-final-method]
+53 |     @classmethod
+54 |     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
+   |         ^^^^^^^^^^^^^ Overrides a definition from superclass `Parent`
+55 |
+56 |     @staticmethod
    |
 info: `Parent.class_method1` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.pyi:17:5
@@ -256,29 +266,28 @@ info: `Parent.class_method1` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `class_method1`
 info: rule `override-of-final-method` is enabled by default
-44 |     def my_property1(self) -> int: ...  # error: [override-of-final-method]
-45 |     @property
-46 |     def my_property2(self) -> int: ...  # error: [override-of-final-method]
+50 |     @property
+51 |     def my_property2(self) -> int: ...  # error: [override-of-final-method]
+52 | 
    -     @classmethod
    -     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
-47 +       # error: [override-of-final-method]
-48 |     @staticmethod
-49 |     def static_method1() -> int: ...  # error: [override-of-final-method]
-50 |     @classmethod
+53 +       # error: [override-of-final-method]
+54 | 
+55 |     @staticmethod
+56 |     def static_method1() -> int: ...  # error: [override-of-final-method]
 note: This is an unsafe fix and may change runtime behavior
 
 ```
 
 ```
 error[override-of-final-method]: Cannot override `Parent.static_method1`
-  --> src/mdtest_snippet.pyi:50:9
+  --> src/mdtest_snippet.pyi:57:9
    |
-48 |     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
-49 |     @staticmethod
-50 |     def static_method1() -> int: ...  # error: [override-of-final-method]
-   |         ^^^^^^^^^^^^^^ Override of `static_method1` from superclass `Parent`
-51 |     @classmethod
-52 |     def class_method2(cls) -> int: ...  # error: [override-of-final-method]
+56 |     @staticmethod
+57 |     def static_method1() -> int: ...  # error: [override-of-final-method]
+   |         ^^^^^^^^^^^^^^ Overrides a definition from superclass `Parent`
+58 |
+59 |     @classmethod
    |
 info: `Parent.static_method1` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.pyi:25:5
@@ -295,29 +304,28 @@ info: `Parent.static_method1` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `static_method1`
 info: rule `override-of-final-method` is enabled by default
-46 |     def my_property2(self) -> int: ...  # error: [override-of-final-method]
-47 |     @classmethod
-48 |     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
+53 |     @classmethod
+54 |     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
+55 | 
    -     @staticmethod
    -     def static_method1() -> int: ...  # error: [override-of-final-method]
-49 +       # error: [override-of-final-method]
-50 |     @classmethod
-51 |     def class_method2(cls) -> int: ...  # error: [override-of-final-method]
-52 |     @staticmethod
+56 +       # error: [override-of-final-method]
+57 | 
+58 |     @classmethod
+59 |     def class_method2(cls) -> int: ...  # error: [override-of-final-method]
 note: This is an unsafe fix and may change runtime behavior
 
 ```
 
 ```
 error[override-of-final-method]: Cannot override `Parent.class_method2`
-  --> src/mdtest_snippet.pyi:52:9
+  --> src/mdtest_snippet.pyi:60:9
    |
-50 |     def static_method1() -> int: ...  # error: [override-of-final-method]
-51 |     @classmethod
-52 |     def class_method2(cls) -> int: ...  # error: [override-of-final-method]
-   |         ^^^^^^^^^^^^^ Override of `class_method2` from superclass `Parent`
-53 |     @staticmethod
-54 |     def static_method2() -> int: ...  # error: [override-of-final-method]
+59 |     @classmethod
+60 |     def class_method2(cls) -> int: ...  # error: [override-of-final-method]
+   |         ^^^^^^^^^^^^^ Overrides a definition from superclass `Parent`
+61 |
+62 |     @staticmethod
    |
 info: `Parent.class_method2` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.pyi:22:5
@@ -332,29 +340,28 @@ info: `Parent.class_method2` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `class_method2`
 info: rule `override-of-final-method` is enabled by default
-48 |     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
-49 |     @staticmethod
-50 |     def static_method1() -> int: ...  # error: [override-of-final-method]
+56 |     @staticmethod
+57 |     def static_method1() -> int: ...  # error: [override-of-final-method]
+58 | 
    -     @classmethod
    -     def class_method2(cls) -> int: ...  # error: [override-of-final-method]
-51 +       # error: [override-of-final-method]
-52 |     @staticmethod
-53 |     def static_method2() -> int: ...  # error: [override-of-final-method]
-54 |     def decorated_1(self): ...  # TODO: should emit [override-of-final-method]
+59 +       # error: [override-of-final-method]
+60 | 
+61 |     @staticmethod
+62 |     def static_method2() -> int: ...  # error: [override-of-final-method]
 note: This is an unsafe fix and may change runtime behavior
 
 ```
 
 ```
 error[override-of-final-method]: Cannot override `Parent.static_method2`
-  --> src/mdtest_snippet.pyi:54:9
+  --> src/mdtest_snippet.pyi:63:9
    |
-52 |     def class_method2(cls) -> int: ...  # error: [override-of-final-method]
-53 |     @staticmethod
-54 |     def static_method2() -> int: ...  # error: [override-of-final-method]
-   |         ^^^^^^^^^^^^^^ Override of `static_method2` from superclass `Parent`
-55 |     def decorated_1(self): ...  # TODO: should emit [override-of-final-method]
-56 |     @lossy_decorator
+62 |     @staticmethod
+63 |     def static_method2() -> int: ...  # error: [override-of-final-method]
+   |         ^^^^^^^^^^^^^^ Overrides a definition from superclass `Parent`
+64 |
+65 |     def decorated_1(self): ...  # TODO: should emit [override-of-final-method]
    |
 info: `Parent.static_method2` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.pyi:30:5
@@ -369,29 +376,29 @@ info: `Parent.static_method2` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `static_method2`
 info: rule `override-of-final-method` is enabled by default
-50 |     def static_method1() -> int: ...  # error: [override-of-final-method]
-51 |     @classmethod
-52 |     def class_method2(cls) -> int: ...  # error: [override-of-final-method]
+59 |     @classmethod
+60 |     def class_method2(cls) -> int: ...  # error: [override-of-final-method]
+61 | 
    -     @staticmethod
    -     def static_method2() -> int: ...  # error: [override-of-final-method]
-53 +       # error: [override-of-final-method]
-54 |     def decorated_1(self): ...  # TODO: should emit [override-of-final-method]
-55 |     @lossy_decorator
-56 |     def decorated_2(self): ...  # TODO: should emit [override-of-final-method]
+62 +       # error: [override-of-final-method]
+63 | 
+64 |     def decorated_1(self): ...  # TODO: should emit [override-of-final-method]
+65 | 
 note: This is an unsafe fix and may change runtime behavior
 
 ```
 
 ```
 error[override-of-final-method]: Cannot override `Parent.foo`
-  --> src/mdtest_snippet.pyi:65:9
+  --> src/mdtest_snippet.pyi:76:9
    |
-63 |     # TODO: we should emit a Liskov violation here too
-64 |     # error: [override-of-final-method]
-65 |     def foo(): ...
-   |         ^^^ Override of `foo` from superclass `Parent`
-66 |     @property
-67 |     # TODO: we should emit a Liskov violation here too
+74 |     # TODO: we should emit a Liskov violation here too
+75 |     # error: [override-of-final-method]
+76 |     def foo(): ...
+   |         ^^^ Overrides a definition from superclass `Parent`
+77 |     @property
+78 |     # TODO: we should emit a Liskov violation here too
    |
 info: `Parent.foo` is decorated with `@final`, forbidding overrides
  --> src/mdtest_snippet.pyi:6:5
@@ -406,31 +413,31 @@ info: `Parent.foo` is decorated with `@final`, forbidding overrides
   |
 help: Remove the override of `foo`
 info: rule `override-of-final-method` is enabled by default
-59 | class OtherChild(Parent): ...
-60 | 
-61 | class Grandchild(OtherChild):
+70 | class OtherChild(Parent): ...
+71 | 
+72 | class Grandchild(OtherChild):
    -     @staticmethod
    -     # TODO: we should emit a Liskov violation here too
    -     # error: [override-of-final-method]
    -     def foo(): ...
-62 +     
-63 |     @property
-64 |     # TODO: we should emit a Liskov violation here too
-65 |     # error: [override-of-final-method]
+73 +     
+74 |     @property
+75 |     # TODO: we should emit a Liskov violation here too
+76 |     # error: [override-of-final-method]
 note: This is an unsafe fix and may change runtime behavior
 
 ```
 
 ```
 error[override-of-final-method]: Cannot override `Parent.my_property1`
-  --> src/mdtest_snippet.pyi:69:9
+  --> src/mdtest_snippet.pyi:80:9
    |
-67 |     # TODO: we should emit a Liskov violation here too
-68 |     # error: [override-of-final-method]
-69 |     def my_property1(self) -> str: ...
-   |         ^^^^^^^^^^^^ Override of `my_property1` from superclass `Parent`
-70 |     # TODO: we should emit a Liskov violation here too
-71 |     # error: [override-of-final-method]
+78 |     # TODO: we should emit a Liskov violation here too
+79 |     # error: [override-of-final-method]
+80 |     def my_property1(self) -> str: ...
+   |         ^^^^^^^^^^^^ Overrides a definition from superclass `Parent`
+81 |     # TODO: we should emit a Liskov violation here too
+82 |     # error: [override-of-final-method]
    |
 info: `Parent.my_property1` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.pyi:9:5
@@ -447,31 +454,31 @@ info: `Parent.my_property1` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `my_property1`
 info: rule `override-of-final-method` is enabled by default
-63 |     # TODO: we should emit a Liskov violation here too
-64 |     # error: [override-of-final-method]
-65 |     def foo(): ...
+74 |     # TODO: we should emit a Liskov violation here too
+75 |     # error: [override-of-final-method]
+76 |     def foo(): ...
    -     @property
    -     # TODO: we should emit a Liskov violation here too
    -     # error: [override-of-final-method]
    -     def my_property1(self) -> str: ...
-66 +     
-67 |     # TODO: we should emit a Liskov violation here too
-68 |     # error: [override-of-final-method]
-69 |     class_method1 = None
+77 +     
+78 |     # TODO: we should emit a Liskov violation here too
+79 |     # error: [override-of-final-method]
+80 |     class_method1 = None
 note: This is an unsafe fix and may change runtime behavior
 
 ```
 
 ```
 error[override-of-final-method]: Cannot override `Parent.class_method1`
-  --> src/mdtest_snippet.pyi:72:5
+  --> src/mdtest_snippet.pyi:83:5
    |
-70 |     # TODO: we should emit a Liskov violation here too
-71 |     # error: [override-of-final-method]
-72 |     class_method1 = None
-   |     ^^^^^^^^^^^^^ Override of `class_method1` from superclass `Parent`
-73 |
-74 | # Diagnostic edge case: `final` is very far away from the method definition in the source code:
+81 |     # TODO: we should emit a Liskov violation here too
+82 |     # error: [override-of-final-method]
+83 |     class_method1 = None
+   |     ^^^^^^^^^^^^^ Overrides a definition from superclass `Parent`
+84 |
+85 | # Diagnostic edge case: `final` is very far away from the method definition in the source code:
    |
 info: `Parent.class_method1` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.pyi:17:5
@@ -488,51 +495,51 @@ info: `Parent.class_method1` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `class_method1`
 info: rule `override-of-final-method` is enabled by default
-69 |     def my_property1(self) -> str: ...
-70 |     # TODO: we should emit a Liskov violation here too
-71 |     # error: [override-of-final-method]
+80 |     def my_property1(self) -> str: ...
+81 |     # TODO: we should emit a Liskov violation here too
+82 |     # error: [override-of-final-method]
    -     class_method1 = None
-72 +     
-73 | 
-74 | # Diagnostic edge case: `final` is very far away from the method definition in the source code:
-75 | 
+83 +     
+84 | 
+85 | # Diagnostic edge case: `final` is very far away from the method definition in the source code:
+86 | 
 note: This is an unsafe fix and may change runtime behavior
 
 ```
 
 ```
 error[override-of-final-method]: Cannot override `Foo.bar`
-   --> src/mdtest_snippet.pyi:103:9
+   --> src/mdtest_snippet.pyi:114:9
     |
-102 | class Baz(Foo):
-103 |     def bar(self): ...  # error: [override-of-final-method]
-    |         ^^^ Override of `bar` from superclass `Foo`
+113 | class Baz(Foo):
+114 |     def bar(self): ...  # error: [override-of-final-method]
+    |         ^^^ Overrides a definition from superclass `Foo`
     |
 info: `Foo.bar` is decorated with `@final`, forbidding overrides
-   --> src/mdtest_snippet.pyi:81:5
+   --> src/mdtest_snippet.pyi:92:5
     |
- 80 | class Foo:
- 81 |     @final
+ 91 | class Foo:
+ 92 |     @final
     |     ------
- 82 |     @identity
- 83 |     @identity
+ 93 |     @identity
+ 94 |     @identity
     |
-   ::: src/mdtest_snippet.pyi:100:9
+   ::: src/mdtest_snippet.pyi:111:9
     |
- 98 |     @identity
- 99 |     @identity
-100 |     def bar(self): ...
+109 |     @identity
+110 |     @identity
+111 |     def bar(self): ...
     |         --- `Foo.bar` defined here
-101 |
-102 | class Baz(Foo):
+112 |
+113 | class Baz(Foo):
     |
 help: Remove the override of `bar`
 info: rule `override-of-final-method` is enabled by default
-100 |     def bar(self): ...
-101 | 
-102 | class Baz(Foo):
+111 |     def bar(self): ...
+112 | 
+113 | class Baz(Foo):
     -     def bar(self): ...  # error: [override-of-final-method]
-103 +       # error: [override-of-final-method]
+114 +       # error: [override-of-final-method]
 note: This is an unsafe fix and may change runtime behavior
 
 ```

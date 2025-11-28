@@ -37,7 +37,7 @@ error[override-of-final-method]: Cannot override `A.f`
  7 | class B(A):
  8 |     @final
  9 |     def f(self): ...  # error: [override-of-final-method]
-   |         ^ Override of `f` from superclass `A`
+   |         ^ Overrides a definition from superclass `A`
 10 |
 11 | class C(B):
    |
@@ -74,7 +74,7 @@ error[override-of-final-method]: Cannot override `B.f`
 12 |     @final
 13 |     # we only emit one error here, not two
 14 |     def f(self): ...  # error: [override-of-final-method]
-   |         ^ Override of `f` from superclass `B`
+   |         ^ Overrides a definition from superclass `B`
    |
 info: `B.f` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.py:8:5
