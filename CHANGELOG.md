@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.14.7
+
+Released on 2025-11-28.
+
+### Preview features
+
+- \[`flake8-bandit`\] Handle string literal bindings in suspicious-url-open-usage (`S310`) ([#21469](https://github.com/astral-sh/ruff/pull/21469))
+- \[`pylint`\] Fix `PLR1708` false positives on nested functions ([#21177](https://github.com/astral-sh/ruff/pull/21177))
+- \[`pylint`\] Fix suppression for empty dict without tuple key annotation (`PLE1141`) ([#21290](https://github.com/astral-sh/ruff/pull/21290))
+- \[`ruff`\] Add rule `RUF066` to detect unnecessary class properties ([#21535](https://github.com/astral-sh/ruff/pull/21535))
+- \[`ruff`\] Catch more dummy variable uses (`RUF052`) ([#19799](https://github.com/astral-sh/ruff/pull/19799))
+
+### Bug fixes
+
+- [server] Set severity for non-rule diagnostics ([#21559](https://github.com/astral-sh/ruff/pull/21559))
+- \[`flake8-implicit-str-concat`\] Avoid invalid fix in (`ISC003`) ([#21517](https://github.com/astral-sh/ruff/pull/21517))
+- \[`parser`\] Fix panic when parsing IPython escape command expressions ([#21480](https://github.com/astral-sh/ruff/pull/21480))
+
+### CLI
+
+- Show partial fixability indicator in statistics output ([#21513](https://github.com/astral-sh/ruff/pull/21513))
+
+### Contributors
+
+- [@mikeleppane](https://github.com/mikeleppane)
+- [@senekor](https://github.com/senekor)
+- [@ShaharNaveh](https://github.com/ShaharNaveh)
+- [@JumboBear](https://github.com/JumboBear)
+- [@prakhar1144](https://github.com/prakhar1144)
+- [@tsvikas](https://github.com/tsvikas)
+- [@danparizher](https://github.com/danparizher)
+- [@chirizxc](https://github.com/chirizxc)
+- [@AlexWaygood](https://github.com/AlexWaygood)
+- [@MichaReiser](https://github.com/MichaReiser)
+
 ## 0.14.6
 
 Released on 2025-11-21.
