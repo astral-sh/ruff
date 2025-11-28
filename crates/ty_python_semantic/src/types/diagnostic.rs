@@ -17,7 +17,7 @@ use crate::types::call::CallError;
 use crate::types::class::{
     CodeGeneratorKind, DisjointBase, DisjointBaseKind, Field, MethodDecorator,
 };
-use crate::types::function::{FunctionType, KnownFunction, OverloadLiteral};
+use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral};
 use crate::types::liskov::MethodKind;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
@@ -3803,7 +3803,7 @@ pub(super) fn report_overridden_final_method<'db>(
     subclass_type: Type<'db>,
     superclass: ClassType<'db>,
     subclass: ClassType<'db>,
-    superclass_method: FunctionType<'db>,
+    superclass_method_defs: &[FunctionType<'db>],
 ) {
     let db = context.db();
 
@@ -3836,17 +3836,26 @@ pub(super) fn report_overridden_final_method<'db>(
         ),
     );
 
-    let superclass_function_literal = if superclass_method.file(db).is_stub(db) {
-        superclass_method.first_overload_or_implementation(db)
+    let first_final_superclass_definition = superclass_method_defs
+        .iter()
+        .find(|function| function.has_known_decorator(db, FunctionDecorators::FINAL))
+        .expect(
+            "At least one function definition in the superclass should be decorated with `@final`",
+        );
+
+    let superclass_function_literal = if first_final_superclass_definition.file(db).is_stub(db) {
+        first_final_superclass_definition.first_overload_or_implementation(db)
     } else {
-        superclass_method.literal(db).last_definition(db)
+        first_final_superclass_definition
+            .literal(db)
+            .last_definition(db)
     };
 
     sub.annotate(
-        Annotation::secondary(Span::from(
-            superclass_function_literal
-                .focus_range(db, &parsed_module(db, superclass_method.file(db)).load(db)),
-        ))
+        Annotation::secondary(Span::from(superclass_function_literal.focus_range(
+            db,
+            &parsed_module(db, first_final_superclass_definition.file(db)).load(db),
+        )))
         .message(format_args!("`{superclass_name}.{member}` defined here")),
     );
 

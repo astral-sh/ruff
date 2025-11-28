@@ -19,7 +19,7 @@ use crate::{
             INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, OVERRIDE_OF_FINAL_METHOD,
             report_invalid_method_override, report_overridden_final_method,
         },
-        function::{FunctionDecorators, KnownFunction},
+        function::{FunctionDecorators, FunctionType, KnownFunction},
         ide_support::{MemberWithDefinition, all_declarations_and_bindings},
     },
 };
@@ -46,7 +46,8 @@ fn check_class_declaration<'db>(
     class: ClassType<'db>,
     member: &MemberWithDefinition<'db>,
 ) {
-    /// Salsa-tracked query to check whether a symbol in a superclas scope is a function definition.
+    /// Salsa-tracked query to check whether any of the definitions of a symbol
+    /// in a superclass scope are function definitions.
     ///
     /// We need to know this for compatibility with pyright and mypy, neither of which emit an error
     /// on `C.f` here:
@@ -74,16 +75,37 @@ fn check_class_declaration<'db>(
         scope: ScopeId<'db>,
         symbol: ScopedSymbolId,
     ) -> bool {
-        let Some(binding) = use_def_map(db, scope)
+        use_def_map(db, scope)
             .end_of_scope_symbol_bindings(symbol)
-            .next()
-        else {
-            return false;
-        };
-        let Some(definition) = binding.binding.definition() else {
-            return false;
-        };
-        definition.kind(db).is_function_def()
+            .filter_map(|binding| binding.binding.definition())
+            .any(|definition| definition.kind(db).is_function_def())
+    }
+
+    fn extract_underlying_functions<'db>(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> Option<smallvec::SmallVec<[FunctionType<'db>; 1]>> {
+        match ty {
+            Type::FunctionLiteral(function) => Some(smallvec::smallvec_inline![function]),
+            Type::BoundMethod(method) => Some(smallvec::smallvec_inline![method.function(db)]),
+            Type::PropertyInstance(property) => {
+                extract_underlying_functions(db, property.getter(db)?)
+            }
+            Type::Union(union) => {
+                let mut functions = smallvec::smallvec![];
+                for member in union.elements(db) {
+                    if let Some(mut member_functions) = extract_underlying_functions(db, *member) {
+                        functions.append(&mut member_functions);
+                    }
+                }
+                if functions.is_empty() {
+                    None
+                } else {
+                    Some(functions)
+                }
+            }
+            _ => None,
+        }
     }
 
     let db = context.db();
@@ -167,22 +189,19 @@ fn check_class_declaration<'db>(
                 // we should also recognise `@final`-decorated methods that don't end up
                 // as being function- or property-types (because they're wrapped by other
                 // decorators that transform the type into something else).
-                let underlying_function = match superclass
-                    .own_class_member(db, None, &member.name)
-                    .ignore_possibly_undefined()?
-                {
-                    Type::BoundMethod(method) => method.function(db),
-                    Type::FunctionLiteral(function) => function,
-                    Type::PropertyInstance(property) => {
-                        property.getter(db)?.as_function_literal()?
-                    }
-                    _ => return None,
-                };
+                let underlying_functions = extract_underlying_functions(
+                    db,
+                    superclass
+                        .own_class_member(db, None, &member.name)
+                        .ignore_possibly_undefined()?,
+                )?;
 
-                if underlying_function.has_known_decorator(db, FunctionDecorators::FINAL)
+                if underlying_functions
+                    .iter()
+                    .any(|function| function.has_known_decorator(db, FunctionDecorators::FINAL))
                     && is_function_definition(db, superclass_scope, superclass_symbol_id)
                 {
-                    Some((superclass, underlying_function))
+                    Some((superclass, underlying_functions))
                 } else {
                     None
                 }
@@ -310,7 +329,7 @@ fn check_class_declaration<'db>(
             type_on_subclass_instance,
             superclass,
             class,
-            superclass_method,
+            &superclass_method,
         );
     }
 }

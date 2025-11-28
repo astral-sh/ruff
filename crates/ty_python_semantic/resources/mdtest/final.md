@@ -292,20 +292,31 @@ class ChildOfBad(Bad):
 
 ## Edge case: the function is decorated with `@final` but originally defined elsewhere
 
-As of 2025-11-26, pyrefly emits a diagnostic on this, but mypy and pyright do not:
+As of 2025-11-26, pyrefly emits a diagnostic on this, but mypy and pyright do not. For mypy and
+pyright to emit a diagnostic, the superclass definition decorated with `@final` must be a literal
+function definition: an assignment definition where the right-hand side of the assignment is a
+`@final-decorated` function is not sufficient for them to consider the superclass definition as
+being `@final`.
+
+For now, we choose to follow mypy's and pyright's behaviour here, in order to maximise compatibility
+with other type checkers. We may decide to change this in the future, however, as it would simplify
+our implementation. Mypy's and pyright's behaviour here is also arguably inconsistent with their
+treatment of other type qualifiers such as `Final`. As discussed in
+<https://discuss.python.org/t/imported-final-variable/82429>, both type checkers view the `Final`
+type qualifier as travelling *across* scopes.
 
 ```py
 from typing import final
 
 class A:
     @final
-    def method(self): ...
+    def method(self) -> None: ...
 
 class B:
     method = A.method
 
 class C(B):
-    def method(self): ...  # no diagnostic
+    def method(self) -> None: ...  # no diagnostic here (see prose discussion above)
 ```
 
 ## Constructor methods are also checked
@@ -377,4 +388,78 @@ class C(A):  # error: [subclass-of-final-class]
 class D(B):  # error: [subclass-of-final-class]
     # TODO: we should emit a diagnostic here
     def method(self): ...
+```
+
+## An `@final` method is overridden by an implicit instance attribute
+
+```py
+from typing import final, Any
+
+class Parent:
+    @final
+    def method(self) -> None: ...
+
+class Child(Parent):
+    def __init__(self) -> None:
+        self.method: Any = 42  # TODO: we should emit `[override-of-final-method]` here
+```
+
+## A possibly-undefined `@final` method is overridden
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import final
+
+def coinflip() -> bool:
+    return False
+
+class A:
+    if coinflip():
+        @final
+        def method1(self) -> None: ...
+    else:
+        def method1(self) -> None: ...
+
+    if coinflip():
+        def method2(self) -> None: ...
+    else:
+        @final
+        def method2(self) -> None: ...
+
+    if coinflip():
+        @final
+        def method3(self) -> None: ...
+    else:
+        @final
+        def method3(self) -> None: ...
+
+    if coinflip():
+        def method4(self) -> None: ...
+    elif coinflip():
+        @final
+        def method4(self) -> None: ...
+    else:
+        def method4(self) -> None: ...
+
+class B(A):
+    def method1(self) -> None: ...  # error: [override-of-final-method]
+    def method2(self) -> None: ...  # error: [override-of-final-method]
+    def method3(self) -> None: ...  # error: [override-of-final-method]
+    def method4(self) -> None: ...  # error: [override-of-final-method]
+
+# Possible overrides of possibly `@final` methods...
+class C(A):
+    if coinflip():
+        # TODO: the autofix here introduces invalid syntax because there are now no
+        # statements inside the `if:` branch
+        # (but it might still be a useful autofix in an IDE context?)
+        def method1(self) -> None: ...  # error: [override-of-final-method]
+    else:
+        pass
+
+    if coinflip():
+        def method2(self) -> None: ...  # error: [override-of-final-method]
+        def method3(self) -> None: ...  # error: [override-of-final-method]
+        def method4(self) -> None: ...  # error: [override-of-final-method]
 ```
