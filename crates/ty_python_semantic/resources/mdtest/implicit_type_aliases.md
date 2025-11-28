@@ -637,6 +637,27 @@ def _(
     reveal_type(list_of_ints)  # revealed: list[int]
 ```
 
+### Tuple unpacking
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+
+X = tuple[T, *tuple[U, ...], V]
+Y = X[T, tuple[int, str, U], bytes]
+
+def g(obj: Y[bool, range]):
+    reveal_type(obj)  # revealed: tuple[bool, *tuple[tuple[int, str, range], ...], bytes]
+```
+
 ### Error cases
 
 A generic alias that is already fully specialized cannot be specialized again:
