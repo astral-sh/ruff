@@ -9811,7 +9811,12 @@ impl<'db> BoundTypeVarInstance<'db> {
             self.typevar(db)._default(db),
         );
 
-        Self::new(db, typevar, self.binding_context(db))
+        Self::new(
+            db,
+            typevar,
+            self.binding_context(db),
+            self.paramspec_attr(db),
+        )
     }
 
     pub(crate) fn variance_with_polarity(
