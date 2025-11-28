@@ -11,16 +11,35 @@ valid type for use in a type expression:
 ```py
 MyInt = int
 
+reveal_type(MyInt)  # revealed: <class 'int'>
+reveal_type(MyInt(1))  # revealed: int
+
 def f(x: MyInt):
     reveal_type(x)  # revealed: int
 
 f(1)
 ```
 
+This also works for generic aliases:
+
+```py
+ListOfStr = list[str]
+
+reveal_type(ListOfStr)  # revealed: <class 'list[str]'>
+reveal_type(ListOfStr(["a", "b"]))  # revealed: list[str]
+
+def g(x: ListOfStr):
+    reveal_type(x)  # revealed: list[str]
+
+g(["a", "b"])
+```
+
 ## None
 
 ```py
 MyNone = None
+
+reveal_type(MyNone)  # revealed: None
 
 def g(x: MyNone):
     reveal_type(x)  # revealed: None
@@ -213,6 +232,13 @@ reveal_type(ListOfIntOrListOfInt)  # revealed: <class 'list[int]'>
 def _(int_or_int: IntOrInt, list_of_int_or_list_of_int: ListOfIntOrListOfInt):
     reveal_type(int_or_int)  # revealed: int
     reveal_type(list_of_int_or_list_of_int)  # revealed: list[int]
+```
+
+`types.UnionType` instances can not be instantiated:
+
+```py
+# error: [call-non-callable] "Object of type `UnionType` is not callable"
+IntOrStr()
 ```
 
 `NoneType` has no special or-operator behavior, so this is an error:
@@ -619,7 +645,7 @@ def _(weird: IntLiteral1[int]):
 
 ## `Annotated`
 
-Basic usage:
+### Basic usage
 
 ```py
 from typing import Annotated
@@ -646,10 +672,61 @@ class C:
 reveal_type(C().old)  # revealed: @Todo(Generic specialization of typing.Annotated)
 ```
 
+### Special members
+
+The `__origin__` attribute on an instance of `Annotated` can be used to access the underlying type.
+We currently do not model this precisely:
+
+```py
+from typing import Annotated
+
+StrWithMetadata = Annotated[str, "metadata", 1, 2, 3]
+
+reveal_type(StrWithMetadata.__origin__)  # revealed: type | TypeAliasType
+```
+
+At runtime, the `__metadata__` attribute contains the metadata elements `('metadata', 1, 2, 3)`, but
+we do not model the type of this attribute precisely:
+
+```py
+reveal_type(StrWithMetadata.__metadata__)  # revealed: Any
+```
+
+### Attribute access and instantiation
+
+A class can be instantiated through an `Annotated` alias, and attributes can be accessed on the
+created instance:
+
+```py
+from __future__ import annotations
+from typing import Annotated, Union
+
+class Foo:
+    attribute: int = 1
+
+FooWithMetadata = Annotated[Foo, "metadata"]
+
+c = FooWithMetadata()
+
+reveal_type(c)  # revealed: Foo
+reveal_type(c.attribute)  # revealed: int
+```
+
+However, accessing attributes on the alias itself currently yields `Any`, instead of the attribute's
+type:
+
+```py
+reveal_type(FooWithMetadata.attribute)  # revealed: Any
+```
+
+### Error cases
+
 If the metadata argument is missing, we emit an error (because this code fails at runtime), but
 still use the first element as the type, when used in annotations:
 
 ```py
+from typing import Annotated
+
 # error: [invalid-type-form] "Special form `typing.Annotated` expected at least 2 arguments (one type and at least one metadata element)"
 WronglyAnnotatedInt = Annotated[int]
 
