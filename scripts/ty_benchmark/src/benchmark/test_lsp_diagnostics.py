@@ -159,7 +159,6 @@ class LspTest(ABC):
     edit: IncrementalEdit
 
     def __init__(self, project: Project, tool: Tool, venv: Venv):
-        # Skip if no LSP test config.
         edit = project.edit
         if not edit:
             pytest.skip(f"{project.name} does not have an incremental edit")

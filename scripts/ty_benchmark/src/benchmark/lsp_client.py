@@ -114,7 +114,7 @@ class LSPClient(LanguageClient):
         Returns the diagnostics for `path`
 
         Uses pull diagnostics if the server supports it or waits for a publish diagnostics
-        request if not.
+        notificaton if not.
         """
         if self.server_supports_pull_diagnostics:
             pull_diagnostics = await self.text_document_diagnostic_async(
