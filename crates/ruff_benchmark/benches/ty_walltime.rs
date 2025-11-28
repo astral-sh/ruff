@@ -120,7 +120,7 @@ static COLOUR_SCIENCE: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY310,
     },
-    600,
+    1070,
 );
 
 static FREQTRADE: Benchmark = Benchmark::new(

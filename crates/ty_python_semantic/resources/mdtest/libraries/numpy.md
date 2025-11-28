@@ -44,9 +44,6 @@ class _SupportsDType(Protocol[_DTypeT_co]):
     @property
     def dtype(self) -> _DTypeT_co: ...
 
-# TODO: no errors here
-# error: [invalid-type-arguments] "Type `typing.TypeVar` is not assignable to upper bound `generic[Any]` of type variable `_ScalarT_co@dtype`"
-# error: [invalid-type-arguments] "Type `typing.TypeVar` is not assignable to upper bound `generic[Any]` of type variable `_ScalarT_co@dtype`"
 _DTypeLike: TypeAlias = type[_ScalarT] | dtype[_ScalarT] | _SupportsDType[dtype[_ScalarT]]
 
 DTypeLike: TypeAlias = _DTypeLike[Any] | str | None

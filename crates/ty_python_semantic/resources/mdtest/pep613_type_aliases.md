@@ -96,6 +96,45 @@ def _(x: MyAlias):
     reveal_type(x)  # revealed: int | ((str, /) -> int)
 ```
 
+## Generic aliases
+
+A more comprehensive set of tests can be found in
+[`implicit_type_aliases.md`](./implicit_type_aliases.md). If the implementations ever diverge, we
+may need to duplicate more tests here.
+
+### Basic
+
+```py
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+
+MyList: TypeAlias = list[T]
+ListOrSet: TypeAlias = list[T] | set[T]
+
+reveal_type(MyList)  # revealed: <class 'list[T]'>
+reveal_type(ListOrSet)  # revealed: types.UnionType
+
+def _(list_of_int: MyList[int], list_or_set_of_str: ListOrSet[str]):
+    reveal_type(list_of_int)  # revealed: list[int]
+    reveal_type(list_or_set_of_str)  # revealed: list[str] | set[str]
+```
+
+### Stringified generic alias
+
+```py
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+TotallyStringifiedPEP613: TypeAlias = "dict[T, U]"
+TotallyStringifiedPartiallySpecialized: TypeAlias = "TotallyStringifiedPEP613[U, int]"
+
+def f(x: "TotallyStringifiedPartiallySpecialized[str]"):
+    reveal_type(x)  # revealed: @Todo(Generic stringified PEP-613 type alias)
+```
+
 ## Subscripted generic alias in union
 
 ```py
@@ -107,8 +146,7 @@ Alias1: TypeAlias = list[T] | set[T]
 MyAlias: TypeAlias = int | Alias1[str]
 
 def _(x: MyAlias):
-    # TODO: int | list[str] | set[str]
-    reveal_type(x)  # revealed: int | @Todo(Specialization of union type alias)
+    reveal_type(x)  # revealed: int | list[str] | set[str]
 ```
 
 ## Imported
@@ -173,7 +211,7 @@ NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
 
 def _(nested: NestedDict[str, int]):
     # TODO should be `dict[str, int | NestedDict[str, int]]`
-    reveal_type(nested)  # revealed: @Todo(specialized generic alias in type expression)
+    reveal_type(nested)  # revealed: dict[@Todo(specialized recursive generic type alias), Divergent]
 
 my_isinstance(1, int)
 my_isinstance(1, int | str)

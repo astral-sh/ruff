@@ -3726,7 +3726,7 @@ impl<'db> Type<'db> {
                     dunder_call
                         .has_relation_to_impl(
                             db,
-                            CallableType::unknown(db),
+                            Type::Callable(CallableType::unknown(db)),
                             inferable,
                             TypeRelation::Assignability,
                             relation_visitor,
@@ -7219,7 +7219,7 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::Literal(ty) => Ok(ty.inner(db)),
                 KnownInstanceType::Annotated(ty) => Ok(ty.inner(db)),
-                KnownInstanceType::TypeGenericAlias(ty) => {
+                KnownInstanceType::TypeGenericAlias(instance) => {
                     // When `type[…]` appears in a value position (e.g. in an implicit type alias),
                     // we infer its argument as a type expression. This ensures that we can emit
                     // diagnostics for invalid type expressions, and more importantly, that we can
@@ -7228,7 +7228,7 @@ impl<'db> Type<'db> {
                     // (`int` -> instance of `int` -> subclass of `int`) can be lossy, but it is
                     // okay for all valid arguments to `type[…]`.
 
-                    Ok(ty.inner(db).to_meta_type(db))
+                    Ok(instance.inner(db).to_meta_type(db))
                 }
                 KnownInstanceType::Callable(callable) => Ok(Type::Callable(*callable)),
                 KnownInstanceType::LiteralStringAlias(ty) => Ok(ty.inner(db)),
@@ -7258,7 +7258,7 @@ impl<'db> Type<'db> {
                 SpecialFormType::OrderedDict => Ok(KnownClass::OrderedDict.to_instance(db)),
 
                 // TODO: Use an opt-in rule for a bare `Callable`
-                SpecialFormType::Callable => Ok(CallableType::unknown(db)),
+                SpecialFormType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
 
                 // Special case: `NamedTuple` in a type expression is understood to describe the type
                 // `tuple[object, ...] & <a protocol that any `NamedTuple` class would satisfy>`.
@@ -7578,18 +7578,71 @@ impl<'db> Type<'db> {
         match self {
             Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
 
-            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => match type_mapping {
-                TypeMapping::BindLegacyTypevars(binding_context) => {
-                    Type::TypeVar(BoundTypeVarInstance::new(db, typevar, *binding_context))
+            Type::KnownInstance(known_instance) => match known_instance {
+                KnownInstanceType::TypeVar(typevar) => {
+                    match type_mapping {
+                        TypeMapping::BindLegacyTypevars(binding_context) => {
+                            Type::TypeVar(BoundTypeVarInstance::new(db, typevar, *binding_context))
+                        }
+                        TypeMapping::Specialization(_) |
+                        TypeMapping::PartialSpecialization(_) |
+                        TypeMapping::PromoteLiterals(_) |
+                        TypeMapping::BindSelf(_) |
+                        TypeMapping::ReplaceSelf { .. } |
+                        TypeMapping::Materialize(_) |
+                        TypeMapping::ReplaceParameterDefaults |
+                        TypeMapping::EagerExpansion => self,
+                    }
                 }
-                TypeMapping::Specialization(_) |
-                TypeMapping::PartialSpecialization(_) |
-                TypeMapping::PromoteLiterals(_) |
-                TypeMapping::BindSelf(_) |
-                TypeMapping::ReplaceSelf { .. } |
-                TypeMapping::Materialize(_) |
-                TypeMapping::ReplaceParameterDefaults |
-                TypeMapping::EagerExpansion => self,
+                KnownInstanceType::UnionType(instance) => {
+                    if let Ok(union_type) = instance.union_type(db) {
+                        Type::KnownInstance(KnownInstanceType::UnionType(
+                            UnionTypeInstance::new(
+                                db,
+                                instance._value_expr_types(db),
+                                Ok(union_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                            )
+                        )))
+                    } else {
+                        self
+                    }
+                },
+                KnownInstanceType::Annotated(ty) => {
+                    Type::KnownInstance(KnownInstanceType::Annotated(
+                        InternedType::new(
+                            db,
+                            ty.inner(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                        )
+                    ))
+                },
+                KnownInstanceType::Callable(callable_type) => {
+                    Type::KnownInstance(KnownInstanceType::Callable(
+                        callable_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    ))
+                },
+                KnownInstanceType::TypeGenericAlias(ty) => {
+                    Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
+                        InternedType::new(
+                            db,
+                            ty.inner(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                        )
+                    ))
+                },
+
+                KnownInstanceType::SubscriptedProtocol(_) |
+                KnownInstanceType::SubscriptedGeneric(_) |
+                KnownInstanceType::TypeAliasType(_) |
+                KnownInstanceType::Deprecated(_) |
+                KnownInstanceType::Field(_) |
+                KnownInstanceType::ConstraintSet(_) |
+                KnownInstanceType::GenericContext(_) |
+                KnownInstanceType::Specialization(_) |
+                KnownInstanceType::Literal(_) |
+                KnownInstanceType::LiteralStringAlias(_) |
+                KnownInstanceType::NewType(_) => {
+                    // TODO: For some of these, we may need to apply the type mapping to inner types.
+                    self
+                },
             }
 
             Type::FunctionLiteral(function) => {
@@ -7755,8 +7808,7 @@ impl<'db> Type<'db> {
             // some other generic context's specialization is applied to it.
             | Type::ClassLiteral(_)
             | Type::BoundSuper(_)
-            | Type::SpecialForm(_)
-            | Type::KnownInstance(_) => self,
+            | Type::SpecialForm(_) => self,
         }
     }
 
@@ -7893,6 +7945,44 @@ impl<'db> Type<'db> {
                 });
             }
 
+            Type::KnownInstance(known_instance) => match known_instance {
+                KnownInstanceType::UnionType(instance) => {
+                    if let Ok(union_type) = instance.union_type(db) {
+                        union_type.find_legacy_typevars_impl(
+                            db,
+                            binding_context,
+                            typevars,
+                            visitor,
+                        );
+                    }
+                }
+                KnownInstanceType::Annotated(ty) => {
+                    ty.inner(db)
+                        .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                }
+                KnownInstanceType::Callable(callable_type) => {
+                    callable_type.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                }
+                KnownInstanceType::TypeGenericAlias(ty) => {
+                    ty.inner(db)
+                        .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                }
+                KnownInstanceType::SubscriptedProtocol(_)
+                | KnownInstanceType::SubscriptedGeneric(_)
+                | KnownInstanceType::TypeVar(_)
+                | KnownInstanceType::TypeAliasType(_)
+                | KnownInstanceType::Deprecated(_)
+                | KnownInstanceType::Field(_)
+                | KnownInstanceType::ConstraintSet(_)
+                | KnownInstanceType::GenericContext(_)
+                | KnownInstanceType::Specialization(_)
+                | KnownInstanceType::Literal(_)
+                | KnownInstanceType::LiteralStringAlias(_)
+                | KnownInstanceType::NewType(_) => {
+                    // TODO: For some of these, we may need to try to find legacy typevars in inner types.
+                }
+            },
+
             Type::Dynamic(_)
             | Type::Never
             | Type::AlwaysTruthy
@@ -7920,7 +8010,6 @@ impl<'db> Type<'db> {
             | Type::EnumLiteral(_)
             | Type::BoundSuper(_)
             | Type::SpecialForm(_)
-            | Type::KnownInstance(_)
             | Type::TypedDict(_) => {}
         }
     }
@@ -11595,8 +11684,8 @@ impl<'db> CallableType<'db> {
     }
 
     /// Create a callable type which accepts any parameters and returns an `Unknown` type.
-    pub(crate) fn unknown(db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(Self::single(db, Signature::unknown()))
+    pub(crate) fn unknown(db: &'db dyn Db) -> CallableType<'db> {
+        Self::single(db, Signature::unknown())
     }
 
     pub(crate) fn bind_self(
