@@ -14,6 +14,7 @@ use crate::{
     semantic_index::{place_table, scope::ScopeId, symbol::ScopedSymbolId, use_def_map},
     types::{
         ClassBase, ClassLiteral, ClassType, KnownClass, Type,
+        all_members::{MemberWithDefinition, all_declarations_and_bindings},
         class::CodeGeneratorKind,
         context::InferContext,
         diagnostic::{
@@ -21,7 +22,6 @@ use crate::{
             report_invalid_method_override, report_overridden_final_method,
         },
         function::{FunctionDecorators, FunctionType, KnownFunction},
-        ide_support::{MemberWithDefinition, all_declarations_and_bindings},
     },
 };
 

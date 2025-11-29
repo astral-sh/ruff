@@ -80,6 +80,7 @@ use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
 pub use special_form::SpecialFormType;
 
+pub mod all_members;
 mod bound_super;
 mod builder;
 mod call;

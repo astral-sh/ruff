@@ -64,6 +64,7 @@ use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{FileScopeId, SemanticIndex, semantic_index};
+use crate::types::all_members::all_members;
 use crate::types::call::{Binding, CallArguments};
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
@@ -74,7 +75,6 @@ use crate::types::diagnostic::{
 };
 use crate::types::display::DisplaySettings;
 use crate::types::generics::{GenericContext, InferableTypeVars};
-use crate::types::ide_support::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;

@@ -12,7 +12,7 @@ use crate::module_resolver::{KnownModule, Module, list_modules, resolve_module};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
-use crate::types::ide_support::{Member, all_declarations_and_bindings, all_members};
+use crate::types::all_members::{Member, all_declarations_and_bindings, all_members};
 use crate::types::{Type, binding_type, infer_scope_types};
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
