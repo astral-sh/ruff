@@ -1848,11 +1848,11 @@ impl<'db> InteriorNode<'db> {
         // Seed the seen set with all of the constraints that are present in the input BDD, and the
         // visit queue with all pairs of those constraints. (We use "combinations" because we don't
         // need to compare a constraint against itself, and because ordering doesn't matter.)
-        let mut seen_constraints = FxHashSet::default();
+        let mut seen_constraints = FxIndexSet::default();
         Node::Interior(self).for_each_constraint(db, &mut |constraint| {
             seen_constraints.insert(constraint);
         });
-        let mut to_visit: Vec<(_, _)> = (seen_constraints.unstable_iter().copied())
+        let mut to_visit: Vec<(_, _)> = (seen_constraints.iter().copied())
             .tuple_combinations()
             .collect();
 
@@ -2011,7 +2011,7 @@ impl<'db> InteriorNode<'db> {
                     // seen set and (if we haven't already seen it) to the to-visit queue.
                     if seen_constraints.insert(intersection_constraint) {
                         to_visit.extend(
-                            (seen_constraints.unstable_iter().copied())
+                            (seen_constraints.iter().copied())
                                 .filter(|seen| *seen != intersection_constraint)
                                 .map(|seen| (seen, intersection_constraint)),
                         );
