@@ -175,7 +175,7 @@ impl<'a, 'db> InferableTypeVars<'a, 'db> {
             match inferable {
                 InferableTypeVars::None => {}
                 InferableTypeVars::One(typevars) => {
-                    result.extend(typevars.unstable_iter().copied())
+                    result.extend(typevars.unstable_iter().copied());
                 }
                 InferableTypeVars::Two(left, right) => {
                     find_typevars(result, left);

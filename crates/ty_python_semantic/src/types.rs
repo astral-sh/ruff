@@ -12608,7 +12608,7 @@ impl<'db> ModuleLiteralType<'db> {
     fn available_submodule_attributes(&self, db: &'db dyn Db) -> impl Iterator<Item = Name> {
         self.importing_file(db)
             .into_iter()
-            .flat_map(|file| imported_modules(db, file).sorted_ref_vec())
+            .flat_map(|file| imported_modules(db, file).unstable_iter())
             .filter_map(|submodule_name| submodule_name.relative_to(self.module(db).name(db)))
             .filter_map(|relative_submodule| relative_submodule.components().next().map(Name::from))
     }
