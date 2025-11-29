@@ -1,3 +1,7 @@
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, BTreeSet};
+
+use ruff_db::diagnostic::LintName;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
@@ -9,20 +13,155 @@ use crate::Db;
 use crate::lint::LintId;
 use crate::suppression::{SuppressionTarget, suppressions};
 
+pub fn suppress_all<I>(db: &dyn Db, file: File, ids_with_range: I) -> Vec<Fix>
+where
+    I: IntoIterator<Item = (LintName, TextRange)>,
+{
+    let grouped = group_by_suppression_range(db, file, ids_with_range);
+    create_all_fixes(db, file, grouped)
+}
+
+/// Creates a fix to suppress a single lint.
+pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) -> Fix {
+    let suppression_range = suppression_range(db, file, range);
+    create_suppression_fix(db, file, id.name(), suppression_range)
+}
+
+fn create_all_fixes(
+    db: &dyn Db,
+    file: File,
+    grouped: BTreeMap<SuppressionRange, BTreeSet<LintName>>,
+) -> Vec<Fix> {
+    let mut fixes = Vec::new();
+
+    for (range, lints) in grouped {
+        for lint in lints.into_iter().rev() {
+            let fix = create_suppression_fix(db, file, lint, range);
+            fixes.push(fix);
+        }
+    }
+
+    fixes
+}
+
+fn group_by_suppression_range<I>(
+    db: &dyn Db,
+    file: File,
+    ids_with_range: I,
+) -> BTreeMap<SuppressionRange, BTreeSet<LintName>>
+where
+    I: IntoIterator<Item = (LintName, TextRange)>,
+{
+    let mut map: BTreeMap<SuppressionRange, BTreeSet<LintName>> = BTreeMap::new();
+    for (id, range) in ids_with_range {
+        let full_range = suppression_range(db, file, range);
+        map.entry(full_range).or_default().insert(id);
+    }
+
+    map
+}
+
+/// Returns the suppression range for the given `range`.
+///
+/// The suppression range is defined as:
+///
+/// * `start`: The `end` of the preceding `Newline` or `NonLogicalLine` token.
+/// * `end`: The `start` of the first `NonLogicalLine` or `Newline` token coming after the range.
+///
+/// For most ranges, this means the suppression range starts at the beginning of the physical line
+/// and ends at the end of the physical line containing `range`. The exceptions to this are:
+///
+/// * If `range` is within a single-line interpolated expression, then the start and end are extended to the start and end of the enclosing interpolated string.
+/// * If there's a line continuation, then the suppression range is extended to include the following line too.
+/// * If there's a multiline string, then the suppression range is extended to cover the starting and ending line of the multiline string.
+fn suppression_range(db: &dyn Db, file: File, range: TextRange) -> SuppressionRange {
+    // Always insert a new suppression at the end of the range to avoid having to deal with multiline strings
+    // etc. Also make sure to not pass a sub-token range to `Tokens::after`.
+    let parsed = parsed_module(db, file).load(db);
+    let tokens = parsed.tokens().at_offset(range.end());
+    let token_range = match tokens {
+        ruff_python_ast::token::TokenAt::None => range,
+        ruff_python_ast::token::TokenAt::Single(token) => token.range(),
+        ruff_python_ast::token::TokenAt::Between(..) => range,
+    };
+    let before_tokens = parsed.tokens().after(token_range.end());
+
+    let line_start = before_tokens
+        .iter()
+        .rfind(|token| {
+            matches!(
+                token.kind(),
+                TokenKind::Newline | TokenKind::NonLogicalNewline
+            )
+        })
+        .map(Ranged::end)
+        .unwrap_or(TextSize::default());
+
+    let after_tokens = parsed.tokens().after(range.end());
+    let line_end = after_tokens
+        .iter()
+        .find(|token| {
+            matches!(
+                token.kind(),
+                TokenKind::Newline | TokenKind::NonLogicalNewline
+            )
+        })
+        .map(Ranged::start)
+        .unwrap_or(range.end());
+
+    SuppressionRange(TextRange::new(line_start, line_end))
+}
+
+/// The range of the suppression.
+///
+/// Guaranteed to start at the start of a line and
+/// ends at the end of a line (right before the `\n`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SuppressionRange(TextRange);
+
+impl SuppressionRange {
+    fn text_range(&self) -> TextRange {
+        self.0
+    }
+
+    fn line_end(&self) -> TextSize {
+        self.0.end()
+    }
+}
+
+impl PartialOrd for SuppressionRange {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for SuppressionRange {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.ordering(other.0)
+    }
+}
+
 /// Creates a fix for adding a suppression comment to suppress `lint` for `range`.
 ///
 /// The fix prefers adding the code to an existing `ty: ignore[]` comment over
 /// adding a new suppression comment.
-pub fn create_suppression_fix(db: &dyn Db, file: File, id: LintId, range: TextRange) -> Fix {
+fn create_suppression_fix(
+    db: &dyn Db,
+    file: File,
+    name: LintName,
+    suppression_range: SuppressionRange,
+) -> Fix {
     let suppressions = suppressions(db, file);
     let source = source_text(db, file);
 
-    let mut existing_suppressions = suppressions.line_suppressions(range).filter(|suppression| {
-        matches!(
-            suppression.target,
-            SuppressionTarget::Lint(_) | SuppressionTarget::Empty,
-        )
-    });
+    let mut existing_suppressions = suppressions
+        .line_suppressions(suppression_range.text_range())
+        .filter(|suppression| {
+            matches!(
+                suppression.target,
+                SuppressionTarget::Lint(_) | SuppressionTarget::Empty,
+            )
+        });
 
     // If there's an existing `ty: ignore[]` comment, append the code to it instead of creating a new suppression comment.
     if let Some(existing) = existing_suppressions.next() {
@@ -32,9 +171,9 @@ pub fn create_suppression_fix(db: &dyn Db, file: File, id: LintId, range: TextRa
             let up_to_last_code = before_closing_paren.trim_end();
 
             let insertion = if up_to_last_code.ends_with(',') {
-                format!(" {id}", id = id.name())
+                format!(" {name}")
             } else {
-                format!(", {id}", id = id.name())
+                format!(", {name}")
             };
 
             let relative_offset_from_end = comment_text.text_len() - up_to_last_code.text_len();
@@ -47,35 +186,14 @@ pub fn create_suppression_fix(db: &dyn Db, file: File, id: LintId, range: TextRa
     }
 
     // Always insert a new suppression at the end of the range to avoid having to deal with multiline strings
-    // etc. Also make sure to not pass a sub-token range to `Tokens::after`.
-    let parsed = parsed_module(db, file).load(db);
-    let tokens = parsed.tokens().at_offset(range.end());
-    let token_range = match tokens {
-        ruff_python_ast::token::TokenAt::None => range,
-        ruff_python_ast::token::TokenAt::Single(token) => token.range(),
-        ruff_python_ast::token::TokenAt::Between(..) => range,
-    };
-    let tokens_after = parsed.tokens().after(token_range.end());
+    // etc.
 
-    // Same as for `line_end` when building up the `suppressions`: Ignore newlines
-    // in multiline-strings, inside f-strings, or after a line continuation because we can't
-    // place a comment on those lines.
-    let line_end = tokens_after
-        .iter()
-        .find(|token| {
-            matches!(
-                token.kind(),
-                TokenKind::Newline | TokenKind::NonLogicalNewline
-            )
-        })
-        .map(Ranged::start)
-        .unwrap_or(source.text_len());
-
+    let line_end = suppression_range.line_end();
     let up_to_line_end = &source[..line_end.to_usize()];
     let up_to_first_content = up_to_line_end.trim_end();
     let trailing_whitespace_len = up_to_line_end.text_len() - up_to_first_content.text_len();
 
-    let insertion = format!("  # ty:ignore[{id}]", id = id.name());
+    let insertion = format!("  # ty:ignore[{name}]");
 
     Fix::safe_edit(if trailing_whitespace_len == TextSize::ZERO {
         Edit::insertion(insertion, line_end)
