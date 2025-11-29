@@ -54,21 +54,18 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 40 | # Possible overrides of possibly `@final` methods...
 41 | class C(A):
 42 |     if coinflip():
-43 |         # TODO: the autofix here introduces invalid syntax because there are now no
-44 |         # statements inside the `if:` branch
-45 |         # (but it might still be a useful autofix in an IDE context?)
-46 |         def method1(self) -> None: ...  # error: [override-of-final-method]
-47 |     else:
-48 |         pass
-49 | 
-50 |     if coinflip():
-51 |         def method2(self) -> None: ...  # TODO: should emit [override-of-final-method]
-52 |     else:
-53 |         def method2(self) -> None: ...  # TODO: should emit [override-of-final-method]
-54 | 
-55 |     if coinflip():
-56 |         def method3(self) -> None: ...  # error: [override-of-final-method]
-57 |         def method4(self) -> None: ...  # error: [override-of-final-method]
+43 |         def method1(self) -> None: ...  # error: [override-of-final-method]
+44 |     else:
+45 |         pass
+46 | 
+47 |     if coinflip():
+48 |         def method2(self) -> None: ...  # TODO: should emit [override-of-final-method]
+49 |     else:
+50 |         def method2(self) -> None: ...  # TODO: should emit [override-of-final-method]
+51 | 
+52 |     if coinflip():
+53 |         def method3(self) -> None: ...  # error: [override-of-final-method]
+54 |         def method4(self) -> None: ...  # error: [override-of-final-method]
 ```
 
 # Diagnostics
@@ -220,14 +217,14 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```
 error[override-of-final-method]: Cannot override `A.method1`
-  --> src/mdtest_snippet.py:46:13
+  --> src/mdtest_snippet.py:43:13
    |
-44 |         # statements inside the `if:` branch
-45 |         # (but it might still be a useful autofix in an IDE context?)
-46 |         def method1(self) -> None: ...  # error: [override-of-final-method]
+41 | class C(A):
+42 |     if coinflip():
+43 |         def method1(self) -> None: ...  # error: [override-of-final-method]
    |             ^^^^^^^ Overrides a definition from superclass `A`
-47 |     else:
-48 |         pass
+44 |     else:
+45 |         pass
    |
 info: `A.method1` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.py:8:9
@@ -243,26 +240,26 @@ info: `A.method1` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `method1`
 info: rule `override-of-final-method` is enabled by default
-43 |         # TODO: the autofix here introduces invalid syntax because there are now no
-44 |         # statements inside the `if:` branch
-45 |         # (but it might still be a useful autofix in an IDE context?)
+40 | # Possible overrides of possibly `@final` methods...
+41 | class C(A):
+42 |     if coinflip():
    -         def method1(self) -> None: ...  # error: [override-of-final-method]
-46 +           # error: [override-of-final-method]
-47 |     else:
-48 |         pass
-49 | 
-note: This is an unsafe fix and may change runtime behavior
+43 +           # error: [override-of-final-method]
+44 |     else:
+45 |         pass
+46 | 
+note: This is a display-only fix and is likely to be incorrect
 
 ```
 
 ```
 error[override-of-final-method]: Cannot override `A.method3`
-  --> src/mdtest_snippet.py:56:13
+  --> src/mdtest_snippet.py:53:13
    |
-55 |     if coinflip():
-56 |         def method3(self) -> None: ...  # error: [override-of-final-method]
+52 |     if coinflip():
+53 |         def method3(self) -> None: ...  # error: [override-of-final-method]
    |             ^^^^^^^ Overrides a definition from superclass `A`
-57 |         def method4(self) -> None: ...  # error: [override-of-final-method]
+54 |         def method4(self) -> None: ...  # error: [override-of-final-method]
    |
 info: `A.method3` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.py:20:9
@@ -277,23 +274,23 @@ info: `A.method3` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `method3`
 info: rule `override-of-final-method` is enabled by default
-53 |         def method2(self) -> None: ...  # TODO: should emit [override-of-final-method]
-54 | 
-55 |     if coinflip():
+50 |         def method2(self) -> None: ...  # TODO: should emit [override-of-final-method]
+51 | 
+52 |     if coinflip():
    -         def method3(self) -> None: ...  # error: [override-of-final-method]
-56 +           # error: [override-of-final-method]
-57 |         def method4(self) -> None: ...  # error: [override-of-final-method]
-note: This is an unsafe fix and may change runtime behavior
+53 +           # error: [override-of-final-method]
+54 |         def method4(self) -> None: ...  # error: [override-of-final-method]
+note: This is a display-only fix and is likely to be incorrect
 
 ```
 
 ```
 error[override-of-final-method]: Cannot override `A.method4`
-  --> src/mdtest_snippet.py:57:13
+  --> src/mdtest_snippet.py:54:13
    |
-55 |     if coinflip():
-56 |         def method3(self) -> None: ...  # error: [override-of-final-method]
-57 |         def method4(self) -> None: ...  # error: [override-of-final-method]
+52 |     if coinflip():
+53 |         def method3(self) -> None: ...  # error: [override-of-final-method]
+54 |         def method4(self) -> None: ...  # error: [override-of-final-method]
    |             ^^^^^^^ Overrides a definition from superclass `A`
    |
 info: `A.method4` is decorated with `@final`, forbidding overrides
@@ -310,11 +307,11 @@ info: `A.method4` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `method4`
 info: rule `override-of-final-method` is enabled by default
-54 | 
-55 |     if coinflip():
-56 |         def method3(self) -> None: ...  # error: [override-of-final-method]
+51 | 
+52 |     if coinflip():
+53 |         def method3(self) -> None: ...  # error: [override-of-final-method]
    -         def method4(self) -> None: ...  # error: [override-of-final-method]
-57 +           # error: [override-of-final-method]
-note: This is an unsafe fix and may change runtime behavior
+54 +           # error: [override-of-final-method]
+note: This is a display-only fix and is likely to be incorrect
 
 ```

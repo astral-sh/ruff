@@ -201,7 +201,7 @@ info: rule `override-of-final-method` is enabled by default
 48 | 
 49 |     @property
 50 |     def my_property2(self) -> int: ...  # error: [override-of-final-method]
-note: This is an unsafe fix and may change runtime behavior
+note: This is a display-only fix and is likely to be incorrect
 
 ```
 
@@ -237,7 +237,7 @@ info: rule `override-of-final-method` is enabled by default
 51 | 
 52 |     @classmethod
 53 |     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
-note: This is an unsafe fix and may change runtime behavior
+note: This is a display-only fix and is likely to be incorrect
 
 ```
 
@@ -465,7 +465,7 @@ info: rule `override-of-final-method` is enabled by default
 78 |     # TODO: we should emit a Liskov violation here too
 79 |     # error: [override-of-final-method]
 80 |     class_method1 = None
-note: This is an unsafe fix and may change runtime behavior
+note: This is a display-only fix and is likely to be incorrect
 
 ```
 
@@ -503,7 +503,7 @@ info: rule `override-of-final-method` is enabled by default
 84 | 
 85 | # Diagnostic edge case: `final` is very far away from the method definition in the source code:
 86 | 
-note: This is an unsafe fix and may change runtime behavior
+note: This is a display-only fix and is likely to be incorrect
 
 ```
 
@@ -539,7 +539,7 @@ info: rule `override-of-final-method` is enabled by default
 112 | 
 113 | class Baz(Foo):
     -     def bar(self): ...  # error: [override-of-final-method]
-114 +       # error: [override-of-final-method]
+114 +     pass  # error: [override-of-final-method]
 note: This is an unsafe fix and may change runtime behavior
 
 ```

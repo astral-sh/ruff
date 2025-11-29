@@ -58,7 +58,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 44 |     def bar(self, x: str) -> str: ...
 45 |     @overload
 46 |     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
-47 |     
+47 | 
 48 |     @overload
 49 |     def baz(self, x: str) -> str: ...
 50 |     @overload
@@ -265,7 +265,7 @@ error[override-of-final-method]: Cannot override `Bad.bar`
 45 |     @overload
 46 |     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
    |         ^^^ Overrides a definition from superclass `Bad`
-47 |     
+47 |
 48 |     @overload
    |
 info: `Bad.bar` is decorated with `@final`, forbidding overrides
@@ -287,12 +287,11 @@ info: rule `override-of-final-method` is enabled by default
    -     def bar(self, x: str) -> str: ...
    -     @overload
    -     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
-43 |     
+43 +     
 44 +       # error: [override-of-final-method]
-45 +     
+45 | 
 46 |     @overload
 47 |     def baz(self, x: str) -> str: ...
-48 |     @overload
 note: This is an unsafe fix and may change runtime behavior
 
 ```
@@ -319,7 +318,7 @@ help: Remove all overloads for `baz`
 info: rule `override-of-final-method` is enabled by default
 45 |     @overload
 46 |     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
-47 |     
+47 | 
    -     @overload
    -     def baz(self, x: str) -> str: ...
    -     @overload
@@ -360,12 +359,12 @@ info: rule `override-of-final-method` is enabled by default
    -     def f(self, x: str) -> str: ...
    -     @overload
    -     def f(self, x: int) -> int: ...
-13 +     
-14 +     
+13 +     pass
+14 +     pass
 15 |     # error: [override-of-final-method]
    -     def f(self, x: int | str) -> int | str:
    -         return x
-16 +     
+16 +     pass
 17 | 
 18 | class Bad:
 19 |     @overload
@@ -467,7 +466,7 @@ info: rule `override-of-final-method` is enabled by default
 61 |     g = None  # error: [override-of-final-method]
 62 |     h = None  # error: [override-of-final-method]
 63 |     i = None  # error: [override-of-final-method]
-note: This is an unsafe fix and may change runtime behavior
+note: This is a display-only fix and is likely to be incorrect
 
 ```
 
@@ -500,7 +499,7 @@ info: rule `override-of-final-method` is enabled by default
 61 +       # error: [override-of-final-method]
 62 |     h = None  # error: [override-of-final-method]
 63 |     i = None  # error: [override-of-final-method]
-note: This is an unsafe fix and may change runtime behavior
+note: This is a display-only fix and is likely to be incorrect
 
 ```
 
@@ -531,7 +530,7 @@ info: rule `override-of-final-method` is enabled by default
    -     h = None  # error: [override-of-final-method]
 62 +       # error: [override-of-final-method]
 63 |     i = None  # error: [override-of-final-method]
-note: This is an unsafe fix and may change runtime behavior
+note: This is a display-only fix and is likely to be incorrect
 
 ```
 
@@ -560,6 +559,6 @@ info: rule `override-of-final-method` is enabled by default
 62 |     h = None  # error: [override-of-final-method]
    -     i = None  # error: [override-of-final-method]
 63 +       # error: [override-of-final-method]
-note: This is an unsafe fix and may change runtime behavior
+note: This is a display-only fix and is likely to be incorrect
 
 ```

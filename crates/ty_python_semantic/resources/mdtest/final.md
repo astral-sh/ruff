@@ -230,7 +230,7 @@ class ChildOfBad(Bad):
     def bar(self, x: str) -> str: ...
     @overload
     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
-    
+
     @overload
     def baz(self, x: str) -> str: ...
     @overload
@@ -466,9 +466,6 @@ class B(A):
 # Possible overrides of possibly `@final` methods...
 class C(A):
     if coinflip():
-        # TODO: the autofix here introduces invalid syntax because there are now no
-        # statements inside the `if:` branch
-        # (but it might still be a useful autofix in an IDE context?)
         def method1(self) -> None: ...  # error: [override-of-final-method]
     else:
         pass

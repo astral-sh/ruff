@@ -37,7 +37,7 @@ use ruff_db::{
     parsed::parsed_module,
     source::source_text,
 };
-use ruff_diagnostics::{Edit, Fix};
+use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parentheses_iterator;
 use ruff_python_ast::{self as ast, AnyNodeRef, StringFlags};
@@ -3878,30 +3878,70 @@ pub(super) fn report_overridden_final_method<'db>(
     };
 
     if let Some(function) = underlying_function {
+        let class_node = subclass
+            .class_literal(db)
+            .0
+            .body_scope(db)
+            .node(db)
+            .expect_class()
+            .node(context.module());
+
+        let (overloads, implementation) = function.overloads_and_implementation(db);
+        let overload_count = overloads.len() + usize::from(implementation.is_some());
+        let is_only = overload_count >= class_node.body.len();
+
         let overload_deletion = |overload: &OverloadLiteral<'db>| {
-            Edit::range_deletion(overload.node(db, context.file(), context.module()).range())
+            let range = overload.node(db, context.file(), context.module()).range();
+            if is_only {
+                Edit::range_replacement("pass".to_string(), range)
+            } else {
+                Edit::range_deletion(range)
+            }
+        };
+
+        let should_fix = overloads
+            .iter()
+            .copied()
+            .chain(implementation)
+            .all(|overload| {
+                class_node
+                    .body
+                    .iter()
+                    .filter_map(ast::Stmt::as_function_def_stmt)
+                    .contains(overload.node(db, context.file(), context.module()))
+            });
+
+        let applicability = if should_fix {
+            Applicability::Unsafe
+        } else {
+            Applicability::DisplayOnly
         };
 
         match function.overloads_and_implementation(db) {
             ([first_overload, rest @ ..], None) => {
                 diagnostic.help(format_args!("Remove all overloads for `{member}`"));
-                diagnostic.set_fix(Fix::unsafe_edits(
+                diagnostic.set_fix(Fix::applicable_edits(
                     overload_deletion(first_overload),
                     rest.iter().map(overload_deletion),
+                    applicability,
                 ));
             }
             ([first_overload, rest @ ..], Some(implementation)) => {
                 diagnostic.help(format_args!(
                     "Remove all overloads and the implementation for `{member}`"
                 ));
-                diagnostic.set_fix(Fix::unsafe_edits(
+                diagnostic.set_fix(Fix::applicable_edits(
                     overload_deletion(first_overload),
                     rest.iter().chain([&implementation]).map(overload_deletion),
+                    applicability,
                 ));
             }
             ([], Some(implementation)) => {
                 diagnostic.help(format_args!("Remove the override of `{member}`"));
-                diagnostic.set_fix(Fix::unsafe_edit(overload_deletion(&implementation)));
+                diagnostic.set_fix(Fix::applicable_edit(
+                    overload_deletion(&implementation),
+                    applicability,
+                ));
             }
             ([], None) => {
                 // Should be impossible to get here: how would we even infer a function as a function
@@ -3913,7 +3953,7 @@ pub(super) fn report_overridden_final_method<'db>(
         }
     } else {
         diagnostic.help(format_args!("Remove the override of `{member}`"));
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(
+        diagnostic.set_fix(Fix::display_only_edit(Edit::range_deletion(
             subclass_definition.full_range(db, context.module()).range(),
         )));
     }
