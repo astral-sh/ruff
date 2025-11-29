@@ -19,7 +19,7 @@ pub use semantic_model::{
     Completion, HasDefinition, HasType, MemberDefinition, NameKind, SemanticModel,
 };
 pub use site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
-pub use suppression::create_suppression_fix;
+pub use suppression::{suppress_all, suppress_single};
 pub use ty_module_resolver::MisconfigurationMode;
 pub use types::DisplaySettings;
 pub use types::ide_support::{

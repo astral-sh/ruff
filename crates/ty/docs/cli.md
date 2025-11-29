@@ -37,7 +37,7 @@ ty check [OPTIONS] [PATH]...
 
 <h3 class="cli-reference">Options</h3>
 
-<dl class="cli-reference"><dt id="ty-check--color"><a href="#ty-check--color"><code>--color</code></a> <i>when</i></dt><dd><p>Control when colored output is used</p>
+<dl class="cli-reference"><dt id="ty-check--add-ignore"><a href="#ty-check--add-ignore"><code>--add-ignore</code></a></dt><dt id="ty-check--color"><a href="#ty-check--color"><code>--color</code></a> <i>when</i></dt><dd><p>Control when colored output is used</p>
 <p>Possible values:</p>
 <ul>
 <li><code>auto</code>:  Display colors if the output goes to an interactive terminal</li>
