@@ -349,6 +349,10 @@ impl<T> FixedLengthTuple<T> {
         &self.0
     }
 
+    pub(crate) fn owned_elements(self) -> Box<[T]> {
+        self.0
+    }
+
     pub(crate) fn elements(&self) -> impl DoubleEndedIterator<Item = &T> + ExactSizeIterator + '_ {
         self.0.iter()
     }
