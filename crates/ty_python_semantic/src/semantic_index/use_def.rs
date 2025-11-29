@@ -241,8 +241,8 @@
 //! visits a `StmtIf` node.
 
 use ruff_index::{IndexVec, newtype_index};
-use rustc_hash::FxHashMap;
 
+use crate::FxHashMap;
 use crate::node_key::NodeKey;
 use crate::place::BoundnessAnalysis;
 use crate::semantic_index::ast_ids::ScopedUseId;
@@ -1337,7 +1337,7 @@ impl<'db> UseDefMapBuilder<'db> {
         for bindings in &mut self.bindings_by_use {
             bindings.finish(&mut self.reachability_constraints);
         }
-        for constraint in self.node_reachability.values() {
+        for constraint in self.node_reachability.unstable_values() {
             self.reachability_constraints.mark_used(*constraint);
         }
         for symbol_state in &mut self.symbol_states {
@@ -1362,10 +1362,10 @@ impl<'db> UseDefMapBuilder<'db> {
                 .declarations
                 .finish(&mut self.reachability_constraints);
         }
-        for declarations in self.declarations_by_binding.values_mut() {
+        for declarations in self.declarations_by_binding.unstable_values_mut() {
             declarations.finish(&mut self.reachability_constraints);
         }
-        for bindings in self.bindings_by_definition.values_mut() {
+        for bindings in self.bindings_by_definition.unstable_values_mut() {
             bindings.finish(&mut self.reachability_constraints);
         }
         for eager_snapshot in &mut self.enclosing_snapshots {

@@ -19,7 +19,6 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_macros::{Combine, OptionsMetadata, RustDoc};
 use ruff_options_metadata::{OptionSet, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
-use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt::{self, Debug, Display};
@@ -28,6 +27,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
+use ty_python_semantic::FxHasher;
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
     ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionFileSource,

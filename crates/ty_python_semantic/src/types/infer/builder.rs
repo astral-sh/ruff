@@ -10,7 +10,6 @@ use ruff_python_ast::{
 };
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
 use super::{
@@ -113,7 +112,7 @@ use crate::types::{
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
-use crate::{Db, FxIndexSet, FxOrderSet, Program};
+use crate::{Db, FxHashMap, FxHashSet, FxIndexSet, FxOrderSet, Program};
 
 mod annotation_expression;
 mod type_expression;
@@ -369,7 +368,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.expressions.extend(inference.expressions.iter());
+        self.expressions
+            .extend(inference.expressions.unstable_iter());
         self.declarations
             .extend(inference.declarations(), self.multi_inference_state);
 
@@ -384,7 +384,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred
                 .extend(extra.deferred.iter().copied(), self.multi_inference_state);
             self.string_annotations
-                .extend(extra.string_annotations.iter().copied());
+                .extend(extra.string_annotations.unstable_iter().copied());
         }
     }
 
@@ -396,13 +396,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn extend_expression_unchecked(&mut self, inference: &ExpressionInference<'db>) {
-        self.expressions.extend(inference.expressions.iter());
+        self.expressions
+            .extend(inference.expressions.unstable_iter());
 
         if let Some(extra) = &inference.extra {
             self.context.extend(&extra.diagnostics);
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.string_annotations
-                .extend(extra.string_annotations.iter().copied());
+                .extend(extra.string_annotations.unstable_iter().copied());
 
             if !matches!(self.region, InferenceRegion::Scope(..)) {
                 self.bindings

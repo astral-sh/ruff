@@ -59,7 +59,6 @@ use std::fmt::Display;
 use std::ops::Range;
 
 use itertools::Itertools;
-use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 
 use crate::types::generics::{GenericContext, InferableTypeVars, Specialization};
@@ -68,7 +67,7 @@ use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation,
     TypeVarBoundOrConstraints, UnionType, walk_bound_type_var_type,
 };
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxHashMap, FxHashSet, FxOrderSet};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -265,7 +264,7 @@ impl<'db> ConstraintSet<'db> {
             let outgoing = reachable_typevars
                 .remove(&bound_typevar)
                 .expect("should not visit typevar twice in DFS");
-            for outgoing in outgoing {
+            for outgoing in outgoing.unstable_into_iter() {
                 if discovered.contains(&outgoing) {
                     return true;
                 }
@@ -291,12 +290,12 @@ impl<'db> ConstraintSet<'db> {
             reachable_typevars
                 .entry(constraint.typevar(db).identity(db))
                 .or_default()
-                .extend(visitor.reachable_typevars.into_inner());
+                .extend(visitor.reachable_typevars.into_inner().unstable_into_iter());
         });
 
         // Then perform a depth-first search to see if there are any cycles.
         let mut discovered: FxHashSet<BoundTypeVarIdentity<'db>> = FxHashSet::default();
-        while let Some(bound_typevar) = reachable_typevars.keys().copied().next() {
+        while let Some(bound_typevar) = reachable_typevars.unstable_keys().copied().next() {
             if !discovered.contains(&bound_typevar) {
                 let cycle_found =
                     visit_dfs(&mut reachable_typevars, &mut discovered, bound_typevar);
@@ -1056,7 +1055,7 @@ impl<'db> Node<'db> {
                 .is_always_satisfied(db)
         };
 
-        for typevar in typevars {
+        for typevar in typevars.unstable_into_iter() {
             if typevar.is_inferable(db, inferable) {
                 // If the typevar is in inferable position, we need to verify that some valid
                 // specialization satisfies the constraint set.
@@ -1852,7 +1851,7 @@ impl<'db> InteriorNode<'db> {
         Node::Interior(self).for_each_constraint(db, &mut |constraint| {
             seen_constraints.insert(constraint);
         });
-        let mut to_visit: Vec<(_, _)> = (seen_constraints.iter().copied())
+        let mut to_visit: Vec<(_, _)> = (seen_constraints.unstable_iter().copied())
             .tuple_combinations()
             .collect();
 
@@ -2011,7 +2010,7 @@ impl<'db> InteriorNode<'db> {
                     // seen set and (if we haven't already seen it) to the to-visit queue.
                     if seen_constraints.insert(intersection_constraint) {
                         to_visit.extend(
-                            (seen_constraints.iter().copied())
+                            (seen_constraints.unstable_iter().copied())
                                 .filter(|seen| *seen != intersection_constraint)
                                 .map(|seen| (seen, intersection_constraint)),
                         );
@@ -2306,7 +2305,7 @@ impl<'db> SequentMap<'db> {
             // Otherwise, check this constraint against all of the other ones we've seen so far, seeing
             // if they're related to each other.
             let processed = std::mem::take(&mut self.processed);
-            for other in &processed {
+            for other in processed.unstable_iter() {
                 if constraint != *other {
                     self.add_sequents_for_pair(db, constraint, *other);
                 }
@@ -2632,7 +2631,7 @@ impl<'db> SequentMap<'db> {
                     }
                 };
 
-                for (ante1, ante2) in &self.map.pair_impossibilities {
+                for (ante1, ante2) in self.map.pair_impossibilities.unstable_iter() {
                     maybe_write_prefix(f)?;
                     write!(
                         f,
@@ -2642,8 +2641,8 @@ impl<'db> SequentMap<'db> {
                     )?;
                 }
 
-                for ((ante1, ante2), posts) in &self.map.pair_implications {
-                    for post in posts {
+                for ((ante1, ante2), posts) in self.map.pair_implications.unstable_iter() {
+                    for post in posts.unstable_iter() {
                         maybe_write_prefix(f)?;
                         write!(
                             f,
@@ -2655,8 +2654,8 @@ impl<'db> SequentMap<'db> {
                     }
                 }
 
-                for (ante, posts) in &self.map.single_implications {
-                    for post in posts {
+                for (ante, posts) in self.map.single_implications.unstable_iter() {
+                    for post in posts.unstable_iter() {
                         maybe_write_prefix(f)?;
                         write!(f, "{} → {}", ante.display(self.db), post.display(self.db))?;
                     }
@@ -2765,7 +2764,7 @@ impl<'db> PathAssignments<'db> {
         // don't anticipate the sequent maps to be very large. We might consider avoiding the
         // brute-force search.
 
-        for ante in &map.single_tautologies {
+        for ante in map.single_tautologies.unstable_iter() {
             if self.assignment_holds(ante.when_false()) {
                 // The sequent map says (ante1) is always true, and the current path asserts that
                 // it's false.
@@ -2773,7 +2772,7 @@ impl<'db> PathAssignments<'db> {
             }
         }
 
-        for (ante1, ante2) in &map.pair_impossibilities {
+        for (ante1, ante2) in map.pair_impossibilities.unstable_iter() {
             if self.assignment_holds(ante1.when_true()) && self.assignment_holds(ante2.when_true())
             {
                 // The sequent map says (ante1 ∧ ante2) is an impossible combination, and the
@@ -2782,8 +2781,8 @@ impl<'db> PathAssignments<'db> {
             }
         }
 
-        for ((ante1, ante2), posts) in &map.pair_implications {
-            for post in posts {
+        for ((ante1, ante2), posts) in map.pair_implications.unstable_iter() {
+            for post in posts.unstable_iter() {
                 if self.assignment_holds(ante1.when_true())
                     && self.assignment_holds(ante2.when_true())
                 {
@@ -2792,8 +2791,8 @@ impl<'db> PathAssignments<'db> {
             }
         }
 
-        for (ante, posts) in &map.single_implications {
-            for post in posts {
+        for (ante, posts) in map.single_implications.unstable_iter() {
+            for post in posts.unstable_iter() {
                 if self.assignment_holds(ante.when_true()) {
                     self.add_assignment(map, post.when_true())?;
                 }

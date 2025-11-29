@@ -4,7 +4,6 @@ use std::fmt::Display;
 
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
-use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, ScopeId};
@@ -23,7 +22,7 @@ use crate::types::{
     TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance,
     TypeVarKind, TypeVarVariance, UnionType, declaration_type, walk_bound_type_var_type,
 };
-use crate::{Db, FxOrderMap, FxOrderSet};
+use crate::{Db, FxHashMap, FxHashSet, FxOrderMap, FxOrderSet};
 
 /// Returns an iterator of any generic context introduced by the given scope or any enclosing
 /// scope.
@@ -154,13 +153,13 @@ impl<'a, 'db> InferableTypeVars<'a, 'db> {
 
     // This is not an IntoIterator implementation because I have no desire to try to name the
     // iterator type.
-    pub(crate) fn iter(self) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> {
+    pub(crate) fn unstable_iter(self) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> {
         match self {
             InferableTypeVars::None => Either::Left(Either::Left(std::iter::empty())),
-            InferableTypeVars::One(typevars) => Either::Right(typevars.iter().copied()),
+            InferableTypeVars::One(typevars) => Either::Right(typevars.unstable_iter().copied()),
             InferableTypeVars::Two(left, right) => {
                 let chained: Box<dyn Iterator<Item = BoundTypeVarIdentity<'db>>> =
-                    Box::new(left.iter().chain(right.iter()));
+                    Box::new(left.unstable_iter().chain(right.unstable_iter()));
                 Either::Left(Either::Right(chained))
             }
         }
@@ -175,7 +174,9 @@ impl<'a, 'db> InferableTypeVars<'a, 'db> {
         ) {
             match inferable {
                 InferableTypeVars::None => {}
-                InferableTypeVars::One(typevars) => result.extend(typevars.iter().copied()),
+                InferableTypeVars::One(typevars) => {
+                    result.extend(typevars.unstable_iter().copied())
+                }
                 InferableTypeVars::Two(left, right) => {
                     find_typevars(result, left);
                     find_typevars(result, right);
@@ -188,7 +189,7 @@ impl<'a, 'db> InferableTypeVars<'a, 'db> {
         format!(
             "[{}]",
             typevars
-                .into_iter()
+                .unstable_into_iter()
                 .map(|identity| identity.display(db))
                 .format(", ")
         )

@@ -5,6 +5,7 @@ use super::{
     CallArguments, CallDunderError, ClassBase, ClassLiteral, KnownClass,
     add_inferred_python_version_hint_to_diagnostic,
 };
+use crate::FxHashSet;
 use crate::diagnostic::did_you_mean;
 use crate::diagnostic::format_enumeration;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
@@ -43,7 +44,6 @@ use ruff_python_ast::parenthesize::parentheses_iterator;
 use ruff_python_ast::{self as ast, AnyNodeRef, StringFlags};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashSet;
 use std::fmt::{self, Formatter};
 
 /// Registers all known type check lints.
@@ -2185,7 +2185,8 @@ impl TypeCheckDiagnostics {
 
     pub(super) fn extend(&mut self, other: &TypeCheckDiagnostics) {
         self.diagnostics.extend_from_slice(&other.diagnostics);
-        self.used_suppressions.extend(&other.used_suppressions);
+        self.used_suppressions
+            .extend(other.used_suppressions.unstable_iter());
     }
 
     pub(super) fn extend_diagnostics(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {

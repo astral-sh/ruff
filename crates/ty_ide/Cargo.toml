@@ -31,7 +31,6 @@ get-size2 = { workspace = true }
 itertools = { workspace = true }
 rayon = { workspace = true }
 regex = { workspace = true }
-rustc-hash = { workspace = true }
 salsa = { workspace = true, features = ["compact_str"] }
 smallvec = { workspace = true }
 tracing = { workspace = true }

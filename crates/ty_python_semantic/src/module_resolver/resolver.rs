@@ -14,7 +14,6 @@ use std::iter::FusedIterator;
 use std::str::Split;
 
 use compact_str::format_compact;
-use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::files::{File, FilePath, FileRootKind};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
@@ -27,7 +26,7 @@ use ruff_python_ast::{
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{TypeshedVersions, vendored_typeshed_versions};
-use crate::{Program, SearchPathSettings};
+use crate::{FxBuildHasher, FxHashSet, Program, SearchPathSettings};
 
 use super::module::{Module, ModuleKind};
 use super::path::{ModulePath, SearchPath, SearchPathValidationError, SystemOrVendoredPathRef};

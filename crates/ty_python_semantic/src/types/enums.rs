@@ -1,8 +1,7 @@
 use ruff_python_ast::name::Name;
-use rustc_hash::FxHashMap;
 
 use crate::{
-    Db, FxIndexMap,
+    Db, FxHashMap, FxIndexMap,
     place::{Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{

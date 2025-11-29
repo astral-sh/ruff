@@ -1,4 +1,3 @@
-use crate::Db;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
 use crate::semantic_index::place_table;
@@ -15,15 +14,15 @@ use crate::types::{
     SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext,
     TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
 };
+use crate::{Db, FxIndexMap};
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_stdlib::identifiers::is_identifier;
 
+use indexmap::map::Entry;
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
-use rustc_hash::FxHashMap;
-use std::collections::hash_map::Entry;
 
 use super::UnionType;
 
@@ -273,7 +272,7 @@ impl ClassInfoConstraintFunction {
     }
 }
 
-type NarrowingConstraints<'db> = FxHashMap<ScopedPlaceId, Type<'db>>;
+type NarrowingConstraints<'db> = FxIndexMap<ScopedPlaceId, Type<'db>>;
 
 fn merge_constraints_and<'db>(
     into: &mut NarrowingConstraints<'db>,

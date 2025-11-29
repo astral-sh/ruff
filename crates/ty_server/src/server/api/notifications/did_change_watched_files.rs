@@ -7,9 +7,9 @@ use crate::session::client::Client;
 use crate::system::AnySystemPath;
 use lsp_types as types;
 use lsp_types::{FileChangeType, notification as notif};
-use rustc_hash::FxHashMap;
 use ty_project::Db as _;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
+use ty_python_semantic::FxHashMap;
 
 pub(crate) struct DidChangeWatchedFiles;
 
@@ -75,7 +75,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
             return Ok(());
         }
 
-        for (root, changes) in events_by_db {
+        for (root, changes) in events_by_db.unstable_into_iter() {
             tracing::debug!("Applying changes to `{root}`");
 
             session.apply_changes(&AnySystemPath::System(root.clone()), changes);

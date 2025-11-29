@@ -9,11 +9,9 @@ use std::fmt;
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
-use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
-use crate::Program;
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{Definedness, Place};
@@ -41,6 +39,7 @@ use crate::types::{
     TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
     WrapperDescriptorKind, enums, ide_support, todo_type,
 };
+use crate::{FxHashMap, FxHashSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
 
@@ -844,8 +843,7 @@ impl<'db> Bindings<'db> {
                                             .unwrap_or_default();
                                         match all_names {
                                             Some(names) => {
-                                                let mut names = names.iter().collect::<Vec<_>>();
-                                                names.sort();
+                                                let names = names.sorted_ref_vec();
                                                 Type::heterogeneous_tuple(
                                                     db,
                                                     names.iter().map(|name| {

@@ -38,11 +38,9 @@
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_text_size::Ranged;
-use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
 use salsa::plumbing::AsId;
 
-use crate::Db;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
@@ -56,6 +54,7 @@ use crate::types::{
     ClassLiteral, KnownClass, Truthiness, Type, TypeAndQualifiers, declaration_type,
 };
 use crate::unpack::Unpack;
+use crate::{Db, FxHashMap, FxHashSet};
 use builder::TypeInferenceBuilder;
 
 mod builder;
@@ -564,7 +563,7 @@ impl<'db> ScopeInference<'db> {
         previous_inference: &ScopeInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ScopeInference<'db> {
-        for (expr, ty) in &mut self.expressions {
+        for (expr, ty) in self.expressions.unstable_iter_mut() {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }
@@ -674,7 +673,7 @@ impl<'db> DefinitionInference<'db> {
         previous_inference: &DefinitionInference<'db>,
         cycle: &salsa::Cycle,
     ) -> DefinitionInference<'db> {
-        for (expr, ty) in &mut self.expressions {
+        for (expr, ty) in self.expressions.unstable_iter_mut() {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }
@@ -849,7 +848,7 @@ impl<'db> ExpressionInference<'db> {
             }
         }
 
-        for (expr, ty) in &mut self.expressions {
+        for (expr, ty) in self.expressions.unstable_iter_mut() {
             let previous_ty = previous.expression_type(*expr);
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }

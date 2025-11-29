@@ -18,7 +18,6 @@ use ruff_db::files::{File, FileRootKind};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
 use ruff_db::system::{SystemPath, SystemPathBuf};
-use rustc_hash::FxHashSet;
 use salsa::Durability;
 use salsa::Setter;
 use std::backtrace::BacktraceStatus;
@@ -31,6 +30,7 @@ use tracing::error;
 use ty_python_semantic::add_inferred_python_version_hint_to_diagnostic;
 use ty_python_semantic::lint::RuleSelection;
 use ty_python_semantic::types::check_types;
+pub use ty_python_semantic::{FxHashMap, FxHashSet};
 
 mod db;
 mod files;
@@ -620,7 +620,7 @@ impl<'a> IntoIterator for &'a ProjectFiles<'a> {
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
-            ProjectFiles::OpenFiles(files) => ProjectFilesIter::OpenFiles(files.iter()),
+            ProjectFiles::OpenFiles(files) => ProjectFilesIter::OpenFiles(files.unstable_iter()),
             ProjectFiles::Indexed(files) => ProjectFilesIter::Indexed(files.into_iter()),
         }
     }

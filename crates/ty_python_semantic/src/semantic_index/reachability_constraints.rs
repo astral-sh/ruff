@@ -196,9 +196,7 @@
 use std::cmp::Ordering;
 
 use ruff_index::{Idx, IndexVec};
-use rustc_hash::FxHashMap;
 
-use crate::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{RequiresExplicitReExport, imported_symbol};
 use crate::rank::RankBitBox;
@@ -211,6 +209,7 @@ use crate::types::{
     CallableTypes, IntersectionBuilder, Truthiness, Type, TypeContext, UnionBuilder, UnionType,
     infer_expression_type, static_expression_truthiness,
 };
+use crate::{Db, FxHashMap};
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
 /// is just like a boolean formula, but with `Ambiguous` as a third potential result. See the

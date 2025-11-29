@@ -2,8 +2,8 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use rustc_hash::FxHashSet;
 use salsa::Setter;
+use ty_python_semantic::FxHashSet;
 
 use ruff_db::files::File;
 
@@ -181,7 +181,7 @@ impl<'a> IntoIterator for &'a Indexed<'_> {
     type IntoIter = IndexedIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.inner.files.iter().copied()
+        self.inner.files.unstable_iter().copied()
     }
 }
 
@@ -251,7 +251,7 @@ impl Drop for IndexedMut<'_> {
 
 #[cfg(test)]
 mod tests {
-    use rustc_hash::FxHashSet;
+    use ty_python_semantic::FxHashSet;
 
     use crate::ProjectMetadata;
     use crate::db::Db;
@@ -288,8 +288,8 @@ mod tests {
             }
             Index::Indexed(files_2) => {
                 assert_eq!(
-                    files_2.iter().collect::<Vec<_>>(),
-                    files.iter().collect::<Vec<_>>()
+                    files_2.unstable_iter().collect::<Vec<_>>(),
+                    files.unstable_iter().collect::<Vec<_>>()
                 );
             }
         }

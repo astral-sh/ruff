@@ -43,8 +43,7 @@ use crate::types::{
     BytesLiteralType, IntersectionType, KnownClass, StringLiteralType, Type,
     TypeVarBoundOrConstraints, UnionType,
 };
-use crate::{Db, FxOrderSet};
-use rustc_hash::FxHashSet;
+use crate::{Db, FxHashSet, FxOrderSet};
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

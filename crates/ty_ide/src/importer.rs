@@ -16,7 +16,7 @@ The main differences here are:
 3. It doesn't have as many facilities as `ruff_linter`'s importer.
 */
 
-use rustc_hash::FxHashMap;
+use ty_python_semantic::FxHashMap;
 
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
@@ -325,7 +325,7 @@ impl<'ast> MembersInScope<'ast> {
         let model = SemanticModel::new(db, file);
         let map = model
             .members_in_scope_at(node)
-            .into_iter()
+            .unstable_into_iter()
             .map(|(name, memberdef)| {
                 let Some(def) = memberdef.definition else {
                     return (name, MemberInScope::other(memberdef.ty));

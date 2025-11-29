@@ -1,8 +1,8 @@
+use crate::FxHashMap;
 use crate::diagnostic::did_you_mean;
 use core::fmt;
 use itertools::Itertools;
 use ruff_db::diagnostic::{DiagnosticId, LintName, Severity};
-use rustc_hash::FxHashMap;
 use std::error::Error;
 use std::fmt::Formatter;
 use std::hash::Hasher;
@@ -344,9 +344,9 @@ impl LintRegistryBuilder {
             ),
         };
 
+        let entry = LintEntry::Alias(*target);
         assert_eq!(
-            self.by_name
-                .insert(from.as_str(), LintEntry::Alias(*target)),
+            self.by_name.insert(from.as_str(), entry),
             None,
             "duplicate lint registration for '{from}'",
         );
@@ -389,7 +389,7 @@ impl LintRegistry {
                     }
                 }
 
-                let suggestion = did_you_mean(self.by_name.keys(), code);
+                let suggestion = did_you_mean(self.by_name.unstable_keys(), code);
 
                 Err(GetLintError::Unknown {
                     code: code.to_string(),
@@ -408,7 +408,7 @@ impl LintRegistry {
     ///
     /// This iterator includes aliases that point to removed lints.
     pub fn aliases(&self) -> impl Iterator<Item = (LintName, LintId)> + '_ {
-        self.by_name.iter().filter_map(|(key, value)| {
+        self.by_name.unstable_iter().filter_map(|(key, value)| {
             if let LintEntry::Alias(alias) = value {
                 Some((LintName::of(key), *alias))
             } else {
@@ -419,7 +419,7 @@ impl LintRegistry {
 
     /// Iterates over all removed lints.
     pub fn removed(&self) -> impl Iterator<Item = LintId> + '_ {
-        self.by_name.iter().filter_map(|(_, value)| {
+        self.by_name.unstable_iter().filter_map(|(_, value)| {
             if let LintEntry::Removed(metadata) = value {
                 Some(*metadata)
             } else {
@@ -538,13 +538,13 @@ impl RuleSelection {
 
     /// Returns an iterator over all enabled lints.
     pub fn enabled(&self) -> impl Iterator<Item = LintId> + '_ {
-        self.lints.keys().copied()
+        self.lints.unstable_keys().copied()
     }
 
     /// Returns an iterator over all enabled lints and their severity.
     pub fn iter(&self) -> impl ExactSizeIterator<Item = (LintId, Severity)> + '_ {
         self.lints
-            .iter()
+            .unstable_iter()
             .map(|(&lint, &(severity, _))| (lint, severity))
     }
 
@@ -579,7 +579,10 @@ impl RuleSelection {
 // This is way too verbose.
 impl fmt::Debug for RuleSelection {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let lints = self.lints.iter().sorted_by_key(|(lint, _)| lint.name);
+        let lints = self
+            .lints
+            .unstable_iter()
+            .sorted_by_key(|(lint, _)| lint.name);
 
         if f.alternate() {
             let mut f = f.debug_map();

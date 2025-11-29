@@ -11,9 +11,7 @@ use ruff_db::source::line_index;
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::Db;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
@@ -25,6 +23,7 @@ use crate::types::{
     KnownInstanceType, MaterializationKind, Protocol, ProtocolInstanceType, SpecialFormType,
     StringLiteralType, SubclassOfInner, Type, UnionType, WrapperDescriptorKind, visitor,
 };
+use crate::{Db, FxHashMap, FxHashSet};
 
 /// Settings for displaying types and signatures
 #[derive(Debug, Clone, Default)]
@@ -86,7 +85,7 @@ impl<'db> DisplaySettings<'db> {
                 collector
                     .class_names
                     .borrow()
-                    .iter()
+                    .unstable_iter()
                     .filter_map(|(name, ambiguity)| {
                         Some((*name, QualificationLevel::from_ambiguity_state(ambiguity)?))
                     })

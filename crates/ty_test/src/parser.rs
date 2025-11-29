@@ -7,7 +7,7 @@ use std::{
 
 use anyhow::bail;
 use ruff_db::system::{SystemPath, SystemPathBuf};
-use rustc_hash::FxHashMap;
+use ty_python_semantic::FxHashMap;
 
 use crate::config::MarkdownTestConfig;
 use ruff_index::{IndexVec, newtype_index};
@@ -821,13 +821,13 @@ impl<'s> Parser<'s> {
 
     fn current_section_has_explicit_file_paths(&self) -> bool {
         self.current_section_files
-            .iter()
+            .unstable_iter()
             .any(|(path, _)| path.is_explicit())
     }
 
     fn current_section_has_merged_snippets(&self) -> bool {
         self.current_section_files
-            .values()
+            .unstable_values()
             .any(|id| self.files[*id].backtick_offsets.len() > 1)
     }
 

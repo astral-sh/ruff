@@ -18,13 +18,12 @@ use crate::types::{
     CallableTypes, ClassBase, ClassLiteral, KnownClass, KnownInstanceType, Type, TypeContext,
     TypeVarBoundOrConstraints, class::CodeGeneratorKind,
 };
-use crate::{Db, DisplaySettings, HasType, NameKind, SemanticModel};
+use crate::{Db, DisplaySettings, FxHashSet, FxIndexSet, HasType, NameKind, SemanticModel};
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashSet;
 
 pub use resolve_definition::{ImportAliasResolution, ResolvedDefinition, map_stub_definition};
 use resolve_definition::{find_symbol_in_scope, resolve_definition};
@@ -104,13 +103,13 @@ pub(crate) fn all_declarations_and_bindings<'db>(
 }
 
 struct AllMembers<'db> {
-    members: FxHashSet<Member<'db>>,
+    members: FxIndexSet<Member<'db>>,
 }
 
 impl<'db> AllMembers<'db> {
     fn of(db: &'db dyn Db, ty: Type<'db>) -> Self {
         let mut all_members = Self {
-            members: FxHashSet::default(),
+            members: FxIndexSet::default(),
         };
         all_members.extend_with_type(db, ty);
         all_members
@@ -516,7 +515,7 @@ impl<'db> PartialOrd for Member<'db> {
 
 /// List all members of a given type: anything that would be valid when accessed
 /// as an attribute on an object of the given type.
-pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Member<'db>> {
+pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxIndexSet<Member<'db>> {
     AllMembers::of(db, ty).members
 }
 
@@ -1335,14 +1334,13 @@ mod resolve_definition {
     use ruff_db::system::SystemPath;
     use ruff_db::vendored::VendoredPathBuf;
     use ruff_python_ast as ast;
-    use rustc_hash::FxHashSet;
     use tracing::trace;
 
     use crate::module_resolver::file_to_module;
     use crate::semantic_index::definition::{Definition, DefinitionKind, module_docstring};
     use crate::semantic_index::scope::{NodeWithScopeKind, ScopeId};
     use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
-    use crate::{Db, ModuleName, resolve_module, resolve_real_module};
+    use crate::{Db, FxHashSet, ModuleName, resolve_module, resolve_real_module};
 
     /// Represents the result of resolving an import to either a specific definition or
     /// a specific range within a file.
