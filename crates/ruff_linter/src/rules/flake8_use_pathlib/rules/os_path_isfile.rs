@@ -74,6 +74,6 @@ pub(crate) fn os_path_isfile(checker: &Checker, call: &ExprCall, segments: &[&st
         "path",
         is_fix_os_path_isfile_enabled(checker.settings()),
         OsPathIsfile,
-        Some(Applicability::Safe),
+        Applicability::Safe,
     );
 }

@@ -42,7 +42,7 @@ use crate::{FixAvailability, Violation};
 /// As a result, code relying on the exact string returned by `os.path.dirname`
 /// may behave differently after the fix.
 ///
-/// Additionally, the fix is marked as unsafe because `os.path.dirname()` returns `str` or `bytes`,
+/// Additionally, the fix is marked as unsafe because `os.path.dirname()` returns `str` or `bytes` (`AnyStr`),
 /// while `Path.parent` returns a `Path` object. This change in return type can break code that uses
 /// the return value.
 ///
@@ -86,6 +86,6 @@ pub(crate) fn os_path_dirname(checker: &Checker, call: &ExprCall, segments: &[&s
         "p",
         is_fix_os_path_dirname_enabled(checker.settings()),
         OsPathDirname,
-        Some(Applicability::Unsafe),
+        Applicability::Unsafe,
     );
 }

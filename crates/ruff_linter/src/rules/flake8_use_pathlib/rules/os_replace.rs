@@ -94,11 +94,11 @@ pub(crate) fn os_replace(checker: &Checker, call: &ExprCall, segments: &[&str]) 
         );
 
     // Unsafe when the fix would delete comments or change a used return value
-    let applicability = if fix_enabled && !is_top_level_expression_call(checker, call) {
+    let applicability = if !is_top_level_expression_call(checker) {
         // Unsafe because the return type changes (None -> Path)
-        Some(Applicability::Unsafe)
+        Applicability::Unsafe
     } else {
-        None
+        Applicability::Safe
     };
 
     check_os_pathlib_two_arg_calls(

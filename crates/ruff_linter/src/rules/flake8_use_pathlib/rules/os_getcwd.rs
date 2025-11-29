@@ -88,7 +88,7 @@ pub(crate) fn os_getcwd(checker: &Checker, call: &ExprCall, segments: &[&str]) {
 
             // Unsafe when the fix would delete comments or change a used return value
             let applicability = if checker.comment_ranges().intersects(range)
-                || !is_top_level_expression_call(checker, call)
+                || !is_top_level_expression_call(checker)
             {
                 Applicability::Unsafe
             } else {

@@ -72,6 +72,6 @@ pub(crate) fn os_path_isabs(checker: &Checker, call: &ExprCall, segments: &[&str
         "s",
         is_fix_os_path_isabs_enabled(checker.settings()),
         OsPathIsabs,
-        Some(Applicability::Safe),
+        Applicability::Safe,
     );
 }

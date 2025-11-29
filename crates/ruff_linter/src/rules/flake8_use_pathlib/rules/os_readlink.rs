@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{ExprCall, PythonVersion};
 
@@ -8,7 +9,6 @@ use crate::rules::flake8_use_pathlib::helpers::{
     is_top_level_expression_call,
 };
 use crate::{FixAvailability, Violation};
-use ruff_diagnostics::Applicability;
 
 /// ## What it does
 /// Checks for uses of `os.readlink`.
@@ -41,7 +41,7 @@ use ruff_diagnostics::Applicability;
 /// ## Fix Safety
 /// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
 /// Additionally, the fix is marked as unsafe when the return value is used because the type changes
-/// from `str` or `bytes` to a `Path` object.
+/// from `str` or `bytes` (`AnyStr`) to a `Path` object.
 ///
 /// ## References
 /// - [Python documentation: `Path.readlink`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.readline)
@@ -87,11 +87,11 @@ pub(crate) fn os_readlink(checker: &Checker, call: &ExprCall, segments: &[&str])
     }
 
     let fix_enabled = is_fix_os_readlink_enabled(checker.settings());
-    let applicability = if fix_enabled && !is_top_level_expression_call(checker, call) {
+    let applicability = if fix_enabled && !is_top_level_expression_call(checker) {
         // Unsafe because the return type changes (str/bytes -> Path)
-        Some(Applicability::Unsafe)
+        Applicability::Unsafe
     } else {
-        None
+        Applicability::Safe
     };
 
     check_os_pathlib_single_arg_calls(

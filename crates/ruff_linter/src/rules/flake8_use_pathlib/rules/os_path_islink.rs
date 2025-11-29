@@ -74,6 +74,6 @@ pub(crate) fn os_path_islink(checker: &Checker, call: &ExprCall, segments: &[&st
         "path",
         is_fix_os_path_islink_enabled(checker.settings()),
         OsPathIslink,
-        Some(Applicability::Safe),
+        Applicability::Safe,
     );
 }
