@@ -17,11 +17,12 @@ use crate::types::signatures::Parameters;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral,
-    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeContext,
-    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance,
-    TypeVarKind, TypeVarVariance, UnionType, declaration_type, walk_bound_type_var_type,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableTypes,
+    ClassLiteral, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
+    IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
+    Type, TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, declaration_type,
+    walk_bound_type_var_type,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -842,7 +843,11 @@ fn has_relation_in_invariant_position<'db>(
             disjointness_visitor,
         ),
         // And A <~ B (assignability) is Bottom[A] <: Top[B]
-        (None, Some(base_mat), TypeRelation::Assignability) => is_subtype_in_invariant_position(
+        (
+            None,
+            Some(base_mat),
+            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
+        ) => is_subtype_in_invariant_position(
             db,
             derived_type,
             MaterializationKind::Bottom,
@@ -852,7 +857,11 @@ fn has_relation_in_invariant_position<'db>(
             relation_visitor,
             disjointness_visitor,
         ),
-        (Some(derived_mat), None, TypeRelation::Assignability) => is_subtype_in_invariant_position(
+        (
+            Some(derived_mat),
+            None,
+            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
+        ) => is_subtype_in_invariant_position(
             db,
             derived_type,
             derived_mat,
@@ -1364,7 +1373,7 @@ impl<'db> SpecializationBuilder<'db> {
             .map(|(identity, _)| self.types.get(identity).copied());
 
         // TODO Infer the tuple spec for a tuple type
-        generic_context.specialize_partial(self.db, types)
+        generic_context.specialize_recursive(self.db, types)
     }
 
     fn add_type_mapping(
@@ -1639,6 +1648,48 @@ impl<'db> SpecializationBuilder<'db> {
                         return Ok(());
                     }
                 }
+            }
+
+            (Type::Callable(formal_callable), _) => {
+                let Some(actual_callable) = actual
+                    .try_upcast_to_callable(self.db)
+                    .and_then(CallableTypes::exactly_one)
+                else {
+                    return Ok(());
+                };
+
+                let [formal_signature] = formal_callable.signatures(self.db).overloads.as_slice()
+                else {
+                    return Ok(());
+                };
+                let [actual_signature] = actual_callable.signatures(self.db).overloads.as_slice()
+                else {
+                    return Ok(());
+                };
+
+                let when = formal_signature.when_constraint_set_assignable_to(
+                    self.db,
+                    actual_signature,
+                    self.inferable,
+                );
+                when.for_each_path(self.db, |path| {
+                    for constraint in path.positive_constraints() {
+                        let typevar = constraint.typevar(self.db);
+                        let lower = constraint.lower(self.db);
+                        let upper = constraint.upper(self.db);
+                        if !upper.is_object() {
+                            self.add_type_mapping(typevar, upper, polarity, &mut f);
+                        }
+                        if let Type::TypeVar(lower_bound_typevar) = lower {
+                            self.add_type_mapping(
+                                lower_bound_typevar,
+                                Type::TypeVar(typevar),
+                                polarity,
+                                &mut f,
+                            );
+                        }
+                    }
+                });
             }
 
             // TODO: Add more forms that we can structurally induct into: type[C], callables

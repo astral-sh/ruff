@@ -843,6 +843,22 @@ impl<'db> Signature<'db> {
         result
     }
 
+    pub(crate) fn when_constraint_set_assignable_to(
+        &self,
+        db: &'db dyn Db,
+        other: &Signature<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> ConstraintSet<'db> {
+        self.has_relation_to_impl(
+            db,
+            other,
+            inferable,
+            TypeRelation::ConstraintSetAssignability,
+            &HasRelationToVisitor::default(),
+            &IsDisjointVisitor::default(),
+        )
+    }
+
     /// Implementation of subtyping and assignability for signature.
     fn has_relation_to_impl(
         &self,
@@ -999,7 +1015,13 @@ impl<'db> Signature<'db> {
         // If either of the parameter lists is gradual (`...`), then it is assignable to and from
         // any other parameter list, but not a subtype or supertype of any other parameter list.
         if self.parameters.is_gradual() || other.parameters.is_gradual() {
-            return ConstraintSet::from(relation.is_assignability());
+            result.intersect(
+                db,
+                ConstraintSet::from(
+                    relation.is_assignability() || relation.is_constraint_set_assignability(),
+                ),
+            );
+            return result;
         }
 
         let mut parameters = ParametersZip {
