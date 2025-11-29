@@ -17,7 +17,7 @@ use ty_python_semantic::{
 
 use crate::docstring::Docstring;
 use crate::find_node::covering_node;
-use crate::goto::DefinitionsOrTargets;
+use crate::goto::Definitions;
 use crate::importer::{ImportRequest, Importer};
 use crate::symbols::QueryPattern;
 use crate::{Db, all_symbols};
@@ -220,9 +220,7 @@ impl<'db> Completion<'db> {
         db: &'db dyn Db,
         semantic: SemanticCompletion<'db>,
     ) -> Completion<'db> {
-        let definition = semantic
-            .ty
-            .and_then(|ty| DefinitionsOrTargets::from_ty(db, ty));
+        let definition = semantic.ty.and_then(|ty| Definitions::from_ty(db, ty));
         let documentation = definition.and_then(|def| def.docstring(db));
         let is_type_check_only = semantic.is_type_check_only(db);
         Completion {

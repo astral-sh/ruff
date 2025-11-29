@@ -7,7 +7,7 @@
 //! and overloads.
 
 use crate::docstring::Docstring;
-use crate::goto::DefinitionsOrTargets;
+use crate::goto::Definitions;
 use crate::{Db, find_node::covering_node};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -214,8 +214,7 @@ fn get_callable_documentation(
     db: &dyn crate::Db,
     definition: Option<Definition>,
 ) -> Option<Docstring> {
-    DefinitionsOrTargets::Definitions(vec![ResolvedDefinition::Definition(definition?)])
-        .docstring(db)
+    Definitions(vec![ResolvedDefinition::Definition(definition?)]).docstring(db)
 }
 
 /// Create `ParameterDetails` objects from parameter label offsets.

@@ -52,6 +52,9 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
 38 | 
 39 | def write_to_readonly_key(employee: Employee):
 40 |     employee["id"] = 42  # error: [invalid-assignment]
+41 | def write_to_non_existing_key_single_quotes(person: Person):
+42 |     # error: [invalid-key]
+43 |     person['naem'] = "Alice"  # fmt: skip
 ```
 
 # Diagnostics
@@ -217,6 +220,8 @@ error[invalid-assignment]: Cannot assign to key "id" on TypedDict `Employee`
    |     -------- ^^^^ key is marked read-only
    |     |
    |     TypedDict `Employee`
+41 | def write_to_non_existing_key_single_quotes(person: Person):
+42 |     # error: [invalid-key]
    |
 info: Item declaration
   --> src/mdtest_snippet.py:36:5
@@ -227,5 +232,26 @@ info: Item declaration
 37 |     name: str
    |
 info: rule `invalid-assignment` is enabled by default
+
+```
+
+```
+error[invalid-key]: Unknown key "naem" for TypedDict `Person`
+  --> src/mdtest_snippet.py:43:5
+   |
+41 | def write_to_non_existing_key_single_quotes(person: Person):
+42 |     # error: [invalid-key]
+43 |     person['naem'] = "Alice"  # fmt: skip
+   |     ------ ^^^^^^ Did you mean 'name'?
+   |     |
+   |     TypedDict `Person`
+   |
+info: rule `invalid-key` is enabled by default
+40 |     employee["id"] = 42  # error: [invalid-assignment]
+41 | def write_to_non_existing_key_single_quotes(person: Person):
+42 |     # error: [invalid-key]
+   -     person['naem'] = "Alice"  # fmt: skip
+43 +     person['name'] = "Alice"  # fmt: skip
+note: This is an unsafe fix and may change runtime behavior
 
 ```

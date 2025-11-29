@@ -2,26 +2,32 @@
 //!
 //! [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 
+use bitflags::bitflags;
 use ruff_db::diagnostic::Annotation;
 use rustc_hash::FxHashSet;
 
 use crate::{
+    Db,
+    lint::LintId,
     place::Place,
-    semantic_index::place_table,
+    semantic_index::{place_table, scope::ScopeId, symbol::ScopedSymbolId, use_def_map},
     types::{
         ClassBase, ClassLiteral, ClassType, KnownClass, Type,
         class::CodeGeneratorKind,
         context::InferContext,
-        definition_expression_type,
-        diagnostic::{INVALID_EXPLICIT_OVERRIDE, report_invalid_method_override},
-        function::{FunctionDecorators, KnownFunction},
+        diagnostic::{
+            INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, OVERRIDE_OF_FINAL_METHOD,
+            report_invalid_method_override, report_overridden_final_method,
+        },
+        function::{FunctionDecorators, FunctionType, KnownFunction},
         ide_support::{MemberWithDefinition, all_declarations_and_bindings},
     },
 };
 
 pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: ClassLiteral<'db>) {
     let db = context.db();
-    if class.is_known(db, KnownClass::Object) {
+    let configuration = OverrideRulesConfig::from(context);
+    if configuration.no_rules_enabled() {
         return;
     }
 
@@ -30,45 +36,85 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: ClassLite
         all_declarations_and_bindings(db, class.body_scope(db)).collect();
 
     for member in own_class_members {
-        check_class_declaration(context, class_specialized, &member);
+        check_class_declaration(context, configuration, class_specialized, &member);
     }
 }
 
 fn check_class_declaration<'db>(
     context: &InferContext<'db, '_>,
+    configuration: OverrideRulesConfig,
     class: ClassType<'db>,
     member: &MemberWithDefinition<'db>,
 ) {
+    /// Salsa-tracked query to check whether any of the definitions of a symbol
+    /// in a superclass scope are function definitions.
+    ///
+    /// We need to know this for compatibility with pyright and mypy, neither of which emit an error
+    /// on `C.f` here:
+    ///
+    /// ```python
+    /// from typing import final
+    ///
+    /// class A:
+    ///     @final
+    ///     def f(self) -> None: ...
+    ///
+    /// class B:
+    ///     f = A.f
+    ///
+    /// class C(B):
+    ///     def f(self) -> None: ...  # no error here
+    /// ```
+    ///
+    /// This is a Salsa-tracked query because it has to look at the AST node for the definition,
+    /// which might be in a different Python module. If this weren't a tracked query, we could
+    /// introduce cross-module dependencies and over-invalidation.
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn is_function_definition<'db>(
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        symbol: ScopedSymbolId,
+    ) -> bool {
+        use_def_map(db, scope)
+            .end_of_scope_symbol_bindings(symbol)
+            .filter_map(|binding| binding.binding.definition())
+            .any(|definition| definition.kind(db).is_function_def())
+    }
+
+    fn extract_underlying_functions<'db>(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> Option<smallvec::SmallVec<[FunctionType<'db>; 1]>> {
+        match ty {
+            Type::FunctionLiteral(function) => Some(smallvec::smallvec_inline![function]),
+            Type::BoundMethod(method) => Some(smallvec::smallvec_inline![method.function(db)]),
+            Type::PropertyInstance(property) => {
+                extract_underlying_functions(db, property.getter(db)?)
+            }
+            Type::Union(union) => {
+                let mut functions = smallvec::smallvec![];
+                for member in union.elements(db) {
+                    if let Some(mut member_functions) = extract_underlying_functions(db, *member) {
+                        functions.append(&mut member_functions);
+                    }
+                }
+                if functions.is_empty() {
+                    None
+                } else {
+                    Some(functions)
+                }
+            }
+            _ => None,
+        }
+    }
+
     let db = context.db();
 
     let MemberWithDefinition { member, definition } = member;
 
-    // TODO: Check Liskov on non-methods too
-    let Type::FunctionLiteral(function) = member.ty else {
-        return;
-    };
-
     let Some(definition) = definition else {
         return;
     };
-
-    // Constructor methods are not checked for Liskov compliance
-    if matches!(
-        &*member.name,
-        "__init__" | "__new__" | "__post_init__" | "__init_subclass__"
-    ) {
-        return;
-    }
-
-    let (literal, specialization) = class.class_literal(db);
-    let class_kind = CodeGeneratorKind::from_class(db, literal, specialization);
-
-    // Synthesized `__replace__` methods on dataclasses are not checked
-    if &member.name == "__replace__"
-        && matches!(class_kind, Some(CodeGeneratorKind::DataclassLike(_)))
-    {
-        return;
-    }
 
     let Place::Defined(type_on_subclass_instance, _, _) =
         Type::instance(db, class).member(db, &member.name).place
@@ -76,10 +122,14 @@ fn check_class_declaration<'db>(
         return;
     };
 
+    let (literal, specialization) = class.class_literal(db);
+    let class_kind = CodeGeneratorKind::from_class(db, literal, specialization);
+
     let mut subclass_overrides_superclass_declaration = false;
     let mut has_dynamic_superclass = false;
     let mut has_typeddict_in_mro = false;
     let mut liskov_diagnostic_emitted = false;
+    let mut overridden_final_method = None;
 
     for class_base in class.iter_mro(db).skip(1) {
         let superclass = match class_base {
@@ -96,11 +146,15 @@ fn check_class_declaration<'db>(
         };
 
         let (superclass_literal, superclass_specialization) = superclass.class_literal(db);
-        let superclass_symbol_table = place_table(db, superclass_literal.body_scope(db));
+        let superclass_scope = superclass_literal.body_scope(db);
+        let superclass_symbol_table = place_table(db, superclass_scope);
+        let superclass_symbol_id = superclass_symbol_table.symbol_id(&member.name);
+
         let mut method_kind = MethodKind::default();
 
         // If the member is not defined on the class itself, skip it
-        if let Some(superclass_symbol) = superclass_symbol_table.symbol_by_name(&member.name) {
+        if let Some(id) = superclass_symbol_id {
+            let superclass_symbol = superclass_symbol_table.symbol(id);
             if !(superclass_symbol.is_bound() || superclass_symbol.is_declared()) {
                 continue;
             }
@@ -119,12 +173,6 @@ fn check_class_declaration<'db>(
 
         subclass_overrides_superclass_declaration = true;
 
-        // Only one Liskov diagnostic should be emitted per each invalid override,
-        // even if it overrides multiple superclasses incorrectly!
-        if liskov_diagnostic_emitted {
-            continue;
-        }
-
         let Place::Defined(superclass_type, _, _) = Type::instance(db, superclass)
             .member(db, &member.name)
             .place
@@ -133,14 +181,74 @@ fn check_class_declaration<'db>(
             break;
         };
 
-        let Some(superclass_type_as_callable) = superclass_type
-            .try_upcast_to_callable(db)
-            .map(|callables| callables.into_type(db))
-        else {
+        if configuration.check_final_method_overridden() {
+            overridden_final_method = overridden_final_method.or_else(|| {
+                let superclass_symbol_id = superclass_symbol_id?;
+
+                // TODO: `@final` should be more like a type qualifier:
+                // we should also recognise `@final`-decorated methods that don't end up
+                // as being function- or property-types (because they're wrapped by other
+                // decorators that transform the type into something else).
+                let underlying_functions = extract_underlying_functions(
+                    db,
+                    superclass
+                        .own_class_member(db, None, &member.name)
+                        .ignore_possibly_undefined()?,
+                )?;
+
+                if underlying_functions
+                    .iter()
+                    .any(|function| function.has_known_decorator(db, FunctionDecorators::FINAL))
+                    && is_function_definition(db, superclass_scope, superclass_symbol_id)
+                {
+                    Some((superclass, underlying_functions))
+                } else {
+                    None
+                }
+            });
+        }
+
+        // **********************************************************
+        // Everything below this point in the loop
+        // is about Liskov Substitution Principle checks
+        // **********************************************************
+
+        // Only one Liskov diagnostic should be emitted per each invalid override,
+        // even if it overrides multiple superclasses incorrectly!
+        if liskov_diagnostic_emitted {
+            continue;
+        }
+
+        if !configuration.check_method_liskov_violations() {
+            continue;
+        }
+
+        // TODO: Check Liskov on non-methods too
+        let Type::FunctionLiteral(subclass_function) = member.ty else {
             continue;
         };
 
-        if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_callable) {
+        // Constructor methods are not checked for Liskov compliance
+        if matches!(
+            &*member.name,
+            "__init__" | "__new__" | "__post_init__" | "__init_subclass__"
+        ) {
+            continue;
+        }
+
+        // Synthesized `__replace__` methods on dataclasses are not checked
+        if &member.name == "__replace__"
+            && matches!(class_kind, Some(CodeGeneratorKind::DataclassLike(_)))
+        {
+            continue;
+        }
+
+        let Some(superclass_type_as_callable) = superclass_type.try_upcast_to_callable(db) else {
+            continue;
+        };
+
+        if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_callable.into_type(db))
+        {
             continue;
         }
 
@@ -149,7 +257,7 @@ fn check_class_declaration<'db>(
             &member.name,
             class,
             *definition,
-            function,
+            subclass_function,
             superclass,
             superclass_type,
             method_kind,
@@ -187,13 +295,11 @@ fn check_class_declaration<'db>(
         && function.has_known_decorator(db, FunctionDecorators::OVERRIDE)
     {
         let function_literal = if context.in_stub() {
-            function
-                .iter_overloads_and_implementation(db)
-                .next()
-                .expect("There should always be at least one overload or implementation")
+            function.first_overload_or_implementation(db)
         } else {
             function.literal(db).last_definition(db)
         };
+
         if let Some(builder) = context.report_lint(
             &INVALID_EXPLICIT_OVERRIDE,
             function_literal.focus_range(db, context.module()),
@@ -202,17 +308,10 @@ fn check_class_declaration<'db>(
                 "Method `{}` is decorated with `@override` but does not override anything",
                 member.name
             ));
-            if let Some(decorator) = function_literal
-                .node(db, context.file(), context.module())
-                .decorator_list
-                .iter()
-                .find(|decorator| {
-                    definition_expression_type(db, *definition, &decorator.expression)
-                        .as_function_literal()
-                        .is_some_and(|function| function.is_known(db, KnownFunction::Override))
-                })
+            if let Some(decorator_span) =
+                function_literal.find_known_decorator_span(db, KnownFunction::Override)
             {
-                diagnostic.annotate(Annotation::secondary(context.span(decorator)));
+                diagnostic.annotate(Annotation::secondary(decorator_span));
             }
             diagnostic.info(format_args!(
                 "No `{member}` definitions were found on any superclasses of `{class}`",
@@ -221,6 +320,18 @@ fn check_class_declaration<'db>(
             ));
         }
     }
+
+    if let Some((superclass, superclass_method)) = overridden_final_method {
+        report_overridden_final_method(
+            context,
+            &member.name,
+            *definition,
+            type_on_subclass_instance,
+            superclass,
+            class,
+            &superclass_method,
+        );
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -228,4 +339,49 @@ pub(super) enum MethodKind<'db> {
     Synthesized(CodeGeneratorKind<'db>),
     #[default]
     NotSynthesized,
+}
+
+bitflags! {
+    /// Bitflags representing which override-related rules have been enabled.
+    #[derive(Default, Debug, Copy, Clone)]
+    struct OverrideRulesConfig: u8 {
+        const LISKOV_METHODS = 1 << 0;
+        const EXPLICIT_OVERRIDE = 1 << 1;
+        const FINAL_METHOD_OVERRIDDEN = 1 << 2;
+    }
+}
+
+impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
+    fn from(value: &InferContext<'_, '_>) -> Self {
+        let db = value.db();
+        let rule_selection = db.rule_selection(value.file());
+
+        let mut config = OverrideRulesConfig::empty();
+
+        if rule_selection.is_enabled(LintId::of(&INVALID_METHOD_OVERRIDE)) {
+            config |= OverrideRulesConfig::LISKOV_METHODS;
+        }
+        if rule_selection.is_enabled(LintId::of(&INVALID_EXPLICIT_OVERRIDE)) {
+            config |= OverrideRulesConfig::EXPLICIT_OVERRIDE;
+        }
+        if rule_selection.is_enabled(LintId::of(&OVERRIDE_OF_FINAL_METHOD)) {
+            config |= OverrideRulesConfig::FINAL_METHOD_OVERRIDDEN;
+        }
+
+        config
+    }
+}
+
+impl OverrideRulesConfig {
+    const fn no_rules_enabled(self) -> bool {
+        self.is_empty()
+    }
+
+    const fn check_method_liskov_violations(self) -> bool {
+        self.contains(OverrideRulesConfig::LISKOV_METHODS)
+    }
+
+    const fn check_final_method_overridden(self) -> bool {
+        self.contains(OverrideRulesConfig::FINAL_METHOD_OVERRIDDEN)
+    }
 }
