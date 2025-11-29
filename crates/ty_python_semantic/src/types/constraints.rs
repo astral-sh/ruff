@@ -67,7 +67,7 @@ use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation,
     TypeVarBoundOrConstraints, UnionType, walk_bound_type_var_type,
 };
-use crate::{Db, FxHashMap, FxHashSet, FxOrderSet};
+use crate::{Db, FxHashMap, FxHashSet, FxIndexSet, FxOrderSet};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -1036,7 +1036,8 @@ impl<'db> Node<'db> {
             Node::Interior(_) => {}
         }
 
-        let mut typevars = FxHashSet::default();
+        // We should use `FxIndexSet` here since `BoundTypeVarInstance::{valid, required}_specializations` is query-dependent.
+        let mut typevars = FxIndexSet::default();
         self.for_each_constraint(db, &mut |constraint| {
             typevars.insert(constraint.typevar(db));
         });
@@ -1055,7 +1056,7 @@ impl<'db> Node<'db> {
                 .is_always_satisfied(db)
         };
 
-        for typevar in typevars.unstable_into_iter() {
+        for typevar in typevars {
             if typevar.is_inferable(db, inferable) {
                 // If the typevar is in inferable position, we need to verify that some valid
                 // specialization satisfies the constraint set.
