@@ -25,3 +25,22 @@ B = bytes
 
 reveal_mro(C)  # revealed: (<class 'C'>, <class 'int'>, <class 'G[bytes]'>, typing.Generic, <class 'object'>)
 ```
+
+## Starred bases
+
+These are currently not supported, but ideally we would support them in some limited situations.
+
+```py
+from ty_extensions import reveal_mro
+
+class A: ...
+class B: ...
+class C: ...
+
+bases = (A, B, C)
+
+class Foo(*bases): ...
+
+# revealed: (<class 'Foo'>, @Todo(Starred expressions in class bases), <class 'object'>)
+reveal_mro(Foo)
+```

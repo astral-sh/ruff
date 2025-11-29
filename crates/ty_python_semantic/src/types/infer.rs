@@ -37,6 +37,7 @@
 //! be considered a bug.)
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
@@ -383,6 +384,27 @@ impl<'db> TypeContext<'db> {
     pub(crate) fn is_typealias(&self) -> bool {
         self.annotation
             .is_some_and(|ty| ty.is_typealias_special_form())
+    }
+
+    // TODO: we could just always use `Iterable[<expected_element_type>]`
+    // as the type context once <https://github.com/astral-sh/ty/issues/1576> is fixed.
+    pub(crate) fn for_starred_expression(
+        db: &'db dyn Db,
+        expected_element_type: Type<'db>,
+        expr: &ast::ExprStarred,
+    ) -> Self {
+        match &*expr.value {
+            ast::Expr::List(_) => Self::new(Some(
+                KnownClass::List.to_specialized_instance(db, [expected_element_type]),
+            )),
+            ast::Expr::Set(_) => Self::new(Some(
+                KnownClass::Set.to_specialized_instance(db, [expected_element_type]),
+            )),
+            ast::Expr::Tuple(_) => {
+                Self::new(Some(Type::homogeneous_tuple(db, expected_element_type)))
+            }
+            _ => Self::default(),
+        }
     }
 }
 
