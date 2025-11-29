@@ -88,5 +88,4 @@ mimalloc = { workspace = true }
 tikv-jemallocator = { workspace = true }
 
 [dev-dependencies]
-rustc-hash = { workspace = true }
 rayon = { workspace = true }
