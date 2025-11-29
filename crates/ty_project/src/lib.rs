@@ -21,7 +21,6 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 use salsa::Durability;
 use salsa::Setter;
 use std::backtrace::BacktraceStatus;
-use std::collections::hash_set;
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
@@ -30,7 +29,7 @@ use tracing::error;
 use ty_python_semantic::add_inferred_python_version_hint_to_diagnostic;
 use ty_python_semantic::lint::RuleSelection;
 use ty_python_semantic::types::check_types;
-pub use ty_python_semantic::{FxHashMap, FxHashSet};
+pub use ty_python_semantic::{FxIndexMap, FxIndexSet};
 
 mod db;
 mod files;
@@ -56,7 +55,7 @@ pub struct Project {
     /// The files that are open in the project, [`None`] if there are no open files.
     #[returns(ref)]
     #[default]
-    open_fileset: FxHashSet<File>,
+    open_fileset: FxIndexSet<File>,
 
     /// The first-party files of this project.
     #[default]
@@ -355,7 +354,7 @@ impl Project {
         tracing::debug!("Closing file `{}`", file.path(db));
 
         let mut open_files = self.take_open_files(db);
-        let removed = open_files.remove(&file);
+        let removed = open_files.swap_remove(&file);
 
         if removed {
             self.set_open_files(db, open_files);
@@ -399,25 +398,25 @@ impl Project {
     }
 
     /// Returns the open files in the project or `None` if there are no open files.
-    pub fn open_files(self, db: &dyn Db) -> &FxHashSet<File> {
+    pub fn open_files(self, db: &dyn Db) -> &FxIndexSet<File> {
         self.open_fileset(db)
     }
 
     /// Sets the open files in the project.
     #[tracing::instrument(level = "debug", skip(self, db))]
-    pub fn set_open_files(self, db: &mut dyn Db, open_files: FxHashSet<File>) {
+    pub fn set_open_files(self, db: &mut dyn Db, open_files: FxIndexSet<File>) {
         tracing::debug!("Set open project files (count: {})", open_files.len());
 
         self.set_open_fileset(db).to(open_files);
     }
 
     /// This takes the open files from the project and returns them.
-    fn take_open_files(self, db: &mut dyn Db) -> FxHashSet<File> {
+    fn take_open_files(self, db: &mut dyn Db) -> FxIndexSet<File> {
         tracing::debug!("Take open project files");
 
         // Salsa will cancel any pending queries and remove its own reference to `open_files`
         // so that the reference counter to `open_files` now drops to 1.
-        self.set_open_fileset(db).to(FxHashSet::default())
+        self.set_open_fileset(db).to(FxIndexSet::default())
     }
 
     /// Returns `true` if the file should be checked.
@@ -587,7 +586,7 @@ pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Result<Box<[Diagnostic
 
 #[derive(Debug)]
 enum ProjectFiles<'a> {
-    OpenFiles(&'a FxHashSet<File>),
+    OpenFiles(&'a FxIndexSet<File>),
     Indexed(files::Indexed<'a>),
 }
 
@@ -620,14 +619,14 @@ impl<'a> IntoIterator for &'a ProjectFiles<'a> {
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
-            ProjectFiles::OpenFiles(files) => ProjectFilesIter::OpenFiles(files.unstable_iter()),
+            ProjectFiles::OpenFiles(files) => ProjectFilesIter::OpenFiles(files.iter()),
             ProjectFiles::Indexed(files) => ProjectFilesIter::Indexed(files.into_iter()),
         }
     }
 }
 
 enum ProjectFilesIter<'db> {
-    OpenFiles(hash_set::Iter<'db, File>),
+    OpenFiles(indexmap::set::Iter<'db, File>),
     Indexed(files::IndexedIter<'db>),
 }
 

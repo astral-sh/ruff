@@ -6,7 +6,7 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
 use std::path::PathBuf;
 use thiserror::Error;
-use ty_python_semantic::FxHashSet;
+use ty_python_semantic::FxIndexSet;
 
 /// Filter that decides which files are included in the project.
 ///
@@ -285,7 +285,7 @@ impl<'a> ProjectFilesWalker<'a> {
         )
     }
 
-    pub(crate) fn collect_set(self, db: &dyn Db) -> (FxHashSet<File>, Vec<IOErrorDiagnostic>) {
+    pub(crate) fn collect_set(self, db: &dyn Db) -> (FxIndexSet<File>, Vec<IOErrorDiagnostic>) {
         let (files, diagnostics) = self.collect_vec(db);
         (files.into_iter().collect(), diagnostics)
     }

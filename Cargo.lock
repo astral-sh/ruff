@@ -4417,6 +4417,7 @@ dependencies = [
  "crossbeam",
  "get-size2",
  "globset",
+ "indexmap",
  "insta",
  "notify",
  "ordermap",

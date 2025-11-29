@@ -56,10 +56,10 @@ mod diagnostic;
 #[cfg(feature = "testing")]
 pub mod pull_types;
 
-type FxOrderMap<K, V> = ordermap::map::OrderMap<K, V, BuildHasherDefault<FxHasher>>;
-type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;
-type FxIndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<FxHasher>>;
-type FxIndexSet<V> = indexmap::IndexSet<V, BuildHasherDefault<FxHasher>>;
+pub type FxOrderMap<K, V> = ordermap::map::OrderMap<K, V, BuildHasherDefault<FxHasher>>;
+pub type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;
+pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<FxHasher>>;
+pub type FxIndexSet<V> = indexmap::IndexSet<V, BuildHasherDefault<FxHasher>>;
 
 /// Types that implement this trait are stable as keys of `FxHash{Map, Set}`, and maps and sets can be safely used as iterators.
 pub trait StableKey {}
