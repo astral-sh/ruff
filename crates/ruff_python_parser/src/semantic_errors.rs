@@ -3,9 +3,11 @@
 //! This checker is not responsible for traversing the AST itself. Instead, its
 //! [`SemanticSyntaxChecker::visit_stmt`] and [`SemanticSyntaxChecker::visit_expr`] methods should
 //! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
+use ruff_python_ast::statement_visitor;
+use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{
     self as ast, Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
-    StmtImportFrom,
+    StmtFunctionDef, StmtImportFrom,
     comparable::ComparableExpr,
     helpers,
     visitor::{Visitor, walk_expr},
@@ -701,7 +703,21 @@ impl SemanticSyntaxChecker {
                     self.seen_futures_boundary = true;
                 }
             }
-            Stmt::FunctionDef(_) => {
+            Stmt::FunctionDef(StmtFunctionDef { is_async, body, .. }) => {
+                if *is_async {
+                    let mut visitor = ReturnVisitor::default();
+                    visitor.visit_body(body);
+
+                    if visitor.has_yield {
+                        if let Some(return_range) = visitor.return_range {
+                            Self::add_error(
+                                ctx,
+                                SemanticSyntaxErrorKind::ReturnInGenerator,
+                                return_range,
+                            );
+                        }
+                    }
+                }
                 self.seen_futures_boundary = true;
             }
             _ => {
@@ -1169,6 +1185,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::NonlocalWithoutBinding(name) => {
                 write!(f, "no binding for nonlocal `{name}` found")
             }
+            SemanticSyntaxErrorKind::ReturnInGenerator => {
+                write!(f, "`return` with value in async generator")
+            }
         }
     }
 }
@@ -1572,6 +1591,9 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents a nonlocal statement for a name that has no binding in an enclosing scope.
     NonlocalWithoutBinding(String),
+
+    /// Represents a `return` statement with a value in an asynchronous generator.
+    ReturnInGenerator,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -1685,6 +1707,35 @@ impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
             }
         }
         walk_expr(self, expr);
+    }
+}
+
+#[derive(Default)]
+struct ReturnVisitor {
+    return_range: Option<TextRange>,
+    has_yield: bool,
+}
+
+impl StatementVisitor<'_> for ReturnVisitor {
+    fn visit_stmt(&mut self, stmt: &Stmt) {
+        match stmt {
+            Stmt::Expr(ast::StmtExpr { value, .. }) => match **value {
+                Expr::Yield(_) | Expr::YieldFrom(_) => {
+                    self.has_yield = true;
+                }
+                _ => {}
+            },
+            // Do not recurse into nested functions; they're evaluated separately.
+            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {}
+            Stmt::Return(ast::StmtReturn {
+                value: Some(_),
+                range,
+                ..
+            }) => {
+                self.return_range = Some(*range);
+            }
+            _ => statement_visitor::walk_stmt(self, stmt),
+        }
     }
 }
 

@@ -96,6 +96,11 @@ pub(crate) fn return_in_generator(checker: &Checker, function_def: &StmtFunction
         return;
     }
 
+    // Async functions are flagged by the `ReturnInGenerator` semantic syntax error.
+    if function_def.is_async {
+        return;
+    }
+
     let mut visitor = ReturnInGeneratorVisitor::default();
     visitor.visit_body(&function_def.body);
 
