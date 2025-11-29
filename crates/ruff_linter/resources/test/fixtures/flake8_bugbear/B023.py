@@ -183,3 +183,53 @@ for val in range(3):
 
 
     funcs.append(make_func())
+
+
+# Test cases for issue #15716 - false positives with lambda parameters
+for _ in range(3):
+    [x for x in []]
+    def func():
+        lambda x: x  # Should not trigger B023 - x is a lambda parameter
+
+
+# Test case from issue comment - pandas apply (should NOT trigger B023 - apply is safe like map)
+import pandas as pd
+
+data = pd.DataFrame()
+data.loc[0, "hex"] = "72756666"
+data.loc[1, "hex"] = "75767576"
+
+def modifier(value):
+    return chr(int(value, 16))
+
+
+for _i in range(0, 4):
+    data[f"v{_i}"] = data["hex"].apply(
+        lambda x: modifier(x[2 * _i : 2 * _i + 2]),  # Should NOT trigger B023 - apply is safe
+    )
+
+
+# Test case from issue comment - nested function (should NOT trigger B023 - value is function parameter)
+for _ in range(2):
+
+    def add_one():
+        def _add_one_inner(value):
+            return value + 1  # Should NOT trigger B023 - value is function parameter
+
+        return _add_one_inner
+
+    for value in range(5):
+        result = add_one()(value)
+        print(result)
+
+
+# nested function that captures loop variable (SHOULD trigger B023)
+lst = []
+for value in range(2):
+    def add_one():
+        def _add_one_inner():
+            return value + 1  # Should trigger B023 - value is loop variable, not bound
+
+        return _add_one_inner
+
+    lst.append(add_one())
