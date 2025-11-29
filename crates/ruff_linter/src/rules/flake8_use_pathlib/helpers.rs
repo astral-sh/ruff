@@ -57,7 +57,7 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
     fn_argument: &str,
     fix_enabled: bool,
     violation: impl Violation,
-    applicability: Option<Applicability>,
+    applicability: Applicability,
 ) {
     if call.arguments.len() != 1 {
         return;
@@ -92,14 +92,14 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
         let edit = Edit::range_replacement(replacement, range);
 
         let fix = match applicability {
-            Some(Applicability::Unsafe) => Fix::unsafe_edits(edit, [import_edit]),
+            Applicability::Unsafe => Fix::unsafe_edits(edit, [import_edit]),
             _ => {
-                let applicability = if checker.comment_ranges().intersects(range) {
-                    Applicability::Unsafe
-                } else {
-                    Applicability::Safe
+                let determined_applicability = match applicability {
+                    Applicability::DisplayOnly => Applicability::DisplayOnly,
+                    _ if checker.comment_ranges().intersects(range) => Applicability::Unsafe,
+                    _ => applicability,
                 };
-                Fix::applicable_edits(edit, [import_edit], applicability)
+                Fix::applicable_edits(edit, [import_edit], determined_applicability)
             }
         };
 
@@ -138,6 +138,7 @@ pub(crate) fn is_file_descriptor(expr: &Expr, semantic: &SemanticModel) -> bool 
     typing::is_int(binding, semantic)
 }
 
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn check_os_pathlib_two_arg_calls(
     checker: &Checker,
     call: &ExprCall,
@@ -146,6 +147,7 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
     second_arg: &str,
     fix_enabled: bool,
     violation: impl Violation,
+    applicability: Applicability,
 ) {
     let range = call.range();
     let mut diagnostic = checker.report_diagnostic(violation, call.func.range());
@@ -174,16 +176,16 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
                 format!("{binding}({path_code}).{attr}({second_code})")
             };
 
-            let applicability = if checker.comment_ranges().intersects(range) {
+            let determined_applicability = if checker.comment_ranges().intersects(range) {
                 Applicability::Unsafe
             } else {
-                Applicability::Safe
+                applicability
             };
 
             Ok(Fix::applicable_edits(
                 Edit::range_replacement(replacement, range),
                 [import_edit],
-                applicability,
+                determined_applicability,
             ))
         });
     }
@@ -208,4 +210,10 @@ pub(crate) fn is_argument_non_default(arguments: &Arguments, name: &str, positio
     arguments
         .find_argument_value(name, position)
         .is_some_and(|expr| !expr.is_none_literal_expr())
+}
+
+/// Returns `true` if the given call is a top-level expression in its statement.
+/// This means the call's return value is not used, so return type changes don't matter.
+pub(crate) fn is_top_level_expression_call(checker: &Checker) -> bool {
+    checker.semantic().current_expression_parent().is_none()
 }
