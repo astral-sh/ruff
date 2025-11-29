@@ -19,5 +19,5 @@ help: Replace with `None`; initialize within function
 13 +         s = {"ABC", "DEF"}
 14 |     return s
 15 | 
-16 | # NOT triggering B006 (correct - UPPER_CASE constants are excluded per PEP 8)
+16 | # NOT triggering B006 (correct - PEP 8 specifies that UPPER_CASE variables are considered constants)
 note: This is an unsafe fix and may change runtime behavior
