@@ -1,4 +1,5 @@
-//! Checks relating to the [Liskov Substitution Principle].
+//! Checks relating to invalid method overrides in subclasses,
+//! including (but not limited to) violations of the [Liskov Substitution Principle].
 //!
 //! [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 
