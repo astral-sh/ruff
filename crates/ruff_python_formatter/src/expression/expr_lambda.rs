@@ -1,15 +1,23 @@
-use ruff_formatter::write;
+use ruff_formatter::{FormatRuleWithOptions, RemoveSoftLinesBuffer, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprLambda;
 use ruff_text_size::Ranged;
 
 use crate::comments::dangling_comments;
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::expression::has_own_parentheses;
+use crate::expression::maybe_parenthesize_expression;
+use crate::expression::parentheses::{
+    NeedsParentheses, OptionalParentheses, is_expression_parenthesized, optional_parentheses,
+};
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
+use crate::preview::is_force_single_line_lambda_parameters_enabled;
+use crate::preview::is_parenthesize_lambda_bodies_enabled;
 
 #[derive(Default)]
-pub struct FormatExprLambda;
+pub struct FormatExprLambda {
+    layout: ExprLambdaLayout,
+}
 
 impl FormatNodeRule<ExprLambda> for FormatExprLambda {
     fn fmt_fields(&self, item: &ExprLambda, f: &mut PyFormatter) -> FormatResult<()> {
@@ -26,7 +34,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
         write!(f, [token("lambda")])?;
 
         if let Some(parameters) = parameters {
-            // In this context, a dangling comment can either be a comment between the `lambda` the
+            // In this context, a dangling comment can either be a comment between the `lambda` and the
             // parameters, or a comment between the parameters and the body.
             let (dangling_before_parameters, dangling_after_parameters) = dangling
                 .split_at(dangling.partition_point(|comment| comment.end() < parameters.start()));
@@ -37,12 +45,25 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 write!(f, [dangling_comments(dangling_before_parameters)])?;
             }
 
-            write!(
-                f,
-                [parameters
-                    .format()
-                    .with_options(ParametersParentheses::Never)]
-            )?;
+            // Try to keep the parameters on a single line, unless there are intervening comments.
+            if is_force_single_line_lambda_parameters_enabled(f.context())
+                && !comments.contains_comments(parameters.as_ref().into())
+            {
+                let mut buffer = RemoveSoftLinesBuffer::new(f);
+                write!(
+                    buffer,
+                    [parameters
+                        .format()
+                        .with_options(ParametersParentheses::Never)]
+                )?;
+            } else {
+                write!(
+                    f,
+                    [parameters
+                        .format()
+                        .with_options(ParametersParentheses::Never)]
+                )?;
+            }
 
             write!(f, [token(":")])?;
 
@@ -62,7 +83,65 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             }
         }
 
-        write!(f, [body.format()])
+        // Avoid parenthesizing lists, dictionaries, etc.
+        if is_parenthesize_lambda_bodies_enabled(f.context())
+            && has_own_parentheses(body, f.context()).is_none()
+            && !is_expression_parenthesized(body.into(), comments.ranges(), f.context().source())
+        {
+            match self.layout {
+                ExprLambdaLayout::Default => maybe_parenthesize_expression(
+                    body,
+                    item,
+                    crate::expression::parentheses::Parenthesize::IfBreaksParenthesizedNested,
+                )
+                .fmt(f),
+                ExprLambdaLayout::Assignment => {
+                    fits_expanded(&optional_parentheses(&body.format())).fmt(f)
+                }
+            }
+        } else {
+            body.format().fmt(f)
+        }
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub enum ExprLambdaLayout {
+    #[default]
+    Default,
+
+    /// The [`ExprLambda`] is the direct child of an assignment expression, so it needs to use
+    /// `fits_expanded` to prefer parenthesizing its own body before the assignment tries to
+    /// parenthesize the whole lambda. For example, we want this formatting:
+    ///
+    /// ```py
+    /// long_assignment_target = lambda x, y, z: (
+    ///     x + y + z
+    /// )
+    /// ```
+    ///
+    /// instead of either of these:
+    ///
+    /// ```py
+    /// long_assignment_target = (
+    ///     lambda x, y, z: (
+    ///         x + y + z
+    ///     )
+    /// )
+    ///
+    /// long_assignment_target = (
+    ///     lambda x, y, z: x + y + z
+    /// )
+    /// ```
+    Assignment,
+}
+
+impl FormatRuleWithOptions<ExprLambda, PyFormatContext<'_>> for FormatExprLambda {
+    type Options = ExprLambdaLayout;
+
+    fn with_options(mut self, options: Self::Options) -> Self {
+        self.layout = options;
+        self
     }
 }
 

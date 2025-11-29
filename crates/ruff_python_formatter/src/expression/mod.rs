@@ -14,6 +14,7 @@ use ruff_text_size::Ranged;
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{LeadingDanglingTrailingComments, leading_comments, trailing_comments};
 use crate::context::{NodeLevel, WithNodeLevel};
+use crate::expression::expr_lambda::ExprLambdaLayout;
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize, is_expression_parenthesized,
     optional_parentheses, parenthesized,
@@ -342,6 +343,7 @@ where
         expression,
         parent: parent.into(),
         parenthesize,
+        lambda_layout: ExprLambdaLayout::default(),
     }
 }
 
@@ -349,6 +351,14 @@ pub(crate) struct MaybeParenthesizeExpression<'a> {
     expression: &'a Expr,
     parent: AnyNodeRef<'a>,
     parenthesize: Parenthesize,
+    lambda_layout: ExprLambdaLayout,
+}
+
+impl MaybeParenthesizeExpression<'_> {
+    pub(crate) fn with_lambda_layout(mut self, layout: ExprLambdaLayout) -> Self {
+        self.lambda_layout = layout;
+        self
+    }
 }
 
 impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
@@ -357,6 +367,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             expression,
             parent,
             parenthesize,
+            lambda_layout,
         } = self;
 
         let preserve_parentheses = parenthesize.is_optional()
@@ -412,7 +423,12 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                     if can_omit_optional_parentheses(expression, f.context()) {
                         optional_parentheses(&unparenthesized).fmt(f)
                     } else {
-                        parenthesize_if_expands(&unparenthesized).fmt(f)
+                        if let Expr::Lambda(lambda) = expression {
+                            parenthesize_if_expands(&lambda.format().with_options(*lambda_layout))
+                                .fmt(f)
+                        } else {
+                            parenthesize_if_expands(&unparenthesized).fmt(f)
+                        }
                     }
                 }
             },

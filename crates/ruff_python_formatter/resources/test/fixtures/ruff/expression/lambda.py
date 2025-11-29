@@ -127,6 +127,13 @@ lambda a, /, c: a
 
 (
     lambda
+    # comment
+    *x,
+    **y: x
+)
+
+(
+    lambda
     # comment 1
     *
     # comment 2
@@ -197,12 +204,88 @@ lambda: ( # comment
 )
 
 (
+    lambda  # 1
+    # 2
+    x,  # 3
+    # 4
+    y
+    :  # 5
+    # 6
+    x
+)
+
+(
     lambda
     x,
     # comment
     y:
     z
 )
+
+
+# Leading
+lambda x: (
+    lambda y: lambda z: x
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + z  # Trailing
+)  # Trailing
+
+
+# Leading
+lambda x: lambda y: lambda z: [
+    x,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    z
+] # Trailing
+# Trailing
 
 lambda self, araa, kkkwargs=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs), e=1, f=2, g=2: d
 
@@ -228,3 +311,37 @@ def a():
         g = 10
     )
 
+def a():
+    return b(
+        c,
+        d,
+        e,
+        f=lambda self, *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+            *args, **kwargs
+        ) + 1,
+    )
+
+# Additional ecosystem cases from https://github.com/astral-sh/ruff/pull/21385
+class C:
+    def foo():
+        mock_service.return_value.bucket.side_effect = lambda name: (
+            source_bucket
+            if name == source_bucket_name
+            else storage.Bucket(mock_service, destination_bucket_name)
+        )
+
+class C:
+	function_dict: Dict[Text, Callable[[CRFToken], Any]] = {
+        CRFEntityExtractorOptions.POS2: lambda crf_token: crf_token.pos_tag[:2]
+        if crf_token.pos_tag is not None
+        else None,
+	}
+
+name = re.sub(r"[^\x21\x23-\x5b\x5d-\x7e]...............", lambda m: f"\\{m.group(0)}", p["name"])
+
+def foo():
+    if True:
+        if True:
+            return (
+                lambda x: np.exp(cs(np.log(x.to(u.MeV).value))) * u.MeV * u.cm**2 / u.g
+            )
