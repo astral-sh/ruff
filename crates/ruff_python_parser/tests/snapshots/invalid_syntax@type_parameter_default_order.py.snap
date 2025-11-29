@@ -1,0 +1,92 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/type_parameter_default_order.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..25,
+        body: [
+            ClassDef(
+                StmtClassDef {
+                    node_index: NodeIndex(None),
+                    range: 0..24,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("C"),
+                        range: 6..7,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 7..19,
+                            node_index: NodeIndex(None),
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 8..15,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 8..9,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 12..15,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 17..18,
+                                        name: Identifier {
+                                            id: Name("U"),
+                                            range: 17..18,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    arguments: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 21..24,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 21..24,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | class C[T = int, U]: ...
+  |                  ^ Syntax Error: non default type parameter `U` follows default type parameter
+  |
