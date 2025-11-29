@@ -9,11 +9,9 @@ use std::fmt;
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
-use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
-use crate::Program;
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{Definedness, Place};
@@ -41,6 +39,7 @@ use crate::types::{
     TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
     WrapperDescriptorKind, enums, ide_support, todo_type,
 };
+use crate::{FxHashMap, FxIndexSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
 
@@ -844,8 +843,7 @@ impl<'db> Bindings<'db> {
                                             .unwrap_or_default();
                                         match all_names {
                                             Some(names) => {
-                                                let mut names = names.iter().collect::<Vec<_>>();
-                                                names.sort();
+                                                let names = names.sorted_ref_vec();
                                                 Type::heterogeneous_tuple(
                                                     db,
                                                     names.iter().map(|name| {
@@ -1249,7 +1247,7 @@ impl<'db> Bindings<'db> {
                         let extract_inferable = |instance: &NominalInstanceType<'db>| {
                             if instance.has_known_class(db, KnownClass::NoneType) {
                                 // Caller explicitly passed None, so no typevars are inferable.
-                                return Some(FxHashSet::default());
+                                return Some(FxIndexSet::default());
                             }
                             instance
                                 .tuple_spec(db)?
@@ -1263,7 +1261,7 @@ impl<'db> Bindings<'db> {
 
                         let inferable = match overload.parameter_types() {
                             // Caller did not provide argument, so no typevars are inferable.
-                            [None] => FxHashSet::default(),
+                            [None] => FxIndexSet::default(),
                             [Some(Type::NominalInstance(instance))] => {
                                 match extract_inferable(instance) {
                                     Some(inferable) => inferable,

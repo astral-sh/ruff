@@ -24,10 +24,8 @@ use std::cmp::Eq;
 use std::hash::Hash;
 use std::marker::PhantomData;
 
-use rustc_hash::FxHashMap;
-
-use crate::FxIndexSet;
 use crate::types::Type;
+use crate::{FxHashMap, FxIndexSet};
 
 pub(crate) type TypeTransformer<'db, Tag> = CycleDetector<Tag, Type<'db>, Type<'db>>;
 

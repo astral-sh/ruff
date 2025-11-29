@@ -6,6 +6,8 @@ use crate::ast_node_ref::AstNodeRef;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub(super) struct NodeKey(NodeIndex);
 
+impl crate::StableKey for NodeKey {}
+
 impl NodeKey {
     pub(super) fn from_node<N>(node: N) -> Self
     where

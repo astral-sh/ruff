@@ -2,8 +2,8 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use rustc_hash::FxHashSet;
 use salsa::Setter;
+use ty_python_semantic::FxIndexSet;
 
 use ruff_db::files::File;
 
@@ -127,7 +127,7 @@ impl<'db> LazyFiles<'db> {
     /// Sets the indexed files of a package to `files`.
     pub(super) fn set(
         mut self,
-        files: FxHashSet<File>,
+        files: FxIndexSet<File>,
         diagnostics: Vec<IOErrorDiagnostic>,
     ) -> Indexed<'db> {
         let files = Indexed {
@@ -152,7 +152,7 @@ pub struct Indexed<'db> {
 
 #[derive(Debug, get_size2::GetSize)]
 struct IndexedInner {
-    files: FxHashSet<File>,
+    files: FxIndexSet<File>,
     diagnostics: Vec<IOErrorDiagnostic>,
 }
 
@@ -167,14 +167,14 @@ impl Indexed<'_> {
 }
 
 impl Deref for Indexed<'_> {
-    type Target = FxHashSet<File>;
+    type Target = FxIndexSet<File>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner.files
     }
 }
 
-pub(super) type IndexedIter<'a> = std::iter::Copied<std::collections::hash_set::Iter<'a, File>>;
+pub(super) type IndexedIter<'a> = std::iter::Copied<indexmap::set::Iter<'a, File>>;
 
 impl<'a> IntoIterator for &'a Indexed<'_> {
     type Item = File;
@@ -187,7 +187,7 @@ impl<'a> IntoIterator for &'a Indexed<'_> {
 
 /// A Mutable view of a project's indexed files.
 ///
-/// Allows in-place mutation of the files without deep cloning the hash set.
+/// Allows in-place mutation of the files without deep cloning the index set.
 /// The changes are written back when the mutable view is dropped or by calling [`Self::set`] manually.
 pub(super) struct IndexedMut<'db> {
     db: Option<&'db mut dyn Db>,
@@ -207,7 +207,7 @@ impl IndexedMut<'_> {
     }
 
     pub(super) fn remove(&mut self, file: File) -> bool {
-        if self.inner_mut().files.remove(&file) {
+        if self.inner_mut().files.swap_remove(&file) {
             self.did_change = true;
             true
         } else {
@@ -251,7 +251,7 @@ impl Drop for IndexedMut<'_> {
 
 #[cfg(test)]
 mod tests {
-    use rustc_hash::FxHashSet;
+    use ty_python_semantic::FxIndexSet;
 
     use crate::ProjectMetadata;
     use crate::db::Db;
@@ -273,7 +273,7 @@ mod tests {
         let file = system_path_to_file(&db, "test.py").unwrap();
 
         let files = match project.file_set(&db).get() {
-            Index::Lazy(lazy) => lazy.set(FxHashSet::from_iter([file]), Vec::new()),
+            Index::Lazy(lazy) => lazy.set(FxIndexSet::from_iter([file]), Vec::new()),
             Index::Indexed(files) => files,
         };
 

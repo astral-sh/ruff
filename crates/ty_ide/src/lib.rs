@@ -55,9 +55,9 @@ use ruff_db::{
     vendored::VendoredPath,
 };
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashSet;
 use std::ops::{Deref, DerefMut};
 use ty_project::Db;
+use ty_python_semantic::FxHashSet;
 use ty_python_semantic::types::{Type, TypeDefinition};
 
 /// Information associated with a text range.
@@ -216,7 +216,7 @@ impl NavigationTargets {
         if unique.is_empty() {
             Self::empty()
         } else {
-            let mut targets = unique.into_iter().collect::<Vec<_>>();
+            let mut targets = unique.unstable_into_iter().collect::<Vec<_>>();
             targets.sort_by_key(|target| (target.file, target.focus_range.start()));
             Self(targets.into())
         }

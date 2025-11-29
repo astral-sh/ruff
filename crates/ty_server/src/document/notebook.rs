@@ -1,7 +1,7 @@
 use lsp_types::NotebookCellKind;
 use ruff_notebook::CellMetadata;
 use ruff_source_file::OneIndexed;
-use rustc_hash::FxHashMap;
+use ty_python_semantic::FxHashMap;
 
 use super::{DocumentKey, DocumentVersion};
 use crate::session::index::Index;

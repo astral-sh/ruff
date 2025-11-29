@@ -4,9 +4,9 @@ use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
 use ruff_python_ast::{Expr, ExprRef, HasNodeIndex, name::Name};
 use ruff_python_parser::Parsed;
 use ruff_source_file::LineIndex;
-use rustc_hash::FxHashMap;
 
 use crate::Db;
+use crate::FxHashMap;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, Module, list_modules, resolve_module};
 use crate::semantic_index::definition::Definition;

@@ -4,7 +4,6 @@ use std::fmt::Display;
 
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
-use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, ScopeId};
@@ -23,7 +22,7 @@ use crate::types::{
     TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance,
     TypeVarKind, TypeVarVariance, UnionType, declaration_type, walk_bound_type_var_type,
 };
-use crate::{Db, FxOrderMap, FxOrderSet};
+use crate::{Db, FxHashMap, FxIndexSet, FxOrderMap, FxOrderSet};
 
 /// Returns an iterator of any generic context introduced by the given scope or any enclosing
 /// scope.
@@ -121,7 +120,7 @@ pub(crate) fn typing_self<'db>(
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum InferableTypeVars<'a, 'db> {
     None,
-    One(&'a FxHashSet<BoundTypeVarIdentity<'db>>),
+    One(&'a FxIndexSet<BoundTypeVarIdentity<'db>>),
     Two(
         &'a InferableTypeVars<'a, 'db>,
         &'a InferableTypeVars<'a, 'db>,
@@ -170,12 +169,14 @@ impl<'a, 'db> InferableTypeVars<'a, 'db> {
     #[expect(dead_code)]
     pub(crate) fn display(&self, db: &'db dyn Db) -> impl Display {
         fn find_typevars<'db>(
-            result: &mut FxHashSet<BoundTypeVarIdentity<'db>>,
+            result: &mut FxIndexSet<BoundTypeVarIdentity<'db>>,
             inferable: &InferableTypeVars<'_, 'db>,
         ) {
             match inferable {
                 InferableTypeVars::None => {}
-                InferableTypeVars::One(typevars) => result.extend(typevars.iter().copied()),
+                InferableTypeVars::One(typevars) => {
+                    result.extend(typevars.iter().copied());
+                }
                 InferableTypeVars::Two(left, right) => {
                     find_typevars(result, left);
                     find_typevars(result, right);
@@ -183,7 +184,7 @@ impl<'a, 'db> InferableTypeVars<'a, 'db> {
             }
         }
 
-        let mut typevars = FxHashSet::default();
+        let mut typevars = FxIndexSet::default();
         find_typevars(&mut typevars, self);
         format!(
             "[{}]",
@@ -264,7 +265,7 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> InferableTypeVars<'db, 'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
-            typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
+            typevars: RefCell<FxIndexSet<BoundTypeVarIdentity<'db>>>,
             recursion_guard: TypeCollector<'db>,
         }
 
@@ -297,7 +298,7 @@ impl<'db> GenericContext<'db> {
         fn inferable_typevars_inner<'db>(
             db: &'db dyn Db,
             generic_context: GenericContext<'db>,
-        ) -> FxHashSet<BoundTypeVarIdentity<'db>> {
+        ) -> FxIndexSet<BoundTypeVarIdentity<'db>> {
             let visitor = CollectTypeVars::default();
             for bound_typevar in generic_context.variables(db) {
                 visitor.visit_bound_type_var_type(db, bound_typevar);
@@ -608,8 +609,8 @@ fn inferable_typevars_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,
     _self: GenericContext<'db>,
-) -> FxHashSet<BoundTypeVarIdentity<'db>> {
-    FxHashSet::default()
+) -> FxIndexSet<BoundTypeVarIdentity<'db>> {
+    FxIndexSet::default()
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

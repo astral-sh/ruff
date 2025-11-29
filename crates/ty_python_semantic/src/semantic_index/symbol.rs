@@ -1,8 +1,8 @@
+use crate::FxHasher;
 use bitflags::bitflags;
 use hashbrown::hash_table::Entry;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::name::Name;
-use rustc_hash::FxHasher;
 use std::hash::{Hash as _, Hasher as _};
 use std::ops::{Deref, DerefMut};
 
@@ -10,6 +10,8 @@ use std::ops::{Deref, DerefMut};
 #[newtype_index]
 #[derive(get_size2::GetSize)]
 pub struct ScopedSymbolId;
+
+impl crate::StableKey for ScopedSymbolId {}
 
 /// A symbol in a given scope.
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
