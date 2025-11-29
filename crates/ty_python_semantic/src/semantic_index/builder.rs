@@ -474,7 +474,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if !symbol.is_reassigned() {
             return;
         }
-        for (key, snapshot_id) in self.enclosing_snapshots.unstable_iter() {
+        for (key, snapshot_id) in self.enclosing_snapshots.stable_iter() {
             if let Some(enclosing_symbol) = key.enclosing_place.as_symbol() {
                 let name = self.place_tables[key.enclosing_scope]
                     .symbol(enclosing_symbol)

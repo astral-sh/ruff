@@ -102,7 +102,7 @@ impl<'db> DunderAllNamesCollector<'db> {
                     return false;
                 };
                 self.names
-                    .extend(module_dunder_all_names.unstable_iter().cloned());
+                    .extend(module_dunder_all_names.stable_iter().cloned());
                 true
             }
 
@@ -239,7 +239,7 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
 
                         if all_names.contains(&Name::new_static("__all__")) {
                             self.update_origin(DunderAllOrigin::StarImport);
-                            self.names.extend(all_names.unstable_iter().cloned());
+                            self.names.extend(all_names.stable_iter().cloned());
                         }
                     } else {
                         // `from module import __all__`
@@ -269,7 +269,7 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                         };
 
                         self.update_origin(DunderAllOrigin::ExternalModule);
-                        self.names.extend(all_names.unstable_iter().cloned());
+                        self.names.extend(all_names.stable_iter().cloned());
                     }
                 }
             }

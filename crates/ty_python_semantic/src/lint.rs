@@ -276,6 +276,8 @@ pub struct LintId {
     definition: &'static LintMetadata,
 }
 
+impl crate::StableKey for LintId {}
+
 impl LintId {
     pub const fn of(definition: &'static LintMetadata) -> Self {
         LintId { definition }
@@ -389,7 +391,7 @@ impl LintRegistry {
                     }
                 }
 
-                let suggestion = did_you_mean(self.by_name.unstable_keys(), code);
+                let suggestion = did_you_mean(self.by_name.stable_keys(), code);
 
                 Err(GetLintError::Unknown {
                     code: code.to_string(),
@@ -408,7 +410,7 @@ impl LintRegistry {
     ///
     /// This iterator includes aliases that point to removed lints.
     pub fn aliases(&self) -> impl Iterator<Item = (LintName, LintId)> + '_ {
-        self.by_name.unstable_iter().filter_map(|(key, value)| {
+        self.by_name.stable_iter().filter_map(|(key, value)| {
             if let LintEntry::Alias(alias) = value {
                 Some((LintName::of(key), *alias))
             } else {
@@ -419,7 +421,7 @@ impl LintRegistry {
 
     /// Iterates over all removed lints.
     pub fn removed(&self) -> impl Iterator<Item = LintId> + '_ {
-        self.by_name.unstable_iter().filter_map(|(_, value)| {
+        self.by_name.stable_iter().filter_map(|(_, value)| {
             if let LintEntry::Removed(metadata) = value {
                 Some(*metadata)
             } else {
@@ -538,13 +540,13 @@ impl RuleSelection {
 
     /// Returns an iterator over all enabled lints.
     pub fn enabled(&self) -> impl Iterator<Item = LintId> + '_ {
-        self.lints.unstable_keys().copied()
+        self.lints.stable_keys().copied()
     }
 
     /// Returns an iterator over all enabled lints and their severity.
     pub fn iter(&self) -> impl ExactSizeIterator<Item = (LintId, Severity)> + '_ {
         self.lints
-            .unstable_iter()
+            .stable_iter()
             .map(|(&lint, &(severity, _))| (lint, severity))
     }
 
@@ -581,7 +583,7 @@ impl fmt::Debug for RuleSelection {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let lints = self
             .lints
-            .unstable_iter()
+            .stable_iter()
             .sorted_by_key(|(lint, _)| lint.name);
 
         if f.alternate() {

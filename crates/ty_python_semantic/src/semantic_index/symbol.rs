@@ -11,6 +11,8 @@ use std::ops::{Deref, DerefMut};
 #[derive(get_size2::GetSize)]
 pub struct ScopedSymbolId;
 
+impl crate::StableKey for ScopedSymbolId {}
+
 /// A symbol in a given scope.
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct Symbol {

@@ -4500,6 +4500,7 @@ dependencies = [
  "ty_static",
  "ty_test",
  "ty_vendored",
+ "url",
 ]
 
 [[package]]

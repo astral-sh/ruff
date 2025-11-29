@@ -85,7 +85,7 @@ impl<'db> DisplaySettings<'db> {
                 collector
                     .class_names
                     .borrow()
-                    .unstable_iter()
+                    .stable_iter()
                     .filter_map(|(name, ambiguity)| {
                         Some((*name, QualificationLevel::from_ambiguity_state(ambiguity)?))
                     })

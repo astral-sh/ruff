@@ -623,6 +623,8 @@ impl Suppression {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub(crate) struct FileSuppressionId(TextRange);
 
+impl crate::StableKey for FileSuppressionId {}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 enum SuppressionTarget {
     /// Suppress all lints

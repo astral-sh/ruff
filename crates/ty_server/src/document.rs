@@ -62,6 +62,8 @@ pub(super) enum DocumentKey {
     Opaque(String),
 }
 
+impl ty_python_semantic::StableKey for DocumentKey {}
+
 impl DocumentKey {
     /// Converts the given [`Url`] to an [`DocumentKey`].
     ///

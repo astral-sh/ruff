@@ -14,15 +14,15 @@ use crate::types::{
     SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext,
     TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
 };
-use crate::{Db, FxIndexMap};
+use crate::{Db, FxHashMap};
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_stdlib::identifiers::is_identifier;
 
-use indexmap::map::Entry;
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
+use std::collections::hash_map::Entry;
 
 use super::UnionType;
 
@@ -272,14 +272,14 @@ impl ClassInfoConstraintFunction {
     }
 }
 
-type NarrowingConstraints<'db> = FxIndexMap<ScopedPlaceId, Type<'db>>;
+type NarrowingConstraints<'db> = FxHashMap<ScopedPlaceId, Type<'db>>;
 
 fn merge_constraints_and<'db>(
     into: &mut NarrowingConstraints<'db>,
     from: &NarrowingConstraints<'db>,
     db: &'db dyn Db,
 ) {
-    for (key, value) in from {
+    for (key, value) in from.stable_iter() {
         match into.entry(*key) {
             Entry::Occupied(mut entry) => {
                 *entry.get_mut() = IntersectionBuilder::new(db)
@@ -299,7 +299,7 @@ fn merge_constraints_or<'db>(
     from: &NarrowingConstraints<'db>,
     db: &'db dyn Db,
 ) {
-    for (key, value) in from {
+    for (key, value) in from.stable_iter() {
         match into.entry(*key) {
             Entry::Occupied(mut entry) => {
                 *entry.get_mut() = UnionBuilder::new(db).add(*entry.get()).add(*value).build();
@@ -309,7 +309,7 @@ fn merge_constraints_or<'db>(
             }
         }
     }
-    for (key, value) in into.iter_mut() {
+    for (key, value) in into.stable_iter_mut() {
         if !from.contains_key(key) {
             *value = Type::object();
         }

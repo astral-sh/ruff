@@ -186,7 +186,7 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
             publish_diagnostics_notification(document.url().clone(), diagnostics);
         }
         LspDiagnostics::NotebookDocument(cell_diagnostics) => {
-            for (cell_url, diagnostics) in cell_diagnostics.unstable_into_iter() {
+            for (cell_url, diagnostics) in cell_diagnostics.stable_into_iter() {
                 publish_diagnostics_notification(cell_url, diagnostics);
             }
         }
@@ -240,7 +240,7 @@ pub(crate) fn publish_settings_diagnostics(
     // the next time we publish settings diagnostics!
     let old_untracked = std::mem::replace(
         &mut state.untracked_files_with_pushed_diagnostics,
-        diagnostics_by_url.unstable_keys().cloned().collect(),
+        diagnostics_by_url.stable_keys().cloned().collect(),
     );
 
     // Add empty diagnostics for any files that had diagnostics before but don't now.
@@ -249,7 +249,7 @@ pub(crate) fn publish_settings_diagnostics(
         diagnostics_by_url.entry(url).or_default();
     }
     // Send the settings diagnostics!
-    for (url, file_diagnostics) in diagnostics_by_url.unstable_into_iter() {
+    for (url, file_diagnostics) in diagnostics_by_url.stable_into_iter() {
         // Convert diagnostics to LSP format
         let lsp_diagnostics = file_diagnostics
             .into_iter()

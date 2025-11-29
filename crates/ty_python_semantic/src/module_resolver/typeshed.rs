@@ -222,7 +222,7 @@ impl FromStr for TypeshedVersions {
 
 impl fmt::Display for TypeshedVersions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let sorted_items: BTreeMap<&ModuleName, &PyVersionRange> = self.0.unstable_iter().collect();
+        let sorted_items: BTreeMap<&ModuleName, &PyVersionRange> = self.0.stable_iter().collect();
         for (module_name, range) in sorted_items {
             writeln!(f, "{module_name}: {range}")?;
         }

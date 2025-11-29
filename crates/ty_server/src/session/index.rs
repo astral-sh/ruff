@@ -25,7 +25,7 @@ impl Index {
     pub(super) fn text_documents(
         &self,
     ) -> impl Iterator<Item = (&DocumentKey, &TextDocument)> + '_ {
-        self.documents.unstable_iter().filter_map(|(key, doc)| {
+        self.documents.stable_iter().filter_map(|(key, doc)| {
             let text_document = doc.as_text()?;
             Some((key, text_document))
         })
@@ -46,7 +46,7 @@ impl Index {
     #[expect(dead_code)]
     pub(super) fn notebook_document_keys(&self) -> impl Iterator<Item = &DocumentKey> + '_ {
         self.documents
-            .unstable_iter()
+            .stable_iter()
             .filter(|(_, doc)| doc.as_notebook().is_some())
             .map(|(key, _)| key)
     }

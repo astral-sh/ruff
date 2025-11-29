@@ -325,7 +325,7 @@ impl<'ast> MembersInScope<'ast> {
         let model = SemanticModel::new(db, file);
         let map = model
             .members_in_scope_at(node)
-            .unstable_into_iter()
+            .stable_into_iter()
             .map(|(name, memberdef)| {
                 let Some(def) = memberdef.definition else {
                     return (name, MemberInScope::other(memberdef.ty));

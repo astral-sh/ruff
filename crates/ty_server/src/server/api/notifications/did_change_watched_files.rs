@@ -75,7 +75,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
             return Ok(());
         }
 
-        for (root, changes) in events_by_db.unstable_into_iter() {
+        for (root, changes) in events_by_db.stable_into_iter() {
             tracing::debug!("Applying changes to `{root}`");
 
             session.apply_changes(&AnySystemPath::System(root.clone()), changes);

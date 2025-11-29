@@ -139,6 +139,8 @@ pub enum ScopedPlaceId {
     Member(ScopedMemberId),
 }
 
+impl crate::StableKey for ScopedPlaceId {}
+
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct PlaceTable {
     symbols: SymbolTable,
