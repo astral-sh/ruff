@@ -1,4 +1,4 @@
-# `ParamSpec`
+# Legacy `ParamSpec`
 
 ## Definition
 
@@ -114,60 +114,4 @@ P = ParamSpec("P", default=[A, B])
 
 class A: ...
 class B: ...
-```
-
-### PEP 695
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-#### Valid
-
-```py
-def foo1[**P]() -> None:
-    reveal_type(P)  # revealed: typing.ParamSpec
-
-def foo2[**P = ...]() -> None:
-    reveal_type(P)  # revealed: typing.ParamSpec
-
-def foo3[**P = [int, str]]() -> None:
-    reveal_type(P)  # revealed: typing.ParamSpec
-
-def foo4[**P, **Q = P]():
-    reveal_type(P)  # revealed: typing.ParamSpec
-    reveal_type(Q)  # revealed: typing.ParamSpec
-```
-
-#### Invalid
-
-ParamSpec, when defined using the new syntax, does not allow defining bounds or constraints.
-
-This results in a lot of syntax errors mainly because the AST doesn't accept them in this position.
-The parser could do a better job in recovering from these errors.
-
-<!-- blacken-docs:off -->
-
-```py
-# error: [invalid-syntax]
-# error: [invalid-syntax]
-# error: [invalid-syntax]
-# error: [invalid-syntax]
-# error: [invalid-syntax]
-# error: [invalid-syntax]
-def foo[**P: int]() -> None:
-    # error: [invalid-syntax]
-    # error: [invalid-syntax]
-    pass
-```
-
-<!-- blacken-docs:on -->
-
-#### Invalid default
-
-```py
-# error: [invalid-paramspec]
-def foo[**P = int]() -> None:
-    pass
 ```
