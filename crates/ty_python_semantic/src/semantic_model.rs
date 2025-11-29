@@ -397,7 +397,7 @@ pub trait HasType {
 }
 
 pub trait HasDefinition {
-    /// Returns the inferred type of `self`.
+    /// Returns the definition of `self`.
     ///
     /// ## Panics
     /// May panic if `self` is from another file than `model`.
