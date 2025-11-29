@@ -2770,9 +2770,9 @@ import foo
 import baz
 
 # error: [possibly-missing-attribute]
-reveal_type(foo.bar)  # revealed: Unknown
+reveal_type(foo.bar)  # revealed: <module 'foo.bar'>
 # error: [possibly-missing-attribute]
-reveal_type(baz.bar)  # revealed: Unknown
+reveal_type(baz.bar)  # revealed: <module 'baz.bar'>
 ```
 
 ## References
