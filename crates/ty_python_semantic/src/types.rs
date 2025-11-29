@@ -1814,14 +1814,14 @@ impl<'db> Type<'db> {
             Type::KnownBoundMethod(method) => Some(CallableTypes::one(CallableType::new(
                 db,
                 CallableSignature::from_overloads(method.signatures(db)),
-                false,
+                CallableTypeKind::Regular,
             ))),
 
             Type::WrapperDescriptor(wrapper_descriptor) => {
                 Some(CallableTypes::one(CallableType::new(
                     db,
                     CallableSignature::from_overloads(wrapper_descriptor.signatures(db)),
-                    false,
+                    CallableTypeKind::Regular,
                 )))
             }
 
@@ -4974,11 +4974,15 @@ impl<'db> Type<'db> {
                     .into()
             }
 
-            Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
-                if typevar.kind(db).is_paramspec()
-                    && matches!(name.as_str(), "args" | "kwargs") =>
+            Type::TypeVar(typevar)
+                if typevar.is_paramspec(db) && matches!(name_str, "args" | "kwargs") =>
             {
-                Place::bound(todo_type!("ParamSpecArgs / ParamSpecKwargs")).into()
+                Place::bound(Type::TypeVar(match name_str {
+                    "args" => typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
+                    "kwargs" => typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs),
+                    _ => unreachable!(),
+                }))
+                .into()
             }
 
             Type::NominalInstance(instance)
@@ -7171,6 +7175,9 @@ impl<'db> Type<'db> {
                 KnownInstanceType::TypeAliasType(alias) => Ok(Type::TypeAlias(*alias)),
                 KnownInstanceType::NewType(newtype) => Ok(Type::NewTypeInstance(*newtype)),
                 KnownInstanceType::TypeVar(typevar) => {
+                    // TODO: A `ParamSpec` type variable cannot be used in type expressions. This
+                    // requires storing additional context as it's allowed in some places
+                    // (`Concatenate`, `Callable`) but not others.
                     let index = semantic_index(db, scope_id.file(db));
                     Ok(bind_typevar(
                         db,
@@ -7397,9 +7404,6 @@ impl<'db> Type<'db> {
                 Some(KnownClass::TypeVar) => Ok(todo_type!(
                     "Support for `typing.TypeVar` instances in type expressions"
                 )),
-                Some(
-                    KnownClass::ParamSpec | KnownClass::ParamSpecArgs | KnownClass::ParamSpecKwargs,
-                ) => Ok(todo_type!("Support for `typing.ParamSpec`")),
                 Some(KnownClass::TypeVarTuple) => Ok(todo_type!(
                     "Support for `typing.TypeVarTuple` instances in type expressions"
                 )),
@@ -7582,7 +7586,7 @@ impl<'db> Type<'db> {
                 KnownInstanceType::TypeVar(typevar) => {
                     match type_mapping {
                         TypeMapping::BindLegacyTypevars(binding_context) => {
-                            Type::TypeVar(BoundTypeVarInstance::new(db, typevar, *binding_context))
+                            Type::TypeVar(BoundTypeVarInstance::new(db, typevar, *binding_context, None))
                         }
                         TypeMapping::Specialization(_) |
                         TypeMapping::PartialSpecialization(_) |
@@ -7837,16 +7841,22 @@ impl<'db> Type<'db> {
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self {
-            Type::TypeVar(bound_typevar) => {
-                if matches!(
-                    bound_typevar.typevar(db).kind(db),
-                    TypeVarKind::Legacy | TypeVarKind::TypingSelf | TypeVarKind::ParamSpec
-                ) && binding_context.is_none_or(|binding_context| {
-                    bound_typevar.binding_context(db) == BindingContext::Definition(binding_context)
-                }) {
+            Type::TypeVar(bound_typevar) => match bound_typevar.typevar(db).kind(db) {
+                TypeVarKind::Legacy | TypeVarKind::TypingSelf
+                    if binding_context.is_none_or(|binding_context| {
+                        bound_typevar.binding_context(db)
+                            == BindingContext::Definition(binding_context)
+                    }) =>
+                {
                     typevars.insert(bound_typevar);
                 }
-            }
+                TypeVarKind::ParamSpec => {
+                    // For `ParamSpec`, we're only interested in `P` itself, not `P.args` or
+                    // `P.kwargs`.
+                    typevars.insert(bound_typevar.without_paramspec_attr(db));
+                }
+                _ => {}
+            },
 
             Type::FunctionLiteral(function) => {
                 function.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
@@ -8522,6 +8532,8 @@ pub struct TrackedConstraintSet<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for TrackedConstraintSet<'_> {}
 
+// TODO: The origin is either `TypeVarInstance` or `BoundTypeVarInstance`
+
 /// Singleton types that are heavily special-cased by ty. Despite its name,
 /// quite a different type to [`NominalInstanceType`].
 ///
@@ -8750,7 +8762,7 @@ impl<'db> KnownInstanceType<'db> {
     fn class(self, db: &'db dyn Db) -> KnownClass {
         match self {
             Self::SubscriptedProtocol(_) | Self::SubscriptedGeneric(_) => KnownClass::SpecialForm,
-            Self::TypeVar(typevar_instance) if typevar_instance.kind(db).is_paramspec() => {
+            Self::TypeVar(typevar_instance) if typevar_instance.is_paramspec(db) => {
                 KnownClass::ParamSpec
             }
             Self::TypeVar(_) => KnownClass::TypeVar,
@@ -9395,12 +9407,12 @@ fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 #[salsa::tracked]
 impl<'db> TypeVarInstance<'db> {
-    pub(crate) fn with_binding_context(
+    pub(crate) fn as_bound_type_var_instance(
         self,
         db: &'db dyn Db,
         binding_context: Definition<'db>,
     ) -> BoundTypeVarInstance<'db> {
-        BoundTypeVarInstance::new(db, self, BindingContext::Definition(binding_context))
+        BoundTypeVarInstance::new(db, self, BindingContext::Definition(binding_context), None)
     }
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
@@ -9417,6 +9429,10 @@ impl<'db> TypeVarInstance<'db> {
 
     pub(crate) fn is_self(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), TypeVarKind::TypingSelf)
+    }
+
+    pub(crate) fn is_paramspec(self, db: &'db dyn Db) -> bool {
+        self.kind(db).is_paramspec()
     }
 
     pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
@@ -9612,6 +9628,37 @@ impl<'db> TypeVarInstance<'db> {
 
     #[salsa::tracked(cycle_fn=lazy_default_cycle_recover, cycle_initial=lazy_default_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn lazy_default(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        fn convert_type_to_paramspec_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+            let parameters = match ty {
+                Type::NominalInstance(nominal_instance)
+                    if nominal_instance.has_known_class(db, KnownClass::EllipsisType) =>
+                {
+                    Parameters::gradual_form()
+                }
+                Type::NominalInstance(nominal_instance) => nominal_instance
+                    .own_tuple_spec(db)
+                    .map_or_else(Parameters::unknown, |tuple_spec| {
+                        Parameters::new(
+                            db,
+                            tuple_spec.all_elements().map(|ty| {
+                                Parameter::positional_only(None).with_annotated_type(*ty)
+                            }),
+                        )
+                    }),
+                Type::Dynamic(DynamicType::Todo(_)) => Parameters::todo(),
+                Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
+                    return ty;
+                }
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                    if typevar.is_paramspec(db) =>
+                {
+                    return ty;
+                }
+                _ => Parameters::unknown(),
+            };
+            Type::paramspec_value_callable(db, parameters)
+        }
+
         let definition = self.definition(db)?;
         let module = parsed_module(db, definition.file(db)).load(db);
         match definition.kind(db) {
@@ -9624,27 +9671,35 @@ impl<'db> TypeVarInstance<'db> {
                     typevar_node.default.as_ref()?,
                 ))
             }
-            // legacy typevar
+            // legacy typevar / ParamSpec
             DefinitionKind::Assignment(assignment) => {
                 let call_expr = assignment.value(&module).as_call_expr()?;
+                let func_ty = definition_expression_type(db, definition, &call_expr.func);
+                let known_class = func_ty.as_class_literal().and_then(|cls| cls.known(db));
                 let expr = &call_expr.arguments.find_keyword("default")?.value;
-                Some(definition_expression_type(db, definition, expr))
+                let default_type = definition_expression_type(db, definition, expr);
+                if matches!(known_class, Some(KnownClass::ParamSpec)) {
+                    Some(convert_type_to_paramspec_value(db, default_type))
+                } else {
+                    Some(default_type)
+                }
             }
             // PEP 695 ParamSpec
             DefinitionKind::ParamSpec(paramspec) => {
                 let paramspec_node = paramspec.node(&module);
-                Some(definition_expression_type(
-                    db,
-                    definition,
-                    paramspec_node.default.as_ref()?,
-                ))
+                let default_ty =
+                    definition_expression_type(db, definition, paramspec_node.default.as_ref()?);
+                Some(convert_type_to_paramspec_value(db, default_ty))
             }
             _ => None,
         }
     }
 
     pub fn bind_pep695(self, db: &'db dyn Db) -> Option<BoundTypeVarInstance<'db>> {
-        if self.identity(db).kind(db) != TypeVarKind::Pep695 {
+        if !matches!(
+            self.identity(db).kind(db),
+            TypeVarKind::Pep695 | TypeVarKind::Pep695ParamSpec
+        ) {
             return None;
         }
         let typevar_definition = self.definition(db)?;
@@ -9722,6 +9777,21 @@ impl<'db> BindingContext<'db> {
     }
 }
 
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, get_size2::GetSize)]
+pub enum ParamSpecAttrKind {
+    Args,
+    Kwargs,
+}
+
+impl std::fmt::Display for ParamSpecAttrKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParamSpecAttrKind::Args => f.write_str("args"),
+            ParamSpecAttrKind::Kwargs => f.write_str("kwargs"),
+        }
+    }
+}
+
 /// The identity of a bound type variable.
 ///
 /// This identifies a specific binding of a typevar to a context (e.g., `T@ClassC` vs `T@FunctionF`),
@@ -9734,14 +9804,17 @@ impl<'db> BindingContext<'db> {
 pub struct BoundTypeVarIdentity<'db> {
     pub(crate) identity: TypeVarIdentity<'db>,
     pub(crate) binding_context: BindingContext<'db>,
+    paramspec_attr: Option<ParamSpecAttrKind>,
 }
 
 /// A type variable that has been bound to a generic context, and which can be specialized to a
 /// concrete type.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
 pub struct BoundTypeVarInstance<'db> {
     pub typevar: TypeVarInstance<'db>,
     binding_context: BindingContext<'db>,
+    paramspec_attr: Option<ParamSpecAttrKind>,
 }
 
 // The Salsa heap is tracked separately.
@@ -9756,7 +9829,28 @@ impl<'db> BoundTypeVarInstance<'db> {
         BoundTypeVarIdentity {
             identity: self.typevar(db).identity(db),
             binding_context: self.binding_context(db),
+            paramspec_attr: self.paramspec_attr(db),
         }
+    }
+
+    pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
+        self.typevar(db).name(db)
+    }
+
+    pub(crate) fn kind(self, db: &'db dyn Db) -> TypeVarKind {
+        self.typevar(db).kind(db)
+    }
+
+    pub(crate) fn is_paramspec(self, db: &'db dyn Db) -> bool {
+        self.kind(db).is_paramspec()
+    }
+
+    pub(crate) fn with_paramspec_attr(self, db: &'db dyn Db, kind: ParamSpecAttrKind) -> Self {
+        Self::new(db, self.typevar(db), self.binding_context(db), Some(kind))
+    }
+
+    pub(crate) fn without_paramspec_attr(self, db: &'db dyn Db) -> Self {
+        Self::new(db, self.typevar(db), self.binding_context(db), None)
     }
 
     /// Returns whether two bound typevars represent the same logical typevar, regardless of e.g.
@@ -9785,7 +9879,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             Some(variance),
             None, // _default
         );
-        Self::new(db, typevar, BindingContext::Synthetic)
+        Self::new(db, typevar, BindingContext::Synthetic, None)
     }
 
     /// Create a new synthetic `Self` type variable with the given upper bound.
@@ -9807,7 +9901,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             Some(TypeVarVariance::Invariant),
             None, // _default
         );
-        Self::new(db, typevar, binding_context)
+        Self::new(db, typevar, binding_context, None)
     }
 
     /// Returns an identical type variable with its `TypeVarBoundOrConstraints` mapped by the
@@ -9826,7 +9920,12 @@ impl<'db> BoundTypeVarInstance<'db> {
             self.typevar(db)._default(db),
         );
 
-        Self::new(db, typevar, self.binding_context(db))
+        Self::new(
+            db,
+            typevar,
+            self.binding_context(db),
+            self.paramspec_attr(db),
+        )
     }
 
     pub(crate) fn variance_with_polarity(
@@ -9939,6 +10038,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             db,
             self.typevar(db).normalized_impl(db, visitor),
             self.binding_context(db),
+            self.paramspec_attr(db),
         )
     }
 
@@ -9953,6 +10053,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             self.typevar(db)
                 .materialize_impl(db, materialization_kind, visitor),
             self.binding_context(db),
+            self.paramspec_attr(db),
         )
     }
 
@@ -9961,6 +10062,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             db,
             self.typevar(db).to_instance(db)?,
             self.binding_context(db),
+            self.paramspec_attr(db),
         ))
     }
 }
@@ -11543,7 +11645,7 @@ impl<'db> BoundMethodType<'db> {
                     .iter()
                     .map(|signature| signature.bind_self(db, Some(self_instance))),
             ),
-            true,
+            CallableTypeKind::FunctionLike,
         )
     }
 
@@ -11625,6 +11727,20 @@ impl<'db> BoundMethodType<'db> {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, get_size2::GetSize)]
+pub enum CallableTypeKind {
+    /// Represents regular callable objects.
+    Regular,
+
+    /// Represents function-like objects, like the synthesized methods of dataclasses or
+    /// `NamedTuples`. These callables act like real functions when accessed as attributes on
+    /// instances, i.e. they bind `self`.
+    FunctionLike,
+
+    /// Represents the value bound to a `typing.ParamSpec` type variable.
+    ParamSpecValue,
+}
+
 /// This type represents the set of all callable objects with a certain, possibly overloaded,
 /// signature.
 ///
@@ -11641,10 +11757,7 @@ pub struct CallableType<'db> {
     #[returns(ref)]
     pub(crate) signatures: CallableSignature<'db>,
 
-    /// We use `CallableType` to represent function-like objects, like the synthesized methods
-    /// of dataclasses or NamedTuples. These callables act like real functions when accessed
-    /// as attributes on instances, i.e. they bind `self`.
-    is_function_like: bool,
+    kind: CallableTypeKind,
 }
 
 pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -11672,20 +11785,52 @@ impl<'db> Type<'db> {
     pub(crate) fn function_like_callable(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
         Type::Callable(CallableType::function_like(db, signature))
     }
+
+    /// Create a non-overloaded callable type which represents the value bound to a `ParamSpec`
+    /// type variable.
+    pub(crate) fn paramspec_value_callable(
+        db: &'db dyn Db,
+        parameters: Parameters<'db>,
+    ) -> Type<'db> {
+        Type::Callable(CallableType::paramspec_value(db, parameters))
+    }
 }
 
 impl<'db> CallableType<'db> {
     pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> CallableType<'db> {
-        CallableType::new(db, CallableSignature::single(signature), false)
+        CallableType::new(
+            db,
+            CallableSignature::single(signature),
+            CallableTypeKind::Regular,
+        )
     }
 
     pub(crate) fn function_like(db: &'db dyn Db, signature: Signature<'db>) -> CallableType<'db> {
-        CallableType::new(db, CallableSignature::single(signature), true)
+        CallableType::new(
+            db,
+            CallableSignature::single(signature),
+            CallableTypeKind::FunctionLike,
+        )
+    }
+
+    pub(crate) fn paramspec_value(
+        db: &'db dyn Db,
+        parameters: Parameters<'db>,
+    ) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            CallableSignature::single(Signature::new(parameters, None)),
+            CallableTypeKind::ParamSpecValue,
+        )
     }
 
     /// Create a callable type which accepts any parameters and returns an `Unknown` type.
     pub(crate) fn unknown(db: &'db dyn Db) -> CallableType<'db> {
         Self::single(db, Signature::unknown())
+    }
+
+    pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
+        matches!(self.kind(db), CallableTypeKind::FunctionLike)
     }
 
     pub(crate) fn bind_self(
@@ -11696,7 +11841,7 @@ impl<'db> CallableType<'db> {
         CallableType::new(
             db,
             self.signatures(db).bind_self(db, self_type),
-            self.is_function_like(db),
+            self.kind(db),
         )
     }
 
@@ -11704,7 +11849,7 @@ impl<'db> CallableType<'db> {
         CallableType::new(
             db,
             self.signatures(db).apply_self(db, self_type),
-            self.is_function_like(db),
+            self.kind(db),
         )
     }
 
@@ -11713,7 +11858,7 @@ impl<'db> CallableType<'db> {
     /// Specifically, this represents a callable type with a single signature:
     /// `(*args: object, **kwargs: object) -> Never`.
     pub(crate) fn bottom(db: &'db dyn Db) -> CallableType<'db> {
-        Self::new(db, CallableSignature::bottom(), false)
+        Self::new(db, CallableSignature::bottom(), CallableTypeKind::Regular)
     }
 
     /// Return a "normalized" version of this `Callable` type.
@@ -11723,7 +11868,7 @@ impl<'db> CallableType<'db> {
         CallableType::new(
             db,
             self.signatures(db).normalized_impl(db, visitor),
-            self.is_function_like(db),
+            self.kind(db),
         )
     }
 
@@ -11738,7 +11883,7 @@ impl<'db> CallableType<'db> {
             db,
             self.signatures(db)
                 .recursive_type_normalized_impl(db, div, nested, visitor)?,
-            self.is_function_like(db),
+            self.kind(db),
         ))
     }
 
@@ -11753,7 +11898,7 @@ impl<'db> CallableType<'db> {
             db,
             self.signatures(db)
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            self.is_function_like(db),
+            self.kind(db),
         )
     }
 

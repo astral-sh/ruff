@@ -25,11 +25,11 @@ reveal_type(generic_context(SingleTypevar))
 # revealed: ty_extensions.GenericContext[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
 
-# TODO: support `ParamSpec`/`TypeVarTuple` properly
-# (these should include the `ParamSpec`s and `TypeVarTuple`s in their generic contexts)
-# revealed: ty_extensions.GenericContext[]
+# TODO: support `TypeVarTuple` properly
+# (these should include the `TypeVarTuple`s in their generic contexts)
+# revealed: ty_extensions.GenericContext[P@SingleParamSpec]
 reveal_type(generic_context(SingleParamSpec))
-# revealed: ty_extensions.GenericContext[T@TypeVarAndParamSpec]
+# revealed: ty_extensions.GenericContext[T@TypeVarAndParamSpec, P@TypeVarAndParamSpec]
 reveal_type(generic_context(TypeVarAndParamSpec))
 # revealed: ty_extensions.GenericContext[]
 reveal_type(generic_context(SingleTypeVarTuple))
