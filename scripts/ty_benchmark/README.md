@@ -12,6 +12,56 @@
 
 Requires hyperfine 1.20 or newer.
 
+## Benchmarks
+
+### Cold check time
+
+Run with:
+
+```shell
+uv run --python 3.14 benchmark
+```
+
+Measures how long it takes to type check a project without a pre-existing cache.
+
+You can run the benchmark with `--single-threaded` to measure the check time when using a single thread only.
+
+### Warm check time
+
+Run with:
+
+```shell
+uv run --python 3.14 benchmark --warm
+```
+
+Measures how long it takes to recheck a project if there were no changes.
+
+> **Note**: Of the benchmarked type checkers, only mypy supports caching.
+
+### LSP: Time to first diagnostic
+
+Measures how long it takes for a newly started LSP to return the diagnostics for the files open in the editor.
+
+Run with:
+
+```bash
+uv run --python 3.14 pytest src/benchmark/test_lsp_diagnostics.py::test_fetch_diagnostics
+```
+
+**Note**: Use `-v -s` to see the set of diagnostics returned by each type checker.
+
+### LSP: Re-check time
+
+Measure how long it takes to recheck all open files after making a single change in a file.
+
+Run with:
+
+```bash
+uv run --python 3.14 pytest src/benchmark/test_lsp_diagnostics.py::test_incremental_edit
+```
+
+> **Note**: This benchmark uses [pull diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_pullDiagnostics) for type checkers that support this operation (ty), and falls back to [publish diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics) otherwise (Pyright, Pyrefly).
+
 ## Known limitations
 
 The tested type checkers implement Python's type system to varying degrees and
