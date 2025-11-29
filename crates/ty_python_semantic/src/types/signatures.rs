@@ -754,12 +754,7 @@ impl<'db> Signature<'db> {
         // we produce, we reduce it back down to the inferable set that the caller asked about.
         // If we introduced new inferable typevars, those will be existentially quantified away
         // before returning.
-        when.reduce_inferable(
-            db,
-            self_inferable
-                .unstable_iter()
-                .chain(other_inferable.unstable_iter()),
-        )
+        when.reduce_inferable(db, self_inferable.iter().chain(other_inferable.iter()))
     }
 
     fn is_equivalent_to_inner(
@@ -889,12 +884,7 @@ impl<'db> Signature<'db> {
         // we produce, we reduce it back down to the inferable set that the caller asked about.
         // If we introduced new inferable typevars, those will be existentially quantified away
         // before returning.
-        when.reduce_inferable(
-            db,
-            self_inferable
-                .unstable_iter()
-                .chain(other_inferable.unstable_iter()),
-        )
+        when.reduce_inferable(db, self_inferable.iter().chain(other_inferable.iter()))
     }
 
     fn has_relation_to_inner(

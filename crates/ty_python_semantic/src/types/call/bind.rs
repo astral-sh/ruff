@@ -39,7 +39,7 @@ use crate::types::{
     TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
     WrapperDescriptorKind, enums, ide_support, todo_type,
 };
-use crate::{FxHashMap, FxHashSet, Program};
+use crate::{FxHashMap, FxIndexSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
 
@@ -1247,7 +1247,7 @@ impl<'db> Bindings<'db> {
                         let extract_inferable = |instance: &NominalInstanceType<'db>| {
                             if instance.has_known_class(db, KnownClass::NoneType) {
                                 // Caller explicitly passed None, so no typevars are inferable.
-                                return Some(FxHashSet::default());
+                                return Some(FxIndexSet::default());
                             }
                             instance
                                 .tuple_spec(db)?
@@ -1261,7 +1261,7 @@ impl<'db> Bindings<'db> {
 
                         let inferable = match overload.parameter_types() {
                             // Caller did not provide argument, so no typevars are inferable.
-                            [None] => FxHashSet::default(),
+                            [None] => FxIndexSet::default(),
                             [Some(Type::NominalInstance(instance))] => {
                                 match extract_inferable(instance) {
                                     Some(inferable) => inferable,
