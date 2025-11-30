@@ -16,6 +16,9 @@ use ruff_python_ast::PythonVersion;
 /// `ValueError("...")` on its own will have no effect (unlike
 /// `raise ValueError("...")`) and is likely a mistake.
 ///
+/// Without [preview], this rule only detects built-in exceptions, like `ValueError`, and does
+/// not catch user-defined exceptions.
+///
 /// ## Example
 /// ```python
 /// ValueError("...")
@@ -28,7 +31,8 @@ use ruff_python_ast::PythonVersion;
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as converting a useless exception
-/// statement to a `raise` statement will change the program's behavior.
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct UselessExceptionStatement;
