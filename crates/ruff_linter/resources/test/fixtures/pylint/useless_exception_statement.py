@@ -6,6 +6,10 @@ class MyError(Exception):
     ...
 
 
+class MySubError(MyError):
+    ...
+
+
 class MyValueError(ValueError):
     ...
 
@@ -21,6 +25,7 @@ class MyUserWarning(UserWarning):
 def func():
     AssertionError("This is an assertion error")  # PLW0133
     MyError("This is a custom error")  # PLW0133
+    MySubError("This is a custom error")  # PLW0133
     MyValueError("This is a custom value error")  # PLW0133
 
 
@@ -29,6 +34,7 @@ def func():
     try:
         Exception("This is an exception")  # PLW0133
         MyError("This is an exception")  # PLW0133
+        MySubError("This is an exception")  # PLW0133
         MyValueError("This is an exception")  # PLW0133
     except Exception as err:
         pass
@@ -39,6 +45,7 @@ def func():
     if True:
         RuntimeError("This is an exception")  # PLW0133
         MyError("This is an exception")  # PLW0133
+        MySubError("This is an exception")  # PLW0133
         MyValueError("This is an exception")  # PLW0133
 
 
@@ -48,6 +55,7 @@ def func():
         def __init__(self):
             TypeError("This is an exception")  # PLW0133
             MyError("This is an exception")  # PLW0133
+            MySubError("This is an exception")  # PLW0133
             MyValueError("This is an exception")  # PLW0133
 
 
@@ -56,6 +64,7 @@ def func():
     def inner():
         IndexError("This is an exception")  # PLW0133
         MyError("This is an exception")  # PLW0133
+        MySubError("This is an exception")  # PLW0133
         MyValueError("This is an exception")  # PLW0133
 
     inner()
@@ -66,6 +75,7 @@ def func():
     while True:
         KeyError("This is an exception")  # PLW0133
         MyError("This is an exception")  # PLW0133
+        MySubError("This is an exception")  # PLW0133
         MyValueError("This is an exception")  # PLW0133
 
 
@@ -76,6 +86,7 @@ def func():
         def method(self):
             NotImplementedError("This is an exception")  # PLW0133
             MyError("This is an exception")  # PLW0133
+            MySubError("This is an exception")  # PLW0133
             MyValueError("This is an exception")  # PLW0133
 
 
@@ -84,6 +95,7 @@ def func():
     with suppress(Exception):
         AttributeError("This is an exception")  # PLW0133
         MyError("This is an exception")  # PLW0133
+        MySubError("This is an exception")  # PLW0133
         MyValueError("This is an exception")  # PLW0133
 
 
@@ -91,6 +103,7 @@ def func():
 def func():
     (RuntimeError("This is an exception"))  # PLW0133
     (MyError("This is an exception"))  # PLW0133
+    (MySubError("This is an exception"))  # PLW0133
     (MyValueError("This is an exception"))  # PLW0133
 
 
@@ -98,6 +111,7 @@ def func():
 def func():
     x = 1; (RuntimeError("This is an exception")); y = 2  # PLW0133
     x = 1; (MyError("This is an exception")); y = 2  # PLW0133
+    x = 1; (MySubError("This is an exception")); y = 2  # PLW0133
     x = 1; (MyValueError("This is an exception")); y = 2  # PLW0133
 
 
@@ -115,6 +129,8 @@ builtins.TypeError("still an exception even though it's an Attribute")  # PLW013
 PythonFinalizationError("Added in Python 3.13")  # PLW0133
 
 MyError("This is an exception")  # PLW0133
+
+MySubError("This is an exception")  # PLW0133
 
 MyValueError("This is an exception")  # PLW0133
 
@@ -171,4 +187,3 @@ def func():
 def func():
     with suppress(AttributeError):
         raise AttributeError("This is an exception")  # OK
-
