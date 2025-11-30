@@ -121,6 +121,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
+    registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -1756,6 +1757,33 @@ declare_lint! {
     pub(crate) static UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS = {
         summary: "detects invalid `super()` calls where implicit arguments are unavailable.",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for calls to `super()` inside methods of `NamedTuple` subclasses.
+    ///
+    /// ## Why is this bad?
+    /// Using `super()` in a method of a `NamedTuple` subclass will raise an exception at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import NamedTuple
+    ///
+    /// class F(NamedTuple):
+    ///     x: int
+    ///
+    ///     def method(self):
+    ///         super()  # error: super() is not supported in methods of NamedTuple subclasses
+    /// ```
+    ///
+    /// ## References
+    /// - [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)
+    pub(crate) static SUPER_CALL_IN_NAMED_TUPLE_METHOD = {
+        summary: "detects `super()` calls in methods of `NamedTuple` subclasses",
+        status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
 }
