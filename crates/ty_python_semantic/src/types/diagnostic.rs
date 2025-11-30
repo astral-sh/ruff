@@ -1763,10 +1763,10 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for calls to `super()` inside methods of `NamedTuple` subclasses.
+    /// Checks for calls to `super()` inside methods of `NamedTuple` classes.
     ///
     /// ## Why is this bad?
-    /// Using `super()` in a method of a `NamedTuple` subclass will raise an exception at runtime.
+    /// Using `super()` in a method of a `NamedTuple` class will raise an exception at runtime.
     ///
     /// ## Examples
     /// ```python
@@ -1776,14 +1776,14 @@ declare_lint! {
     ///     x: int
     ///
     ///     def method(self):
-    ///         super()  # error: super() is not supported in methods of NamedTuple subclasses
+    ///         super()  # error: super() is not supported in methods of NamedTuple classes
     /// ```
     ///
     /// ## References
     /// - [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)
     pub(crate) static SUPER_CALL_IN_NAMED_TUPLE_METHOD = {
-        summary: "detects `super()` calls in methods of `NamedTuple` subclasses",
-        status: LintStatus::preview("1.0.0"),
+        summary: "detects `super()` calls in methods of `NamedTuple` classes",
+        status: LintStatus::preview("0.0.1-alpha.30"),
         default_level: Level::Error,
     }
 }

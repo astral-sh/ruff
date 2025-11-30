@@ -411,7 +411,7 @@ Vec2(0.0, 0.0)
 
 ## `super()` is not supported in NamedTuple methods
 
-Using `super()` in a method of a `NamedTuple` subclass will raise an exception at runtime. In Python
+Using `super()` in a method of a `NamedTuple` class will raise an exception at runtime. In Python
 3.14+, a `TypeError` is raised; in earlier versions, a confusing `RuntimeError` about
 `__classcell__` is raised.
 
@@ -422,35 +422,35 @@ class F(NamedTuple):
     x: int
 
     def method(self):
-        # error: [super-call-in-named-tuple-method] "Cannot use `super()` in a method of NamedTuple subclass `F`"
+        # error: [super-call-in-named-tuple-method] "Cannot use `super()` in a method of NamedTuple class `F`"
         super()
 
     def method_with_args(self):
-        # error: [super-call-in-named-tuple-method] "Cannot use `super()` in a method of NamedTuple subclass `F`"
+        # error: [super-call-in-named-tuple-method] "Cannot use `super()` in a method of NamedTuple class `F`"
         super(F, self)
 
     def method_with_different_pivot(self):
         # Even passing a different pivot class fails.
-        # error: [super-call-in-named-tuple-method] "Cannot use `super()` in a method of NamedTuple subclass `F`"
+        # error: [super-call-in-named-tuple-method] "Cannot use `super()` in a method of NamedTuple class `F`"
         super(tuple, self)
 
     @classmethod
     def class_method(cls):
-        # error: [super-call-in-named-tuple-method] "Cannot use `super()` in a method of NamedTuple subclass `F`"
+        # error: [super-call-in-named-tuple-method] "Cannot use `super()` in a method of NamedTuple class `F`"
         super()
 
     @staticmethod
     def static_method():
-        # error: [super-call-in-named-tuple-method] "Cannot use `super()` in a method of NamedTuple subclass `F`"
+        # error: [super-call-in-named-tuple-method] "Cannot use `super()` in a method of NamedTuple class `F`"
         super()
 
     @property
     def prop(self):
-        # error: [super-call-in-named-tuple-method] "Cannot use `super()` in a method of NamedTuple subclass `F`"
+        # error: [super-call-in-named-tuple-method] "Cannot use `super()` in a method of NamedTuple class `F`"
         return super()
 ```
 
-However, classes that **inherit from** a `NamedTuple` subclass (but don't directly inherit from
+However, classes that **inherit from** a `NamedTuple` class (but don't directly inherit from
 `NamedTuple`) can use `super()` normally:
 
 ```py
@@ -470,4 +470,15 @@ And regular classes that don't inherit from `NamedTuple` at all can use `super()
 class Regular:
     def method(self):
         super()  # fine
+```
+
+Using `super()` on a `NamedTuple` class also works fine if it occurs outside the class:
+
+```py
+from typing import NamedTuple
+
+class F(NamedTuple):
+    x: int
+
+super(F, F(42))  # fine
 ```

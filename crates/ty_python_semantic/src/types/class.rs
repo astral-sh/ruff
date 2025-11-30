@@ -5552,7 +5552,7 @@ impl KnownClass {
                                 .report_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD, call_expression)
                             {
                                 builder.into_diagnostic(format_args!(
-                                    "Cannot use `super()` in a method of NamedTuple subclass `{}`",
+                                    "Cannot use `super()` in a method of NamedTuple class `{}`",
                                     enclosing_class.name(db)
                                 ));
                             }
@@ -5606,7 +5606,7 @@ impl KnownClass {
                                     .report_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD, call_expression)
                                 {
                                     builder.into_diagnostic(format_args!(
-                                        "Cannot use `super()` in a method of NamedTuple subclass `{}`",
+                                        "Cannot use `super()` in a method of NamedTuple class `{}`",
                                         enclosing_class.name(db)
                                     ));
                                 }

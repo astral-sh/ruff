@@ -1925,7 +1925,7 @@ class B(A): ...  # Error raised here
 
 <small>
 Default level: <a href="../rules.md#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/1.0.0">1.0.0</a>) ·
+Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.30">0.0.1-alpha.30</a>) ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20super-call-in-named-tuple-method" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1764" target="_blank">View source</a>
 </small>
@@ -1933,11 +1933,11 @@ Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/1.0.0">1.0.
 
 **What it does**
 
-Checks for calls to `super()` inside methods of `NamedTuple` subclasses.
+Checks for calls to `super()` inside methods of `NamedTuple` classes.
 
 **Why is this bad?**
 
-Using `super()` in a method of a `NamedTuple` subclass will raise an exception at runtime.
+Using `super()` in a method of a `NamedTuple` class will raise an exception at runtime.
 
 **Examples**
 
@@ -1948,7 +1948,7 @@ class F(NamedTuple):
     x: int
 
     def method(self):
-        super()  # error: super() is not supported in methods of NamedTuple subclasses
+        super()  # error: super() is not supported in methods of NamedTuple classes
 ```
 
 **References**
