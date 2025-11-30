@@ -5,6 +5,7 @@ use ruff_python_stdlib::builtins;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_custom_exception_checking_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
@@ -57,7 +58,8 @@ pub(crate) fn useless_exception_statement(checker: &Checker, expr: &ast::StmtExp
     };
 
     if is_builtin_exception(func, checker.semantic(), checker.target_version())
-        || is_custom_exception(func, checker.semantic(), checker.target_version())
+        || (is_custom_exception_checking_enabled(checker.settings())
+            && is_custom_exception(func, checker.semantic(), checker.target_version()))
     {
         let mut diagnostic = checker.report_diagnostic(UselessExceptionStatement, expr.range());
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
