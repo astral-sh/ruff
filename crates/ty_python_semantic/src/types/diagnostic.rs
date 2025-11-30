@@ -51,6 +51,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&AMBIGUOUS_PROTOCOL_MEMBER);
     registry.register_lint(&CALL_NON_CALLABLE);
     registry.register_lint(&POSSIBLY_MISSING_IMPLICIT_CALL);
+    registry.register_lint(&CANNOT_OVERWRITE_ATTRIBUTE);
     registry.register_lint(&CONFLICTING_ARGUMENT_FORMS);
     registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&CONFLICTING_METACLASS);
@@ -388,6 +389,15 @@ declare_lint! {
     pub(crate) static DUPLICATE_KW_ONLY = {
         summary: "detects dataclass definitions with more than one usage of `KW_ONLY`",
         status: LintStatus::stable("0.0.1-alpha.12"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// TODO
+    pub(crate) static CANNOT_OVERWRITE_ATTRIBUTE = {
+        summary: "TODO",
+        status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
 }
