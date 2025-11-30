@@ -26,6 +26,8 @@ pub struct ParseOptions {
     pub(crate) mode: Mode,
     /// Target version for detecting version-related syntax errors.
     pub(crate) target_version: PythonVersion,
+    /// Whether the source file is a stub file.
+    pub(crate) is_stub: bool,
 }
 
 impl ParseOptions {
@@ -38,6 +40,16 @@ impl ParseOptions {
     pub fn target_version(&self) -> PythonVersion {
         self.target_version
     }
+
+    #[must_use]
+    pub fn with_is_stub(mut self, is_stub: bool) -> Self {
+        self.is_stub = is_stub;
+        self
+    }
+
+    pub fn is_stub(&self) -> bool {
+        self.is_stub
+    }
 }
 
 impl From<Mode> for ParseOptions {
@@ -45,6 +57,7 @@ impl From<Mode> for ParseOptions {
         Self {
             mode,
             target_version: PythonVersion::default(),
+            is_stub: false,
         }
     }
 }
@@ -54,6 +67,7 @@ impl From<PySourceType> for ParseOptions {
         Self {
             mode: source_type.as_mode(),
             target_version: PythonVersion::default(),
+            is_stub: source_type.is_stub(),
         }
     }
 }
