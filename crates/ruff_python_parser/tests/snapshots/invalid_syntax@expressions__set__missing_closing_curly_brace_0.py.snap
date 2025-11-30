@@ -14,20 +14,11 @@ Module(
                 StmtExpr {
                     node_index: NodeIndex(None),
                     range: 46..47,
-                    value: Set(
-                        ExprSet {
+                    value: Dict(
+                        ExprDict {
                             node_index: NodeIndex(None),
                             range: 46..47,
-                            elts: [
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 47..47,
-                                        id: Name(""),
-                                        ctx: Invalid,
-                                    },
-                                ),
-                            ],
+                            items: [],
                         },
                     ),
                 },

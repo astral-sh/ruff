@@ -1944,9 +1944,18 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#list-displays>
     fn parse_list_like_expression(&mut self) -> Expr {
         let start = self.node_start();
-
         self.bump(TokenKind::Lsqb);
 
+        if self.at(TokenKind::Unknown)
+            && (self.peek() == TokenKind::EndOfFile || self.peek() == TokenKind::Newline)
+        {
+            return Expr::List(ast::ExprList {
+                elts: vec![],
+                ctx: ExprContext::Load,
+                range: self.node_range(start),
+                node_index: AtomicNodeIndex::NONE,
+            });
+        }
         // Nice error message when having a unclosed open bracket `[`
         if self.at_ts(NEWLINE_EOF_SET) {
             self.add_error(
@@ -1999,6 +2008,16 @@ impl<'src> Parser<'src> {
     fn parse_set_or_dict_like_expression(&mut self) -> Expr {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
+
+        if self.at(TokenKind::Unknown)
+            && (self.peek() == TokenKind::EndOfFile || self.peek() == TokenKind::Newline)
+        {
+            return Expr::Dict(ast::ExprDict {
+                items: vec![],
+                range: self.node_range(start),
+                node_index: AtomicNodeIndex::NONE,
+            });
+        }
 
         // Nice error message when having a unclosed open brace `{`
         if self.at_ts(NEWLINE_EOF_SET) {
@@ -2108,6 +2127,19 @@ impl<'src> Parser<'src> {
     fn parse_parenthesized_expression(&mut self) -> ParsedExpr {
         let start = self.node_start();
         self.bump(TokenKind::Lpar);
+
+        if self.at(TokenKind::Unknown)
+            && (self.peek() == TokenKind::EndOfFile || self.peek() == TokenKind::Newline)
+        {
+            return Expr::Tuple(ast::ExprTuple {
+                elts: vec![],
+                ctx: ExprContext::Load,
+                range: self.node_range(start),
+                node_index: AtomicNodeIndex::NONE,
+                parenthesized: true,
+            })
+            .into();
+        }
 
         // Nice error message when having a unclosed open parenthesis `(`
         if self.at_ts(NEWLINE_EOF_SET) {
