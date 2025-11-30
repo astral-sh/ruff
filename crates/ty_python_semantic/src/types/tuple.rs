@@ -235,12 +235,11 @@ impl<'db> TupleType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
         Some(Self::new_internal(
             db,
             self.tuple(db)
-                .recursive_type_normalized_impl(db, div, nested, visitor)?,
+                .recursive_type_normalized_impl(db, div, nested)?,
         ))
     }
 
@@ -412,13 +411,12 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
         if nested {
             Some(Self::from_elements(
                 self.0
                     .iter()
-                    .map(|ty| ty.recursive_type_normalized_impl(db, div, true, visitor))
+                    .map(|ty| ty.recursive_type_normalized_impl(db, div, true))
                     .collect::<Option<Box<[_]>>>()?,
             ))
         } else {
@@ -426,7 +424,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                 self.0
                     .iter()
                     .map(|ty| {
-                        ty.recursive_type_normalized_impl(db, div, true, visitor)
+                        ty.recursive_type_normalized_impl(db, div, true)
                             .unwrap_or(div)
                     })
                     .collect::<Box<[_]>>(),
@@ -805,18 +803,17 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
         let prefix = if nested {
             self.prefix
                 .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, div, true, visitor))
+                .map(|ty| ty.recursive_type_normalized_impl(db, div, true))
                 .collect::<Option<Box<_>>>()?
         } else {
             self.prefix
                 .iter()
                 .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, div, true, visitor)
+                    ty.recursive_type_normalized_impl(db, div, true)
                         .unwrap_or(div)
                 })
                 .collect::<Box<_>>()
@@ -824,23 +821,23 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         let suffix = if nested {
             self.suffix
                 .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, div, true, visitor))
+                .map(|ty| ty.recursive_type_normalized_impl(db, div, true))
                 .collect::<Option<Box<_>>>()?
         } else {
             self.suffix
                 .iter()
                 .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, div, true, visitor)
+                    ty.recursive_type_normalized_impl(db, div, true)
                         .unwrap_or(div)
                 })
                 .collect::<Box<_>>()
         };
         let variable = if nested {
             self.variable
-                .recursive_type_normalized_impl(db, div, true, visitor)?
+                .recursive_type_normalized_impl(db, div, true)?
         } else {
             self.variable
-                .recursive_type_normalized_impl(db, div, true, visitor)
+                .recursive_type_normalized_impl(db, div, true)
                 .unwrap_or(div)
         };
         Some(Self {
@@ -1251,14 +1248,13 @@ impl<'db> Tuple<Type<'db>> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
         match self {
             Tuple::Fixed(tuple) => Some(Tuple::Fixed(
-                tuple.recursive_type_normalized_impl(db, div, nested, visitor)?,
+                tuple.recursive_type_normalized_impl(db, div, nested)?,
             )),
             Tuple::Variable(tuple) => Some(Tuple::Variable(
-                tuple.recursive_type_normalized_impl(db, div, nested, visitor)?,
+                tuple.recursive_type_normalized_impl(db, div, nested)?,
             )),
         }
     }

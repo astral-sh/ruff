@@ -1112,19 +1112,14 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
         let literal = self.literal(db);
         let updated_signature = match self.updated_signature(db) {
-            Some(signature) => {
-                Some(signature.recursive_type_normalized_impl(db, div, nested, visitor)?)
-            }
+            Some(signature) => Some(signature.recursive_type_normalized_impl(db, div, nested)?),
             None => None,
         };
         let updated_last_definition_signature = match self.updated_last_definition_signature(db) {
-            Some(signature) => {
-                Some(signature.recursive_type_normalized_impl(db, div, nested, visitor)?)
-            }
+            Some(signature) => Some(signature.recursive_type_normalized_impl(db, div, nested)?),
             None => None,
         };
         Some(Self::new(
