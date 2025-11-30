@@ -147,15 +147,13 @@ impl SemanticSyntaxChecker {
             Stmt::ClassDef(ast::StmtClassDef {
                 type_params: Some(type_params),
                 ..
-            }) => {
-                Self::duplicate_type_parameter_name(type_params, ctx);
-                Self::type_parameter_default_order(type_params, ctx);
-            }
-            Stmt::TypeAlias(ast::StmtTypeAlias {
+            })
+            | Stmt::TypeAlias(ast::StmtTypeAlias {
                 type_params: Some(type_params),
                 ..
             }) => {
                 Self::duplicate_type_parameter_name(type_params, ctx);
+                Self::type_parameter_default_order(type_params, ctx);
             }
             Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
                 if let [Expr::Starred(ast::ExprStarred { range, .. })] = targets.as_slice() {
@@ -635,6 +633,8 @@ impl SemanticSyntaxChecker {
             if seen_default && !has_default {
                 // test_err type_parameter_default_order
                 // class C[T = int, U]: ...
+                // class C[T1, T2 = int, T3, T4]: ...
+                // type Alias[T = int, U] = ...
                 Self::add_error(
                     ctx,
                     SemanticSyntaxErrorKind::TypeParameterDefaultOrder(
