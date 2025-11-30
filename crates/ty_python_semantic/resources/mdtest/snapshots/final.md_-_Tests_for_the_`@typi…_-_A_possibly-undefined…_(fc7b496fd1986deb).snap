@@ -49,23 +49,29 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 35 |     def method1(self) -> None: ...  # error: [override-of-final-method]
 36 |     def method2(self) -> None: ...  # error: [override-of-final-method]
 37 |     def method3(self) -> None: ...  # error: [override-of-final-method]
-38 |     def method4(self) -> None: ...  # error: [override-of-final-method]
-39 | 
-40 | # Possible overrides of possibly `@final` methods...
-41 | class C(A):
-42 |     if coinflip():
-43 |         def method1(self) -> None: ...  # error: [override-of-final-method]
-44 |     else:
-45 |         pass
-46 | 
-47 |     if coinflip():
-48 |         def method2(self) -> None: ...  # TODO: should emit [override-of-final-method]
-49 |     else:
-50 |         def method2(self) -> None: ...  # TODO: should emit [override-of-final-method]
-51 | 
-52 |     if coinflip():
-53 |         def method3(self) -> None: ...  # error: [override-of-final-method]
-54 |         def method4(self) -> None: ...  # error: [override-of-final-method]
+38 | 
+39 |     # check that autofixes don't introduce invalid syntax
+40 |     # if there are multiple statements on one line
+41 |     #
+42 |     # TODO: we should emit a Liskov violation here too
+43 |     # error: [override-of-final-method]
+44 |     method4 = 42; unrelated = 56  # fmt: skip
+45 | 
+46 | # Possible overrides of possibly `@final` methods...
+47 | class C(A):
+48 |     if coinflip():
+49 |         def method1(self) -> None: ...  # error: [override-of-final-method]
+50 |     else:
+51 |         pass
+52 | 
+53 |     if coinflip():
+54 |         def method2(self) -> None: ...  # TODO: should emit [override-of-final-method]
+55 |     else:
+56 |         def method2(self) -> None: ...  # TODO: should emit [override-of-final-method]
+57 | 
+58 |     if coinflip():
+59 |         def method3(self) -> None: ...  # error: [override-of-final-method]
+60 |         def method4(self) -> None: ...  # error: [override-of-final-method]
 ```
 
 # Diagnostics
@@ -101,7 +107,7 @@ info: rule `override-of-final-method` is enabled by default
 35 +       # error: [override-of-final-method]
 36 |     def method2(self) -> None: ...  # error: [override-of-final-method]
 37 |     def method3(self) -> None: ...  # error: [override-of-final-method]
-38 |     def method4(self) -> None: ...  # error: [override-of-final-method]
+38 | 
 note: This is an unsafe fix and may change runtime behavior
 
 ```
@@ -115,7 +121,6 @@ error[override-of-final-method]: Cannot override `A.method2`
 36 |     def method2(self) -> None: ...  # error: [override-of-final-method]
    |         ^^^^^^^ Overrides a definition from superclass `A`
 37 |     def method3(self) -> None: ...  # error: [override-of-final-method]
-38 |     def method4(self) -> None: ...  # error: [override-of-final-method]
    |
 info: `A.method2` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.py:16:9
@@ -137,8 +142,8 @@ info: rule `override-of-final-method` is enabled by default
    -     def method2(self) -> None: ...  # error: [override-of-final-method]
 36 +       # error: [override-of-final-method]
 37 |     def method3(self) -> None: ...  # error: [override-of-final-method]
-38 |     def method4(self) -> None: ...  # error: [override-of-final-method]
-39 | 
+38 | 
+39 |     # check that autofixes don't introduce invalid syntax
 note: This is an unsafe fix and may change runtime behavior
 
 ```
@@ -151,7 +156,8 @@ error[override-of-final-method]: Cannot override `A.method3`
 36 |     def method2(self) -> None: ...  # error: [override-of-final-method]
 37 |     def method3(self) -> None: ...  # error: [override-of-final-method]
    |         ^^^^^^^ Overrides a definition from superclass `A`
-38 |     def method4(self) -> None: ...  # error: [override-of-final-method]
+38 |
+39 |     # check that autofixes don't introduce invalid syntax
    |
 info: `A.method3` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.py:20:9
@@ -171,23 +177,23 @@ info: rule `override-of-final-method` is enabled by default
 36 |     def method2(self) -> None: ...  # error: [override-of-final-method]
    -     def method3(self) -> None: ...  # error: [override-of-final-method]
 37 +       # error: [override-of-final-method]
-38 |     def method4(self) -> None: ...  # error: [override-of-final-method]
-39 | 
-40 | # Possible overrides of possibly `@final` methods...
+38 | 
+39 |     # check that autofixes don't introduce invalid syntax
+40 |     # if there are multiple statements on one line
 note: This is an unsafe fix and may change runtime behavior
 
 ```
 
 ```
 error[override-of-final-method]: Cannot override `A.method4`
-  --> src/mdtest_snippet.py:38:9
+  --> src/mdtest_snippet.py:44:5
    |
-36 |     def method2(self) -> None: ...  # error: [override-of-final-method]
-37 |     def method3(self) -> None: ...  # error: [override-of-final-method]
-38 |     def method4(self) -> None: ...  # error: [override-of-final-method]
-   |         ^^^^^^^ Overrides a definition from superclass `A`
-39 |
-40 | # Possible overrides of possibly `@final` methods...
+42 |     # TODO: we should emit a Liskov violation here too
+43 |     # error: [override-of-final-method]
+44 |     method4 = 42; unrelated = 56  # fmt: skip
+   |     ^^^^^^^ Overrides a definition from superclass `A`
+45 |
+46 | # Possible overrides of possibly `@final` methods...
    |
 info: `A.method4` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.py:29:9
@@ -203,28 +209,19 @@ info: `A.method4` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `method4`
 info: rule `override-of-final-method` is enabled by default
-35 |     def method1(self) -> None: ...  # error: [override-of-final-method]
-36 |     def method2(self) -> None: ...  # error: [override-of-final-method]
-37 |     def method3(self) -> None: ...  # error: [override-of-final-method]
-   -     def method4(self) -> None: ...  # error: [override-of-final-method]
-38 +       # error: [override-of-final-method]
-39 | 
-40 | # Possible overrides of possibly `@final` methods...
-41 | class C(A):
-note: This is an unsafe fix and may change runtime behavior
 
 ```
 
 ```
 error[override-of-final-method]: Cannot override `A.method1`
-  --> src/mdtest_snippet.py:43:13
+  --> src/mdtest_snippet.py:49:13
    |
-41 | class C(A):
-42 |     if coinflip():
-43 |         def method1(self) -> None: ...  # error: [override-of-final-method]
+47 | class C(A):
+48 |     if coinflip():
+49 |         def method1(self) -> None: ...  # error: [override-of-final-method]
    |             ^^^^^^^ Overrides a definition from superclass `A`
-44 |     else:
-45 |         pass
+50 |     else:
+51 |         pass
    |
 info: `A.method1` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.py:8:9
@@ -240,26 +237,17 @@ info: `A.method1` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `method1`
 info: rule `override-of-final-method` is enabled by default
-40 | # Possible overrides of possibly `@final` methods...
-41 | class C(A):
-42 |     if coinflip():
-   -         def method1(self) -> None: ...  # error: [override-of-final-method]
-43 +           # error: [override-of-final-method]
-44 |     else:
-45 |         pass
-46 | 
-note: This is a display-only fix and is likely to be incorrect
 
 ```
 
 ```
 error[override-of-final-method]: Cannot override `A.method3`
-  --> src/mdtest_snippet.py:53:13
+  --> src/mdtest_snippet.py:59:13
    |
-52 |     if coinflip():
-53 |         def method3(self) -> None: ...  # error: [override-of-final-method]
+58 |     if coinflip():
+59 |         def method3(self) -> None: ...  # error: [override-of-final-method]
    |             ^^^^^^^ Overrides a definition from superclass `A`
-54 |         def method4(self) -> None: ...  # error: [override-of-final-method]
+60 |         def method4(self) -> None: ...  # error: [override-of-final-method]
    |
 info: `A.method3` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.py:20:9
@@ -274,23 +262,16 @@ info: `A.method3` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `method3`
 info: rule `override-of-final-method` is enabled by default
-50 |         def method2(self) -> None: ...  # TODO: should emit [override-of-final-method]
-51 | 
-52 |     if coinflip():
-   -         def method3(self) -> None: ...  # error: [override-of-final-method]
-53 +           # error: [override-of-final-method]
-54 |         def method4(self) -> None: ...  # error: [override-of-final-method]
-note: This is a display-only fix and is likely to be incorrect
 
 ```
 
 ```
 error[override-of-final-method]: Cannot override `A.method4`
-  --> src/mdtest_snippet.py:54:13
+  --> src/mdtest_snippet.py:60:13
    |
-52 |     if coinflip():
-53 |         def method3(self) -> None: ...  # error: [override-of-final-method]
-54 |         def method4(self) -> None: ...  # error: [override-of-final-method]
+58 |     if coinflip():
+59 |         def method3(self) -> None: ...  # error: [override-of-final-method]
+60 |         def method4(self) -> None: ...  # error: [override-of-final-method]
    |             ^^^^^^^ Overrides a definition from superclass `A`
    |
 info: `A.method4` is decorated with `@final`, forbidding overrides
@@ -307,11 +288,5 @@ info: `A.method4` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `method4`
 info: rule `override-of-final-method` is enabled by default
-51 | 
-52 |     if coinflip():
-53 |         def method3(self) -> None: ...  # error: [override-of-final-method]
-   -         def method4(self) -> None: ...  # error: [override-of-final-method]
-54 +           # error: [override-of-final-method]
-note: This is a display-only fix and is likely to be incorrect
 
 ```

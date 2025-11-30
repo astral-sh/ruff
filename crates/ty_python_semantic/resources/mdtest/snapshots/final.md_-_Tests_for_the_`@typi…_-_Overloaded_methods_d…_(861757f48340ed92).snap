@@ -458,15 +458,6 @@ info: `Bad.f` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `f`
 info: rule `override-of-final-method` is enabled by default
-57 | 
-58 | class ChildOfBad(Bad):
-59 |     # TODO: these should all cause us to emit Liskov violations as well
-   -     f = None  # error: [override-of-final-method]
-60 +       # error: [override-of-final-method]
-61 |     g = None  # error: [override-of-final-method]
-62 |     h = None  # error: [override-of-final-method]
-63 |     i = None  # error: [override-of-final-method]
-note: This is a display-only fix and is likely to be incorrect
 
 ```
 
@@ -492,14 +483,6 @@ info: `Bad.g` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `g`
 info: rule `override-of-final-method` is enabled by default
-58 | class ChildOfBad(Bad):
-59 |     # TODO: these should all cause us to emit Liskov violations as well
-60 |     f = None  # error: [override-of-final-method]
-   -     g = None  # error: [override-of-final-method]
-61 +       # error: [override-of-final-method]
-62 |     h = None  # error: [override-of-final-method]
-63 |     i = None  # error: [override-of-final-method]
-note: This is a display-only fix and is likely to be incorrect
 
 ```
 
@@ -524,13 +507,6 @@ info: `Bad.h` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `h`
 info: rule `override-of-final-method` is enabled by default
-59 |     # TODO: these should all cause us to emit Liskov violations as well
-60 |     f = None  # error: [override-of-final-method]
-61 |     g = None  # error: [override-of-final-method]
-   -     h = None  # error: [override-of-final-method]
-62 +       # error: [override-of-final-method]
-63 |     i = None  # error: [override-of-final-method]
-note: This is a display-only fix and is likely to be incorrect
 
 ```
 
@@ -554,11 +530,5 @@ info: `Bad.i` is decorated with `@final`, forbidding overrides
    |
 help: Remove the override of `i`
 info: rule `override-of-final-method` is enabled by default
-60 |     f = None  # error: [override-of-final-method]
-61 |     g = None  # error: [override-of-final-method]
-62 |     h = None  # error: [override-of-final-method]
-   -     i = None  # error: [override-of-final-method]
-63 +       # error: [override-of-final-method]
-note: This is a display-only fix and is likely to be incorrect
 
 ```

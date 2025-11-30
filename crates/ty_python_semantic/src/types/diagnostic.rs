@@ -37,7 +37,7 @@ use ruff_db::{
     parsed::parsed_module,
     source::source_text,
 };
-use ruff_diagnostics::{Applicability, Edit, Fix};
+use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parentheses_iterator;
 use ruff_python_ast::{self as ast, AnyNodeRef, StringFlags};
@@ -3804,12 +3804,30 @@ pub(super) fn report_overridden_final_method<'db>(
     context: &InferContext<'db, '_>,
     member: &str,
     subclass_definition: Definition<'db>,
+    // N.B. the type of the *definition*, not the type on an instance of the subclass
     subclass_type: Type<'db>,
     superclass: ClassType<'db>,
     subclass: ClassType<'db>,
     superclass_method_defs: &[FunctionType<'db>],
 ) {
     let db = context.db();
+
+    // Some hijinks so that we emit a diagnostic on the property getter rather than the property setter
+    let property_getter_definition = if subclass_definition.kind(db).is_function_def()
+        && let Type::PropertyInstance(property) = subclass_type
+        && let Some(Type::FunctionLiteral(getter)) = property.getter(db)
+    {
+        let getter_definition = getter.definition(db);
+        if getter_definition.scope(db) == subclass_definition.scope(db) {
+            Some(getter_definition)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let subclass_definition = property_getter_definition.unwrap_or(subclass_definition);
 
     let Some(builder) = context.report_lint(
         &OVERRIDE_OF_FINAL_METHOD,
@@ -3871,13 +3889,10 @@ pub(super) fn report_overridden_final_method<'db>(
 
     diagnostic.sub(sub);
 
-    let underlying_function = match subclass_type {
-        Type::FunctionLiteral(function) => Some(function),
-        Type::BoundMethod(method) => Some(method.function(db)),
-        _ => None,
-    };
-
-    if let Some(function) = underlying_function {
+    // It's tempting to autofix properties as well,
+    // but you'd want to delete the `@my_property.deleter` as well as the getter and the deleter,
+    // and we don't model property deleters at all right now.
+    if let Type::FunctionLiteral(function) = subclass_type {
         let class_node = subclass
             .class_literal(db)
             .0
@@ -3911,37 +3926,32 @@ pub(super) fn report_overridden_final_method<'db>(
                     .contains(overload.node(db, context.file(), context.module()))
             });
 
-        let applicability = if should_fix {
-            Applicability::Unsafe
-        } else {
-            Applicability::DisplayOnly
-        };
-
         match function.overloads_and_implementation(db) {
             ([first_overload, rest @ ..], None) => {
                 diagnostic.help(format_args!("Remove all overloads for `{member}`"));
-                diagnostic.set_fix(Fix::applicable_edits(
-                    overload_deletion(first_overload),
-                    rest.iter().map(overload_deletion),
-                    applicability,
-                ));
+                diagnostic.set_optional_fix(should_fix.then(|| {
+                    Fix::unsafe_edits(
+                        overload_deletion(first_overload),
+                        rest.iter().map(overload_deletion),
+                    )
+                }));
             }
             ([first_overload, rest @ ..], Some(implementation)) => {
                 diagnostic.help(format_args!(
                     "Remove all overloads and the implementation for `{member}`"
                 ));
-                diagnostic.set_fix(Fix::applicable_edits(
-                    overload_deletion(first_overload),
-                    rest.iter().chain([&implementation]).map(overload_deletion),
-                    applicability,
-                ));
+                diagnostic.set_optional_fix(should_fix.then(|| {
+                    Fix::unsafe_edits(
+                        overload_deletion(first_overload),
+                        rest.iter().chain([&implementation]).map(overload_deletion),
+                    )
+                }));
             }
             ([], Some(implementation)) => {
                 diagnostic.help(format_args!("Remove the override of `{member}`"));
-                diagnostic.set_fix(Fix::applicable_edit(
-                    overload_deletion(&implementation),
-                    applicability,
-                ));
+                diagnostic.set_optional_fix(
+                    should_fix.then(|| Fix::unsafe_edit(overload_deletion(&implementation))),
+                );
             }
             ([], None) => {
                 // Should be impossible to get here: how would we even infer a function as a function
@@ -3951,11 +3961,12 @@ pub(super) fn report_overridden_final_method<'db>(
                 );
             }
         }
+    } else if let Type::PropertyInstance(property) = subclass_type
+        && property.setter(db).is_some()
+    {
+        diagnostic.help(format_args!("Remove the getter and setter for `{member}`"));
     } else {
         diagnostic.help(format_args!("Remove the override of `{member}`"));
-        diagnostic.set_fix(Fix::display_only_edit(Edit::range_deletion(
-            subclass_definition.full_range(db, context.module()).range(),
-        )));
     }
 }
 

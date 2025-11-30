@@ -51,6 +51,10 @@ class Parent:
     @final
     def my_property2(self) -> int: ...
 
+    @property
+    @final
+    def my_property3(self) -> int: ...
+
     @final
     @classmethod
     def class_method1(cls) -> int: ...
@@ -86,6 +90,13 @@ class Child(Parent):
 
     @property
     def my_property2(self) -> int: ...  # error: [override-of-final-method]
+    @my_property2.setter
+    def my_property2(self, x: int) -> None: ...
+
+    @property
+    def my_property3(self) -> int: ...  # error: [override-of-final-method]
+    @my_property3.deleter
+    def my_proeprty3(self) -> None: ...
 
     @classmethod
     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
@@ -461,7 +472,13 @@ class B(A):
     def method1(self) -> None: ...  # error: [override-of-final-method]
     def method2(self) -> None: ...  # error: [override-of-final-method]
     def method3(self) -> None: ...  # error: [override-of-final-method]
-    def method4(self) -> None: ...  # error: [override-of-final-method]
+
+    # check that autofixes don't introduce invalid syntax
+    # if there are multiple statements on one line
+    #
+    # TODO: we should emit a Liskov violation here too
+    # error: [override-of-final-method]
+    method4 = 42; unrelated = 56  # fmt: skip
 
 # Possible overrides of possibly `@final` methods...
 class C(A):

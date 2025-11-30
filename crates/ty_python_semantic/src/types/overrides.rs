@@ -327,7 +327,7 @@ fn check_class_declaration<'db>(
             context,
             &member.name,
             *definition,
-            type_on_subclass_instance,
+            member.ty,
             superclass,
             class,
             &superclass_method,
