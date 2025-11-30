@@ -1,9 +1,10 @@
 use std::fmt::Write as _;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
+use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, StringLiteral, StringLiteralValue};
 use ruff_python_parser::{TokenKind, Tokens};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_trivia::Cursor;
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
@@ -158,6 +159,10 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
     };
     match variable {
         Expr::StringLiteral(ast::ExprStringLiteral { value: literal, .. }) => {
+            if string_contains_string_only_escapes(literal, checker.locator()) {
+                return;
+            }
+
             // Ex) `"str".encode()`, `"str".encode("utf-8")`
             if let Some(encoding_arg) = match_encoding_arg(&call.arguments) {
                 if literal.to_str().is_ascii() {
@@ -258,4 +263,83 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
         }
         _ => {}
     }
+}
+/// In a string, there are two kinds of escape sequences: "single" and "multi".
+///
+/// A "single" escape sequence is formed if a backslash is followed by
+/// a newline, another backslash, `'`, `"`, `a`, `b`, `f`, `n`, `t`, or `v`.
+/// A "multi" escape sequence is formed if a backslash is followed by
+/// `x` and 2 hex digits, `N` and a Unicode character name enclosed in a pair of braces,
+/// `u` and 4 hex digits, `U` and 8 hex digits, or 1 to 3 oct digits.
+///
+/// Out of the aforementioned, `u`, `U` and `N` are only valid in a string.
+/// However, an octal escape `\ooo` where `ooo` is greater than 377 base 8
+/// currently raises a `SyntaxWarning` (will eventually be a `SyntaxError`)
+/// in both strings and bytes and thus is not considered `bytes`-compatible.
+///
+/// An unrecognized escape sequence is ignored, resulting in both
+/// the backslash and the following character being part of the string.
+///
+/// Reference: [Lexical analysis &sect; 2.4.1.1. Escape sequences][escape-sequences]
+///
+/// [escape-sequences]: https://docs.python.org/3/reference/lexical_analysis.html#escape-sequences
+fn string_contains_string_only_escapes(string: &StringLiteralValue, locator: &Locator) -> bool {
+    for literal in string {
+        let flags = literal.flags;
+
+        if flags.prefix().is_raw() {
+            continue;
+        }
+
+        if literal.content_range().len() > literal.as_str().text_len()
+            && literal_contains_string_only_escapes(literal, locator)
+        {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn literal_contains_string_only_escapes(literal: &StringLiteral, locator: &Locator) -> bool {
+    let inner_in_source = locator.slice(literal.content_range());
+
+    let mut cursor = Cursor::new(inner_in_source);
+
+    while let Some(backslash_offset) = memchr::memchr(b'\\', cursor.as_bytes()) {
+        cursor.skip_bytes(backslash_offset + "\\".len());
+
+        let Some(escaped) = cursor.bump() else {
+            continue;
+        };
+
+        match escaped {
+            'N' | 'u' | 'U' => return true,
+            'x' => {
+                cursor.skip_bytes(2);
+            }
+            '0'..='7' => {
+                let (second, third) = (cursor.first(), cursor.second());
+
+                let octal_codepoint = match (is_octal_digit(second), is_octal_digit(third)) {
+                    (false, _) => escaped.to_string(),
+                    (true, false) => format!("{escaped}{second}"),
+                    (true, true) => format!("{escaped}{second}{third}"),
+                };
+
+                if octal_codepoint.parse::<u8>().is_err() {
+                    return true;
+                }
+
+                cursor.skip_bytes(octal_codepoint.len());
+            }
+            _ => {}
+        }
+    }
+
+    false
+}
+
+const fn is_octal_digit(char: char) -> bool {
+    matches!(char, '0'..='7')
 }

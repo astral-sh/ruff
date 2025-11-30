@@ -563,3 +563,333 @@ help: Rewrite as bytes literal
 87 | 
 88 | # AttributeError for t-strings so skip lint
 89 | (t"foo{bar}").encode("utf-8")
+
+UP012 [*] Unnecessary call to `encode` as UTF-8
+  --> UP012.py:96:1
+   |
+95 | ## Errors
+96 | ("a" "b").encode()
+   | ^^^^^^^^^^^^^^^^^^
+97 |
+98 | '''\
+   |
+help: Rewrite as bytes literal
+93 | # https://github.com/astral-sh/ruff/issues/12753
+94 | 
+95 | ## Errors
+   - ("a" "b").encode()
+96 + (b"a" b"b")
+97 | 
+98 | '''\
+99 | '''.encode()
+
+UP012 [*] Unnecessary call to `encode` as UTF-8
+   --> UP012.py:98:1
+    |
+ 96 |   ("a" "b").encode()
+ 97 |
+ 98 | / '''\
+ 99 | | '''.encode()
+    | |____________^
+100 |
+101 |   '\x20\\'.encode()
+    |
+help: Rewrite as bytes literal
+95  | ## Errors
+96  | ("a" "b").encode()
+97  | 
+    - '''\
+    - '''.encode()
+98  + b'''\
+99  + '''
+100 | 
+101 | '\x20\\'.encode()
+102 | '\0\b0'.encode()
+
+UP012 [*] Unnecessary call to `encode` as UTF-8
+   --> UP012.py:101:1
+    |
+ 99 | '''.encode()
+100 |
+101 | '\x20\\'.encode()
+    | ^^^^^^^^^^^^^^^^^
+102 | '\0\b0'.encode()
+103 | '\01\fc'.encode()
+    |
+help: Rewrite as bytes literal
+98  | '''\
+99  | '''.encode()
+100 | 
+    - '\x20\\'.encode()
+101 + b'\x20\\'
+102 | '\0\b0'.encode()
+103 | '\01\fc'.encode()
+104 | '\143\\'.encode()
+
+UP012 [*] Unnecessary call to `encode` as UTF-8
+   --> UP012.py:102:1
+    |
+101 | '\x20\\'.encode()
+102 | '\0\b0'.encode()
+    | ^^^^^^^^^^^^^^^^
+103 | '\01\fc'.encode()
+104 | '\143\\'.encode()
+    |
+help: Rewrite as bytes literal
+99  | '''.encode()
+100 | 
+101 | '\x20\\'.encode()
+    - '\0\b0'.encode()
+102 + b'\0\b0'
+103 | '\01\fc'.encode()
+104 | '\143\\'.encode()
+105 | 
+
+UP012 [*] Unnecessary call to `encode` as UTF-8
+   --> UP012.py:103:1
+    |
+101 | '\x20\\'.encode()
+102 | '\0\b0'.encode()
+103 | '\01\fc'.encode()
+    | ^^^^^^^^^^^^^^^^^
+104 | '\143\\'.encode()
+    |
+help: Rewrite as bytes literal
+100 | 
+101 | '\x20\\'.encode()
+102 | '\0\b0'.encode()
+    - '\01\fc'.encode()
+103 + b'\01\fc'
+104 | '\143\\'.encode()
+105 | 
+106 | ("a" "\b").encode()
+
+UP012 [*] Unnecessary call to `encode` as UTF-8
+   --> UP012.py:104:1
+    |
+102 | '\0\b0'.encode()
+103 | '\01\fc'.encode()
+104 | '\143\\'.encode()
+    | ^^^^^^^^^^^^^^^^^
+105 |
+106 | ("a" "\b").encode()
+    |
+help: Rewrite as bytes literal
+101 | '\x20\\'.encode()
+102 | '\0\b0'.encode()
+103 | '\01\fc'.encode()
+    - '\143\\'.encode()
+104 + b'\143\\'
+105 | 
+106 | ("a" "\b").encode()
+107 | ("\a" "b").encode()
+
+UP012 [*] Unnecessary call to `encode` as UTF-8
+   --> UP012.py:106:1
+    |
+104 | '\143\\'.encode()
+105 |
+106 | ("a" "\b").encode()
+    | ^^^^^^^^^^^^^^^^^^^
+107 | ("\a" "b").encode()
+108 | ("\a" r"\b").encode()
+    |
+help: Rewrite as bytes literal
+103 | '\01\fc'.encode()
+104 | '\143\\'.encode()
+105 | 
+    - ("a" "\b").encode()
+106 + (b"a" b"\b")
+107 | ("\a" "b").encode()
+108 | ("\a" r"\b").encode()
+109 | (r"\a" "\b").encode()
+
+UP012 [*] Unnecessary call to `encode` as UTF-8
+   --> UP012.py:107:1
+    |
+106 | ("a" "\b").encode()
+107 | ("\a" "b").encode()
+    | ^^^^^^^^^^^^^^^^^^^
+108 | ("\a" r"\b").encode()
+109 | (r"\a" "\b").encode()
+    |
+help: Rewrite as bytes literal
+104 | '\143\\'.encode()
+105 | 
+106 | ("a" "\b").encode()
+    - ("\a" "b").encode()
+107 + (b"\a" b"b")
+108 | ("\a" r"\b").encode()
+109 | (r"\a" "\b").encode()
+110 | 
+
+UP012 [*] Unnecessary call to `encode` as UTF-8
+   --> UP012.py:108:1
+    |
+106 | ("a" "\b").encode()
+107 | ("\a" "b").encode()
+108 | ("\a" r"\b").encode()
+    | ^^^^^^^^^^^^^^^^^^^^^
+109 | (r"\a" "\b").encode()
+    |
+help: Rewrite as bytes literal
+105 | 
+106 | ("a" "\b").encode()
+107 | ("\a" "b").encode()
+    - ("\a" r"\b").encode()
+108 + (b"\a" br"\b")
+109 | (r"\a" "\b").encode()
+110 | 
+111 | '\"'.encode()
+
+UP012 [*] Unnecessary call to `encode` as UTF-8
+   --> UP012.py:109:1
+    |
+107 | ("\a" "b").encode()
+108 | ("\a" r"\b").encode()
+109 | (r"\a" "\b").encode()
+    | ^^^^^^^^^^^^^^^^^^^^^
+110 |
+111 | '\"'.encode()
+    |
+help: Rewrite as bytes literal
+106 | ("a" "\b").encode()
+107 | ("\a" "b").encode()
+108 | ("\a" r"\b").encode()
+    - (r"\a" "\b").encode()
+109 + (br"\a" b"\b")
+110 | 
+111 | '\"'.encode()
+112 | "\'".encode()
+
+UP012 [*] Unnecessary call to `encode` as UTF-8
+   --> UP012.py:111:1
+    |
+109 | (r"\a" "\b").encode()
+110 |
+111 | '\"'.encode()
+    | ^^^^^^^^^^^^^
+112 | "\'".encode()
+    |
+help: Rewrite as bytes literal
+108 | ("\a" r"\b").encode()
+109 | (r"\a" "\b").encode()
+110 | 
+    - '\"'.encode()
+111 + b'\"'
+112 | "\'".encode()
+113 | 
+114 | '\\\\\\\\ '.encode()  # 4 backslashes
+
+UP012 [*] Unnecessary call to `encode` as UTF-8
+   --> UP012.py:112:1
+    |
+111 | '\"'.encode()
+112 | "\'".encode()
+    | ^^^^^^^^^^^^^
+113 |
+114 | '\\\\\\\\ '.encode()  # 4 backslashes
+    |
+help: Rewrite as bytes literal
+109 | (r"\a" "\b").encode()
+110 | 
+111 | '\"'.encode()
+    - "\'".encode()
+112 + b"\'"
+113 | 
+114 | '\\\\\\\\ '.encode()  # 4 backslashes
+115 | '\\\\\\\  '.encode()  # `\ ` is invalid but only causes a SyntaxWarning
+
+UP012 [*] Unnecessary call to `encode` as UTF-8
+   --> UP012.py:114:1
+    |
+112 | "\'".encode()
+113 |
+114 | '\\\\\\\\ '.encode()  # 4 backslashes
+    | ^^^^^^^^^^^^^^^^^^^^
+115 | '\\\\\\\  '.encode()  # `\ ` is invalid but only causes a SyntaxWarning
+    |
+help: Rewrite as bytes literal
+111 | '\"'.encode()
+112 | "\'".encode()
+113 | 
+    - '\\\\\\\\ '.encode()  # 4 backslashes
+114 + b'\\\\\\\\ '  # 4 backslashes
+115 | '\\\\\\\  '.encode()  # `\ ` is invalid but only causes a SyntaxWarning
+116 | 
+117 | '\\a'.encode()
+
+UP012 [*] Unnecessary call to `encode` as UTF-8
+   --> UP012.py:115:1
+    |
+114 | '\\\\\\\\ '.encode()  # 4 backslashes
+115 | '\\\\\\\  '.encode()  # `\ ` is invalid but only causes a SyntaxWarning
+    | ^^^^^^^^^^^^^^^^^^^^
+116 |
+117 | '\\a'.encode()
+    |
+help: Rewrite as bytes literal
+112 | "\'".encode()
+113 | 
+114 | '\\\\\\\\ '.encode()  # 4 backslashes
+    - '\\\\\\\  '.encode()  # `\ ` is invalid but only causes a SyntaxWarning
+115 + b'\\\\\\\  '  # `\ ` is invalid but only causes a SyntaxWarning
+116 | 
+117 | '\\a'.encode()
+118 | 'a\\\b'.encode()
+
+UP012 [*] Unnecessary call to `encode` as UTF-8
+   --> UP012.py:117:1
+    |
+115 | '\\\\\\\  '.encode()  # `\ ` is invalid but only causes a SyntaxWarning
+116 |
+117 | '\\a'.encode()
+    | ^^^^^^^^^^^^^^
+118 | 'a\\\b'.encode()
+    |
+help: Rewrite as bytes literal
+114 | '\\\\\\\\ '.encode()  # 4 backslashes
+115 | '\\\\\\\  '.encode()  # `\ ` is invalid but only causes a SyntaxWarning
+116 | 
+    - '\\a'.encode()
+117 + b'\\a'
+118 | 'a\\\b'.encode()
+119 | 
+120 | '\\ u0000 '.encode()
+
+UP012 [*] Unnecessary call to `encode` as UTF-8
+   --> UP012.py:118:1
+    |
+117 | '\\a'.encode()
+118 | 'a\\\b'.encode()
+    | ^^^^^^^^^^^^^^^^
+119 |
+120 | '\\ u0000 '.encode()
+    |
+help: Rewrite as bytes literal
+115 | '\\\\\\\  '.encode()  # `\ ` is invalid but only causes a SyntaxWarning
+116 | 
+117 | '\\a'.encode()
+    - 'a\\\b'.encode()
+118 + b'a\\\b'
+119 | 
+120 | '\\ u0000 '.encode()
+121 | 
+
+UP012 [*] Unnecessary call to `encode` as UTF-8
+   --> UP012.py:120:1
+    |
+118 | 'a\\\b'.encode()
+119 |
+120 | '\\ u0000 '.encode()
+    | ^^^^^^^^^^^^^^^^^^^^
+    |
+help: Rewrite as bytes literal
+117 | '\\a'.encode()
+118 | 'a\\\b'.encode()
+119 | 
+    - '\\ u0000 '.encode()
+120 + b'\\ u0000 '
+121 | 
+122 | 
+123 | ## No errors
