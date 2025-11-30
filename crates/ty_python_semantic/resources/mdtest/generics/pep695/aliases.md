@@ -189,7 +189,7 @@ r5: RecursiveList[int] = [1, ["a"]]
 def _(x: RecursiveList[int]):
     if isinstance(x, list):
         # TODO: should be `list[RecursiveList[int]]
-        reveal_type(x[0])  # revealed: int | list[Any]
+        reveal_type(x[0])  # revealed: list[Any] | int
     if isinstance(x, list) and isinstance(x[0], list):
         # TODO: should be `list[RecursiveList[int]]`
         reveal_type(x[0])  # revealed: list[Any]

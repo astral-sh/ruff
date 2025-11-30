@@ -26,17 +26,22 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
     db: &'db dyn Db,
     left: &Type<'db>,
     right: &Type<'db>,
+    cycle_recovery: bool,
 ) -> Ordering {
-    debug_assert_eq!(
-        *left,
-        left.normalized(db),
-        "`left` must be normalized before a meaningful ordering can be established"
-    );
-    debug_assert_eq!(
-        *right,
-        right.normalized(db),
-        "`right` must be normalized before a meaningful ordering can be established"
-    );
+    // If we sort union types in a cycle recovery function, this check is not necessary
+    // because the purpose is to stabilize the output and the sort order itself is not important.
+    if !cycle_recovery {
+        debug_assert_eq!(
+            *left,
+            left.normalized(db),
+            "`left` must be normalized before a meaningful ordering can be established"
+        );
+        debug_assert_eq!(
+            *right,
+            right.normalized(db),
+            "`right` must be normalized before a meaningful ordering can be established"
+        );
+    }
 
     if left == right {
         return Ordering::Equal;
@@ -128,7 +133,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::SubclassOf(_), _) => Ordering::Less,
         (_, Type::SubclassOf(_)) => Ordering::Greater,
 
-        (Type::TypeIs(left), Type::TypeIs(right)) => typeis_ordering(db, *left, *right),
+        (Type::TypeIs(left), Type::TypeIs(right)) => {
+            typeis_ordering(db, *left, *right, cycle_recovery)
+        }
         (Type::TypeIs(_), _) => Ordering::Less,
         (_, Type::TypeIs(_)) => Ordering::Greater,
 
@@ -239,13 +246,15 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 return left_negative.len().cmp(&right_negative.len());
             }
             for (left, right) in left_positive.iter().zip(right_positive) {
-                let ordering = union_or_intersection_elements_ordering(db, left, right);
+                let ordering =
+                    union_or_intersection_elements_ordering(db, left, right, cycle_recovery);
                 if ordering != Ordering::Equal {
                     return ordering;
                 }
             }
             for (left, right) in left_negative.iter().zip(right_negative) {
-                let ordering = union_or_intersection_elements_ordering(db, left, right);
+                let ordering =
+                    union_or_intersection_elements_ordering(db, left, right, cycle_recovery);
                 if ordering != Ordering::Equal {
                     return ordering;
                 }
@@ -286,17 +295,26 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
 /// * Boundness: Unbound precedes bound
 /// * Symbol name: String comparison
 /// * Guarded type: [`union_or_intersection_elements_ordering`]
-fn typeis_ordering(db: &dyn Db, left: TypeIsType, right: TypeIsType) -> Ordering {
+fn typeis_ordering(
+    db: &dyn Db,
+    left: TypeIsType,
+    right: TypeIsType,
+    cycle_recovery: bool,
+) -> Ordering {
     let (left_ty, right_ty) = (left.return_type(db), right.return_type(db));
 
     match (left.place_info(db), right.place_info(db)) {
         (None, Some(_)) => Ordering::Less,
         (Some(_), None) => Ordering::Greater,
 
-        (None, None) => union_or_intersection_elements_ordering(db, &left_ty, &right_ty),
+        (None, None) => {
+            union_or_intersection_elements_ordering(db, &left_ty, &right_ty, cycle_recovery)
+        }
 
         (Some(_), Some(_)) => match left.place_name(db).cmp(&right.place_name(db)) {
-            Ordering::Equal => union_or_intersection_elements_ordering(db, &left_ty, &right_ty),
+            Ordering::Equal => {
+                union_or_intersection_elements_ordering(db, &left_ty, &right_ty, cycle_recovery)
+            }
             ordering => ordering,
         },
     }

@@ -13356,7 +13356,8 @@ impl<'db> IntersectionType<'db> {
                 .map(|ty| ty.normalized_impl(db, visitor))
                 .collect();
 
-            elements.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
+            elements
+                .sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r, false));
             elements
         }
 
