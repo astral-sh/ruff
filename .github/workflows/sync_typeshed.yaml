@@ -198,7 +198,7 @@ jobs:
         run: |
           rm "${VENDORED_TYPESHED}/pyproject.toml"
           git commit -am "Remove pyproject.toml file"
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
       - name: "Install Rust toolchain"
         if: ${{ success() }}
         run: rustup show
