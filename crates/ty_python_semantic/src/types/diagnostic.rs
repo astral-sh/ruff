@@ -35,13 +35,11 @@ use itertools::Itertools;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
     parsed::parsed_module,
-    source::source_text,
 };
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::parenthesize::parentheses_iterator;
 use ruff_python_ast::{self as ast, AnyNodeRef, StringFlags};
-use ruff_python_trivia::CommentRanges;
+use ruff_python_parser::parentheses_iterator_from_tokens;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::{self, Formatter};
@@ -2399,9 +2397,7 @@ pub(super) fn report_invalid_assignment<'db>(
         // )  # ty: ignore <- or here
         // ```
 
-        let comment_ranges = CommentRanges::from(context.module().tokens());
-        let source = source_text(context.db(), context.file());
-        parentheses_iterator(value_node.into(), None, &comment_ranges, &source)
+        parentheses_iterator_from_tokens(value_node.into(), None, context.module().tokens())
             .last()
             .unwrap_or(value_node.range())
     } else {

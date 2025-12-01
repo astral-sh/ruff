@@ -70,6 +70,7 @@ pub use crate::error::{
     InterpolatedStringErrorType, LexicalErrorType, ParseError, ParseErrorType,
     UnsupportedSyntaxError, UnsupportedSyntaxErrorKind,
 };
+pub use crate::parenthesize::{parentheses_iterator_from_tokens, parenthesized_range_from_tokens};
 pub use crate::parser::ParseOptions;
 pub use crate::token::{Token, TokenKind};
 
@@ -83,6 +84,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 mod error;
 pub mod lexer;
+mod parenthesize;
 mod parser;
 pub mod semantic_errors;
 mod string;
