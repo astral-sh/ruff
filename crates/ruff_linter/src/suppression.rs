@@ -1,11 +1,11 @@
 use compact_str::CompactString;
 use core::fmt;
+use ruff_python_ast::whitespace::indentation;
 use ruff_python_parser::{TokenKind, Tokens};
-use ruff_source_file::LineRanges;
 use std::{error::Error, fmt::Formatter};
 use thiserror::Error;
 
-use ruff_python_trivia::{Cursor, is_python_whitespace};
+use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize, TextSlice};
 use smallvec::{SmallVec, smallvec};
 
@@ -138,34 +138,25 @@ impl<'a> SuppressionsBuilder<'a> {
     }
 
     pub(crate) fn load_from_tokens(mut self, tokens: &Tokens) -> Suppressions {
-        let default_indent = String::new();
-        let mut current_indent: &String = &default_indent;
-        let mut indents: Vec<String> = vec![];
+        let default_indent = "";
+        let mut indents: Vec<&str> = vec![];
 
         // Iterate through tokens, tracking indentation, filtering trailing comments, and then
         // looking for matching comments from the previous block when reaching a dedent token.
         for (token_index, token) in tokens.iter().enumerate() {
             match token.kind() {
                 TokenKind::Indent => {
-                    indents.push(self.source.slice(token).to_string());
-                    current_indent = indents.last().unwrap_or(&default_indent);
+                    indents.push(self.source.slice(token));
                 }
                 TokenKind::Dedent => {
-                    self.match_comments(current_indent);
-
+                    self.match_comments(indents.last().copied().unwrap_or_default());
                     indents.pop();
-                    current_indent = indents.last().unwrap_or(&default_indent);
                 }
                 TokenKind::Comment => {
                     let mut parser = SuppressionParser::new(self.source, token.range());
                     match parser.parse_comment() {
                         Ok(comment) => {
-                            let text_before = self.source.slice(TextRange::new(
-                                self.source.line_start(comment.range.start()),
-                                comment.range.start(),
-                            ));
-                            let is_own_line = text_before.chars().all(is_python_whitespace);
-                            let indent = is_own_line.then_some(text_before);
+                            let indent = indentation(self.source, &comment.range);
 
                             let Some(indent) = indent else {
                                 // trailing suppressions are not supported
@@ -177,7 +168,7 @@ impl<'a> SuppressionsBuilder<'a> {
                             };
 
                             // comment matches current block's indentation, or precedes an indent/dedent token
-                            if indent == current_indent
+                            if indent == indents.last().copied().unwrap_or_default()
                                 || tokens[token_index..]
                                     .iter()
                                     .find(|t| !t.kind().is_trivia())
@@ -209,7 +200,7 @@ impl<'a> SuppressionsBuilder<'a> {
             }
         }
 
-        self.match_comments(&default_indent);
+        self.match_comments(default_indent);
 
         Suppressions {
             valid: self.valid,
@@ -218,7 +209,7 @@ impl<'a> SuppressionsBuilder<'a> {
         }
     }
 
-    fn match_comments(&mut self, current_indent: &String) {
+    fn match_comments(&mut self, current_indent: &str) {
         let mut comment_index = 0;
 
         // for each pending comment, search for matching comments at the same indentation level,
