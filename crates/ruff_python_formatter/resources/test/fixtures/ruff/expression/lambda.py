@@ -345,3 +345,8 @@ def foo():
             return (
                 lambda x: np.exp(cs(np.log(x.to(u.MeV).value))) * u.MeV * u.cm**2 / u.g
             )
+
+class C:
+    _is_recognized_dtype: Callable[[DtypeObj], bool] = lambda x: lib.is_np_dtype(
+        x, "M"
+    ) or isinstance(x, DatetimeTZDtype)
