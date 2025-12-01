@@ -970,7 +970,7 @@ jobs:
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@346a2d8a8d9d38909abd0bc3d23f773110f076ad # v4.4.1
         with:
-          mode: instrumentation
+          mode: simulation
           run: cargo codspeed run
 
   benchmarks-instrumented-ty:
@@ -1012,7 +1012,7 @@ jobs:
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@346a2d8a8d9d38909abd0bc3d23f773110f076ad # v4.4.1
         with:
-          mode: instrumentation
+          mode: simulation
           run: cargo codspeed run
           token: ${{ secrets.CODSPEED_TOKEN }}
 
