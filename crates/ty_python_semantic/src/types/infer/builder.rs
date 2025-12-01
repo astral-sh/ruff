@@ -8407,7 +8407,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
 
         // TODO
-        todo_type!("starred expression")
+        Type::Dynamic(DynamicType::TodoStarredExpression)
     }
 
     fn infer_yield_expression(&mut self, yield_expression: &ast::ExprYield) -> Type<'db> {
@@ -9571,10 +9571,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
 
-            (todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::TodoUnpack), _, _)
-            | (_, todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::TodoUnpack), _) => {
-                Some(todo)
-            }
+            (
+                todo @ Type::Dynamic(
+                    DynamicType::Todo(_)
+                    | DynamicType::TodoUnpack
+                    | DynamicType::TodoStarredExpression,
+                ),
+                _,
+                _,
+            )
+            | (
+                _,
+                todo @ Type::Dynamic(
+                    DynamicType::Todo(_)
+                    | DynamicType::TodoUnpack
+                    | DynamicType::TodoStarredExpression,
+                ),
+                _,
+            ) => Some(todo),
 
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 
@@ -11898,7 +11912,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.db(),
                     *typevar,
                     &|ty| match ty {
-                        Type::Dynamic(DynamicType::TodoUnpack) => true,
+                        Type::Dynamic(
+                            DynamicType::TodoUnpack | DynamicType::TodoStarredExpression,
+                        ) => true,
                         Type::NominalInstance(nominal) => matches!(
                             nominal.known_class(self.db()),
                             Some(KnownClass::TypeVarTuple | KnownClass::ParamSpec)
