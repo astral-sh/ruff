@@ -553,6 +553,16 @@ impl<'a> ImportRequest<'a> {
         }
     }
 
+    /// Causes this request to become a command. This will force the
+    /// requested import style, even if another style would be more
+    /// appropriate generally.
+    pub(crate) fn force(mut self) -> Self {
+        Self {
+            force_style: true,
+            ..self
+        }
+    }
+
     /// Attempts to change the import request style so that the chances
     /// of an import conflict are minimized (although not always reduced
     /// to zero).
