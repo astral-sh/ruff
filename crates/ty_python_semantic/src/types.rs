@@ -2339,6 +2339,33 @@ impl<'db> Type<'db> {
             (_, Type::TypeVar(bound_typevar)) if bound_typevar.is_inferable(db, inferable) => {
                 ConstraintSet::from(false)
             }
+            (Type::TypeVar(bound_typevar), _)
+                if bound_typevar.paramspec_attr(db) == Some(ParamSpecAttrKind::Args) =>
+            {
+                Type::homogeneous_tuple(db, Type::object()).has_relation_to_impl(
+                    db,
+                    target,
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+            }
+            (Type::TypeVar(bound_typevar), _)
+                if bound_typevar.paramspec_attr(db) == Some(ParamSpecAttrKind::Kwargs) =>
+            {
+                KnownClass::Dict
+                    .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::any()])
+                    .top_materialization(db)
+                    .has_relation_to_impl(
+                        db,
+                        target,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+            }
             (Type::TypeVar(bound_typevar), _) => {
                 // All inferable cases should have been handled above
                 assert!(!bound_typevar.is_inferable(db, inferable));
