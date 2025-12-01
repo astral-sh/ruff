@@ -1820,6 +1820,11 @@ impl<'db> InteriorNode<'db> {
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn sequent_map(self, db: &'db dyn Db) -> SequentMap<'db> {
+        let _span = tracing::debug!(
+            target: "ty_python_semantic::types::constraints::SequentMap",
+            constraints = %Node::Interior(self).display(db),
+            "create sequent map",
+        );
         let mut map = SequentMap::default();
         Node::Interior(self).for_each_constraint(db, &mut |constraint| {
             map.add(db, constraint);
@@ -2304,18 +2309,29 @@ impl<'db> SequentMap<'db> {
                 continue;
             }
 
-            // Otherwise, check this constraint against all of the other ones we've seen so far, seeing
+            // First see if we can create any sequents from the constraint on its own.
+            tracing::trace!(
+                target: "ty_python_semantic::types::constraints::SequentMap",
+                constraint = %constraint.display(db),
+                "add sequents for constraint",
+            );
+            self.add_sequents_for_single(db, constraint);
+
+            // Then check this constraint against all of the other ones we've seen so far, seeing
             // if they're related to each other.
             let processed = std::mem::take(&mut self.processed);
             for other in &processed {
                 if constraint != *other {
+                    tracing::trace!(
+                        target: "ty_python_semantic::types::constraints::SequentMap",
+                        left = %constraint.display(db),
+                        right = %other.display(db),
+                        "add sequents for constraint pair",
+                    );
                     self.add_sequents_for_pair(db, constraint, *other);
                 }
             }
             self.processed = processed;
-
-            // And see if we can create any sequents from the constraint on its own.
-            self.add_sequents_for_single(db, constraint);
         }
     }
 
@@ -2339,8 +2355,14 @@ impl<'db> SequentMap<'db> {
         }
     }
 
-    fn add_single_tautology(&mut self, ante: ConstrainedTypeVar<'db>) {
-        self.single_tautologies.insert(ante);
+    fn add_single_tautology(&mut self, db: &'db dyn Db, ante: ConstrainedTypeVar<'db>) {
+        if self.single_tautologies.insert(ante) {
+            tracing::debug!(
+                target: "ty_python_semantic::types::constraints::SequentMap",
+                sequent = %format_args!("¬{} → false", ante.display(db)),
+                "add sequent",
+            );
+        }
     }
 
     fn add_pair_impossibility(
@@ -2349,8 +2371,16 @@ impl<'db> SequentMap<'db> {
         ante1: ConstrainedTypeVar<'db>,
         ante2: ConstrainedTypeVar<'db>,
     ) {
-        self.pair_impossibilities
-            .insert(Self::pair_key(db, ante1, ante2));
+        if self
+            .pair_impossibilities
+            .insert(Self::pair_key(db, ante1, ante2))
+        {
+            tracing::debug!(
+                target: "ty_python_semantic::types::constraints::SequentMap",
+                sequent = %format_args!("{} ∧ {} → false", ante1.display(db), ante2.display(db)),
+                "add sequent",
+            );
+        }
     }
 
     fn add_pair_implication(
@@ -2364,24 +2394,50 @@ impl<'db> SequentMap<'db> {
         if ante1.implies(db, post) || ante2.implies(db, post) {
             return;
         }
-        self.pair_implications
+        if self
+            .pair_implications
             .entry(Self::pair_key(db, ante1, ante2))
             .or_default()
-            .insert(post);
+            .insert(post)
+        {
+            tracing::debug!(
+                target: "ty_python_semantic::types::constraints::SequentMap",
+                sequent = %format_args!(
+                    "{} ∧ {} → {}",
+                    ante1.display(db),
+                    ante2.display(db),
+                    post.display(db),
+                ),
+                "add sequent",
+            );
+        }
     }
 
     fn add_single_implication(
         &mut self,
+        db: &'db dyn Db,
         ante: ConstrainedTypeVar<'db>,
         post: ConstrainedTypeVar<'db>,
     ) {
         if ante == post {
             return;
         }
-        self.single_implications
+        if self
+            .single_implications
             .entry(ante)
             .or_default()
-            .insert(post);
+            .insert(post)
+        {
+            tracing::debug!(
+                target: "ty_python_semantic::types::constraints::SequentMap",
+                sequent = %format_args!(
+                    "{} → {}",
+                    ante.display(db),
+                    post.display(db),
+                ),
+                "add sequent",
+            );
+        }
     }
 
     fn add_sequents_for_single(&mut self, db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) {
@@ -2390,7 +2446,7 @@ impl<'db> SequentMap<'db> {
         let lower = constraint.lower(db);
         let upper = constraint.upper(db);
         if lower.is_never() && upper.is_object() {
-            self.add_single_tautology(constraint);
+            self.add_single_tautology(db, constraint);
             return;
         }
 
@@ -2427,7 +2483,7 @@ impl<'db> SequentMap<'db> {
             _ => return,
         };
 
-        self.add_single_implication(constraint, post_constraint);
+        self.add_single_implication(db, constraint, post_constraint);
         self.enqueue_constraint(post_constraint);
     }
 
@@ -2589,25 +2645,50 @@ impl<'db> SequentMap<'db> {
         // elements. (For instance, when processing `T ≤ τ₁ & τ₂` and `T ≤ τ₂ & τ₁`, these clauses
         // would add sequents for `(T ≤ τ₁ & τ₂) → (T ≤ τ₂ & τ₁)` and vice versa.)
         if left_constraint.implies(db, right_constraint) {
-            self.add_single_implication(left_constraint, right_constraint);
+            tracing::debug!(
+                target: "ty_python_semantic::types::constraints::SequentMap",
+                left = %left_constraint.display(db),
+                right = %right_constraint.display(db),
+                "left implies right",
+            );
+            self.add_single_implication(db, left_constraint, right_constraint);
         }
         if right_constraint.implies(db, left_constraint) {
-            self.add_single_implication(right_constraint, left_constraint);
+            tracing::debug!(
+                target: "ty_python_semantic::types::constraints::SequentMap",
+                left = %left_constraint.display(db),
+                right = %right_constraint.display(db),
+                "right implies left",
+            );
+            self.add_single_implication(db, right_constraint, left_constraint);
         }
 
         match left_constraint.intersect(db, right_constraint) {
             Some(intersection_constraint) => {
+                tracing::debug!(
+                    target: "ty_python_semantic::types::constraints::SequentMap",
+                    left = %left_constraint.display(db),
+                    right = %right_constraint.display(db),
+                    intersection = %intersection_constraint.display(db),
+                    "left and right overlap",
+                );
                 self.add_pair_implication(
                     db,
                     left_constraint,
                     right_constraint,
                     intersection_constraint,
                 );
-                self.add_single_implication(intersection_constraint, left_constraint);
-                self.add_single_implication(intersection_constraint, right_constraint);
+                self.add_single_implication(db, intersection_constraint, left_constraint);
+                self.add_single_implication(db, intersection_constraint, right_constraint);
                 self.enqueue_constraint(intersection_constraint);
             }
             None => {
+                tracing::debug!(
+                    target: "ty_python_semantic::types::constraints::SequentMap",
+                    left = %left_constraint.display(db),
+                    right = %right_constraint.display(db),
+                    "left and right are disjoint",
+                );
                 self.add_pair_impossibility(db, left_constraint, right_constraint);
             }
         }
