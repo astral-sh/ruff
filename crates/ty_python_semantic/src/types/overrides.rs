@@ -11,19 +11,39 @@ use crate::{
     Db,
     lint::LintId,
     place::Place,
-    semantic_index::{place_table, scope::ScopeId, symbol::ScopedSymbolId, use_def_map},
+    semantic_index::{
+        definition::DefinitionKind, place_table, scope::ScopeId, symbol::ScopedSymbolId,
+        use_def_map,
+    },
     types::{
         ClassBase, ClassLiteral, ClassType, KnownClass, Type,
         class::CodeGeneratorKind,
         context::InferContext,
         diagnostic::{
             INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, OVERRIDE_OF_FINAL_METHOD,
-            report_invalid_method_override, report_overridden_final_method,
+            OVERRIDE_OF_PROHIBITED_NAMED_TUPLE_ATTRIBUTE, report_invalid_method_override,
+            report_overridden_final_method,
         },
         function::{FunctionDecorators, FunctionType, KnownFunction},
         ide_support::{MemberWithDefinition, all_declarations_and_bindings},
     },
 };
+
+/// Prohibited `NamedTuple` attributes that cannot be overwritten.
+/// See <https://github.com/python/cpython/blob/main/Lib/typing.py> for the list.
+const PROHIBITED_NAMEDTUPLE_ATTRS: &[&str] = &[
+    "__new__",
+    "__init__",
+    "__slots__",
+    "__getnewargs__",
+    "_fields",
+    "_field_defaults",
+    "_field_types",
+    "_make",
+    "_replace",
+    "_asdict",
+    "_source",
+];
 
 pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: ClassLiteral<'db>) {
     let db = context.db();
@@ -35,6 +55,12 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: ClassLite
     let class_specialized = class.identity_specialization(db);
     let own_class_members: FxHashSet<_> =
         all_declarations_and_bindings(db, class.body_scope(db)).collect();
+
+    if configuration.check_prohibited_named_tuple_attrs()
+        && CodeGeneratorKind::NamedTuple.matches(db, class, None)
+    {
+        check_prohibited_namedtuple_attrs(context, &own_class_members);
+    }
 
     for member in own_class_members {
         check_class_declaration(context, configuration, class_specialized, &member);
@@ -335,6 +361,43 @@ fn check_class_declaration<'db>(
     }
 }
 
+/// Check for prohibited `NamedTuple` attribute overrides.
+///
+/// `NamedTuple` classes have certain synthesized attributes (like `_asdict`, `_make`, etc.)
+/// that cannot be overwritten. Attempting to assign to these attributes (without type
+/// annotations) or define methods with these names will raise an `AttributeError` at runtime.
+fn check_prohibited_namedtuple_attrs<'db>(
+    context: &InferContext<'db, '_>,
+    own_class_members: &FxHashSet<MemberWithDefinition<'db>>,
+) {
+    let db = context.db();
+    let module = context.module();
+
+    for member in own_class_members {
+        if !PROHIBITED_NAMEDTUPLE_ATTRS.contains(&member.member.name.as_str()) {
+            continue;
+        }
+
+        let Some(definition) = member.definition else {
+            continue;
+        };
+
+        // Only annotated assignments are allowed (they become fields).
+        // Everything else (assignments, method definitions, etc.) is an error.
+        if !matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_)) {
+            if let Some(builder) = context.report_lint(
+                &OVERRIDE_OF_PROHIBITED_NAMED_TUPLE_ATTRIBUTE,
+                definition.full_range(db, module),
+            ) {
+                builder.into_diagnostic(format_args!(
+                    "Cannot overwrite NamedTuple attribute `{}`",
+                    member.member.name
+                ));
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(super) enum MethodKind<'db> {
     Synthesized(CodeGeneratorKind<'db>),
@@ -349,6 +412,7 @@ bitflags! {
         const LISKOV_METHODS = 1 << 0;
         const EXPLICIT_OVERRIDE = 1 << 1;
         const FINAL_METHOD_OVERRIDDEN = 1 << 2;
+        const PROHIBITED_NAMED_TUPLE_ATTR = 1 << 3;
     }
 }
 
@@ -368,6 +432,9 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
         if rule_selection.is_enabled(LintId::of(&OVERRIDE_OF_FINAL_METHOD)) {
             config |= OverrideRulesConfig::FINAL_METHOD_OVERRIDDEN;
         }
+        if rule_selection.is_enabled(LintId::of(&OVERRIDE_OF_PROHIBITED_NAMED_TUPLE_ATTRIBUTE)) {
+            config |= OverrideRulesConfig::PROHIBITED_NAMED_TUPLE_ATTR;
+        }
 
         config
     }
@@ -384,5 +451,9 @@ impl OverrideRulesConfig {
 
     const fn check_final_method_overridden(self) -> bool {
         self.contains(OverrideRulesConfig::FINAL_METHOD_OVERRIDDEN)
+    }
+
+    const fn check_prohibited_named_tuple_attrs(self) -> bool {
+        self.contains(OverrideRulesConfig::PROHIBITED_NAMED_TUPLE_ATTR)
     }
 }

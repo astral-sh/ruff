@@ -873,6 +873,16 @@
             }
           ]
         },
+        "override-of-prohibited-named-tuple-attribute": {
+          "title": "detects attempts to override prohibited `NamedTuple` attributes",
+          "description": "## What it does\nChecks for attempts to override prohibited attributes in `NamedTuple` classes.\n\n## Why is this bad?\n`NamedTuple` classes have certain synthesized attributes (like `_asdict`, `_make`,\n`_replace`, etc.) that cannot be overwritten. Attempting to assign to these attributes\nwithout a type annotation will raise an `AttributeError` at runtime.\n\n## Examples\n```python\nfrom typing import NamedTuple\n\nclass F(NamedTuple):\n    x: int\n    _asdict = 42  # error: Cannot overwrite NamedTuple attribute _asdict\n```\n\n## References\n- [Python documentation: NamedTuple](https://docs.python.org/3/library/typing.html#typing.NamedTuple)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "parameter-already-assigned": {
           "title": "detects multiple arguments for the same parameter",
           "description": "## What it does\nChecks for calls which provide more than one argument for a single parameter.\n\n## Why is this bad?\nProviding multiple values for a single parameter will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\ndef f(x: int) -> int: ...\n\nf(1, x=2)  # Error raised here\n```",
