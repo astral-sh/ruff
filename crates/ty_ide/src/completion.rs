@@ -417,7 +417,16 @@ pub fn completion<'db>(
         }
         if settings.auto_import {
             if let Some(scoped) = scoped {
-                add_unimported_completions(db, file, &parsed, scoped, &mut completions);
+                add_unimported_completions(
+                    db,
+                    file,
+                    &parsed,
+                    scoped,
+                    |module_name: &ModuleName, symbol: &str| {
+                        ImportRequest::import_from(module_name.as_str(), symbol)
+                    },
+                    &mut completions,
+                );
             }
         }
     }
@@ -453,7 +462,16 @@ pub(crate) fn missing_imports(
 ) -> Vec<ImportEdit> {
     let mut completions = Completions::exactly(db, symbol);
     let scoped = ScopedTarget { node };
-    add_unimported_completions(db, file, parsed, scoped, &mut completions);
+    add_unimported_completions(
+        db,
+        file,
+        parsed,
+        scoped,
+        |module_name: &ModuleName, symbol: &str| {
+            ImportRequest::import_from(module_name.as_str(), symbol).force()
+        },
+        &mut completions,
+    );
 
     completions.into_imports()
 }
@@ -502,6 +520,7 @@ fn add_unimported_completions<'db>(
     file: File,
     parsed: &ParsedModuleRef,
     scoped: ScopedTarget<'_>,
+    create_import_request: impl for<'a> Fn(&'a ModuleName, &'a str) -> ImportRequest<'a>,
     completions: &mut Completions<'db>,
 ) {
     // This is redundant since `all_symbols` will also bail
@@ -523,8 +542,7 @@ fn add_unimported_completions<'db>(
             continue;
         }
 
-        let request =
-            ImportRequest::import_from(symbol.module.name(db).as_str(), &symbol.symbol.name);
+        let request = create_import_request(symbol.module.name(db), &symbol.symbol.name);
         // FIXME: `all_symbols` doesn't account for wildcard imports.
         // Since we're looking at every module, this is probably
         // "fine," but it might mean that we import a symbol from the
