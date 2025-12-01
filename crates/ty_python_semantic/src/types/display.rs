@@ -2213,7 +2213,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 }
                 Ok(())
             }
-            KnownInstanceType::ConstraintSet(tracked_set) => {
+            KnownInstanceType::ConstraintSet(_) => {
                 f.with_type(ty).write_str("ty_extensions.ConstraintSet")
             }
             KnownInstanceType::GenericContext(generic_context) => {
