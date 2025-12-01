@@ -2214,9 +2214,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 Ok(())
             }
             KnownInstanceType::ConstraintSet(tracked_set) => {
-                let constraints = tracked_set.constraints(self.db);
-                f.with_type(ty).write_str("ty_extensions.ConstraintSet")?;
-                write!(f, "[{}]", constraints.display(self.db))
+                f.with_type(ty).write_str("ty_extensions.ConstraintSet")
             }
             KnownInstanceType::GenericContext(generic_context) => {
                 f.with_type(ty).write_str("ty_extensions.GenericContext")?;
