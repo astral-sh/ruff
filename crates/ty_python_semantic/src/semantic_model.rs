@@ -6,7 +6,6 @@ use ruff_python_parser::Parsed;
 use ruff_source_file::LineIndex;
 use rustc_hash::FxHashMap;
 
-use crate::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, Module, list_modules, resolve_module};
 use crate::semantic_index::definition::Definition;
@@ -14,6 +13,7 @@ use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::ide_support::{Member, all_declarations_and_bindings, all_members};
 use crate::types::{Type, binding_type, infer_scope_types};
+use crate::{Db, resolve_real_shadowable_module};
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
 ///
@@ -105,8 +105,14 @@ impl<'db> SemanticModel<'db> {
 
     /// Returns completions for symbols available in a `import <CURSOR>` context.
     pub fn import_completions(&self) -> Vec<Completion<'db>> {
+        let typing_extensions = ModuleName::new("typing_extensions").unwrap();
+        let is_typing_extensions_available = self.file.is_stub(self.db)
+            || resolve_real_shadowable_module(self.db, &typing_extensions).is_some();
         list_modules(self.db)
             .into_iter()
+            .filter(|module| {
+                is_typing_extensions_available || module.name(self.db) != &typing_extensions
+            })
             .map(|module| {
                 let builtin = module.is_known(self.db, KnownModule::Builtins);
                 let ty = Type::module_literal(self.db, self.file, module);

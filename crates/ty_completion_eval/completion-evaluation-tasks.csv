@@ -25,4 +25,4 @@ scope-simple-long-identifier,main.py,0,1
 tstring-completions,main.py,0,1
 ty-extensions-lower-stdlib,main.py,0,8
 type-var-typing-over-ast,main.py,0,3
-type-var-typing-over-ast,main.py,1,278
+type-var-typing-over-ast,main.py,1,275

@@ -517,7 +517,7 @@ fn add_unimported_completions<'db>(
     let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
 
-    for symbol in all_symbols(db, &completions.query) {
+    for symbol in all_symbols(db, file, &completions.query) {
         if symbol.module.file(db) == Some(file) || symbol.module.is_known(db, KnownModule::Builtins)
         {
             continue;
@@ -5566,10 +5566,7 @@ def foo(param: s<CURSOR>)
     #[test]
     fn from_import_no_space_not_suggests_import() {
         let builder = completion_test_builder("from typing<CURSOR>");
-        assert_snapshot!(builder.build().snapshot(), @r"
-        typing
-        typing_extensions
-        ");
+        assert_snapshot!(builder.build().snapshot(), @"typing");
     }
 
     #[test]
@@ -5782,6 +5779,86 @@ from .imp<CURSOR>
         bar
         foo
         imposition
+        ");
+    }
+
+    #[test]
+    fn typing_extensions_excluded_from_import() {
+        let builder = completion_test_builder("from typing<CURSOR>").module_names();
+        assert_snapshot!(builder.build().snapshot(), @"typing :: Current module");
+    }
+
+    #[test]
+    fn typing_extensions_excluded_from_auto_import() {
+        let builder = completion_test_builder("deprecated<CURSOR>")
+            .auto_import()
+            .module_names();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        Deprecated :: importlib.metadata
+        DeprecatedList :: importlib.metadata
+        DeprecatedNonAbstract :: importlib.metadata
+        DeprecatedTuple :: importlib.metadata
+        deprecated :: warnings
+        ");
+    }
+
+    #[test]
+    fn typing_extensions_included_from_import() {
+        let builder = CursorTest::builder()
+            .source("typing_extensions.py", "deprecated = 1")
+            .source("foo.py", "from typing<CURSOR>")
+            .completion_test_builder()
+            .module_names();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        typing :: Current module
+        typing_extensions :: Current module
+        ");
+    }
+
+    #[test]
+    fn typing_extensions_included_from_auto_import() {
+        let builder = CursorTest::builder()
+            .source("typing_extensions.py", "deprecated = 1")
+            .source("foo.py", "deprecated<CURSOR>")
+            .completion_test_builder()
+            .auto_import()
+            .module_names();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        Deprecated :: importlib.metadata
+        DeprecatedList :: importlib.metadata
+        DeprecatedNonAbstract :: importlib.metadata
+        DeprecatedTuple :: importlib.metadata
+        deprecated :: typing_extensions
+        deprecated :: warnings
+        ");
+    }
+
+    #[test]
+    fn typing_extensions_included_from_import_in_stub() {
+        let builder = CursorTest::builder()
+            .source("foo.pyi", "from typing<CURSOR>")
+            .completion_test_builder()
+            .module_names();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        typing :: Current module
+        typing_extensions :: Current module
+        ");
+    }
+
+    #[test]
+    fn typing_extensions_included_from_auto_import_in_stub() {
+        let builder = CursorTest::builder()
+            .source("foo.pyi", "deprecated<CURSOR>")
+            .completion_test_builder()
+            .auto_import()
+            .module_names();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        Deprecated :: importlib.metadata
+        DeprecatedList :: importlib.metadata
+        DeprecatedNonAbstract :: importlib.metadata
+        DeprecatedTuple :: importlib.metadata
+        deprecated :: typing_extensions
+        deprecated :: warnings
         ");
     }
 
