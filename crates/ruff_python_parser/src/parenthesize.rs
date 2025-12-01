@@ -39,7 +39,7 @@ pub fn parentheses_iterator<'a>(
             parent.end()
         }
     } else {
-        tokens.last().map_or(expr.end(), |t| t.end())
+        tokens.last().map_or(expr.end(), Ranged::end)
     };
 
     let right_parens = tokens
