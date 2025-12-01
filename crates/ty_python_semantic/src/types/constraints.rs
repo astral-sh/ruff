@@ -1447,21 +1447,13 @@ impl<'db> Node<'db> {
                     Node::AlwaysFalse => {}
                     Node::AlwaysTrue => self.clauses.push(self.current_clause.clone()),
                     Node::Interior(interior) => {
-                        let if_true = interior.if_true(db);
-                        let if_false = interior.if_false(db);
-                        if if_true == if_false {
-                            // TODO: Consider adding a ConstraintAssignment::DontCare variant, and
-                            // including that in the display rendering somehow.
-                            self.visit_node(db, if_true);
-                        } else {
-                            let interior_constraint = interior.constraint(db).normalized(db);
-                            self.current_clause.push(interior_constraint.when_true());
-                            self.visit_node(db, if_true);
-                            self.current_clause.pop();
-                            self.current_clause.push(interior_constraint.when_false());
-                            self.visit_node(db, if_false);
-                            self.current_clause.pop();
-                        }
+                        let interior_constraint = interior.constraint(db).normalized(db);
+                        self.current_clause.push(interior_constraint.when_true());
+                        self.visit_node(db, interior.if_true(db));
+                        self.current_clause.pop();
+                        self.current_clause.push(interior_constraint.when_false());
+                        self.visit_node(db, interior.if_false(db));
+                        self.current_clause.pop();
                     }
                 }
             }
