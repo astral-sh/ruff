@@ -1,7 +1,5 @@
 """Simple LSP client for benchmarking diagnostic response times."""
 
-from __future__ import annotations
-
 import asyncio
 import logging
 from asyncio import Future

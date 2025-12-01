@@ -4,15 +4,13 @@ Benchmarks for LSP servers
 When debugging test failures, run pytest with `-s -v --log-cli-level=DEBUG`
 """
 
-from __future__ import annotations
-
 import asyncio
 import tempfile
 from abc import ABC, abstractmethod
 from collections import Counter
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from pathlib import Path
-from typing import Any, Callable, Final, override
+from typing import Any, Final, override
 
 import pytest
 from lsprotocol import types as lsp
@@ -30,7 +28,7 @@ TOOLS_TO_BENCHMARK: Final = [
     Pyrefly(),
 ]
 
-SEVERITY_LABELS = {1: "Error", 2: "Warning", 3: "Info", 4: "Hint"}
+SEVERITY_LABELS: Final = {1: "Error", 2: "Warning", 3: "Info", 4: "Hint"}
 
 
 @pytest.fixture(scope="module", params=ALL_PROJECTS, ids=lambda p: p.name)
@@ -437,7 +435,7 @@ def count_diagnostic_signatures(
     )
 
 
-def new_diagnostics(
+def diff_diagnostics(
     old: list[FileDiagnostics],
     new: list[FileDiagnostics],
 ) -> list[FileDiagnostics]:
@@ -467,8 +465,8 @@ def print_diagnostic_diff(
 ) -> None:
     """Print the difference in diagnostics before and after a change."""
 
-    added = new_diagnostics(before_diagnostics, after_diagnostics)
-    removed = new_diagnostics(after_diagnostics, before_diagnostics)
+    added = diff_diagnostics(before_diagnostics, after_diagnostics)
+    removed = diff_diagnostics(after_diagnostics, before_diagnostics)
 
     total_added = sum(len(diagnostics) for _, diagnostics in added)
     total_removed = sum(len(diagnostics) for _, diagnostics in removed)
