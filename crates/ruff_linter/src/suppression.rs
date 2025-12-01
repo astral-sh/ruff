@@ -431,22 +431,23 @@ impl<'src> SuppressionParser<'src> {
     }
 
     fn error<T>(&self, kind: ParseErrorKind) -> Result<T, ParseError> {
-        Err(ParseError::new(
-            kind,
-            TextRange::new(self.offset(), self.range.end()),
-        ))
+        Err(ParseError::new(kind, self.range))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::{self, Formatter};
+
     use insta::assert_debug_snapshot;
+    use itertools::Itertools;
     use ruff_python_parser::{Mode, ParseOptions, parse};
     use ruff_text_size::{TextRange, TextSize};
     use similar::DiffableStr;
 
     use crate::suppression::{
-        ParseError, SuppressionAction, SuppressionComment, SuppressionParser, Suppressions,
+        InvalidSuppression, ParseError, Suppression, SuppressionAction, SuppressionComment,
+        SuppressionParser, Suppressions,
     };
 
     #[test]
@@ -473,80 +474,69 @@ def bar():
 # ruff: enable[zeta]  # underindented
     pass
 ";
-        let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
-        let suppressions = Suppressions::from_tokens(source, parsed.tokens());
         assert_debug_snapshot!(
-            suppressions,
-            @r#"
+            Suppressions::debug(source),
+            @r##"
         Suppressions {
             valid: [
                 Suppression {
                     code: "beta",
-                    range: 129..257,
                     comments: [
                         SuppressionComment {
-                            range: 129..156,
                             action: Disable,
                             codes: [
-                                145..149,
-                                150..155,
+                                "beta",
+                                "gamma",
                             ],
-                            reason: 156..156,
+                            reason: "",
                         },
                         SuppressionComment {
-                            range: 231..257,
                             action: Enable,
                             codes: [
-                                246..250,
-                                251..256,
+                                "beta",
+                                "gamma",
                             ],
-                            reason: 257..257,
+                            reason: "",
                         },
                     ],
                 },
                 Suppression {
                     code: "gamma",
-                    range: 129..257,
                     comments: [
                         SuppressionComment {
-                            range: 129..156,
                             action: Disable,
                             codes: [
-                                145..149,
-                                150..155,
+                                "beta",
+                                "gamma",
                             ],
-                            reason: 156..156,
+                            reason: "",
                         },
                         SuppressionComment {
-                            range: 231..257,
                             action: Enable,
                             codes: [
-                                246..250,
-                                251..256,
+                                "beta",
+                                "gamma",
                             ],
-                            reason: 257..257,
+                            reason: "",
                         },
                     ],
                 },
                 Suppression {
                     code: "alpha",
-                    range: 91..279,
                     comments: [
                         SuppressionComment {
-                            range: 91..113,
                             action: Disable,
                             codes: [
-                                107..112,
+                                "alpha",
                             ],
-                            reason: 113..113,
+                            reason: "",
                         },
                         SuppressionComment {
-                            range: 258..279,
                             action: Enable,
                             codes: [
-                                273..278,
+                                "alpha",
                             ],
-                            reason: 279..279,
+                            reason: "",
                         },
                     ],
                 },
@@ -555,66 +545,53 @@ def bar():
                 InvalidSuppression {
                     kind: Trailing,
                     comment: SuppressionComment {
-                        range: 57..89,
                         action: Disable,
                         codes: [
-                            73..76,
+                            "phi",
                         ],
-                        reason: 79..89,
+                        reason: "# trailing",
                     },
                 },
                 InvalidSuppression {
                     kind: Unmatched,
                     comment: SuppressionComment {
-                        range: 178..213,
                         action: Disable,
                         codes: [
-                            194..199,
+                            "delta",
                         ],
-                        reason: 202..213,
+                        reason: "# unmatched",
                     },
                 },
                 InvalidSuppression {
                     kind: Indentation,
                     comment: SuppressionComment {
-                        range: 372..409,
                         action: Enable,
                         codes: [
-                            387..391,
+                            "zeta",
                         ],
-                        reason: 394..409,
+                        reason: "# underindented",
                     },
                 },
                 InvalidSuppression {
                     kind: Unmatched,
                     comment: SuppressionComment {
-                        range: 328..362,
                         action: Disable,
                         codes: [
-                            344..348,
+                            "zeta",
                         ],
-                        reason: 351..362,
+                        reason: "# unmatched",
                     },
                 },
             ],
             errors: [
                 ParseError {
                     kind: MissingCodes,
-                    range: 298..312,
+                    source: "# ruff: disable  # parse error!",
                 },
             ],
         }
-        "#,
+        "##,
         );
-    }
-
-    fn parse_suppression_comment(source: &str) -> Result<SuppressionComment, ParseError> {
-        let offset = TextSize::new(source.find('#').unwrap_or(0).try_into().unwrap());
-        let mut parser = SuppressionParser::new(
-            source,
-            TextRange::new(offset, TextSize::try_from(source.len()).unwrap()),
-        );
-        parser.parse_comment()
     }
 
     #[test]
@@ -625,7 +602,7 @@ def bar():
         Err(
             ParseError {
                 kind: NotASuppression,
-                range: 2..13,
+                range: 0..13,
             },
         )
         ",
@@ -640,7 +617,7 @@ def bar():
         Err(
             ParseError {
                 kind: UnknownAction,
-                range: 8..15,
+                range: 0..15,
             },
         )
         ",
@@ -655,7 +632,7 @@ def bar():
         Err(
             ParseError {
                 kind: MissingCodes,
-                range: 15..15,
+                range: 0..15,
             },
         )
         ",
@@ -685,7 +662,7 @@ def bar():
         Err(
             ParseError {
                 kind: MissingBracket,
-                range: 19..19,
+                range: 0..19,
             },
         )
         ",
@@ -700,7 +677,7 @@ def bar():
         Err(
             ParseError {
                 kind: MissingComma,
-                range: 20..24,
+                range: 0..24,
             },
         )
         ",
@@ -711,18 +688,17 @@ def bar():
     fn disable_single_code() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable[foo]"),
-            @r"
+            @r#"
         Ok(
             SuppressionComment {
-                range: 0..20,
                 action: Disable,
                 codes: [
-                    16..19,
+                    "foo",
                 ],
-                reason: 20..20,
+                reason: "",
             },
         )
-        ",
+        "#,
         );
     }
 
@@ -730,18 +706,17 @@ def bar():
     fn disable_single_code_with_reason() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable[foo] I like bar better"),
-            @r"
+            @r#"
         Ok(
             SuppressionComment {
-                range: 0..38,
                 action: Disable,
                 codes: [
-                    16..19,
+                    "foo",
                 ],
-                reason: 21..38,
+                reason: "I like bar better",
             },
         )
-        ",
+        "#,
         );
     }
 
@@ -749,19 +724,18 @@ def bar():
     fn disable_multiple_codes() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable[foo, bar]"),
-            @r"
+            @r#"
         Ok(
             SuppressionComment {
-                range: 0..25,
                 action: Disable,
                 codes: [
-                    16..19,
-                    21..24,
+                    "foo",
+                    "bar",
                 ],
-                reason: 25..25,
+                reason: "",
             },
         )
-        ",
+        "#,
         );
     }
 
@@ -769,18 +743,17 @@ def bar():
     fn enable_single_code() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: enable[some-thing]"),
-            @r"
+            @r#"
         Ok(
             SuppressionComment {
-                range: 0..26,
                 action: Enable,
                 codes: [
-                    15..25,
+                    "some-thing",
                 ],
-                reason: 26..26,
+                reason: "",
             },
         )
-        ",
+        "#,
         );
     }
 
@@ -790,18 +763,17 @@ def bar():
         let comment = parse_suppression_comment(source);
         assert_debug_snapshot!(
             comment,
-            @r"
+            @r#"
         Ok(
             SuppressionComment {
-                range: 22..48,
                 action: Enable,
                 codes: [
-                    37..47,
+                    "some-thing",
                 ],
-                reason: 48..48,
+                reason: "",
             },
         )
-        ",
+        "#,
         );
     }
 
@@ -811,18 +783,17 @@ def bar():
         let comment = parse_suppression_comment(source);
         assert_debug_snapshot!(
             comment,
-            @r"
+            @r#"
         Ok(
             SuppressionComment {
-                range: 4..30,
                 action: Enable,
                 codes: [
-                    19..29,
+                    "some-thing",
                 ],
-                reason: 30..30,
+                reason: "",
             },
         )
-        ",
+        "#,
         );
     }
 
@@ -844,5 +815,175 @@ def bar():
             ["foo", "bar"]
         );
         assert_eq!(source.slice(comment.reason.into()), "hello world");
+    }
+
+    /// Parse a single suppression comment for testing
+    fn parse_suppression_comment(
+        source: &'_ str,
+    ) -> Result<DebugSuppressionComment<'_>, ParseError> {
+        let offset = TextSize::new(source.find('#').unwrap_or(0).try_into().unwrap());
+        let mut parser = SuppressionParser::new(
+            source,
+            TextRange::new(offset, TextSize::try_from(source.len()).unwrap()),
+        );
+        match parser.parse_comment() {
+            Ok(comment) => Ok(DebugSuppressionComment { source, comment }),
+            Err(error) => Err(error),
+        }
+    }
+
+    impl Suppressions {
+        /// Parse all suppressions and errors in a module for testing
+        fn debug(source: &'_ str) -> DebugSuppressions<'_> {
+            let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
+            let suppressions = Suppressions::from_tokens(source, parsed.tokens());
+            DebugSuppressions {
+                source,
+                suppressions,
+            }
+        }
+    }
+
+    struct DebugSuppressions<'a> {
+        source: &'a str,
+        suppressions: Suppressions,
+    }
+
+    impl fmt::Debug for DebugSuppressions<'_> {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            f.debug_struct("Suppressions")
+                .field(
+                    "valid",
+                    &self
+                        .suppressions
+                        .valid
+                        .iter()
+                        .map(|suppression| DebugSuppression {
+                            source: self.source,
+                            suppression,
+                        })
+                        .collect_vec(),
+                )
+                .field(
+                    "invalid",
+                    &self
+                        .suppressions
+                        .invalid
+                        .iter()
+                        .map(|invalid| DebugInvalidSuppression {
+                            source: self.source,
+                            invalid,
+                        })
+                        .collect_vec(),
+                )
+                .field(
+                    "errors",
+                    &self
+                        .suppressions
+                        .errors
+                        .iter()
+                        .map(|error| DebugParseError {
+                            source: self.source,
+                            error,
+                        })
+                        .collect_vec(),
+                )
+                .finish()
+        }
+    }
+
+    struct DebugSuppression<'a> {
+        source: &'a str,
+        suppression: &'a Suppression,
+    }
+
+    impl fmt::Debug for DebugSuppression<'_> {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            f.debug_struct("Suppression")
+                .field("code", &self.suppression.code)
+                .field(
+                    "comments",
+                    &self
+                        .suppression
+                        .comments
+                        .iter()
+                        .map(|comment| DebugSuppressionComment {
+                            source: self.source,
+                            comment: comment.clone(),
+                        })
+                        .collect_vec(),
+                )
+                .finish()
+        }
+    }
+
+    struct DebugInvalidSuppression<'a> {
+        source: &'a str,
+        invalid: &'a InvalidSuppression,
+    }
+
+    impl fmt::Debug for DebugInvalidSuppression<'_> {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            f.debug_struct("InvalidSuppression")
+                .field("kind", &self.invalid.kind)
+                .field(
+                    "comment",
+                    &DebugSuppressionComment {
+                        source: self.source,
+                        comment: self.invalid.comment.clone(),
+                    },
+                )
+                .finish()
+        }
+    }
+
+    struct DebugParseError<'a> {
+        source: &'a str,
+        error: &'a ParseError,
+    }
+
+    impl fmt::Debug for DebugParseError<'_> {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            f.debug_struct("ParseError")
+                .field("kind", &self.error.kind)
+                .field("source", &&self.source[self.error.range])
+                .finish()
+        }
+    }
+
+    struct DebugSuppressionComment<'a> {
+        source: &'a str,
+        comment: SuppressionComment,
+    }
+
+    impl fmt::Debug for DebugSuppressionComment<'_> {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            f.debug_struct("SuppressionComment")
+                .field("action", &self.comment.action)
+                .field(
+                    "codes",
+                    &DebugCodes {
+                        source: self.source,
+                        codes: &self.comment.codes,
+                    },
+                )
+                .field("reason", &&self.source[self.comment.reason])
+                .finish()
+        }
+    }
+
+    struct DebugCodes<'a> {
+        source: &'a str,
+        codes: &'a [TextRange],
+    }
+
+    impl fmt::Debug for DebugCodes<'_> {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            let mut f = f.debug_list();
+            for code in self.codes {
+                f.entry(&&self.source[*code]);
+            }
+            f.finish()
+        }
     }
 }
