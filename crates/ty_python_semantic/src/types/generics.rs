@@ -1404,6 +1404,10 @@ impl<'db> SpecializationBuilder<'db> {
 
         match self.types.entry(identity) {
             Entry::Occupied(mut entry) => {
+                // TODO: mypy and Pyright does this, should we keep doing it?
+                if bound_typevar.is_paramspec(self.db) {
+                    return;
+                }
                 *entry.get_mut() = UnionType::from_elements(self.db, [*entry.get(), ty]);
             }
             Entry::Vacant(entry) => {
