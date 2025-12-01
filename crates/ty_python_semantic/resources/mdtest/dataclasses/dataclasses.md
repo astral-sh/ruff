@@ -1462,3 +1462,48 @@ def test_c():
     c = C(1)
     c.__lt__ = Mock()
 ```
+
+## Imperatively calling `dataclasses.dataclass`
+
+While we do not currently recognize the special behaviour of `dataclasses.dataclass` if it is called
+imperatively, we recognize that it can be called imperatively and do not emit any false-positive
+diagnostics on such calls:
+
+```py
+from dataclasses import dataclass
+from typing_extensions import TypeVar, dataclass_transform
+
+U = TypeVar("U")
+
+@dataclass_transform(kw_only_default=True)
+def sequence(cls: type[U]) -> type[U]:
+    d = dataclass(
+        repr=False,
+        eq=False,
+        match_args=False,
+        kw_only=True,
+    )(cls)
+    reveal_type(d)  # revealed: type[U@sequence]
+    return d
+
+@dataclass_transform(kw_only_default=True)
+def sequence2(cls: type) -> type:
+    d = dataclass(
+        repr=False,
+        eq=False,
+        match_args=False,
+        kw_only=True,
+    )(cls)
+    reveal_type(d)  # revealed: type
+    return d
+
+@dataclass_transform(kw_only_default=True)
+def sequence3(cls: type[U]) -> type[U]:
+    # TODO: should reveal `type[U@sequence3]`
+    return reveal_type(dataclass(cls))  # revealed: Unknown
+
+@dataclass_transform(kw_only_default=True)
+def sequence4(cls: type) -> type:
+    # TODO: should reveal `type`
+    return reveal_type(dataclass(cls))  # revealed: Unknown
+```
