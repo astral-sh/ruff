@@ -1322,10 +1322,6 @@ impl Truthiness {
                             && arguments.keywords.is_empty()
                         {
                             // Ex) `list([1, 2, 3])`
-                            // Return Unknown for types with definite truthiness that might result
-                            // in empty iterables or will raise a type error. Explicitly list types
-                            // we recurse for (types without definite truthiness or where Self::from_expr
-                            // correctly handles the truthiness).
                             match argument {
                                 // Return Unknown for types with definite truthiness that might result
                                 // in empty iterables or will raise a type error:
