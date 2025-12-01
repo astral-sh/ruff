@@ -208,7 +208,12 @@ impl<'db> CallableSignature<'db> {
             && matches!(callable.kind(db), CallableTypeKind::ParamSpecValue)
         {
             return Self::from_overloads(callable.signatures(db).iter().map(|signature| {
-                Signature::new(signature.parameters.clone(), self_signature.return_ty)
+                Signature::new(
+                    signature.parameters.clone(),
+                    self_signature
+                        .return_ty
+                        .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+                )
             }));
         }
 
