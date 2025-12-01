@@ -92,6 +92,7 @@ Settings: Settings {
         "raw-string-type-annotation": Error (Default),
         "redundant-cast": Warning (Default),
         "static-assert-error": Error (Default),
+        "subclass-of-dataclass-with-order": Warning (Default),
         "subclass-of-final-class": Error (Default),
         "super-call-in-named-tuple-method": Error (Default),
         "too-many-positional-arguments": Error (Default),
