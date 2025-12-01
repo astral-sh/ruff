@@ -416,7 +416,7 @@ def print_diagnostics(
         )
 
 
-DiagnosticSignature = tuple[Path, str | int | None, str]
+type DiagnosticSignature = tuple[Path, str | int | None, str]
 
 
 def diagnostic_signature(file: Path, diagnostic: lsp.Diagnostic) -> DiagnosticSignature:
