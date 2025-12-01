@@ -946,8 +946,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
                 KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(_)) => {
-                    self.infer_type_expression(slice);
-                    todo_type!("Generic manual PEP-695 type alias")
+                    let slice_ty = self.infer_expression(slice, TypeContext::default());
+                    let mut variables = FxOrderSet::default();
+                    slice_ty.bind_and_find_all_legacy_typevars(
+                        self.db(),
+                        self.typevar_binding_context,
+                        &mut variables,
+                    );
+                    let generic_context =
+                        GenericContext::from_typevar_instances(self.db(), variables);
+                    Type::Dynamic(DynamicType::UnknownGeneric(generic_context))
                 }
                 KnownInstanceType::LiteralStringAlias(_) => {
                     self.infer_type_expression(slice);
@@ -984,6 +992,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
             },
+            Type::Dynamic(DynamicType::UnknownGeneric(_)) => {
+                self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
+            }
             Type::Dynamic(_) => {
                 // Infer slice as a value expression to avoid false-positive
                 // `invalid-type-form` diagnostics, when we have e.g.
