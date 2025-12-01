@@ -767,60 +767,6 @@ def f[S, T, U]():
 
 ## Other simplifications
 
-### Displaying constraint sets
-
-When displaying a constraint set, we transform the internal BDD representation into a DNF formula
-(i.e., the logical OR of several clauses, each of which is the logical AND of several constraints).
-This section contains several examples that show that we simplify the DNF formula as much as we can
-before displaying it.
-
-```py
-from ty_extensions import ConstraintSet
-
-def f[T, U]():
-    t1 = ConstraintSet.range(str, T, str)
-    t2 = ConstraintSet.range(bool, T, bool)
-    u1 = ConstraintSet.range(str, U, str)
-    u2 = ConstraintSet.range(bool, U, bool)
-
-    # revealed: ty_extensions.ConstraintSet[(T@f = bool) ∨ (T@f = str)]
-    reveal_type(t1 | t2)
-    # revealed: ty_extensions.ConstraintSet[(U@f = bool) ∨ (U@f = str)]
-    reveal_type(u1 | u2)
-    # revealed: ty_extensions.ConstraintSet[((T@f = bool) ∧ (U@f = bool)) ∨ ((T@f = bool) ∧ (U@f = str)) ∨ ((T@f = str) ∧ (U@f = bool)) ∨ ((T@f = str) ∧ (U@f = str))]
-    reveal_type((t1 | t2) & (u1 | u2))
-```
-
-We might simplify a BDD so much that we can no longer see the constraints that we used to construct
-it!
-
-```py
-from typing import Never
-from ty_extensions import static_assert
-
-def f[T]():
-    t_int = ConstraintSet.range(Never, T, int)
-    t_bool = ConstraintSet.range(Never, T, bool)
-
-    # `T ≤ bool` implies `T ≤ int`: if a type satisfies the former, it must always satisfy the
-    # latter. We can turn that into a constraint set, using the equivalence `p → q == ¬p ∨ q`:
-    implication = ~t_bool | t_int
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(implication)
-    static_assert(implication)
-
-    # However, because of that implication, some inputs aren't valid: it's not possible for
-    # `T ≤ bool` to be true and `T ≤ int` to be false. This is reflected in the constraint set's
-    # "domain", which maps valid inputs to `true` and invalid inputs to `false`. This means that two
-    # constraint sets that are both always satisfied will not be identical if they have different
-    # domains!
-    always = ConstraintSet.always()
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(always)
-    static_assert(always)
-    static_assert(implication != always)
-```
-
 ### Normalized bounds
 
 The lower and upper bounds of a constraint are normalized, so that we equate unions and
