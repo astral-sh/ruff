@@ -1656,4 +1656,70 @@ func<CURSOR>_alias()
           |
         ");
     }
+
+    #[test]
+    fn stub_target() {
+        let test = CursorTest::builder()
+            .source(
+                "path.pyi",
+                r#"
+                class Path:
+                    def __init__(self, path: str): ...
+            "#,
+            )
+            .source(
+                "path.py",
+                r#"
+                class Path:
+                    def __init__(self, path: str):
+                        self.path = path
+            "#,
+            )
+            .source(
+                "importer.py",
+                r#"
+                from path import Path<CURSOR>
+
+                a: Path = Path("test")
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r###"
+        info[references]: Reference 1
+         --> path.pyi:2:7
+          |
+        2 | class Path:
+          |       ^^^^
+        3 |     def __init__(self, path: str): ...
+          |
+
+        info[references]: Reference 2
+         --> importer.py:2:18
+          |
+        2 | from path import Path
+          |                  ^^^^
+        3 |
+        4 | a: Path = Path("test")
+          |
+
+        info[references]: Reference 3
+         --> importer.py:4:4
+          |
+        2 | from path import Path
+        3 |
+        4 | a: Path = Path("test")
+          |    ^^^^
+          |
+
+        info[references]: Reference 4
+         --> importer.py:4:11
+          |
+        2 | from path import Path
+        3 |
+        4 | a: Path = Path("test")
+          |           ^^^^
+          |
+        "###);
+    }
 }
