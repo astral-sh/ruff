@@ -83,6 +83,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 mod error;
 pub mod lexer;
+pub mod parenthesize;
 mod parser;
 pub mod semantic_errors;
 mod string;
