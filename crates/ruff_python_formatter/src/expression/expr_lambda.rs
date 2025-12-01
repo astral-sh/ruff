@@ -3,12 +3,12 @@ use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprLambda;
 use ruff_text_size::Ranged;
 
+use crate::builders::parenthesize_if_expands;
 use crate::comments::dangling_comments;
 use crate::expression::has_own_parentheses;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parenthesize, is_expression_parenthesized,
-    optional_parentheses,
 };
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
@@ -97,7 +97,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 )
                 .fmt(f),
                 ExprLambdaLayout::Assignment => {
-                    fits_expanded(&optional_parentheses(&body.format())).fmt(f)
+                    fits_expanded(&parenthesize_if_expands(&body.format())).fmt(f)
                 }
             }
         } else {

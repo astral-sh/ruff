@@ -968,8 +968,7 @@ def foo():
          if True:
 -            return (
 -                lambda x: np.exp(cs(np.log(x.to(u.MeV).value))) * u.MeV * u.cm**2 / u.g
--            )
-+            return lambda x: np.exp(
-+                cs(np.log(x.to(u.MeV).value))
-+            ) * u.MeV * u.cm**2 / u.g
++            return lambda x: (
++                np.exp(cs(np.log(x.to(u.MeV).value))) * u.MeV * u.cm**2 / u.g
+             )
 ```
