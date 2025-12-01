@@ -593,6 +593,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                                 *statement,
                                 Parenthesize::IfBreaks
                             )
+                            .with_lambda_layout(ExprLambdaLayout::Assignment)
                         ]
                     );
                 }

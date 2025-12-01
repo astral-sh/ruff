@@ -421,7 +421,12 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 | Parenthesize::IfBreaksParenthesized
                 | Parenthesize::IfBreaksParenthesizedNested => {
                     if can_omit_optional_parentheses(expression, f.context()) {
-                        optional_parentheses(&unparenthesized).fmt(f)
+                        if let Expr::Lambda(lambda) = expression {
+                            optional_parentheses(&lambda.format().with_options(*lambda_layout))
+                                .fmt(f)
+                        } else {
+                            optional_parentheses(&unparenthesized).fmt(f)
+                        }
                     } else {
                         if let Expr::Lambda(lambda) = expression {
                             parenthesize_if_expands(&lambda.format().with_options(*lambda_layout))
