@@ -363,6 +363,24 @@ impl<'src> Parser<'src> {
         }
 
         match self.current_token_kind() {
+            TokenKind::DoubleStar => {
+                self.bump(TokenKind::DoubleStar);
+                let right =
+                    self.parse_binary_expression_or_higher(OperatorPrecedence::Exponent, context);
+                return Expr::BinOp(ast::ExprBinOp {
+                    left: Box::new(Expr::Name(ast::ExprName {
+                        range: self.missing_node_range(),
+                        id: Name::empty(),
+                        ctx: ExprContext::Invalid,
+                        node_index: AtomicNodeIndex::NONE,
+                    })),
+                    op: Operator::Pow,
+                    right: Box::new(right.expr),
+                    range: self.node_range(start),
+                    node_index: AtomicNodeIndex::NONE,
+                })
+                .into();
+            }
             TokenKind::Star => {
                 let starred_expr = self.parse_starred_expression(context);
 
