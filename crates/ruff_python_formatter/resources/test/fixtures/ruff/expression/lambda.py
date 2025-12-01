@@ -350,3 +350,14 @@ class C:
     _is_recognized_dtype: Callable[[DtypeObj], bool] = lambda x: lib.is_np_dtype(
         x, "M"
     ) or isinstance(x, DatetimeTZDtype)
+
+class C:
+    def foo():
+        if True:
+            transaction_count = self._query_txs_for_range(
+                get_count_fn=lambda from_ts, to_ts, _chain_id=chain_id: db_evmtx.count_transactions_in_range(
+                    chain_id=_chain_id,
+                    from_ts=from_ts,
+                    to_ts=to_ts,
+                ),
+            )
