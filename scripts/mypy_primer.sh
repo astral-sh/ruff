@@ -10,8 +10,8 @@ PRIMER_SELECTOR="$(paste -s -d'|' "${PRIMER_SELECTOR}")"
 echo "new commit"
 git rev-list --format=%s --max-count=1 "${GITHUB_SHA}"
 
-MERGE_BASE="$(git merge-base "${GITHUB_SHA}" "origin/${GITHUB_BASE_REF}")"
-git checkout -b base_commit "${MERGE_BASE}"
+# https://github.com/astral-sh/ruff/pull/21722
+git checkout -b base_commit 56d3173da5c4eaa597efb010d20130069985e7e2
 echo "base commit"
 git rev-list --format=%s --max-count=1 base_commit
 
