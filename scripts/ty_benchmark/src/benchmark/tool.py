@@ -185,7 +185,7 @@ class Pyright(Tool):
 
             if not self.path.exists():
                 print(
-                    "Pyright executable not found. Did you ran `npm install` in the `ty_benchmark` directory?"
+                    "Pyright executable not found. Did you run `npm ci` in the `ty_benchmark` directory?"
                 )
 
     @override
