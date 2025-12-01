@@ -1,12 +1,13 @@
+use ruff_diagnostics::{Applicability, Edit, Fix};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCall;
+use ruff_text_size::Ranged;
+
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_getcwd_enabled;
 use crate::rules::flake8_use_pathlib::helpers::is_top_level_expression_call;
 use crate::{FixAvailability, Violation};
-use ruff_diagnostics::{Applicability, Edit, Fix};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
-use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for uses of `os.getcwd` and `os.getcwdb`.

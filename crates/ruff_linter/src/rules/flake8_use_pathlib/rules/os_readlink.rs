@@ -86,8 +86,7 @@ pub(crate) fn os_readlink(checker: &Checker, call: &ExprCall, segments: &[&str])
         return;
     }
 
-    let fix_enabled = is_fix_os_readlink_enabled(checker.settings());
-    let applicability = if fix_enabled && !is_top_level_expression_call(checker) {
+    let applicability = if !is_top_level_expression_call(checker) {
         // Unsafe because the return type changes (str/bytes -> Path)
         Applicability::Unsafe
     } else {
@@ -99,7 +98,7 @@ pub(crate) fn os_readlink(checker: &Checker, call: &ExprCall, segments: &[&str])
         call,
         "readlink()",
         "path",
-        fix_enabled,
+        is_fix_os_readlink_enabled(checker.settings()),
         OsReadlink,
         applicability,
     );

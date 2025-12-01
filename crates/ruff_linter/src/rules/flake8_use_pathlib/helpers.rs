@@ -91,17 +91,13 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
 
         let edit = Edit::range_replacement(replacement, range);
 
-        let fix = match applicability {
-            Applicability::Unsafe => Fix::unsafe_edits(edit, [import_edit]),
-            _ => {
-                let determined_applicability = match applicability {
-                    Applicability::DisplayOnly => Applicability::DisplayOnly,
-                    _ if checker.comment_ranges().intersects(range) => Applicability::Unsafe,
-                    _ => applicability,
-                };
-                Fix::applicable_edits(edit, [import_edit], determined_applicability)
-            }
+        let applicability = match applicability {
+            Applicability::DisplayOnly => Applicability::DisplayOnly,
+            _ if checker.comment_ranges().intersects(range) => Applicability::Unsafe,
+            _ => applicability,
         };
+
+        let fix = Fix::applicable_edits(edit, [import_edit], applicability);
 
         Ok(fix)
     });
@@ -176,16 +172,16 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
                 format!("{binding}({path_code}).{attr}({second_code})")
             };
 
-            let determined_applicability = if checker.comment_ranges().intersects(range) {
-                Applicability::Unsafe
-            } else {
-                applicability
+            let applicability = match applicability {
+                Applicability::DisplayOnly => Applicability::DisplayOnly,
+                _ if checker.comment_ranges().intersects(range) => Applicability::Unsafe,
+                _ => applicability,
             };
 
             Ok(Fix::applicable_edits(
                 Edit::range_replacement(replacement, range),
                 [import_edit],
-                determined_applicability,
+                applicability,
             ))
         });
     }
