@@ -14,10 +14,10 @@ use crate::types::signatures::Signature;
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::{
-    BindingContext, BoundTypeVarInstance, CallableType, DynamicType, GenericContext,
-    IntersectionBuilder, KnownClass, KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeIsType, TypeMapping,
-    UnionBuilder, UnionType, any_over_type, todo_type,
+    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
+    KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType,
+    Type, TypeAliasType, TypeContext, TypeIsType, TypeMapping, UnionBuilder, UnionType,
+    any_over_type, todo_type,
 };
 
 /// Type expressions
@@ -1742,21 +1742,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     && typevar.is_paramspec(self.db())
                 {
                     let index = semantic_index(self.db(), self.scope().file(self.db()));
-                    let bound_typevar = bind_typevar(
+                    let Some(bound_typevar) = bind_typevar(
                         self.db(),
                         index,
                         self.scope().file_scope_id(self.db()),
                         self.typevar_binding_context,
                         typevar,
-                    )
-                    .unwrap_or_else(|| {
-                        BoundTypeVarInstance::new(
-                            self.db(),
-                            typevar,
-                            BindingContext::Synthetic,
-                            None,
-                        )
-                    });
+                    ) else {
+                        // TODO: What to do here?
+                        return None;
+                    };
                     return Some(Parameters::paramspec(self.db(), bound_typevar));
                 }
             }
