@@ -750,9 +750,10 @@ impl<'db> ConstrainedTypeVar<'db> {
 /// Terminal nodes (`false` and `true`) have their own dedicated enum variants. The
 /// [`Interior`][InteriorNode] variant represents interior nodes.
 ///
-/// BDD nodes are _reduced_, which means that there are no duplicate nodes (which we handle via
-/// Salsa interning), and that there are no redundant nodes, with `if_true` and `if_false` edges
-/// that point at the same node.
+/// BDD nodes are _quasi-reduced_, which means that there are no duplicate nodes (which we handle
+/// via Salsa interning). Unlike the typical BDD representation, which is (fully) reduced, we do
+/// allow redundant nodes, with `if_true` and `if_false` edges that point at the same node. That
+/// means that our BDDs "remember" all of the individual constraints that they were created with.
 ///
 /// BDD nodes are also _ordered_, meaning that every path from the root of a BDD to a terminal node
 /// visits variables in the same order. [`ConstrainedTypeVar::ordering`] defines the variable
@@ -765,7 +766,7 @@ enum Node<'db> {
 }
 
 impl<'db> Node<'db> {
-    /// Creates a new BDD node, ensuring that it is fully reduced.
+    /// Creates a new BDD node, ensuring that it is quasi-reduced.
     fn new(
         db: &'db dyn Db,
         constraint: ConstrainedTypeVar<'db>,
