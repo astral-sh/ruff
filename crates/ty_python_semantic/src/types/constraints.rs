@@ -1845,7 +1845,7 @@ impl<'db> InteriorNode<'db> {
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn sequent_map(self, db: &'db dyn Db) -> SequentMap<'db> {
-        let _span = tracing::debug!(
+        tracing::debug!(
             target: "ty_python_semantic::types::constraints::SequentMap",
             constraints = %Node::Interior(self).display(db),
             "create sequent map",
@@ -2255,9 +2255,6 @@ impl<'db> ConstraintAssignment<'db> {
         }
     }
 
-    // Keep this for future debugging needs, even though it's not currently used when rendering
-    // constraint sets.
-    #[expect(dead_code)]
     fn display(self, db: &'db dyn Db) -> impl Display {
         struct DisplayConstraintAssignment<'db> {
             constraint: ConstraintAssignment<'db>,
@@ -3277,7 +3274,7 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         constraints: ConstraintSet<'db>,
     ) -> Result<Specialization<'db>, ()> {
-        let _span = tracing::debug!(
+        tracing::debug!(
             target: "ty_python_semantic::types::constraints::specialize_constrained",
             generic_context = %self.display_full(db),
             constraints = %constraints.node.display(db),
