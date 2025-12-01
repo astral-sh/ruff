@@ -103,7 +103,7 @@ impl<'db> Module<'db> {
             .unwrap_or_default()
     }
 
-    pub fn structural_ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
+    pub(crate) fn structural_ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
         match (self, other) {
             (Module::File(left), Module::File(right)) => left.structural_ordering(db, right),
             (Module::Namespace(left), Module::Namespace(right)) => {
@@ -286,7 +286,7 @@ pub struct FileModule<'db> {
 }
 
 impl FileModule<'_> {
-    pub fn structural_ordering(self, db: &dyn Db, other: Self) -> std::cmp::Ordering {
+    pub(crate) fn structural_ordering(self, db: &dyn Db, other: Self) -> std::cmp::Ordering {
         self.name(db)
             .cmp(other.name(db))
             .then_with(|| self.file(db).structural_ordering(db, other.file(db)))
