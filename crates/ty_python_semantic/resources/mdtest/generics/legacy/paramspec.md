@@ -115,3 +115,233 @@ P = ParamSpec("P", default=[A, B])
 class A: ...
 class B: ...
 ```
+
+## Validating `ParamSpec` usage
+
+`ParamSpec` is only valid as the first element to `Callable` or the final element to `Concatenate`.
+
+```py
+from typing import ParamSpec, Callable, Concatenate
+
+P = ParamSpec("P")
+
+def valid(
+    a1: Callable[P, int],
+    a2: Callable[Concatenate[int, P], int],
+) -> None: ...
+
+def invalid(
+    # TODO: error
+    a1: P,
+    # TODO: error
+    a2: list[P],
+    # TODO: error
+    a3: Callable[[P], int],
+    # TODO: error
+    a4: Callable[..., P],
+    # TODO: error
+    a5: Callable[Concatenate[P, ...], int],
+) -> None: ...
+```
+
+## Validating `P.args` and `P.kwargs` usage
+
+The components of `ParamSpec` i.e., `P.args` and `P.kwargs` are only valid when used as the
+annotated types of `*args` and `**kwargs` respectively.
+
+```py
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+
+def foo(c: Callable[P, int]) -> None:
+    def nested1(*args: P.args, **kwargs: P.kwargs) -> None: ...
+
+    # error: [invalid-type-form] "`P.args` is valid only in `*args` annotation: Did you mean `P.kwargs`?"
+    # error: [invalid-type-form] "`P.kwargs` is valid only in `**kwargs` annotation: Did you mean `P.args`?"
+    def nested2(*args: P.kwargs, **kwargs: P.args) -> None: ...
+
+    # TODO: error
+    def nested3(*args: P.args) -> None: ...
+
+    # TODO: error
+    def nested4(**kwargs: P.kwargs) -> None: ...
+
+# TODO: error
+def bar(*args: P.args, **kwargs: P.kwargs) -> None:
+    pass
+
+class Foo:
+    # TODO: error
+    def method(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+```
+
+And, they need to be used together.
+
+```py
+def foo(c: Callable[P, int]) -> None:
+    # TODO: error
+    def nested1(*args: P.args) -> None: ...
+
+    # TODO: error
+    def nested2(**kwargs: P.kwargs) -> None: ...
+
+
+class Foo:
+    # TODO: error
+    args: P.args
+
+    # TODO: error
+    kwargs: P.kwargs
+```
+
+## Specializing generic classes explicitly
+
+```py
+from typing import Any, Generic, ParamSpec, Callable, TypeVar
+
+P1 = ParamSpec("P1")
+P2 = ParamSpec("P2")
+T1 = TypeVar("T1")
+
+class OnlyParamSpec(Generic[P1]):
+    attr: Callable[P1, None]
+
+class TwoParamSpec(Generic[P1, P2]):
+    attr1: Callable[P1, None]
+    attr2: Callable[P2, None]
+
+class TypeVarAndParamSpec(Generic[T1, P1]):
+    attr: Callable[P1, T1]
+```
+
+Explicit specialization of a generic class involving `ParamSpec` is done by providing either a list
+of types, `...`, or another in-scope `ParamSpec`.
+
+```py
+reveal_type(OnlyParamSpec[[int, str]]().attr)  # revealed: (int, str, /) -> None
+reveal_type(OnlyParamSpec[...]().attr)  # revealed: (...) -> None
+
+def func(c: Callable[P2, None]):
+    reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (**P2@func) -> None
+
+# TODO: error: paramspec is unbound
+reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (...) -> None
+```
+
+The square brackets can be omitted when `ParamSpec` is the only type variable
+
+```py
+reveal_type(OnlyParamSpec[int, str]().attr)  # revealed: (int, str, /) -> None
+reveal_type(OnlyParamSpec[int,]().attr)  # revealed: (int, /) -> None
+
+# Even when there is only one element
+reveal_type(OnlyParamSpec[Any]().attr)  # revealed: (Any, /) -> None
+reveal_type(OnlyParamSpec[object]().attr)  # revealed: (object, /) -> None
+reveal_type(OnlyParamSpec[int]().attr)  # revealed: (int, /) -> None
+```
+
+But, they cannot be omitted when there are multiple type variables.
+
+```py
+reveal_type(TypeVarAndParamSpec[int, [int, str]]().attr)  # revealed: (int, str, /) -> int
+reveal_type(TypeVarAndParamSpec[int, [str]]().attr)  # revealed: (str, /) -> int
+reveal_type(TypeVarAndParamSpec[int, ...]().attr)  # revealed: (...) -> int
+
+# TODO: We could still specialize for `T1` as the type is valid which would reveal `(...) -> int`
+# TODO: error: paramspec is unbound
+reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> Unknown
+# error: [invalid-type-arguments] "Type argument for `ParamSpec` must be either a list of types, `ParamSpec`, `Concatenate`, or `...`"
+reveal_type(TypeVarAndParamSpec[int, int]().attr)  # revealed: (...) -> Unknown
+```
+
+Nor can they be omitted when there are more than one `ParamSpec`.
+
+```py
+p = TwoParamSpec[[int, str], [int]]()
+reveal_type(p.attr1)  # revealed: (int, str, /) -> None
+reveal_type(p.attr2)  # revealed: (int, /) -> None
+
+# error: [invalid-type-arguments]
+# error: [invalid-type-arguments]
+TwoParamSpec[int, str]
+```
+
+## Specialization when defaults are involved
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any, Generic, ParamSpec, Callable, TypeVar
+
+P = ParamSpec("P")
+PList = ParamSpec("PList", default=[int, str])
+PEllipsis = ParamSpec("PEllipsis", default=...)
+PAnother = ParamSpec("PAnother", default=P)
+PAnotherWithDefault = ParamSpec("PAnotherWithDefault", default=PList)
+```
+
+```py
+class ParamSpecWithDefault1(Generic[PList]):
+    attr: Callable[PList, None]
+
+reveal_type(ParamSpecWithDefault1().attr)  # revealed: (int, str, /) -> None
+reveal_type(ParamSpecWithDefault1[[int]]().attr)  # revealed: (int, /) -> None
+```
+
+```py
+class ParamSpecWithDefault2(Generic[PEllipsis]):
+    attr: Callable[PEllipsis, None]
+
+reveal_type(ParamSpecWithDefault2().attr)  # revealed: (...) -> None
+reveal_type(ParamSpecWithDefault2[[int, str]]().attr)  # revealed: (int, str, /) -> None
+```
+
+```py
+class ParamSpecWithDefault3(Generic[P, PAnother]):
+    attr1: Callable[P, None]
+    attr2: Callable[PAnother, None]
+
+# `P` hasn't been specialized, so it defaults to `Unknown` gradual form
+p1 = ParamSpecWithDefault3()
+reveal_type(p1.attr1)  # revealed: (...) -> None
+reveal_type(p1.attr2)  # revealed: (...) -> None
+
+p2 = ParamSpecWithDefault3[[int, str]]()
+reveal_type(p2.attr1)  # revealed: (int, str, /) -> None
+reveal_type(p2.attr2)  # revealed: (int, str, /) -> None
+
+p3 = ParamSpecWithDefault3[[int], [str]]()
+reveal_type(p3.attr1)  # revealed: (int, /) -> None
+reveal_type(p3.attr2)  # revealed: (str, /) -> None
+
+class ParamSpecWithDefault4(Generic[PList, PAnotherWithDefault]):
+    attr1: Callable[PList, None]
+    attr2: Callable[PAnotherWithDefault, None]
+
+p1 = ParamSpecWithDefault4()
+reveal_type(p1.attr1)  # revealed: (int, str, /) -> None
+reveal_type(p1.attr2)  # revealed: (int, str, /) -> None
+
+p2 = ParamSpecWithDefault4[[int]]()
+reveal_type(p2.attr1)  # revealed: (int, /) -> None
+reveal_type(p2.attr2)  # revealed: (int, /) -> None
+
+p3 = ParamSpecWithDefault4[[int], [str]]()
+reveal_type(p3.attr1)  # revealed: (int, /) -> None
+reveal_type(p3.attr2)  # revealed: (str, /) -> None
+
+# TODO: error
+# Un-ordered type variables as the default of `PAnother` is `P`
+class ParamSpecWithDefault5(Generic[PAnother, P]):
+    attr: Callable[PAnother, None]
+```
+
+## Semantics
+
+The semantics of `ParamSpec` are described in [the PEP 695 `ParamSpec`
+document](./../pep695/paramspec.md) to avoid duplication unless there are any behavior specific to
+the legacy `ParamSpec` implementation.
