@@ -367,6 +367,19 @@ class C:
                     to_ts=to_ts,
                 ),
             )
+
+def ddb():
+    sql = (
+        lambda var, table, n=N: f"""
+        CREATE TABLE {table} AS
+        SELECT ROW_NUMBER() OVER () AS id, {var}
+        FROM (
+            SELECT {var}
+            FROM RANGE({n}) _ ({var})
+            ORDER BY RANDOM()
+        )
+        """
+    )
 ```
 
 ## Output
@@ -748,6 +761,20 @@ class C:
                     to_ts=to_ts,
                 ),
             )
+
+
+def ddb():
+    sql = (
+        lambda var, table, n=N: f"""
+        CREATE TABLE {table} AS
+        SELECT ROW_NUMBER() OVER () AS id, {var}
+        FROM (
+            SELECT {var}
+            FROM RANGE({n}) _ ({var})
+            ORDER BY RANDOM()
+        )
+        """
+    )
 ```
 
 
@@ -1029,4 +1056,15 @@ class C:
                      chain_id=_chain_id,
                      from_ts=from_ts,
                      to_ts=to_ts,
+@@ -378,8 +360,8 @@
+ 
+ 
+ def ddb():
+-    sql = (
+-        lambda var, table, n=N: f"""
++    sql = lambda var, table, n=N: (
++        f"""
+         CREATE TABLE {table} AS
+         SELECT ROW_NUMBER() OVER () AS id, {var}
+         FROM (
 ```

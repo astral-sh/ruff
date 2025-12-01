@@ -361,3 +361,16 @@ class C:
                     to_ts=to_ts,
                 ),
             )
+
+def ddb():
+    sql = (
+        lambda var, table, n=N: f"""
+        CREATE TABLE {table} AS
+        SELECT ROW_NUMBER() OVER () AS id, {var}
+        FROM (
+            SELECT {var}
+            FROM RANGE({n}) _ ({var})
+            ORDER BY RANDOM()
+        )
+        """
+    )
