@@ -12074,10 +12074,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     *typevar,
                     &|ty| match ty {
                         Type::Dynamic(DynamicType::TodoUnpack) => true,
-                        Type::NominalInstance(nominal) => matches!(
-                            nominal.known_class(self.db()),
-                            Some(KnownClass::TypeVarTuple | KnownClass::ParamSpec)
-                        ),
+                        Type::NominalInstance(nominal) => {
+                            nominal.has_known_class(self.db(), KnownClass::TypeVarTuple)
+                        }
                         _ => false,
                     },
                     true,
