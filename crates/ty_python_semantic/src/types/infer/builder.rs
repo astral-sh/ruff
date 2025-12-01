@@ -1,9 +1,9 @@
 use std::iter;
 
 use itertools::{Either, EitherOrBoth, Itertools};
-use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
+use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
-use ruff_db::parsed::ParsedModuleRef;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ExprContext, HasNodeIndex, NodeIndex, PythonVersion,
@@ -102,14 +102,15 @@ use crate::types::typed_dict::{
 };
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    CallDunderError, CallableBinding, CallableType, CallableTypes, ClassLiteral, ClassType,
-    DataclassParams, DynamicType, InternedType, IntersectionBuilder, IntersectionType, KnownClass,
-    KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
-    PEP695TypeAliasType, ParameterForm, SpecialFormType, SubclassOfType, TrackedConstraintSet,
-    Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
-    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
-    UnionType, UnionTypeInstance, binding_type, infer_scope_types, overrides, todo_type,
+    BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes,
+    ClassLiteral, ClassType, DataclassParams, DynamicType, InternedType, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy,
+    MetaclassCandidate, PEP695TypeAliasType, ParameterForm, SpecialFormType, SubclassOfType,
+    TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
+    TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
+    TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type, infer_scope_types,
+    overrides, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -11292,6 +11293,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         generic_context: GenericContext<'db>,
         specialize: impl FnOnce(&[Option<Type<'db>>]) -> Type<'db>,
     ) -> Type<'db> {
+        fn add_typevar_definition<'db>(
+            db: &'db dyn Db,
+            diagnostic: &mut Diagnostic,
+            typevar: BoundTypeVarInstance<'db>,
+        ) {
+            let Some(definition) = typevar.typevar(db).definition(db) else {
+                return;
+            };
+            let file = definition.file(db);
+            let module = parsed_module(db, file).load(db);
+            let range = definition.focus_range(db, &module).range();
+            diagnostic.annotate(
+                Annotation::secondary(Span::from(file).with_range(range))
+                    .message("Type variable defined here"),
+            );
+        }
+
         let db = self.db();
         let slice_node = subscript.slice.as_ref();
 
@@ -11349,13 +11367,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 if let Some(builder) =
                                     self.context.report_lint(&INVALID_TYPE_ARGUMENTS, node)
                                 {
-                                    builder.into_diagnostic(format_args!(
+                                    let mut diagnostic = builder.into_diagnostic(format_args!(
                                         "Type `{}` is not assignable to upper bound `{}` \
                                             of type variable `{}`",
                                         provided_type.display(db),
                                         bound.display(db),
                                         typevar.identity(db).display(db),
                                     ));
+                                    add_typevar_definition(db, &mut diagnostic, typevar);
                                 }
                                 has_error = true;
                                 continue;
@@ -11374,7 +11393,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 if let Some(builder) =
                                     self.context.report_lint(&INVALID_TYPE_ARGUMENTS, node)
                                 {
-                                    builder.into_diagnostic(format_args!(
+                                    let mut diagnostic = builder.into_diagnostic(format_args!(
                                         "Type `{}` does not satisfy constraints `{}` \
                                             of type variable `{}`",
                                         provided_type.display(db),
@@ -11385,6 +11404,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             .format("`, `"),
                                         typevar.identity(db).display(db),
                                     ));
+                                    add_typevar_definition(db, &mut diagnostic, typevar);
                                 }
                                 has_error = true;
                                 continue;
