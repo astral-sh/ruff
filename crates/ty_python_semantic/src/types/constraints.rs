@@ -3423,18 +3423,32 @@ mod tests {
     fn test_display_graph_output() {
         let expected = indoc! {r#"
             (T = str)
-            ┡━₁ (U = str)
-            │   ┡━₁ always
-            │   └─₀ (U = bool)
-            │       ┡━₁ always
-            │       └─₀ never
+            ┡━₁ (T = bool)
+            │   ┡━₁ (U = str)
+            │   │   ┡━₁ (U = bool)
+            │   │   │   ┡━₁ always
+            │   │   │   └─₀ always
+            │   │   └─₀ (U = bool)
+            │   │       ┡━₁ always
+            │   │       └─₀ never
+            │   └─₀ (U = str)
+            │       ┡━₁ (U = bool)
+            │       │   ┡━₁ always
+            │       │   └─₀ always
+            │       └─₀ (U = bool)
+            │           ┡━₁ always
+            │           └─₀ never
             └─₀ (T = bool)
                 ┡━₁ (U = str)
-                │   ┡━₁ always
+                │   ┡━₁ (U = bool)
+                │   │   ┡━₁ always
+                │   │   └─₀ always
                 │   └─₀ (U = bool)
                 │       ┡━₁ always
                 │       └─₀ never
-                └─₀ never
+                └─₀ (U = str)
+                    ┡━₁ never
+                    └─₀ never
         "#}
         .trim_end();
 
