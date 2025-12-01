@@ -1,3 +1,10 @@
+//! Routines and types to list all members present on a given type or in a given scope.
+//!
+//! These two concepts are closely related, since listing all members of a given
+//! module-literal type requires listing all members in the module's scope, and
+//! listing all members on a nominal-instance type or a class-literal type requires
+//! listing all members in the class's body scope.
+
 use std::cmp::Ordering;
 
 use ruff_python_ast::name::Name;
@@ -16,6 +23,7 @@ use crate::{
     },
 };
 
+/// Iterate over all declarations and bindings in the given scope.
 pub(crate) fn all_declarations_and_bindings<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId<'db>,
@@ -449,17 +457,17 @@ impl<'db> AllMembers<'db> {
     }
 }
 
-/// A member of a type with an optional definition.
+/// A member of a type or scope, with an optional definition.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct MemberWithDefinition<'db> {
     pub member: Member<'db>,
     pub definition: Option<Definition<'db>>,
 }
 
-/// A member of a type.
+/// A member of a type or scope.
 ///
-/// This represents a single item in (ideally) the list returned by
-/// `dir(object)`.
+/// In the context of the [`all_members`] routine, this represents
+/// a single item in (ideally) the list returned by `dir(object)`.
 ///
 /// The equality, comparison and hashing traits implemented for
 /// this type are done so by taking only the name into account. At
@@ -467,7 +475,7 @@ pub struct MemberWithDefinition<'db> {
 /// identify each attribute on an object. This is perhaps complicated
 /// by overloads, but they only get represented by one member for
 /// now. Moreover, it is convenient to be able to sort collections of
-/// members, and a `Type` currently (as of 2025-07-09) has no way to do
+/// members, and a [`Type`] currently (as of 2025-07-09) has no way to do
 /// ordered comparisons.
 #[derive(Clone, Debug)]
 pub struct Member<'db> {
