@@ -66,6 +66,8 @@ def _(flag_s: bool, flag_l: bool):
 
 ## Unsupported operations
 
+<!-- snapshot-diagnostics -->
+
 Make sure we emit a diagnostic if *any* of the possible comparisons is unsupported. For now, we fall
 back to `bool` for the result type instead of trying to infer something more precise from the other
 (supported) variants:

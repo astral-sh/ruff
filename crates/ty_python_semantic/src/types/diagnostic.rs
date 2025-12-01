@@ -18,6 +18,7 @@ use crate::types::class::{
     CodeGeneratorKind, DisjointBase, DisjointBaseKind, Field, MethodDecorator,
 };
 use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral};
+use crate::types::infer::UnsupportedComparisonError;
 use crate::types::overrides::MethodKind;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
@@ -2410,7 +2411,7 @@ pub(super) fn report_invalid_assignment<'db>(
     }
 
     let settings =
-        DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), target_ty, value_ty);
+        DisplaySettings::from_possibly_ambiguous_types(context.db(), [target_ty, value_ty]);
 
     let diagnostic_range = if let Some(value_node) = value_node {
         // Expand the range to include parentheses around the value, if any. This allows
@@ -2548,7 +2549,7 @@ pub(super) fn report_invalid_return_type(
     };
 
     let settings =
-        DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), expected_ty, actual_ty);
+        DisplaySettings::from_possibly_ambiguous_types(context.db(), [expected_ty, actual_ty]);
     let return_type_span = context.span(return_type_range);
 
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
@@ -4051,6 +4052,83 @@ pub(super) fn report_overridden_final_method<'db>(
         diagnostic.help(format_args!("Remove the getter and setter for `{member}`"));
     } else {
         diagnostic.help(format_args!("Remove the override of `{member}`"));
+    }
+}
+
+pub(super) fn report_unsupported_comparison<'db>(
+    context: &InferContext<'db, '_>,
+    error: &UnsupportedComparisonError<'db>,
+    range: TextRange,
+    left: &ast::Expr,
+    right: &ast::Expr,
+    left_ty: Type<'db>,
+    right_ty: Type<'db>,
+) {
+    let db = context.db();
+
+    let Some(diagnostic_builder) = context.report_lint(&UNSUPPORTED_OPERATOR, range) else {
+        return;
+    };
+
+    let display_settings = DisplaySettings::from_possibly_ambiguous_types(
+        db,
+        [error.left_ty, error.right_ty, left_ty, right_ty],
+    );
+
+    let mut diagnostic =
+        diagnostic_builder.into_diagnostic(format_args!("Unsupported `{}` operation", error.op));
+
+    diagnostic.set_primary_message("Comparison may raise an exception");
+
+    let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Operand types");
+    sub.annotate(context.secondary(left).message(format_args!(
+        "Left-hand side has type `{}`",
+        left_ty.display_with(db, display_settings.clone())
+    )));
+    let mut rhs_annotation = context.secondary(right);
+    if left_ty == right_ty {
+        rhs_annotation = rhs_annotation.message("Right-hand side has the same type");
+    } else {
+        rhs_annotation = rhs_annotation.message(format_args!(
+            "Right-hand side has type `{}`",
+            right_ty.display_with(db, display_settings.clone())
+        ));
+    }
+    sub.annotate(rhs_annotation);
+    diagnostic.sub(sub);
+
+    if left_ty == right_ty {
+        diagnostic.set_concise_message(format_args!(
+            "Operator `{}` is not supported between two objects of type `{}`",
+            error.op,
+            left_ty.display_with(db, display_settings.clone())
+        ));
+    } else {
+        diagnostic.set_concise_message(format_args!(
+            "Operator `{}` is not supported between objects of type `{}` and `{}`",
+            error.op,
+            left_ty.display_with(db, display_settings.clone()),
+            right_ty.display_with(db, display_settings.clone())
+        ));
+    }
+
+    if (error.left_ty, error.right_ty) != (left_ty, right_ty) {
+        if error.left_ty == error.right_ty {
+            diagnostic.info(format_args!(
+                "Operation fails because operator `{}` is not supported \
+                between two objects of type `{}`",
+                error.op,
+                error.left_ty.display_with(db, display_settings),
+            ));
+        } else {
+            diagnostic.info(format_args!(
+                "Operation fails because operator `{}` is not supported \
+                between objects of type `{}` and `{}`",
+                error.op,
+                error.left_ty.display_with(db, display_settings.clone()),
+                error.right_ty.display_with(db, display_settings)
+            ));
+        }
     }
 }
 

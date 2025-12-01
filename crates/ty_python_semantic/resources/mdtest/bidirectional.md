@@ -340,7 +340,7 @@ def _(a: object, b: object, flag: bool):
     else:
         x = g
 
-    # error: [unsupported-operator] "Operator `>` is not supported for types `object` and `object`"
+    # error: [unsupported-operator] "Operator `>` is not supported between two objects of type `object`"
     x(f"{'a' if a > b else 'b'}")
 ```
 

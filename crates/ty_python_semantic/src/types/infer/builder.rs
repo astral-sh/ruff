@@ -79,7 +79,7 @@ use crate::types::diagnostic::{
     report_invalid_type_checking_constant, report_named_tuple_field_with_leading_underscore,
     report_namedtuple_field_without_default_after_field_with_default, report_non_subscriptable,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
-    report_rebound_typevar, report_slice_step_size_zero,
+    report_rebound_typevar, report_slice_step_size_zero, report_unsupported_comparison,
 };
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
@@ -158,7 +158,7 @@ impl<'db> DeclaredAndInferredType<'db> {
 type BinaryComparisonVisitor<'db> = CycleDetector<
     ast::CmpOp,
     (Type<'db>, ast::CmpOp, Type<'db>),
-    Result<Type<'db>, CompareUnsupportedError<'db>>,
+    Result<Type<'db>, UnsupportedComparisonError<'db>>,
 >;
 
 /// We currently store one dataclass field-specifiers inline, because that covers standard
@@ -10056,26 +10056,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         &BinaryComparisonVisitor::new(Ok(Type::BooleanLiteral(true))),
                     )
                     .unwrap_or_else(|error| {
-                        if let Some(diagnostic_builder) =
-                            builder.context.report_lint(&UNSUPPORTED_OPERATOR, range)
-                        {
-                            // Handle unsupported operators (diagnostic, `bool`/`Unknown` outcome)
-                            diagnostic_builder.into_diagnostic(format_args!(
-                                "Operator `{}` is not supported for types `{}` and `{}`{}",
-                                error.op,
-                                error.left_ty.display(builder.db()),
-                                error.right_ty.display(builder.db()),
-                                if (left_ty, right_ty) == (error.left_ty, error.right_ty) {
-                                    String::new()
-                                } else {
-                                    format!(
-                                        ", in comparing `{}` with `{}`",
-                                        left_ty.display(builder.db()),
-                                        right_ty.display(builder.db())
-                                    )
-                                }
-                            ));
-                        }
+                        report_unsupported_comparison(
+                            &builder.context,
+                            &error,
+                            range,
+                            left,
+                            right,
+                            left_ty,
+                            right_ty,
+                        );
 
                         match op {
                             // `in, not in, is, is not` always return bool instances
@@ -10101,13 +10090,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         intersection_on: IntersectionOn,
         range: TextRange,
         visitor: &BinaryComparisonVisitor<'db>,
-    ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
+    ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
         enum State<'db> {
             // We have not seen any positive elements (yet)
             NoPositiveElements,
             // The operator was unsupported on all elements that we have seen so far.
             // Contains the first error we encountered.
-            UnsupportedOnAllElements(CompareUnsupportedError<'db>),
+            UnsupportedOnAllElements(UnsupportedComparisonError<'db>),
             // The operator was supported on at least one positive element.
             Supported,
         }
@@ -10263,7 +10252,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         right: Type<'db>,
         range: TextRange,
         visitor: &BinaryComparisonVisitor<'db>,
-    ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
+    ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
         // Note: identity (is, is not) for equal builtin types is unreliable and not part of the
         // language spec.
         // - `[ast::CompOp::Is]`: return `false` if unequal, `bool` if equal
@@ -10392,7 +10381,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 // Undefined for (int, int)
-                ast::CmpOp::In | ast::CmpOp::NotIn => Err(CompareUnsupportedError {
+                ast::CmpOp::In | ast::CmpOp::NotIn => Err(UnsupportedComparisonError {
                     op,
                     left_ty: left,
                     right_ty: right,
@@ -10405,7 +10394,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     right,
                     range,
                     visitor,
-                ))
+                ).map_err(|_| UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
             }
             (Type::NominalInstance(_), Type::IntLiteral(_)) => {
                 Some(self.infer_binary_type_comparison(
@@ -10414,7 +10403,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     KnownClass::Int.to_instance(self.db()),
                     range,
                     visitor,
-                ))
+                ).map_err(|_|UnsupportedComparisonError { op, left_ty: left, right_ty: right }))
             }
 
             // Booleans are coded as integers (False = 0, True = 1)
@@ -10425,7 +10414,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Type::IntLiteral(i64::from(b)),
                     range,
                     visitor,
-                ))
+                ).map_err(|_|UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
             }
             (Type::BooleanLiteral(b), Type::IntLiteral(m)) => {
                 Some(self.infer_binary_type_comparison(
@@ -10434,7 +10423,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Type::IntLiteral(m),
                     range,
                     visitor,
-                ))
+                ).map_err(|_|UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
             }
             (Type::BooleanLiteral(a), Type::BooleanLiteral(b)) => {
                 Some(self.infer_binary_type_comparison(
@@ -10443,37 +10432,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Type::IntLiteral(i64::from(b)),
                     range,
                     visitor,
-                ))
+                ).map_err(|_|UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
             }
 
             (Type::StringLiteral(salsa_s1), Type::StringLiteral(salsa_s2)) => {
                 let s1 = salsa_s1.value(self.db());
                 let s2 = salsa_s2.value(self.db());
                 let result = match op {
-                    ast::CmpOp::Eq => Ok(Type::BooleanLiteral(s1 == s2)),
-                    ast::CmpOp::NotEq => Ok(Type::BooleanLiteral(s1 != s2)),
-                    ast::CmpOp::Lt => Ok(Type::BooleanLiteral(s1 < s2)),
-                    ast::CmpOp::LtE => Ok(Type::BooleanLiteral(s1 <= s2)),
-                    ast::CmpOp::Gt => Ok(Type::BooleanLiteral(s1 > s2)),
-                    ast::CmpOp::GtE => Ok(Type::BooleanLiteral(s1 >= s2)),
-                    ast::CmpOp::In => Ok(Type::BooleanLiteral(s2.contains(s1))),
-                    ast::CmpOp::NotIn => Ok(Type::BooleanLiteral(!s2.contains(s1))),
+                    ast::CmpOp::Eq => Type::BooleanLiteral(s1 == s2),
+                    ast::CmpOp::NotEq => Type::BooleanLiteral(s1 != s2),
+                    ast::CmpOp::Lt => Type::BooleanLiteral(s1 < s2),
+                    ast::CmpOp::LtE => Type::BooleanLiteral(s1 <= s2),
+                    ast::CmpOp::Gt => Type::BooleanLiteral(s1 > s2),
+                    ast::CmpOp::GtE => Type::BooleanLiteral(s1 >= s2),
+                    ast::CmpOp::In => Type::BooleanLiteral(s2.contains(s1)),
+                    ast::CmpOp::NotIn => Type::BooleanLiteral(!s2.contains(s1)),
                     ast::CmpOp::Is => {
                         if s1 == s2 {
-                            Ok(KnownClass::Bool.to_instance(self.db()))
+                            KnownClass::Bool.to_instance(self.db())
                         } else {
-                            Ok(Type::BooleanLiteral(false))
+                            Type::BooleanLiteral(false)
                         }
                     }
                     ast::CmpOp::IsNot => {
                         if s1 == s2 {
-                            Ok(KnownClass::Bool.to_instance(self.db()))
+                            KnownClass::Bool.to_instance(self.db())
                         } else {
-                            Ok(Type::BooleanLiteral(true))
+                            Type::BooleanLiteral(true)
                         }
                     }
                 };
-                Some(result)
+                Some(Ok(result))
             }
             (Type::StringLiteral(_), _) => Some(self.infer_binary_type_comparison(
                 KnownClass::Str.to_instance(self.db()),
@@ -10481,14 +10470,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 right,
                 range,
                 visitor,
-            )),
+            ).map_err(|err|UnsupportedComparisonError {op, left_ty: left, right_ty: err.right_ty})),
             (_, Type::StringLiteral(_)) => Some(self.infer_binary_type_comparison(
                 left,
                 op,
                 KnownClass::Str.to_instance(self.db()),
                 range,
                 visitor,
-            )),
+            ).map_err(|err|UnsupportedComparisonError {op, left_ty: err.left_ty, right_ty: right})),
 
             (Type::LiteralString, _) => Some(self.infer_binary_type_comparison(
                 KnownClass::Str.to_instance(self.db()),
@@ -10496,47 +10485,47 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 right,
                 range,
                 visitor,
-            )),
+            ).map_err(|err|UnsupportedComparisonError {op, left_ty: left, right_ty: err.right_ty})),
             (_, Type::LiteralString) => Some(self.infer_binary_type_comparison(
                 left,
                 op,
                 KnownClass::Str.to_instance(self.db()),
                 range,
                 visitor,
-            )),
+            ).map_err(|err|UnsupportedComparisonError {op, left_ty: err.left_ty, right_ty: right})),
 
             (Type::BytesLiteral(salsa_b1), Type::BytesLiteral(salsa_b2)) => {
                 let b1 = salsa_b1.value(self.db());
                 let b2 = salsa_b2.value(self.db());
                 let result = match op {
-                    ast::CmpOp::Eq => Ok(Type::BooleanLiteral(b1 == b2)),
-                    ast::CmpOp::NotEq => Ok(Type::BooleanLiteral(b1 != b2)),
-                    ast::CmpOp::Lt => Ok(Type::BooleanLiteral(b1 < b2)),
-                    ast::CmpOp::LtE => Ok(Type::BooleanLiteral(b1 <= b2)),
-                    ast::CmpOp::Gt => Ok(Type::BooleanLiteral(b1 > b2)),
-                    ast::CmpOp::GtE => Ok(Type::BooleanLiteral(b1 >= b2)),
+                    ast::CmpOp::Eq => Type::BooleanLiteral(b1 == b2),
+                    ast::CmpOp::NotEq => Type::BooleanLiteral(b1 != b2),
+                    ast::CmpOp::Lt => Type::BooleanLiteral(b1 < b2),
+                    ast::CmpOp::LtE => Type::BooleanLiteral(b1 <= b2),
+                    ast::CmpOp::Gt => Type::BooleanLiteral(b1 > b2),
+                    ast::CmpOp::GtE => Type::BooleanLiteral(b1 >= b2),
                     ast::CmpOp::In => {
-                        Ok(Type::BooleanLiteral(memchr::memmem::find(b2, b1).is_some()))
+                        Type::BooleanLiteral(memchr::memmem::find(b2, b1).is_some())
                     }
                     ast::CmpOp::NotIn => {
-                        Ok(Type::BooleanLiteral(memchr::memmem::find(b2, b1).is_none()))
+                        Type::BooleanLiteral(memchr::memmem::find(b2, b1).is_none())
                     }
                     ast::CmpOp::Is => {
                         if b1 == b2 {
-                            Ok(KnownClass::Bool.to_instance(self.db()))
+                            KnownClass::Bool.to_instance(self.db())
                         } else {
-                            Ok(Type::BooleanLiteral(false))
+                            Type::BooleanLiteral(false)
                         }
                     }
                     ast::CmpOp::IsNot => {
                         if b1 == b2 {
-                            Ok(KnownClass::Bool.to_instance(self.db()))
+                            KnownClass::Bool.to_instance(self.db())
                         } else {
-                            Ok(Type::BooleanLiteral(true))
+                            Type::BooleanLiteral(true)
                         }
                     }
                 };
-                Some(result)
+                Some(Ok(result))
             }
             (Type::BytesLiteral(_), _) => Some(self.infer_binary_type_comparison(
                 KnownClass::Bytes.to_instance(self.db()),
@@ -10544,14 +10533,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 right,
                 range,
                 visitor,
-            )),
+            ).map_err(|err| UnsupportedComparisonError { op, left_ty: left, right_ty: err.right_ty })),
             (_, Type::BytesLiteral(_)) => Some(self.infer_binary_type_comparison(
                 left,
                 op,
                 KnownClass::Bytes.to_instance(self.db()),
                 range,
                 visitor,
-            )),
+            ).map_err(|err| UnsupportedComparisonError { op, left_ty: err.left_ty, right_ty: right })),
 
             (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
                 if op == ast::CmpOp::Eq =>
@@ -10683,7 +10672,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         right: Type<'db>,
         op: RichCompareOperator,
         policy: MemberLookupPolicy,
-    ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
+    ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
         let db = self.db();
         // The following resource has details about the rich comparison algorithm:
         // https://snarky.ca/unravelling-rich-comparison-operators/
@@ -10719,7 +10708,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 None
             }
         })
-        .ok_or_else(|| CompareUnsupportedError {
+        .ok_or_else(|| UnsupportedComparisonError {
             op: op.into(),
             left_ty: left,
             right_ty: right,
@@ -10736,7 +10725,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         right: Type<'db>,
         op: MembershipTestCompareOperator,
         range: TextRange,
-    ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
+    ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
         let db = self.db();
 
         let contains_dunder = right.class_member(db, "__contains__".into()).place;
@@ -10773,7 +10762,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     MembershipTestCompareOperator::NotIn => truthiness.negate().into_type(db),
                 }
             })
-            .ok_or_else(|| CompareUnsupportedError {
+            .ok_or_else(|| UnsupportedComparisonError {
                 op: op.into(),
                 left_ty: left,
                 right_ty: right,
@@ -10792,7 +10781,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         right: &TupleSpec<'db>,
         range: TextRange,
         visitor: &BinaryComparisonVisitor<'db>,
-    ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
+    ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
         // If either tuple is variable length, we can make no assumptions about the relative
         // lengths of the tuples, and therefore neither about how they compare lexicographically.
         // TODO: Consider comparing the prefixes of the tuples, since that could give a comparison
@@ -12382,11 +12371,22 @@ impl From<MembershipTestCompareOperator> for ast::CmpOp {
     }
 }
 
+/// Context for a failed comparison operation.
+///
+/// `left_ty` and `right_ty` are the "low-level" types
+/// that cannot be compared using `op`. For example,
+/// when evaluating `(1, "foo") < (2, 3)`, the "high-level"
+/// types of the operands are `tuple[Literal[1], Literal["foo"]]`
+/// and `tuple[Literal[2], Literal[3]]`. Those aren't captured
+/// in this struct, but the "low-level" types that mean that
+/// the high-level types cannot be compared *are* captured in
+/// this struct. In this case, those would be `Literal["foo"]`
+/// and `Literal[3]`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct CompareUnsupportedError<'db> {
-    op: ast::CmpOp,
-    left_ty: Type<'db>,
-    right_ty: Type<'db>,
+pub(crate) struct UnsupportedComparisonError<'db> {
+    pub(crate) op: ast::CmpOp,
+    pub(crate) left_ty: Type<'db>,
+    pub(crate) right_ty: Type<'db>,
 }
 
 fn format_import_from_module(level: u32, module: Option<&str>) -> String {

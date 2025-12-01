@@ -1,0 +1,48 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: unions.md - Comparison: Unions - Unsupported operations
+mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/unions.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | def _(flag: bool):
+2 |     x = [1, 2] if flag else 1
+3 | 
+4 |     result = 1 in x  # error: "Operator `in` is not supported"
+5 |     reveal_type(result)  # revealed: bool
+```
+
+# Diagnostics
+
+```
+error[unsupported-operator]: Unsupported `in` operation
+ --> src/mdtest_snippet.py:4:14
+  |
+2 |     x = [1, 2] if flag else 1
+3 |
+4 |     result = 1 in x  # error: "Operator `in` is not supported"
+  |              ^^^^^^ Comparison may raise an exception
+5 |     reveal_type(result)  # revealed: bool
+  |
+info: Operand types
+ --> src/mdtest_snippet.py:4:14
+  |
+2 |     x = [1, 2] if flag else 1
+3 |
+4 |     result = 1 in x  # error: "Operator `in` is not supported"
+  |              -    - Right-hand side has type `list[Unknown | int] | Literal[1]`
+  |              |
+  |              Left-hand side has type `Literal[1]`
+5 |     reveal_type(result)  # revealed: bool
+  |
+info: Operation fails because operator `in` is not supported between two objects of type `Literal[1]`
+info: rule `unsupported-operator` is enabled by default
+
+```
