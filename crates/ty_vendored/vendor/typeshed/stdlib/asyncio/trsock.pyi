@@ -14,13 +14,6 @@ _WriteBuffer: TypeAlias = bytearray | memoryview
 _CMSG: TypeAlias = tuple[int, int, bytes]
 
 class TransportSocket:
-    """A socket-like wrapper for exposing real transport sockets.
-
-    These objects can be safely returned by APIs like
-    `transport.get_extra_info('socket')`.  All potentially disruptive
-    operations (like "socket.close()") are banned.
-    """
-
     __slots__ = ("_sock",)
     def __init__(self, sock: socket.socket) -> None: ...
     @property
@@ -69,7 +62,7 @@ class TransportSocket:
         def listen(self, backlog: int = ..., /) -> None: ...
         @deprecated("Removed in Python 3.11")
         def makefile(self) -> BinaryIO: ...
-        @deprecated("Rmoved in Python 3.11")
+        @deprecated("Removed in Python 3.11")
         def sendfile(self, file: BinaryIO, offset: int = 0, count: int | None = None) -> int: ...
         @deprecated("Removed in Python 3.11")
         def close(self) -> None: ...
