@@ -1014,7 +1014,6 @@ jobs:
         with:
           mode: simulation
           run: cargo codspeed run
-          token: ${{ secrets.CODSPEED_TOKEN }}
 
   benchmarks-walltime:
     name: "benchmarks walltime (${{ matrix.benchmarks }})"
