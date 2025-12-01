@@ -90,14 +90,14 @@ pub(crate) enum InvalidSuppressionKind {
     Indentation,
 }
 
-#[expect(unused)]
+#[allow(unused)]
 #[derive(Clone, Debug)]
 pub(crate) struct InvalidSuppression {
     kind: InvalidSuppressionKind,
     comment: SuppressionComment,
 }
 
-#[expect(unused)]
+#[allow(unused)]
 #[derive(Debug)]
 pub(crate) struct Suppressions {
     /// Valid suppression ranges with associated comments
