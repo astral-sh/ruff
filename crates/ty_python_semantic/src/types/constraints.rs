@@ -51,6 +51,19 @@
 //! the constraint says that the typevar must specialize to that _exact_ type, not to a subtype or
 //! supertype of it.
 //!
+//! ### Tracing
+//!
+//! This module is instrumented with debug- and trace-level `tracing` messages. You can set the
+//! `TY_LOG` environment variable to see this output when testing locally. `tracing` log messages
+//! typically have a `target` field, which is the name of the module the message appears in — in
+//! this case, `ty_python_semantic::types::constraints`. We add additional detail to these targets,
+//! in case you only want to debug parts of the implementation. For instance, if you want to debug
+//! how we construct sequent maps, you could use
+//!
+//! ```sh
+//! env TY_LOG=ty_python_semantic::types::constraints::SequentMap=trace ty check ...
+//! ```
+//!
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
 use std::cell::RefCell;
