@@ -91,14 +91,14 @@ error[missing-argument]: No argument provided for required parameter `arg` of bo
 7 | from typing_extensions import deprecated
   |
 info: Parameter declared here
-    --> stdlib/typing_extensions.pyi:1000:28
+    --> stdlib/typing_extensions.pyi:1001:28
      |
- 998 |         stacklevel: int
- 999 |         def __init__(self, message: LiteralString, /, *, category: type[Warning] | None = ..., stacklevel: int = 1) -> None: ...
-1000 |         def __call__(self, arg: _T, /) -> _T: ...
+ 999 |         stacklevel: int
+1000 |         def __init__(self, message: LiteralString, /, *, category: type[Warning] | None = ..., stacklevel: int = 1) -> None: ...
+1001 |         def __call__(self, arg: _T, /) -> _T: ...
      |                            ^^^^^^^
-1001 |
-1002 |     @final
+1002 |
+1003 |     @final
      |
 info: rule `missing-argument` is enabled by default
 
