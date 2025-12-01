@@ -76,7 +76,7 @@ use crate::types::diagnostic::{
     report_invalid_exception_raised, report_invalid_exception_tuple_caught,
     report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
     report_invalid_or_unsupported_base, report_invalid_return_type,
-    report_invalid_type_checking_constant,
+    report_invalid_type_checking_constant, report_named_tuple_field_with_leading_underscore,
     report_namedtuple_field_without_default_after_field_with_default, report_non_subscriptable,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
     report_rebound_typevar, report_slice_step_size_zero,
@@ -628,6 +628,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 for (field_name, field) in
                     class.own_fields(self.db(), None, CodeGeneratorKind::NamedTuple)
                 {
+                    if field_name.starts_with('_') {
+                        report_named_tuple_field_with_leading_underscore(
+                            &self.context,
+                            class,
+                            &field_name,
+                            field.single_declaration,
+                        );
+                    }
+
                     if matches!(
                         field.kind,
                         FieldKind::NamedTuple {
@@ -641,7 +650,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         report_namedtuple_field_without_default_after_field_with_default(
                             &self.context,
                             class,
-                            &(field_name, field.single_declaration),
+                            (&field_name, field.single_declaration),
                             field_with_default,
                         );
                     }

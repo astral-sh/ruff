@@ -482,3 +482,21 @@ class F(NamedTuple):
 
 super(F, F(42))  # fine
 ```
+
+## NamedTuples cannot have field names starting with underscores
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import NamedTuple
+
+class Foo(NamedTuple):
+    # error: [invalid-named-tuple] "NamedTuple field `_bar` cannot start with an underscore"
+    _bar: int
+
+class Bar(NamedTuple):
+    x: int
+
+class Baz(Bar):
+    _whatever: str  # `Baz` is not a NamedTuple class, so this is fine
+```

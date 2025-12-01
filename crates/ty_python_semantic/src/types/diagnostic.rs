@@ -3529,7 +3529,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'db>(
     context: &InferContext<'db, '_>,
     class: ClassLiteral<'db>,
-    (field, field_def): &(Name, Option<Definition<'db>>),
+    (field, field_def): (&str, Option<Definition<'db>>),
     (field_with_default, field_with_default_def): &(Name, Option<Definition<'db>>),
 ) {
     let db = context.db();
@@ -3542,9 +3542,9 @@ pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'
     let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, diagnostic_range) else {
         return;
     };
-    let mut diagnostic = builder.into_diagnostic(format_args!(
+    let mut diagnostic = builder.into_diagnostic(
         "NamedTuple field without default value cannot follow field(s) with default value(s)",
-    ));
+    );
 
     diagnostic.set_primary_message(format_args!(
         "Field `{field}` defined here without a default value",
@@ -3573,6 +3573,40 @@ pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'
             "Earlier field `{field_with_default}` was defined with a default value",
         ));
     }
+}
+
+pub(super) fn report_named_tuple_field_with_leading_underscore<'db>(
+    context: &InferContext<'db, '_>,
+    class: ClassLiteral<'db>,
+    field_name: &str,
+    field_definition: Option<Definition<'db>>,
+) {
+    let db = context.db();
+    let module = context.module();
+
+    let diagnostic_range = field_definition
+        .map(|definition| definition.kind(db).full_range(module))
+        .unwrap_or_else(|| class.header_range(db));
+
+    let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, diagnostic_range) else {
+        return;
+    };
+    let mut diagnostic =
+        builder.into_diagnostic("NamedTuple field name cannot start with an underscore");
+
+    if field_definition.is_some() {
+        diagnostic.set_primary_message(
+            "Class definition will raise `TypeError` at runtime due to this field",
+        );
+    } else {
+        diagnostic.set_primary_message(format_args!(
+            "Class definition will raise `TypeError` at runtime due to field `{field_name}`",
+        ));
+    }
+
+    diagnostic.set_concise_message(format_args!(
+        "NamedTuple field `{field_name}` cannot start with an underscore"
+    ));
 }
 
 pub(crate) fn report_missing_typed_dict_key<'db>(
