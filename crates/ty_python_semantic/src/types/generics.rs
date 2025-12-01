@@ -1045,24 +1045,23 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
         let types = if nested {
             self.types(db)
                 .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, div, true, visitor))
+                .map(|ty| ty.recursive_type_normalized_impl(db, div, true))
                 .collect::<Option<Box<[_]>>>()?
         } else {
             self.types(db)
                 .iter()
                 .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, div, true, visitor)
+                    ty.recursive_type_normalized_impl(db, div, true)
                         .unwrap_or(div)
                 })
                 .collect::<Box<[_]>>()
         };
         let tuple_inner = match self.tuple_inner(db) {
-            Some(tuple) => Some(tuple.recursive_type_normalized_impl(db, div, nested, visitor)?),
+            Some(tuple) => Some(tuple.recursive_type_normalized_impl(db, div, nested)?),
             None => None,
         };
         let context = self.generic_context(db);

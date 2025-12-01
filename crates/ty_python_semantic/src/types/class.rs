@@ -284,13 +284,12 @@ impl<'db> GenericAlias<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
         Some(Self::new(
             db,
             self.origin(db),
             self.specialization(db)
-                .recursive_type_normalized_impl(db, div, nested, visitor)?,
+                .recursive_type_normalized_impl(db, div, nested)?,
         ))
     }
 
@@ -443,12 +442,11 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
         match self {
             Self::NonGeneric(_) => Some(self),
             Self::Generic(generic) => Some(Self::Generic(
-                generic.recursive_type_normalized_impl(db, div, nested, visitor)?,
+                generic.recursive_type_normalized_impl(db, div, nested)?,
             )),
         }
     }
