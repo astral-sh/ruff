@@ -1483,7 +1483,7 @@ def sequence(cls: type[U]) -> type[U]:
         match_args=False,
         kw_only=True,
     )(cls)
-    reveal_type(d)  # revealed: type[U@sequence]
+    reveal_type(d)  # revealed: type[U@sequence] & Any
     return d
 
 @dataclass_transform(kw_only_default=True)
@@ -1494,7 +1494,7 @@ def sequence2(cls: type) -> type:
         match_args=False,
         kw_only=True,
     )(cls)
-    reveal_type(d)  # revealed: type
+    reveal_type(d)  # revealed: type & Any
     return d
 
 @dataclass_transform(kw_only_default=True)
@@ -1506,4 +1506,13 @@ def sequence3(cls: type[U]) -> type[U]:
 def sequence4(cls: type) -> type:
     # TODO: should reveal `type`
     return reveal_type(dataclass(cls))  # revealed: Unknown
+
+class Foo: ...
+
+ordered_foo = dataclass(order=True)(Foo)
+reveal_type(ordered_foo)  # revealed: type[Foo] & Any
+# TODO: should be `Foo & Any`
+reveal_type(ordered_foo())  # revealed: @Todo(Type::Intersection.call)
+# TODO: should be `Any`
+reveal_type(ordered_foo() < ordered_foo())  # revealed: @Todo(Type::Intersection.call)
 ```
