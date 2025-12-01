@@ -428,8 +428,7 @@ def _(
     reveal_type(int_and_bytes)  # revealed: tuple[int, bytes]
     reveal_type(list_or_tuple)  # revealed: list[int] | tuple[int, ...]
     reveal_type(list_or_tuple_legacy)  # revealed: list[int] | tuple[int, ...]
-    # TODO: This should be `(str, bytes) -> int`
-    reveal_type(my_callable)  # revealed: (str, bytes, /) -> T@MyCallable
+    reveal_type(my_callable)  # revealed: (str, bytes, /) -> int
     reveal_type(annotated_int)  # revealed: int
     reveal_type(transparent_alias)  # revealed: int
     reveal_type(optional_int)  # revealed: int | None
@@ -483,8 +482,7 @@ def _(
     reveal_type(list_or_tuple_of_ints)  # revealed: list[int] | tuple[int, ...]
     reveal_type(annotated_int)  # revealed: int
     reveal_type(subclass_of_int)  # revealed: type[int]
-    # TODO: This should be `(int, /) -> str`
-    reveal_type(callable_int_to_str)  # revealed: (int, /) -> T@MyCallable
+    reveal_type(callable_int_to_str)  # revealed: (int, /) -> str
 ```
 
 A generic implicit type alias can also be used in another generic implicit type alias:
