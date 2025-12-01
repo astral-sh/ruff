@@ -2410,7 +2410,7 @@ class C3:
         self.x = [self.x[0].flip()]
 
 # TODO: should be `list[Unknown | Sub] | list[Unknown | Base] | Unknown`
-reveal_type(C3(Sub()).x)  # revealed: list[Unknown | Sub] | list[Divergent] | Unknown
+reveal_type(C3(Sub()).x)  # revealed: list[Divergent] | list[Unknown | Sub] | Unknown
 ```
 
 And cycles between many attributes:
@@ -2469,7 +2469,7 @@ class ManyCycles2:
 
     def f1(self: "ManyCycles2"):
         # TODO: should be list[Unknown | int] | list[Divergent] | Unknown
-        reveal_type(self.x3)  # revealed: list[Unknown | int] | list[Divergent] | list[Divergent] | Unknown
+        reveal_type(self.x3)  # revealed: list[Divergent] | list[Divergent] | list[Unknown | int] | Unknown
 
         self.x1 = [self.x2] + [self.x3]
         self.x2 = [self.x1] + [self.x3]

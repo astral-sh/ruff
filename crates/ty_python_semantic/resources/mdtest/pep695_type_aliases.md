@@ -248,9 +248,9 @@ IntOrStr = TypeAliasType(get_name(), int | str)
 type OptNestedInt = int | tuple[OptNestedInt, ...] | None
 
 def f(x: OptNestedInt) -> None:
-    reveal_type(x)  # revealed: int | None | tuple[OptNestedInt, ...]
+    reveal_type(x)  # revealed: tuple[OptNestedInt, ...] | None | int
     if x is not None:
-        reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...]
+        reveal_type(x)  # revealed: tuple[OptNestedInt, ...] | int
 ```
 
 ### Invalid self-referential
@@ -344,12 +344,12 @@ def f(x: A):
             reveal_type(y)  # revealed: tuple[A]
 
 def g(x: A | B):
-    reveal_type(x)  # revealed: None | tuple[B]
+    reveal_type(x)  # revealed: tuple[B] | None
 
 from ty_extensions import Intersection
 
 def h(x: Intersection[A, B]):
-    reveal_type(x)  # revealed: None | tuple[B]
+    reveal_type(x)  # revealed: tuple[B] | None
 ```
 
 ### Self-recursive callable type

@@ -102,6 +102,17 @@ impl<'db> Module<'db> {
             .as_deref()
             .unwrap_or_default()
     }
+
+    pub fn structural_ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (Module::File(left), Module::File(right)) => left.structural_ordering(db, right),
+            (Module::Namespace(left), Module::Namespace(right)) => {
+                left.name(db).cmp(right.name(db))
+            }
+            (Module::File(_), Module::Namespace(_)) => std::cmp::Ordering::Less,
+            (Module::Namespace(_), Module::File(_)) => std::cmp::Ordering::Greater,
+        }
+    }
 }
 
 impl std::fmt::Debug for Module<'_> {
@@ -272,6 +283,14 @@ pub struct FileModule<'db> {
     pub(super) search_path: SearchPath,
     pub(super) file: File,
     pub(super) known: Option<KnownModule>,
+}
+
+impl FileModule<'_> {
+    pub fn structural_ordering(self, db: &dyn Db, other: Self) -> std::cmp::Ordering {
+        self.name(db)
+            .cmp(other.name(db))
+            .then_with(|| self.file(db).structural_ordering(db, other.file(db)))
+    }
 }
 
 /// A namespace package.

@@ -30,7 +30,7 @@ use crate::types::generics::InferableTypeVars;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
     IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, Type, TypeMapping, TypeRelation,
-    UnionBuilder, UnionType,
+    UnionBuilder, UnionType, structural_type_ordering,
 };
 use crate::types::{Truthiness, TypeContext};
 use crate::{Db, FxOrderSet, Program};
@@ -301,6 +301,10 @@ impl<'db> TupleType<'db> {
 
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         self.tuple(db).is_single_valued(db)
+    }
+
+    pub(super) fn structural_ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
+        self.tuple(db).structural_ordering(db, other.tuple(db))
     }
 }
 
@@ -582,6 +586,22 @@ impl<'db> FixedLengthTuple<Type<'db>> {
 
     fn is_single_valued(&self, db: &'db dyn Db) -> bool {
         self.0.iter().all(|ty| ty.is_single_valued(db))
+    }
+
+    fn structural_ordering(&self, db: &'db dyn Db, other: &Self) -> std::cmp::Ordering {
+        let len_count = self.0.len().cmp(&other.0.len());
+        if len_count != std::cmp::Ordering::Equal {
+            return len_count;
+        }
+
+        for (left, right) in self.0.iter().zip(&other.0) {
+            let ord = structural_type_ordering(db, left, right);
+            if ord != std::cmp::Ordering::Equal {
+                return ord;
+            }
+        }
+
+        std::cmp::Ordering::Equal
     }
 }
 
@@ -1096,6 +1116,32 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     })
             })
     }
+
+    fn structural_ordering(&self, db: &'db dyn Db, other: &Self) -> std::cmp::Ordering {
+        let prefix_count = self.prefix.len().cmp(&other.prefix.len());
+        if prefix_count != std::cmp::Ordering::Equal {
+            return prefix_count;
+        }
+        let suffix_count = self.suffix.len().cmp(&other.suffix.len());
+        if suffix_count != std::cmp::Ordering::Equal {
+            return suffix_count;
+        }
+
+        for (left, right) in self.prefix.iter().zip(&other.prefix) {
+            let ord = structural_type_ordering(db, left, right);
+            if ord != std::cmp::Ordering::Equal {
+                return ord;
+            }
+        }
+        for (left, right) in self.suffix.iter().zip(&other.suffix) {
+            let ord = structural_type_ordering(db, left, right);
+            if ord != std::cmp::Ordering::Equal {
+                return ord;
+            }
+        }
+
+        structural_type_ordering(db, &self.variable, &other.variable)
+    }
 }
 
 impl<'db> PyIndex<'db> for &VariableLengthTuple<Type<'db>> {
@@ -1469,6 +1515,19 @@ impl<'db> Tuple<Type<'db>> {
             release_level_ty,
             int_instance_ty,
         ])
+    }
+
+    pub(super) fn structural_ordering(&self, db: &'db dyn Db, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
+                self_tuple.structural_ordering(db, other_tuple)
+            }
+            (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => {
+                self_tuple.structural_ordering(db, other_tuple)
+            }
+            (Tuple::Fixed(_), Tuple::Variable(_)) => std::cmp::Ordering::Less,
+            (Tuple::Variable(_), Tuple::Fixed(_)) => std::cmp::Ordering::Greater,
+        }
     }
 }
 

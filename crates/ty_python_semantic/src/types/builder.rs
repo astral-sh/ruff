@@ -41,7 +41,7 @@ use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::type_ordering::union_or_intersection_elements_ordering;
 use crate::types::{
     BytesLiteralType, IntersectionType, KnownClass, StringLiteralType, Type,
-    TypeVarBoundOrConstraints, UnionType,
+    TypeVarBoundOrConstraints, UnionType, structural_type_ordering,
 };
 use crate::{Db, FxOrderSet};
 use rustc_hash::FxHashSet;
@@ -613,7 +613,11 @@ impl<'db> UnionBuilder<'db> {
         }
         if self.order_elements {
             types.sort_unstable_by(|l, r| {
-                union_or_intersection_elements_ordering(self.db, l, r, self.cycle_recovery)
+                if self.cycle_recovery && self.recursively_defined.is_yes() {
+                    structural_type_ordering(self.db, l, r)
+                } else {
+                    union_or_intersection_elements_ordering(self.db, l, r)
+                }
             });
         }
         match types.len() {

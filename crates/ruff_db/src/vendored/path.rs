@@ -88,7 +88,7 @@ impl ToOwned for VendoredPath {
 }
 
 #[repr(transparent)]
-#[derive(Debug, Eq, PartialEq, Clone, Hash)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash, PartialOrd, Ord)]
 pub struct VendoredPathBuf(Utf8PathBuf);
 
 impl get_size2::GetSize for VendoredPathBuf {
