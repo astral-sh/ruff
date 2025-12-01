@@ -942,6 +942,9 @@ jobs:
         needs.determine_changes.outputs.linter == 'true'
       )
     timeout-minutes: 20
+    permissions:
+      contents: read # required for actions/checkout
+      id-token: write # required for OIDC authentication with CodSpeed
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -967,9 +970,8 @@ jobs:
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@346a2d8a8d9d38909abd0bc3d23f773110f076ad # v4.4.1
         with:
-          mode: instrumentation
+          mode: simulation
           run: cargo codspeed run
-          token: ${{ secrets.CODSPEED_TOKEN }}
 
   benchmarks-instrumented-ty:
     name: "benchmarks instrumented (ty)"
@@ -982,6 +984,9 @@ jobs:
         needs.determine_changes.outputs.ty == 'true'
       )
     timeout-minutes: 20
+    permissions:
+      contents: read # required for actions/checkout
+      id-token: write # required for OIDC authentication with CodSpeed
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -1007,9 +1012,8 @@ jobs:
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@346a2d8a8d9d38909abd0bc3d23f773110f076ad # v4.4.1
         with:
-          mode: instrumentation
+          mode: simulation
           run: cargo codspeed run
-          token: ${{ secrets.CODSPEED_TOKEN }}
 
   benchmarks-walltime:
     name: "benchmarks walltime (${{ matrix.benchmarks }})"
@@ -1017,6 +1021,9 @@ jobs:
     needs: determine_changes
     if: ${{ github.repository == 'astral-sh/ruff' && !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.ty == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
+    permissions:
+      contents: read # required for actions/checkout
+      id-token: write # required for OIDC authentication with CodSpeed
     strategy:
       matrix:
         benchmarks:
@@ -1054,4 +1061,3 @@ jobs:
         with:
           mode: walltime
           run: cargo codspeed run --bench ty_walltime "${{ matrix.benchmarks }}"
-          token: ${{ secrets.CODSPEED_TOKEN }}
