@@ -28,7 +28,11 @@ use crate::rules::flake8_executable::helpers::is_executable;
 ///
 /// A file is considered executable if it has the executable bit set (i.e., its
 /// permissions mode intersects with `0o111`). As such, _this rule is only
-/// available on Unix-like systems_, and is not enforced on Windows or WSL.
+/// available on Unix-like systems_.
+///
+/// If this rule produces a significant amount of false positives, it's likely
+/// your source is stored on a filesystem that does not implement Unix file
+/// permissions (e.g. FAT variants, NTFS, CIFS network mounts, VM/WSL shared folders, etc).
 ///
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
@@ -47,12 +51,6 @@ impl Violation for ShebangMissingExecutableFile {
 /// EXE002
 #[cfg(target_family = "unix")]
 pub(crate) fn shebang_missing_executable_file(filepath: &Path, context: &LintContext) {
-    // WSL supports Windows file systems, which do not have executable bits.
-    // Instead, everything is executable. Therefore, we skip this rule on WSL.
-
-    if is_wsl::is_wsl() {
-        return;
-    }
     if let Ok(true) = is_executable(filepath) {
         context.report_diagnostic_if_enabled(
             ShebangMissingExecutableFile,
