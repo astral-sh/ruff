@@ -16,8 +16,6 @@ use crate::{db::Db, module_resolver::file_to_module};
 #[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord, get_size2::GetSize)]
 pub struct ModuleName(compact_str::CompactString);
 
-impl crate::StableKey for ModuleName {}
-
 impl ModuleName {
     /// Creates a new module name for `name`. Returns `Some` if `name` is a valid, absolute
     /// module name and `None` otherwise.

@@ -312,8 +312,6 @@ pub(crate) enum EmbeddedFilePath<'s> {
     Explicit(&'s str),
 }
 
-impl ty_python_semantic::StableKey for EmbeddedFilePath<'_> {}
-
 impl EmbeddedFilePath<'_> {
     pub(crate) fn as_str(&self) -> &str {
         match self {
@@ -823,13 +821,13 @@ impl<'s> Parser<'s> {
 
     fn current_section_has_explicit_file_paths(&self) -> bool {
         self.current_section_files
-            .stable_iter()
+            .unstable_iter()
             .any(|(path, _)| path.is_explicit())
     }
 
     fn current_section_has_merged_snippets(&self) -> bool {
         self.current_section_files
-            .stable_values()
+            .unstable_values()
             .any(|id| self.files[*id].backtick_offsets.len() > 1)
     }
 

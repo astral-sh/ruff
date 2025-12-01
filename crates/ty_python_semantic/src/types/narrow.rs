@@ -279,7 +279,7 @@ fn merge_constraints_and<'db>(
     from: &NarrowingConstraints<'db>,
     db: &'db dyn Db,
 ) {
-    for (key, value) in from.stable_iter() {
+    for (key, value) in from.unstable_iter() {
         match into.entry(*key) {
             Entry::Occupied(mut entry) => {
                 *entry.get_mut() = IntersectionBuilder::new(db)
@@ -299,7 +299,7 @@ fn merge_constraints_or<'db>(
     from: &NarrowingConstraints<'db>,
     db: &'db dyn Db,
 ) {
-    for (key, value) in from.stable_iter() {
+    for (key, value) in from.unstable_iter() {
         match into.entry(*key) {
             Entry::Occupied(mut entry) => {
                 *entry.get_mut() = UnionBuilder::new(db).add(*entry.get()).add(*value).build();
@@ -309,7 +309,7 @@ fn merge_constraints_or<'db>(
             }
         }
     }
-    for (key, value) in into.stable_iter_mut() {
+    for (key, value) in into.unstable_iter_mut() {
         if !from.contains_key(key) {
             *value = Type::object();
         }

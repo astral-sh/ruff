@@ -245,7 +245,7 @@ impl<'db> UnpackResult<'db> {
         previous_cycle_result: &UnpackResult<'db>,
         cycle: &salsa::Cycle,
     ) -> Self {
-        for (expr, ty) in self.targets.stable_iter_mut() {
+        for (expr, ty) in self.targets.unstable_iter_mut() {
             let previous_ty = previous_cycle_result.expression_type(*expr);
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }

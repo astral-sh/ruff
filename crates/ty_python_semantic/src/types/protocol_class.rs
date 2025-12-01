@@ -922,7 +922,7 @@ fn cached_protocol_interface<'db>(
             }
         }
 
-        for (symbol_id, (ty, qualifiers, bound_on_class)) in direct_members.stable_into_iter() {
+        for (symbol_id, (ty, qualifiers, bound_on_class)) in direct_members.unstable_into_iter() {
             let name = place_table.symbol(symbol_id).name();
             if excluded_from_proto_members(name) {
                 continue;

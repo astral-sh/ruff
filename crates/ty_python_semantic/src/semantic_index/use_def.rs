@@ -664,8 +664,6 @@ pub(crate) struct EnclosingSnapshotKey {
     pub(crate) nested_laziness: ScopeLaziness,
 }
 
-impl crate::StableKey for EnclosingSnapshotKey {}
-
 /// Snapshots of enclosing scope place states for resolving a reference in a nested scope.
 /// If the nested scope is eager, the snapshot is simply recorded and used as is.
 /// If it is lazy, every time the outer symbol is reassigned, the snapshot is updated to add the
@@ -1339,7 +1337,7 @@ impl<'db> UseDefMapBuilder<'db> {
         for bindings in &mut self.bindings_by_use {
             bindings.finish(&mut self.reachability_constraints);
         }
-        for constraint in self.node_reachability.stable_values() {
+        for constraint in self.node_reachability.unstable_values() {
             self.reachability_constraints.mark_used(*constraint);
         }
         for symbol_state in &mut self.symbol_states {

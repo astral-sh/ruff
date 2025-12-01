@@ -61,16 +61,6 @@ pub type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 pub type FxIndexSet<V> = indexmap::IndexSet<V, BuildHasherDefault<FxHasher>>;
 
-/// Types that implement this trait are stable as keys of `FxHash{Map, Set}`, and maps and sets can be safely used as iterators.
-pub trait StableKey {}
-
-impl StableKey for String {}
-impl StableKey for &str {}
-impl StableKey for &ruff_python_ast::name::Name {}
-impl StableKey for ruff_python_ast::name::Name {}
-impl StableKey for ruff_db::system::SystemPathBuf {}
-impl StableKey for url::Url {}
-
 /// Always use this instead of [`rustc_hash::FxHashSet`].
 /// This struct intentionally does not implement `(Into)Iterator` because the iterator's output order will be unstable if the set's values depend on salsa's non-deterministic IDs.
 /// Only use `unstable_iter()`, etc. if you are sure the iterator is safe to use despite that.
@@ -118,16 +108,6 @@ impl<V> std::ops::DerefMut for FxHashSet<V> {
     }
 }
 
-impl<V: Eq + Hash + StableKey> FxHashSet<V> {
-    pub fn stable_iter(&self) -> std::collections::hash_set::Iter<'_, V> {
-        self.0.iter()
-    }
-
-    pub fn stable_into_iter(self) -> std::collections::hash_set::IntoIter<V> {
-        self.0.into_iter()
-    }
-}
-
 impl<V: Eq + Hash> FxHashSet<V> {
     pub fn with_capacity_and_hasher(capacity: usize, hasher: FxBuildHasher) -> Self {
         Self(rustc_hash::FxHashSet::with_capacity_and_hasher(
@@ -135,10 +115,12 @@ impl<V: Eq + Hash> FxHashSet<V> {
         ))
     }
 
+    /// Unstable iterator: ordering may be inconsistent across environments and versions. Use this only if you are sure this instability will not be a problem for your use case.
     pub fn unstable_iter(&self) -> std::collections::hash_set::Iter<'_, V> {
         self.0.iter()
     }
 
+    /// Unstable iterator: ordering may be inconsistent across environments and versions. Use this only if you are sure this instability will not be a problem for your use case.
     pub fn unstable_into_iter(self) -> std::collections::hash_set::IntoIter<V> {
         self.0.into_iter()
     }
@@ -227,40 +209,6 @@ impl<K, V> std::ops::DerefMut for FxHashMap<K, V> {
     }
 }
 
-impl<K: Eq + Hash + StableKey, V> FxHashMap<K, V> {
-    pub fn stable_iter(&self) -> std::collections::hash_map::Iter<'_, K, V> {
-        self.0.iter()
-    }
-
-    pub fn stable_keys(&self) -> std::collections::hash_map::Keys<'_, K, V> {
-        self.0.keys()
-    }
-
-    pub fn stable_values(&self) -> std::collections::hash_map::Values<'_, K, V> {
-        self.0.values()
-    }
-
-    pub fn stable_iter_mut(&mut self) -> std::collections::hash_map::IterMut<'_, K, V> {
-        self.0.iter_mut()
-    }
-
-    pub fn stable_values_mut(&mut self) -> std::collections::hash_map::ValuesMut<'_, K, V> {
-        self.0.values_mut()
-    }
-
-    pub fn stable_into_iter(self) -> std::collections::hash_map::IntoIter<K, V> {
-        self.0.into_iter()
-    }
-
-    pub fn stable_into_keys(self) -> std::collections::hash_map::IntoKeys<K, V> {
-        self.0.into_keys()
-    }
-
-    pub fn stable_into_values(self) -> std::collections::hash_map::IntoValues<K, V> {
-        self.0.into_values()
-    }
-}
-
 impl<K: Eq + Hash, V> FxHashMap<K, V> {
     pub fn with_capacity_and_hasher(capacity: usize, hasher: FxBuildHasher) -> Self {
         Self(rustc_hash::FxHashMap::with_capacity_and_hasher(
@@ -268,34 +216,42 @@ impl<K: Eq + Hash, V> FxHashMap<K, V> {
         ))
     }
 
+    /// Unstable iterator: ordering may be inconsistent across environments and versions. Use this only if you are sure this instability will not be a problem for your use case.
     pub fn unstable_iter(&self) -> std::collections::hash_map::Iter<'_, K, V> {
         self.0.iter()
     }
 
+    /// Unstable iterator: ordering may be inconsistent across environments and versions. Use this only if you are sure this instability will not be a problem for your use case.
     pub fn unstable_keys(&self) -> std::collections::hash_map::Keys<'_, K, V> {
         self.0.keys()
     }
 
+    /// Unstable iterator: ordering may be inconsistent across environments and versions. Use this only if you are sure this instability will not be a problem for your use case.
     pub fn unstable_values(&self) -> std::collections::hash_map::Values<'_, K, V> {
         self.0.values()
     }
 
+    /// Unstable iterator: ordering may be inconsistent across environments and versions. Use this only if you are sure this instability will not be a problem for your use case.
     pub fn unstable_iter_mut(&mut self) -> std::collections::hash_map::IterMut<'_, K, V> {
         self.0.iter_mut()
     }
 
+    /// Unstable iterator: ordering may be inconsistent across environments and versions. Use this only if you are sure this instability will not be a problem for your use case.
     pub fn unstable_values_mut(&mut self) -> std::collections::hash_map::ValuesMut<'_, K, V> {
         self.0.values_mut()
     }
 
+    /// Unstable iterator: ordering may be inconsistent across environments and versions. Use this only if you are sure this instability will not be a problem for your use case.
     pub fn unstable_into_iter(self) -> std::collections::hash_map::IntoIter<K, V> {
         self.0.into_iter()
     }
 
+    /// Unstable iterator: ordering may be inconsistent across environments and versions. Use this only if you are sure this instability will not be a problem for your use case.
     pub fn unstable_into_keys(self) -> std::collections::hash_map::IntoKeys<K, V> {
         self.0.into_keys()
     }
 
+    /// Unstable iterator: ordering may be inconsistent across environments and versions. Use this only if you are sure this instability will not be a problem for your use case.
     pub fn unstable_into_values(self) -> std::collections::hash_map::IntoValues<K, V> {
         self.0.into_values()
     }

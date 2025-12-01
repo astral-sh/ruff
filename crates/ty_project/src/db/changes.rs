@@ -318,7 +318,7 @@ impl ProjectDatabase {
         }
 
         let diagnostics = if let Some(walker) =
-            ProjectFilesWalker::incremental(self, added_paths.stable_iter())
+            ProjectFilesWalker::incremental(self, added_paths.unstable_iter())
         {
             // Use directory walking to discover newly added files.
             let (files, diagnostics) = walker.collect_vec(self);

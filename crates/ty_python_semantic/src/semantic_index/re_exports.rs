@@ -78,7 +78,7 @@ impl<'db> ExportFinder<'db> {
         match self.dunder_all {
             DunderAll::NotPresent => self
                 .exports
-                .stable_into_iter()
+                .unstable_into_iter()
                 .filter_map(|(name, kind)| {
                     if kind == PossibleExportKind::StubImportWithoutRedundantAlias {
                         return None;
@@ -89,7 +89,7 @@ impl<'db> ExportFinder<'db> {
                     Some(name.clone())
                 })
                 .collect(),
-            DunderAll::Present => self.exports.stable_into_keys().cloned().collect(),
+            DunderAll::Present => self.exports.unstable_into_keys().cloned().collect(),
         }
     }
 }

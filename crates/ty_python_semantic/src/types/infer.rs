@@ -563,7 +563,7 @@ impl<'db> ScopeInference<'db> {
         previous_inference: &ScopeInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ScopeInference<'db> {
-        for (expr, ty) in self.expressions.stable_iter_mut() {
+        for (expr, ty) in self.expressions.unstable_iter_mut() {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }
@@ -673,7 +673,7 @@ impl<'db> DefinitionInference<'db> {
         previous_inference: &DefinitionInference<'db>,
         cycle: &salsa::Cycle,
     ) -> DefinitionInference<'db> {
-        for (expr, ty) in self.expressions.stable_iter_mut() {
+        for (expr, ty) in self.expressions.unstable_iter_mut() {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }
@@ -848,7 +848,7 @@ impl<'db> ExpressionInference<'db> {
             }
         }
 
-        for (expr, ty) in self.expressions.stable_iter_mut() {
+        for (expr, ty) in self.expressions.unstable_iter_mut() {
             let previous_ty = previous.expression_type(*expr);
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }
