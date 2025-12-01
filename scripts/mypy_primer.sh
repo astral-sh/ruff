@@ -11,7 +11,7 @@ echo "new commit"
 git rev-list --format=%s --max-count=1 "${GITHUB_SHA}"
 
 # https://github.com/astral-sh/ruff/pull/21722
-git checkout -b base_commit 56d3173da5c4eaa597efb010d20130069985e7e2
+git checkout -b base_commit 42448fdba97cb4683cf09287e8df7465080eed92
 echo "base commit"
 git rev-list --format=%s --max-count=1 base_commit
 
