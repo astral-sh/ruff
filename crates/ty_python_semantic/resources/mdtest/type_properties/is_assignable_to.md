@@ -1356,6 +1356,8 @@ def f(func: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
     static_assert(is_assignable_to(TypeOf[args], tuple[Any, ...]))
     static_assert(is_assignable_to(TypeOf[args], tuple[object, ...]))
     static_assert(is_assignable_to(TypeOf[args], tuple[Unknown, ...]))
+    static_assert(not is_assignable_to(TypeOf[args], tuple[int, ...]))
+    static_assert(not is_assignable_to(TypeOf[args], tuple[int, str]))
 
     static_assert(not is_assignable_to(tuple[Any, ...], TypeOf[args]))
     static_assert(not is_assignable_to(tuple[object, ...], TypeOf[args]))
@@ -1364,6 +1366,7 @@ def f(func: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
     static_assert(is_assignable_to(TypeOf[kwargs], dict[str, Any]))
     static_assert(is_assignable_to(TypeOf[kwargs], dict[str, object]))
     static_assert(is_assignable_to(TypeOf[kwargs], dict[str, Unknown]))
+    static_assert(not is_assignable_to(TypeOf[kwargs], dict[str, int]))
     static_assert(is_assignable_to(TypeOf[kwargs], Mapping[str, Any]))
     static_assert(is_assignable_to(TypeOf[kwargs], Mapping[str, object]))
     static_assert(is_assignable_to(TypeOf[kwargs], Mapping[str, Unknown]))
