@@ -1,3 +1,5 @@
+"""Non-terminal symbols of Python grammar (from "graminit.h").
+"""
 from typing import Final
 
 single_input: Final[int]

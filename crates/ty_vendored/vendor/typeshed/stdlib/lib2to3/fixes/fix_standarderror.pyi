@@ -1,3 +1,5 @@
+"""Fixer for StandardError -> Exception.
+"""
 from typing import ClassVar, Literal
 
 from .. import fixer_base

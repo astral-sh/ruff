@@ -1,3 +1,5 @@
+"""A POSIX helper for the subprocess module.
+"""
 import sys
 from _typeshed import StrOrBytesPath
 from collections.abc import Callable, Sequence
@@ -29,7 +31,29 @@ if sys.platform != "win32":
             child_umask: int,
             preexec_fn: Callable[[], None],
             /,
-        ) -> int: ...
+        ) -> int:
+            """Spawn a fresh new child process.
+
+Fork a child process, close parent file descriptors as appropriate in the
+child and duplicate the few that are needed before calling exec() in the
+child process.
+
+If close_fds is True, close file descriptors 3 and higher, except those listed
+in the sorted tuple pass_fds.
+
+The preexec_fn, if supplied, will be called immediately before closing file
+descriptors and exec.
+
+WARNING: preexec_fn is NOT SAFE if your application uses threads.
+         It may trigger infrequent, difficult to debug deadlocks.
+
+If an error occurs in the child process before the exec, it is
+serialized and written to the errpipe_write fd per subprocess.py.
+
+Returns: the child process's PID.
+
+Raises: Only on an error in the parent process.
+"""
     else:
         def fork_exec(
             args: Sequence[StrOrBytesPath] | None,
@@ -56,4 +80,26 @@ if sys.platform != "win32":
             preexec_fn: Callable[[], None],
             allow_vfork: bool,
             /,
-        ) -> int: ...
+        ) -> int:
+            """Spawn a fresh new child process.
+
+Fork a child process, close parent file descriptors as appropriate in the
+child and duplicate the few that are needed before calling exec() in the
+child process.
+
+If close_fds is True, close file descriptors 3 and higher, except those listed
+in the sorted tuple pass_fds.
+
+The preexec_fn, if supplied, will be called immediately before closing file
+descriptors and exec.
+
+WARNING: preexec_fn is NOT SAFE if your application uses threads.
+         It may trigger infrequent, difficult to debug deadlocks.
+
+If an error occurs in the child process before the exec, it is
+serialized and written to the errpipe_write fd per subprocess.py.
+
+Returns: the child process's PID.
+
+Raises: Only on an error in the parent process.
+"""
