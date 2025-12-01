@@ -854,7 +854,7 @@ impl<'db> Node<'db> {
                 // impossible paths, and so we treat them as passing the "always satisfied" check.
                 let constraint = interior.constraint(db);
                 let true_always_satisfied = path
-                    .walk_edge(map, constraint.when_true(), |path, _| {
+                    .walk_edge(db, map, constraint.when_true(), |path, _| {
                         interior
                             .if_true(db)
                             .is_always_satisfied_inner(db, map, path)
@@ -865,7 +865,7 @@ impl<'db> Node<'db> {
                 }
 
                 // Ditto for the if_false branch
-                path.walk_edge(map, constraint.when_false(), |path, _| {
+                path.walk_edge(db, map, constraint.when_false(), |path, _| {
                     interior
                         .if_false(db)
                         .is_always_satisfied_inner(db, map, path)
@@ -903,7 +903,7 @@ impl<'db> Node<'db> {
                 // impossible paths, and so we treat them as passing the "never satisfied" check.
                 let constraint = interior.constraint(db);
                 let true_never_satisfied = path
-                    .walk_edge(map, constraint.when_true(), |path, _| {
+                    .walk_edge(db, map, constraint.when_true(), |path, _| {
                         interior.if_true(db).is_never_satisfied_inner(db, map, path)
                     })
                     .unwrap_or(true);
@@ -912,7 +912,7 @@ impl<'db> Node<'db> {
                 }
 
                 // Ditto for the if_false branch
-                path.walk_edge(map, constraint.when_false(), |path, _| {
+                path.walk_edge(db, map, constraint.when_false(), |path, _| {
                     interior
                         .if_false(db)
                         .is_never_satisfied_inner(db, map, path)
@@ -1727,7 +1727,7 @@ impl<'db> InteriorNode<'db> {
             // we're about to remove. If so, we need to "remember" them by AND-ing them in with the
             // corresponding branch.
             let if_true = path
-                .walk_edge(map, self_constraint.when_true(), |path, new_range| {
+                .walk_edge(db, map, self_constraint.when_true(), |path, new_range| {
                     let branch = self
                         .if_true(db)
                         .abstract_one_inner(db, should_remove, map, path);
@@ -1744,7 +1744,7 @@ impl<'db> InteriorNode<'db> {
                 })
                 .unwrap_or(Node::AlwaysFalse);
             let if_false = path
-                .walk_edge(map, self_constraint.when_false(), |path, new_range| {
+                .walk_edge(db, map, self_constraint.when_false(), |path, new_range| {
                     let branch = self
                         .if_false(db)
                         .abstract_one_inner(db, should_remove, map, path);
@@ -1764,13 +1764,13 @@ impl<'db> InteriorNode<'db> {
         } else {
             // Otherwise, we abstract the if_false/if_true edges recursively.
             let if_true = path
-                .walk_edge(map, self_constraint.when_true(), |path, _| {
+                .walk_edge(db, map, self_constraint.when_true(), |path, _| {
                     self.if_true(db)
                         .abstract_one_inner(db, should_remove, map, path)
                 })
                 .unwrap_or(Node::AlwaysFalse);
             let if_false = path
-                .walk_edge(map, self_constraint.when_false(), |path, _| {
+                .walk_edge(db, map, self_constraint.when_false(), |path, _| {
                     self.if_false(db)
                         .abstract_one_inner(db, should_remove, map, path)
                 })
@@ -2791,6 +2791,7 @@ impl<'db> PathAssignments<'db> {
     /// the path we're on.
     fn walk_edge<R>(
         &mut self,
+        db: &'db dyn Db,
         map: &SequentMap<'db>,
         assignment: ConstraintAssignment<'db>,
         f: impl FnOnce(&mut Self, Range<usize>) -> R,
@@ -2801,7 +2802,17 @@ impl<'db> PathAssignments<'db> {
         let start = self.assignments.len();
 
         // Add the new assignment and anything we can derive from it.
-        let result = if self.add_assignment(map, assignment).is_err() {
+        tracing::trace!(
+            target: "ty_python_semantic::types::constraints::PathAssignment",
+            before = %format_args!(
+                "[{}]",
+                self.assignments[..start].iter().map(|assignment| assignment.display(db)).format(", "),
+            ),
+            edge = %assignment.display(db),
+            "walk edge",
+        );
+        let found_conflict = self.add_assignment(db, map, assignment);
+        let result = if found_conflict.is_err() {
             // If that results in the path now being impossible due to a contradiction, return
             // without invoking the callback.
             None
@@ -2811,6 +2822,14 @@ impl<'db> PathAssignments<'db> {
             // if that happens, `start..end` will mark the assignments that were added by the
             // `add_assignment` call above — that is, the new assignment for this edge along with
             // the derived information we inferred from it.
+            tracing::trace!(
+                target: "ty_python_semantic::types::constraints::PathAssignment",
+                new = %format_args!(
+                    "[{}]",
+                    self.assignments[start..].iter().map(|assignment| assignment.display(db)).format(", "),
+                ),
+                "new assignments",
+            );
             let end = self.assignments.len();
             Some(f(self, start..end))
         };
@@ -2830,12 +2849,22 @@ impl<'db> PathAssignments<'db> {
     /// to become invalid, due to a contradiction, returns a [`PathAssignmentConflict`] error.
     fn add_assignment(
         &mut self,
+        db: &'db dyn Db,
         map: &SequentMap<'db>,
         assignment: ConstraintAssignment<'db>,
     ) -> Result<(), PathAssignmentConflict> {
         // First add this assignment. If it causes a conflict, return that as an error. If we've
         // already know this assignment holds, just return.
         if self.assignments.contains(&assignment.negated()) {
+            tracing::trace!(
+                target: "ty_python_semantic::types::constraints::PathAssignment",
+                assignment = %assignment.display(db),
+                facts = %format_args!(
+                    "[{}]",
+                    self.assignments.iter().map(|assignment| assignment.display(db)).format(", "),
+                ),
+                "found contradiction",
+            );
             return Err(PathAssignmentConflict);
         }
         if !self.assignments.insert(assignment) {
@@ -2851,6 +2880,15 @@ impl<'db> PathAssignments<'db> {
             if self.assignment_holds(ante.when_false()) {
                 // The sequent map says (ante1) is always true, and the current path asserts that
                 // it's false.
+                tracing::trace!(
+                    target: "ty_python_semantic::types::constraints::PathAssignment",
+                    ante = %ante.display(db),
+                    facts = %format_args!(
+                        "[{}]",
+                        self.assignments.iter().map(|assignment| assignment.display(db)).format(", "),
+                    ),
+                    "found contradiction",
+                );
                 return Err(PathAssignmentConflict);
             }
         }
@@ -2860,6 +2898,16 @@ impl<'db> PathAssignments<'db> {
             {
                 // The sequent map says (ante1 ∧ ante2) is an impossible combination, and the
                 // current path asserts that both are true.
+                tracing::trace!(
+                    target: "ty_python_semantic::types::constraints::PathAssignment",
+                    ante1 = %ante1.display(db),
+                    ante2 = %ante2.display(db),
+                    facts = %format_args!(
+                        "[{}]",
+                        self.assignments.iter().map(|assignment| assignment.display(db)).format(", "),
+                    ),
+                    "found contradiction",
+                );
                 return Err(PathAssignmentConflict);
             }
         }
@@ -2869,7 +2917,7 @@ impl<'db> PathAssignments<'db> {
                 if self.assignment_holds(ante1.when_true())
                     && self.assignment_holds(ante2.when_true())
                 {
-                    self.add_assignment(map, post.when_true())?;
+                    self.add_assignment(db, map, post.when_true())?;
                 }
             }
         }
@@ -2877,7 +2925,7 @@ impl<'db> PathAssignments<'db> {
         for (ante, posts) in &map.single_implications {
             for post in posts {
                 if self.assignment_holds(ante.when_true()) {
-                    self.add_assignment(map, post.when_true())?;
+                    self.add_assignment(db, map, post.when_true())?;
                 }
             }
         }
@@ -3201,8 +3249,20 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         constraints: ConstraintSet<'db>,
     ) -> Result<Specialization<'db>, ()> {
+        let _span = tracing::debug!(
+            target: "ty_python_semantic::types::constraints::specialize_constrained",
+            generic_context = %self.display_full(db),
+            constraints = %constraints.node.display(db),
+            "create specialization for constraint set",
+        );
+
         // If the constraint set is cyclic, don't even try to construct a specialization.
         if constraints.is_cyclic(db) {
+            tracing::error!(
+                target: "ty_python_semantic::types::constraints::specialize_constrained",
+                constraints = %constraints.node.display(db),
+                "constraint set is cyclic",
+            );
             // TODO: Better error
             return Err(());
         }
@@ -3215,6 +3275,11 @@ impl<'db> GenericContext<'db> {
             .fold(constraints.node, |constraints, bound_typevar| {
                 constraints.and(db, bound_typevar.valid_specializations(db))
             });
+        tracing::debug!(
+            target: "ty_python_semantic::types::constraints::specialize_constrained",
+            valid = %abstracted.display(db),
+            "limited to valid specializations",
+        );
 
         // Then we find all of the "representative types" for each typevar in the constraint set.
         let mut error_occurred = false;
@@ -3233,10 +3298,24 @@ impl<'db> GenericContext<'db> {
             let mut unconstrained = false;
             let mut greatest_lower_bound = Type::Never;
             let mut least_upper_bound = Type::object();
-            abstracted.find_representative_types(db, bound_typevar.identity(db), |bounds| {
+            let identity = bound_typevar.identity(db);
+            tracing::trace!(
+                target: "ty_python_semantic::types::constraints::specialize_constrained",
+                bound_typevar = %identity.display(db),
+                abstracted = %abstracted.retain_one(db, identity).display(db),
+                "find specialization for typevar",
+            );
+            abstracted.find_representative_types(db, identity, |bounds| {
                 satisfied = true;
                 match bounds {
                     Some((lower_bound, upper_bound)) => {
+                        tracing::trace!(
+                            target: "ty_python_semantic::types::constraints::specialize_constrained",
+                            bound_typevar = %identity.display(db),
+                            lower_bound = %lower_bound.display(db),
+                            upper_bound = %upper_bound.display(db),
+                            "found representative type",
+                        );
                         greatest_lower_bound =
                             UnionType::from_elements(db, [greatest_lower_bound, lower_bound]);
                         least_upper_bound =
@@ -3252,6 +3331,11 @@ impl<'db> GenericContext<'db> {
             // for this constraint set.
             if !satisfied {
                 // TODO: Construct a useful error here
+                tracing::debug!(
+                    target: "ty_python_semantic::types::constraints::specialize_constrained",
+                    bound_typevar = %identity.display(db),
+                    "typevar cannot be satisfied",
+                );
                 error_occurred = true;
                 return None;
             }
@@ -3259,18 +3343,36 @@ impl<'db> GenericContext<'db> {
             // The BDD is satisfiable, but the typevar is unconstrained, then we use `None` to tell
             // specialize_recursive to fall back on the typevar's default.
             if unconstrained {
+                tracing::debug!(
+                    target: "ty_python_semantic::types::constraints::specialize_constrained",
+                    bound_typevar = %identity.display(db),
+                    "typevar is unconstrained",
+                );
                 return None;
             }
 
             // If `lower ≰ upper`, then there is no type that satisfies all of the paths in the
             // BDD. That's an ambiguous specialization, as described above.
             if !greatest_lower_bound.is_subtype_of(db, least_upper_bound) {
+                tracing::debug!(
+                    target: "ty_python_semantic::types::constraints::specialize_constrained",
+                    bound_typevar = %identity.display(db),
+                    greatest_lower_bound = %greatest_lower_bound.display(db),
+                    least_upper_bound = %least_upper_bound.display(db),
+                    "typevar bounds are incompatible",
+                );
                 error_occurred = true;
                 return None;
             }
 
             // Of all of the types that satisfy all of the paths in the BDD, we choose the
             // "largest" one (i.e., "closest to `object`") as the specialization.
+            tracing::debug!(
+                target: "ty_python_semantic::types::constraints::specialize_constrained",
+                bound_typevar = %identity.display(db),
+                specialization = %least_upper_bound.display(db),
+                "found specialization for typevar",
+            );
             Some(least_upper_bound)
         });
 
