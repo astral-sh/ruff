@@ -210,6 +210,37 @@ reveal_type(WithDefault[str, str]())  # revealed: WithDefault[str, str]
 reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
 ```
 
+## Diagnostics for bad specializations
+
+We show the user where the type variable was defined if a specialization is given that doesn't
+satisfy the type variable's upper bound or constraints:
+
+<!-- snapshot-diagnostics -->
+
+`library.py`:
+
+```py
+from typing import TypeVar, Generic
+
+T = TypeVar("T", bound=str)
+U = TypeVar("U", int, bytes)
+
+class Bounded(Generic[T]):
+    x: T
+
+class Constrained(Generic[U]):
+    x: U
+```
+
+`main.py`:
+
+```py
+from library import Bounded, Constrained
+
+x: Bounded[int]  # error: [invalid-type-arguments]
+y: Constrained[str]  # error: [invalid-type-arguments]
+```
+
 ## Inferring generic class parameters
 
 We can infer the type parameter from a type context:
