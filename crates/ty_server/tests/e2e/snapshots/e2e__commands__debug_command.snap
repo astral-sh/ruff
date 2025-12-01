@@ -93,6 +93,7 @@ Settings: Settings {
         "redundant-cast": Warning (Default),
         "static-assert-error": Error (Default),
         "subclass-of-final-class": Error (Default),
+        "super-call-in-named-tuple-method": Error (Default),
         "too-many-positional-arguments": Error (Default),
         "type-assertion-failure": Error (Default),
         "unavailable-implicit-super-arguments": Error (Default),

@@ -19,7 +19,7 @@ use crate::semantic_index::{
 use crate::types::bound_super::BoundSuperError;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
-use crate::types::diagnostic::INVALID_TYPE_ALIAS_TYPE;
+use crate::types::diagnostic::{INVALID_TYPE_ALIAS_TYPE, SUPER_CALL_IN_NAMED_TUPLE_METHOD};
 use crate::types::enums::enum_metadata;
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{
@@ -5584,6 +5584,20 @@ impl KnownClass {
                             return;
                         };
 
+                        // Check if the enclosing class is a `NamedTuple`, which forbids the use of `super()`.
+                        if CodeGeneratorKind::NamedTuple.matches(db, enclosing_class, None) {
+                            if let Some(builder) = context
+                                .report_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD, call_expression)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Cannot use `super()` in a method of NamedTuple class `{}`",
+                                    enclosing_class.name(db)
+                                ));
+                            }
+                            overload.set_return_type(Type::unknown());
+                            return;
+                        }
+
                         // The type of the first parameter if the given scope is function-like (i.e. function or lambda).
                         // `None` if the scope is not function-like, or has no parameters.
                         let first_param = match scope.node(db) {
@@ -5623,6 +5637,22 @@ impl KnownClass {
                         overload.set_return_type(bound_super);
                     }
                     [Some(pivot_class_type), Some(owner_type)] => {
+                        // Check if the enclosing class is a `NamedTuple`, which forbids the use of `super()`.
+                        if let Some(enclosing_class) = nearest_enclosing_class(db, index, scope) {
+                            if CodeGeneratorKind::NamedTuple.matches(db, enclosing_class, None) {
+                                if let Some(builder) = context
+                                    .report_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD, call_expression)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "Cannot use `super()` in a method of NamedTuple class `{}`",
+                                        enclosing_class.name(db)
+                                    ));
+                                }
+                                overload.set_return_type(Type::unknown());
+                                return;
+                            }
+                        }
+
                         let bound_super = BoundSuperType::build(db, *pivot_class_type, *owner_type)
                             .unwrap_or_else(|err| {
                                 err.report_diagnostic(context, call_expression.into());

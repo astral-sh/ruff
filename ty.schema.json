@@ -973,6 +973,16 @@
             }
           ]
         },
+        "super-call-in-named-tuple-method": {
+          "title": "detects `super()` calls in methods of `NamedTuple` classes",
+          "description": "## What it does\nChecks for calls to `super()` inside methods of `NamedTuple` classes.\n\n## Why is this bad?\nUsing `super()` in a method of a `NamedTuple` class will raise an exception at runtime.\n\n## Examples\n```python\nfrom typing import NamedTuple\n\nclass F(NamedTuple):\n    x: int\n\n    def method(self):\n        super()  # error: super() is not supported in methods of NamedTuple classes\n```\n\n## References\n- [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "too-many-positional-arguments": {
           "title": "detects calls passing too many positional arguments",
           "description": "## What it does\nChecks for calls that pass more positional arguments than the callable can accept.\n\n## Why is this bad?\nPassing too many positional arguments will raise `TypeError` at runtime.\n\n## Example\n\n```python\ndef f(): ...\n\nf(\"foo\")  # Error raised here\n```",
