@@ -780,9 +780,6 @@ impl<'db> Node<'db> {
                 root_constraint.ordering(db) > constraint.ordering(db)
             })
         );
-        if if_true == if_false {
-            return if_true;
-        }
         Self::Interior(InteriorNode::new(db, constraint, if_true, if_false))
     }
 
@@ -934,8 +931,15 @@ impl<'db> Node<'db> {
     /// Returns the `or` or union of two BDDs.
     fn or(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
-            (Node::AlwaysTrue, _) | (_, Node::AlwaysTrue) => Node::AlwaysTrue,
+            (Node::AlwaysTrue, Node::AlwaysTrue) => Node::AlwaysTrue,
             (Node::AlwaysFalse, other) | (other, Node::AlwaysFalse) => other,
+            (Node::AlwaysTrue, Node::Interior(interior))
+            | (Node::Interior(interior), Node::AlwaysTrue) => Node::new(
+                db,
+                interior.constraint(db),
+                Node::AlwaysTrue,
+                Node::AlwaysTrue,
+            ),
             (Node::Interior(a), Node::Interior(b)) => {
                 // OR is commutative, which lets us halve the cache requirements
                 let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
@@ -947,8 +951,15 @@ impl<'db> Node<'db> {
     /// Returns the `and` or intersection of two BDDs.
     fn and(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
-            (Node::AlwaysFalse, _) | (_, Node::AlwaysFalse) => Node::AlwaysFalse,
+            (Node::AlwaysFalse, Node::AlwaysFalse) => Node::AlwaysFalse,
             (Node::AlwaysTrue, other) | (other, Node::AlwaysTrue) => other,
+            (Node::AlwaysFalse, Node::Interior(interior))
+            | (Node::Interior(interior), Node::AlwaysFalse) => Node::new(
+                db,
+                interior.constraint(db),
+                Node::AlwaysFalse,
+                Node::AlwaysFalse,
+            ),
             (Node::Interior(a), Node::Interior(b)) => {
                 // AND is commutative, which lets us halve the cache requirements
                 let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
@@ -1435,13 +1446,21 @@ impl<'db> Node<'db> {
                     Node::AlwaysFalse => {}
                     Node::AlwaysTrue => self.clauses.push(self.current_clause.clone()),
                     Node::Interior(interior) => {
-                        let interior_constraint = interior.constraint(db).normalized(db);
-                        self.current_clause.push(interior_constraint.when_true());
-                        self.visit_node(db, interior.if_true(db));
-                        self.current_clause.pop();
-                        self.current_clause.push(interior_constraint.when_false());
-                        self.visit_node(db, interior.if_false(db));
-                        self.current_clause.pop();
+                        let if_true = interior.if_true(db);
+                        let if_false = interior.if_false(db);
+                        if if_true == if_false {
+                            // TODO: Consider adding a ConstraintAssignment::DontCare variant, and
+                            // including that in the display rendering somehow.
+                            self.visit_node(db, if_true);
+                        } else {
+                            let interior_constraint = interior.constraint(db).normalized(db);
+                            self.current_clause.push(interior_constraint.when_true());
+                            self.visit_node(db, if_true);
+                            self.current_clause.pop();
+                            self.current_clause.push(interior_constraint.when_false());
+                            self.visit_node(db, if_false);
+                            self.current_clause.pop();
+                        }
                     }
                 }
             }
@@ -3014,10 +3033,13 @@ impl<'db> SatisfiedClause<'db> {
     }
 
     fn display(&self, db: &'db dyn Db) -> String {
+        if self.constraints.is_empty() {
+            return String::from("always");
+        }
+
         // This is a bit heavy-handed, but we need to output the constraints in a consistent order
         // even though Salsa IDs are assigned non-deterministically. This Display output is only
         // used in test cases, so we don't need to over-optimize it.
-
         let mut constraints: Vec<_> = self
             .constraints
             .iter()
@@ -3144,7 +3166,7 @@ impl<'db> SatisfiedClauses<'db> {
         // used in test cases, so we don't need to over-optimize it.
 
         if self.clauses.is_empty() {
-            return String::from("always");
+            return String::from("never");
         }
         let mut clauses: Vec<_> = self
             .clauses
