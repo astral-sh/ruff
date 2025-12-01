@@ -254,6 +254,15 @@ impl<'a> UnparsedAssertion<'a> {
         let comment = comment.trim().strip_prefix('#')?.trim();
         let (keyword, body) = comment.split_once(':')?;
         let keyword = keyword.trim();
+
+        // Support other pragma comments coming after `error` or `revealed`, e.g.
+        // `# error: [code] # type: ignore` (nested pragma comments)
+        let body = if let Some((before_nested, _)) = body.split_once('#') {
+            before_nested
+        } else {
+            body
+        };
+
         let body = body.trim();
 
         match keyword {

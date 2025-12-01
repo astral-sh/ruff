@@ -354,6 +354,13 @@ impl Diagnostic {
         Arc::make_mut(&mut self.inner).fix = Some(fix);
     }
 
+    /// If `fix` is `Some`, set the fix for this diagnostic.
+    pub fn set_optional_fix(&mut self, fix: Option<Fix>) {
+        if let Some(fix) = fix {
+            self.set_fix(fix);
+        }
+    }
+
     /// Remove the fix for this diagnostic.
     pub fn remove_fix(&mut self) {
         Arc::make_mut(&mut self.inner).fix = None;

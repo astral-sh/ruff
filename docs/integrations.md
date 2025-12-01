@@ -88,7 +88,7 @@ You can add the following configuration to `.gitlab-ci.yml` to run a `ruff forma
 Ruff Check:
   extends: .base_ruff
   script:
-    - ruff check --output-format=gitlab > code-quality-report.json
+    - ruff check --output-format=gitlab --output-file=code-quality-report.json
   artifacts:
     reports:
       codequality: $CI_PROJECT_DIR/code-quality-report.json

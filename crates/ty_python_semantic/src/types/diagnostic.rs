@@ -18,7 +18,7 @@ use crate::types::class::{
     CodeGeneratorKind, DisjointBase, DisjointBaseKind, Field, MethodDecorator,
 };
 use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral};
-use crate::types::liskov::MethodKind;
+use crate::types::overrides::MethodKind;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
@@ -121,6 +121,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
+    registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -1756,6 +1757,33 @@ declare_lint! {
     pub(crate) static UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS = {
         summary: "detects invalid `super()` calls where implicit arguments are unavailable.",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for calls to `super()` inside methods of `NamedTuple` classes.
+    ///
+    /// ## Why is this bad?
+    /// Using `super()` in a method of a `NamedTuple` class will raise an exception at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import NamedTuple
+    ///
+    /// class F(NamedTuple):
+    ///     x: int
+    ///
+    ///     def method(self):
+    ///         super()  # error: super() is not supported in methods of NamedTuple classes
+    /// ```
+    ///
+    /// ## References
+    /// - [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)
+    pub(crate) static SUPER_CALL_IN_NAMED_TUPLE_METHOD = {
+        summary: "detects `super()` calls in methods of `NamedTuple` classes",
+        status: LintStatus::preview("0.0.1-alpha.30"),
         default_level: Level::Error,
     }
 }
@@ -3804,12 +3832,30 @@ pub(super) fn report_overridden_final_method<'db>(
     context: &InferContext<'db, '_>,
     member: &str,
     subclass_definition: Definition<'db>,
+    // N.B. the type of the *definition*, not the type on an instance of the subclass
     subclass_type: Type<'db>,
     superclass: ClassType<'db>,
     subclass: ClassType<'db>,
     superclass_method_defs: &[FunctionType<'db>],
 ) {
     let db = context.db();
+
+    // Some hijinks so that we emit a diagnostic on the property getter rather than the property setter
+    let property_getter_definition = if subclass_definition.kind(db).is_function_def()
+        && let Type::PropertyInstance(property) = subclass_type
+        && let Some(Type::FunctionLiteral(getter)) = property.getter(db)
+    {
+        let getter_definition = getter.definition(db);
+        if getter_definition.scope(db) == subclass_definition.scope(db) {
+            Some(getter_definition)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let subclass_definition = property_getter_definition.unwrap_or(subclass_definition);
 
     let Some(builder) = context.report_lint(
         &OVERRIDE_OF_FINAL_METHOD,
@@ -3871,37 +3917,69 @@ pub(super) fn report_overridden_final_method<'db>(
 
     diagnostic.sub(sub);
 
-    let underlying_function = match subclass_type {
-        Type::FunctionLiteral(function) => Some(function),
-        Type::BoundMethod(method) => Some(method.function(db)),
-        _ => None,
-    };
+    // It's tempting to autofix properties as well,
+    // but you'd want to delete the `@my_property.deleter` as well as the getter and the deleter,
+    // and we don't model property deleters at all right now.
+    if let Type::FunctionLiteral(function) = subclass_type {
+        let class_node = subclass
+            .class_literal(db)
+            .0
+            .body_scope(db)
+            .node(db)
+            .expect_class()
+            .node(context.module());
 
-    if let Some(function) = underlying_function {
+        let (overloads, implementation) = function.overloads_and_implementation(db);
+        let overload_count = overloads.len() + usize::from(implementation.is_some());
+        let is_only = overload_count >= class_node.body.len();
+
         let overload_deletion = |overload: &OverloadLiteral<'db>| {
-            Edit::range_deletion(overload.node(db, context.file(), context.module()).range())
+            let range = overload.node(db, context.file(), context.module()).range();
+            if is_only {
+                Edit::range_replacement("pass".to_string(), range)
+            } else {
+                Edit::range_deletion(range)
+            }
         };
+
+        let should_fix = overloads
+            .iter()
+            .copied()
+            .chain(implementation)
+            .all(|overload| {
+                class_node
+                    .body
+                    .iter()
+                    .filter_map(ast::Stmt::as_function_def_stmt)
+                    .contains(overload.node(db, context.file(), context.module()))
+            });
 
         match function.overloads_and_implementation(db) {
             ([first_overload, rest @ ..], None) => {
                 diagnostic.help(format_args!("Remove all overloads for `{member}`"));
-                diagnostic.set_fix(Fix::unsafe_edits(
-                    overload_deletion(first_overload),
-                    rest.iter().map(overload_deletion),
-                ));
+                diagnostic.set_optional_fix(should_fix.then(|| {
+                    Fix::unsafe_edits(
+                        overload_deletion(first_overload),
+                        rest.iter().map(overload_deletion),
+                    )
+                }));
             }
             ([first_overload, rest @ ..], Some(implementation)) => {
                 diagnostic.help(format_args!(
                     "Remove all overloads and the implementation for `{member}`"
                 ));
-                diagnostic.set_fix(Fix::unsafe_edits(
-                    overload_deletion(first_overload),
-                    rest.iter().chain([&implementation]).map(overload_deletion),
-                ));
+                diagnostic.set_optional_fix(should_fix.then(|| {
+                    Fix::unsafe_edits(
+                        overload_deletion(first_overload),
+                        rest.iter().chain([&implementation]).map(overload_deletion),
+                    )
+                }));
             }
             ([], Some(implementation)) => {
                 diagnostic.help(format_args!("Remove the override of `{member}`"));
-                diagnostic.set_fix(Fix::unsafe_edit(overload_deletion(&implementation)));
+                diagnostic.set_optional_fix(
+                    should_fix.then(|| Fix::unsafe_edit(overload_deletion(&implementation))),
+                );
             }
             ([], None) => {
                 // Should be impossible to get here: how would we even infer a function as a function
@@ -3911,11 +3989,12 @@ pub(super) fn report_overridden_final_method<'db>(
                 );
             }
         }
+    } else if let Type::PropertyInstance(property) = subclass_type
+        && property.setter(db).is_some()
+    {
+        diagnostic.help(format_args!("Remove the getter and setter for `{member}`"));
     } else {
         diagnostic.help(format_args!("Remove the override of `{member}`"));
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(
-            subclass_definition.full_range(db, context.module()).range(),
-        )));
     }
 }
 

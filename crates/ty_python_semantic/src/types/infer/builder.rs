@@ -111,7 +111,7 @@ use crate::types::{
     TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
     UnionTypeInstance, binding_type, infer_scope_types, todo_type,
 };
-use crate::types::{CallableTypes, liskov};
+use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
@@ -973,8 +973,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (8) Check for Liskov violations
-            liskov::check_class(&self.context, class);
+            // (8) Check for violations of the Liskov Substitution Principle,
+            // and for violations of other rules relating to invalid overrides of some sort.
+            overrides::check_class(&self.context, class);
 
             if let Some(protocol) = class.into_protocol_class(self.db()) {
                 protocol.validate_members(&self.context);
