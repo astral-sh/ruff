@@ -157,3 +157,15 @@ print(f"{1}{''}" and "bar")
 
 # https://github.com/astral-sh/ruff/issues/7127
 def f(a: "'' and 'b'"): ...
+
+
+# https://github.com/astral-sh/ruff/issues/21473
+tuple("") and False  # SIM223
+tuple(t"") and False  # OK
+tuple(0) and False  # OK
+tuple(1) and False  # OK
+tuple(False) and False  # OK
+tuple(None) and False  # OK
+tuple(...) and False  # OK
+tuple(lambda x: x) and False  # OK
+tuple(x for x in range(0)) and False  # OK
