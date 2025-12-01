@@ -918,7 +918,7 @@ jobs:
           cache-dependency-path: playground/package-lock.json
       - uses: jetli/wasm-bindgen-action@20b33e20595891ab1a0ed73145d8a21fc96e7c29 # v0.2.0
       - name: "Install Node dependencies"
-        run: npm ci
+        run: npm ci --ignore-scripts
         working-directory: playground
       - name: "Build playgrounds"
         run: npm run dev:wasm
