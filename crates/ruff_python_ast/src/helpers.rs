@@ -1323,11 +1323,10 @@ impl Truthiness {
                         {
                             // Ex) `list([1, 2, 3])`
                             match argument {
-                                // Return Unknown for types with definite truthiness that might result
-                                // in empty iterables or will raise a type error:
-                                // - Non-iterable types (numbers, booleans, None, etc.) raise TypeError
-                                // - TString: always truthy but might result in empty iterables
-                                // - Lambda/Generator: always truthy but might result in empty iterables
+                                // Return Unknown for types with definite truthiness that might
+                                // result in empty iterables (t-strings and generators) or will
+                                // raise a type error (non-iterable types like numbers, booleans,
+                                // None, etc.).
                                 Expr::NumberLiteral(_)
                                 | Expr::BooleanLiteral(_)
                                 | Expr::NoneLiteral(_)
