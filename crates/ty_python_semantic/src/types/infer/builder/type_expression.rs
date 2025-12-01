@@ -501,7 +501,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if starred_type.exact_tuple_instance_spec(self.db()).is_some() {
             starred_type
         } else {
-            todo_type!("PEP 646")
+            Type::Dynamic(DynamicType::TodoStarredExpression)
         }
     }
 

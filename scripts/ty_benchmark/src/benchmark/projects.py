@@ -32,6 +32,8 @@ class Project(NamedTuple):
     exclude: list[str] = []
     """The directories and files to exclude from checks."""
 
+    edit: IncrementalEdit | None = None
+
     def clone(self, checkout_dir: Path) -> None:
         # Skip cloning if the project has already been cloned (the script doesn't yet support updating)
         if (checkout_dir / ".git").exists():
@@ -95,6 +97,33 @@ class Project(NamedTuple):
         logging.info(f"Cloned {self.name} to {checkout_dir}.")
 
 
+class IncrementalEdit(NamedTuple):
+    """Description of an edit to measure incremental performance"""
+
+    edited_file: str
+    """The file to which to apply the edit."""
+
+    affected_files: list[str]
+    """Files other than the main file that's affected by the edit."""
+
+    replace_text: str
+    """The original code snippet to find and replace in the main file."""
+
+    replacement: str
+    """The new code snippet to insert in place of `replace_text`"""
+
+    def apply_to(self, text: str) -> str | None:
+        """Applies the edit to the given text.
+
+        Returns:
+            The modified text or None if the edit couldn't be applied"""
+
+        if self.replace_text not in text:
+            return None
+
+        return text.replace(self.replace_text, self.replacement, 1)
+
+
 # Selection of projects taken from
 # [mypy-primer](https://github.com/hauntsaninja/mypy_primer/blob/0ea6cc614b3e91084059b9a3acc58f94c066a211/mypy_primer/projects.py#L71).
 # May require frequent updating, especially the dependencies list
@@ -116,6 +145,12 @@ ALL: Final = [
             "--extra",
             "d",
         ],
+        edit=IncrementalEdit(
+            edited_file="src/black/nodes.py",
+            replace_text="LN = Union[Leaf, Node]",
+            replacement="LN = Union[Leaf, Node, int]",
+            affected_files=["src/black/linegen.py"],
+        ),
     ),
     Project(
         name="discord.py",
@@ -128,6 +163,12 @@ ALL: Final = [
             "pyproject.toml",
             "typing_extensions>=4.3,<5",
         ],
+        edit=IncrementalEdit(
+            edited_file="discord/abc.py",
+            replace_text="id: int",
+            replacement="id: str",
+            affected_files=["discord/channel.py"],
+        ),
     ),
     # Fairly chunky project, requires the pydantic mypy plugin.
     #
@@ -146,6 +187,12 @@ ALL: Final = [
             "-r",
             "requirements.txt",
         ],
+        edit=IncrementalEdit(
+            edited_file="homeassistant/core.py",
+            affected_files=["homeassistant/helpers/event.py"],
+            replace_text="type CALLBACK_TYPE = Callable[[], None]",
+            replacement="type CALLBACK_TYPE = Callable[[str], None]",
+        ),
     ),
     Project(
         name="isort",
@@ -154,6 +201,12 @@ ALL: Final = [
         python_version="3.11",
         include=["isort"],
         install_arguments=["types-colorama", "colorama"],
+        edit=IncrementalEdit(
+            edited_file="isort/settings.py",
+            replace_text="def is_skipped(self, file_path: Path) -> bool:",
+            replacement="def is_skipped(self, file_path: str) -> bool:",
+            affected_files=["isort/files.py"],
+        ),
     ),
     Project(
         name="jinja",
@@ -162,6 +215,24 @@ ALL: Final = [
         python_version="3.10",
         include=["src"],
         install_arguments=["-r", "pyproject.toml"],
+        edit=IncrementalEdit(
+            edited_file="src/jinja2/nodes.py",
+            replace_text="""def iter_child_nodes(
+        self,
+        exclude: t.Container[str] | None = None,
+        only: t.Container[str] | None = None,
+    ) -> t.Iterator["Node"]""",
+            replacement="""def iter_child_nodes(
+        self,
+        exclude: t.Container[str] | None = None,
+        only: t.Container[str] | None = None,
+    ) -> t.Iterator[str]""",
+            affected_files=[
+                "src/jinja2/compiler.py",
+                "src/jinja2/idtracking.py",
+                "src/jinja2/visitor.py",
+            ],
+        ),
     ),
     Project(
         name="pandas",
@@ -174,6 +245,12 @@ ALL: Final = [
             "-r",
             "requirements-dev.txt",
         ],
+        edit=IncrementalEdit(
+            edited_file="pandas/_typing.py",
+            replace_text='Axis: TypeAlias = AxisInt | Literal["index", "columns", "rows"]',
+            replacement='Axis: TypeAlias = Literal["index", "columns", "rows"]',
+            affected_files=["pandas/core/frame.py"],
+        ),
     ),
     Project(
         name="pandas-stubs",
@@ -196,6 +273,7 @@ ALL: Final = [
             "scipy >=1.9.1",
             "scipy-stubs >=1.15.3.0",
         ],
+        edit=None,  # Tricky in a stubs only project as there are no actual method calls.
     ),
     Project(
         name="prefect",
@@ -215,6 +293,22 @@ ALL: Final = [
             "--group",
             "dev",
         ],
+        edit=IncrementalEdit(
+            edited_file="src/prefect/server/models/events.py",
+            replace_text="""async def deployment_status_event(
+    session: AsyncSession,
+    deployment_id: UUID,
+    status: DeploymentStatus,
+    occurred: DateTime,
+) -> Event:""",
+            replacement="""async def deployment_status_event(
+    session: AsyncSession,
+    deployment_id: UUID,
+    status: DeploymentStatus,
+    occurred: DateTime,
+) -> int:""",
+            affected_files=["src/prefect/server/models/deployments.py"],
+        ),
     ),
     Project(
         name="pytorch",
@@ -283,5 +377,22 @@ ALL: Final = [
             "mypy==1.16.0",  # pytorch pins mypy,
         ],
         python_version="3.11",
+        edit=IncrementalEdit(
+            edited_file="torch/nn/__init__.py",
+            replace_text="""from torch.nn.parameter import (  # usort: skip
+    Buffer as Buffer,
+    Parameter as Parameter,
+    UninitializedBuffer as UninitializedBuffer,
+    UninitializedParameter as UninitializedParameter,
+)""",
+            replacement="""from torch.nn.parameter import (  # usort: skip
+    Buffer as Buffer,
+    UninitializedBuffer as UninitializedBuffer,
+    UninitializedParameter as UninitializedParameter,
+)""",
+            affected_files=[
+                "torch/distributed/pipelining/_backward.py",
+            ],
+        ),
     ),
 ]
