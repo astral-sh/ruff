@@ -1446,14 +1446,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 _ => TypeIsType::unbound(
                     self.db(),
-                    // N.B. Using the top materialization here is a pragmatic decision
-                    // that makes us produce more intuitive results given how
-                    // `TypeIs` is used in the real world (in particular, in typeshed).
-                    // However, there's some debate about whether this is really
-                    // fully correct. See <https://github.com/astral-sh/ruff/pull/20591>
-                    // for more discussion.
-                    self.infer_type_expression(arguments_slice)
-                        .top_materialization(self.db()),
+                    self.infer_type_expression(arguments_slice),
                 ),
             },
             SpecialFormType::TypeGuard => {

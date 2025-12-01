@@ -367,3 +367,49 @@ def narrowed_type_must_be_exact(a: object, b: Baz):
         # TODO: Should be `Foo`
         reveal_type(a)  # revealed: Bar
 ```
+
+## Generic type narrowing with `TypeIs`
+
+```py
+from typing import Union, Generic, TypeVar
+from typing_extensions import TypeIs
+
+T = TypeVar('T', covariant=True)
+E = TypeVar('E', covariant=True)
+
+class Ok(Generic[T]):
+    def __init__(self, value: T):
+        self._value = value
+
+    @property
+    def ok_value(self) -> T:
+        return self._value
+
+class Err(Generic[E]):
+    def __init__(self, error: E):
+        self._error = error
+
+    @property
+    def err_value(self) -> E:
+        return self._error
+
+Result = Union[Ok[T], Err[E]]
+
+def is_err(result: Result[T, E]) -> TypeIs[Err[E]]:
+    return isinstance(result, Err)
+
+def some_function() -> Result[int, Exception]:
+    return Err(Exception("error"))
+
+def use_function() -> None:
+    result = some_function()
+
+    if is_err(result):
+        reveal_type(result)  # revealed: Err[Exception]
+        reveal_type(result.err_value)  # revealed: Exception
+        return None
+
+    # After narrowing: Ok[int] with negative constraint
+    reveal_type(result)  # revealed: Ok[int] & ~Err[Exception]
+    reveal_type(result.ok_value)  # revealed: int
+```

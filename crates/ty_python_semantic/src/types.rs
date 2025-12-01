@@ -7740,7 +7740,18 @@ impl<'db> Type<'db> {
             }
 
             // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
-            Type::TypeIs(type_is) => type_is.with_type(db, type_is.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
+            Type::TypeIs(type_is) => {
+                if matches!(type_mapping, TypeMapping::Materialize(_)) && type_is.is_materialized(db) {
+                    return self;
+                }
+
+                let new_inner = type_is.return_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+
+                let is_materialized = type_is.is_materialized(db)
+                    || matches!(type_mapping, TypeMapping::Specialization(_) | TypeMapping::Materialize(_));
+
+                Type::TypeIs(TypeIsType::new(db, new_inner, type_is.place_info(db), is_materialized))
+            }
 
             Type::TypeAlias(alias) => {
                 if TypeMapping::EagerExpansion == *type_mapping {
@@ -13673,6 +13684,8 @@ pub struct TypeIsType<'db> {
     /// The ID of the scope to which the place belongs
     /// and the ID of the place itself within that scope.
     place_info: Option<(ScopeId<'db>, ScopedPlaceId)>,
+    /// Whether the type has been materialized.
+    is_materialized: bool,
 }
 
 fn walk_typeis_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -13695,7 +13708,7 @@ impl<'db> TypeIsType<'db> {
     }
 
     pub(crate) fn unbound(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        Type::TypeIs(Self::new(db, ty, None))
+        Type::TypeIs(Self::new(db, ty, None, false))
     }
 
     pub(crate) fn bound(
@@ -13704,7 +13717,7 @@ impl<'db> TypeIsType<'db> {
         scope: ScopeId<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
-        Type::TypeIs(Self::new(db, return_type, Some((scope, place))))
+        Type::TypeIs(Self::new(db, return_type, Some((scope, place)), true))
     }
 
     #[must_use]
@@ -13714,12 +13727,21 @@ impl<'db> TypeIsType<'db> {
         scope: ScopeId<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
-        Self::bound(db, self.return_type(db), scope, place)
+        let mut ty = self.return_type(db);
+        if !self.is_materialized(db) {
+            ty = ty.top_materialization(db);
+        }
+        Self::bound(db, ty, scope, place)
     }
 
     #[must_use]
     pub(crate) fn with_type(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        Type::TypeIs(Self::new(db, ty, self.place_info(db)))
+        Type::TypeIs(Self::new(
+            db,
+            ty,
+            self.place_info(db),
+            self.is_materialized(db),
+        ))
     }
 
     pub(crate) fn is_bound(self, db: &'db dyn Db) -> bool {

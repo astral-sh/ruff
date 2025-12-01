@@ -1458,23 +1458,55 @@ impl<'db> SpecializationBuilder<'db> {
                 // We do not handle cases where the `formal` types contain other types that contain type variables
                 // to prevent incorrect specialization: e.g. `T = int | list[int]` for `formal: T | list[T], actual: int | list[int]`
                 // (the correct specialization is `T = int`).
-                let types_have_typevars = formal_union
+                let types_have_typevars: Vec<_> = formal_union
                     .elements(self.db)
                     .iter()
-                    .filter(|ty| ty.has_typevar(self.db));
-                let Ok(Type::TypeVar(formal_bound_typevar)) = types_have_typevars.exactly_one()
-                else {
-                    return Ok(());
-                };
-                if (actual_union.elements(self.db).iter()).any(|ty| ty.is_type_var()) {
-                    return Ok(());
+                    .filter(|ty| ty.has_typevar(self.db))
+                    .collect();
+
+                // Original logic: handle single bare typevar case
+                if let Ok(Type::TypeVar(formal_bound_typevar)) =
+                    types_have_typevars.iter().copied().exactly_one()
+                {
+                    if !(actual_union.elements(self.db).iter()).any(|ty| ty.is_type_var()) {
+                        let remaining_actual =
+                            actual_union.filter(self.db, |ty| !ty.is_subtype_of(self.db, formal));
+                        if !remaining_actual.is_never() {
+                            self.add_type_mapping(
+                                *formal_bound_typevar,
+                                remaining_actual,
+                                polarity,
+                                f,
+                            );
+                        }
+                    }
+                } else if types_have_typevars.len() >= 2 {
+                    // New logic: for multiple wrapped typevars, try class-based matching
+                    // This handles cases like Ok[T] | Err[E] where we have at least 2 distinct type-containing elements
+                    for formal_elem in types_have_typevars.iter() {
+                        if let Type::NominalInstance(formal_inst) = formal_elem {
+                            let formal_class = formal_inst.class_literal(self.db);
+
+                            let mut matching_actual = None;
+                            let mut count = 0;
+
+                            for actual_elem in actual_union.elements(self.db) {
+                                if let Type::NominalInstance(actual_inst) = actual_elem {
+                                    if actual_inst.class_literal(self.db) == formal_class {
+                                        matching_actual = Some(*actual_elem);
+                                        count += 1;
+                                    }
+                                }
+                            }
+
+                            if count == 1 {
+                                if let Some(actual) = matching_actual {
+                                    self.infer_map_impl(**formal_elem, actual, polarity, f)?;
+                                }
+                            }
+                        }
+                    }
                 }
-                let remaining_actual =
-                    actual_union.filter(self.db, |ty| !ty.is_subtype_of(self.db, formal));
-                if remaining_actual.is_never() {
-                    return Ok(());
-                }
-                self.add_type_mapping(*formal_bound_typevar, remaining_actual, polarity, f);
             }
             (Type::Union(formal), _) => {
                 // Second, if the formal is a union, and precisely one union element is assignable
