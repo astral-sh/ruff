@@ -1,5 +1,5 @@
-"""Mailcap file handling.  See RFC 1524.
-"""
+"""Mailcap file handling.  See RFC 1524."""
+
 from collections.abc import Mapping, Sequence
 from typing_extensions import TypeAlias
 
@@ -18,6 +18,7 @@ def findmatch(
     entry to use.
 
     """
+
 def getcaps() -> dict[str, list[_Cap]]:
     """Return a dictionary containing the mailcap database.
 

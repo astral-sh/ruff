@@ -18,6 +18,7 @@ Sample use, programmatically
   r = tracer.results()
   r.write_results(show_missing=True, coverdir="/tmp")
 """
+
 import sys
 import types
 from _typeshed import Incomplete, StrPath, TraceFunction
@@ -47,8 +48,7 @@ class CoverageResults:
         outfile: StrPath | None = None,
     ) -> None: ...  # undocumented
     def update(self, other: CoverageResults) -> None:
-        """Merge in the data from another CoverageResults
-"""
+        """Merge in the data from another CoverageResults"""
     if sys.version_info >= (3, 13):
         def write_results(
             self,
@@ -59,38 +59,38 @@ class CoverageResults:
             ignore_missing_files: bool = False,
         ) -> None:
             """
-Write the coverage results.
+            Write the coverage results.
 
-:param show_missing: Show lines that had no hits.
-:param summary: Include coverage summary per module.
-:param coverdir: If None, the results of each module are placed in its
-                 directory, otherwise it is included in the directory
-                 specified.
-:param ignore_missing_files: If True, counts for files that no longer
-                 exist are silently ignored. Otherwise, a missing file
-                 will raise a FileNotFoundError.
-"""
+            :param show_missing: Show lines that had no hits.
+            :param summary: Include coverage summary per module.
+            :param coverdir: If None, the results of each module are placed in its
+                             directory, otherwise it is included in the directory
+                             specified.
+            :param ignore_missing_files: If True, counts for files that no longer
+                             exist are silently ignored. Otherwise, a missing file
+                             will raise a FileNotFoundError.
+            """
     else:
         def write_results(self, show_missing: bool = True, summary: bool = False, coverdir: StrPath | None = None) -> None:
             """
-        Write the coverage results.
+            Write the coverage results.
 
-        :param show_missing: Show lines that had no hits.
-        :param summary: Include coverage summary per module.
-        :param coverdir: If None, the results of each module are placed in its
-                         directory, otherwise it is included in the directory
-                         specified.
-        """
+            :param show_missing: Show lines that had no hits.
+            :param summary: Include coverage summary per module.
+            :param coverdir: If None, the results of each module are placed in its
+                             directory, otherwise it is included in the directory
+                             specified.
+            """
 
     def write_results_file(
         self, path: StrPath, lines: Sequence[str], lnotab: Any, lines_hit: Mapping[int, int], encoding: str | None = None
     ) -> tuple[int, int]:
-        """Return a coverage results file in path.
-"""
+        """Return a coverage results file in path."""
+
     def is_ignored_filename(self, filename: str) -> bool:  # undocumented
         """Return True if the filename does not refer to a file
-we want to have reported.
-"""
+        we want to have reported.
+        """
 
 class _Ignore:
     def __init__(self, modules: Iterable[str] | None = None, dirs: Iterable[StrPath] | None = None) -> None: ...
@@ -120,22 +120,23 @@ class Trace:
         timing: bool = False,
     ) -> None:
         """
-@param count true iff it should count number of times each
-             line is executed
-@param trace true iff it should print out each line that is
-             being counted
-@param countfuncs true iff it should just output a list of
-             (filename, modulename, funcname,) for functions
-             that were called at least once;  This overrides
-             'count' and 'trace'
-@param ignoremods a list of the names of modules to ignore
-@param ignoredirs a list of the names of directories to ignore
-             all of the (recursive) contents of
-@param infile file from which to read stored counts to be
-             added into the results
-@param outfile file in which to write the results
-@param timing true iff timing information be displayed
-"""
+        @param count true iff it should count number of times each
+                     line is executed
+        @param trace true iff it should print out each line that is
+                     being counted
+        @param countfuncs true iff it should just output a list of
+                     (filename, modulename, funcname,) for functions
+                     that were called at least once;  This overrides
+                     'count' and 'trace'
+        @param ignoremods a list of the names of modules to ignore
+        @param ignoredirs a list of the names of directories to ignore
+                     all of the (recursive) contents of
+        @param infile file from which to read stored counts to be
+                     added into the results
+        @param outfile file in which to write the results
+        @param timing true iff timing information be displayed
+        """
+
     def run(self, cmd: str | types.CodeType) -> None: ...
     def runctx(
         self, cmd: str | types.CodeType, globals: Mapping[str, Any] | None = None, locals: Mapping[str, Any] | None = None
@@ -145,19 +146,22 @@ class Trace:
     def globaltrace_trackcallers(self, frame: types.FrameType, why: str, arg: Any) -> None:
         """Handler for call events.
 
-Adds information about who called who to the self._callers dict.
-"""
+        Adds information about who called who to the self._callers dict.
+        """
+
     def globaltrace_countfuncs(self, frame: types.FrameType, why: str, arg: Any) -> None:
         """Handler for call events.
 
-Adds (filename, modulename, funcname) to the self._calledfuncs dict.
-"""
+        Adds (filename, modulename, funcname) to the self._calledfuncs dict.
+        """
+
     def globaltrace_lt(self, frame: types.FrameType, why: str, arg: Any) -> None:
         """Handler for call events.
 
-If the code block being entered is to be ignored, returns 'None',
-else returns self.localtrace.
-"""
+        If the code block being entered is to be ignored, returns 'None',
+        else returns self.localtrace.
+        """
+
     def localtrace_trace_and_count(self, frame: types.FrameType, why: str, arg: Any) -> TraceFunction: ...
     def localtrace_trace(self, frame: types.FrameType, why: str, arg: Any) -> TraceFunction: ...
     def localtrace_count(self, frame: types.FrameType, why: str, arg: Any) -> TraceFunction: ...

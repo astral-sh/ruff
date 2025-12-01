@@ -26,6 +26,7 @@ For descriptions of all methods, read the comments in the code below.
 Note that all arguments and return values representing article numbers
 are strings, not numbers, since they are rarely used for calculations.
 """
+
 import datetime
 import socket
 import ssl
@@ -50,40 +51,39 @@ __all__ = [
 _File: TypeAlias = IO[bytes] | bytes | str | None
 
 class NNTPError(Exception):
-    """Base class for all nntplib exceptions
-"""
+    """Base class for all nntplib exceptions"""
+
     response: str
 
 class NNTPReplyError(NNTPError):
-    """Unexpected [123]xx reply
-"""
+    """Unexpected [123]xx reply"""
+
 class NNTPTemporaryError(NNTPError):
-    """4xx errors
-"""
+    """4xx errors"""
+
 class NNTPPermanentError(NNTPError):
-    """5xx errors
-"""
+    """5xx errors"""
+
 class NNTPProtocolError(NNTPError):
-    """Response does not begin with [1-5]
-"""
+    """Response does not begin with [1-5]"""
+
 class NNTPDataError(NNTPError):
-    """Error in response data
-"""
+    """Error in response data"""
 
 NNTP_PORT: Final = 119
 NNTP_SSL_PORT: Final = 563
 
 class GroupInfo(NamedTuple):
-    """GroupInfo(group, last, first, flag)
-"""
+    """GroupInfo(group, last, first, flag)"""
+
     group: str
     last: str
     first: str
     flag: str
 
 class ArticleInfo(NamedTuple):
-    """ArticleInfo(number, message_id, lines)
-"""
+    """ArticleInfo(number, message_id, lines)"""
+
     number: int
     message_id: str
     lines: list[bytes]
@@ -91,7 +91,7 @@ class ArticleInfo(NamedTuple):
 def decode_header(header_str: str) -> str:
     """Takes a unicode string representing a munged header value
     and decodes it as a (possibly non-ASCII) readable value.
-"""
+    """
 
 class NNTP:
     encoding: str
@@ -135,6 +135,7 @@ class NNTP:
         unexpected NNTPPermanentErrors, you might need to set
         readermode.
         """
+
     def __enter__(self) -> Self: ...
     def __exit__(self, *args: Unused) -> None: ...
     def getwelcome(self) -> str:
@@ -142,24 +143,28 @@ class NNTP:
         (this is read and squirreled away by __init__()).
         If the response code is 200, posting is allowed;
         if it 201, posting is not allowed.
-"""
+        """
+
     def getcapabilities(self) -> dict[str, _list[str]]:
         """Get the server capabilities, as read by __init__().
         If the CAPABILITIES command is not supported, an empty dict is
         returned.
-"""
+        """
+
     def set_debuglevel(self, level: int) -> None:
         """Set the debugging level.  Argument 'level' means:
         0: no debugging output (default)
         1: print commands and responses but not body text etc.
         2: also print raw lines read and sent before stripping CR/LF
-"""
+        """
+
     def debug(self, level: int) -> None:
         """Set the debugging level.  Argument 'level' means:
         0: no debugging output (default)
         1: print commands and responses but not body text etc.
         2: also print raw lines read and sent before stripping CR/LF
-"""
+        """
+
     def capabilities(self) -> tuple[str, dict[str, _list[str]]]:
         """Process a CAPABILITIES command.  Not supported by all servers.
         Return:
@@ -167,6 +172,7 @@ class NNTP:
         - caps: a dictionary mapping capability names to lists of tokens
         (for example {'VERSION': ['2'], 'OVER': [], LIST: ['ACTIVE', 'HEADERS'] })
         """
+
     def newgroups(self, date: datetime.date | datetime.datetime, *, file: _File = None) -> tuple[str, _list[str]]:
         """Process a NEWGROUPS command.  Arguments:
         - date: a date or datetime object
@@ -174,6 +180,7 @@ class NNTP:
         - resp: server response if successful
         - list: list of newsgroup names
         """
+
     def newnews(self, group: str, date: datetime.date | datetime.datetime, *, file: _File = None) -> tuple[str, _list[str]]:
         """Process a NEWNEWS command.  Arguments:
         - group: group name or '*'
@@ -182,6 +189,7 @@ class NNTP:
         - resp: server response if successful
         - list: list of message ids
         """
+
     def list(self, group_pattern: str | None = None, *, file: _File = None) -> tuple[str, _list[str]]:
         """Process a LIST or LIST ACTIVE command. Arguments:
         - group_pattern: a pattern indicating which groups to query
@@ -190,6 +198,7 @@ class NNTP:
         - resp: server response if successful
         - list: list of (group, last, first, flag) (strings)
         """
+
     def description(self, group: str) -> str:
         """Get a description for a single group.  If more than one
         group matches ('group' is a pattern), return the first.  If no
@@ -201,10 +210,11 @@ class NNTP:
 
         NOTE: This neither checks for a wildcard in 'group' nor does
         it check whether the group actually exists.
-"""
+        """
+
     def descriptions(self, group_pattern: str) -> tuple[str, dict[str, str]]:
-        """Get descriptions for a range of groups.
-"""
+        """Get descriptions for a range of groups."""
+
     def group(self, name: str) -> tuple[str, int, int, int, str]:
         """Process a GROUP command.  Argument:
         - group: the group name
@@ -215,6 +225,7 @@ class NNTP:
         - last: last article number
         - name: the group name
         """
+
     def help(self, *, file: _File = None) -> tuple[str, _list[str]]:
         """Process a HELP command. Argument:
         - file: Filename string or file object to store the result in
@@ -223,6 +234,7 @@ class NNTP:
         - list: list of strings returned by the server in response to the
                 HELP command
         """
+
     def stat(self, message_spec: Any = None) -> tuple[str, int, str]:
         """Process a STAT command.  Argument:
         - message_spec: article number or message id (if not specified,
@@ -232,12 +244,13 @@ class NNTP:
         - art_num: the article number
         - message_id: the message id
         """
+
     def next(self) -> tuple[str, int, str]:
-        """Process a NEXT command.  No arguments.  Return as for STAT.
-"""
+        """Process a NEXT command.  No arguments.  Return as for STAT."""
+
     def last(self) -> tuple[str, int, str]:
-        """Process a LAST command.  No arguments.  Return as for STAT.
-"""
+        """Process a LAST command.  No arguments.  Return as for STAT."""
+
     def head(self, message_spec: Any = None, *, file: _File = None) -> tuple[str, ArticleInfo]:
         """Process a HEAD command.  Argument:
         - message_spec: article number or message id
@@ -246,6 +259,7 @@ class NNTP:
         - resp: server response if successful
         - ArticleInfo: (article number, message id, list of header lines)
         """
+
     def body(self, message_spec: Any = None, *, file: _File = None) -> tuple[str, ArticleInfo]:
         """Process a BODY command.  Argument:
         - message_spec: article number or message id
@@ -254,6 +268,7 @@ class NNTP:
         - resp: server response if successful
         - ArticleInfo: (article number, message id, list of body lines)
         """
+
     def article(self, message_spec: Any = None, *, file: _File = None) -> tuple[str, ArticleInfo]:
         """Process an ARTICLE command.  Argument:
         - message_spec: article number or message id
@@ -262,10 +277,12 @@ class NNTP:
         - resp: server response if successful
         - ArticleInfo: (article number, message id, list of article lines)
         """
+
     def slave(self) -> str:
         """Process a SLAVE command.  Returns:
         - resp: server response if successful
         """
+
     def xhdr(self, hdr: str, str: Any, *, file: _File = None) -> tuple[str, _list[str]]:
         """Process an XHDR command (optional server extension).  Arguments:
         - hdr: the header type (e.g. 'subject')
@@ -275,6 +292,7 @@ class NNTP:
         - resp: server response if successful
         - list: list of (nr, value) strings
         """
+
     def xover(self, start: int, end: int, *, file: _File = None) -> tuple[str, _list[tuple[int, dict[str, str]]]]:
         """Process an XOVER command (optional server extension) Arguments:
         - start: start of range
@@ -284,6 +302,7 @@ class NNTP:
         - resp: server response if successful
         - list: list of dicts containing the response fields
         """
+
     def over(
         self, message_spec: None | str | _list[Any] | tuple[Any, ...], *, file: _File = None
     ) -> tuple[str, _list[tuple[int, dict[str, str]]]]:
@@ -303,18 +322,21 @@ class NNTP:
 
         NOTE: the "message id" form isn't supported by XOVER
         """
+
     def date(self) -> tuple[str, datetime.datetime]:
         """Process the DATE command.
         Returns:
         - resp: server response if successful
         - date: datetime object
         """
+
     def post(self, data: bytes | Iterable[bytes]) -> str:
         """Process a POST command.  Arguments:
         - data: bytes object, iterable or file containing the article
         Returns:
         - resp: server response if successful
-"""
+        """
+
     def ihave(self, message_id: Any, data: bytes | Iterable[bytes]) -> str:
         """Process an IHAVE command.  Arguments:
         - message_id: message-id of the article
@@ -322,16 +344,18 @@ class NNTP:
         Returns:
         - resp: server response if successful
         Note that if the server refuses the article an exception is raised.
-"""
+        """
+
     def quit(self) -> str:
         """Process a QUIT command and close the socket.  Returns:
         - resp: server response if successful
-"""
+        """
+
     def login(self, user: str | None = None, password: str | None = None, usenetrc: bool = True) -> None: ...
     def starttls(self, context: ssl.SSLContext | None = None) -> None:
         """Process a STARTTLS command. Arguments:
-            - context: SSL context to use for the encrypted connection
-            """
+        - context: SSL context to use for the encrypted connection
+        """
 
 class NNTP_SSL(NNTP):
     ssl_context: ssl.SSLContext | None
@@ -348,5 +372,5 @@ class NNTP_SSL(NNTP):
         timeout: float = ...,
     ) -> None:
         """This works identically to NNTP.__init__, except for the change
-            in default port and the `ssl_context` argument for SSL connections.
-            """
+        in default port and the `ssl_context` argument for SSL connections.
+        """

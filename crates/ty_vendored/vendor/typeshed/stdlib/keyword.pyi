@@ -9,22 +9,21 @@ the python source tree and run:
 
 Alternatively, you can run 'make regen-keyword'.
 """
+
 from collections.abc import Sequence
 from typing import Final
 
 __all__ = ["iskeyword", "issoftkeyword", "kwlist", "softkwlist"]
 
 def iskeyword(s: str, /) -> bool:
-    """x.__contains__(y) <==> y in x.
-"""
+    """x.__contains__(y) <==> y in x."""
 
 # a list at runtime, but you're not meant to mutate it;
 # type it as a sequence
 kwlist: Final[Sequence[str]]
 
 def issoftkeyword(s: str, /) -> bool:
-    """x.__contains__(y) <==> y in x.
-"""
+    """x.__contains__(y) <==> y in x."""
 
 # a list at runtime, but you're not meant to mutate it;
 # type it as a sequence

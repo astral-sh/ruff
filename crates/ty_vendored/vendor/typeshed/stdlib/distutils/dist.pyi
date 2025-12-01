@@ -3,6 +3,7 @@
 Provides the Distribution class, which represents the module distribution
 being built/installed/distributed.
 """
+
 from _typeshed import Incomplete, StrOrBytesPath, StrPath, SupportsWrite
 from collections.abc import Iterable, MutableMapping
 from distutils.cmd import Command
@@ -39,6 +40,7 @@ class DistributionMetadata:
     """Dummy class to hold the distribution meta-data: name, version,
     author, and so forth.
     """
+
     def __init__(self, path: StrOrBytesPath | None = None) -> None: ...
     name: str | None
     version: str | None
@@ -58,14 +60,14 @@ class DistributionMetadata:
     requires: list[str] | None
     obsoletes: list[str] | None
     def read_pkg_file(self, file: IO[str]) -> None:
-        """Reads the metadata values from a file object.
-"""
+        """Reads the metadata values from a file object."""
+
     def write_pkg_info(self, base_dir: StrPath) -> None:
-        """Write the PKG-INFO file into the release tree.
-        """
+        """Write the PKG-INFO file into the release tree."""
+
     def write_pkg_file(self, file: SupportsWrite[str]) -> None:
-        """Write the PKG-INFO format data to a file object.
-        """
+        """Write the PKG-INFO format data to a file object."""
+
     def get_name(self) -> str: ...
     def get_version(self) -> str: ...
     def get_fullname(self) -> str: ...
@@ -104,6 +106,7 @@ class Distribution:
     necessary to respect the expectations that 'setup' has of Distribution.
     See the code for 'setup()', in core.py, for details.
     """
+
     cmdclass: dict[str, type[Command]]
     metadata: DistributionMetadata
     def __init__(self, attrs: MutableMapping[str, Incomplete] | None = None) -> None:
@@ -116,12 +119,14 @@ class Distribution:
         'command_obj' attribute to the empty dictionary; this will be
         filled in with real command objects by 'parse_command_line()'.
         """
+
     def get_option_dict(self, command: str) -> dict[str, tuple[str, str]]:
         """Get the option dictionary for a given command.  If that
         command's option dictionary hasn't been created yet, then create it
         and return the new dictionary; otherwise, return the existing
         option dictionary.
         """
+
     def parse_config_files(self, filenames: Iterable[str] | None = None) -> None: ...
     global_options: ClassVar[_OptionsList]
     common_usage: ClassVar[str]
@@ -188,21 +193,25 @@ class Distribution:
         execute commands (currently, this only happens if user asks for
         help).
         """
+
     def finalize_options(self) -> None:
         """Set final values for all the options on the Distribution
         instance, analogous to the .finalize_options() method of Command
         objects.
         """
+
     def handle_display_options(self, option_order):
         """If there were any non-global "display-only" options
         (--help-commands or the metadata display options) on the command
         line, display the requested info and return true; else return
         false.
         """
+
     def print_command_list(self, commands, header, max_length) -> None:
         """Print a subset of the list of all commands -- used by
         'print_commands()'.
         """
+
     def print_commands(self) -> None:
         """Print out a help message listing all available commands with a
         description of each.  The list is divided into "standard commands"
@@ -211,6 +220,7 @@ class Distribution:
         descriptions come from the command class attribute
         'description'.
         """
+
     def get_command_list(self):
         """Get a list of (command, description) tuples.
         The list is divided into "standard commands" (listed in
@@ -218,9 +228,9 @@ class Distribution:
         self.cmdclass, but not a standard command).  The descriptions come
         from the command class attribute 'description'.
         """
+
     def get_command_packages(self):
-        """Return a list of packages from which commands are loaded.
-"""
+        """Return a list of packages from which commands are loaded."""
     # NOTE: This list comes directly from the distutils/command folder. Minus bdist_msi and bdist_wininst.
     @overload
     def get_command_obj(self, command: Literal["bdist"], create: Literal[1, True] = 1) -> bdist:
@@ -229,6 +239,7 @@ class Distribution:
         object for 'command' is in the cache, then we either create and
         return it (if 'create' is true) or return None.
         """
+
     @overload
     def get_command_obj(self, command: Literal["bdist_dumb"], create: Literal[1, True] = 1) -> bdist_dumb: ...
     @overload
@@ -285,6 +296,7 @@ class Distribution:
         Raises DistutilsModuleError if the expected module could not be
         found, or if that module does not define the expected class.
         """
+
     @overload
     def get_command_class(self, command: Literal["bdist_dumb"]) -> type[bdist_dumb]: ...
     @overload
@@ -345,6 +357,7 @@ class Distribution:
 
         Returns the reinitialized command object.
         """
+
     @overload
     def reinitialize_command(self, command: Literal["bdist_dumb"], reinit_subcommands: bool = False) -> bdist_dumb: ...
     @overload
@@ -395,6 +408,7 @@ class Distribution:
         Uses the list of commands found and cache of command objects
         created by 'get_command_obj()'.
         """
+
     def run_command(self, command: str) -> None:
         """Do whatever it takes to run a command (including nothing at all,
         if the command has already been run).  Specifically: if we have
@@ -403,6 +417,7 @@ class Distribution:
         doesn't even have a command object yet, create one.  Then invoke
         'run()' on that command object (or an existing one).
         """
+
     def has_pure_modules(self) -> bool: ...
     def has_ext_modules(self) -> bool: ...
     def has_c_libraries(self) -> bool: ...

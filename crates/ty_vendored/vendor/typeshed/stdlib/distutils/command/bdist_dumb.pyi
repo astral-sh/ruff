@@ -4,6 +4,7 @@ Implements the Distutils 'bdist_dumb' command (create a "dumb" built
 distribution -- i.e., just an archive to be unpacked under $prefix or
 $exec_prefix).
 """
+
 from _typeshed import Incomplete
 from typing import ClassVar
 
