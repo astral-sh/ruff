@@ -129,7 +129,6 @@ def valid(
     a1: Callable[P, int],
     a2: Callable[Concatenate[int, P], int],
 ) -> None: ...
-
 def invalid(
     # TODO: error
     a1: P,
@@ -185,7 +184,6 @@ def foo(c: Callable[P, int]) -> None:
 
     # TODO: error
     def nested2(**kwargs: P.kwargs) -> None: ...
-
 
 class Foo:
     # TODO: error
@@ -342,6 +340,6 @@ class ParamSpecWithDefault5(Generic[PAnother, P]):
 
 ## Semantics
 
-The semantics of `ParamSpec` are described in [the PEP 695 `ParamSpec`
-document](./../pep695/paramspec.md) to avoid duplication unless there are any behavior specific to
-the legacy `ParamSpec` implementation.
+The semantics of `ParamSpec` are described in
+[the PEP 695 `ParamSpec` document](./../pep695/paramspec.md) to avoid duplication unless there are
+any behavior specific to the legacy `ParamSpec` implementation.

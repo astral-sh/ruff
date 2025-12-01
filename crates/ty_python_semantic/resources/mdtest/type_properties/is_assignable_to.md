@@ -1364,8 +1364,8 @@ def f(func: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
     static_assert(not is_assignable_to(tuple[Unknown, ...], TypeOf[args]))
 
     static_assert(is_assignable_to(TypeOf[kwargs], dict[str, Any]))
-    static_assert(is_assignable_to(TypeOf[kwargs], dict[str, object]))
     static_assert(is_assignable_to(TypeOf[kwargs], dict[str, Unknown]))
+    static_assert(not is_assignable_to(TypeOf[kwargs], dict[str, object]))
     static_assert(not is_assignable_to(TypeOf[kwargs], dict[str, int]))
     static_assert(is_assignable_to(TypeOf[kwargs], Mapping[str, Any]))
     static_assert(is_assignable_to(TypeOf[kwargs], Mapping[str, object]))

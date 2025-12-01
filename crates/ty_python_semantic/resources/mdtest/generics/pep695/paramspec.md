@@ -74,7 +74,6 @@ def valid[**P](
     a1: Callable[P, int],
     a2: Callable[Concatenate[int, P], int],
 ) -> None: ...
-
 def invalid[**P](
     # TODO: error
     a1: P,
@@ -124,7 +123,6 @@ def foo[**P](c: Callable[P, int]) -> None:
     # TODO: error
     def nested2(**kwargs: P.kwargs) -> None: ...
 
-
 class Foo[**P]:
     # TODO: error
     args: P.args
@@ -159,7 +157,6 @@ def f[**P](func: Callable[P, int]) -> Callable[P, None]:
         reveal_type(func())  # revealed: int
         reveal_type(func(*args))  # revealed: int
         reveal_type(func(**kwargs))  # revealed: int
-
     return wrapper
 ```
 
@@ -295,8 +292,8 @@ class ParamSpecWithDefault5[**P1 = P2]:
 
 ## Semantics
 
-Most of these test cases are adopted from the [typing documentation on `ParamSpec`
-semantics](https://typing.python.org/en/latest/spec/generics.html#semantics).
+Most of these test cases are adopted from the
+[typing documentation on `ParamSpec` semantics](https://typing.python.org/en/latest/spec/generics.html#semantics).
 
 ### Return type change using `ParamSpec` once
 
@@ -409,9 +406,7 @@ from typing import Callable
 def foo1[**P1](func: Callable[P1, int], *args: P1.args, **kwargs: P1.kwargs) -> int:
     return func(*args, **kwargs)
 
-def foo1_with_extra_arg[**P1](
-    func: Callable[P1, int], extra: str, *args: P1.args, **kwargs: P1.kwargs
-) -> int:
+def foo1_with_extra_arg[**P1](func: Callable[P1, int], extra: str, *args: P1.args, **kwargs: P1.kwargs) -> int:
     return func(*args, **kwargs)
 
 def foo2[**P2](func: Callable[P2, int], *args: P2.args, **kwargs: P2.kwargs) -> None:
@@ -423,7 +418,6 @@ def foo2[**P2](func: Callable[P2, int], *args: P2.args, **kwargs: P2.kwargs) -> 
     # error: [invalid-argument-type] "Argument to function `foo1_with_extra_arg` is incorrect: Expected `P1@foo1_with_extra_arg.args`, found `P2@foo2.args`"
     # error: [invalid-argument-type] "Argument to function `foo1_with_extra_arg` is incorrect: Expected `str`, found `P2@foo2.args`"
     foo1_with_extra_arg(func, *args, **kwargs)
-
 ```
 
 Here, the first argument to `f` can specialize `P` to the parameters of the callable passed to it

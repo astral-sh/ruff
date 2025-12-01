@@ -126,6 +126,8 @@ def custom_decorator(f) -> Callable[[int], str]:
     def wrapper(*args, **kwargs):
         print("Calling decorated function")
         return f(*args, **kwargs)
+    # TODO: This shouldn't be an error
+    # error: [invalid-return-type]
     return wrapper
 
 @custom_decorator
