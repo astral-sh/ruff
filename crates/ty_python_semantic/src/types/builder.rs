@@ -593,7 +593,7 @@ impl<'db> UnionBuilder<'db> {
         // If the type is defined recursively, the union type is sorted and normalized.
         // This is because the execution order of the queries is not deterministic and may result in a different order of elements.
         // The order of the union type does not affect the type check result, but unstable output is undesirable.
-        if self.cycle_recovery && self.recursively_defined.is_yes() {
+        if self.recursively_defined.is_yes() {
             self.order_elements = true;
         }
         let mut types = vec![];
@@ -613,7 +613,7 @@ impl<'db> UnionBuilder<'db> {
         }
         if self.order_elements {
             types.sort_unstable_by(|l, r| {
-                if self.cycle_recovery && self.recursively_defined.is_yes() {
+                if self.recursively_defined.is_yes() {
                     structural_type_ordering(self.db, l, r)
                 } else {
                     union_or_intersection_elements_ordering(self.db, l, r)

@@ -29,7 +29,7 @@ class Point:
 
 p = Point()
 reveal_type(p.x)  # revealed: int | Unknown
-reveal_type(p.y)  # revealed: Unknown | int
+reveal_type(p.y)  # revealed: int | Unknown
 ```
 
 ## Self-referential bare type alias

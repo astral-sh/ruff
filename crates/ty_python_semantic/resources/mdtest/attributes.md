@@ -2382,7 +2382,7 @@ class B:
         self.x = other.x
 
 reveal_type(B().x)  # revealed: Literal[1] | Unknown
-reveal_type(A().x)  # revealed: Unknown | Literal[1]
+reveal_type(A().x)  # revealed: Literal[1] | Unknown
 
 class Base:
     def flip(self) -> "Sub":
@@ -2674,7 +2674,7 @@ class C:
         self.x = (other.x, 1)
 
 reveal_type(C().x)  # revealed: tuple[Divergent, Literal[1]] | Unknown
-reveal_type(C().x[0])  # revealed: Divergent | Unknown
+reveal_type(C().x[0])  # revealed: Unknown | Divergent
 ```
 
 This also works if the tuple is not constructed directly:
