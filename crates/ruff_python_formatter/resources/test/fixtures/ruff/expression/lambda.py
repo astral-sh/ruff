@@ -392,3 +392,7 @@ long_assignment_target.with_attribute.and_a_slice[with_an_index] = (
 )
 
 long_assignment_target.with_attribute.and_a_slice[with_an_index] = lambda x, y, z: x + y + z
+
+very_long_variable_name_x, very_long_variable_name_y = lambda a: a + some_very_long_expression, lambda b: b * another_very_long_expression_here
+
+very_long_variable_name_for_result += lambda x: very_long_function_call_that_should_definitely_be_parenthesized_now(x, more_args, additional_parameters)
