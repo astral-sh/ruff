@@ -2,6 +2,7 @@ use compact_str::{CompactString, ToCompactString};
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
+use rustc_hash::FxHashSet;
 
 use std::borrow::Cow;
 use std::time::Duration;
@@ -1049,6 +1050,16 @@ impl<'db> Type<'db> {
         bound_typevar: BoundTypeVarInstance<'db>,
         class: ClassLiteral<'db>,
     ) -> Option<Type<'db>> {
+        self.find_type_var_from_impl(db, bound_typevar, class, &mut FxHashSet::default())
+    }
+
+    pub(crate) fn find_type_var_from_impl(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        class: ClassLiteral<'db>,
+        visited: &mut FxHashSet<(ClassLiteral<'db>, BoundTypeVarIdentity<'db>)>,
+    ) -> Option<Type<'db>> {
         if let Some(specialization) = self.specialization_of(db, class) {
             return specialization.get(db, bound_typevar);
         }
@@ -1057,19 +1068,25 @@ impl<'db> Type<'db> {
         // complex subtyping relationships, e.g., `type[C[T]]` to `Callable[..., T]`, or unions
         // containing multiple generic elements.
         for base in class.iter_mro(db, None) {
-            let Some(ClassType::Generic(class)) = base.into_class() else {
+            let Some((origin, Some(specialization))) =
+                base.into_class().map(|class| class.class_literal(db))
+            else {
                 continue;
             };
 
-            for (base_typevar, base_ty) in class
-                .specialization(db)
+            for (base_typevar, base_ty) in specialization
                 .generic_context(db)
                 .variables(db)
-                .zip(class.specialization(db).types(db))
+                .zip(specialization.types(db))
             {
                 if *base_ty == Type::TypeVar(bound_typevar) {
-                    // TODO: This is potentially quadratic.
-                    if let Some(ty) = self.find_type_var_from(db, base_typevar, class.origin(db)) {
+                    if !visited.insert((origin, base_typevar.identity(db))) {
+                        return None;
+                    }
+
+                    if let Some(ty) =
+                        self.find_type_var_from_impl(db, base_typevar, origin, visited)
+                    {
                         return Some(ty);
                     }
                 }
