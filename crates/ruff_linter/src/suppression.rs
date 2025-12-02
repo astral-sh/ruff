@@ -1,7 +1,7 @@
 use compact_str::CompactString;
 use core::fmt;
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_parser::{TokenKind, Tokens};
 use std::{error::Error, fmt::Formatter};
 use thiserror::Error;
 
