@@ -7,7 +7,6 @@
   schedule: ["before 4am on Monday"],
   semanticCommits: "disabled",
   separateMajorMinor: false,
-  prHourlyLimit: 10,
   enabledManagers: ["github-actions", "pre-commit", "cargo", "pep621", "pip_requirements", "npm"],
   cargo: {
     // See https://docs.renovatebot.com/configuration-options/#rangestrategy
