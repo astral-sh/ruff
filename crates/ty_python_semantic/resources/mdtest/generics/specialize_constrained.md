@@ -321,9 +321,8 @@ from typing import Never
 from ty_extensions import ConstraintSet, generic_context
 
 def mentions[T, U]():
+    # (T@mentions ≤ int) ∧ (U@mentions = list[T@mentions])
     constraints = ConstraintSet.range(Never, T, int) & ConstraintSet.range(list[T], U, list[T])
-    # revealed: ty_extensions.ConstraintSet[((T@mentions ≤ int) ∧ (U@mentions = list[T@mentions]))]
-    reveal_type(constraints)
     # revealed: ty_extensions.Specialization[T@mentions = int, U@mentions = list[int]]
     reveal_type(generic_context(mentions).specialize_constrained(constraints))
 ```
@@ -334,9 +333,8 @@ this case.
 
 ```py
 def divergent[T, U]():
+    # (T@divergent = list[U@divergent]) ∧ (U@divergent = list[T@divergent]))
     constraints = ConstraintSet.range(list[U], T, list[U]) & ConstraintSet.range(list[T], U, list[T])
-    # revealed: ty_extensions.ConstraintSet[((T@divergent = list[U@divergent]) ∧ (U@divergent = list[T@divergent]))]
-    reveal_type(constraints)
     # revealed: None
     reveal_type(generic_context(divergent).specialize_constrained(constraints))
 ```
