@@ -26,6 +26,7 @@ use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
 use crate::noqa::add_noqa;
 use crate::package::PackageRoot;
+use crate::preview::is_range_suppressions_enabled;
 use crate::registry::Rule;
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TEST_RULES, TestRule};
@@ -332,7 +333,11 @@ pub fn check_path(
             .iter_enabled_rules()
             .any(|rule_code| rule_code.lint_source().is_noqa())
     {
-        let suppressions = Suppressions::from_tokens(locator.contents(), tokens);
+        let suppressions = if is_range_suppressions_enabled(settings) {
+            Suppressions::from_tokens(locator.contents(), tokens)
+        } else {
+            Suppressions::default()
+        };
         let ignored = check_noqa(
             &mut context,
             path,

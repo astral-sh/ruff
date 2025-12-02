@@ -99,7 +99,7 @@ pub(crate) struct InvalidSuppression {
 }
 
 #[allow(unused)]
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(crate) struct Suppressions {
     /// Valid suppression ranges with associated comments
     valid: Vec<Suppression>,
