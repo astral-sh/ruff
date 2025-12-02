@@ -149,7 +149,10 @@ impl<'a> SuppressionsBuilder<'a> {
                     indents.push(self.source.slice(token));
                 }
                 TokenKind::Dedent => {
-                    self.match_comments(indents.last().copied().unwrap_or_default());
+                    self.match_comments(
+                        indents.last().copied().unwrap_or_default(),
+                        &token.range(),
+                    );
                     indents.pop();
                 }
                 TokenKind::Comment => {
@@ -200,7 +203,7 @@ impl<'a> SuppressionsBuilder<'a> {
             }
         }
 
-        self.match_comments(default_indent);
+        self.match_comments(default_indent, &TextRange::up_to(self.source.text_len()));
 
         Suppressions {
             valid: self.valid,
@@ -209,11 +212,11 @@ impl<'a> SuppressionsBuilder<'a> {
         }
     }
 
-    fn match_comments(&mut self, current_indent: &str) {
+    fn match_comments(&mut self, current_indent: &str, dedent_range: &TextRange) {
         let mut comment_index = 0;
 
         // for each pending comment, search for matching comments at the same indentation level,
-        // generate range suppressions for any matches, and then discard and unmatched comments
+        // generate range suppressions for any matches, and then discard any unmatched comments
         // from the outgoing indentation block
         while comment_index < self.pending.len() {
             let comment = &self.pending[comment_index];
@@ -246,6 +249,19 @@ impl<'a> SuppressionsBuilder<'a> {
 
                 // remove both comments from further consideration
                 self.pending.remove(other_index);
+                self.pending.remove(comment_index);
+            } else if matches!(comment.comment.action, SuppressionAction::Disable) {
+                // treat "disable" comments without a matching "enable" as *implicitly* matched
+                // to the end of the current indentation level
+                let implicit_range =
+                    TextRange::new(comment.comment.range.start(), dedent_range.end());
+                for code in comment.comment.codes_as_str(self.source) {
+                    self.valid.push(Suppression {
+                        code: code.into(),
+                        range: implicit_range,
+                        comments: smallvec![comment.comment.clone()],
+                    });
+                }
                 self.pending.remove(comment_index);
             } else {
                 self.invalid.push(InvalidSuppression {
@@ -529,6 +545,58 @@ print('hello')
     }
 
     #[test]
+    fn single_range_suppression_implicit_match() {
+        let source = "
+# ruff: disable[foo]
+print('hello')
+
+def foo():
+    # ruff: disable[bar]
+    print('hello')
+
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "# ruff: disable[bar]\n    print('hello')\n\n",
+                    code: "bar",
+                    comments: [
+                        SuppressionComment {
+                            text: "# ruff: disable[bar]",
+                            action: Disable,
+                            codes: [
+                                "bar",
+                            ],
+                            reason: "",
+                        },
+                    ],
+                },
+                Suppression {
+                    covered_source: "# ruff: disable[foo]\nprint('hello')\n\ndef foo():\n    # ruff: disable[bar]\n    print('hello')\n\n",
+                    code: "foo",
+                    comments: [
+                        SuppressionComment {
+                            text: "# ruff: disable[foo]",
+                            action: Disable,
+                            codes: [
+                                "foo",
+                            ],
+                            reason: "",
+                        },
+                    ],
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
     fn nested_range_suppressions() {
         let source = "
 class Foo:
@@ -739,24 +807,29 @@ print('hello')
 # ruff: disable[foo]
 print('hello')
 # ruff: enable[bar]
+print('world')
 ";
         assert_debug_snapshot!(
             Suppressions::debug(source),
             @r##"
         Suppressions {
-            valid: [],
-            invalid: [
-                InvalidSuppression {
-                    kind: Unmatched,
-                    comment: SuppressionComment {
-                        text: "# ruff: disable[foo]",
-                        action: Disable,
-                        codes: [
-                            "foo",
-                        ],
-                        reason: "",
-                    },
+            valid: [
+                Suppression {
+                    covered_source: "# ruff: disable[foo]\nprint('hello')\n# ruff: enable[bar]\nprint('world')\n",
+                    code: "foo",
+                    comments: [
+                        SuppressionComment {
+                            text: "# ruff: disable[foo]",
+                            action: Disable,
+                            codes: [
+                                "foo",
+                            ],
+                            reason: "",
+                        },
+                    ],
                 },
+            ],
+            invalid: [
                 InvalidSuppression {
                     kind: Unmatched,
                     comment: SuppressionComment {
@@ -786,20 +859,39 @@ print('hello')
             Suppressions::debug(source),
             @r##"
         Suppressions {
-            valid: [],
-            invalid: [
-                InvalidSuppression {
-                    kind: Unmatched,
-                    comment: SuppressionComment {
-                        text: "# ruff: disable[foo, bar]",
-                        action: Disable,
-                        codes: [
-                            "foo",
-                            "bar",
-                        ],
-                        reason: "",
-                    },
+            valid: [
+                Suppression {
+                    covered_source: "# ruff: disable[foo, bar]\nprint('hello')\n# ruff: enable[bar, foo]\n",
+                    code: "foo",
+                    comments: [
+                        SuppressionComment {
+                            text: "# ruff: disable[foo, bar]",
+                            action: Disable,
+                            codes: [
+                                "foo",
+                                "bar",
+                            ],
+                            reason: "",
+                        },
+                    ],
                 },
+                Suppression {
+                    covered_source: "# ruff: disable[foo, bar]\nprint('hello')\n# ruff: enable[bar, foo]\n",
+                    code: "bar",
+                    comments: [
+                        SuppressionComment {
+                            text: "# ruff: disable[foo, bar]",
+                            action: Disable,
+                            codes: [
+                                "foo",
+                                "bar",
+                            ],
+                            reason: "",
+                        },
+                    ],
+                },
+            ],
+            invalid: [
                 InvalidSuppression {
                     kind: Unmatched,
                     comment: SuppressionComment {
@@ -855,20 +947,22 @@ print('hello')
                         },
                     ],
                 },
-            ],
-            invalid: [
-                InvalidSuppression {
-                    kind: Unmatched,
-                    comment: SuppressionComment {
-                        text: "# ruff: disable[foo] second",
-                        action: Disable,
-                        codes: [
-                            "foo",
-                        ],
-                        reason: "second",
-                    },
+                Suppression {
+                    covered_source: "# ruff: disable[foo] second\nprint('hello')\n# ruff: enable[foo]\n",
+                    code: "foo",
+                    comments: [
+                        SuppressionComment {
+                            text: "# ruff: disable[foo] second",
+                            action: Disable,
+                            codes: [
+                                "foo",
+                            ],
+                            reason: "second",
+                        },
+                    ],
                 },
             ],
+            invalid: [],
             errors: [],
         }
         "##,
@@ -904,6 +998,20 @@ def bar():
             @r##"
         Suppressions {
             valid: [
+                Suppression {
+                    covered_source: "# ruff: disable[delta] unmatched\n        pass\n    # ruff: enable[beta,gamma]\n# ruff: enable[alpha]\n\n# ruff: disable  # parse error!\n",
+                    code: "delta",
+                    comments: [
+                        SuppressionComment {
+                            text: "# ruff: disable[delta] unmatched",
+                            action: Disable,
+                            codes: [
+                                "delta",
+                            ],
+                            reason: "unmatched",
+                        },
+                    ],
+                },
                 Suppression {
                     covered_source: "# ruff: disable[beta,gamma]\n    if True:\n        # ruff: disable[delta] unmatched\n        pass\n    # ruff: enable[beta,gamma]",
                     code: "beta",
@@ -953,6 +1061,20 @@ def bar():
                     ],
                 },
                 Suppression {
+                    covered_source: "# ruff: disable[zeta] unmatched\n    pass\n# ruff: enable[zeta] underindented\n    pass\n",
+                    code: "zeta",
+                    comments: [
+                        SuppressionComment {
+                            text: "# ruff: disable[zeta] unmatched",
+                            action: Disable,
+                            codes: [
+                                "zeta",
+                            ],
+                            reason: "unmatched",
+                        },
+                    ],
+                },
+                Suppression {
                     covered_source: "# ruff: disable[alpha]\ndef foo():\n    # ruff: disable[beta,gamma]\n    if True:\n        # ruff: disable[delta] unmatched\n        pass\n    # ruff: enable[beta,gamma]\n# ruff: enable[alpha]",
                     code: "alpha",
                     comments: [
@@ -988,17 +1110,6 @@ def bar():
                     },
                 },
                 InvalidSuppression {
-                    kind: Unmatched,
-                    comment: SuppressionComment {
-                        text: "# ruff: disable[delta] unmatched",
-                        action: Disable,
-                        codes: [
-                            "delta",
-                        ],
-                        reason: "unmatched",
-                    },
-                },
-                InvalidSuppression {
                     kind: Indentation,
                     comment: SuppressionComment {
                         text: "# ruff: enable[zeta] underindented",
@@ -1007,17 +1118,6 @@ def bar():
                             "zeta",
                         ],
                         reason: "underindented",
-                    },
-                },
-                InvalidSuppression {
-                    kind: Unmatched,
-                    comment: SuppressionComment {
-                        text: "# ruff: disable[zeta] unmatched",
-                        action: Disable,
-                        codes: [
-                            "zeta",
-                        ],
-                        reason: "unmatched",
                     },
                 },
             ],
