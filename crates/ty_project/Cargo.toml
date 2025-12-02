@@ -31,7 +31,6 @@ colored = { workspace = true }
 crossbeam = { workspace = true }
 get-size2 = { workspace = true }
 globset = { workspace = true }
-indexmap = { workspace = true }
 notify = { workspace = true }
 pep440_rs = { workspace = true, features = ["version-ranges"] }
 ordermap = { workspace = true, features = ["serde"] }

@@ -4417,7 +4417,6 @@ dependencies = [
  "crossbeam",
  "get-size2",
  "globset",
- "indexmap",
  "insta",
  "notify",
  "ordermap",
@@ -4501,7 +4500,6 @@ dependencies = [
  "ty_static",
  "ty_test",
  "ty_vendored",
- "url",
 ]
 
 [[package]]
