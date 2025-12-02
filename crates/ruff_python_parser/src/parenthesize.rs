@@ -3,17 +3,6 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::{TokenKind, Tokens};
 
-/// Tokens that should be treated as trivia when scanning around parentheses.
-/// Mirrors the behavior of `SimpleTokenKind::is_trivia()` as closely as possible
-/// at the `TokenKind` level.
-const fn is_trivia(kind: TokenKind) -> bool {
-    matches!(
-        kind,
-        TokenKind::Comment
-            | TokenKind::NonLogicalNewline
-    )
-}
-
 /// Returns an iterator over the ranges of the optional parentheses surrounding an expression.
 ///
 /// E.g. for `((f()))` with `f()` as expression, the iterator returns the ranges (1, 6) and (0, 7).
@@ -40,7 +29,7 @@ pub fn parentheses_iterator<'a>(
     } else {
         tokens.after(expr.end())
     };
-    
+
     let right_parens = after_tokens
         .iter()
         .filter(|token| !token.kind().is_trivia())
@@ -50,7 +39,7 @@ pub fn parentheses_iterator<'a>(
         .before(expr.start())
         .iter()
         .rev()
-        .filter(|token| !is_trivia(token.kind()))
+        .filter(|token| !token.kind().is_trivia())
         .take_while(|token| token.kind() == TokenKind::Lpar);
 
     right_parens
