@@ -3470,9 +3470,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         match expr {
-            ast::Expr::EllipsisLiteral(ellipsis) => {
-                let ty = self.infer_ellipsis_literal_expression(ellipsis);
-                self.store_expression_type(expr, ty);
+            ast::Expr::EllipsisLiteral(_) => {
                 return Ok(Type::paramspec_value_callable(
                     db,
                     Parameters::gradual_form(),
@@ -3506,13 +3504,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     parameter_types.push(param_type);
                 }
 
-                // N.B. We cannot represent a heterogeneous list of types in our type system, so we
-                // use a heterogeneous tuple type to represent the list of types instead.
-                self.store_expression_type(
-                    expr,
-                    Type::heterogeneous_tuple(db, parameter_types.iter().copied()),
-                );
-
                 let parameters = if return_todo {
                     // TODO: `Unpack`
                     Parameters::todo()
@@ -3529,7 +3520,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             ast::Expr::Subscript(_) => {
-                self.infer_type_expression(expr);
                 // TODO: Support `Concatenate[...]`
                 return Ok(Type::paramspec_value_callable(db, Parameters::todo()));
             }
@@ -3552,6 +3542,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return Err(());
                     }
 
+                    // This is to handle the following case:
+                    //
+                    // ```python
+                    // from typing import ParamSpec
+                    //
+                    // class Foo[**P]: ...
+                    //
+                    // Foo[ParamSpec]  # P: (ParamSpec, /)
+                    // ```
                     Type::NominalInstance(nominal)
                         if nominal.has_known_class(self.db(), KnownClass::ParamSpec) =>
                     {
@@ -3593,7 +3592,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            _ => self.store_expression_type(expr, Type::unknown()),
+            _ => {}
         }
 
         if let Some(builder) = self.context.report_lint(&INVALID_TYPE_ARGUMENTS, expr) {
