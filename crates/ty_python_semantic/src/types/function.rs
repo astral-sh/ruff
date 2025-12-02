@@ -509,7 +509,7 @@ impl<'db> OverloadLiteral<'db> {
         );
 
         let generic_context = raw_signature.generic_context;
-        raw_signature.add_implicit_self_annotation(|| {
+        raw_signature.add_implicit_self_annotation(db, || {
             if self.is_staticmethod(db) || self.is_classmethod(db) {
                 return None;
             }

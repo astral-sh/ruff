@@ -690,6 +690,7 @@ impl<'db> Signature<'db> {
     /// annotation.
     pub(crate) fn add_implicit_self_annotation(
         &mut self,
+        db: &'db dyn Db,
         self_type: impl FnOnce() -> Option<Type<'db>>,
     ) {
         if let Some(first_parameter) = self.parameters.value.first_mut()
@@ -699,6 +700,31 @@ impl<'db> Signature<'db> {
         {
             first_parameter.annotated_type = Some(self_type);
             first_parameter.inferred_annotation = true;
+
+            // If we've added an implicit `self` annotation, we might need to update the
+            // signature's generic context, too. (The generic context should include any synthetic
+            // typevars created for `typing.Self`, even if the `typing.Self` annotation was added
+            // implicitly.)
+            if let Type::TypeVar(self_typevar) = self_type {
+                match self.generic_context.as_mut() {
+                    Some(generic_context)
+                        if generic_context
+                            .binds_typevar(db, self_typevar.typevar(db))
+                            .is_some() => {}
+                    Some(generic_context) => {
+                        *generic_context = GenericContext::from_typevar_instances(
+                            db,
+                            std::iter::once(self_typevar).chain(generic_context.variables(db)),
+                        );
+                    }
+                    None => {
+                        self.generic_context = Some(GenericContext::from_typevar_instances(
+                            db,
+                            std::iter::once(self_typevar),
+                        ));
+                    }
+                }
+            }
         }
     }
 
