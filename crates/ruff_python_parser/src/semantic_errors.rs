@@ -1718,12 +1718,6 @@ struct ReturnVisitor {
 impl Visitor<'_> for ReturnVisitor {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
-            Stmt::Expr(ast::StmtExpr { value, .. }) => match **value {
-                Expr::Yield(_) | Expr::YieldFrom(_) => {
-                    self.has_yield = true;
-                }
-                _ => {}
-            },
             // Do not recurse into nested functions; they're evaluated separately.
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {}
             Stmt::Return(ast::StmtReturn {
@@ -1737,6 +1731,7 @@ impl Visitor<'_> for ReturnVisitor {
             _ => walk_stmt(self, stmt),
         }
     }
+
     fn visit_expr(&mut self, expr: &Expr) {
         match expr {
             Expr::Lambda(_) => {}
