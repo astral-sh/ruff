@@ -205,13 +205,35 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
 
     let path = SystemOrVendoredPathRef::try_from_file(db, file)?;
 
-    let module_name = search_paths(db, ModuleResolveMode::StubsAllowed).find_map(|candidate| {
-        let relative_path = match path {
-            SystemOrVendoredPathRef::System(path) => candidate.relativize_system_path(path),
-            SystemOrVendoredPathRef::Vendored(path) => candidate.relativize_vendored_path(path),
-        }?;
-        relative_path.to_module_name()
-    })?;
+    let module_name = search_paths(db, ModuleResolveMode::StubsAllowed)
+        .find_map(|candidate| {
+            let relative_path = match path {
+                SystemOrVendoredPathRef::System(path) => candidate.relativize_system_path(path),
+                SystemOrVendoredPathRef::Vendored(path) => candidate.relativize_vendored_path(path),
+            }?;
+            relative_path.to_module_name()
+        })
+        .or_else(|| {
+            // As a last desperate attempt, try to resolve a module name relative to the nearest pyproject.toml
+            let system = db.system();
+            let importing_path = file.path(db).as_system_path()?;
+            for dir in importing_path.ancestors() {
+                let pyproject = dir.join("pyproject.toml");
+                if system.path_exists(&pyproject) {
+                    let candidate = SearchPath::extra(system, dir.to_owned()).ok()?;
+                    let relative_path = match path {
+                        SystemOrVendoredPathRef::System(path) => {
+                            candidate.relativize_system_path(path)
+                        }
+                        SystemOrVendoredPathRef::Vendored(path) => {
+                            candidate.relativize_vendored_path(path)
+                        }
+                    }?;
+                    return relative_path.to_module_name();
+                }
+            }
+            None
+        })?;
 
     // Resolve the module name to see if Python would resolve the name to the same path.
     // If it doesn't, then that means that multiple modules have the same name in different
