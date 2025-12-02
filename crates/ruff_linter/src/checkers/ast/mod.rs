@@ -780,6 +780,10 @@ impl SemanticSyntaxContext for Checker<'_> {
             match scope.kind {
                 ScopeKind::Class(_) => return false,
                 ScopeKind::Function(_) | ScopeKind::Lambda(_) => return true,
+                ScopeKind::Generator {
+                    kind: GeneratorKind::Generator,
+                    ..
+                } => return true,
                 ScopeKind::Generator { .. }
                 | ScopeKind::Module
                 | ScopeKind::Type
@@ -829,14 +833,19 @@ impl SemanticSyntaxContext for Checker<'_> {
         self.source_type.is_ipynb()
     }
 
-    fn in_generator_scope(&self) -> bool {
-        matches!(
-            &self.semantic.current_scope().kind,
-            ScopeKind::Generator {
-                kind: GeneratorKind::Generator,
-                ..
+    fn in_generator_context(&self) -> bool {
+        for scope in self.semantic.current_scopes() {
+            if matches!(
+                scope.kind,
+                ScopeKind::Generator {
+                    kind: GeneratorKind::Generator,
+                    ..
+                }
+            ) {
+                return true;
             }
-        )
+        }
+        false
     }
 
     fn in_loop_context(&self) -> bool {
