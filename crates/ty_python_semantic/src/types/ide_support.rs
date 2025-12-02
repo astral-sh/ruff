@@ -1636,8 +1636,8 @@ mod resolve_definition {
         // It's definitely a stub, so now rerun module resolution but with stubs disabled.
         let stub_module = file_to_module(db, stub_file_for_module_lookup)?;
         trace!("Found stub module: {}", stub_module.name(db));
-        // We need to pass an importing file to resolve_real_module which is a bit odd
-        // here because there isn't really an importing file. However this `resolve_real_model`
+        // We need to pass an importing file to `resolve_real_module` which is a bit odd
+        // here because there isn't really an importing file. However this `resolve_real_module`
         // can be understood as essentially `import .`, which is also what `file_to_module` is,
         // so this is in fact exactly the file we want to consider the importer.
         let real_module =

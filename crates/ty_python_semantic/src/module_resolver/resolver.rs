@@ -1,8 +1,31 @@
 /*!
-This module principally provides two routines for resolving a particular module
-name to a `Module`: [`resolve_module`] and [`resolve_real_module`]. You'll
-usually want the former, unless you're certain you want to forbid stubs, in
-which case, use the latter.
+This module principally provides several routines for resolving a particular module
+name to a `Module`:
+
+* [`file_to_module`][]: resolves the module name `.` (often to make it an absolute module name)
+* [`resolve_module`][]: resolves an absolute module name
+
+You may notice that we actually provide `resolve_(real)_(shadowable)_module_(confident)`.
+You almost certainly just want [`resolve_module`][]. The other variations represent
+restrictions to answer specific kinds of questions, usually to empower IDE features.
+
+* The `real` variation disallows all stub files, including the vendored typeshed.
+  This enables the goto-definition ("real") vs goto-declaration ("stub or real") distinction.
+
+* The `confident` variation disallows "desperate resolution", which is a fallback
+  mode where we start trying to use ancestor directories of the importing file
+  as search-paths, but only if we failed to resolve it with the normal search-paths.
+  This is mostly just a convenience for cases where we don't want to try to define
+  the importing file (resolving a `KnownModule` and tests).
+
+* The `shadowable` variation disables some guards that prevents third-party code
+  from shadowing any vendored non-stdlib `KnownModule`. In particular `typing_extensions`,
+  which we vendor and heavily assume the contents of (and so don't ever want to shadow).
+  This enables checking if the user *actually* has `typing_extensions` installed,
+  in which case it's ok to suggest it in features like auto-imports.
+
+There is some awkwardness to the structure of the code to specifically enable caching
+of queries, as module resolution happens a lot and involves a lot of disk access.
 
 For implementors, see `import-resolution-diagram.svg` for a flow diagram that
 specifies ty's implementation of Python's import resolution algorithm.
@@ -314,7 +337,7 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
             // Resolve `.` in cases where the file exists only in a desperate search path.
             // Probably because this directory was implicitly masked out by a parent directory
             // not being a valid module name (i.e. `/my-proj/tests/thisfile.py`).
-            desperate_search_paths(db, file)?
+            desperate_search_paths(db, file)
                 .iter()
                 .find_map(try_candidate)
         })?;
@@ -367,14 +390,14 @@ pub(crate) fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> Sear
 /// Being so strict minimizes concerns about this going off a lot and doing random
 /// chaotic things. In particular, all files under a given pyproject.toml will currently
 /// agree on this being their desperate search-path, which is really nice.
-fn desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Vec<SearchPath>> {
+fn desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<SearchPath> {
     let system = db.system();
     let importing_path = importing_file.path(db).as_system_path()?;
     for dir in importing_path.ancestors() {
         let pyproject = dir.join("pyproject.toml");
         if system.path_exists(&pyproject) {
             let search_path = SearchPath::extra(system, dir.to_owned()).ok()?;
-            return Some(vec![search_path]);
+            return Some(search_path);
         }
     }
     None
@@ -899,7 +922,7 @@ fn desperately_resolve_name(
     name: &ModuleName,
     mode: ModuleResolveMode,
 ) -> Option<ResolvedName> {
-    let search_paths = desperate_search_paths(db, importing_file)?;
+    let search_paths = desperate_search_paths(db, importing_file);
     resolve_name_impl(db, name, mode, search_paths.iter())
 }
 
