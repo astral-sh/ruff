@@ -31,14 +31,13 @@ impl ParenthesizeIfExpands<'_, '_> {
 impl<'ast> Format<PyFormatContext<'ast>> for ParenthesizeIfExpands<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
         {
-            let parens_id = f.group_id("optional_parentheses");
-
             let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
 
             write!(
                 f,
                 [group(&format_with(|f| {
                     if self.indent {
+                        let parens_id = f.group_id("indented_parenthesize_if_expands");
                         write!(
                             f,
                             [group(&format_args![
