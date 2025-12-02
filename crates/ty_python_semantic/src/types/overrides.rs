@@ -25,7 +25,7 @@ use crate::{
             report_overridden_final_method,
         },
         function::{FunctionDecorators, FunctionType, KnownFunction},
-        list_members::{MemberWithDefinition, all_members_of_scope},
+        list_members::{Member, MemberWithDefinition, all_members_of_scope},
     },
 };
 
@@ -101,33 +101,6 @@ fn check_class_declaration<'db>(
             .any(|definition| definition.kind(db).is_function_def())
     }
 
-    fn extract_underlying_functions<'db>(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-    ) -> Option<smallvec::SmallVec<[FunctionType<'db>; 1]>> {
-        match ty {
-            Type::FunctionLiteral(function) => Some(smallvec::smallvec_inline![function]),
-            Type::BoundMethod(method) => Some(smallvec::smallvec_inline![method.function(db)]),
-            Type::PropertyInstance(property) => {
-                extract_underlying_functions(db, property.getter(db)?)
-            }
-            Type::Union(union) => {
-                let mut functions = smallvec::smallvec![];
-                for member in union.elements(db) {
-                    if let Some(mut member_functions) = extract_underlying_functions(db, *member) {
-                        functions.append(&mut member_functions);
-                    }
-                }
-                if functions.is_empty() {
-                    None
-                } else {
-                    Some(functions)
-                }
-            }
-            _ => None,
-        }
-    }
-
     let db = context.db();
 
     let MemberWithDefinition { member, definition } = member;
@@ -153,6 +126,8 @@ fn check_class_declaration<'db>(
     if class_kind == Some(CodeGeneratorKind::NamedTuple)
         && configuration.check_prohibited_named_tuple_attrs()
         && PROHIBITED_NAMEDTUPLE_ATTRS.contains(&member.name.as_str())
+        // accessing `.kind()` here is fine as `definition`
+        // will always be a definition in the file currently being checked
         && !matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
         && let Some(builder) = context.report_lint(
             &INVALID_NAMED_TUPLE,
@@ -331,35 +306,11 @@ fn check_class_declaration<'db>(
 
     if !subclass_overrides_superclass_declaration
         && !has_dynamic_superclass
+        // accessing `.kind()` here is fine as `definition`
+        // will always be a definition in the file currently being checked
         && definition.kind(db).is_function_def()
-        && let Type::FunctionLiteral(function) = member.ty
-        && function.has_known_decorator(db, FunctionDecorators::OVERRIDE)
     {
-        let function_literal = if context.in_stub() {
-            function.first_overload_or_implementation(db)
-        } else {
-            function.literal(db).last_definition(db)
-        };
-
-        if let Some(builder) = context.report_lint(
-            &INVALID_EXPLICIT_OVERRIDE,
-            function_literal.focus_range(db, context.module()),
-        ) {
-            let mut diagnostic = builder.into_diagnostic(format_args!(
-                "Method `{}` is decorated with `@override` but does not override anything",
-                member.name
-            ));
-            if let Some(decorator_span) =
-                function_literal.find_known_decorator_span(db, KnownFunction::Override)
-            {
-                diagnostic.annotate(Annotation::secondary(decorator_span));
-            }
-            diagnostic.info(format_args!(
-                "No `{member}` definitions were found on any superclasses of `{class}`",
-                member = &member.name,
-                class = class.name(db)
-            ));
-        }
+        check_explicit_overrides(context, member, class);
     }
 
     if let Some((superclass, superclass_method)) = overridden_final_method {
@@ -432,5 +383,74 @@ impl OverrideRulesConfig {
 
     const fn check_prohibited_named_tuple_attrs(self) -> bool {
         self.contains(OverrideRulesConfig::PROHIBITED_NAMED_TUPLE_ATTR)
+    }
+}
+
+fn check_explicit_overrides<'db>(
+    context: &InferContext<'db, '_>,
+    member: &Member<'db>,
+    class: ClassType<'db>,
+) {
+    let db = context.db();
+    let underlying_functions = extract_underlying_functions(db, member.ty);
+    let Some(functions) = underlying_functions else {
+        return;
+    };
+    if !functions
+        .iter()
+        .any(|function| function.has_known_decorator(db, FunctionDecorators::OVERRIDE))
+    {
+        return;
+    }
+    let function_literal = if context.in_stub() {
+        functions[0].first_overload_or_implementation(db)
+    } else {
+        functions[0].literal(db).last_definition(db)
+    };
+
+    let Some(builder) = context.report_lint(
+        &INVALID_EXPLICIT_OVERRIDE,
+        function_literal.focus_range(db, context.module()),
+    ) else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Method `{}` is decorated with `@override` but does not override anything",
+        member.name
+    ));
+    if let Some(decorator_span) =
+        function_literal.find_known_decorator_span(db, KnownFunction::Override)
+    {
+        diagnostic.annotate(Annotation::secondary(decorator_span));
+    }
+    diagnostic.info(format_args!(
+        "No `{member}` definitions were found on any superclasses of `{class}`",
+        member = &member.name,
+        class = class.name(db)
+    ));
+}
+
+fn extract_underlying_functions<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<smallvec::SmallVec<[FunctionType<'db>; 1]>> {
+    match ty {
+        Type::FunctionLiteral(function) => Some(smallvec::smallvec_inline![function]),
+        Type::BoundMethod(method) => Some(smallvec::smallvec_inline![method.function(db)]),
+        Type::PropertyInstance(property) => extract_underlying_functions(db, property.getter(db)?),
+        Type::Union(union) => {
+            let mut functions = smallvec::smallvec![];
+            for member in union.elements(db) {
+                if let Some(mut member_functions) = extract_underlying_functions(db, *member) {
+                    functions.append(&mut member_functions);
+                }
+            }
+            if functions.is_empty() {
+                None
+            } else {
+                Some(functions)
+            }
+        }
+        _ => None,
     }
 }

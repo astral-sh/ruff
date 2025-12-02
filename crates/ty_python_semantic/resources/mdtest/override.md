@@ -19,54 +19,74 @@ class A:
 
 class Parent:
     def foo(self): ...
+
     @property
     def my_property1(self) -> int: ...
+
     @property
     def my_property2(self) -> int: ...
+
     baz = None
+
     @classmethod
     def class_method1(cls) -> int: ...
+
     @staticmethod
     def static_method1() -> int: ...
+
     @classmethod
     def class_method2(cls) -> int: ...
+
     @staticmethod
     def static_method2() -> int: ...
+
     @lossy_decorator
     def decorated_1(self): ...
+
     @lossy_decorator
     def decorated_2(self): ...
+
     @lossy_decorator
     def decorated_3(self): ...
 
 class Child(Parent):
     @override
     def foo(self): ...  # fine: overrides `Parent.foo`
+
     @property
     @override
     def my_property1(self) -> int: ...  # fine: overrides `Parent.my_property1`
+
     @override
     @property
     def my_property2(self) -> int: ...  # fine: overrides `Parent.my_property2`
+
     @override
     def baz(self): ...  # fine: overrides `Parent.baz`
+
     @classmethod
     @override
     def class_method1(cls) -> int: ...  # fine: overrides `Parent.class_method1`
+
     @staticmethod
     @override
     def static_method1() -> int: ...  # fine: overrides `Parent.static_method1`
+
     @override
     @classmethod
     def class_method2(cls) -> int: ...  # fine: overrides `Parent.class_method2`
+
     @override
     @staticmethod
     def static_method2() -> int: ...  # fine: overrides `Parent.static_method2`
+
     @override
     def decorated_1(self): ...  # fine: overrides `Parent.decorated_1`
+
     @override
     @lossy_decorator
     def decorated_2(self): ...  # fine: overrides `Parent.decorated_2`
+
     @lossy_decorator
     @override
     def decorated_3(self): ...  # fine: overrides `Parent.decorated_3`
@@ -76,28 +96,37 @@ class OtherChild(Parent): ...
 class Grandchild(OtherChild):
     @override
     def foo(self): ...  # fine: overrides `Parent.foo`
+
     @override
     @property
-    def bar(self) -> int: ...  # fine: overrides `Parent.bar`
+    def my_property1(self) -> int: ...  # fine: overrides `Parent.my_property1`
+
     @override
     def baz(self): ...  # fine: overrides `Parent.baz`
+
     @classmethod
     @override
     def class_method1(cls) -> int: ...  # fine: overrides `Parent.class_method1`
+
     @staticmethod
     @override
     def static_method1() -> int: ...  # fine: overrides `Parent.static_method1`
+
     @override
     @classmethod
     def class_method2(cls) -> int: ...  # fine: overrides `Parent.class_method2`
+
     @override
     @staticmethod
     def static_method2() -> int: ...  # fine: overrides `Parent.static_method2`
+
     @override
     def decorated_1(self): ...  # fine: overrides `Parent.decorated_1`
+
     @override
     @lossy_decorator
     def decorated_2(self): ...  # fine: overrides `Parent.decorated_2`
+
     @lossy_decorator
     @override
     def decorated_3(self): ...  # fine: overrides `Parent.decorated_3`
@@ -105,27 +134,41 @@ class Grandchild(OtherChild):
 class Invalid:
     @override
     def ___reprrr__(self): ...  # error: [invalid-explicit-override]
+
     @override
     @classmethod
     def foo(self): ...  # error: [invalid-explicit-override]
+
     @classmethod
     @override
     def bar(self): ...  # error: [invalid-explicit-override]
+
     @staticmethod
     @override
     def baz(): ...  # error: [invalid-explicit-override]
+
     @override
     @staticmethod
     def eggs(): ...  # error: [invalid-explicit-override]
+
     @property
     @override
-    def bad_property1(self) -> int: ...  # TODO: should emit `invalid-explicit-override` here
+    def bad_property1(self) -> int: ...  # error: [invalid-explicit-override]
+
     @override
     @property
-    def bad_property2(self) -> int: ...  # TODO: should emit `invalid-explicit-override` here
+    def bad_property2(self) -> int: ...  # error: [invalid-explicit-override]
+
+    @property
+    @override
+    def bad_settable_property(self) -> int: ...  # error: [invalid-explicit-override]
+    @bad_settable_property.setter
+    def bad_settable_property(self, x: int) -> None: ...
+
     @lossy_decorator
     @override
     def lossy(self): ...  # TODO: should emit `invalid-explicit-override` here
+
     @override
     @lossy_decorator
     def lossy2(self): ...  # TODO: should emit `invalid-explicit-override` here
@@ -136,11 +179,14 @@ class LiskovViolatingButNotOverrideViolating(Parent):
     @override
     @property
     def foo(self) -> int: ...
+
     @override
     def my_property1(self) -> int: ...
+
     @staticmethod
     @override
     def class_method1() -> int: ...
+
     @classmethod
     @override
     def static_method1(cls) -> int: ...
