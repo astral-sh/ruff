@@ -5,6 +5,11 @@
 At its simplest, to define a generic class using the legacy syntax, you inherit from the
 `typing.Generic` special form, which is "specialized" with the generic class's type variables.
 
+```toml
+[environment]
+python-version = "3.11"
+```
+
 ```py
 from ty_extensions import generic_context
 from typing_extensions import Generic, TypeVar, TypeVarTuple, ParamSpec, Unpack
@@ -19,7 +24,9 @@ class MultipleTypevars(Generic[T, S]): ...
 class SingleParamSpec(Generic[P]): ...
 class TypeVarAndParamSpec(Generic[P, T]): ...
 class SingleTypeVarTuple(Generic[Unpack[Ts]]): ...
+class StarredSingleTypeVarTuple(Generic[*Ts]): ...
 class TypeVarAndTypeVarTuple(Generic[T, Unpack[Ts]]): ...
+class StarredTypeVarAndTypeVarTuple(Generic[T, *Ts]): ...
 
 # revealed: ty_extensions.GenericContext[T@SingleTypevar]
 reveal_type(generic_context(SingleTypevar))
@@ -34,6 +41,8 @@ reveal_type(generic_context(TypeVarAndParamSpec))
 # TODO: support `TypeVarTuple` properly (these should not reveal `None`)
 reveal_type(generic_context(SingleTypeVarTuple))  # revealed: None
 reveal_type(generic_context(TypeVarAndTypeVarTuple))  # revealed: None
+reveal_type(generic_context(StarredSingleTypeVarTuple))  # revealed: None
+reveal_type(generic_context(StarredTypeVarAndTypeVarTuple))  # revealed: None
 ```
 
 Inheriting from `Generic` multiple times yields a `duplicate-base` diagnostic, just like any other
@@ -208,6 +217,37 @@ class WithDefault(Generic[T, WithDefaultU]): ...
 
 reveal_type(WithDefault[str, str]())  # revealed: WithDefault[str, str]
 reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
+```
+
+## Diagnostics for bad specializations
+
+We show the user where the type variable was defined if a specialization is given that doesn't
+satisfy the type variable's upper bound or constraints:
+
+<!-- snapshot-diagnostics -->
+
+`library.py`:
+
+```py
+from typing import TypeVar, Generic
+
+T = TypeVar("T", bound=str)
+U = TypeVar("U", int, bytes)
+
+class Bounded(Generic[T]):
+    x: T
+
+class Constrained(Generic[U]):
+    x: U
+```
+
+`main.py`:
+
+```py
+from library import Bounded, Constrained
+
+x: Bounded[int]  # error: [invalid-type-arguments]
+y: Constrained[str]  # error: [invalid-type-arguments]
 ```
 
 ## Inferring generic class parameters

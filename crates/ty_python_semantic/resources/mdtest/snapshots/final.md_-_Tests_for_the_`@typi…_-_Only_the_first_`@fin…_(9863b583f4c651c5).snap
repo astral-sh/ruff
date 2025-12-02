@@ -59,7 +59,7 @@ info: rule `override-of-final-method` is enabled by default
 7  | class B(A):
    -     @final
    -     def f(self): ...  # error: [override-of-final-method]
-8  +       # error: [override-of-final-method]
+8  +     pass  # error: [override-of-final-method]
 9  | 
 10 | class C(B):
 11 |     @final
@@ -95,7 +95,7 @@ info: rule `override-of-final-method` is enabled by default
    -     @final
    -     # we only emit one error here, not two
    -     def f(self): ...  # error: [override-of-final-method]
-12 +       # error: [override-of-final-method]
+12 +     pass  # error: [override-of-final-method]
 note: This is an unsafe fix and may change runtime behavior
 
 ```

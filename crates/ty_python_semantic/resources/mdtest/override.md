@@ -283,8 +283,7 @@ class MyNamedTuple(NamedTuple):
     x: int
 
     @override
-    # TODO: this raises an exception at runtime (which we should emit a diagnostic for).
-    # It shouldn't be an `invalid-explicit-override` diagnostic, however.
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
     def _asdict(self, /) -> dict[str, Any]: ...
 
 class MyNamedTupleParent(NamedTuple):

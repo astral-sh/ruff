@@ -335,6 +335,7 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
                 infer_expression_type(db, *class_expr, TypeContext::default())
                     .to_instance(db)
                     .unwrap_or(Type::Never)
+                    .top_materialization(db)
             } else {
                 Type::Never
             }

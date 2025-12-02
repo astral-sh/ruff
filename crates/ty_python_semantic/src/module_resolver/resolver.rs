@@ -46,8 +46,33 @@ pub fn resolve_real_module<'db>(db: &'db dyn Db, module_name: &ModuleName) -> Op
     resolve_module_query(db, interned_name)
 }
 
+/// Resolves a module name to a module (stubs not allowed, some shadowing is
+/// allowed).
+///
+/// In particular, this allows `typing_extensions` to be shadowed by a
+/// non-standard library module. This is useful in the context of the LSP
+/// where we don't want to pretend as if these modules are always available at
+/// runtime.
+///
+/// This should generally only be used within the context of the LSP. Using it
+/// within ty proper risks being unable to resolve builtin modules since they
+/// are involved in an import cycle with `builtins`.
+pub fn resolve_real_shadowable_module<'db>(
+    db: &'db dyn Db,
+    module_name: &ModuleName,
+) -> Option<Module<'db>> {
+    let interned_name = ModuleNameIngredient::new(
+        db,
+        module_name,
+        ModuleResolveMode::StubsNotAllowedSomeShadowingAllowed,
+    );
+
+    resolve_module_query(db, interned_name)
+}
+
 /// Which files should be visible when doing a module query
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, get_size2::GetSize)]
+#[allow(clippy::enum_variant_names)]
 pub(crate) enum ModuleResolveMode {
     /// Stubs are allowed to appear.
     ///
@@ -60,6 +85,13 @@ pub(crate) enum ModuleResolveMode {
     /// implementations. When querying searchpaths this also notably replaces typeshed with
     /// the "real" stdlib.
     StubsNotAllowed,
+    /// Like `StubsNotAllowed`, but permits some modules to be shadowed.
+    ///
+    /// In particular, this allows `typing_extensions` to be shadowed by a
+    /// non-standard library module. This is useful in the context of the LSP
+    /// where we don't want to pretend as if these modules are always available
+    /// at runtime.
+    StubsNotAllowedSomeShadowingAllowed,
 }
 
 #[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
@@ -71,6 +103,39 @@ pub(crate) struct ModuleResolveModeIngredient<'db> {
 impl ModuleResolveMode {
     fn stubs_allowed(self) -> bool {
         matches!(self, Self::StubsAllowed)
+    }
+
+    /// Returns `true` if the module name refers to a standard library module
+    /// which can't be shadowed by a first-party module.
+    ///
+    /// This includes "builtin" modules, which can never be shadowed at runtime
+    /// either. Additionally, certain other modules that are involved in an
+    /// import cycle with `builtins` (`types`, `typing_extensions`, etc.) are
+    /// also considered non-shadowable, unless the module resolution mode
+    /// specifically opts into allowing some of them to be shadowed. This
+    /// latter set of modules cannot be allowed to be shadowed by first-party
+    /// or "extra-path" modules in ty proper, or we risk panics in unexpected
+    /// places due to being unable to resolve builtin symbols. This is similar
+    /// behaviour to other type checkers such as mypy:
+    /// <https://github.com/python/mypy/blob/3807423e9d98e678bf16b13ec8b4f909fe181908/mypy/build.py#L104-L117>
+    pub(super) fn is_non_shadowable(self, minor_version: u8, module_name: &str) -> bool {
+        // Builtin modules are never shadowable, no matter what.
+        if ruff_python_stdlib::sys::is_builtin_module(minor_version, module_name) {
+            return true;
+        }
+        // Similarly for `types`, which is always available at runtime.
+        if module_name == "types" {
+            return true;
+        }
+
+        // Otherwise, some modules should only be conditionally allowed
+        // to be shadowed, depending on the module resolution mode.
+        match self {
+            ModuleResolveMode::StubsAllowed | ModuleResolveMode::StubsNotAllowed => {
+                module_name == "typing_extensions"
+            }
+            ModuleResolveMode::StubsNotAllowedSomeShadowingAllowed => false,
+        }
     }
 }
 
@@ -385,7 +450,10 @@ impl SearchPaths {
     pub(crate) fn stdlib(&self, mode: ModuleResolveMode) -> Option<&SearchPath> {
         match mode {
             ModuleResolveMode::StubsAllowed => self.stdlib_path.as_ref(),
-            ModuleResolveMode::StubsNotAllowed => self.real_stdlib_path.as_ref(),
+            ModuleResolveMode::StubsNotAllowed
+            | ModuleResolveMode::StubsNotAllowedSomeShadowingAllowed => {
+                self.real_stdlib_path.as_ref()
+            }
         }
     }
 
@@ -438,7 +506,8 @@ pub(crate) fn dynamic_resolution_paths<'db>(
     // Use the `ModuleResolveMode` to determine which stdlib (if any) to mark as existing
     let stdlib = match mode.mode(db) {
         ModuleResolveMode::StubsAllowed => stdlib_path,
-        ModuleResolveMode::StubsNotAllowed => real_stdlib_path,
+        ModuleResolveMode::StubsNotAllowed
+        | ModuleResolveMode::StubsNotAllowedSomeShadowingAllowed => real_stdlib_path,
     };
     if let Some(path) = stdlib.as_ref().and_then(SearchPath::as_system_path) {
         existing_paths.insert(Cow::Borrowed(path));
@@ -683,27 +752,13 @@ struct ModuleNameIngredient<'db> {
     pub(super) mode: ModuleResolveMode,
 }
 
-/// Returns `true` if the module name refers to a standard library module which can't be shadowed
-/// by a first-party module.
-///
-/// This includes "builtin" modules, which can never be shadowed at runtime either, as well as
-/// certain other modules that are involved in an import cycle with `builtins` (`types`,
-/// `typing_extensions`, etc.). This latter set of modules cannot be allowed to be shadowed by
-/// first-party or "extra-path" modules, or we risk panics in unexpected places due to being
-/// unable to resolve builtin symbols. This is similar behaviour to other type checkers such
-/// as mypy: <https://github.com/python/mypy/blob/3807423e9d98e678bf16b13ec8b4f909fe181908/mypy/build.py#L104-L117>
-pub(super) fn is_non_shadowable(minor_version: u8, module_name: &str) -> bool {
-    matches!(module_name, "types" | "typing_extensions")
-        || ruff_python_stdlib::sys::is_builtin_module(minor_version, module_name)
-}
-
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
 fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Option<ResolvedName> {
     let program = Program::get(db);
     let python_version = program.python_version(db);
     let resolver_state = ResolverContext::new(db, python_version, mode);
-    let is_non_shadowable = is_non_shadowable(python_version.minor, name.as_str());
+    let is_non_shadowable = mode.is_non_shadowable(python_version.minor, name.as_str());
 
     let name = RelaxedModuleName::new(name);
     let stub_name = name.to_stub_package();

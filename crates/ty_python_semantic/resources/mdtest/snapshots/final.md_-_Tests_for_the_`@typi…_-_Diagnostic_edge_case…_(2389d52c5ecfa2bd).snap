@@ -53,7 +53,7 @@ info: rule `override-of-final-method` is enabled by default
 2 | 
 3 | class Foo(module1.Foo):
   -     def f(self): ...  # error: [override-of-final-method]
-4 +       # error: [override-of-final-method]
+4 +     pass  # error: [override-of-final-method]
 note: This is an unsafe fix and may change runtime behavior
 
 ```

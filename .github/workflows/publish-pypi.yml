@@ -18,8 +18,7 @@ jobs:
     environment:
       name: release
     permissions:
-      # For PyPI's trusted publishing.
-      id-token: write
+      id-token: write # For PyPI's trusted publishing + PEP 740 attestations
     steps:
       - name: "Install uv"
         uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
@@ -28,5 +27,8 @@ jobs:
           pattern: wheels-*
           path: wheels
           merge-multiple: true
+      - uses: astral-sh/attest-action@2c727738cea36d6c97dd85eb133ea0e0e8fe754b # v0.0.4
+        with:
+          paths: wheels/*
       - name: Publish to PyPi
         run: uv publish -v wheels/*

@@ -499,7 +499,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if starred_type.exact_tuple_instance_spec(self.db()).is_some() {
             starred_type
         } else {
-            todo_type!("PEP 646")
+            Type::Dynamic(DynamicType::TodoStarredExpression)
         }
     }
 
@@ -691,6 +691,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 self.db(),
                                 todo_type!("type[T] for protocols").expect_dynamic(),
                             )
+                        } else if class_literal.is_tuple(self.db()) {
+                            let class_type = self
+                                .infer_tuple_type_expression(parameters)
+                                .map(|tuple_type| tuple_type.to_class_type(self.db()))
+                                .unwrap_or_else(|| class_literal.default_specialization(self.db()));
+                            SubclassOfType::from(self.db(), class_type)
                         } else {
                             match class_literal.generic_context(self.db()) {
                                 Some(generic_context) => {
