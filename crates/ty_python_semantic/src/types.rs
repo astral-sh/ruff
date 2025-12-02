@@ -6122,30 +6122,35 @@ impl<'db> Type<'db> {
                 }
 
                 Some(KnownClass::Tuple) => {
-                    let object = Type::object();
+                    let element_ty =
+                        BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Covariant);
 
                     // ```py
-                    // class tuple:
+                    // class tuple(Sequence[_T_co]):
                     //     @overload
                     //     def __new__(cls) -> tuple[()]: ...
                     //     @overload
-                    //     def __new__(cls, iterable: Iterable[object]) -> tuple[object, ...]: ...
+                    //     def __new__(cls, iterable: Iterable[_T_co]) -> tuple[_T_co, ...]: ...
                     // ```
                     CallableBinding::from_overloads(
                         self,
                         [
                             Signature::new(Parameters::empty(), Some(Type::empty_tuple(db))),
-                            Signature::new(
+                            Signature::new_generic(
+                                Some(GenericContext::from_typevar_instances(db, [element_ty])),
                                 Parameters::new(
                                     db,
                                     [Parameter::positional_only(Some(Name::new_static(
                                         "iterable",
                                     )))
                                     .with_annotated_type(
-                                        KnownClass::Iterable.to_specialized_instance(db, [object]),
+                                        KnownClass::Iterable.to_specialized_instance(
+                                            db,
+                                            [Type::TypeVar(element_ty)],
+                                        ),
                                     )],
                                 ),
-                                Some(Type::homogeneous_tuple(db, object)),
+                                Some(Type::homogeneous_tuple(db, Type::TypeVar(element_ty))),
                             ),
                         ],
                     )
