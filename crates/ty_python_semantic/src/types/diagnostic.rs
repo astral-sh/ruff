@@ -4075,43 +4075,53 @@ pub(super) fn report_unsupported_comparison<'db>(
         [error.left_ty, error.right_ty, left_ty, right_ty],
     );
 
-    let mut diagnostic =
-        diagnostic_builder.into_diagnostic(format_args!("Unsupported `{}` operation", error.op));
-
-    diagnostic.set_primary_message("Comparison may raise an exception");
-
-    let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Operand types");
-    sub.annotate(context.secondary(left).message(format_args!(
-        "Left-hand side has type `{}`",
-        left_ty.display_with(db, display_settings.clone())
-    )));
-    let mut rhs_annotation = context.secondary(right);
-    if left_ty == right_ty {
-        rhs_annotation = rhs_annotation.message("Right-hand side has the same type");
-    } else {
-        rhs_annotation = rhs_annotation.message(format_args!(
-            "Right-hand side has type `{}`",
-            right_ty.display_with(db, display_settings.clone())
+    let mut diagnostic = if left_ty == right_ty {
+        let mut diag = diagnostic_builder
+            .into_diagnostic(format_args!("Unsupported `{}` operation", error.op));
+        diag.set_primary_message(format_args!(
+            "Both operands have type `{}`",
+            left_ty.display_with(db, display_settings.clone())
         ));
-    }
-    sub.annotate(rhs_annotation);
-    diagnostic.sub(sub);
-
-    if left_ty == right_ty {
-        diagnostic.set_concise_message(format_args!(
+        diag.annotate(context.secondary(left));
+        diag.annotate(context.secondary(right));
+        diag.set_concise_message(format_args!(
             "Operator `{}` is not supported between two objects of type `{}`",
             error.op,
             left_ty.display_with(db, display_settings.clone())
         ));
+        diag
     } else {
-        diagnostic.set_concise_message(format_args!(
+        let mut diag = diagnostic_builder.into_diagnostic("Unsupported comparison operation");
+
+        diag.set_primary_message(format_args!("`{}` is not supported here", error.op));
+
+        let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Operand types");
+        for (ty, expr) in [(left_ty, left), (right_ty, right)] {
+            sub.annotate(context.secondary(expr).message(format_args!(
+                "Has type `{}`",
+                ty.display_with(db, display_settings.clone())
+            )));
+        }
+        diag.sub(sub);
+
+        diag.set_concise_message(format_args!(
             "Operator `{}` is not supported between objects of type `{}` and `{}`",
             error.op,
             left_ty.display_with(db, display_settings.clone()),
             right_ty.display_with(db, display_settings.clone())
         ));
-    }
 
+        diag
+    };
+
+    // For non-atomic types like unions and tuples, we now provide context
+    // on the underlying elements that caused the error.
+    // If we're emitting a diagnostic for something like `(1, "foo") < (2, 3)`:
+    //
+    // - `left_ty` is `tuple[Literal[1], Literal["foo"]]`
+    // - `right_ty` is `tuple[Literal[2], Literal[3]]
+    // - `error.left_ty` is `Literal["foo"]`
+    // - `error.right_ty` is `Literal[3]`
     if (error.left_ty, error.right_ty) != (left_ty, right_ty) {
         if error.left_ty == error.right_ty {
             diagnostic.info(format_args!(

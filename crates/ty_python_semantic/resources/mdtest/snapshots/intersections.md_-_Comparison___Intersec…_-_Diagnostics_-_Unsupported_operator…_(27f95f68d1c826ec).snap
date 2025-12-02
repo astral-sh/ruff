@@ -45,12 +45,12 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/intersections
 # Diagnostics
 
 ```
-error[unsupported-operator]: Unsupported `in` operation
+error[unsupported-operator]: Unsupported comparison operation
   --> src/mdtest_snippet.py:10:25
    |
  9 |             # error: [unsupported-operator] "Operator `in` is not supported between objects of type `Literal[2]` and `NonContainer1 & …
 10 |             reveal_type(2 in x)  # revealed: bool
-   |                         ^^^^^^ Comparison may raise an exception
+   |                         ^^^^^^ `in` is not supported here
 11 | class Container:
 12 |     def __contains__(self, x) -> bool:
    |
@@ -59,9 +59,9 @@ info: Operand types
    |
  9 |             # error: [unsupported-operator] "Operator `in` is not supported between objects of type `Literal[2]` and `NonContainer1 & …
 10 |             reveal_type(2 in x)  # revealed: bool
-   |                         -    - Right-hand side has type `NonContainer1 & NonContainer2`
+   |                         -    - Has type `NonContainer1 & NonContainer2`
    |                         |
-   |                         Left-hand side has type `Literal[2]`
+   |                         Has type `Literal[2]`
 11 | class Container:
 12 |     def __contains__(self, x) -> bool:
    |
@@ -71,12 +71,12 @@ info: rule `unsupported-operator` is enabled by default
 ```
 
 ```
-error[unsupported-operator]: Unsupported `in` operation
+error[unsupported-operator]: Unsupported comparison operation
   --> src/mdtest_snippet.py:26:21
    |
 25 |         # error: [unsupported-operator] "Operator `in` is not supported between objects of type `Literal[2]` and `~NonContainer1`"
 26 |         reveal_type(2 in x)  # revealed: bool
-   |                     ^^^^^^ Comparison may raise an exception
+   |                     ^^^^^^ `in` is not supported here
 27 |
 28 |         reveal_type(2 is x)  # revealed: bool
    |
@@ -85,9 +85,9 @@ info: Operand types
    |
 25 |         # error: [unsupported-operator] "Operator `in` is not supported between objects of type `Literal[2]` and `~NonContainer1`"
 26 |         reveal_type(2 in x)  # revealed: bool
-   |                     -    - Right-hand side has type `~NonContainer1`
+   |                     -    - Has type `~NonContainer1`
    |                     |
-   |                     Left-hand side has type `Literal[2]`
+   |                     Has type `Literal[2]`
 27 |
 28 |         reveal_type(2 is x)  # revealed: bool
    |

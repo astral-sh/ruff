@@ -45,13 +45,13 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/unsupported.m
 # Diagnostics
 
 ```
-error[unsupported-operator]: Unsupported `in` operation
+error[unsupported-operator]: Unsupported comparison operation
  --> src/mdtest_snippet.py:3:9
   |
 1 | def _(flag: bool, flag1: bool, flag2: bool):
 2 |     class A: ...
 3 |     a = 1 in 7  # error: "Operator `in` is not supported between objects of type `Literal[1]` and `Literal[7]`"
-  |         ^^^^^^ Comparison may raise an exception
+  |         ^^^^^^ `in` is not supported here
 4 |     reveal_type(a)  # revealed: bool
   |
 info: Operand types
@@ -60,9 +60,9 @@ info: Operand types
 1 | def _(flag: bool, flag1: bool, flag2: bool):
 2 |     class A: ...
 3 |     a = 1 in 7  # error: "Operator `in` is not supported between objects of type `Literal[1]` and `Literal[7]`"
-  |         -    - Right-hand side has type `Literal[7]`
+  |         -    - Has type `Literal[7]`
   |         |
-  |         Left-hand side has type `Literal[1]`
+  |         Has type `Literal[1]`
 4 |     reveal_type(a)  # revealed: bool
   |
 info: rule `unsupported-operator` is enabled by default
@@ -70,13 +70,13 @@ info: rule `unsupported-operator` is enabled by default
 ```
 
 ```
-error[unsupported-operator]: Unsupported `not in` operation
+error[unsupported-operator]: Unsupported comparison operation
  --> src/mdtest_snippet.py:6:9
   |
 4 |     reveal_type(a)  # revealed: bool
 5 |
 6 |     b = 0 not in 10  # error: "Operator `not in` is not supported between objects of type `Literal[0]` and `Literal[10]`"
-  |         ^^^^^^^^^^^ Comparison may raise an exception
+  |         ^^^^^^^^^^^ `not in` is not supported here
 7 |     reveal_type(b)  # revealed: bool
   |
 info: Operand types
@@ -85,9 +85,9 @@ info: Operand types
 4 |     reveal_type(a)  # revealed: bool
 5 |
 6 |     b = 0 not in 10  # error: "Operator `not in` is not supported between objects of type `Literal[0]` and `Literal[10]`"
-  |         -        -- Right-hand side has type `Literal[10]`
+  |         -        -- Has type `Literal[10]`
   |         |
-  |         Left-hand side has type `Literal[0]`
+  |         Has type `Literal[0]`
 7 |     reveal_type(b)  # revealed: bool
   |
 info: rule `unsupported-operator` is enabled by default
@@ -95,12 +95,12 @@ info: rule `unsupported-operator` is enabled by default
 ```
 
 ```
-error[unsupported-operator]: Unsupported `<` operation
+error[unsupported-operator]: Unsupported comparison operation
   --> src/mdtest_snippet.py:10:9
    |
  9 |     # error: [unsupported-operator] "Operator `<` is not supported between objects of type `object` and `Literal[5]`"
 10 |     c = object() < 5
-   |         ^^^^^^^^^^^^ Comparison may raise an exception
+   |         ^^^^^^^^^^^^ `<` is not supported here
 11 |     reveal_type(c)  # revealed: Unknown
    |
 info: Operand types
@@ -108,9 +108,9 @@ info: Operand types
    |
  9 |     # error: [unsupported-operator] "Operator `<` is not supported between objects of type `object` and `Literal[5]`"
 10 |     c = object() < 5
-   |         --------   - Right-hand side has type `Literal[5]`
+   |         --------   - Has type `Literal[5]`
    |         |
-   |         Left-hand side has type `object`
+   |         Has type `object`
 11 |     reveal_type(c)  # revealed: Unknown
    |
 info: rule `unsupported-operator` is enabled by default
@@ -118,12 +118,12 @@ info: rule `unsupported-operator` is enabled by default
 ```
 
 ```
-error[unsupported-operator]: Unsupported `<` operation
+error[unsupported-operator]: Unsupported comparison operation
   --> src/mdtest_snippet.py:14:9
    |
 13 |     # error: [unsupported-operator] "Operator `<` is not supported between objects of type `Literal[5]` and `object`"
 14 |     d = 5 < object()
-   |         ^^^^^^^^^^^^ Comparison may raise an exception
+   |         ^^^^^^^^^^^^ `<` is not supported here
 15 |     reveal_type(d)  # revealed: Unknown
    |
 info: Operand types
@@ -131,9 +131,9 @@ info: Operand types
    |
 13 |     # error: [unsupported-operator] "Operator `<` is not supported between objects of type `Literal[5]` and `object`"
 14 |     d = 5 < object()
-   |         -   -------- Right-hand side has type `object`
+   |         -   -------- Has type `object`
    |         |
-   |         Left-hand side has type `Literal[5]`
+   |         Has type `Literal[5]`
 15 |     reveal_type(d)  # revealed: Unknown
    |
 info: rule `unsupported-operator` is enabled by default
@@ -141,13 +141,13 @@ info: rule `unsupported-operator` is enabled by default
 ```
 
 ```
-error[unsupported-operator]: Unsupported `in` operation
+error[unsupported-operator]: Unsupported comparison operation
   --> src/mdtest_snippet.py:19:9
    |
 17 |     int_literal_or_str_literal = 1 if flag else "foo"
 18 |     # error: "Operator `in` is not supported between objects of type `Literal[42]` and `Literal[1, "foo"]`"
 19 |     e = 42 in int_literal_or_str_literal
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Comparison may raise an exception
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `in` is not supported here
 20 |     reveal_type(e)  # revealed: bool
    |
 info: Operand types
@@ -156,9 +156,9 @@ info: Operand types
 17 |     int_literal_or_str_literal = 1 if flag else "foo"
 18 |     # error: "Operator `in` is not supported between objects of type `Literal[42]` and `Literal[1, "foo"]`"
 19 |     e = 42 in int_literal_or_str_literal
-   |         --    -------------------------- Right-hand side has type `Literal[1, "foo"]`
+   |         --    -------------------------- Has type `Literal[1, "foo"]`
    |         |
-   |         Left-hand side has type `Literal[42]`
+   |         Has type `Literal[42]`
 20 |     reveal_type(e)  # revealed: bool
    |
 info: Operation fails because operator `in` is not supported between objects of type `Literal[42]` and `Literal[1]`
@@ -167,12 +167,12 @@ info: rule `unsupported-operator` is enabled by default
 ```
 
 ```
-error[unsupported-operator]: Unsupported `<` operation
+error[unsupported-operator]: Unsupported comparison operation
   --> src/mdtest_snippet.py:23:9
    |
 22 |     # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[…
 23 |     f = (1, 2) < (1, "hello")
-   |         ^^^^^^^^^^^^^^^^^^^^^ Comparison may raise an exception
+   |         ^^^^^^^^^^^^^^^^^^^^^ `<` is not supported here
 24 |     reveal_type(f)  # revealed: Unknown
    |
 info: Operand types
@@ -180,9 +180,9 @@ info: Operand types
    |
 22 |     # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[…
 23 |     f = (1, 2) < (1, "hello")
-   |         ------   ------------ Right-hand side has type `tuple[Literal[1], Literal["hello"]]`
+   |         ------   ------------ Has type `tuple[Literal[1], Literal["hello"]]`
    |         |
-   |         Left-hand side has type `tuple[Literal[1], Literal[2]]`
+   |         Has type `tuple[Literal[1], Literal[2]]`
 24 |     reveal_type(f)  # revealed: Unknown
    |
 info: Operation fails because operator `<` is not supported between objects of type `Literal[2]` and `Literal["hello"]`
@@ -196,17 +196,9 @@ error[unsupported-operator]: Unsupported `<` operation
    |
 26 |     # error: [unsupported-operator] "Operator `<` is not supported between two objects of type `tuple[bool, A]`"
 27 |     g = (flag1, A()) < (flag2, A())
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Comparison may raise an exception
-28 |     reveal_type(g)  # revealed: Unknown
-   |
-info: Operand types
-  --> src/mdtest_snippet.py:27:9
-   |
-26 |     # error: [unsupported-operator] "Operator `<` is not supported between two objects of type `tuple[bool, A]`"
-27 |     g = (flag1, A()) < (flag2, A())
-   |         ------------   ------------ Right-hand side has the same type
+   |         ------------^^^------------
    |         |
-   |         Left-hand side has type `tuple[bool, A]`
+   |         Both operands have type `tuple[bool, A]`
 28 |     reveal_type(g)  # revealed: Unknown
    |
 info: Operation fails because operator `<` is not supported between two objects of type `A`
