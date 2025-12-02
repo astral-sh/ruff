@@ -1,17 +1,48 @@
-use std::sync::{LazyLock, Mutex};
+use std::cell::RefCell;
 
 use get_size2::{GetSize, StandardTracker};
 use ordermap::{OrderMap, OrderSet};
 
+thread_local! {
+    pub static TRACKER: RefCell<Option<StandardTracker>>= const { RefCell::new(None) };
+}
+
+struct TrackerGuard(Option<Option<StandardTracker>>);
+
+impl Drop for TrackerGuard {
+    fn drop(&mut self) {
+        if let Some(prev) = self.0.take() {
+            TRACKER.set(prev)
+        }
+    }
+}
+
+pub fn attach_tracker<R>(tracker: StandardTracker, f: impl FnOnce() -> R) -> R {
+    let prev = TRACKER.replace(Some(tracker));
+    let _guard = TrackerGuard(Some(prev));
+    f()
+}
+
+fn with_tracker<F, R>(f: F) -> R
+where
+    F: FnOnce(Option<&mut StandardTracker>) -> R,
+{
+    TRACKER.with(|tracker| {
+        let mut tracker = tracker.borrow_mut();
+        f(tracker.as_mut())
+    })
+}
+
 /// Returns the memory usage of the provided object, using a global tracker to avoid
 /// double-counting shared objects.
 pub fn heap_size<T: GetSize>(value: &T) -> usize {
-    static TRACKER: LazyLock<Mutex<StandardTracker>> =
-        LazyLock::new(|| Mutex::new(StandardTracker::new()));
-
-    value
-        .get_heap_size_with_tracker(&mut *TRACKER.lock().unwrap())
-        .0
+    with_tracker(|tracker| {
+        if let Some(tracker) = tracker {
+            value.get_heap_size_with_tracker(tracker).0
+        } else {
+            value.get_heap_size()
+        }
+    })
 }
 
 /// An implementation of [`GetSize::get_heap_size`] for [`OrderSet`].
