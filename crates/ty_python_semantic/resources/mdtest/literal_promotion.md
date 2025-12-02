@@ -341,3 +341,40 @@ reveal_type(x21)  # revealed: X[Literal[1]]
 x22: X[Literal[1]] | None = x(1)
 reveal_type(x22)  # revealed: X[Literal[1]]
 ```
+
+## Literal annotations see through subtyping
+
+```py
+from typing import Iterable, Literal, MutableSequence, Sequence
+
+x1: Sequence[Literal[1, 2, 3]] = [1, 2, 3]
+reveal_type(x1)  # revealed: list[Literal[1, 2, 3]]
+
+x2: MutableSequence[Literal[1, 2, 3]] = [1, 2, 3]
+reveal_type(x2)  # revealed: list[Literal[1, 2, 3]]
+
+x3: Iterable[Literal[1, 2, 3]] = [1, 2, 3]
+reveal_type(x3)  # revealed: list[Literal[1, 2, 3]]
+
+class X[T]:
+    value: T
+
+    def __init__(self, value: T): ...
+
+class A[T](X[T]): ...
+
+def a[T](value: T) -> A[T]:
+    return A(value)
+
+x4: A[Literal[1]] = A(1)
+reveal_type(x4)  # revealed: A[Literal[1]]
+
+x5: X[Literal[1]] = A(1)
+reveal_type(x5)  # revealed: A[Literal[1]]
+
+x6: X[Literal[1]] | None = A(1)
+reveal_type(x6)  # revealed: A[Literal[1]]
+
+x7: X[Literal[1]] | None = a(1)
+reveal_type(x7)  # revealed: A[Literal[1]]
+```

@@ -1000,7 +1000,10 @@ impl<'db> Type<'db> {
     }
 
     /// If this type is a class instance, returns its specialization.
-    pub(crate) fn class_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+    pub(crate) fn class_specialization(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<(ClassType<'db>, Specialization<'db>)> {
         self.specialization_of_optional(db, None)
     }
 
@@ -1011,15 +1014,17 @@ impl<'db> Type<'db> {
         expected_class: ClassLiteral<'_>,
     ) -> Option<Specialization<'db>> {
         self.specialization_of_optional(db, Some(expected_class))
+            .map(|(_, specialization)| specialization)
     }
 
     fn specialization_of_optional(
         self,
         db: &'db dyn Db,
         expected_class: Option<ClassLiteral<'_>>,
-    ) -> Option<Specialization<'db>> {
+    ) -> Option<(ClassType<'db>, Specialization<'db>)> {
         let class_type = match self {
             Type::NominalInstance(instance) => instance,
+            Type::ProtocolInstance(instance) => instance.to_nominal_instance()?,
             Type::TypeAlias(alias) => alias.value_type(db).as_nominal_instance()?,
             _ => return None,
         }
@@ -1030,7 +1035,48 @@ impl<'db> Type<'db> {
             return None;
         }
 
-        specialization
+        Some((class_type, specialization?))
+    }
+
+    /// Given a type variable `T` from the generic context of a class `C`:
+    /// - If `self` is a specialized instance of `C`, returns the type assigned to `T` on `self`.
+    /// - If `self` is a specialized instance of some class `A`, and `C` is a subclass of `A`
+    ///   such that the type variable `U` on `A` is specialized to `T`, returns the type
+    ///   assigned to `U` on `self`.
+    pub(crate) fn find_type_var_from(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        class: ClassLiteral<'db>,
+    ) -> Option<Type<'db>> {
+        if let Some(specialization) = self.specialization_of(db, class) {
+            return specialization.get(db, bound_typevar);
+        }
+
+        // TODO: We should use the constraint solver here to determine the type mappings for more
+        // complex subtyping relationships, e.g., `type[C[T]]` to `Callable[..., T]`, or unions
+        // containing multiple generic elements.
+        for base in class.iter_mro(db, None) {
+            let Some(ClassType::Generic(class)) = base.into_class() else {
+                continue;
+            };
+
+            for (base_typevar, base_ty) in class
+                .specialization(db)
+                .generic_context(db)
+                .variables(db)
+                .zip(class.specialization(db).types(db))
+            {
+                if *base_ty == Type::TypeVar(bound_typevar) {
+                    // TODO: This is potentially quadratic.
+                    if let Some(ty) = self.find_type_var_from(db, base_typevar, class.origin(db)) {
+                        return Some(ty);
+                    }
+                }
+            }
+        }
+
+        None
     }
 
     /// Returns the top materialization (or upper bound materialization) of this type, which is the
@@ -3852,20 +3898,20 @@ impl<'db> Type<'db> {
             return;
         };
 
-        let tcx_specialization = tcx.annotation.and_then(|tcx| {
-            tcx.filter_union(db, |ty| ty.specialization_of(db, class_literal).is_some())
-                .specialization_of(db, class_literal)
-        });
-
-        for (typevar, ty) in specialization
+        for (type_var, ty) in specialization
             .generic_context(db)
             .variables(db)
             .zip(specialization.types(db))
         {
-            let variance = typevar.variance_with_polarity(db, polarity);
-            let tcx = TypeContext::new(tcx_specialization.and_then(|spec| spec.get(db, typevar)));
+            let variance = type_var.variance_with_polarity(db, polarity);
+            let tcx = tcx.and_then(|tcx| {
+                tcx.filter_union(db, |ty| {
+                    ty.find_type_var_from(db, type_var, class_literal).is_some()
+                })
+                .find_type_var_from(db, type_var, class_literal)
+            });
 
-            f(typevar, *ty, variance, tcx);
+            f(type_var, *ty, variance, tcx);
 
             visitor.visit(*ty, || {
                 ty.visit_specialization_impl(db, tcx, variance, f, visitor);

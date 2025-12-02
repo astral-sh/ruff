@@ -542,8 +542,7 @@ e: list[Any] | None = [1]
 reveal_type(e)  # revealed: list[Any]
 
 f: list[Any] | None = f2(1)
-# TODO: Better constraint solver.
-reveal_type(f)  # revealed: list[int] | None
+reveal_type(f)  # revealed: list[Any] | None
 
 g: list[Any] | dict[Any, Any] = f3(1)
 # TODO: Better constraint solver.
@@ -598,6 +597,48 @@ reveal_type(x5)  # revealed: Bivariant[Any]
 reveal_type(x6)  # revealed: Covariant[Any]
 reveal_type(x7)  # revealed: Contravariant[Any]
 reveal_type(x8)  # revealed: Invariant[Any]
+```
+
+## Declared type preference sees through subtyping
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Iterable, Literal, MutableSequence, Sequence
+
+x1: Sequence[Any] = [1, 2, 3]
+reveal_type(x1)  # revealed: list[Any]
+
+x2: MutableSequence[Any] = [1, 2, 3]
+reveal_type(x2)  # revealed: list[Any]
+
+x3: Iterable[Any] = [1, 2, 3]
+reveal_type(x3)  # revealed: list[Any]
+
+class X[T]:
+    value: T
+
+    def __init__(self, value: T): ...
+
+class A[T](X[T]): ...
+
+def a[T](value: T) -> A[T]:
+    return A(value)
+
+x4: A[object] = A(1)
+reveal_type(x4)  # revealed: A[object]
+
+x5: X[object] = A(1)
+reveal_type(x5)  # revealed: A[object]
+
+x6: X[object] | None = A(1)
+reveal_type(x6)  # revealed: A[object]
+
+x7: X[object] | None = a(1)
+reveal_type(x7)  # revealed: A[object]
 ```
 
 ## Narrow generic unions
