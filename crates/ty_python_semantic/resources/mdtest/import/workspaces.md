@@ -154,17 +154,12 @@ version = "0.1.0"
 `my-proj/tests/main.py`:
 
 ```py
-# TODO: there should be no errors in this file
-
-# error: [unresolved-import]
 from .mod1 import x
-
-# error: [unresolved-import]
 from . import mod2
 import mod3
 
-reveal_type(x)  # revealed: Unknown
-reveal_type(mod2.y)  # revealed: Unknown
+reveal_type(x)  # revealed: int
+reveal_type(mod2.y)  # revealed: int
 reveal_type(mod3.z)  # revealed: int
 ```
 

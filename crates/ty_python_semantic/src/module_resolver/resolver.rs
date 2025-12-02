@@ -300,13 +300,24 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
 
     let path = SystemOrVendoredPathRef::try_from_file(db, file)?;
 
-    let module_name = search_paths(db, ModuleResolveMode::StubsAllowed).find_map(|candidate| {
+    let try_candidate = |candidate: &SearchPath| {
         let relative_path = match path {
             SystemOrVendoredPathRef::System(path) => candidate.relativize_system_path(path),
             SystemOrVendoredPathRef::Vendored(path) => candidate.relativize_vendored_path(path),
         }?;
         relative_path.to_module_name()
-    })?;
+    };
+
+    let module_name = search_paths(db, ModuleResolveMode::StubsAllowed)
+        .find_map(try_candidate)
+        .or_else(|| {
+            // Resolve `.` in cases where the file exists only in a desperate search path.
+            // Probably because this directory was implicitly masked out by a parent directory
+            // not being a valid module name (i.e. `/my-proj/tests/thisfile.py`).
+            desperate_search_paths(db, file)?
+                .iter()
+                .find_map(try_candidate)
+        })?;
 
     // Resolve the module name to see if Python would resolve the name to the same path.
     // If it doesn't, then that means that multiple modules have the same name in different
