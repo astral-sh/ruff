@@ -4,9 +4,9 @@ use std::path::Path;
 
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
+use ruff_python_ast::token::Tokens;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::Tokens;
 
 use crate::Locator;
 use crate::directives::TodoComment;

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use ruff_python_parser::{Token, TokenKind};
+use ruff_python_ast::token::{Token, TokenKind};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 /// Stores the ranges of all interpolated strings in a file sorted by [`TextRange::start`].

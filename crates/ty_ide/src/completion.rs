@@ -5,9 +5,9 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::source_text;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::token::{Token, TokenAt, TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::{Token, TokenAt, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ty_python_semantic::types::UnionType;
 use ty_python_semantic::{
@@ -1557,7 +1557,8 @@ fn compare_suggestions(c1: &Completion, c2: &Completion) -> Ordering {
 #[cfg(test)]
 mod tests {
     use insta::assert_snapshot;
-    use ruff_python_parser::{Mode, ParseOptions, TokenKind, Tokens};
+    use ruff_python_ast::token::{TokenKind, Tokens};
+    use ruff_python_parser::{Mode, ParseOptions};
     use ty_python_semantic::ModuleName;
 
     use crate::completion::{Completion, completion};

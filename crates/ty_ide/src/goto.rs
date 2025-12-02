@@ -8,8 +8,8 @@ use std::borrow::Cow;
 use crate::find_node::covering_node;
 use crate::stub_mapping::StubMapper;
 use ruff_db::parsed::ParsedModuleRef;
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_python_parser::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ty_python_semantic::ResolvedDefinition;
