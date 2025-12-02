@@ -51,7 +51,7 @@ pub(crate) use self::use_def::{
 /// Returns the semantic index for `file`.
 ///
 /// Prefer using [`symbol_table`] when working with symbols from a single scope.
-#[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size, lru=200)]
 pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
     let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
