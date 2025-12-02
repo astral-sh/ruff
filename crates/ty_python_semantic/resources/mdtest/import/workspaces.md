@@ -139,6 +139,53 @@ y: int = 2
 z: int = 2
 ```
 
+### Ancestor Directory Above `pyproject.toml` is invalid
+
+Like the previous tests but with a `pyproject.toml` existing between the invalid name and the python
+files. This is an "easier" case in case we use the `pyproject.toml` as a hint about what's going on.
+
+`my-proj/pyproject.toml`:
+
+```text
+name = "my_proj"
+version = "0.1.0"
+```
+
+`my-proj/tests/main.py`:
+
+```py
+# TODO: there should be no errors in this file
+
+# error: [unresolved-import]
+from .mod1 import x
+
+# error: [unresolved-import]
+from . import mod2
+import mod3
+
+reveal_type(x)  # revealed: Unknown
+reveal_type(mod2.y)  # revealed: Unknown
+reveal_type(mod3.z)  # revealed: int
+```
+
+`my-proj/tests/mod1.py`:
+
+```py
+x: int = 1
+```
+
+`my-proj/tests/mod2.py`:
+
+```py
+y: int = 2
+```
+
+`my-proj/mod3.py`:
+
+```py
+z: int = 2
+```
+
 ## Multiple Projects
 
 It's common for a monorepo to define many separate projects that may or may not depend on eachother
