@@ -14,11 +14,11 @@ use crate::find_node::CoveringNode;
 use crate::goto::GotoTarget;
 use crate::{Db, NavigationTargets, ReferenceKind, ReferenceTarget};
 use ruff_db::files::File;
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{
     self as ast, AnyNodeRef,
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
-use ruff_python_parser::Tokens;
 use ruff_text_size::{Ranged, TextRange};
 use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 
