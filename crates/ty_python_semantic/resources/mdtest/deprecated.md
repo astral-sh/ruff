@@ -329,19 +329,11 @@ from typing_extensions import overload
 def f(x: str): ...
 @overload
 def f(x: int): ...
-
-# TODO: no error
-# (This is caused by a salsa cycle and how we union type inference results to avoid oscillations
-# during cycle handling.)
-# error: [invalid-overload] "Overloaded function `f` requires at least two overloads"
 def f(x):
     print(x)
 
 f(1)
-# TODO: no invalid-argument-type error
-# TODO: error: [deprecated] "strings are no longer supported"
-# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `Literal["hello"]`"
-f("hello")
+f("hello")  # TODO: error: [deprecated] "strings are no longer supported"
 ```
 
 If the actual impl is deprecated, the deprecation always fires.

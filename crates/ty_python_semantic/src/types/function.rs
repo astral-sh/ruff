@@ -372,10 +372,33 @@ impl<'db> OverloadLiteral<'db> {
             .name
             .scoped_use_id(db, scope);
 
-        let Place::Defined(Type::FunctionLiteral(previous_type), _, Definedness::AlwaysDefined) =
+        let Place::Defined(previous_type, _, Definedness::AlwaysDefined) =
             place_from_bindings(db, use_def.bindings_at_use(use_id))
         else {
             return None;
+        };
+
+        // TODO: When we encounter a salsa cycle during type inference, we currently union together
+        // the inferred types from each cycle iteration. That means that in certain cases
+        // (especially involving decorators), we can end up with a union of FunctionLiterals for
+        // each overload, instead of a single bare FunctionLiteral. If we do see a union
+        // (containing _only_ function literals), pull out the first function literal and use it as
+        // the type of the overload. Note that this depends on how Type::cycle_normalized orders
+        // things so that later cycle iterations appear first in the union.
+        let previous_type = match previous_type {
+            Type::FunctionLiteral(function) => function,
+            Type::Union(union_type)
+                if union_type
+                    .elements(db)
+                    .iter()
+                    .all(|element| element.is_function_literal()) =>
+            {
+                // SAFETY: We just checked this
+                union_type.elements(db)[0]
+                    .as_function_literal()
+                    .expect("type should be a function literal")
+            }
+            _ => return None,
         };
 
         let previous_literal = previous_type.literal(db);

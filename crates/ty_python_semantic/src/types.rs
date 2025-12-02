@@ -907,6 +907,8 @@ impl<'db> Type<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
+        // Note: other parts of this crate assume that this union will be ordered with the types
+        // from later cycle iterations appearing first.
         UnionType::from_elements_cycle_recovery(db, [self, previous])
             .recursive_type_normalized(db, cycle)
     }
