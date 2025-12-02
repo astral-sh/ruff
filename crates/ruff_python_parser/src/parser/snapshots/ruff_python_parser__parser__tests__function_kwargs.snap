@@ -1,0 +1,56 @@
+---
+source: crates/ruff_python_parser/src/parser/tests.rs
+expression: result
+---
+Parsed {
+    syntax: ModExpression {
+        node_index: NodeIndex(None),
+        range: 0..13,
+        body: Call(
+            ExprCall {
+                node_index: NodeIndex(None),
+                range: 0..13,
+                func: Name(
+                    ExprName {
+                        node_index: NodeIndex(None),
+                        range: 0..3,
+                        id: Name("foo"),
+                        ctx: Load,
+                    },
+                ),
+                arguments: Arguments {
+                    range: 3..13,
+                    node_index: NodeIndex(None),
+                    args: [],
+                    keywords: [
+                        Keyword {
+                            range: 4..12,
+                            node_index: NodeIndex(None),
+                            arg: None,
+                            value: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 6..12,
+                                    id: Name("kwargs"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ],
+                },
+            },
+        ),
+    },
+    tokens: Tokens {
+        raw: [
+            Name 0..3,
+            Lpar 3..4,
+            DoubleStar 4..6,
+            Name 6..12,
+            Rpar 12..13,
+            Newline 13..13,
+        ],
+    },
+    errors: [],
+    unsupported_syntax_errors: [],
+}
