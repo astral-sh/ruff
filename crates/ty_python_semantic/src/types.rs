@@ -9398,7 +9398,7 @@ fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 #[salsa::tracked]
 impl<'db> TypeVarInstance<'db> {
-    pub(crate) fn as_bound_type_var_instance(
+    pub(crate) fn with_binding_context(
         self,
         db: &'db dyn Db,
         binding_context: Definition<'db>,
