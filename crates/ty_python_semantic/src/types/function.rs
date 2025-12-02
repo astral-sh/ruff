@@ -373,7 +373,7 @@ impl<'db> OverloadLiteral<'db> {
             .scoped_use_id(db, scope);
 
         let Place::Defined(Type::FunctionLiteral(previous_type), _, Definedness::AlwaysDefined) =
-            place_from_bindings(db, use_def.bindings_at_use(use_id))
+            place_from_bindings(db, use_def.bindings_at_use(use_id)).place
         else {
             return None;
         };

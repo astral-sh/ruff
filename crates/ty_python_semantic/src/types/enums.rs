@@ -77,7 +77,7 @@ pub(crate) fn enum_metadata<'db>(
 
     let ignored_names: Option<Vec<&str>> = if let Some(ignore) = table.symbol_id("_ignore_") {
         let ignore_bindings = use_def_map.all_reachable_symbol_bindings(ignore);
-        let ignore_place = place_from_bindings(db, ignore_bindings);
+        let ignore_place = place_from_bindings(db, ignore_bindings).place;
 
         match ignore_place {
             Place::Defined(Type::StringLiteral(ignored_names), _, _) => {
@@ -111,7 +111,7 @@ pub(crate) fn enum_metadata<'db>(
                 return None;
             }
 
-            let inferred = place_from_bindings(db, bindings);
+            let inferred = place_from_bindings(db, bindings).place;
 
             let value_ty = match inferred {
                 Place::Undefined => {

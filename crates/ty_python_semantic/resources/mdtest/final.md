@@ -488,11 +488,16 @@ class C(A):
         pass
 
     if coinflip():
-        def method2(self) -> None: ...  # TODO: should emit [override-of-final-method]
+        def method2(self) -> None: ...  # error: [override-of-final-method]
     else:
-        def method2(self) -> None: ...  # TODO: should emit [override-of-final-method]
+        def method2(self) -> None: ...
 
     if coinflip():
         def method3(self) -> None: ...  # error: [override-of-final-method]
-        def method4(self) -> None: ...  # error: [override-of-final-method]
+
+    # TODO: we should emit Liskov violations here too:
+    if coinflip():
+        method4 = 42  # error: [override-of-final-method]
+    else:
+        method4 = 56
 ```

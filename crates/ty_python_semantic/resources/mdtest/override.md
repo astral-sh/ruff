@@ -220,6 +220,69 @@ class Foo:
     def bar(self): ...  # error: [invalid-explicit-override]
 ```
 
+## Possibly-unbound definitions
+
+```py
+from typing_extensions import override
+
+def coinflip() -> bool:
+    return False
+
+class Parent:
+    if coinflip():
+        def method1(self) -> None: ...
+        def method2(self) -> None: ...
+
+    if coinflip():
+        def method3(self) -> None: ...
+        def method4(self) -> None: ...
+    else:
+        def method3(self) -> None: ...
+        def method4(self) -> None: ...
+
+    def method5(self) -> None: ...
+    def method6(self) -> None: ...
+
+class Child(Parent):
+    @override
+    def method1(self) -> None: ...
+    @override
+    def method2(self) -> None: ...
+
+    if coinflip():
+        @override
+        def method3(self) -> None: ...
+
+    if coinflip():
+        @override
+        def method4(self) -> None: ...
+    else:
+        @override
+        def method4(self) -> None: ...
+
+    if coinflip():
+        @override
+        def method5(self) -> None: ...
+
+    if coinflip():
+        @override
+        def method6(self) -> None: ...
+    else:
+        @override
+        def method6(self) -> None: ...
+
+    if coinflip():
+        @override
+        def method7(self) -> None: ...  # error: [invalid-explicit-override]
+
+    if coinflip():
+        @override
+        def method8(self) -> None: ...  # error: [invalid-explicit-override]
+    else:
+        @override
+        def method8(self) -> None: ...
+```
+
 ## Overloads
 
 The typing spec states that for an overloaded method, `@override` should only be applied to the

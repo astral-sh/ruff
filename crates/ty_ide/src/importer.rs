@@ -1891,13 +1891,13 @@ else:
         "#);
         assert_snapshot!(
             test.import_from("foo", "MAGIC"), @r#"
-        import foo
+        from foo import MAGIC
         if os.getenv("WHATEVER"):
             from foo import MAGIC
         else:
             from bar import MAGIC
 
-        (foo.MAGIC)
+        (MAGIC)
         "#);
     }
 
@@ -2108,13 +2108,13 @@ except ImportError:
         ");
         assert_snapshot!(
             test.import_from("foo", "MAGIC"), @r"
-        import foo
+        from foo import MAGIC
         try:
             from foo import MAGIC
         except ImportError:
             from bar import MAGIC
 
-        (foo.MAGIC)
+        (MAGIC)
         ");
     }
 
