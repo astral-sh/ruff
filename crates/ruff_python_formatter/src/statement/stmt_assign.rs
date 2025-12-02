@@ -304,13 +304,17 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     && format_implicit_flat.is_none()
                     && format_interpolated_string.is_none()
                 {
-                    return maybe_parenthesize_expression(
-                        value,
-                        *statement,
-                        Parenthesize::IfBreaks,
-                    )
-                    .with_lambda_layout(ExprLambdaLayout::Assignment)
-                    .fmt(f);
+                    return if let Expr::Lambda(lambda) = value {
+                        let lambda = lambda.format().with_options(ExprLambdaLayout::Assignment);
+                        if can_omit_optional_parentheses(value, f.context()) {
+                            optional_parentheses(&lambda).fmt(f)
+                        } else {
+                            parenthesize_if_expands(&lambda).fmt(f)
+                        }
+                    } else {
+                        maybe_parenthesize_expression(value, *statement, Parenthesize::IfBreaks)
+                            .fmt(f)
+                    };
                 }
 
                 let comments = f.context().comments().clone();
@@ -581,20 +585,23 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     && format_implicit_flat.is_none()
                     && format_interpolated_string.is_none()
                 {
+                    let formatted_value = format_with(|f| {
+                        if let Expr::Lambda(lambda) = value {
+                            let lambda = lambda.format().with_options(ExprLambdaLayout::Assignment);
+                            if can_omit_optional_parentheses(value, f.context()) {
+                                optional_parentheses(&lambda).fmt(f)
+                            } else {
+                                parenthesize_if_expands(&lambda).fmt(f)
+                            }
+                        } else {
+                            maybe_parenthesize_expression(value, *statement, Parenthesize::IfBreaks)
+                                .fmt(f)
+                        }
+                    });
+
                     return write!(
                         f,
-                        [
-                            before_operator,
-                            space(),
-                            operator,
-                            space(),
-                            maybe_parenthesize_expression(
-                                value,
-                                *statement,
-                                Parenthesize::IfBreaks
-                            )
-                            .with_lambda_layout(ExprLambdaLayout::Assignment)
-                        ]
+                        [before_operator, space(), operator, space(), formatted_value]
                     );
                 }
 
