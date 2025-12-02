@@ -334,15 +334,24 @@ impl GotoTarget<'_> {
                 let (_, ty) = ty_python_semantic::definitions_for_unary_op(model, expression)?;
                 ty
             }
-            // TODO: Support identifier targets
-            GotoTarget::PatternMatchRest(_)
-            | GotoTarget::PatternKeywordArgument(_)
-            | GotoTarget::PatternMatchStarName(_)
-            | GotoTarget::PatternMatchAsName(_)
-            | GotoTarget::TypeParamParamSpecName(_)
-            | GotoTarget::TypeParamTypeVarTupleName(_)
-            | GotoTarget::NonLocal { .. }
-            | GotoTarget::Globals { .. } => return None,
+            GotoTarget::PatternMatchRest(pattern) => {
+                model.inferred_type_for_identifier(pattern.rest.as_ref()?)
+            }
+            GotoTarget::PatternKeywordArgument(pattern) => {
+                model.inferred_type_for_identifier(&pattern.attr)
+            }
+            GotoTarget::PatternMatchStarName(pattern) => {
+                model.inferred_type_for_identifier(pattern.name.as_ref()?)
+            }
+            GotoTarget::PatternMatchAsName(pattern) => {
+                model.inferred_type_for_identifier(pattern.name.as_ref()?)
+            }
+            GotoTarget::NonLocal { identifier } => model.inferred_type_for_identifier(identifier),
+            GotoTarget::Globals { identifier } => model.inferred_type_for_identifier(identifier),
+            // These don't really... *have* a type?
+            GotoTarget::TypeParamParamSpecName(_) | GotoTarget::TypeParamTypeVarTupleName(_) => {
+                return None;
+            }
         };
 
         Some(ty)

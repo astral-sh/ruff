@@ -1704,7 +1704,26 @@ def outer():
         );
 
         // Should find the variable declaration in the outer scope, not the nonlocal statement
-        assert_snapshot!(test.hover(), @"Hover provided no content");
+        assert_snapshot!(test.hover(), @r#"
+        Unknown
+        ---------------------------------------------
+        ```python
+        Unknown
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:6:18
+          |
+        5 |     def inner():
+        6 |         nonlocal xy
+          |                  ^-
+          |                  ||
+          |                  |Cursor offset
+          |                  source
+        7 |         xy = "modified"
+        8 |         return x  # Should find the nonlocal x declaration in outer scope
+          |
+        "#);
     }
 
     #[test]
@@ -1756,7 +1775,26 @@ def function():
         );
 
         // Should find the global variable declaration, not the global statement
-        assert_snapshot!(test.hover(), @"Hover provided no content");
+        assert_snapshot!(test.hover(), @r#"
+        Unknown
+        ---------------------------------------------
+        ```python
+        Unknown
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:5:12
+          |
+        4 | def function():
+        5 |     global global_var
+          |            ^^^^^^^-^^
+          |            |      |
+          |            |      Cursor offset
+          |            source
+        6 |     global_var = "modified"
+        7 |     return global_var  # Should find the global variable declaration
+          |
+        "#);
     }
 
     #[test]
@@ -1770,7 +1808,26 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.hover(), @"Hover provided no content");
+        assert_snapshot!(test.hover(), @r#"
+        Unknown
+        ---------------------------------------------
+        ```python
+        Unknown
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:4:22
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", ab]:
+          |                      ^-
+          |                      ||
+          |                      |Cursor offset
+          |                      source
+        5 |             x = ab
+          |
+        "#);
     }
 
     #[test]
@@ -1816,7 +1873,26 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.hover(), @"Hover provided no content");
+        assert_snapshot!(test.hover(), @r#"
+        Unknown
+        ---------------------------------------------
+        ```python
+        Unknown
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:4:23
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", *ab]:
+          |                       ^-
+          |                       ||
+          |                       |Cursor offset
+          |                       source
+        5 |             x = ab
+          |
+        "#);
     }
 
     #[test]
@@ -1862,7 +1938,26 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.hover(), @"Hover provided no content");
+        assert_snapshot!(test.hover(), @r#"
+        Unknown
+        ---------------------------------------------
+        ```python
+        Unknown
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:4:37
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", ("a" | "b") as ab]:
+          |                                     ^-
+          |                                     ||
+          |                                     |Cursor offset
+          |                                     source
+        5 |             x = ab
+          |
+        "#);
     }
 
     #[test]
@@ -1914,7 +2009,26 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.hover(), @"Hover provided no content");
+        assert_snapshot!(test.hover(), @r"
+        Unknown
+        ---------------------------------------------
+        ```python
+        Unknown
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:10:30
+           |
+         8 | def my_func(event: Click):
+         9 |     match event:
+        10 |         case Click(x, button=ab):
+           |                              ^-
+           |                              ||
+           |                              |Cursor offset
+           |                              source
+        11 |             x = ab
+           |
+        ");
     }
 
     #[test]
@@ -2011,7 +2125,26 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.hover(), @"Hover provided no content");
+        assert_snapshot!(test.hover(), @r"
+        Unknown
+        ---------------------------------------------
+        ```python
+        Unknown
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:10:23
+           |
+         8 | def my_func(event: Click):
+         9 |     match event:
+        10 |         case Click(x, button=ab):
+           |                       ^^^-^^
+           |                       |  |
+           |                       |  Cursor offset
+           |                       source
+        11 |             x = ab
+           |
+        ");
     }
 
     #[test]

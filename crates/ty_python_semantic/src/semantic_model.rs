@@ -1,6 +1,6 @@
 use ruff_db::files::{File, FilePath};
 use ruff_db::source::{line_index, source_text};
-use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
+use ruff_python_ast::{self as ast, ExprStringLiteral, Identifier, ModExpression};
 use ruff_python_ast::{Expr, ExprRef, HasNodeIndex, name::Name};
 use ruff_python_parser::Parsed;
 use ruff_source_file::LineIndex;
@@ -88,6 +88,19 @@ impl<'db> SemanticModel<'db> {
             }
         }
         members
+    }
+
+    pub fn inferred_type_for_identifier(&self, identifier: &Identifier) -> Type<'db> {
+        // TODO(#1637): semantic tokens is making this crash even with
+        // `try_expr_ref_in_ast` guarding this, for now just use `try_expression_scope_id`.
+        // The problematic input is `x: "float` (with a dangling quote). I imagine the issue
+        // is we're too eagerly setting `is_string_annotation` in inference.
+        let Some(file_scope) = self.scope(identifier.into()) else {
+            return Type::unknown();
+        };
+        let scope = file_scope.to_scope_id(self.db, self.file);
+
+        infer_scope_types(self.db, scope).expression_type(identifier)
     }
 
     /// Resolve the given import made in this file to a Type

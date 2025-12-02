@@ -975,7 +975,26 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+          --> stdlib/ty_extensions.pyi:20:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+           | ^^^^^^^
+        21 | AlwaysTruthy = object()
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main.py:4:22
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", ab]:
+          |                      ^^
+        5 |             x = ab
+          |
+        "#);
     }
 
     #[test]
@@ -1003,7 +1022,26 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+          --> stdlib/ty_extensions.pyi:20:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+           | ^^^^^^^
+        21 | AlwaysTruthy = object()
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main.py:4:23
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", *ab]:
+          |                       ^^
+        5 |             x = ab
+          |
+        "#);
     }
 
     #[test]
@@ -1031,7 +1069,26 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+          --> stdlib/ty_extensions.pyi:20:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+           | ^^^^^^^
+        21 | AlwaysTruthy = object()
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main.py:4:37
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", ("a" | "b") as ab]:
+          |                                     ^^
+        5 |             x = ab
+          |
+        "#);
     }
 
     #[test]
@@ -1065,7 +1122,26 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+          --> stdlib/ty_extensions.pyi:20:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+           | ^^^^^^^
+        21 | AlwaysTruthy = object()
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+          --> main.py:10:30
+           |
+         8 | def my_func(event: Click):
+         9 |     match event:
+        10 |         case Click(x, button=ab):
+           |                              ^^
+        11 |             x = ab
+           |
+        ");
     }
 
     #[test]
@@ -1143,7 +1219,26 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+          --> stdlib/ty_extensions.pyi:20:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+           | ^^^^^^^
+        21 | AlwaysTruthy = object()
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+          --> main.py:10:23
+           |
+         8 | def my_func(event: Click):
+         9 |     match event:
+        10 |         case Click(x, button=ab):
+           |                       ^^^^^^
+        11 |             x = ab
+           |
+        ");
     }
 
     #[test]
@@ -1395,7 +1490,26 @@ def outer():
         );
 
         // Should find the variable declaration in the outer scope, not the nonlocal statement
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+          --> stdlib/ty_extensions.pyi:20:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+           | ^^^^^^^
+        21 | AlwaysTruthy = object()
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main.py:6:18
+          |
+        5 |     def inner():
+        6 |         nonlocal xy
+          |                  ^^
+        7 |         xy = "modified"
+        8 |         return x  # Should find the nonlocal x declaration in outer scope
+          |
+        "#);
     }
 
     #[test]
@@ -1447,7 +1561,26 @@ def function():
         );
 
         // Should find the global variable declaration, not the global statement
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+          --> stdlib/ty_extensions.pyi:20:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+           | ^^^^^^^
+        21 | AlwaysTruthy = object()
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main.py:5:12
+          |
+        4 | def function():
+        5 |     global global_var
+          |            ^^^^^^^^^^
+        6 |     global_var = "modified"
+        7 |     return global_var  # Should find the global variable declaration
+          |
+        "#);
     }
 
     #[test]
