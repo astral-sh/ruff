@@ -10,11 +10,11 @@ expression: code_actions
       {
         "range": {
           "start": {
-            "line": 1,
+            "line": 3,
             "character": 1
           },
           "end": {
-            "line": 1,
+            "line": 3,
             "character": 11
           }
         },
@@ -56,11 +56,11 @@ expression: code_actions
       {
         "range": {
           "start": {
-            "line": 1,
+            "line": 3,
             "character": 1
           },
           "end": {
-            "line": 1,
+            "line": 3,
             "character": 11
           }
         },
@@ -80,11 +80,11 @@ expression: code_actions
           {
             "range": {
               "start": {
-                "line": 1,
+                "line": 3,
                 "character": 28
               },
               "end": {
-                "line": 1,
+                "line": 3,
                 "character": 28
               }
             },

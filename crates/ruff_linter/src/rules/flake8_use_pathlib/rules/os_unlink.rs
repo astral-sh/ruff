@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 
@@ -84,6 +85,6 @@ pub(crate) fn os_unlink(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         "path",
         is_fix_os_unlink_enabled(checker.settings()),
         OsUnlink,
-        None,
+        Applicability::Safe,
     );
 }

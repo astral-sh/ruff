@@ -8,9 +8,7 @@ use crate::program::Program;
 
 use super::module::{Module, ModuleKind};
 use super::path::{ModulePath, SearchPath, SystemOrVendoredPathRef};
-use super::resolver::{
-    ModuleResolveMode, ResolverContext, is_non_shadowable, resolve_file_module, search_paths,
-};
+use super::resolver::{ModuleResolveMode, ResolverContext, resolve_file_module, search_paths};
 
 /// List all available modules, including all sub-modules, sorted in lexicographic order.
 pub fn all_modules(db: &dyn Db) -> Vec<Module<'_>> {
@@ -309,7 +307,8 @@ impl<'db> Lister<'db> {
 
     /// Returns true if the given module name cannot be shadowable.
     fn is_non_shadowable(&self, name: &ModuleName) -> bool {
-        is_non_shadowable(self.python_version().minor, name.as_str())
+        ModuleResolveMode::StubsAllowed
+            .is_non_shadowable(self.python_version().minor, name.as_str())
     }
 
     /// Returns the Python version we want to perform module resolution
