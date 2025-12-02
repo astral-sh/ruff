@@ -22,7 +22,7 @@ def f():
 
 
 def f():
-    # One should both be ignored by the range suppression, and
+    # One should be ignored by the range suppression, and
     # the other logged to the user.
     # ruff: disable[E741]
     I = 1
@@ -30,7 +30,7 @@ def f():
 
 
 def f():
-    # Neither of these are ignored and warning is
+    # Neither of these are ignored and warnings are
     # logged to user
     # ruff: disable[E501]
     I = 1
