@@ -29,6 +29,7 @@
 
 mod code_actions;
 mod commands;
+mod completions;
 mod initialize;
 mod inlay_hints;
 mod notebook;
@@ -51,16 +52,17 @@ use lsp_types::notification::{
     Initialized, Notification,
 };
 use lsp_types::request::{
-    DocumentDiagnosticRequest, HoverRequest, Initialize, InlayHintRequest, Request, Shutdown,
-    WorkspaceConfiguration, WorkspaceDiagnosticRequest,
+    Completion, DocumentDiagnosticRequest, HoverRequest, Initialize, InlayHintRequest, Request,
+    Shutdown, WorkspaceConfiguration, WorkspaceDiagnosticRequest,
 };
 use lsp_types::{
-    ClientCapabilities, ConfigurationParams, DiagnosticClientCapabilities,
-    DidChangeTextDocumentParams, DidChangeWatchedFilesClientCapabilities,
-    DidChangeWatchedFilesParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, Hover, HoverParams,
-    InitializeParams, InitializeResult, InitializedParams, InlayHint, InlayHintClientCapabilities,
-    InlayHintParams, NumberOrString, PartialResultParams, Position, PreviousResultId,
+    ClientCapabilities, CompletionClientCapabilities, CompletionParams, CompletionResponse,
+    ConfigurationParams, DiagnosticClientCapabilities, DidChangeTextDocumentParams,
+    DidChangeWatchedFilesClientCapabilities, DidChangeWatchedFilesParams,
+    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DocumentDiagnosticParams,
+    DocumentDiagnosticReportResult, FileEvent, Hover, HoverParams, InitializeParams,
+    InitializeResult, InitializedParams, InlayHint, InlayHintClientCapabilities, InlayHintParams,
+    NumberOrString, PartialResultParams, Position, PreviousResultId,
     PublishDiagnosticsClientCapabilities, Range, TextDocumentClientCapabilities,
     TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
     TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
@@ -870,6 +872,26 @@ impl TestServer {
         let id = self.send_request::<InlayHintRequest>(params);
         self.await_response::<InlayHintRequest>(&id)
     }
+
+    pub(crate) fn completions_request(
+        &mut self,
+        path: impl AsRef<SystemPath>,
+        position: Position,
+    ) -> Option<CompletionResponse> {
+        let params = CompletionParams {
+            text_document_position: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: self.file_uri(path),
+                },
+                position,
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            context: None,
+            partial_result_params: PartialResultParams::default(),
+        };
+        let id = self.send_request::<Completion>(params);
+        self.await_response::<Completion>(&id)
+    }
 }
 
 impl fmt::Debug for TestServer {
@@ -1081,6 +1103,19 @@ impl TestServerBuilder {
             .get_or_insert_default()
             .inlay_hint = if enabled {
             Some(InlayHintClientCapabilities::default())
+        } else {
+            None
+        };
+        self
+    }
+
+    /// Enable (with auto import) or disable completions capability
+    pub(crate) fn enable_completions(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .completion = if enabled {
+            Some(CompletionClientCapabilities::default())
         } else {
             None
         };
