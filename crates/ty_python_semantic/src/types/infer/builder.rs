@@ -6507,6 +6507,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if symbol.is_bound() || symbol.is_declared() {
                     // This name is explicitly defined in the global scope (not just in function
                     // bodies that mark it `global`).
+                    //
+                    // TODO: call `self.store_expression_type(name)` here with the computed type of
+                    // the variable (requires `infer_load_name` but for `Identifier`). This would
+                    // empower displaying the type on-hover in the LSP.
                     continue;
                 }
             }
@@ -6588,6 +6592,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // but it's ok if it's `nonlocal`. If a "chain" of `nonlocal` statements fails to
                 // lead to a valid binding, the outermost one will be an error; we don't need to
                 // walk the whole chain for each one.
+                //
+                // TODO: call `self.store_expression_type(name)` here with the computed type of
+                // the variable (requires `infer_load_name` but for `Identifier`). This would
+                // empower displaying the type on-hover in the LSP.
                 continue 'names;
             }
             // There's no matching binding in an enclosing scope. This `nonlocal` statement is
