@@ -7540,6 +7540,15 @@ impl<'db> Type<'db> {
         self.apply_type_mapping_impl(db, type_mapping, tcx, &ApplyTypeMappingVisitor::default())
     }
 
+    /// Erase all free type variables in this type, replacing them with their defaults
+    /// or `Unknown` if no default exists.
+    ///
+    /// This is used when an implicit type alias containing free type variables is used
+    /// in a type expression without explicit type arguments.
+    pub(crate) fn erase_free_typevars(self, db: &'db dyn Db) -> Type<'db> {
+        self.apply_type_mapping(db, &TypeMapping::EraseTypevars, TypeContext::default())
+    }
+
     fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -7571,7 +7580,8 @@ impl<'db> Type<'db> {
                         TypeMapping::ReplaceSelf { .. } |
                         TypeMapping::Materialize(_) |
                         TypeMapping::ReplaceParameterDefaults |
-                        TypeMapping::EagerExpansion => self,
+                        TypeMapping::EagerExpansion |
+                        TypeMapping::EraseTypevars => self,
                     }
                 }
                 KnownInstanceType::UnionType(instance) => {
@@ -7748,6 +7758,7 @@ impl<'db> Type<'db> {
                 TypeMapping::Materialize(_) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
+                TypeMapping::EraseTypevars |
                 TypeMapping::PromoteLiterals(PromoteLiteralsMode::Off) => self,
                 TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => self.promote_literals_impl(db, tcx)
             }
@@ -7760,7 +7771,8 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::PromoteLiterals(_) |
                 TypeMapping::ReplaceParameterDefaults |
-                TypeMapping::EagerExpansion => self,
+                TypeMapping::EagerExpansion |
+                TypeMapping::EraseTypevars => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
@@ -8434,6 +8446,9 @@ pub enum TypeMapping<'a, 'db> {
     /// Apply eager expansion to the type.
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     EagerExpansion,
+    /// Replace all type variables with `Unknown`. This is used when an implicit type alias containing
+    /// free type variables is used in a type expression without explicit type arguments.
+    EraseTypevars,
 }
 
 impl<'db> TypeMapping<'_, 'db> {
@@ -8450,7 +8465,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
-            | TypeMapping::EagerExpansion => context,
+            | TypeMapping::EagerExpansion
+            | TypeMapping::EraseTypevars => context,
             TypeMapping::BindSelf { .. } => GenericContext::from_typevar_instances(
                 db,
                 context
@@ -8487,7 +8503,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::BindSelf { .. }
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceParameterDefaults
-            | TypeMapping::EagerExpansion => self.clone(),
+            | TypeMapping::EagerExpansion
+            | TypeMapping::EraseTypevars => self.clone(),
         }
     }
 }
@@ -9866,6 +9883,12 @@ impl<'db> BoundTypeVarInstance<'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion => Type::TypeVar(self),
+            TypeMapping::EraseTypevars => {
+                // Replace the type variable with its default, or Unknown if no default exists.
+                self.default_type(db)
+                    .unwrap_or_else(Type::unknown)
+                    .apply_type_mapping(db, type_mapping, TypeContext::default())
+            }
             TypeMapping::Materialize(materialization_kind) => {
                 Type::TypeVar(self.materialize_impl(db, *materialization_kind, visitor))
             }

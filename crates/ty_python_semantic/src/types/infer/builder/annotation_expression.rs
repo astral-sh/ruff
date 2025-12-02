@@ -143,20 +143,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         TypeQualifiers::INIT_VAR,
                     )
                 }
-                _ => TypeAndQualifiers::declared(
-                    ty.in_type_expression(
-                        builder.db(),
-                        builder.scope(),
-                        builder.typevar_binding_context,
+                _ => {
+                    // When a name or attribute expression resolves to a type containing free
+                    // type variables (like a GenericAlias from an implicit type alias), we need
+                    // to erase them since the alias is being used without explicit type arguments.
+                    let erased = ty.erase_free_typevars(builder.db());
+                    TypeAndQualifiers::declared(
+                        erased
+                            .in_type_expression(
+                                builder.db(),
+                                builder.scope(),
+                                builder.typevar_binding_context,
+                            )
+                            .unwrap_or_else(|error| {
+                                error.into_fallback_type(
+                                    &builder.context,
+                                    annotation,
+                                    builder.is_reachable(annotation),
+                                )
+                            }),
                     )
-                    .unwrap_or_else(|error| {
-                        error.into_fallback_type(
-                            &builder.context,
-                            annotation,
-                            builder.is_reachable(annotation),
-                        )
-                    }),
-                ),
+                }
             }
         }
 

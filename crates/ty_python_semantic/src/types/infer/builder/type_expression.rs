@@ -89,16 +89,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         match expression {
             ast::Expr::Name(name) => match name.ctx {
-                ast::ExprContext::Load => self
-                    .infer_name_expression(name)
-                    .in_type_expression(self.db(), self.scope(), self.typevar_binding_context)
-                    .unwrap_or_else(|error| {
-                        error.into_fallback_type(
-                            &self.context,
-                            expression,
-                            self.is_reachable(expression),
-                        )
-                    }),
+                ast::ExprContext::Load => {
+                    // When a name expression resolves to a type containing free type variables
+                    // (like a GenericAlias from an implicit type alias), we need to erase them
+                    // since the alias is being used without explicit type arguments.
+                    let ty = self.infer_name_expression(name);
+                    let erased = ty.erase_free_typevars(self.db());
+                    erased
+                        .in_type_expression(self.db(), self.scope(), self.typevar_binding_context)
+                        .unwrap_or_else(|error| {
+                            error.into_fallback_type(
+                                &self.context,
+                                expression,
+                                self.is_reachable(expression),
+                            )
+                        })
+                }
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => {
                     todo_type!("Name expression annotation in Store/Del context")
@@ -106,16 +112,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             },
 
             ast::Expr::Attribute(attribute_expression) => match attribute_expression.ctx {
-                ast::ExprContext::Load => self
-                    .infer_attribute_expression(attribute_expression)
-                    .in_type_expression(self.db(), self.scope(), self.typevar_binding_context)
-                    .unwrap_or_else(|error| {
-                        error.into_fallback_type(
-                            &self.context,
-                            expression,
-                            self.is_reachable(expression),
-                        )
-                    }),
+                ast::ExprContext::Load => {
+                    // Same as name expressions - erase free type variables in attribute access
+                    let ty = self.infer_attribute_expression(attribute_expression);
+                    let erased = ty.erase_free_typevars(self.db());
+                    erased
+                        .in_type_expression(self.db(), self.scope(), self.typevar_binding_context)
+                        .unwrap_or_else(|error| {
+                            error.into_fallback_type(
+                                &self.context,
+                                expression,
+                                self.is_reachable(expression),
+                            )
+                        })
+                }
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => {
                     todo_type!("Attribute expression annotation in Store/Del context")
