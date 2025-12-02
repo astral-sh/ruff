@@ -52,16 +52,16 @@ def not_broken5():
     yield inner()
 
 
-def not_broken6():
+def broken3():
     return (yield from [])
 
 
-def not_broken7():
+def broken4():
     x = yield from []
     return x
 
 
-def not_broken8():
+def broken5():
     x = None
 
     def inner(ex):
