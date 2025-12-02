@@ -350,6 +350,20 @@ fn run_test(
         vec![]
     };
 
+    // Make any relative extra-paths be relative to src_path
+    let extra_paths = configuration
+        .extra_paths()
+        .unwrap_or_default()
+        .iter()
+        .map(|path| {
+            if path.is_absolute() {
+                path.clone()
+            } else {
+                src_path.join(path)
+            }
+        })
+        .collect();
+
     let settings = ProgramSettings {
         python_version: PythonVersionWithSource {
             version: python_version,
@@ -360,7 +374,7 @@ fn run_test(
             .unwrap_or(PythonPlatform::Identifier("linux".to_string())),
         search_paths: SearchPathSettings {
             src_roots: vec![src_path],
-            extra_paths: configuration.extra_paths().unwrap_or_default().to_vec(),
+            extra_paths,
             custom_typeshed: custom_typeshed_path.map(SystemPath::to_path_buf),
             site_packages_paths,
             real_stdlib_path: None,

@@ -5,7 +5,7 @@ use std::slice::Iter;
 use ruff_formatter::{FormatError, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::Stmt;
-use ruff_python_parser::{self as parser, TokenKind};
+use ruff_python_ast::token::{Token as AstToken, TokenKind};
 use ruff_python_trivia::lines_before;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -770,7 +770,7 @@ impl Format<PyFormatContext<'_>> for FormatVerbatimStatementRange {
 }
 
 struct LogicalLinesIter<'a> {
-    tokens: Iter<'a, parser::Token>,
+    tokens: Iter<'a, AstToken>,
     // The end of the last logical line
     last_line_end: TextSize,
     // The position where the content to lex ends.
@@ -778,7 +778,7 @@ struct LogicalLinesIter<'a> {
 }
 
 impl<'a> LogicalLinesIter<'a> {
-    fn new(tokens: Iter<'a, parser::Token>, verbatim_range: TextRange) -> Self {
+    fn new(tokens: Iter<'a, AstToken>, verbatim_range: TextRange) -> Self {
         Self {
             tokens,
             last_line_end: verbatim_range.start(),

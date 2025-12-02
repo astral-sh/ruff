@@ -57,6 +57,7 @@ use crate::types::{
 };
 use crate::unpack::Unpack;
 use builder::TypeInferenceBuilder;
+pub(super) use builder::UnsupportedComparisonError;
 
 mod builder;
 #[cfg(test)]
