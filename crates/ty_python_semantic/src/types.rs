@@ -96,6 +96,7 @@ mod generics;
 pub mod ide_support;
 mod infer;
 mod instance;
+pub mod list_members;
 mod member;
 mod mro;
 mod narrow;
