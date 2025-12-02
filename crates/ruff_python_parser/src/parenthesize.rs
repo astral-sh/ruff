@@ -26,25 +26,25 @@ pub fn parentheses_iterator<'a>(
     parent: Option<AnyNodeRef>,
     tokens: &'a Tokens,
 ) -> impl Iterator<Item = TextRange> + 'a {
-    let exclusive_parent_end = if let Some(parent) = parent {
+    let after_tokens = if let Some(parent) = parent {
         // If the parent is a node that brings its own parentheses, exclude the closing parenthesis
         // from our search range. Otherwise, we risk matching on calls, like `func(x)`, for which
         // the open and close parentheses are part of the `Arguments` node.
-        if parent.is_arguments() {
+        let exclusive_parent_end = if parent.is_arguments() {
             parent.end() - ")".text_len()
         } else {
             parent.end()
-        }
-    } else {
-        tokens.last().map_or(expr.end(), Ranged::end)
-    };
+        };
 
-    let right_parens = tokens
-        .after(expr.end())
+        tokens.in_range(TextRange::new(expr.end(), exclusive_parent_end))
+    } else {
+        tokens.after(expr.end())
+    };
+    
+    let right_parens = after_tokens
         .iter()
-        .take_while(move |token| token.start() < exclusive_parent_end)
-        .filter(|token| !is_trivia(token.kind()))
-        .take_while(|token| token.kind() == TokenKind::Rpar);
+        .filter(|token| !token.kind().is_trivia())
+        .take_while(move |token| token.kind() == TokenKind::Rpar);
 
     let left_parens = tokens
         .before(expr.start())
