@@ -2846,6 +2846,11 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
                 ScopeKind::Class => return false,
                 ScopeKind::Function | ScopeKind::Lambda => return true,
                 ScopeKind::Comprehension
+                    if matches!(scope.node(), NodeWithScopeKind::GeneratorExpression(_)) =>
+                {
+                    return true;
+                }
+                ScopeKind::Comprehension
                 | ScopeKind::Module
                 | ScopeKind::TypeAlias
                 | ScopeKind::TypeParams => {}
