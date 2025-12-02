@@ -53,9 +53,14 @@ impl<'ast> Format<PyFormatContext<'ast>> for ParenthesizeIfExpands<'_, 'ast> {
                             .with_id(Some(parens_id))]
                         )
                     } else {
-                        if_group_breaks(&token("(")).fmt(f)?;
-                        Arguments::from(&self.inner).fmt(f)?;
-                        if_group_breaks(&token(")")).fmt(f)
+                        write!(
+                            f,
+                            [
+                                if_group_breaks(&token("(")),
+                                Arguments::from(&self.inner),
+                                if_group_breaks(&token(")")),
+                            ]
+                        )
                     }
                 }))]
             )
