@@ -391,7 +391,7 @@ impl<'db> OverloadLiteral<'db> {
                 if union_type
                     .elements(db)
                     .iter()
-                    .all(|element| element.is_function_literal()) =>
+                    .all(Type::is_function_literal) =>
             {
                 // SAFETY: We just checked this
                 union_type.elements(db)[0]
