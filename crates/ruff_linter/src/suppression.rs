@@ -64,7 +64,7 @@ impl PendingSuppressionComment<'_> {
     }
 }
 
-#[expect(unused)]
+#[allow(unused)]
 #[derive(Clone, Debug)]
 pub(crate) struct Suppression {
     /// The lint code being suppressed
@@ -451,27 +451,452 @@ mod tests {
     };
 
     #[test]
-    fn suppressions_from_tokens() {
+    fn no_suppression() {
+        let source = "
+# this is a comment
+print('hello')
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r"
+        Suppressions {
+            valid: [],
+            invalid: [],
+            errors: [],
+        }
+        ",
+        );
+    }
+
+    #[test]
+    fn file_level_suppression() {
+        let source = "
+# ruff: noqa F401
+print('hello')
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r"
+        Suppressions {
+            valid: [],
+            invalid: [],
+            errors: [],
+        }
+        ",
+        );
+    }
+
+    #[test]
+    fn single_range_suppression() {
+        let source = "
+# ruff: disable[foo]
+print('hello')
+# ruff: enable[foo]
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "# ruff: disable[foo]\nprint('hello')\n# ruff: enable[foo]",
+                    code: "foo",
+                    comments: [
+                        SuppressionComment {
+                            text: "# ruff: disable[foo]",
+                            action: Disable,
+                            codes: [
+                                "foo",
+                            ],
+                            reason: "",
+                        },
+                        SuppressionComment {
+                            text: "# ruff: enable[foo]",
+                            action: Enable,
+                            codes: [
+                                "foo",
+                            ],
+                            reason: "",
+                        },
+                    ],
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn nested_range_suppressions() {
+        let source = "
+class Foo:
+    # ruff: disable[foo]
+    def bar(self):
+        # ruff: disable[bar]
+        print('hello')
+        # ruff: enable[bar]
+    # ruff: enable[foo]
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "# ruff: disable[bar]\n        print('hello')\n        # ruff: enable[bar]",
+                    code: "bar",
+                    comments: [
+                        SuppressionComment {
+                            text: "# ruff: disable[bar]",
+                            action: Disable,
+                            codes: [
+                                "bar",
+                            ],
+                            reason: "",
+                        },
+                        SuppressionComment {
+                            text: "# ruff: enable[bar]",
+                            action: Enable,
+                            codes: [
+                                "bar",
+                            ],
+                            reason: "",
+                        },
+                    ],
+                },
+                Suppression {
+                    covered_source: "# ruff: disable[foo]\n    def bar(self):\n        # ruff: disable[bar]\n        print('hello')\n        # ruff: enable[bar]\n    # ruff: enable[foo]",
+                    code: "foo",
+                    comments: [
+                        SuppressionComment {
+                            text: "# ruff: disable[foo]",
+                            action: Disable,
+                            codes: [
+                                "foo",
+                            ],
+                            reason: "",
+                        },
+                        SuppressionComment {
+                            text: "# ruff: enable[foo]",
+                            action: Enable,
+                            codes: [
+                                "foo",
+                            ],
+                            reason: "",
+                        },
+                    ],
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn interleaved_range_suppressions() {
+        let source = "
+def foo():
+    # ruff: disable[foo]
+    print('hello')
+    # ruff: disable[bar]
+    print('hello')
+    # ruff: enable[foo]
+    print('hello')
+    # ruff: enable[bar]
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "# ruff: disable[foo]\n    print('hello')\n    # ruff: disable[bar]\n    print('hello')\n    # ruff: enable[foo]",
+                    code: "foo",
+                    comments: [
+                        SuppressionComment {
+                            text: "# ruff: disable[foo]",
+                            action: Disable,
+                            codes: [
+                                "foo",
+                            ],
+                            reason: "",
+                        },
+                        SuppressionComment {
+                            text: "# ruff: enable[foo]",
+                            action: Enable,
+                            codes: [
+                                "foo",
+                            ],
+                            reason: "",
+                        },
+                    ],
+                },
+                Suppression {
+                    covered_source: "# ruff: disable[bar]\n    print('hello')\n    # ruff: enable[foo]\n    print('hello')\n    # ruff: enable[bar]",
+                    code: "bar",
+                    comments: [
+                        SuppressionComment {
+                            text: "# ruff: disable[bar]",
+                            action: Disable,
+                            codes: [
+                                "bar",
+                            ],
+                            reason: "",
+                        },
+                        SuppressionComment {
+                            text: "# ruff: enable[bar]",
+                            action: Enable,
+                            codes: [
+                                "bar",
+                            ],
+                            reason: "",
+                        },
+                    ],
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn range_suppression_two_codes() {
+        let source = "
+# ruff: disable[foo, bar]
+print('hello')
+# ruff: enable[foo, bar]
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "# ruff: disable[foo, bar]\nprint('hello')\n# ruff: enable[foo, bar]",
+                    code: "foo",
+                    comments: [
+                        SuppressionComment {
+                            text: "# ruff: disable[foo, bar]",
+                            action: Disable,
+                            codes: [
+                                "foo",
+                                "bar",
+                            ],
+                            reason: "",
+                        },
+                        SuppressionComment {
+                            text: "# ruff: enable[foo, bar]",
+                            action: Enable,
+                            codes: [
+                                "foo",
+                                "bar",
+                            ],
+                            reason: "",
+                        },
+                    ],
+                },
+                Suppression {
+                    covered_source: "# ruff: disable[foo, bar]\nprint('hello')\n# ruff: enable[foo, bar]",
+                    code: "bar",
+                    comments: [
+                        SuppressionComment {
+                            text: "# ruff: disable[foo, bar]",
+                            action: Disable,
+                            codes: [
+                                "foo",
+                                "bar",
+                            ],
+                            reason: "",
+                        },
+                        SuppressionComment {
+                            text: "# ruff: enable[foo, bar]",
+                            action: Enable,
+                            codes: [
+                                "foo",
+                                "bar",
+                            ],
+                            reason: "",
+                        },
+                    ],
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn range_suppression_unmatched() {
+        let source = "
+# ruff: disable[foo]
+print('hello')
+# ruff: enable[bar]
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [],
+            invalid: [
+                InvalidSuppression {
+                    kind: Unmatched,
+                    comment: SuppressionComment {
+                        text: "# ruff: disable[foo]",
+                        action: Disable,
+                        codes: [
+                            "foo",
+                        ],
+                        reason: "",
+                    },
+                },
+                InvalidSuppression {
+                    kind: Unmatched,
+                    comment: SuppressionComment {
+                        text: "# ruff: enable[bar]",
+                        action: Enable,
+                        codes: [
+                            "bar",
+                        ],
+                        reason: "",
+                    },
+                },
+            ],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn range_suppression_unordered() {
+        let source = "
+# ruff: disable[foo, bar]
+print('hello')
+# ruff: enable[bar, foo]
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [],
+            invalid: [
+                InvalidSuppression {
+                    kind: Unmatched,
+                    comment: SuppressionComment {
+                        text: "# ruff: disable[foo, bar]",
+                        action: Disable,
+                        codes: [
+                            "foo",
+                            "bar",
+                        ],
+                        reason: "",
+                    },
+                },
+                InvalidSuppression {
+                    kind: Unmatched,
+                    comment: SuppressionComment {
+                        text: "# ruff: enable[bar, foo]",
+                        action: Enable,
+                        codes: [
+                            "bar",
+                            "foo",
+                        ],
+                        reason: "",
+                    },
+                },
+            ],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn range_suppression_extra_disable() {
+        let source = "
+# ruff: disable[foo] first
+print('hello')
+# ruff: disable[foo] second
+print('hello')
+# ruff: enable[foo]
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "# ruff: disable[foo] first\nprint('hello')\n# ruff: disable[foo] second\nprint('hello')\n# ruff: enable[foo]",
+                    code: "foo",
+                    comments: [
+                        SuppressionComment {
+                            text: "# ruff: disable[foo] first",
+                            action: Disable,
+                            codes: [
+                                "foo",
+                            ],
+                            reason: "first",
+                        },
+                        SuppressionComment {
+                            text: "# ruff: enable[foo]",
+                            action: Enable,
+                            codes: [
+                                "foo",
+                            ],
+                            reason: "",
+                        },
+                    ],
+                },
+            ],
+            invalid: [
+                InvalidSuppression {
+                    kind: Unmatched,
+                    comment: SuppressionComment {
+                        text: "# ruff: disable[foo] second",
+                        action: Disable,
+                        codes: [
+                            "foo",
+                        ],
+                        reason: "second",
+                    },
+                },
+            ],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn combined_range_suppressions() {
         let source = "
 # ruff: noqa  # ignored
 
 # comment here
-print('hello')  # ruff: disable[phi]  # trailing
+print('hello')  # ruff: disable[phi] trailing
 
 # ruff: disable[alpha]
 def foo():
     # ruff: disable[beta,gamma]
     if True:
-        # ruff: disable[delta]  # unmatched
+        # ruff: disable[delta] unmatched
         pass
     # ruff: enable[beta,gamma]
 # ruff: enable[alpha]
 
 # ruff: disable  # parse error!
 def bar():
-    # ruff: disable[zeta]  # unmatched
+    # ruff: disable[zeta] unmatched
     pass
-# ruff: enable[zeta]  # underindented
+# ruff: enable[zeta] underindented
     pass
 ";
         assert_debug_snapshot!(
@@ -480,9 +905,11 @@ def bar():
         Suppressions {
             valid: [
                 Suppression {
+                    covered_source: "# ruff: disable[beta,gamma]\n    if True:\n        # ruff: disable[delta] unmatched\n        pass\n    # ruff: enable[beta,gamma]",
                     code: "beta",
                     comments: [
                         SuppressionComment {
+                            text: "# ruff: disable[beta,gamma]",
                             action: Disable,
                             codes: [
                                 "beta",
@@ -491,6 +918,7 @@ def bar():
                             reason: "",
                         },
                         SuppressionComment {
+                            text: "# ruff: enable[beta,gamma]",
                             action: Enable,
                             codes: [
                                 "beta",
@@ -501,9 +929,11 @@ def bar():
                     ],
                 },
                 Suppression {
+                    covered_source: "# ruff: disable[beta,gamma]\n    if True:\n        # ruff: disable[delta] unmatched\n        pass\n    # ruff: enable[beta,gamma]",
                     code: "gamma",
                     comments: [
                         SuppressionComment {
+                            text: "# ruff: disable[beta,gamma]",
                             action: Disable,
                             codes: [
                                 "beta",
@@ -512,6 +942,7 @@ def bar():
                             reason: "",
                         },
                         SuppressionComment {
+                            text: "# ruff: enable[beta,gamma]",
                             action: Enable,
                             codes: [
                                 "beta",
@@ -522,9 +953,11 @@ def bar():
                     ],
                 },
                 Suppression {
+                    covered_source: "# ruff: disable[alpha]\ndef foo():\n    # ruff: disable[beta,gamma]\n    if True:\n        # ruff: disable[delta] unmatched\n        pass\n    # ruff: enable[beta,gamma]\n# ruff: enable[alpha]",
                     code: "alpha",
                     comments: [
                         SuppressionComment {
+                            text: "# ruff: disable[alpha]",
                             action: Disable,
                             codes: [
                                 "alpha",
@@ -532,6 +965,7 @@ def bar():
                             reason: "",
                         },
                         SuppressionComment {
+                            text: "# ruff: enable[alpha]",
                             action: Enable,
                             codes: [
                                 "alpha",
@@ -545,48 +979,52 @@ def bar():
                 InvalidSuppression {
                     kind: Trailing,
                     comment: SuppressionComment {
+                        text: "# ruff: disable[phi] trailing",
                         action: Disable,
                         codes: [
                             "phi",
                         ],
-                        reason: "# trailing",
+                        reason: "trailing",
                     },
                 },
                 InvalidSuppression {
                     kind: Unmatched,
                     comment: SuppressionComment {
+                        text: "# ruff: disable[delta] unmatched",
                         action: Disable,
                         codes: [
                             "delta",
                         ],
-                        reason: "# unmatched",
+                        reason: "unmatched",
                     },
                 },
                 InvalidSuppression {
                     kind: Indentation,
                     comment: SuppressionComment {
+                        text: "# ruff: enable[zeta] underindented",
                         action: Enable,
                         codes: [
                             "zeta",
                         ],
-                        reason: "# underindented",
+                        reason: "underindented",
                     },
                 },
                 InvalidSuppression {
                     kind: Unmatched,
                     comment: SuppressionComment {
+                        text: "# ruff: disable[zeta] unmatched",
                         action: Disable,
                         codes: [
                             "zeta",
                         ],
-                        reason: "# unmatched",
+                        reason: "unmatched",
                     },
                 },
             ],
             errors: [
                 ParseError {
+                    text: "# ruff: disable  # parse error!",
                     kind: MissingCodes,
-                    source: "# ruff: disable  # parse error!",
                 },
             ],
         }
@@ -595,7 +1033,7 @@ def bar():
     }
 
     #[test]
-    fn unrelated_comment() {
+    fn parse_unrelated_comment() {
         assert_debug_snapshot!(
             parse_suppression_comment("# hello world"),
             @r"
@@ -610,7 +1048,7 @@ def bar():
     }
 
     #[test]
-    fn invalid_action() {
+    fn parse_invalid_action() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: lol[hi]"),
             @r"
@@ -625,7 +1063,7 @@ def bar():
     }
 
     #[test]
-    fn missing_codes() {
+    fn parse_missing_codes() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable"),
             @r"
@@ -640,7 +1078,7 @@ def bar():
     }
 
     #[test]
-    fn empty_codes() {
+    fn parse_empty_codes() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable[]"),
             @r"
@@ -655,7 +1093,7 @@ def bar():
     }
 
     #[test]
-    fn missing_bracket() {
+    fn parse_missing_bracket() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable[foo"),
             @r"
@@ -670,7 +1108,7 @@ def bar():
     }
 
     #[test]
-    fn missing_comma() {
+    fn parse_missing_comma() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable[foo bar]"),
             @r"
@@ -688,9 +1126,10 @@ def bar():
     fn disable_single_code() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable[foo]"),
-            @r#"
+            @r##"
         Ok(
             SuppressionComment {
+                text: "# ruff: disable[foo]",
                 action: Disable,
                 codes: [
                     "foo",
@@ -698,7 +1137,7 @@ def bar():
                 reason: "",
             },
         )
-        "#,
+        "##,
         );
     }
 
@@ -706,9 +1145,10 @@ def bar():
     fn disable_single_code_with_reason() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable[foo] I like bar better"),
-            @r#"
+            @r##"
         Ok(
             SuppressionComment {
+                text: "# ruff: disable[foo] I like bar better",
                 action: Disable,
                 codes: [
                     "foo",
@@ -716,7 +1156,7 @@ def bar():
                 reason: "I like bar better",
             },
         )
-        "#,
+        "##,
         );
     }
 
@@ -724,9 +1164,10 @@ def bar():
     fn disable_multiple_codes() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable[foo, bar]"),
-            @r#"
+            @r##"
         Ok(
             SuppressionComment {
+                text: "# ruff: disable[foo, bar]",
                 action: Disable,
                 codes: [
                     "foo",
@@ -735,7 +1176,7 @@ def bar():
                 reason: "",
             },
         )
-        "#,
+        "##,
         );
     }
 
@@ -743,9 +1184,10 @@ def bar():
     fn enable_single_code() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: enable[some-thing]"),
-            @r#"
+            @r##"
         Ok(
             SuppressionComment {
+                text: "# ruff: enable[some-thing]",
                 action: Enable,
                 codes: [
                     "some-thing",
@@ -753,7 +1195,7 @@ def bar():
                 reason: "",
             },
         )
-        "#,
+        "##,
         );
     }
 
@@ -763,9 +1205,10 @@ def bar():
         let comment = parse_suppression_comment(source);
         assert_debug_snapshot!(
             comment,
-            @r#"
+            @r##"
         Ok(
             SuppressionComment {
+                text: "# ruff: enable[some-thing]",
                 action: Enable,
                 codes: [
                     "some-thing",
@@ -773,7 +1216,7 @@ def bar():
                 reason: "",
             },
         )
-        "#,
+        "##,
         );
     }
 
@@ -783,9 +1226,10 @@ def bar():
         let comment = parse_suppression_comment(source);
         assert_debug_snapshot!(
             comment,
-            @r#"
+            @r##"
         Ok(
             SuppressionComment {
+                text: "# ruff: enable[some-thing]",
                 action: Enable,
                 codes: [
                     "some-thing",
@@ -793,7 +1237,7 @@ def bar():
                 reason: "",
             },
         )
-        "#,
+        "##,
         );
     }
 
@@ -900,6 +1344,7 @@ def bar():
     impl fmt::Debug for DebugSuppression<'_> {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             f.debug_struct("Suppression")
+                .field("covered_source", &&self.source[self.suppression.range])
                 .field("code", &self.suppression.code)
                 .field(
                     "comments",
@@ -945,8 +1390,8 @@ def bar():
     impl fmt::Debug for DebugParseError<'_> {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             f.debug_struct("ParseError")
+                .field("text", &&self.source[self.error.range])
                 .field("kind", &self.error.kind)
-                .field("source", &&self.source[self.error.range])
                 .finish()
         }
     }
@@ -959,6 +1404,7 @@ def bar():
     impl fmt::Debug for DebugSuppressionComment<'_> {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             f.debug_struct("SuppressionComment")
+                .field("text", &&self.source[self.comment.range])
                 .field("action", &self.comment.action)
                 .field(
                     "codes",
