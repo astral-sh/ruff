@@ -77,10 +77,12 @@ class NotBroken9(object):
         yield from function()
         return 42
 
-async def gen():
+
+async def broken6():
     yield 1
     return foo()
 
-async def gen():
+
+async def broken7():
     yield 1
     return [1, 2, 3]
