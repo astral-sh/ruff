@@ -280,10 +280,7 @@ impl<'a> From<&'a SymbolTree> for SymbolInfo<'a> {
             kind: symbol.kind,
             name_range: symbol.name_range,
             full_range: symbol.full_range,
-            documentation: symbol
-                .documentation
-                .as_deref()
-                .map(|doc| Cow::Borrowed(doc)),
+            documentation: symbol.documentation.as_deref().map(Cow::Borrowed),
         }
     }
 }
