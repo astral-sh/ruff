@@ -402,6 +402,19 @@ long_assignment_target.with_attribute.and_a_slice[with_an_index] = lambda x, y, 
 very_long_variable_name_x, very_long_variable_name_y = lambda a: a + some_very_long_expression, lambda b: b * another_very_long_expression_here
 
 very_long_variable_name_for_result += lambda x: very_long_function_call_that_should_definitely_be_parenthesized_now(x, more_args, additional_parameters)
+
+
+if 1:
+    if 2:
+        if 3:
+            if self.location in EVM_EVMLIKE_LOCATIONS and database is not None:
+                exported_dict["notes"] = EVM_ADDRESS_REGEX.sub(
+                    repl=lambda matched_address: self._maybe_add_label_with_address(
+                        database=database,
+                        matched_address=matched_address,
+                    ),
+                    string=exported_dict["notes"],
+                )
 ```
 
 ## Output
@@ -834,6 +847,19 @@ very_long_variable_name_for_result += (
         x, more_args, additional_parameters
     )
 )
+
+
+if 1:
+    if 2:
+        if 3:
+            if self.location in EVM_EVMLIKE_LOCATIONS and database is not None:
+                exported_dict["notes"] = EVM_ADDRESS_REGEX.sub(
+                    repl=lambda matched_address: self._maybe_add_label_with_address(
+                        database=database,
+                        matched_address=matched_address,
+                    ),
+                    string=exported_dict["notes"],
+                )
 ```
 
 
@@ -1171,4 +1197,19 @@ very_long_variable_name_for_result += (
          x, more_args, additional_parameters
      )
  )
+@@ -433,9 +415,11 @@
+         if 3:
+             if self.location in EVM_EVMLIKE_LOCATIONS and database is not None:
+                 exported_dict["notes"] = EVM_ADDRESS_REGEX.sub(
+-                    repl=lambda matched_address: self._maybe_add_label_with_address(
+-                        database=database,
+-                        matched_address=matched_address,
++                    repl=lambda matched_address: (
++                        self._maybe_add_label_with_address(
++                            database=database,
++                            matched_address=matched_address,
++                        )
+                     ),
+                     string=exported_dict["notes"],
+                 )
 ```
