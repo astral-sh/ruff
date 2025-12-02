@@ -79,6 +79,8 @@ def _(x: bool, y: int):
 
 #### Comparison Unsupported
 
+<!-- snapshot-diagnostics -->
+
 If two tuples contain types that do not support comparison, the result may be `Unknown`. However,
 `==` and `!=` are exceptions and can still provide definite results.
 
@@ -92,14 +94,17 @@ reveal_type(a == b)  # revealed: bool
 # TODO: should be Literal[True], once we implement (in)equality for mismatched literals
 reveal_type(a != b)  # revealed: bool
 
-# error: [unsupported-operator] "Operator `<` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+# error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Literal[1], Literal["hello"]]`"
 reveal_type(a < b)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `<=` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+# error: [unsupported-operator] "Operator `<=` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Literal[1], Literal["hello"]]`"
 reveal_type(a <= b)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `>` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+# error: [unsupported-operator] "Operator `>` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Literal[1], Literal["hello"]]`"
 reveal_type(a > b)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `>=` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+# error: [unsupported-operator] "Operator `>=` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Literal[1], Literal["hello"]]`"
 reveal_type(a >= b)  # revealed: Unknown
+# error: [unsupported-operator]
+# error: [unsupported-operator]
+reveal_type((object(),) < (object(),) < (object(),))  # revealed: Unknown
 ```
 
 However, if the lexicographic comparison completes without reaching a point where str and int are
@@ -257,24 +262,24 @@ comparison can clearly conclude before encountering an error, the error should n
 ```py
 def _(n: int, s: str):
     class A: ...
-    # error: [unsupported-operator] "Operator `<` is not supported for types `A` and `A`"
+    # error: [unsupported-operator] "Operator `<` is not supported between two objects of type `A`"
     A() < A()
-    # error: [unsupported-operator] "Operator `<=` is not supported for types `A` and `A`"
+    # error: [unsupported-operator] "Operator `<=` is not supported between two objects of type `A`"
     A() <= A()
-    # error: [unsupported-operator] "Operator `>` is not supported for types `A` and `A`"
+    # error: [unsupported-operator] "Operator `>` is not supported between two objects of type `A`"
     A() > A()
-    # error: [unsupported-operator] "Operator `>=` is not supported for types `A` and `A`"
+    # error: [unsupported-operator] "Operator `>=` is not supported between two objects of type `A`"
     A() >= A()
 
     a = (0, n, A())
 
-    # error: [unsupported-operator] "Operator `<` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
+    # error: [unsupported-operator] "Operator `<` is not supported between two objects of type `tuple[Literal[0], int, A]`"
     reveal_type(a < a)  # revealed: Unknown
-    # error: [unsupported-operator] "Operator `<=` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
+    # error: [unsupported-operator] "Operator `<=` is not supported between two objects of type `tuple[Literal[0], int, A]`"
     reveal_type(a <= a)  # revealed: Unknown
-    # error: [unsupported-operator] "Operator `>` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
+    # error: [unsupported-operator] "Operator `>` is not supported between two objects of type `tuple[Literal[0], int, A]`"
     reveal_type(a > a)  # revealed: Unknown
-    # error: [unsupported-operator] "Operator `>=` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
+    # error: [unsupported-operator] "Operator `>=` is not supported between two objects of type `tuple[Literal[0], int, A]`"
     reveal_type(a >= a)  # revealed: Unknown
 
     # Comparison between `a` and `b` should only involve the first elements, `Literal[0]` and `Literal[99999]`,
