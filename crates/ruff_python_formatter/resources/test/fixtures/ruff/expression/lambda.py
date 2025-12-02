@@ -378,3 +378,17 @@ def ddb():
         )
         """
     )
+
+long_assignment_target.with_attribute.and_a_slice[with_an_index] = ( # 1
+    # 2
+    lambda x, y, z: # 3
+    # 4
+    x + y + z # 5
+    # 6
+)
+
+long_assignment_target.with_attribute.and_a_slice[with_an_index] = (
+    lambda x, y, z: x + y + z
+)
+
+long_assignment_target.with_attribute.and_a_slice[with_an_index] = lambda x, y, z: x + y + z
