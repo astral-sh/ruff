@@ -46,111 +46,76 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/tuples.md
 # Diagnostics
 
 ```
-error[unsupported-operator]: Unsupported comparison operation
+error[unsupported-operator]: Unsupported `<` operation
   --> src/mdtest_snippet.py:11:13
    |
 10 | # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Lite…
 11 | reveal_type(a < b)  # revealed: Unknown
-   |             ^^^^^ `<` is not supported here
-12 | # error: [unsupported-operator] "Operator `<=` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Lit…
-13 | reveal_type(a <= b)  # revealed: Unknown
-   |
-info: Operand types
-  --> src/mdtest_snippet.py:11:13
-   |
-10 | # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Lite…
-11 | reveal_type(a < b)  # revealed: Unknown
-   |             -   - Has type `tuple[Literal[1], Literal["hello"]]`
-   |             |
+   |             -^^^-
+   |             |   |
+   |             |   Has type `tuple[Literal[1], Literal["hello"]]`
    |             Has type `tuple[Literal[1], Literal[2]]`
 12 | # error: [unsupported-operator] "Operator `<=` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Lit…
 13 | reveal_type(a <= b)  # revealed: Unknown
    |
-info: Operation fails because operator `<` is not supported between objects of type `Literal[2]` and `Literal["hello"]`
+info: Operation fails because operator `<` is not supported between the tuple elements at index 2 (of type `Literal[2]` and `Literal["hello"]`)
 info: rule `unsupported-operator` is enabled by default
 
 ```
 
 ```
-error[unsupported-operator]: Unsupported comparison operation
+error[unsupported-operator]: Unsupported `<=` operation
   --> src/mdtest_snippet.py:13:13
    |
 11 | reveal_type(a < b)  # revealed: Unknown
 12 | # error: [unsupported-operator] "Operator `<=` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Lit…
 13 | reveal_type(a <= b)  # revealed: Unknown
-   |             ^^^^^^ `<=` is not supported here
-14 | # error: [unsupported-operator] "Operator `>` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Lite…
-15 | reveal_type(a > b)  # revealed: Unknown
-   |
-info: Operand types
-  --> src/mdtest_snippet.py:13:13
-   |
-11 | reveal_type(a < b)  # revealed: Unknown
-12 | # error: [unsupported-operator] "Operator `<=` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Lit…
-13 | reveal_type(a <= b)  # revealed: Unknown
-   |             -    - Has type `tuple[Literal[1], Literal["hello"]]`
-   |             |
+   |             -^^^^-
+   |             |    |
+   |             |    Has type `tuple[Literal[1], Literal["hello"]]`
    |             Has type `tuple[Literal[1], Literal[2]]`
 14 | # error: [unsupported-operator] "Operator `>` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Lite…
 15 | reveal_type(a > b)  # revealed: Unknown
    |
-info: Operation fails because operator `<=` is not supported between objects of type `Literal[2]` and `Literal["hello"]`
+info: Operation fails because operator `<=` is not supported between the tuple elements at index 2 (of type `Literal[2]` and `Literal["hello"]`)
 info: rule `unsupported-operator` is enabled by default
 
 ```
 
 ```
-error[unsupported-operator]: Unsupported comparison operation
+error[unsupported-operator]: Unsupported `>` operation
   --> src/mdtest_snippet.py:15:13
    |
 13 | reveal_type(a <= b)  # revealed: Unknown
 14 | # error: [unsupported-operator] "Operator `>` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Lite…
 15 | reveal_type(a > b)  # revealed: Unknown
-   |             ^^^^^ `>` is not supported here
-16 | # error: [unsupported-operator] "Operator `>=` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Lit…
-17 | reveal_type(a >= b)  # revealed: Unknown
-   |
-info: Operand types
-  --> src/mdtest_snippet.py:15:13
-   |
-13 | reveal_type(a <= b)  # revealed: Unknown
-14 | # error: [unsupported-operator] "Operator `>` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Lite…
-15 | reveal_type(a > b)  # revealed: Unknown
-   |             -   - Has type `tuple[Literal[1], Literal["hello"]]`
-   |             |
+   |             -^^^-
+   |             |   |
+   |             |   Has type `tuple[Literal[1], Literal["hello"]]`
    |             Has type `tuple[Literal[1], Literal[2]]`
 16 | # error: [unsupported-operator] "Operator `>=` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Lit…
 17 | reveal_type(a >= b)  # revealed: Unknown
    |
-info: Operation fails because operator `>` is not supported between objects of type `Literal[2]` and `Literal["hello"]`
+info: Operation fails because operator `>` is not supported between the tuple elements at index 2 (of type `Literal[2]` and `Literal["hello"]`)
 info: rule `unsupported-operator` is enabled by default
 
 ```
 
 ```
-error[unsupported-operator]: Unsupported comparison operation
+error[unsupported-operator]: Unsupported `>=` operation
   --> src/mdtest_snippet.py:17:13
    |
 15 | reveal_type(a > b)  # revealed: Unknown
 16 | # error: [unsupported-operator] "Operator `>=` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Lit…
 17 | reveal_type(a >= b)  # revealed: Unknown
-   |             ^^^^^^ `>=` is not supported here
-18 | # error: [unsupported-operator]
-19 | # error: [unsupported-operator]
-   |
-info: Operand types
-  --> src/mdtest_snippet.py:17:13
-   |
-15 | reveal_type(a > b)  # revealed: Unknown
-16 | # error: [unsupported-operator] "Operator `>=` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Lit…
-17 | reveal_type(a >= b)  # revealed: Unknown
-   |             -    - Has type `tuple[Literal[1], Literal["hello"]]`
-   |             |
+   |             -^^^^-
+   |             |    |
+   |             |    Has type `tuple[Literal[1], Literal["hello"]]`
    |             Has type `tuple[Literal[1], Literal[2]]`
 18 | # error: [unsupported-operator]
 19 | # error: [unsupported-operator]
    |
-info: Operation fails because operator `>=` is not supported between objects of type `Literal[2]` and `Literal["hello"]`
+info: Operation fails because operator `>=` is not supported between the tuple elements at index 2 (of type `Literal[2]` and `Literal["hello"]`)
 info: rule `unsupported-operator` is enabled by default
 
 ```
@@ -168,7 +133,7 @@ error[unsupported-operator]: Unsupported `<` operation
 21 | a = (1, 2)
 22 | b = (999999, "hello")
    |
-info: Operation fails because operator `<` is not supported between two objects of type `object`
+info: Operation fails because operator `<` is not supported between the tuple elements at index 1 (both of type `object`)
 info: rule `unsupported-operator` is enabled by default
 
 ```
@@ -186,7 +151,7 @@ error[unsupported-operator]: Unsupported `<` operation
 21 | a = (1, 2)
 22 | b = (999999, "hello")
    |
-info: Operation fails because operator `<` is not supported between two objects of type `object`
+info: Operation fails because operator `<` is not supported between the tuple elements at index 1 (both of type `object`)
 info: rule `unsupported-operator` is enabled by default
 
 ```

@@ -73,9 +73,22 @@ back to `bool` for the result type instead of trying to infer something more pre
 (supported) variants:
 
 ```py
-def _(flag: bool):
-    x = [1, 2] if flag else 1
+from typing import Literal
 
+def _(
+    x: list[int] | Literal[1],
+    y: list[int] | Literal[1],
+    aa: tuple[int],
+    bb: tuple[int] | tuple[int, int],
+    cc: tuple[str] | tuple[str, str],
+):
     result = 1 in x  # error: "Operator `in` is not supported"
     reveal_type(result)  # revealed: bool
+
+    result2 = y in x  # error: [unsupported-operator]
+    reveal_type(result)  # revealed: bool
+
+    result3 = aa < cc  # error: [unsupported-operator]
+    result4 = cc < aa  # error: [unsupported-operator]
+    result5 = bb < cc  # error: [unsupported-operator]
 ```

@@ -45,23 +45,15 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/unsupported.m
 # Diagnostics
 
 ```
-error[unsupported-operator]: Unsupported comparison operation
+error[unsupported-operator]: Unsupported `in` operation
  --> src/mdtest_snippet.py:3:9
   |
 1 | def _(flag: bool, flag1: bool, flag2: bool):
 2 |     class A: ...
 3 |     a = 1 in 7  # error: "Operator `in` is not supported between objects of type `Literal[1]` and `Literal[7]`"
-  |         ^^^^^^ `in` is not supported here
-4 |     reveal_type(a)  # revealed: bool
-  |
-info: Operand types
- --> src/mdtest_snippet.py:3:9
-  |
-1 | def _(flag: bool, flag1: bool, flag2: bool):
-2 |     class A: ...
-3 |     a = 1 in 7  # error: "Operator `in` is not supported between objects of type `Literal[1]` and `Literal[7]`"
-  |         -    - Has type `Literal[7]`
-  |         |
+  |         -^^^^-
+  |         |    |
+  |         |    Has type `Literal[7]`
   |         Has type `Literal[1]`
 4 |     reveal_type(a)  # revealed: bool
   |
@@ -70,23 +62,15 @@ info: rule `unsupported-operator` is enabled by default
 ```
 
 ```
-error[unsupported-operator]: Unsupported comparison operation
+error[unsupported-operator]: Unsupported `not in` operation
  --> src/mdtest_snippet.py:6:9
   |
 4 |     reveal_type(a)  # revealed: bool
 5 |
 6 |     b = 0 not in 10  # error: "Operator `not in` is not supported between objects of type `Literal[0]` and `Literal[10]`"
-  |         ^^^^^^^^^^^ `not in` is not supported here
-7 |     reveal_type(b)  # revealed: bool
-  |
-info: Operand types
- --> src/mdtest_snippet.py:6:9
-  |
-4 |     reveal_type(a)  # revealed: bool
-5 |
-6 |     b = 0 not in 10  # error: "Operator `not in` is not supported between objects of type `Literal[0]` and `Literal[10]`"
-  |         -        -- Has type `Literal[10]`
-  |         |
+  |         -^^^^^^^^--
+  |         |        |
+  |         |        Has type `Literal[10]`
   |         Has type `Literal[0]`
 7 |     reveal_type(b)  # revealed: bool
   |
@@ -95,21 +79,14 @@ info: rule `unsupported-operator` is enabled by default
 ```
 
 ```
-error[unsupported-operator]: Unsupported comparison operation
+error[unsupported-operator]: Unsupported `<` operation
   --> src/mdtest_snippet.py:10:9
    |
  9 |     # error: [unsupported-operator] "Operator `<` is not supported between objects of type `object` and `Literal[5]`"
 10 |     c = object() < 5
-   |         ^^^^^^^^^^^^ `<` is not supported here
-11 |     reveal_type(c)  # revealed: Unknown
-   |
-info: Operand types
-  --> src/mdtest_snippet.py:10:9
-   |
- 9 |     # error: [unsupported-operator] "Operator `<` is not supported between objects of type `object` and `Literal[5]`"
-10 |     c = object() < 5
-   |         --------   - Has type `Literal[5]`
-   |         |
+   |         --------^^^-
+   |         |          |
+   |         |          Has type `Literal[5]`
    |         Has type `object`
 11 |     reveal_type(c)  # revealed: Unknown
    |
@@ -118,21 +95,14 @@ info: rule `unsupported-operator` is enabled by default
 ```
 
 ```
-error[unsupported-operator]: Unsupported comparison operation
+error[unsupported-operator]: Unsupported `<` operation
   --> src/mdtest_snippet.py:14:9
    |
 13 |     # error: [unsupported-operator] "Operator `<` is not supported between objects of type `Literal[5]` and `object`"
 14 |     d = 5 < object()
-   |         ^^^^^^^^^^^^ `<` is not supported here
-15 |     reveal_type(d)  # revealed: Unknown
-   |
-info: Operand types
-  --> src/mdtest_snippet.py:14:9
-   |
-13 |     # error: [unsupported-operator] "Operator `<` is not supported between objects of type `Literal[5]` and `object`"
-14 |     d = 5 < object()
-   |         -   -------- Has type `object`
-   |         |
+   |         -^^^--------
+   |         |   |
+   |         |   Has type `object`
    |         Has type `Literal[5]`
 15 |     reveal_type(d)  # revealed: Unknown
    |
@@ -141,23 +111,15 @@ info: rule `unsupported-operator` is enabled by default
 ```
 
 ```
-error[unsupported-operator]: Unsupported comparison operation
+error[unsupported-operator]: Unsupported `in` operation
   --> src/mdtest_snippet.py:19:9
    |
 17 |     int_literal_or_str_literal = 1 if flag else "foo"
 18 |     # error: "Operator `in` is not supported between objects of type `Literal[42]` and `Literal[1, "foo"]`"
 19 |     e = 42 in int_literal_or_str_literal
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `in` is not supported here
-20 |     reveal_type(e)  # revealed: bool
-   |
-info: Operand types
-  --> src/mdtest_snippet.py:19:9
-   |
-17 |     int_literal_or_str_literal = 1 if flag else "foo"
-18 |     # error: "Operator `in` is not supported between objects of type `Literal[42]` and `Literal[1, "foo"]`"
-19 |     e = 42 in int_literal_or_str_literal
-   |         --    -------------------------- Has type `Literal[1, "foo"]`
-   |         |
+   |         --^^^^--------------------------
+   |         |     |
+   |         |     Has type `Literal[1, "foo"]`
    |         Has type `Literal[42]`
 20 |     reveal_type(e)  # revealed: bool
    |
@@ -167,25 +129,18 @@ info: rule `unsupported-operator` is enabled by default
 ```
 
 ```
-error[unsupported-operator]: Unsupported comparison operation
+error[unsupported-operator]: Unsupported `<` operation
   --> src/mdtest_snippet.py:23:9
    |
 22 |     # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[…
 23 |     f = (1, 2) < (1, "hello")
-   |         ^^^^^^^^^^^^^^^^^^^^^ `<` is not supported here
-24 |     reveal_type(f)  # revealed: Unknown
-   |
-info: Operand types
-  --> src/mdtest_snippet.py:23:9
-   |
-22 |     # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[…
-23 |     f = (1, 2) < (1, "hello")
-   |         ------   ------------ Has type `tuple[Literal[1], Literal["hello"]]`
-   |         |
+   |         ------^^^------------
+   |         |        |
+   |         |        Has type `tuple[Literal[1], Literal["hello"]]`
    |         Has type `tuple[Literal[1], Literal[2]]`
 24 |     reveal_type(f)  # revealed: Unknown
    |
-info: Operation fails because operator `<` is not supported between objects of type `Literal[2]` and `Literal["hello"]`
+info: Operation fails because operator `<` is not supported between the tuple elements at index 2 (of type `Literal[2]` and `Literal["hello"]`)
 info: rule `unsupported-operator` is enabled by default
 
 ```
@@ -201,7 +156,7 @@ error[unsupported-operator]: Unsupported `<` operation
    |         Both operands have type `tuple[bool, A]`
 28 |     reveal_type(g)  # revealed: Unknown
    |
-info: Operation fails because operator `<` is not supported between two objects of type `A`
+info: Operation fails because operator `<` is not supported between the tuple elements at index 2 (both of type `A`)
 info: rule `unsupported-operator` is enabled by default
 
 ```

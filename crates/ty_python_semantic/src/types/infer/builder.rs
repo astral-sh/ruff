@@ -10324,7 +10324,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     IntersectionOn::Left,
                     range,
                     visitor,
-                ))
+                ).map_err(|err|UnsupportedComparisonError { op, left_ty: left, right_ty: err.right_ty }))
             }
             (left, Type::Intersection(intersection)) => {
                 Some(self.infer_binary_intersection_type_comparison(
@@ -10334,7 +10334,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     IntersectionOn::Right,
                     range,
                     visitor,
-                ))
+                ).map_err(|err|UnsupportedComparisonError { op, left_ty: err.left_ty, right_ty: right }))
             }
 
             (Type::TypeAlias(alias), right) => Some(
