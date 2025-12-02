@@ -109,4 +109,16 @@ F704 `await` statement outside of a function
 35 | # scope
 36 | (cor async for cor in await f())  # F704
    |                       ^^^^^^^^^
+37 | (await cor async for cor in [await c for c in f()])  # F704
+   |
+
+F704 `await` statement outside of a function
+  --> F704.py:37:30
+   |
+35 | # scope
+36 | (cor async for cor in await f())  # F704
+37 | (await cor async for cor in [await c for c in f()])  # F704
+   |                              ^^^^^^^
+38 |
+39 | # this is also okay because the comprehension is within the generator scope
    |

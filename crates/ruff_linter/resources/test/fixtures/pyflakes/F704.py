@@ -34,3 +34,7 @@ def _():
 # or in the iterator of an async generator, which is evaluated in the parent
 # scope
 (cor async for cor in await f())  # F704
+(await cor async for cor in [await c for c in f()])  # F704
+
+# this is also okay because the comprehension is within the generator scope
+([await c for c in cor] async for cor in f())  # ok
