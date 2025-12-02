@@ -22,7 +22,8 @@ use super::{
 use crate::diagnostic::format_enumeration;
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
 use crate::module_resolver::{
-    KnownModule, ModuleResolveMode, file_to_module, resolve_module, search_paths,
+    KnownModule, ModuleResolveMode, file_to_module, resolve_module, resolve_module_old,
+    search_paths,
 };
 use crate::node_key::NodeKey;
 use crate::place::{
@@ -5922,7 +5923,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ) else {
                     return false;
                 };
-                resolve_module(self.db(), &module_name).is_some()
+                resolve_module(self.db(), self.file(), &module_name).is_some()
             }) {
                 diagnostic
                     .help("The module can be resolved if the number of leading dots is reduced");
@@ -6159,7 +6160,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        if resolve_module(self.db(), &module_name).is_none() {
+        if resolve_module(self.db(), self.file(), &module_name).is_none() {
             self.report_unresolved_import(import_from.into(), module_ref.range(), *level, module);
         }
     }
@@ -6177,7 +6178,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        let Some(module) = resolve_module(self.db(), &module_name) else {
+        let Some(module) = resolve_module(self.db(), self.file(), &module_name) else {
             self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
         };
@@ -6362,7 +6363,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
             return;
         };
-        let Some(module) = resolve_module(self.db(), &thispackage_name) else {
+        let Some(module) = resolve_module(self.db(), self.file(), &thispackage_name) else {
             self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
             return;
         };
@@ -6593,7 +6594,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn module_type_from_name(&self, module_name: &ModuleName) -> Option<Type<'db>> {
-        resolve_module(self.db(), module_name)
+        resolve_module(self.db(), self.file(), module_name)
             .map(|module| Type::module_literal(self.db(), self.file(), module))
     }
 
@@ -9172,7 +9173,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         let mut maybe_submodule_name = module_name.clone();
                         maybe_submodule_name.extend(&relative_submodule);
-                        if resolve_module(db, &maybe_submodule_name).is_some() {
+                        if resolve_module_old(db, &maybe_submodule_name).is_some() {
                             if let Some(builder) = self
                                 .context
                                 .report_lint(&POSSIBLY_MISSING_ATTRIBUTE, attribute)

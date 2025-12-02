@@ -15,7 +15,7 @@ use ty_project::metadata::pyproject::{PyProject, Tool};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
-use ty_python_semantic::{Module, ModuleName, PythonPlatform, resolve_module};
+use ty_python_semantic::{Module, ModuleName, PythonPlatform, resolve_module_old};
 
 struct TestCase {
     db: ProjectDatabase,
@@ -232,7 +232,8 @@ impl TestCase {
     }
 
     fn module<'c>(&'c self, name: &str) -> Module<'c> {
-        resolve_module(self.db(), &ModuleName::new(name).unwrap()).expect("module to be present")
+        resolve_module_old(self.db(), &ModuleName::new(name).unwrap())
+            .expect("module to be present")
     }
 
     fn sorted_submodule_names(&self, parent_module_name: &str) -> Vec<String> {
@@ -811,7 +812,7 @@ fn directory_moved_to_project() -> anyhow::Result<()> {
         .with_context(|| "Failed to create __init__.py")?;
     std::fs::write(a_original_path.as_std_path(), "").with_context(|| "Failed to create a.py")?;
 
-    let sub_a_module = resolve_module(case.db(), &ModuleName::new_static("sub.a").unwrap());
+    let sub_a_module = resolve_module_old(case.db(), &ModuleName::new_static("sub.a").unwrap());
 
     assert_eq!(sub_a_module, None);
     case.assert_indexed_project_files([bar]);
@@ -832,7 +833,7 @@ fn directory_moved_to_project() -> anyhow::Result<()> {
         .expect("a.py to exist");
 
     // `import sub.a` should now resolve
-    assert!(resolve_module(case.db(), &ModuleName::new_static("sub.a").unwrap()).is_some());
+    assert!(resolve_module_old(case.db(), &ModuleName::new_static("sub.a").unwrap()).is_some());
 
     case.assert_indexed_project_files([bar, init_file, a_file]);
 
@@ -848,7 +849,7 @@ fn directory_moved_to_trash() -> anyhow::Result<()> {
     ])?;
     let bar = case.system_file(case.project_path("bar.py")).unwrap();
 
-    assert!(resolve_module(case.db(), &ModuleName::new_static("sub.a").unwrap()).is_some());
+    assert!(resolve_module_old(case.db(), &ModuleName::new_static("sub.a").unwrap()).is_some());
 
     let sub_path = case.project_path("sub");
     let init_file = case
@@ -870,7 +871,7 @@ fn directory_moved_to_trash() -> anyhow::Result<()> {
     case.apply_changes(changes, None);
 
     // `import sub.a` should no longer resolve
-    assert!(resolve_module(case.db(), &ModuleName::new_static("sub.a").unwrap()).is_none());
+    assert!(resolve_module_old(case.db(), &ModuleName::new_static("sub.a").unwrap()).is_none());
 
     assert!(!init_file.exists(case.db()));
     assert!(!a_file.exists(case.db()));
@@ -890,8 +891,8 @@ fn directory_renamed() -> anyhow::Result<()> {
 
     let bar = case.system_file(case.project_path("bar.py")).unwrap();
 
-    assert!(resolve_module(case.db(), &ModuleName::new_static("sub.a").unwrap()).is_some());
-    assert!(resolve_module(case.db(), &ModuleName::new_static("foo.baz").unwrap()).is_none());
+    assert!(resolve_module_old(case.db(), &ModuleName::new_static("sub.a").unwrap()).is_some());
+    assert!(resolve_module_old(case.db(), &ModuleName::new_static("foo.baz").unwrap()).is_none());
 
     let sub_path = case.project_path("sub");
     let sub_init = case
@@ -915,9 +916,9 @@ fn directory_renamed() -> anyhow::Result<()> {
     case.apply_changes(changes, None);
 
     // `import sub.a` should no longer resolve
-    assert!(resolve_module(case.db(), &ModuleName::new_static("sub.a").unwrap()).is_none());
+    assert!(resolve_module_old(case.db(), &ModuleName::new_static("sub.a").unwrap()).is_none());
     // `import foo.baz` should now resolve
-    assert!(resolve_module(case.db(), &ModuleName::new_static("foo.baz").unwrap()).is_some());
+    assert!(resolve_module_old(case.db(), &ModuleName::new_static("foo.baz").unwrap()).is_some());
 
     // The old paths are no longer tracked
     assert!(!sub_init.exists(case.db()));
@@ -950,7 +951,7 @@ fn directory_deleted() -> anyhow::Result<()> {
 
     let bar = case.system_file(case.project_path("bar.py")).unwrap();
 
-    assert!(resolve_module(case.db(), &ModuleName::new_static("sub.a").unwrap()).is_some());
+    assert!(resolve_module_old(case.db(), &ModuleName::new_static("sub.a").unwrap()).is_some());
 
     let sub_path = case.project_path("sub");
 
@@ -970,7 +971,7 @@ fn directory_deleted() -> anyhow::Result<()> {
     case.apply_changes(changes, None);
 
     // `import sub.a` should no longer resolve
-    assert!(resolve_module(case.db(), &ModuleName::new_static("sub.a").unwrap()).is_none());
+    assert!(resolve_module_old(case.db(), &ModuleName::new_static("sub.a").unwrap()).is_none());
 
     assert!(!init_file.exists(case.db()));
     assert!(!a_file.exists(case.db()));
@@ -999,7 +1000,7 @@ fn search_path() -> anyhow::Result<()> {
     let site_packages = case.root_path().join("site_packages");
 
     assert_eq!(
-        resolve_module(case.db(), &ModuleName::new("a").unwrap()),
+        resolve_module_old(case.db(), &ModuleName::new("a").unwrap()),
         None
     );
 
@@ -1009,7 +1010,7 @@ fn search_path() -> anyhow::Result<()> {
 
     case.apply_changes(changes, None);
 
-    assert!(resolve_module(case.db(), &ModuleName::new_static("a").unwrap()).is_some());
+    assert!(resolve_module_old(case.db(), &ModuleName::new_static("a").unwrap()).is_some());
     case.assert_indexed_project_files([case.system_file(case.project_path("bar.py")).unwrap()]);
 
     Ok(())
@@ -1022,7 +1023,7 @@ fn add_search_path() -> anyhow::Result<()> {
     let site_packages = case.project_path("site_packages");
     std::fs::create_dir_all(site_packages.as_std_path())?;
 
-    assert!(resolve_module(case.db(), &ModuleName::new_static("a").unwrap()).is_none());
+    assert!(resolve_module_old(case.db(), &ModuleName::new_static("a").unwrap()).is_none());
 
     // Register site-packages as a search path.
     case.update_options(Options {
@@ -1040,7 +1041,7 @@ fn add_search_path() -> anyhow::Result<()> {
 
     case.apply_changes(changes, None);
 
-    assert!(resolve_module(case.db(), &ModuleName::new_static("a").unwrap()).is_some());
+    assert!(resolve_module_old(case.db(), &ModuleName::new_static("a").unwrap()).is_some());
 
     Ok(())
 }
@@ -1172,7 +1173,7 @@ fn changed_versions_file() -> anyhow::Result<()> {
 
     // Unset the custom typeshed directory.
     assert_eq!(
-        resolve_module(case.db(), &ModuleName::new("os").unwrap()),
+        resolve_module_old(case.db(), &ModuleName::new("os").unwrap()),
         None
     );
 
@@ -1187,7 +1188,7 @@ fn changed_versions_file() -> anyhow::Result<()> {
 
     case.apply_changes(changes, None);
 
-    assert!(resolve_module(case.db(), &ModuleName::new("os").unwrap()).is_some());
+    assert!(resolve_module_old(case.db(), &ModuleName::new("os").unwrap()).is_some());
 
     Ok(())
 }
@@ -1410,7 +1411,7 @@ mod unix {
             Ok(())
         })?;
 
-        let baz = resolve_module(case.db(), &ModuleName::new_static("bar.baz").unwrap())
+        let baz = resolve_module_old(case.db(), &ModuleName::new_static("bar.baz").unwrap())
             .expect("Expected bar.baz to exist in site-packages.");
         let baz_project = case.project_path("bar/baz.py");
         let baz_file = baz.file(case.db()).unwrap();
@@ -1486,7 +1487,7 @@ mod unix {
             Ok(())
         })?;
 
-        let baz = resolve_module(case.db(), &ModuleName::new_static("bar.baz").unwrap())
+        let baz = resolve_module_old(case.db(), &ModuleName::new_static("bar.baz").unwrap())
             .expect("Expected bar.baz to exist in site-packages.");
         let baz_file = baz.file(case.db()).unwrap();
         let bar_baz = case.project_path("bar/baz.py");
@@ -1591,7 +1592,7 @@ mod unix {
             Ok(())
         })?;
 
-        let baz = resolve_module(case.db(), &ModuleName::new_static("bar.baz").unwrap())
+        let baz = resolve_module_old(case.db(), &ModuleName::new_static("bar.baz").unwrap())
             .expect("Expected bar.baz to exist in site-packages.");
         let baz_site_packages_path =
             case.project_path(".venv/lib/python3.12/site-packages/bar/baz.py");
@@ -1854,11 +1855,11 @@ fn rename_files_casing_only() -> anyhow::Result<()> {
     let mut case = setup([("lib.py", "class Foo: ...")])?;
 
     assert!(
-        resolve_module(case.db(), &ModuleName::new("lib").unwrap()).is_some(),
+        resolve_module_old(case.db(), &ModuleName::new("lib").unwrap()).is_some(),
         "Expected `lib` module to exist."
     );
     assert_eq!(
-        resolve_module(case.db(), &ModuleName::new("Lib").unwrap()),
+        resolve_module_old(case.db(), &ModuleName::new("Lib").unwrap()),
         None,
         "Expected `Lib` module not to exist"
     );
@@ -1891,13 +1892,13 @@ fn rename_files_casing_only() -> anyhow::Result<()> {
 
     // Resolving `lib` should now fail but `Lib` should now succeed
     assert_eq!(
-        resolve_module(case.db(), &ModuleName::new("lib").unwrap()),
+        resolve_module_old(case.db(), &ModuleName::new("lib").unwrap()),
         None,
         "Expected `lib` module to no longer exist."
     );
 
     assert!(
-        resolve_module(case.db(), &ModuleName::new("Lib").unwrap()).is_some(),
+        resolve_module_old(case.db(), &ModuleName::new("Lib").unwrap()).is_some(),
         "Expected `Lib` module to exist"
     );
 

@@ -1580,7 +1580,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             continue;
                         };
 
-                        let Some(module) = resolve_module(self.db, &module_name) else {
+                        let Some(module) = resolve_module(self.db, self.file, &module_name) else {
                             continue;
                         };
 

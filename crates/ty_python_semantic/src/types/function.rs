@@ -1887,7 +1887,7 @@ impl KnownFunction {
                 let Some(module_name) = ModuleName::new(module_name) else {
                     return;
                 };
-                let Some(module) = resolve_module(db, &module_name) else {
+                let Some(module) = resolve_module(db, file, &module_name) else {
                     return;
                 };
 

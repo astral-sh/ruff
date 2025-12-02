@@ -1342,7 +1342,7 @@ mod resolve_definition {
     use crate::semantic_index::definition::{Definition, DefinitionKind, module_docstring};
     use crate::semantic_index::scope::{NodeWithScopeKind, ScopeId};
     use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
-    use crate::{Db, ModuleName, resolve_module, resolve_real_module};
+    use crate::{Db, ModuleName, resolve_module, resolve_real_module_old};
 
     /// Represents the result of resolving an import to either a specific definition or
     /// a specific range within a file.
@@ -1440,7 +1440,7 @@ mod resolve_definition {
                 };
 
                 // Resolve the module to its file
-                let Some(resolved_module) = resolve_module(db, &module_name) else {
+                let Some(resolved_module) = resolve_module(db, file, &module_name) else {
                     return Vec::new(); // Module not found, return empty list
                 };
 
@@ -1527,7 +1527,7 @@ mod resolve_definition {
             else {
                 return Vec::new();
             };
-            let Some(resolved_module) = resolve_module(db, &module_name) else {
+            let Some(resolved_module) = resolve_module(db, file, &module_name) else {
                 return Vec::new();
             };
             resolved_module.file(db)
@@ -1636,7 +1636,7 @@ mod resolve_definition {
         // It's definitely a stub, so now rerun module resolution but with stubs disabled.
         let stub_module = file_to_module(db, stub_file_for_module_lookup)?;
         trace!("Found stub module: {}", stub_module.name(db));
-        let real_module = resolve_real_module(db, stub_module.name(db))?;
+        let real_module = resolve_real_module_old(db, stub_module.name(db))?;
         trace!("Found real module: {}", real_module.name(db));
         let real_file = real_module.file(db)?;
         trace!("Found real file: {}", real_file.path(db));

@@ -100,7 +100,7 @@ impl<'db> SemanticModel<'db> {
     pub fn resolve_module(&self, module: Option<&str>, level: u32) -> Option<Module<'db>> {
         let module_name =
             ModuleName::from_identifier_parts(self.db, self.file, module, level).ok()?;
-        resolve_module(self.db, &module_name)
+        resolve_module(self.db, self.file, &module_name)
     }
 
     /// Returns completions for symbols available in a `import <CURSOR>` context.
@@ -140,7 +140,7 @@ impl<'db> SemanticModel<'db> {
         &self,
         module_name: &ModuleName,
     ) -> Vec<Completion<'db>> {
-        let Some(module) = resolve_module(self.db, module_name) else {
+        let Some(module) = resolve_module(self.db, self.file, module_name) else {
             tracing::debug!("Could not resolve module from `{module_name:?}`");
             return vec![];
         };
@@ -150,7 +150,7 @@ impl<'db> SemanticModel<'db> {
     /// Returns completions for symbols available in the given module as if
     /// it were imported by this model's `File`.
     fn module_completions(&self, module_name: &ModuleName) -> Vec<Completion<'db>> {
-        let Some(module) = resolve_module(self.db, module_name) else {
+        let Some(module) = resolve_module(self.db, self.file, module_name) else {
             tracing::debug!("Could not resolve module from `{module_name:?}`");
             return vec![];
         };

@@ -3,8 +3,7 @@
 
 use super::{ClassType, Type, class::KnownClass};
 use crate::db::Db;
-use crate::module_resolver::{KnownModule, file_to_module};
-use crate::resolve_module;
+use crate::module_resolver::{KnownModule, file_to_module, resolve_module_old};
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::{FileScopeId, place_table, use_def_map};
 use crate::types::TypeDefinition;
@@ -544,7 +543,7 @@ impl SpecialFormType {
         self.definition_modules()
             .iter()
             .find_map(|module| {
-                let file = resolve_module(db, &module.name())?.file(db)?;
+                let file = resolve_module_old(db, &module.name())?.file(db)?;
                 let scope = FileScopeId::global().to_scope_id(db, file);
                 let symbol_id = place_table(db, scope).symbol_id(self.name())?;
 

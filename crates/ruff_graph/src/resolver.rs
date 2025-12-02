@@ -1,5 +1,5 @@
 use ruff_db::files::FilePath;
-use ty_python_semantic::{ModuleName, resolve_module, resolve_real_module};
+use ty_python_semantic::{ModuleName, resolve_module_old, resolve_real_module_old};
 
 use crate::ModuleDb;
 use crate::collector::CollectedImport;
@@ -70,13 +70,13 @@ impl<'a> Resolver<'a> {
 
     /// Resolves a module name to a module.
     pub(crate) fn resolve_module(&self, module_name: &ModuleName) -> Option<&'a FilePath> {
-        let module = resolve_module(self.db, module_name)?;
+        let module = resolve_module_old(self.db, module_name)?;
         Some(module.file(self.db)?.path(self.db))
     }
 
     /// Resolves a module name to a module (stubs not allowed).
     fn resolve_real_module(&self, module_name: &ModuleName) -> Option<&'a FilePath> {
-        let module = resolve_real_module(self.db, module_name)?;
+        let module = resolve_real_module_old(self.db, module_name)?;
         Some(module.file(self.db)?.path(self.db))
     }
 }

@@ -21,7 +21,7 @@ use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
 use ty_python_semantic::{
     Module, Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
     PythonVersionWithSource, SearchPath, SearchPathSettings, SysPrefixPathOrigin, list_modules,
-    resolve_module,
+    resolve_module_old,
 };
 
 mod assertion;
@@ -566,7 +566,7 @@ struct ModuleInconsistency<'db> {
 fn run_module_resolution_consistency_test(db: &db::Db) -> Result<(), Vec<ModuleInconsistency<'_>>> {
     let mut errs = vec![];
     for from_list in list_modules(db) {
-        errs.push(match resolve_module(db, from_list.name(db)) {
+        errs.push(match resolve_module_old(db, from_list.name(db)) {
             None => ModuleInconsistency {
                 db,
                 from_list,
