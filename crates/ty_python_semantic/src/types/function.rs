@@ -509,13 +509,12 @@ impl<'db> OverloadLiteral<'db> {
         );
 
         let generic_context = raw_signature.generic_context;
-        raw_signature.add_implicit_self_annotation(|| {
+        raw_signature.add_implicit_self_annotation(db, || {
             if self.is_staticmethod(db) || self.is_classmethod(db) {
                 return None;
             }
 
-            let method_may_be_generic =
-                generic_context
+            let method_may_be_generic = generic_context
                 .is_some_and(|context| context.variables(db).any(|v| v.typevar(db).is_self(db)));
 
             let class_scope_id = definition.scope(db);
@@ -533,27 +532,29 @@ impl<'db> OverloadLiteral<'db> {
                 _ => return None,
             };
 
-                if method_may_be_generic
-                    || class_is_generic
-                    || class_literal
-                        .known(db)
-                        .is_some_and(KnownClass::is_fallback_class)
-                {
-                    let scope_id = definition.scope(db);
-                    let typevar_binding_context = Some(definition);
-                    let index = semantic_index(db, scope_id.file(db));
-                    let class = nearest_enclosing_class(db, index, scope_id).unwrap();
+            if method_may_be_generic
+                || class_is_generic
+                || class_literal
+                    .known(db)
+                    .is_some_and(KnownClass::is_fallback_class)
+            {
+                let scope_id = definition.scope(db);
+                let typevar_binding_context = Some(definition);
+                let index = semantic_index(db, scope_id.file(db));
+                let class = nearest_enclosing_class(db, index, scope_id).unwrap();
 
-                    Some(
-                        typing_self(db, scope_id, typevar_binding_context, class)
-                            .expect("We should always find the surrounding class for an implicit self: Self annotation"),
-                    )
-                } else {
-                    // For methods of non-generic classes that are not otherwise generic (e.g. return `Self` or
-                    // have additional type parameters), the implicit `Self` type of the `self` parameter would
-                    // be the only type variable, so we can just use the class directly.
-                    Some(class_literal.to_non_generic_instance(db))
-                }
+                Some(
+                    typing_self(db, scope_id, typevar_binding_context, class).expect(
+                        "We should always find the surrounding class \
+                         for an implicit self: Self annotation",
+                    ),
+                )
+            } else {
+                // For methods of non-generic classes that are not otherwise generic (e.g. return `Self` or
+                // have additional type parameters), the implicit `Self` type of the `self` parameter would
+                // be the only type variable, so we can just use the class directly.
+                Some(class_literal.to_non_generic_instance(db))
+            }
         });
 
         raw_signature
