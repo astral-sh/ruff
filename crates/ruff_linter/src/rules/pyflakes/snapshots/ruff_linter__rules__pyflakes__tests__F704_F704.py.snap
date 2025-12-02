@@ -39,26 +39,6 @@ F704 `await` statement outside of a function
    |
 
 F704 `await` statement outside of a function
-  --> F704.py:23:2
-   |
-22 | # await is valid in any generator, sync or async
-23 | (await cor async for cor in f())  # ok
-   |  ^^^^^^^^^
-24 | (await cor for cor in f())  # ok
-   |
-
-F704 `await` statement outside of a function
-  --> F704.py:24:2
-   |
-22 | # await is valid in any generator, sync or async
-23 | (await cor async for cor in f())  # ok
-24 | (await cor for cor in f())  # ok
-   |  ^^^^^^^^^
-25 |
-26 | # but not in comprehensions
-   |
-
-F704 `await` statement outside of a function
   --> F704.py:27:2
    |
 26 | # but not in comprehensions
