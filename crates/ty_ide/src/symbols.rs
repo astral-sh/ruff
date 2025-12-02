@@ -380,9 +380,7 @@ pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: File) -> FlatSymbo
     };
     visitor.visit_body(&module.syntax().body);
 
-    if let Some(path) = file.path(db).as_system_path()
-        && !db.project().is_file_included(db, path)
-    {
+    if !db.project().files(db).contains(&file) {
         // Eagerly clear ASTs of third party files.
         parsed.clear();
     }
