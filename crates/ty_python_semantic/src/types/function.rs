@@ -73,7 +73,8 @@ use crate::types::diagnostic::{
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
 use crate::types::display::DisplaySettings;
-use crate::types::generics::{GenericContext, InferableTypeVars};
+use crate::types::generics::{GenericContext, InferableTypeVars, typing_self};
+use crate::types::infer::nearest_enclosing_class;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
@@ -83,7 +84,7 @@ use crate::types::{
     ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
     NormalizedVisitor, SpecialFormType, Truthiness, Type, TypeContext, TypeMapping, TypeRelation,
-    UnionBuilder, binding_type, definition_expression_type, walk_signature,
+    UnionBuilder, binding_type, definition_expression_type, infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -499,13 +500,63 @@ impl<'db> OverloadLiteral<'db> {
             index,
         );
 
-        Signature::from_function(
+        let mut raw_signature = Signature::from_function(
             db,
             pep695_ctx,
             definition,
             function_stmt_node,
             has_implicitly_positional_first_parameter,
-        )
+        );
+
+        let generic_context = raw_signature.generic_context;
+        raw_signature.add_implicit_self_annotation(|| {
+            if self.is_staticmethod(db) || self.is_classmethod(db) {
+                return None;
+            }
+
+            let method_may_be_generic =
+                generic_context
+                .is_some_and(|context| context.variables(db).any(|v| v.typevar(db).is_self(db)));
+
+            let class_scope_id = definition.scope(db);
+            let class_scope = index.scope(class_scope_id.file_scope_id(db));
+            let class_node = class_scope.node().as_class()?;
+            let class_def = index.expect_single_definition(class_node);
+            let (class_literal, class_is_generic) = match infer_definition_types(db, class_def)
+                .declaration_type(class_def)
+                .inner_type()
+            {
+                Type::ClassLiteral(class_literal) => {
+                    (class_literal, class_literal.generic_context(db).is_some())
+                }
+                Type::GenericAlias(alias) => (alias.origin(db), true),
+                _ => return None,
+            };
+
+                if method_may_be_generic
+                    || class_is_generic
+                    || class_literal
+                        .known(db)
+                        .is_some_and(KnownClass::is_fallback_class)
+                {
+                    let scope_id = definition.scope(db);
+                    let typevar_binding_context = Some(definition);
+                    let index = semantic_index(db, scope_id.file(db));
+                    let class = nearest_enclosing_class(db, index, scope_id).unwrap();
+
+                    Some(
+                        typing_self(db, scope_id, typevar_binding_context, class)
+                            .expect("We should always find the surrounding class for an implicit self: Self annotation"),
+                    )
+                } else {
+                    // For methods of non-generic classes that are not otherwise generic (e.g. return `Self` or
+                    // have additional type parameters), the implicit `Self` type of the `self` parameter would
+                    // be the only type variable, so we can just use the class directly.
+                    Some(class_literal.to_non_generic_instance(db))
+                }
+        });
+
+        raw_signature
     }
 
     pub(crate) fn parameter_span(
