@@ -7,19 +7,17 @@ thread_local! {
     pub static TRACKER: RefCell<Option<StandardTracker>>= const { RefCell::new(None) };
 }
 
-struct TrackerGuard(Option<Option<StandardTracker>>);
+struct TrackerGuard(Option<StandardTracker>);
 
 impl Drop for TrackerGuard {
     fn drop(&mut self) {
-        if let Some(prev) = self.0.take() {
-            TRACKER.set(prev)
-        }
+        TRACKER.set(self.0.take());
     }
 }
 
 pub fn attach_tracker<R>(tracker: StandardTracker, f: impl FnOnce() -> R) -> R {
     let prev = TRACKER.replace(Some(tracker));
-    let _guard = TrackerGuard(Some(prev));
+    let _guard = TrackerGuard(prev);
     f()
 }
 
