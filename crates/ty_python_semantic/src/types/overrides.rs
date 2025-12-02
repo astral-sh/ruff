@@ -21,7 +21,7 @@ use crate::{
             report_invalid_method_override, report_overridden_final_method,
         },
         function::{FunctionDecorators, FunctionType, KnownFunction},
-        list_members::{MemberWithDefinition, all_declarations_and_bindings},
+        list_members::{MemberWithDefinition, all_members_of_scope},
     },
 };
 
@@ -33,8 +33,7 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: ClassLite
     }
 
     let class_specialized = class.identity_specialization(db);
-    let own_class_members: FxHashSet<_> =
-        all_declarations_and_bindings(db, class.body_scope(db)).collect();
+    let own_class_members: FxHashSet<_> = all_members_of_scope(db, class.body_scope(db)).collect();
 
     for member in own_class_members {
         check_class_declaration(context, configuration, class_specialized, &member);

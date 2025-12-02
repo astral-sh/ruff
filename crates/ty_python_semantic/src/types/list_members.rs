@@ -24,7 +24,7 @@ use crate::{
 };
 
 /// Iterate over all declarations and bindings in the given scope.
-pub(crate) fn all_declarations_and_bindings<'db>(
+pub(crate) fn all_members_of_scope<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId<'db>,
 ) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
@@ -365,7 +365,7 @@ impl<'db> AllMembers<'db> {
             .map(|class| class.class_literal(db).0)
         {
             let parent_scope = parent.body_scope(db);
-            for memberdef in all_declarations_and_bindings(db, parent_scope) {
+            for memberdef in all_members_of_scope(db, parent_scope) {
                 let result = ty.member(db, memberdef.member.name.as_str());
                 let Some(ty) = result.place.ignore_possibly_undefined() else {
                     continue;
@@ -413,7 +413,7 @@ impl<'db> AllMembers<'db> {
             // class member. This gets us the right type for each
             // member, e.g., `SomeClass.__delattr__` is not a bound
             // method, but `instance_of_SomeClass.__delattr__` is.
-            for memberdef in all_declarations_and_bindings(db, class_body_scope) {
+            for memberdef in all_members_of_scope(db, class_body_scope) {
                 let result = ty.member(db, memberdef.member.name.as_str());
                 let Some(ty) = result.place.ignore_possibly_undefined() else {
                     continue;
