@@ -35,8 +35,8 @@ fn completions() -> Result<()> {
           "kind": 7,
           "detail": "<class 'TypeError'>",
           "documentation": {
-            "kind": "markdown",
-            "value": "Inappropriate argument type."
+            "kind": "plaintext",
+            "value": "Inappropriate argument type.\n"
           },
           "sortText": "0"
         },
@@ -45,8 +45,8 @@ fn completions() -> Result<()> {
           "kind": 7,
           "detail": "<class 'type'>",
           "documentation": {
-            "kind": "markdown",
-            "value": "type(object) -> the object's type  /ntype(name, bases, dict, **kwds) -> a new type"
+            "kind": "plaintext",
+            "value": "type(object) -> the object's type/ntype(name, bases, dict, **kwds) -> a new type\n"
           },
           "sortText": "1"
         }

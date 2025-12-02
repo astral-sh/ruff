@@ -100,6 +100,23 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                         .unwrap_or_else(|| name);
                     (label, None)
                 };
+
+                let documentation = comp.documentation.map(|docstring| {
+                    let (kind, value) = if snapshot
+                        .resolved_client_capabilities()
+                        .prefers_markdown_in_completion()
+                    {
+                        (lsp_types::MarkupKind::Markdown, docstring.render_markdown())
+                    } else {
+                        (
+                            lsp_types::MarkupKind::PlainText,
+                            docstring.render_plaintext(),
+                        )
+                    };
+
+                    Documentation::MarkupContent(lsp_types::MarkupContent { kind, value })
+                });
+
                 CompletionItem {
                     label,
                     kind,
@@ -108,12 +125,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     label_details,
                     insert_text: comp.insert.map(String::from),
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
-                    documentation: comp.documentation.map(|docstring| {
-                        Documentation::MarkupContent(lsp_types::MarkupContent {
-                            kind: lsp_types::MarkupKind::Markdown,
-                            value: docstring.render_markdown(),
-                        })
-                    }),
+                    documentation,
                     ..Default::default()
                 }
             })
