@@ -13,7 +13,6 @@ use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_python_ast::{Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 use ty_project::Db;
-use ty_python_semantic::{HasDefinition, SemanticModel};
 
 use crate::completion::CompletionKind;
 
@@ -254,8 +253,6 @@ pub struct SymbolInfo<'a> {
     pub name_range: TextRange,
     /// The full range of the symbol (including body)
     pub full_range: TextRange,
-    /// The documentation of the symbol
-    pub documentation: Option<Cow<'a, str>>,
 }
 
 impl SymbolInfo<'_> {
@@ -265,10 +262,6 @@ impl SymbolInfo<'_> {
             kind: self.kind,
             name_range: self.name_range,
             full_range: self.full_range,
-            documentation: self
-                .documentation
-                .as_ref()
-                .map(|doc| Cow::Owned(doc.to_string())),
         }
     }
 }
@@ -280,7 +273,6 @@ impl<'a> From<&'a SymbolTree> for SymbolInfo<'a> {
             kind: symbol.kind,
             name_range: symbol.name_range,
             full_range: symbol.full_range,
-            documentation: symbol.documentation.as_deref().map(Cow::Borrowed),
         }
     }
 }
@@ -363,7 +355,6 @@ pub(crate) fn symbols_for_file(db: &dyn Db, file: File) -> FlatSymbols {
         symbol_stack: vec![],
         in_function: false,
         global_only: false,
-        model: SemanticModel::new(db, file),
     };
     visitor.visit_body(&module.syntax().body);
     FlatSymbols {
@@ -386,7 +377,6 @@ pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: File) -> FlatSymbo
         symbol_stack: vec![],
         in_function: false,
         global_only: true,
-        model: SemanticModel::new(db, file),
     };
     visitor.visit_body(&module.syntax().body);
     FlatSymbols {
@@ -401,23 +391,21 @@ struct SymbolTree {
     kind: SymbolKind,
     name_range: TextRange,
     full_range: TextRange,
-    documentation: Option<String>,
 }
 
 /// A visitor over all symbols in a single file.
 ///
 /// This guarantees that child symbols have a symbol ID greater
 /// than all of its parents.
-struct SymbolVisitor<'db> {
+struct SymbolVisitor {
     symbols: IndexVec<SymbolId, SymbolTree>,
     symbol_stack: Vec<SymbolId>,
     /// Track if we're currently inside a function (to exclude local variables)
     in_function: bool,
     global_only: bool,
-    model: SemanticModel<'db>,
 }
 
-impl SymbolVisitor<'_> {
+impl SymbolVisitor {
     fn visit_body(&mut self, body: &[Stmt]) {
         for stmt in body {
             self.visit_stmt(stmt);
@@ -458,7 +446,7 @@ impl SymbolVisitor<'_> {
     }
 }
 
-impl SourceOrderVisitor<'_> for SymbolVisitor<'_> {
+impl SourceOrderVisitor<'_> for SymbolVisitor {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::FunctionDef(func_def) => {
@@ -481,7 +469,6 @@ impl SourceOrderVisitor<'_> for SymbolVisitor<'_> {
                     kind,
                     name_range: func_def.name.range(),
                     full_range: stmt.range(),
-                    documentation: func_def.definition(&self.model).docstring(self.model.db()),
                 };
 
                 if self.global_only {
@@ -511,7 +498,6 @@ impl SourceOrderVisitor<'_> for SymbolVisitor<'_> {
                     kind: SymbolKind::Class,
                     name_range: class_def.name.range(),
                     full_range: stmt.range(),
-                    documentation: class_def.definition(&self.model).docstring(self.model.db()),
                 };
 
                 if self.global_only {
@@ -549,7 +535,6 @@ impl SourceOrderVisitor<'_> for SymbolVisitor<'_> {
                         kind,
                         name_range: name.range(),
                         full_range: stmt.range(),
-                        documentation: None,
                     };
                     self.add_symbol(symbol);
                 }
@@ -580,7 +565,6 @@ impl SourceOrderVisitor<'_> for SymbolVisitor<'_> {
                     kind,
                     name_range: name.range(),
                     full_range: stmt.range(),
-                    documentation: None,
                 };
                 self.add_symbol(symbol);
             }
