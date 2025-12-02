@@ -234,7 +234,7 @@ reveal_type(not_a_method)  # revealed: def not_a_method(self) -> Unknown
 
 ## Different occurrences of `Self` represent different types
 
-Here, both `Foo.foo` and `Bar._` use `Self`. When accessing a bound method, we replace any
+Here, both `Foo.foo` and `Bar.bar` use `Self`. When accessing a bound method, we replace any
 occurrences of `Self` with the bound `self` type. In this example, when we access `x.foo`, we only
 want to substitute the occurrences of `Self` in `Foo.foo` — that is, occurrences of `Self@foo`. The
 fact that `x` is an instance of `Foo[Self@bar]` (a completely different `Self` type) should not
@@ -250,11 +250,11 @@ class Foo[T]:
 
 class Bar:
     def bar(self: Self, x: Foo[Self]):
-        # revealed: bound method Foo[Self@bar].foo() -> Self@_
+        # revealed: bound method Foo[Self@bar].foo() -> Self@bar
         reveal_type(x.foo)
 
-def f[T: Bar](x: Foo[T]):
-    # revealed: bound method Foo[T@f].foo() -> T@f
+def f[U: Bar](x: Foo[U]):
+    # revealed: bound method Foo[U@f].foo() -> U@f
     reveal_type(x.foo)
 ```
 
