@@ -20,12 +20,3 @@ PLE1142 `await` should be used within an async function
 6 |
 7 | ([await c for c in cor] async for cor in func())  # ok
   |
-
-PLE1142 `await` should be used within an async function
- --> resources/test/fixtures/syntax_errors/await_outside_async_function.py:7:3
-  |
-5 | await 1
-6 |
-7 | ([await c for c in cor] async for cor in func())  # ok
-  |   ^^^^^^^
-  |
