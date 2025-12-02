@@ -1654,12 +1654,12 @@ def ab(a: int, *, c: int):
             r#"
 def outer():
     x = "outer_value"
-    
+
     def inner():
         nonlocal x
         x = "modified"
         return x<CURSOR>  # Should find the nonlocal x declaration in outer scope
-    
+
     return inner
 "#,
         );
@@ -1693,12 +1693,12 @@ def outer():
             r#"
 def outer():
     xy = "outer_value"
-    
+
     def inner():
         nonlocal x<CURSOR>y
         xy = "modified"
         return x  # Should find the nonlocal x declaration in outer scope
-    
+
     return inner
 "#,
         );
@@ -1906,7 +1906,7 @@ def function():
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Click(x, button=a<CURSOR>b):
@@ -1926,7 +1926,7 @@ def function():
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Click(x, button=ab):
@@ -1964,7 +1964,7 @@ def function():
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Cl<CURSOR>ick(x, button=ab):
@@ -2003,7 +2003,7 @@ def function():
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Click(x, but<CURSOR>ton=ab):
@@ -2089,15 +2089,13 @@ def function():
             "#,
         );
 
+        // TODO: This should just be `**AB@Alias2 (<variance>)`
+        // https://github.com/astral-sh/ty/issues/1581
         assert_snapshot!(test.hover(), @r"
-        (
-            ...
-        ) -> tuple[typing.ParamSpec]
+        (**AB@Alias2) -> tuple[AB@Alias2]
         ---------------------------------------------
         ```python
-        (
-            ...
-        ) -> tuple[typing.ParamSpec]
+        (**AB@Alias2) -> tuple[AB@Alias2]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -2238,12 +2236,11 @@ def function():
             "#,
         );
 
-        // TODO: This should be `P@Alias (<variance>)`
         assert_snapshot!(test.hover(), @r"
-        typing.ParamSpec
+        P@Alias (bivariant)
         ---------------------------------------------
         ```python
-        typing.ParamSpec
+        P@Alias (bivariant)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
