@@ -431,21 +431,16 @@ that `import main` and expect that to work.
 `a/tests/test1.py`:
 
 ```py
-# TODO: there should be no errors in this file.
-
 from .setup import x
 from . import setup
 
-# error: [unresolved-import]
 from main import y
-
-# error: [unresolved-import]
 import main
 
 reveal_type(x)  # revealed: int
 reveal_type(setup.x)  # revealed: int
-reveal_type(y)  # revealed: Unknown
-reveal_type(main.y)  # revealed: Unknown
+reveal_type(y)  # revealed: int
+reveal_type(main.y)  # revealed: int
 ```
 
 `a/tests/setup.py`:
@@ -470,21 +465,16 @@ y: int = 10
 `b/tests/test1.py`:
 
 ```py
-# TODO: there should be no errors in this file
-
 from .setup import x
 from . import setup
 
-# error: [unresolved-import]
 from main import y
-
-# error: [unresolved-import]
 import main
 
 reveal_type(x)  # revealed: str
 reveal_type(setup.x)  # revealed: str
-reveal_type(y)  # revealed: Unknown
-reveal_type(main.y)  # revealed: Unknown
+reveal_type(y)  # revealed: str
+reveal_type(main.y)  # revealed: str
 ```
 
 `b/tests/setup.py`:
@@ -513,21 +503,16 @@ The same as the previous case but `tests/__init__.py` exists in case that causes
 `a/tests/test1.py`:
 
 ```py
-# TODO: there should be no errors in this file.
-
 from .setup import x
 from . import setup
 
-# error: [unresolved-import]
 from main import y
-
-# error: [unresolved-import]
 import main
 
 reveal_type(x)  # revealed: int
 reveal_type(setup.x)  # revealed: int
-reveal_type(y)  # revealed: Unknown
-reveal_type(main.y)  # revealed: Unknown
+reveal_type(y)  # revealed: int
+reveal_type(main.y)  # revealed: int
 ```
 
 `a/tests/__init__.py`:
@@ -557,21 +542,16 @@ y: int = 10
 `b/tests/test1.py`:
 
 ```py
-# TODO: there should be no errors in this file
-
 from .setup import x
 from . import setup
 
-# error: [unresolved-import]
 from main import y
-
-# error: [unresolved-import]
 import main
 
 reveal_type(x)  # revealed: str
 reveal_type(setup.x)  # revealed: str
-reveal_type(y)  # revealed: Unknown
-reveal_type(main.y)  # revealed: Unknown
+reveal_type(y)  # revealed: str
+reveal_type(main.y)  # revealed: str
 ```
 
 `b/tests/__init__.py`:
@@ -606,16 +586,11 @@ imports it.
 `a/main.py`:
 
 ```py
-# TODO: there should be no errors in this file.
-
-# error: [unresolved-import]
 from utils import x
-
-# error: [unresolved-import]
 import utils
 
-reveal_type(x)  # revealed: Unknown
-reveal_type(utils.x)  # revealed: Unknown
+reveal_type(x)  # revealed: int
+reveal_type(utils.x)  # revealed: int
 ```
 
 `a/utils/__init__.py`:
@@ -634,16 +609,11 @@ version = "0.1.0"
 `b/main.py`:
 
 ```py
-# TODO: there should be no errors in this file.
-
-# error: [unresolved-import]
 from utils import x
-
-# error: [unresolved-import]
 import utils
 
-reveal_type(x)  # revealed: Unknown
-reveal_type(utils.x)  # revealed: Unknown
+reveal_type(x)  # revealed: str
+reveal_type(utils.x)  # revealed: str
 ```
 
 `b/utils/__init__.py`:
