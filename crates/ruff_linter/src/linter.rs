@@ -980,6 +980,7 @@ mod tests {
     #[test_case(Path::new("write_to_debug.py"), PythonVersion::PY310)]
     #[test_case(Path::new("invalid_expression.py"), PythonVersion::PY312)]
     #[test_case(Path::new("global_parameter.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("return_in_generator.py"), PythonVersion::PY310)]
     fn test_semantic_errors(path: &Path, python_version: PythonVersion) -> Result<()> {
         let snapshot = format!(
             "semantic_syntax_error_{}_{}",
@@ -1041,7 +1042,6 @@ mod tests {
         Rule::YieldFromInAsyncFunction,
         Path::new("yield_from_in_async_function.py")
     )]
-    #[test_case(Rule::ReturnInGenerator, Path::new("return_in_generator.py"))]
     fn test_syntax_errors(rule: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
         let path = Path::new("resources/test/fixtures/syntax_errors").join(path);

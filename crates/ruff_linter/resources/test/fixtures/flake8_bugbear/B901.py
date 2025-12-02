@@ -76,3 +76,11 @@ class NotBroken9(object):
     def __await__(self):
         yield from function()
         return 42
+
+async def gen():
+    yield 1
+    return foo()
+
+async def gen():
+    yield 1
+    return [1, 2, 3]

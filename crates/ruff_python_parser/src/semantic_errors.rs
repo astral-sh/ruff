@@ -3,14 +3,13 @@
 //! This checker is not responsible for traversing the AST itself. Instead, its
 //! [`SemanticSyntaxChecker::visit_stmt`] and [`SemanticSyntaxChecker::visit_expr`] methods should
 //! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
-use ruff_python_ast::statement_visitor;
-use ruff_python_ast::statement_visitor::StatementVisitor;
+
 use ruff_python_ast::{
     self as ast, Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
     StmtFunctionDef, StmtImportFrom,
     comparable::ComparableExpr,
     helpers,
-    visitor::{Visitor, walk_expr},
+    visitor::{Visitor, walk_expr, walk_stmt},
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::{FxBuildHasher, FxHashSet};
@@ -1716,7 +1715,7 @@ struct ReturnVisitor {
     has_yield: bool,
 }
 
-impl StatementVisitor<'_> for ReturnVisitor {
+impl Visitor<'_> for ReturnVisitor {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::Expr(ast::StmtExpr { value, .. }) => match **value {
@@ -1733,8 +1732,18 @@ impl StatementVisitor<'_> for ReturnVisitor {
                 ..
             }) => {
                 self.return_range = Some(*range);
+                walk_stmt(self, stmt);
             }
-            _ => statement_visitor::walk_stmt(self, stmt),
+            _ => walk_stmt(self, stmt),
+        }
+    }
+    fn visit_expr(&mut self, expr: &Expr) {
+        match expr {
+            Expr::Lambda(_) => {}
+            Expr::Yield(_) | Expr::YieldFrom(_) => {
+                self.has_yield = true;
+            }
+            _ => walk_expr(self, expr),
         }
     }
 }
