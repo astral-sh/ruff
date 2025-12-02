@@ -195,7 +195,7 @@ x: int = 1
 
 `aproj/pyproject.toml`:
 
-```ignore
+```text
 name = "a"
 version = "0.1.0"
 ```
@@ -228,7 +228,7 @@ x: str = "2"
 
 `bproj/pyproject.toml`:
 
-```ignore
+```text
 name = "a"
 version = "0.1.0"
 ```
@@ -278,7 +278,7 @@ x: int = 1
 
 `a/pyproject.toml`:
 
-```ignore
+```text
 name = "a"
 version = "0.1.0"
 ```
@@ -316,7 +316,7 @@ x: str = "2"
 
 `b/pyproject.toml`:
 
-```ignore
+```text
 name = "a"
 version = "0.1.0"
 ```
@@ -369,7 +369,7 @@ x: int = 1
 
 `a/pyproject.toml`:
 
-```ignore
+```text
 name = "a"
 version = "0.1.0"
 ```
@@ -412,7 +412,7 @@ x: str = "2"
 
 `b/pyproject.toml`:
 
-```ignore
+```text
 name = "a"
 version = "0.1.0"
 ```
@@ -456,7 +456,7 @@ x: int = 1
 
 `a/pyproject.toml`:
 
-```ignore
+```text
 name = "a"
 version = "0.1.0"
 ```
@@ -495,7 +495,7 @@ x: str = "2"
 
 `b/pyproject.toml`:
 
-```ignore
+```text
 name = "a"
 version = "0.1.0"
 ```
@@ -543,7 +543,7 @@ x: int = 1
 
 `a/pyproject.toml`:
 
-```ignore
+```text
 name = "a"
 version = "0.1.0"
 ```
@@ -587,7 +587,7 @@ x: str = "2"
 
 `b/pyproject.toml`:
 
-```ignore
+```text
 name = "a"
 version = "0.1.0"
 ```
@@ -626,7 +626,7 @@ x: int = 1
 
 `a/pyproject.toml`:
 
-```ignore
+```text
 name = "a"
 version = "0.1.0"
 ```
@@ -654,7 +654,7 @@ x: str = "2"
 
 `b/pyproject.toml`:
 
-```ignore
+```text
 name = "a"
 version = "0.1.0"
 ```
