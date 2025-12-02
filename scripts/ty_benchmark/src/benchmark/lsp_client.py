@@ -4,7 +4,7 @@ import asyncio
 import logging
 from asyncio import Future
 from pathlib import Path
-from typing import Any, NamedTuple, cast, override
+from typing import Any, NamedTuple, override
 
 from lsprotocol import types as lsp
 from pygls.lsp.client import LanguageClient
@@ -136,12 +136,7 @@ class LSPClient(LanguageClient):
         self, files: list[Path]
     ) -> list[FileDiagnostics]:
         responses = await asyncio.gather(
-            *[self.text_document_diagnostics_async(f) for f in files]
-        )
-
-        responses = cast(
-            list[lsp.Diagnostic],
-            responses,
+            *(self.text_document_diagnostics_async(f) for f in files)
         )
 
         return [
