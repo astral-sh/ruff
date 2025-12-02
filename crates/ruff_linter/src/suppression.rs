@@ -149,10 +149,7 @@ impl<'a> SuppressionsBuilder<'a> {
                     indents.push(self.source.slice(token));
                 }
                 TokenKind::Dedent => {
-                    self.match_comments(
-                        indents.last().copied().unwrap_or_default(),
-                        &token.range(),
-                    );
+                    self.match_comments(indents.last().copied().unwrap_or_default(), token.range());
                     indents.pop();
                 }
                 TokenKind::Comment => {
@@ -176,8 +173,7 @@ impl<'a> SuppressionsBuilder<'a> {
                                     .iter()
                                     .find(|t| !t.kind().is_trivia())
                                     .is_some_and(|t| {
-                                        t.kind() == TokenKind::Dedent
-                                            || t.kind() == TokenKind::Indent
+                                        matches!(t.kind(), TokenKind::Dedent | TokenKind::Indent)
                                     })
                             {
                                 self.pending
@@ -203,7 +199,7 @@ impl<'a> SuppressionsBuilder<'a> {
             }
         }
 
-        self.match_comments(default_indent, &TextRange::up_to(self.source.text_len()));
+        self.match_comments(default_indent, TextRange::up_to(self.source.text_len()));
 
         Suppressions {
             valid: self.valid,
@@ -212,7 +208,7 @@ impl<'a> SuppressionsBuilder<'a> {
         }
     }
 
-    fn match_comments(&mut self, current_indent: &str, dedent_range: &TextRange) {
+    fn match_comments(&mut self, current_indent: &str, dedent_range: TextRange) {
         let mut comment_index = 0;
 
         // for each pending comment, search for matching comments at the same indentation level,
