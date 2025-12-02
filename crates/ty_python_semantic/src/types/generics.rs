@@ -1684,15 +1684,27 @@ impl<'db> SpecializationBuilder<'db> {
                     let ParametersKind::ParamSpec(typevar) = formal_parameters.kind() else {
                         return Ok(());
                     };
-                    let paramspec_value = Type::Callable(CallableType::new(
-                        self.db,
-                        CallableSignature::from_overloads(
-                            actual_callable.signatures(self.db).iter().map(|signature| {
-                                Signature::new(signature.parameters().clone(), None)
-                            }),
-                        ),
-                        CallableTypeKind::ParamSpecValue,
-                    ));
+                    let paramspec_value = match actual_callable.signatures(self.db).as_slice() {
+                        [] => return Ok(()),
+                        [actual_signature] => match actual_signature.parameters().kind() {
+                            ParametersKind::ParamSpec(typevar) => Type::TypeVar(typevar),
+                            _ => Type::Callable(CallableType::new(
+                                self.db,
+                                CallableSignature::single(Signature::new(
+                                    actual_signature.parameters().clone(),
+                                    None,
+                                )),
+                                CallableTypeKind::ParamSpecValue,
+                            )),
+                        },
+                        actual_signatures => Type::Callable(CallableType::new(
+                            self.db,
+                            CallableSignature::from_overloads(actual_signatures.iter().map(
+                                |signature| Signature::new(signature.parameters().clone(), None),
+                            )),
+                            CallableTypeKind::ParamSpecValue,
+                        )),
+                    };
                     self.add_type_mapping(typevar, paramspec_value, polarity, &mut f);
                 }
             }

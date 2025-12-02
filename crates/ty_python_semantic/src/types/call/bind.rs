@@ -3049,7 +3049,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         for (argument_index, adjusted_argument_index, argument, argument_type) in
             self.enumerate_argument_types()
         {
-            if let Some(paramspec) = paramspec {
+            if let Some((_, paramspec)) = paramspec {
                 if self.try_paramspec_evaluation_at(argument_index, paramspec) {
                     // Once we find an argument that matches the `ParamSpec`, we can stop checking
                     // the remaining arguments since `ParamSpec` should always be the last
@@ -3084,7 +3084,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        if let Some(paramspec) = paramspec {
+        if let Some((_, paramspec)) = paramspec {
             // If we reach here, none of the arguments matched the `ParamSpec` parameter, but the
             // `ParamSpec` could specialize to a parameter list containing some parameters.
             self.evaluate_paramspec_sub_call(None, paramspec);

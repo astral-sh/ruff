@@ -203,18 +203,57 @@ impl<'db> CallableSignature<'db> {
     ) -> Self {
         if let TypeMapping::Specialization(specialization) = type_mapping
             && let [self_signature] = self.overloads.as_slice()
-            && let ParametersKind::ParamSpec(typevar) = self_signature.parameters.kind
-            && let Some(Type::Callable(callable)) = specialization.get(db, typevar)
-            && matches!(callable.kind(db), CallableTypeKind::ParamSpecValue)
+            && let Some((prefix_parameters, typevar)) = self_signature
+                .parameters
+                .find_paramspec_from_args_kwargs(db)
         {
-            return Self::from_overloads(callable.signatures(db).iter().map(|signature| {
-                Signature::new(
-                    signature.parameters.clone(),
-                    self_signature
-                        .return_ty
-                        .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
-                )
-            }));
+            let prefix_parameters = prefix_parameters
+                .iter()
+                .map(|param| param.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                .collect::<Vec<_>>();
+
+            let return_ty = self_signature
+                .return_ty
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+
+            match specialization.get(db, typevar) {
+                Some(Type::TypeVar(typevar)) if typevar.is_paramspec(db) => {
+                    return Self::single(Signature::new(
+                        Parameters::new(
+                            db,
+                            prefix_parameters.into_iter().chain([
+                                Parameter::variadic(Name::new_static("args")).with_annotated_type(
+                                    Type::TypeVar(
+                                        typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
+                                    ),
+                                ),
+                                Parameter::keyword_variadic(Name::new_static("kwargs"))
+                                    .with_annotated_type(Type::TypeVar(
+                                        typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs),
+                                    )),
+                            ]),
+                        ),
+                        return_ty,
+                    ));
+                }
+                Some(Type::Callable(callable))
+                    if matches!(callable.kind(db), CallableTypeKind::ParamSpecValue) =>
+                {
+                    return Self::from_overloads(callable.signatures(db).iter().map(|signature| {
+                        Signature::new(
+                            Parameters::new(
+                                db,
+                                prefix_parameters
+                                    .iter()
+                                    .cloned()
+                                    .chain(signature.parameters().iter().cloned()),
+                            ),
+                            return_ty,
+                        )
+                    }));
+                }
+                _ => {}
+            }
         }
 
         Self::from_overloads(
@@ -1551,11 +1590,11 @@ impl<'db> Parameters<'db> {
     }
 
     /// Returns the bound `ParamSpec` type variable if the parameters contain a `ParamSpec`.
-    pub(crate) fn find_paramspec_from_args_kwargs(
-        &self,
+    pub(crate) fn find_paramspec_from_args_kwargs<'a>(
+        &'a self,
         db: &'db dyn Db,
-    ) -> Option<BoundTypeVarInstance<'db>> {
-        let [.., maybe_args, maybe_kwargs] = self.value.as_slice() else {
+    ) -> Option<(&'a [Parameter<'db>], BoundTypeVarInstance<'db>)> {
+        let [prefix @ .., maybe_args, maybe_kwargs] = self.value.as_slice() else {
             return None;
         };
 
@@ -1581,7 +1620,7 @@ impl<'db> Parameters<'db> {
         ) {
             let typevar = args_typevar.without_paramspec_attr(db);
             if typevar.is_same_typevar_as(db, kwargs_typevar.without_paramspec_attr(db)) {
-                return Some(typevar);
+                return Some((prefix, typevar));
             }
         }
 

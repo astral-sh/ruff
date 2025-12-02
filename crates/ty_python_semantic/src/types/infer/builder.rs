@@ -3529,10 +3529,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 match param_type {
                     Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
-                        return Ok(Type::paramspec_value_callable(
-                            db,
-                            Parameters::paramspec(db, typevar),
-                        ));
+                        return Ok(param_type);
                     }
 
                     Type::KnownInstance(known_instance)

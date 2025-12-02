@@ -9956,12 +9956,30 @@ impl<'db> BoundTypeVarInstance<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
         match type_mapping {
-            TypeMapping::Specialization(specialization) => {
-                specialization.get(db, self).unwrap_or(Type::TypeVar(self))
-            }
-            TypeMapping::PartialSpecialization(partial) => {
-                partial.get(db, self).unwrap_or(Type::TypeVar(self))
-            }
+            TypeMapping::Specialization(specialization) => specialization
+                .get(db, self.without_paramspec_attr(db))
+                .map(|ty| {
+                    if let Some(attr) = self.paramspec_attr(db)
+                        && let Type::TypeVar(typevar) = ty
+                        && typevar.is_paramspec(db)
+                    {
+                        return Type::TypeVar(typevar.with_paramspec_attr(db, attr));
+                    }
+                    ty
+                })
+                .unwrap_or(Type::TypeVar(self)),
+            TypeMapping::PartialSpecialization(partial) => partial
+                .get(db, self.without_paramspec_attr(db))
+                .map(|ty| {
+                    if let Some(attr) = self.paramspec_attr(db)
+                        && let Type::TypeVar(typevar) = ty
+                        && typevar.is_paramspec(db)
+                    {
+                        return Type::TypeVar(typevar.with_paramspec_attr(db, attr));
+                    }
+                    ty
+                })
+                .unwrap_or(Type::TypeVar(self)),
             TypeMapping::BindSelf(self_type) => {
                 if self.typevar(db).is_self(db) {
                     *self_type

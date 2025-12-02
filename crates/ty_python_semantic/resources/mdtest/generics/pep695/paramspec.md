@@ -415,7 +415,6 @@ def foo2[**P2](func: Callable[P2, int], *args: P2.args, **kwargs: P2.kwargs) -> 
     # error: [invalid-argument-type] "Argument to function `foo1` is incorrect: Expected `P2@foo2.args`, found `Literal[1]`"
     foo1(func, 1, *args, **kwargs)
 
-    # error: [invalid-argument-type] "Argument to function `foo1_with_extra_arg` is incorrect: Expected `P1@foo1_with_extra_arg.args`, found `P2@foo2.args`"
     # error: [invalid-argument-type] "Argument to function `foo1_with_extra_arg` is incorrect: Expected `str`, found `P2@foo2.args`"
     foo1_with_extra_arg(func, *args, **kwargs)
 ```
@@ -446,4 +445,17 @@ foo1(f1, 1, "a", "b")
 # error: [missing-argument] "No argument provided for required parameter `y` of function `foo1`"
 # error: [unknown-argument] "Argument `z` does not match any known parameter of function `foo1`"
 foo1(f1, x=1, z="a")
+```
+
+### Specializing `ParamSpec` with another `ParamSpec`
+
+```py
+class Foo[**P]:
+    def __init__(self, *args: P.args, **kwargs: P.kwargs) -> None:
+        self.args = args
+        self.kwargs = kwargs
+
+def bar[**P](foo: Foo[P]) -> None:
+    reveal_type(foo.args)  # revealed: Unknown | P@bar.args
+    reveal_type(foo.kwargs)  # revealed: Unknown | P@bar.kwargs
 ```
