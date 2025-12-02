@@ -2900,7 +2900,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 
     fn in_generator_context(&self) -> bool {
-        for scope_info in self.scope_stack.iter().rev() {
+        for scope_info in &self.scope_stack {
             let scope = &self.scopes[scope_info.file_scope_id];
             if matches!(scope.node(), NodeWithScopeKind::GeneratorExpression(_)) {
                 return true;
