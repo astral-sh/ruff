@@ -6,19 +6,17 @@ def f():
 
 
 def f():
-    # These should both be ignored by the range suppression.
+    # These should both be ignored by the implicit range suppression.
+    # Should also generate an "unmatched suppression" warning.
     # ruff:disable[E741,F841]
     I = 1
-    # ruff:enable[E741,F841]
 
 
 def f():
-    # These should both be ignored by the range suppression.
-    # ruff: disable[E741]
-    # ruff: disable[F841]
+    # Neither warning is ignored, and an "unmatched suppression"
+    # should be generated.
     I = 1
-    # ruff: enable[E741]
-    # ruff: enable[F841]
+    # ruff: enable[E741, F841]
 
 
 def f():
@@ -27,6 +25,19 @@ def f():
     # ruff: disable[E741]
     I = 1
     # ruff: enable[E741]
+
+
+def f():
+    # Test interleaved range suppressions. The first and last
+    # lines should each log a different warning, while the
+    # middle line should be completely silenced.
+    # ruff: disable[E741]
+    l = 0
+    # ruff: disable[F841]
+    O = 1
+    # ruff: enable[E741]
+    I = 2
+    # ruff: enable[F841]
 
 
 def f():
