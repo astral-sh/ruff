@@ -896,7 +896,7 @@ impl SemanticSyntaxChecker {
         // This check is required in addition to avoiding calling this function in `visit_expr`
         // because the generator scope applies to nested parts of the `Expr::Generator` that are
         // visited separately.
-        if ctx.in_generator_scope() {
+        if ctx.in_generator_context() {
             return;
         }
         Self::add_error(
@@ -2096,11 +2096,11 @@ pub trait SemanticSyntaxContext {
     /// Returns `true` if the visitor is in a function scope.
     fn in_function_scope(&self) -> bool;
 
-    /// Returns `true` if the visitor is in a generator scope.
+    /// Returns `true` if the visitor is within a generator scope.
     ///
     /// Note that this refers to an `Expr::Generator` precisely, not to comprehensions more
     /// generally.
-    fn in_generator_scope(&self) -> bool;
+    fn in_generator_context(&self) -> bool;
 
     /// Returns `true` if the source file is a Jupyter notebook.
     fn in_notebook(&self) -> bool;
