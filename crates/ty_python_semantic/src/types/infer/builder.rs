@@ -370,7 +370,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assert_eq!(self.scope, inference.scope);
 
         self.expressions
-            .extend(inference.expressions.unstable_iter());
+            .extend(inference.expressions.unstable_iter_copied());
         self.declarations
             .extend(inference.declarations(), self.multi_inference_state);
 
@@ -398,7 +398,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn extend_expression_unchecked(&mut self, inference: &ExpressionInference<'db>) {
         self.expressions
-            .extend(inference.expressions.unstable_iter());
+            .extend(inference.expressions.unstable_iter_copied());
 
         if let Some(extra) = &inference.extra {
             self.context.extend(&extra.diagnostics);

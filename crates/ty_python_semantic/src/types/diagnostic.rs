@@ -2236,7 +2236,7 @@ impl TypeCheckDiagnostics {
     pub(super) fn extend(&mut self, other: &TypeCheckDiagnostics) {
         self.diagnostics.extend_from_slice(&other.diagnostics);
         self.used_suppressions
-            .extend(other.used_suppressions.unstable_iter());
+            .extend(other.used_suppressions.unstable_iter().copied());
     }
 
     pub(super) fn extend_diagnostics(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
