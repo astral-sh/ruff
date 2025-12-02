@@ -2,11 +2,11 @@ async def gen():
     yield 1
     return 42
 
-def gen(): #ok
+def gen(): # B901 but not a syntax error - not an async generator
     yield 1
     return 42
 
-async def gen(): #ok
+async def gen(): # ok - no value in return
     yield 1
     return
 
