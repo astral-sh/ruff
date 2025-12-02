@@ -52,6 +52,10 @@ def f(x: A):
 
 JSONPrimitive = Union[str, int, float, bool, None]
 JSONValue = TypeAliasType("JSONValue", 'Union[JSONPrimitive, Sequence["JSONValue"], Mapping[str, "JSONValue"]]')
+
+def _(x: JSONValue):
+    # TODO: should be `JSONValue`
+    reveal_type(x)  # revealed: Divergent
 ```
 
 ## Self-referential legacy type variables
@@ -62,22 +66,6 @@ from typing import Generic, TypeVar
 B = TypeVar("B", bound="Base")
 
 class Base(Generic[B]):
-    pass
-
-T = TypeVar("T", bound="Foo[int]")
-
-class Foo(Generic[T]): ...
-```
-
-## Self-referential PEP-695 type variables
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-class Node[T: "Node[int]"]:
     pass
 ```
 

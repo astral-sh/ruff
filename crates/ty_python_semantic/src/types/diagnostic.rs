@@ -17,8 +17,8 @@ use crate::types::call::CallError;
 use crate::types::class::{
     CodeGeneratorKind, DisjointBase, DisjointBaseKind, Field, MethodDecorator,
 };
-use crate::types::function::{FunctionType, KnownFunction};
-use crate::types::liskov::MethodKind;
+use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral};
+use crate::types::overrides::MethodKind;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
@@ -37,9 +37,10 @@ use ruff_db::{
     parsed::parsed_module,
     source::source_text,
 };
+use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parentheses_iterator;
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast::{self as ast, AnyNodeRef, StringFlags};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
@@ -84,6 +85,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_NAMED_TUPLE);
     registry.register_lint(&INVALID_RAISE);
     registry.register_lint(&INVALID_SUPER_ARGUMENT);
+    registry.register_lint(&INVALID_TYPE_ARGUMENTS);
     registry.register_lint(&INVALID_TYPE_CHECKING_CONSTANT);
     registry.register_lint(&INVALID_TYPE_FORM);
     registry.register_lint(&INVALID_TYPE_GUARD_DEFINITION);
@@ -99,6 +101,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&POSSIBLY_MISSING_IMPORT);
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
+    registry.register_lint(&OVERRIDE_OF_FINAL_METHOD);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
     registry.register_lint(&TOO_MANY_POSITIONAL_ARGUMENTS);
     registry.register_lint(&UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS);
@@ -118,6 +121,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
+    registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -541,7 +545,8 @@ declare_lint! {
     ///
     /// ## Why is this bad?
     /// An invalidly defined `NamedTuple` class may lead to the type checker
-    /// drawing incorrect conclusions. It may also lead to `TypeError`s at runtime.
+    /// drawing incorrect conclusions. It may also lead to `TypeError`s or
+    /// `AttributeError`s at runtime.
     ///
     /// ## Examples
     /// A class definition cannot combine `NamedTuple` with other base classes
@@ -553,6 +558,27 @@ declare_lint! {
     /// >>> from typing import NamedTuple
     /// >>> class Foo(NamedTuple, object): ...
     /// TypeError: can only inherit from a NamedTuple type and Generic
+    /// ```
+    ///
+    /// Further, `NamedTuple` field names cannot start with an underscore:
+    ///
+    /// ```pycon
+    /// >>> from typing import NamedTuple
+    /// >>> class Foo(NamedTuple):
+    /// ...     _bar: int
+    /// ValueError: Field names cannot start with an underscore: '_bar'
+    /// ```
+    ///
+    /// `NamedTuple` classes also have certain synthesized attributes (like `_asdict`, `_make`,
+    /// `_replace`, etc.) that cannot be overwritten. Attempting to assign to these attributes
+    /// without a type annotation will raise an `AttributeError` at runtime.
+    ///
+    /// ```pycon
+    /// >>> from typing import NamedTuple
+    /// >>> class Foo(NamedTuple):
+    /// ...     x: int
+    /// ...     _asdict = 42
+    /// AttributeError: Cannot overwrite NamedTuple attribute _asdict
     /// ```
     pub(crate) static INVALID_NAMED_TUPLE = {
         summary: "detects invalid `NamedTuple` class definitions",
@@ -1408,6 +1434,47 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for invalid type arguments in explicit type specialization.
+    ///
+    /// ## Why is this bad?
+    /// Providing the wrong number of type arguments or type arguments that don't
+    /// satisfy the type variable's bounds or constraints will lead to incorrect
+    /// type inference and may indicate a misunderstanding of the generic type's
+    /// interface.
+    ///
+    /// ## Examples
+    ///
+    /// Using legacy type variables:
+    /// ```python
+    /// from typing import Generic, TypeVar
+    ///
+    /// T1 = TypeVar('T1', int, str)
+    /// T2 = TypeVar('T2', bound=int)
+    ///
+    /// class Foo1(Generic[T1]): ...
+    /// class Foo2(Generic[T2]): ...
+    ///
+    /// Foo1[bytes]  # error: bytes does not satisfy T1's constraints
+    /// Foo2[str]  # error: str does not satisfy T2's bound
+    /// ```
+    ///
+    /// Using PEP 695 type variables:
+    /// ```python
+    /// class Foo[T]: ...
+    /// class Bar[T, U]: ...
+    ///
+    /// Foo[int, str]  # error: too many arguments
+    /// Bar[int]  # error: too few arguments
+    /// ```
+    pub(crate) static INVALID_TYPE_ARGUMENTS = {
+        summary: "detects invalid type arguments in generic specialization",
+        status: LintStatus::stable("0.0.1-alpha.29"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for objects that are not iterable but are used in a context that requires them to be.
     ///
     /// ## Why is this bad?
@@ -1573,6 +1640,33 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for methods on subclasses that override superclass methods decorated with `@final`.
+    ///
+    /// ## Why is this bad?
+    /// Decorating a method with `@final` declares to the type checker that it should not be
+    /// overridden on any subclass.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from typing import final
+    ///
+    /// class A:
+    ///     @final
+    ///     def foo(self): ...
+    ///
+    /// class B(A):
+    ///     def foo(self): ...  # Error raised here
+    /// ```
+    pub(crate) static OVERRIDE_OF_FINAL_METHOD = {
+        summary: "detects overrides of final methods",
+        status: LintStatus::stable("0.0.1-alpha.29"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for methods that are decorated with `@override` but do not override any method in a superclass.
     ///
     /// ## Why is this bad?
@@ -1691,6 +1785,33 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for calls to `super()` inside methods of `NamedTuple` classes.
+    ///
+    /// ## Why is this bad?
+    /// Using `super()` in a method of a `NamedTuple` class will raise an exception at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import NamedTuple
+    ///
+    /// class F(NamedTuple):
+    ///     x: int
+    ///
+    ///     def method(self):
+    ///         super()  # error: super() is not supported in methods of NamedTuple classes
+    /// ```
+    ///
+    /// ## References
+    /// - [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)
+    pub(crate) static SUPER_CALL_IN_NAMED_TUPLE_METHOD = {
+        summary: "detects `super()` calls in methods of `NamedTuple` classes",
+        status: LintStatus::preview("0.0.1-alpha.30"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for calls to `reveal_type` without importing it.
     ///
     /// ## Why is this bad?
@@ -1802,7 +1923,7 @@ declare_lint! {
     /// ```python
     /// print(x)  # NameError: name 'x' is not defined
     /// ```
-    pub(crate) static UNRESOLVED_REFERENCE = {
+    pub static UNRESOLVED_REFERENCE = {
         summary: "detects references to names that are not defined",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
@@ -2072,7 +2193,27 @@ declare_lint! {
     /// be avoided wherever possible. As part of this check, therefore, ty enforces that `__eq__`
     /// and `__ne__` methods accept `object` as their second argument.
     ///
+    /// ### Why does ty disagree with Ruff about how to write my method?
+    ///
+    /// Ruff has several rules that will encourage you to rename a parameter, or change its type
+    /// signature, if it thinks you're falling into a certain anti-pattern. For example, Ruff's
+    /// [ARG002](https://docs.astral.sh/ruff/rules/unused-method-argument/) rule recommends that an
+    /// unused parameter should either be removed or renamed to start with `_`. Applying either of
+    /// these suggestions can cause ty to start reporting an `invalid-method-override` error if
+    /// the function in question is a method on a subclass that overrides a method on a superclass,
+    /// and the change would cause the subclass method to no longer accept all argument combinations
+    /// that the superclass method accepts.
+    ///
+    /// This can usually be resolved by adding [`@typing.override`][override] to your method
+    /// definition. Ruff knows that a method decorated with `@typing.override` is intended to
+    /// override a method by the same name on a superclass, and avoids reporting rules like ARG002
+    /// for such methods; it knows that the changes recommended by ARG002 would violate the Liskov
+    /// Substitution Principle.
+    ///
+    /// Correct use of `@override` is enforced by ty's `invalid-explicit-override` rule.
+    ///
     /// [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
+    /// [override]: https://docs.python.org/3/library/typing.html#typing.override
     pub(crate) static INVALID_METHOD_OVERRIDE = {
         summary: "detects method definitions that violate the Liskov Substitution Principle",
         status: LintStatus::stable("0.0.1-alpha.20"),
@@ -3059,7 +3200,7 @@ pub(crate) fn report_undeclared_protocol_member(
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Class(class) => class,
                 SubclassOfInner::Dynamic(DynamicType::Any) => return true,
-                SubclassOfInner::Dynamic(_) => return false,
+                SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => return false,
             },
             Type::NominalInstance(instance) => instance.class(db),
             Type::Union(union) => {
@@ -3365,9 +3506,17 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 
                 let existing_keys = items.keys();
                 if let Some(suggestion) = did_you_mean(existing_keys, key) {
-                    if key_node.is_expr_string_literal() {
+                    if let AnyNodeRef::ExprStringLiteral(literal) = key_node {
+                        let quoted_suggestion = format!(
+                            "{quote}{suggestion}{quote}",
+                            quote = literal.value.first_literal_flags().quote_str()
+                        );
                         diagnostic
-                            .set_primary_message(format_args!("Did you mean \"{suggestion}\"?"));
+                            .set_primary_message(format_args!("Did you mean {quoted_suggestion}?"));
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                            quoted_suggestion,
+                            key_node.range(),
+                        )));
                     } else {
                         diagnostic.set_primary_message(format_args!(
                             "Unknown key \"{key}\" - did you mean \"{suggestion}\"?",
@@ -3402,7 +3551,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'db>(
     context: &InferContext<'db, '_>,
     class: ClassLiteral<'db>,
-    (field, field_def): &(Name, Option<Definition<'db>>),
+    (field, field_def): (&str, Option<Definition<'db>>),
     (field_with_default, field_with_default_def): &(Name, Option<Definition<'db>>),
 ) {
     let db = context.db();
@@ -3415,9 +3564,9 @@ pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'
     let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, diagnostic_range) else {
         return;
     };
-    let mut diagnostic = builder.into_diagnostic(format_args!(
+    let mut diagnostic = builder.into_diagnostic(
         "NamedTuple field without default value cannot follow field(s) with default value(s)",
-    ));
+    );
 
     diagnostic.set_primary_message(format_args!(
         "Field `{field}` defined here without a default value",
@@ -3446,6 +3595,40 @@ pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'
             "Earlier field `{field_with_default}` was defined with a default value",
         ));
     }
+}
+
+pub(super) fn report_named_tuple_field_with_leading_underscore<'db>(
+    context: &InferContext<'db, '_>,
+    class: ClassLiteral<'db>,
+    field_name: &str,
+    field_definition: Option<Definition<'db>>,
+) {
+    let db = context.db();
+    let module = context.module();
+
+    let diagnostic_range = field_definition
+        .map(|definition| definition.kind(db).full_range(module))
+        .unwrap_or_else(|| class.header_range(db));
+
+    let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, diagnostic_range) else {
+        return;
+    };
+    let mut diagnostic =
+        builder.into_diagnostic("NamedTuple field name cannot start with an underscore");
+
+    if field_definition.is_some() {
+        diagnostic.set_primary_message(
+            "Class definition will raise `TypeError` at runtime due to this field",
+        );
+    } else {
+        diagnostic.set_primary_message(format_args!(
+            "Class definition will raise `TypeError` at runtime due to field `{field_name}`",
+        ));
+    }
+
+    diagnostic.set_concise_message(format_args!(
+        "NamedTuple field `{field_name}` cannot start with an underscore"
+    ));
 }
 
 pub(crate) fn report_missing_typed_dict_key<'db>(
@@ -3558,7 +3741,7 @@ pub(super) fn report_invalid_method_override<'db>(
     let overridden_method = if class_name == superclass_name {
         format!(
             "{superclass}.{member}",
-            superclass = superclass.class_literal(db).0.qualified_name(db),
+            superclass = superclass.qualified_name(db),
         )
     } else {
         format!("{superclass_name}.{member}")
@@ -3698,6 +3881,176 @@ pub(super) fn report_invalid_method_override<'db>(
         for subdiag in eq_subdiagnostics {
             diagnostic.help(subdiag);
         }
+    }
+}
+
+pub(super) fn report_overridden_final_method<'db>(
+    context: &InferContext<'db, '_>,
+    member: &str,
+    subclass_definition: Definition<'db>,
+    // N.B. the type of the *definition*, not the type on an instance of the subclass
+    subclass_type: Type<'db>,
+    superclass: ClassType<'db>,
+    subclass: ClassType<'db>,
+    superclass_method_defs: &[FunctionType<'db>],
+) {
+    let db = context.db();
+
+    // Some hijinks so that we emit a diagnostic on the property getter rather than the property setter
+    let property_getter_definition = if subclass_definition.kind(db).is_function_def()
+        && let Type::PropertyInstance(property) = subclass_type
+        && let Some(Type::FunctionLiteral(getter)) = property.getter(db)
+    {
+        let getter_definition = getter.definition(db);
+        if getter_definition.scope(db) == subclass_definition.scope(db) {
+            Some(getter_definition)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let subclass_definition = property_getter_definition.unwrap_or(subclass_definition);
+
+    let Some(builder) = context.report_lint(
+        &OVERRIDE_OF_FINAL_METHOD,
+        subclass_definition.focus_range(db, context.module()),
+    ) else {
+        return;
+    };
+
+    let superclass_name = if superclass.name(db) == subclass.name(db) {
+        superclass.qualified_name(db).to_string()
+    } else {
+        superclass.name(db).to_string()
+    };
+
+    let mut diagnostic =
+        builder.into_diagnostic(format_args!("Cannot override `{superclass_name}.{member}`"));
+    diagnostic.set_primary_message(format_args!(
+        "Overrides a definition from superclass `{superclass_name}`"
+    ));
+    diagnostic.set_concise_message(format_args!(
+        "Cannot override final member `{member}` from superclass `{superclass_name}`"
+    ));
+
+    let mut sub = SubDiagnostic::new(
+        SubDiagnosticSeverity::Info,
+        format_args!(
+            "`{superclass_name}.{member}` is decorated with `@final`, forbidding overrides"
+        ),
+    );
+
+    let first_final_superclass_definition = superclass_method_defs
+        .iter()
+        .find(|function| function.has_known_decorator(db, FunctionDecorators::FINAL))
+        .expect(
+            "At least one function definition in the superclass should be decorated with `@final`",
+        );
+
+    let superclass_function_literal = if first_final_superclass_definition.file(db).is_stub(db) {
+        first_final_superclass_definition.first_overload_or_implementation(db)
+    } else {
+        first_final_superclass_definition
+            .literal(db)
+            .last_definition(db)
+    };
+
+    sub.annotate(
+        Annotation::secondary(Span::from(superclass_function_literal.focus_range(
+            db,
+            &parsed_module(db, first_final_superclass_definition.file(db)).load(db),
+        )))
+        .message(format_args!("`{superclass_name}.{member}` defined here")),
+    );
+
+    if let Some(decorator_span) =
+        superclass_function_literal.find_known_decorator_span(db, KnownFunction::Final)
+    {
+        sub.annotate(Annotation::secondary(decorator_span));
+    }
+
+    diagnostic.sub(sub);
+
+    // It's tempting to autofix properties as well,
+    // but you'd want to delete the `@my_property.deleter` as well as the getter and the deleter,
+    // and we don't model property deleters at all right now.
+    if let Type::FunctionLiteral(function) = subclass_type {
+        let class_node = subclass
+            .class_literal(db)
+            .0
+            .body_scope(db)
+            .node(db)
+            .expect_class()
+            .node(context.module());
+
+        let (overloads, implementation) = function.overloads_and_implementation(db);
+        let overload_count = overloads.len() + usize::from(implementation.is_some());
+        let is_only = overload_count >= class_node.body.len();
+
+        let overload_deletion = |overload: &OverloadLiteral<'db>| {
+            let range = overload.node(db, context.file(), context.module()).range();
+            if is_only {
+                Edit::range_replacement("pass".to_string(), range)
+            } else {
+                Edit::range_deletion(range)
+            }
+        };
+
+        let should_fix = overloads
+            .iter()
+            .copied()
+            .chain(implementation)
+            .all(|overload| {
+                class_node
+                    .body
+                    .iter()
+                    .filter_map(ast::Stmt::as_function_def_stmt)
+                    .contains(overload.node(db, context.file(), context.module()))
+            });
+
+        match function.overloads_and_implementation(db) {
+            ([first_overload, rest @ ..], None) => {
+                diagnostic.help(format_args!("Remove all overloads for `{member}`"));
+                diagnostic.set_optional_fix(should_fix.then(|| {
+                    Fix::unsafe_edits(
+                        overload_deletion(first_overload),
+                        rest.iter().map(overload_deletion),
+                    )
+                }));
+            }
+            ([first_overload, rest @ ..], Some(implementation)) => {
+                diagnostic.help(format_args!(
+                    "Remove all overloads and the implementation for `{member}`"
+                ));
+                diagnostic.set_optional_fix(should_fix.then(|| {
+                    Fix::unsafe_edits(
+                        overload_deletion(first_overload),
+                        rest.iter().chain([&implementation]).map(overload_deletion),
+                    )
+                }));
+            }
+            ([], Some(implementation)) => {
+                diagnostic.help(format_args!("Remove the override of `{member}`"));
+                diagnostic.set_optional_fix(
+                    should_fix.then(|| Fix::unsafe_edit(overload_deletion(&implementation))),
+                );
+            }
+            ([], None) => {
+                // Should be impossible to get here: how would we even infer a function as a function
+                // if it has 0 overloads and no implementation?
+                unreachable!(
+                    "A function should always have an implementation and/or >=1 overloads"
+                );
+            }
+        }
+    } else if let Type::PropertyInstance(property) = subclass_type
+        && property.setter(db).is_some()
+    {
+        diagnostic.help(format_args!("Remove the getter and setter for `{member}`"));
+    } else {
+        diagnostic.help(format_args!("Remove the override of `{member}`"));
     }
 }
 

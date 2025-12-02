@@ -4,10 +4,10 @@ use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::source_text;
 use ruff_diagnostics::Edit;
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::token::{Token, TokenAt, TokenKind, Tokens};
+use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::{Token, TokenAt, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ty_python_semantic::types::UnionType;
 use ty_python_semantic::{
@@ -17,7 +17,7 @@ use ty_python_semantic::{
 
 use crate::docstring::Docstring;
 use crate::find_node::covering_node;
-use crate::goto::DefinitionsOrTargets;
+use crate::goto::Definitions;
 use crate::importer::{ImportRequest, Importer};
 use crate::symbols::QueryPattern;
 use crate::{Db, all_symbols};
@@ -37,10 +37,19 @@ impl<'db> Completions<'db> {
     /// the user has typed as part of the next symbol they are writing.
     /// This collection will treat it as a query when present, and only
     /// add completions that match it.
-    fn new(db: &'db dyn Db, typed: Option<&str>) -> Completions<'db> {
+    fn fuzzy(db: &'db dyn Db, typed: Option<&str>) -> Completions<'db> {
         let query = typed
-            .map(QueryPattern::new)
+            .map(QueryPattern::fuzzy)
             .unwrap_or_else(QueryPattern::matches_all_symbols);
+        Completions {
+            db,
+            items: vec![],
+            query,
+        }
+    }
+
+    fn exactly(db: &'db dyn Db, symbol: &str) -> Completions<'db> {
+        let query = QueryPattern::exactly(symbol);
         Completions {
             db,
             items: vec![],
@@ -55,6 +64,21 @@ impl<'db> Completions<'db> {
         self.items
             .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
         self.items
+    }
+
+    fn into_imports(mut self) -> Vec<ImportEdit> {
+        self.items.sort_by(compare_suggestions);
+        self.items
+            .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
+        self.items
+            .into_iter()
+            .filter_map(|item| {
+                Some(ImportEdit {
+                    label: format!("import {}.{}", item.module_name?, item.name),
+                    edit: item.import?,
+                })
+            })
+            .collect()
     }
 
     /// Attempts to adds the given completion to this collection.
@@ -196,9 +220,7 @@ impl<'db> Completion<'db> {
         db: &'db dyn Db,
         semantic: SemanticCompletion<'db>,
     ) -> Completion<'db> {
-        let definition = semantic
-            .ty
-            .and_then(|ty| DefinitionsOrTargets::from_ty(db, ty));
+        let definition = semantic.ty.and_then(|ty| Definitions::from_ty(db, ty));
         let documentation = definition.and_then(|def| def.docstring(db));
         let is_type_check_only = semantic.is_type_check_only(db);
         Completion {
@@ -369,7 +391,7 @@ pub fn completion<'db>(
         return vec![];
     }
 
-    let mut completions = Completions::new(db, typed.as_deref());
+    let mut completions = Completions::fuzzy(db, typed.as_deref());
 
     if let Some(import) = ImportStatement::detect(db, file, &parsed, tokens, typed.as_deref()) {
         import.add_completions(db, file, &mut completions);
@@ -395,7 +417,16 @@ pub fn completion<'db>(
         }
         if settings.auto_import {
             if let Some(scoped) = scoped {
-                add_unimported_completions(db, file, &parsed, scoped, &mut completions);
+                add_unimported_completions(
+                    db,
+                    file,
+                    &parsed,
+                    scoped,
+                    |module_name: &ModuleName, symbol: &str| {
+                        ImportRequest::import_from(module_name.as_str(), symbol)
+                    },
+                    &mut completions,
+                );
             }
         }
     }
@@ -415,6 +446,34 @@ pub fn completion<'db>(
     }
 
     completions.into_completions()
+}
+
+pub(crate) struct ImportEdit {
+    pub label: String,
+    pub edit: Edit,
+}
+
+pub(crate) fn missing_imports(
+    db: &dyn Db,
+    file: File,
+    parsed: &ParsedModuleRef,
+    symbol: &str,
+    node: AnyNodeRef,
+) -> Vec<ImportEdit> {
+    let mut completions = Completions::exactly(db, symbol);
+    let scoped = ScopedTarget { node };
+    add_unimported_completions(
+        db,
+        file,
+        parsed,
+        scoped,
+        |module_name: &ModuleName, symbol: &str| {
+            ImportRequest::import_from(module_name.as_str(), symbol).force()
+        },
+        &mut completions,
+    );
+
+    completions.into_imports()
 }
 
 /// Adds completions derived from keywords.
@@ -461,6 +520,7 @@ fn add_unimported_completions<'db>(
     file: File,
     parsed: &ParsedModuleRef,
     scoped: ScopedTarget<'_>,
+    create_import_request: impl for<'a> Fn(&'a ModuleName, &'a str) -> ImportRequest<'a>,
     completions: &mut Completions<'db>,
 ) {
     // This is redundant since `all_symbols` will also bail
@@ -476,14 +536,13 @@ fn add_unimported_completions<'db>(
     let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
 
-    for symbol in all_symbols(db, &completions.query) {
+    for symbol in all_symbols(db, file, &completions.query) {
         if symbol.module.file(db) == Some(file) || symbol.module.is_known(db, KnownModule::Builtins)
         {
             continue;
         }
 
-        let request =
-            ImportRequest::import_from(symbol.module.name(db).as_str(), &symbol.symbol.name);
+        let request = create_import_request(symbol.module.name(db), &symbol.symbol.name);
         // FIXME: `all_symbols` doesn't account for wildcard imports.
         // Since we're looking at every module, this is probably
         // "fine," but it might mean that we import a symbol from the
@@ -1498,7 +1557,8 @@ fn compare_suggestions(c1: &Completion, c2: &Completion) -> Ordering {
 #[cfg(test)]
 mod tests {
     use insta::assert_snapshot;
-    use ruff_python_parser::{Mode, ParseOptions, TokenKind, Tokens};
+    use ruff_python_ast::token::{TokenKind, Tokens};
+    use ruff_python_parser::{Mode, ParseOptions};
     use ty_python_semantic::ModuleName;
 
     use crate::completion::{Completion, completion};
@@ -2855,7 +2915,7 @@ Answer.<CURSOR>
                 __itemsize__ :: int
                 __iter__ :: bound method <class 'Answer'>.__iter__[_EnumMemberT]() -> Iterator[_EnumMemberT@__iter__]
                 __len__ :: bound method <class 'Answer'>.__len__() -> int
-                __members__ :: MappingProxyType[str, Unknown]
+                __members__ :: MappingProxyType[str, Answer]
                 __module__ :: str
                 __mro__ :: tuple[type, ...]
                 __name__ :: str
@@ -5525,10 +5585,7 @@ def foo(param: s<CURSOR>)
     #[test]
     fn from_import_no_space_not_suggests_import() {
         let builder = completion_test_builder("from typing<CURSOR>");
-        assert_snapshot!(builder.build().snapshot(), @r"
-        typing
-        typing_extensions
-        ");
+        assert_snapshot!(builder.build().snapshot(), @"typing");
     }
 
     #[test]
@@ -5741,6 +5798,86 @@ from .imp<CURSOR>
         bar
         foo
         imposition
+        ");
+    }
+
+    #[test]
+    fn typing_extensions_excluded_from_import() {
+        let builder = completion_test_builder("from typing<CURSOR>").module_names();
+        assert_snapshot!(builder.build().snapshot(), @"typing :: Current module");
+    }
+
+    #[test]
+    fn typing_extensions_excluded_from_auto_import() {
+        let builder = completion_test_builder("deprecated<CURSOR>")
+            .auto_import()
+            .module_names();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        Deprecated :: importlib.metadata
+        DeprecatedList :: importlib.metadata
+        DeprecatedNonAbstract :: importlib.metadata
+        DeprecatedTuple :: importlib.metadata
+        deprecated :: warnings
+        ");
+    }
+
+    #[test]
+    fn typing_extensions_included_from_import() {
+        let builder = CursorTest::builder()
+            .source("typing_extensions.py", "deprecated = 1")
+            .source("foo.py", "from typing<CURSOR>")
+            .completion_test_builder()
+            .module_names();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        typing :: Current module
+        typing_extensions :: Current module
+        ");
+    }
+
+    #[test]
+    fn typing_extensions_included_from_auto_import() {
+        let builder = CursorTest::builder()
+            .source("typing_extensions.py", "deprecated = 1")
+            .source("foo.py", "deprecated<CURSOR>")
+            .completion_test_builder()
+            .auto_import()
+            .module_names();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        Deprecated :: importlib.metadata
+        DeprecatedList :: importlib.metadata
+        DeprecatedNonAbstract :: importlib.metadata
+        DeprecatedTuple :: importlib.metadata
+        deprecated :: typing_extensions
+        deprecated :: warnings
+        ");
+    }
+
+    #[test]
+    fn typing_extensions_included_from_import_in_stub() {
+        let builder = CursorTest::builder()
+            .source("foo.pyi", "from typing<CURSOR>")
+            .completion_test_builder()
+            .module_names();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        typing :: Current module
+        typing_extensions :: Current module
+        ");
+    }
+
+    #[test]
+    fn typing_extensions_included_from_auto_import_in_stub() {
+        let builder = CursorTest::builder()
+            .source("foo.pyi", "deprecated<CURSOR>")
+            .completion_test_builder()
+            .auto_import()
+            .module_names();
+        assert_snapshot!(builder.build().snapshot(), @r"
+        Deprecated :: importlib.metadata
+        DeprecatedList :: importlib.metadata
+        DeprecatedNonAbstract :: importlib.metadata
+        DeprecatedTuple :: importlib.metadata
+        deprecated :: typing_extensions
+        deprecated :: warnings
         ");
     }
 

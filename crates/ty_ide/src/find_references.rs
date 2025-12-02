@@ -7,7 +7,7 @@ use ty_python_semantic::SemanticModel;
 
 /// Find all references to a symbol at the given position.
 /// Search for references across all files in the project.
-pub fn goto_references(
+pub fn find_references(
     db: &dyn Db,
     file: File,
     offset: TextSize,
@@ -41,7 +41,7 @@ mod tests {
     impl CursorTest {
         fn references(&self) -> String {
             let Some(mut reference_results) =
-                goto_references(&self.db, self.cursor.file, self.cursor.offset, true)
+                find_references(&self.db, self.cursor.file, self.cursor.offset, true)
             else {
                 return "No references found".to_string();
             };
@@ -84,7 +84,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parameter_references_in_function() {
+    fn parameter_references_in_function() {
         let test = cursor_test(
             "
 def calculate_sum(<CURSOR>value: int) -> int:
@@ -149,28 +149,28 @@ result = calculate_sum(value=42)
     }
 
     #[test]
-    fn test_nonlocal_variable_references() {
+    fn nonlocal_variable_references() {
         let test = cursor_test(
             "
 def outer_function():
     coun<CURSOR>ter = 0
-    
+
     def increment():
         nonlocal counter
         counter += 1
         return counter
-    
+
     def decrement():
         nonlocal counter
         counter -= 1
         return counter
-    
+
     # Use counter in outer scope
     initial = counter
     increment()
     decrement()
     final = counter
-    
+
     return increment, decrement
 ",
         );
@@ -272,7 +272,7 @@ def outer_function():
     }
 
     #[test]
-    fn test_global_variable_references() {
+    fn global_variable_references() {
         let test = cursor_test(
             "
 glo<CURSOR>bal_counter = 0
@@ -389,7 +389,7 @@ final_value = global_counter
     }
 
     #[test]
-    fn test_except_handler_variable_references() {
+    fn except_handler_variable_references() {
         let test = cursor_test(
             "
 try:
@@ -450,7 +450,7 @@ except ValueError as err:
     }
 
     #[test]
-    fn test_pattern_match_as_references() {
+    fn pattern_match_as_references() {
         let test = cursor_test(
             "
 match x:
@@ -498,7 +498,7 @@ match x:
     }
 
     #[test]
-    fn test_pattern_match_mapping_rest_references() {
+    fn pattern_match_mapping_rest_references() {
         let test = cursor_test(
             "
 match data:
@@ -553,7 +553,7 @@ match data:
     }
 
     #[test]
-    fn test_function_definition_references() {
+    fn function_definition_references() {
         let test = cursor_test(
             "
 def my_func<CURSOR>tion():
@@ -632,7 +632,7 @@ value = my_function
     }
 
     #[test]
-    fn test_class_definition_references() {
+    fn class_definition_references() {
         let test = cursor_test(
             "
 class My<CURSOR>Class:
@@ -899,7 +899,553 @@ cls = MyClass
     }
 
     #[test]
-    fn test_multi_file_function_references() {
+    fn references_match_name_stmt() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", a<CURSOR>b]:
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Reference 1
+         --> main.py:4:22
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", ab]:
+          |                      ^^
+        5 |             x = ab
+          |
+
+        info[references]: Reference 2
+         --> main.py:5:17
+          |
+        3 |     match command.split():
+        4 |         case ["get", ab]:
+        5 |             x = ab
+          |                 ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn references_match_name_binding() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", ab]:
+                        x = a<CURSOR>b
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Reference 1
+         --> main.py:4:22
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", ab]:
+          |                      ^^
+        5 |             x = ab
+          |
+
+        info[references]: Reference 2
+         --> main.py:5:17
+          |
+        3 |     match command.split():
+        4 |         case ["get", ab]:
+        5 |             x = ab
+          |                 ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn references_match_rest_stmt() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", *a<CURSOR>b]:
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Reference 1
+         --> main.py:4:23
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", *ab]:
+          |                       ^^
+        5 |             x = ab
+          |
+
+        info[references]: Reference 2
+         --> main.py:5:17
+          |
+        3 |     match command.split():
+        4 |         case ["get", *ab]:
+        5 |             x = ab
+          |                 ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn references_match_rest_binding() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", *ab]:
+                        x = a<CURSOR>b
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Reference 1
+         --> main.py:4:23
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", *ab]:
+          |                       ^^
+        5 |             x = ab
+          |
+
+        info[references]: Reference 2
+         --> main.py:5:17
+          |
+        3 |     match command.split():
+        4 |         case ["get", *ab]:
+        5 |             x = ab
+          |                 ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn references_match_as_stmt() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", ("a" | "b") as a<CURSOR>b]:
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Reference 1
+         --> main.py:4:37
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", ("a" | "b") as ab]:
+          |                                     ^^
+        5 |             x = ab
+          |
+
+        info[references]: Reference 2
+         --> main.py:5:17
+          |
+        3 |     match command.split():
+        4 |         case ["get", ("a" | "b") as ab]:
+        5 |             x = ab
+          |                 ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn references_match_as_binding() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", ("a" | "b") as ab]:
+                        x = a<CURSOR>b
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Reference 1
+         --> main.py:4:37
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", ("a" | "b") as ab]:
+          |                                     ^^
+        5 |             x = ab
+          |
+
+        info[references]: Reference 2
+         --> main.py:5:17
+          |
+        3 |     match command.split():
+        4 |         case ["get", ("a" | "b") as ab]:
+        5 |             x = ab
+          |                 ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn references_match_keyword_stmt() {
+        let test = cursor_test(
+            r#"
+            class Click:
+                __match_args__ = ("position", "button")
+                def __init__(self, pos, btn):
+                    self.position: int = pos
+                    self.button: str = btn
+
+            def my_func(event: Click):
+                match event:
+                    case Click(x, button=a<CURSOR>b):
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+          --> main.py:10:30
+           |
+         8 | def my_func(event: Click):
+         9 |     match event:
+        10 |         case Click(x, button=ab):
+           |                              ^^
+        11 |             x = ab
+           |
+
+        info[references]: Reference 2
+          --> main.py:11:17
+           |
+         9 |     match event:
+        10 |         case Click(x, button=ab):
+        11 |             x = ab
+           |                 ^^
+           |
+        ");
+    }
+
+    #[test]
+    fn references_match_keyword_binding() {
+        let test = cursor_test(
+            r#"
+            class Click:
+                __match_args__ = ("position", "button")
+                def __init__(self, pos, btn):
+                    self.position: int = pos
+                    self.button: str = btn
+
+            def my_func(event: Click):
+                match event:
+                    case Click(x, button=ab):
+                        x = a<CURSOR>b
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+          --> main.py:10:30
+           |
+         8 | def my_func(event: Click):
+         9 |     match event:
+        10 |         case Click(x, button=ab):
+           |                              ^^
+        11 |             x = ab
+           |
+
+        info[references]: Reference 2
+          --> main.py:11:17
+           |
+         9 |     match event:
+        10 |         case Click(x, button=ab):
+        11 |             x = ab
+           |                 ^^
+           |
+        ");
+    }
+
+    #[test]
+    fn references_match_class_name() {
+        let test = cursor_test(
+            r#"
+            class Click:
+                __match_args__ = ("position", "button")
+                def __init__(self, pos, btn):
+                    self.position: int = pos
+                    self.button: str = btn
+
+            def my_func(event: Click):
+                match event:
+                    case Cl<CURSOR>ick(x, button=ab):
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Reference 1
+         --> main.py:2:7
+          |
+        2 | class Click:
+          |       ^^^^^
+        3 |     __match_args__ = ("position", "button")
+        4 |     def __init__(self, pos, btn):
+          |
+
+        info[references]: Reference 2
+          --> main.py:8:20
+           |
+         6 |         self.button: str = btn
+         7 |
+         8 | def my_func(event: Click):
+           |                    ^^^^^
+         9 |     match event:
+        10 |         case Click(x, button=ab):
+           |
+
+        info[references]: Reference 3
+          --> main.py:10:14
+           |
+         8 | def my_func(event: Click):
+         9 |     match event:
+        10 |         case Click(x, button=ab):
+           |              ^^^^^
+        11 |             x = ab
+           |
+        "#);
+    }
+
+    #[test]
+    fn references_match_class_field_name() {
+        let test = cursor_test(
+            r#"
+            class Click:
+                __match_args__ = ("position", "button")
+                def __init__(self, pos, btn):
+                    self.position: int = pos
+                    self.button: str = btn
+
+            def my_func(event: Click):
+                match event:
+                    case Click(x, but<CURSOR>ton=ab):
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
+    fn references_typevar_name_stmt() {
+        let test = cursor_test(
+            r#"
+            type Alias1[A<CURSOR>B: int = bool] = tuple[AB, list[AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> main.py:2:13
+          |
+        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
+          |             ^^
+          |
+
+        info[references]: Reference 2
+         --> main.py:2:37
+          |
+        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
+          |                                     ^^
+          |
+
+        info[references]: Reference 3
+         --> main.py:2:46
+          |
+        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
+          |                                              ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn references_typevar_name_binding() {
+        let test = cursor_test(
+            r#"
+            type Alias1[AB: int = bool] = tuple[A<CURSOR>B, list[AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> main.py:2:13
+          |
+        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
+          |             ^^
+          |
+
+        info[references]: Reference 2
+         --> main.py:2:37
+          |
+        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
+          |                                     ^^
+          |
+
+        info[references]: Reference 3
+         --> main.py:2:46
+          |
+        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
+          |                                              ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn references_typevar_spec_stmt() {
+        let test = cursor_test(
+            r#"
+            from typing import Callable
+            type Alias2[**A<CURSOR>B = [int, str]] = Callable[AB, tuple[AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> main.py:3:15
+          |
+        2 | from typing import Callable
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |               ^^
+          |
+
+        info[references]: Reference 2
+         --> main.py:3:43
+          |
+        2 | from typing import Callable
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |                                           ^^
+          |
+
+        info[references]: Reference 3
+         --> main.py:3:53
+          |
+        2 | from typing import Callable
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |                                                     ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn references_typevar_spec_binding() {
+        let test = cursor_test(
+            r#"
+            from typing import Callable
+            type Alias2[**AB = [int, str]] = Callable[A<CURSOR>B, tuple[AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> main.py:3:15
+          |
+        2 | from typing import Callable
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |               ^^
+          |
+
+        info[references]: Reference 2
+         --> main.py:3:43
+          |
+        2 | from typing import Callable
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |                                           ^^
+          |
+
+        info[references]: Reference 3
+         --> main.py:3:53
+          |
+        2 | from typing import Callable
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |                                                     ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn references_typevar_tuple_stmt() {
+        let test = cursor_test(
+            r#"
+            type Alias3[*A<CURSOR>B = ()] = tuple[tuple[*AB], tuple[*AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> main.py:2:14
+          |
+        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+          |              ^^
+          |
+
+        info[references]: Reference 2
+         --> main.py:2:38
+          |
+        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+          |                                      ^^
+          |
+
+        info[references]: Reference 3
+         --> main.py:2:50
+          |
+        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+          |                                                  ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn references_typevar_tuple_binding() {
+        let test = cursor_test(
+            r#"
+            type Alias3[*AB = ()] = tuple[tuple[*A<CURSOR>B], tuple[*AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> main.py:2:14
+          |
+        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+          |              ^^
+          |
+
+        info[references]: Reference 2
+         --> main.py:2:38
+          |
+        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+          |                                      ^^
+          |
+
+        info[references]: Reference 3
+         --> main.py:2:50
+          |
+        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+          |                                                  ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn multi_file_function_references() {
         let test = CursorTest::builder()
             .source(
                 "utils.py",
@@ -925,7 +1471,7 @@ from utils import func
 class DataProcessor:
     def __init__(self):
         self.multiplier = func
-    
+
     def process(self, value):
         return func(value)
 ",
@@ -989,14 +1535,14 @@ class DataProcessor:
     }
 
     #[test]
-    fn test_multi_file_class_attribute_references() {
+    fn multi_file_class_attribute_references() {
         let test = CursorTest::builder()
             .source(
                 "models.py",
                 "
 class MyModel:
     a<CURSOR>ttr = 42
-        
+
     def get_attribute(self):
         return MyModel.attr
 ",
@@ -1067,7 +1613,7 @@ def process_model():
     }
 
     #[test]
-    fn test_import_alias_references_should_not_resolve_to_original() {
+    fn import_alias_references_should_not_resolve_to_original() {
         let test = CursorTest::builder()
             .source(
                 "original.py",
@@ -1107,6 +1653,220 @@ func<CURSOR>_alias()
         3 |
         4 | func_alias()
           | ^^^^^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn stub_target() {
+        let test = CursorTest::builder()
+            .source(
+                "path.pyi",
+                r#"
+                class Path:
+                    def __init__(self, path: str): ...
+            "#,
+            )
+            .source(
+                "path.py",
+                r#"
+                class Path:
+                    def __init__(self, path: str):
+                        self.path = path
+            "#,
+            )
+            .source(
+                "importer.py",
+                r#"
+                from path import Path<CURSOR>
+
+                a: Path = Path("test")
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r###"
+        info[references]: Reference 1
+         --> path.pyi:2:7
+          |
+        2 | class Path:
+          |       ^^^^
+        3 |     def __init__(self, path: str): ...
+          |
+
+        info[references]: Reference 2
+         --> importer.py:2:18
+          |
+        2 | from path import Path
+          |                  ^^^^
+        3 |
+        4 | a: Path = Path("test")
+          |
+
+        info[references]: Reference 3
+         --> importer.py:4:4
+          |
+        2 | from path import Path
+        3 |
+        4 | a: Path = Path("test")
+          |    ^^^^
+          |
+
+        info[references]: Reference 4
+         --> importer.py:4:11
+          |
+        2 | from path import Path
+        3 |
+        4 | a: Path = Path("test")
+          |           ^^^^
+          |
+        "###);
+    }
+
+    #[test]
+    fn import_alias() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                import warnings
+                import warnings as <CURSOR>abc
+
+                x = abc
+                y = warnings
+            "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> main.py:3:20
+          |
+        2 | import warnings
+        3 | import warnings as abc
+          |                    ^^^
+        4 |
+        5 | x = abc
+          |
+
+        info[references]: Reference 2
+         --> main.py:5:5
+          |
+        3 | import warnings as abc
+        4 |
+        5 | x = abc
+          |     ^^^
+        6 | y = warnings
+          |
+        ");
+    }
+
+    #[test]
+    fn import_alias_use() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                import warnings
+                import warnings as abc
+
+                x = abc<CURSOR>
+                y = warnings
+            "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> main.py:3:20
+          |
+        2 | import warnings
+        3 | import warnings as abc
+          |                    ^^^
+        4 |
+        5 | x = abc
+          |
+
+        info[references]: Reference 2
+         --> main.py:5:5
+          |
+        3 | import warnings as abc
+        4 |
+        5 | x = abc
+          |     ^^^
+        6 | y = warnings
+          |
+        ");
+    }
+
+    #[test]
+    fn import_from_alias() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                from warnings import deprecated as xyz<CURSOR>
+                from warnings import deprecated
+
+                y = xyz
+                z = deprecated
+            "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> main.py:2:36
+          |
+        2 | from warnings import deprecated as xyz
+          |                                    ^^^
+        3 | from warnings import deprecated
+          |
+
+        info[references]: Reference 2
+         --> main.py:5:5
+          |
+        3 | from warnings import deprecated
+        4 |
+        5 | y = xyz
+          |     ^^^
+        6 | z = deprecated
+          |
+        ");
+    }
+
+    #[test]
+    fn import_from_alias_use() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                from warnings import deprecated as xyz
+                from warnings import deprecated
+
+                y = xyz<CURSOR>
+                z = deprecated
+            "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> main.py:2:36
+          |
+        2 | from warnings import deprecated as xyz
+          |                                    ^^^
+        3 | from warnings import deprecated
+          |
+
+        info[references]: Reference 2
+         --> main.py:5:5
+          |
+        3 | from warnings import deprecated
+        4 |
+        5 | y = xyz
+          |     ^^^
+        6 | z = deprecated
           |
         ");
     }

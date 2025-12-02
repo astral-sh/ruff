@@ -1,0 +1,59 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: final.md - Tests for the `@typing(_extensions).final` decorator - Diagnostic edge case: superclass with `@final` method has the same name as the subclass
+mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
+---
+
+# Python source files
+
+## module1.py
+
+```
+1 | from typing import final
+2 | 
+3 | class Foo:
+4 |     @final
+5 |     def f(self): ...
+```
+
+## module2.py
+
+```
+1 | import module1
+2 | 
+3 | class Foo(module1.Foo):
+4 |     def f(self): ...  # error: [override-of-final-method]
+```
+
+# Diagnostics
+
+```
+error[override-of-final-method]: Cannot override `module1.Foo.f`
+ --> src/module2.py:4:9
+  |
+3 | class Foo(module1.Foo):
+4 |     def f(self): ...  # error: [override-of-final-method]
+  |         ^ Overrides a definition from superclass `module1.Foo`
+  |
+info: `module1.Foo.f` is decorated with `@final`, forbidding overrides
+ --> src/module1.py:4:5
+  |
+3 | class Foo:
+4 |     @final
+  |     ------
+5 |     def f(self): ...
+  |         - `module1.Foo.f` defined here
+  |
+help: Remove the override of `f`
+info: rule `override-of-final-method` is enabled by default
+1 | import module1
+2 | 
+3 | class Foo(module1.Foo):
+  -     def f(self): ...  # error: [override-of-final-method]
+4 +     pass  # error: [override-of-final-method]
+note: This is an unsafe fix and may change runtime behavior
+
+```

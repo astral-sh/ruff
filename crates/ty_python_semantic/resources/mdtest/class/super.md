@@ -210,9 +210,7 @@ class BuilderMeta2(type):
     ) -> BuilderMeta2:
         # revealed: <super: <class 'BuilderMeta2'>, <class 'BuilderMeta2'>>
         s = reveal_type(super())
-        # TODO: should be `BuilderMeta2` (needs https://github.com/astral-sh/ty/issues/501)
-        # revealed:  Unknown
-        return reveal_type(s.__new__(cls, name, bases, dct))
+        return reveal_type(s.__new__(cls, name, bases, dct))  # revealed: BuilderMeta2
 
 class Foo[T]:
     x: T
@@ -393,6 +391,14 @@ class E(Enum):
     X = 42
 
 reveal_type(super(E, E.X))  # revealed: <super: <class 'E'>, E>
+```
+
+## `type[Self]`
+
+```py
+class Foo:
+    def method(self):
+        super(self.__class__, self)
 ```
 
 ## Descriptor Behavior with Super

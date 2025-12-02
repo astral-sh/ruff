@@ -150,11 +150,9 @@ impl<'db> ProtocolClass<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
         Some(Self(
-            self.0
-                .recursive_type_normalized_impl(db, div, nested, visitor)?,
+            self.0.recursive_type_normalized_impl(db, div, nested)?,
         ))
     }
 }
@@ -212,7 +210,10 @@ impl<'db> ProtocolInterface<'db> {
                 // Synthesize a read-only property (one that has a getter but no setter)
                 // which returns the specified type from its getter.
                 let property_getter_signature = Signature::new(
-                    Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))]),
+                    Parameters::new(
+                        db,
+                        [Parameter::positional_only(Some(Name::new_static("self")))],
+                    ),
                     Some(ty.normalized(db)),
                 );
                 let property_getter = Type::single_callable(db, property_getter_signature);
@@ -383,7 +384,6 @@ impl<'db> ProtocolInterface<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
         Some(Self::new(
             db,
@@ -392,7 +392,7 @@ impl<'db> ProtocolInterface<'db> {
                 .map(|(name, data)| {
                     Some((
                         name.clone(),
-                        data.recursive_type_normalized_impl(db, div, nested, visitor)?,
+                        data.recursive_type_normalized_impl(db, div, nested)?,
                     ))
                 })
                 .collect::<Option<BTreeMap<_, _>>>()?,
@@ -495,21 +495,20 @@ impl<'db> ProtocolMemberData<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
         Some(Self {
             kind: match &self.kind {
                 ProtocolMemberKind::Method(callable) => ProtocolMemberKind::Method(
-                    callable.recursive_type_normalized_impl(db, div, nested, visitor)?,
+                    callable.recursive_type_normalized_impl(db, div, nested)?,
                 ),
                 ProtocolMemberKind::Property(property) => ProtocolMemberKind::Property(
-                    property.recursive_type_normalized_impl(db, div, nested, visitor)?,
+                    property.recursive_type_normalized_impl(db, div, nested)?,
                 ),
-                ProtocolMemberKind::Other(ty) if nested => ProtocolMemberKind::Other(
-                    ty.recursive_type_normalized_impl(db, div, true, visitor)?,
-                ),
+                ProtocolMemberKind::Other(ty) if nested => {
+                    ProtocolMemberKind::Other(ty.recursive_type_normalized_impl(db, div, true)?)
+                }
                 ProtocolMemberKind::Other(ty) => ProtocolMemberKind::Other(
-                    ty.recursive_type_normalized_impl(db, div, true, visitor)
+                    ty.recursive_type_normalized_impl(db, div, true)
                         .unwrap_or(div),
                 ),
             },

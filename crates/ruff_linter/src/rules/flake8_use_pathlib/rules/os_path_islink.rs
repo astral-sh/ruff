@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 
@@ -73,6 +74,6 @@ pub(crate) fn os_path_islink(checker: &Checker, call: &ExprCall, segments: &[&st
         "path",
         is_fix_os_path_islink_enabled(checker.settings()),
         OsPathIslink,
-        None,
+        Applicability::Safe,
     );
 }

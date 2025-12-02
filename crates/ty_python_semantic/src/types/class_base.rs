@@ -48,12 +48,11 @@ impl<'db> ClassBase<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
         match self {
             Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
             Self::Class(class) => Some(Self::Class(
-                class.recursive_type_normalized_impl(db, div, nested, visitor)?,
+                class.recursive_type_normalized_impl(db, div, nested)?,
             )),
             Self::Protocol | Self::Generic | Self::TypedDict => Some(self),
         }
@@ -64,7 +63,9 @@ impl<'db> ClassBase<'db> {
             ClassBase::Class(class) => class.name(db),
             ClassBase::Dynamic(DynamicType::Any) => "Any",
             ClassBase::Dynamic(DynamicType::Unknown) => "Unknown",
-            ClassBase::Dynamic(DynamicType::Todo(_) | DynamicType::TodoUnpack) => "@Todo",
+            ClassBase::Dynamic(
+                DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoStarredExpression,
+            ) => "@Todo",
             ClassBase::Dynamic(DynamicType::Divergent(_)) => "Divergent",
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",

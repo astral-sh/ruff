@@ -191,13 +191,13 @@ def _(
     reveal_type(int_or_callable)  # revealed: int | ((str, /) -> bytes)
     reveal_type(callable_or_int)  # revealed: ((str, /) -> bytes) | int
     # TODO should be Unknown | int
-    reveal_type(type_var_or_int)  # revealed: typing.TypeVar | int
+    reveal_type(type_var_or_int)  # revealed: T@TypeVarOrInt | int
     # TODO should be int | Unknown
-    reveal_type(int_or_type_var)  # revealed: int | typing.TypeVar
+    reveal_type(int_or_type_var)  # revealed: int | T@IntOrTypeVar
     # TODO should be Unknown | None
-    reveal_type(type_var_or_none)  # revealed: typing.TypeVar | None
+    reveal_type(type_var_or_none)  # revealed: T@TypeVarOrNone | None
     # TODO should be None | Unknown
-    reveal_type(none_or_type_var)  # revealed: None | typing.TypeVar
+    reveal_type(none_or_type_var)  # revealed: None | T@NoneOrTypeVar
 ```
 
 If a type is unioned with itself in a value expression, the result is just that type. No
@@ -366,7 +366,9 @@ def g(obj: Y):
     reveal_type(obj)  # revealed: list[int | str]
 ```
 
-## Generic types
+## Generic implicit type aliases
+
+### Functionality
 
 Implicit type aliases can also be generic:
 
@@ -388,73 +390,62 @@ ListOrTuple = list[T] | tuple[T, ...]
 ListOrTupleLegacy = Union[list[T], tuple[T, ...]]
 MyCallable = Callable[P, T]
 AnnotatedType = Annotated[T, "tag"]
+TransparentAlias = T
+MyOptional = T | None
 
-# TODO: Consider displaying this as `<class 'list[T]'>`, … instead? (and similar for some others below)
-reveal_type(MyList)  # revealed: <class 'list[typing.TypeVar]'>
-reveal_type(MyDict)  # revealed: <class 'dict[typing.TypeVar, typing.TypeVar]'>
+reveal_type(MyList)  # revealed: <class 'list[T@MyList]'>
+reveal_type(MyDict)  # revealed: <class 'dict[T@MyDict, U@MyDict]'>
 reveal_type(MyType)  # revealed: GenericAlias
-reveal_type(IntAndType)  # revealed: <class 'tuple[int, typing.TypeVar]'>
-reveal_type(Pair)  # revealed: <class 'tuple[typing.TypeVar, typing.TypeVar]'>
-reveal_type(Sum)  # revealed: <class 'tuple[typing.TypeVar, typing.TypeVar]'>
+reveal_type(IntAndType)  # revealed: <class 'tuple[int, T@IntAndType]'>
+reveal_type(Pair)  # revealed: <class 'tuple[T@Pair, T@Pair]'>
+reveal_type(Sum)  # revealed: <class 'tuple[T@Sum, U@Sum]'>
 reveal_type(ListOrTuple)  # revealed: types.UnionType
 reveal_type(ListOrTupleLegacy)  # revealed: types.UnionType
-reveal_type(MyCallable)  # revealed: GenericAlias
+reveal_type(MyCallable)  # revealed: @Todo(Callable[..] specialized with ParamSpec)
 reveal_type(AnnotatedType)  # revealed: <typing.Annotated special form>
+reveal_type(TransparentAlias)  # revealed: typing.TypeVar
+reveal_type(MyOptional)  # revealed: types.UnionType
 
 def _(
     list_of_ints: MyList[int],
     dict_str_to_int: MyDict[str, int],
-    # TODO: no error here
-    # error: [invalid-type-form] "`typing.TypeVar` is not a generic class"
     subclass_of_int: MyType[int],
     int_and_str: IntAndType[str],
     pair_of_ints: Pair[int],
     int_and_bytes: Sum[int, bytes],
     list_or_tuple: ListOrTuple[int],
     list_or_tuple_legacy: ListOrTupleLegacy[int],
-    # TODO: no error here
-    # error: [invalid-type-form] "List literals are not allowed in this context in a type expression: Did you mean `tuple[str, bytes]`?"
     my_callable: MyCallable[[str, bytes], int],
     annotated_int: AnnotatedType[int],
+    transparent_alias: TransparentAlias[int],
+    optional_int: MyOptional[int],
 ):
-    # TODO: This should be `list[int]`
-    reveal_type(list_of_ints)  # revealed: @Todo(specialized generic alias in type expression)
-    # TODO: This should be `dict[str, int]`
-    reveal_type(dict_str_to_int)  # revealed: @Todo(specialized generic alias in type expression)
-    # TODO: This should be `type[int]`
-    reveal_type(subclass_of_int)  # revealed: Unknown
-    # TODO: This should be `tuple[int, str]`
-    reveal_type(int_and_str)  # revealed: @Todo(specialized generic alias in type expression)
-    # TODO: This should be `tuple[int, int]`
-    reveal_type(pair_of_ints)  # revealed: @Todo(specialized generic alias in type expression)
-    # TODO: This should be `tuple[int, bytes]`
-    reveal_type(int_and_bytes)  # revealed: @Todo(specialized generic alias in type expression)
-    # TODO: This should be `list[int] | tuple[int, ...]`
-    reveal_type(list_or_tuple)  # revealed: @Todo(Generic specialization of types.UnionType)
-    # TODO: This should be `list[int] | tuple[int, ...]`
-    reveal_type(list_or_tuple_legacy)  # revealed: @Todo(Generic specialization of types.UnionType)
+    reveal_type(list_of_ints)  # revealed: list[int]
+    reveal_type(dict_str_to_int)  # revealed: dict[str, int]
+    reveal_type(subclass_of_int)  # revealed: type[int]
+    reveal_type(int_and_str)  # revealed: tuple[int, str]
+    reveal_type(pair_of_ints)  # revealed: tuple[int, int]
+    reveal_type(int_and_bytes)  # revealed: tuple[int, bytes]
+    reveal_type(list_or_tuple)  # revealed: list[int] | tuple[int, ...]
+    reveal_type(list_or_tuple_legacy)  # revealed: list[int] | tuple[int, ...]
     # TODO: This should be `(str, bytes) -> int`
-    reveal_type(my_callable)  # revealed: @Todo(Generic specialization of typing.Callable)
-    # TODO: This should be `int`
-    reveal_type(annotated_int)  # revealed: @Todo(Generic specialization of typing.Annotated)
+    reveal_type(my_callable)  # revealed: @Todo(Callable[..] specialized with ParamSpec)
+    reveal_type(annotated_int)  # revealed: int
+    reveal_type(transparent_alias)  # revealed: int
+    reveal_type(optional_int)  # revealed: int | None
 ```
 
 Generic implicit type aliases can be partially specialized:
 
 ```py
-U = TypeVar("U")
-
 DictStrTo = MyDict[str, U]
 
-reveal_type(DictStrTo)  # revealed: GenericAlias
+reveal_type(DictStrTo)  # revealed: <class 'dict[str, U@DictStrTo]'>
 
 def _(
-    # TODO: No error here
-    # error: [invalid-type-form] "Invalid subscript of object of type `GenericAlias` in type expression"
     dict_str_to_int: DictStrTo[int],
 ):
-    # TODO: This should be `dict[str, int]`
-    reveal_type(dict_str_to_int)  # revealed: Unknown
+    reveal_type(dict_str_to_int)  # revealed: dict[str, int]
 ```
 
 Using specializations of generic implicit type aliases in other implicit type aliases works as
@@ -464,43 +455,118 @@ expected:
 IntsOrNone = MyList[int] | None
 IntsOrStrs = Pair[int] | Pair[str]
 ListOfPairs = MyList[Pair[str]]
+ListOrTupleOfInts = ListOrTuple[int]
+AnnotatedInt = AnnotatedType[int]
+SubclassOfInt = MyType[int]
+CallableIntToStr = MyCallable[[int], str]
 
-reveal_type(IntsOrNone)  # revealed: UnionType
-reveal_type(IntsOrStrs)  # revealed: UnionType
-reveal_type(ListOfPairs)  # revealed: GenericAlias
+reveal_type(IntsOrNone)  # revealed: types.UnionType
+reveal_type(IntsOrStrs)  # revealed: types.UnionType
+reveal_type(ListOfPairs)  # revealed: <class 'list[tuple[str, str]]'>
+reveal_type(ListOrTupleOfInts)  # revealed: types.UnionType
+reveal_type(AnnotatedInt)  # revealed: <typing.Annotated special form>
+reveal_type(SubclassOfInt)  # revealed: GenericAlias
+reveal_type(CallableIntToStr)  # revealed: @Todo(Callable[..] specialized with ParamSpec)
 
 def _(
-    # TODO: This should not be an error
-    # error: [invalid-type-form] "Variable of type `UnionType` is not allowed in a type expression"
     ints_or_none: IntsOrNone,
-    # TODO: This should not be an error
-    # error: [invalid-type-form] "Variable of type `UnionType` is not allowed in a type expression"
     ints_or_strs: IntsOrStrs,
     list_of_pairs: ListOfPairs,
+    list_or_tuple_of_ints: ListOrTupleOfInts,
+    annotated_int: AnnotatedInt,
+    subclass_of_int: SubclassOfInt,
+    callable_int_to_str: CallableIntToStr,
 ):
-    # TODO: This should be `list[int] | None`
-    reveal_type(ints_or_none)  # revealed: Unknown
-    # TODO: This should be `tuple[int, int] | tuple[str, str]`
-    reveal_type(ints_or_strs)  # revealed: Unknown
-    # TODO: This should be `list[tuple[str, str]]`
-    reveal_type(list_of_pairs)  # revealed: @Todo(Support for `typing.GenericAlias` instances in type expressions)
+    reveal_type(ints_or_none)  # revealed: list[int] | None
+    reveal_type(ints_or_strs)  # revealed: tuple[int, int] | tuple[str, str]
+    reveal_type(list_of_pairs)  # revealed: list[tuple[str, str]]
+    reveal_type(list_or_tuple_of_ints)  # revealed: list[int] | tuple[int, ...]
+    reveal_type(annotated_int)  # revealed: int
+    reveal_type(subclass_of_int)  # revealed: type[int]
+    # TODO: This should be `(int, /) -> str`
+    reveal_type(callable_int_to_str)  # revealed: @Todo(Callable[..] specialized with ParamSpec)
 ```
 
-If a generic implicit type alias is used unspecialized in a type expression, we treat it as an
-`Unknown` specialization:
+A generic implicit type alias can also be used in another generic implicit type alias:
+
+```py
+from typing_extensions import Any
+
+B = TypeVar("B", bound=int)
+
+MyOtherList = MyList[T]
+MyOtherType = MyType[T]
+TypeOrList = MyType[B] | MyList[B]
+
+reveal_type(MyOtherList)  # revealed: <class 'list[T@MyOtherList]'>
+reveal_type(MyOtherType)  # revealed: GenericAlias
+reveal_type(TypeOrList)  # revealed: types.UnionType
+
+def _(
+    list_of_ints: MyOtherList[int],
+    subclass_of_int: MyOtherType[int],
+    type_or_list: TypeOrList[Any],
+):
+    reveal_type(list_of_ints)  # revealed: list[int]
+    reveal_type(subclass_of_int)  # revealed: type[int]
+    reveal_type(type_or_list)  # revealed: type[Any] | list[Any]
+```
+
+If a generic implicit type alias is used unspecialized in a type expression, we use the default
+specialization. For type variables without defaults, this is `Unknown`:
 
 ```py
 def _(
-    my_list: MyList,
-    my_dict: MyDict,
+    list_unknown: MyList,
+    dict_unknown: MyDict,
+    subclass_of_unknown: MyType,
+    int_and_unknown: IntAndType,
+    pair_of_unknown: Pair,
+    unknown_and_unknown: Sum,
+    list_or_tuple: ListOrTuple,
+    list_or_tuple_legacy: ListOrTupleLegacy,
     my_callable: MyCallable,
+    annotated_unknown: AnnotatedType,
+    optional_unknown: MyOptional,
 ):
-    # TODO: Should be `list[Unknown]`
-    reveal_type(my_list)  # revealed: list[typing.TypeVar]
-    # TODO: Should be `dict[Unknown, Unknown]`
-    reveal_type(my_dict)  # revealed: dict[typing.TypeVar, typing.TypeVar]
+    # TODO: This should be `list[Unknown]`
+    reveal_type(list_unknown)  # revealed: list[T@MyList]
+    # TODO: This should be `dict[Unknown, Unknown]`
+    reveal_type(dict_unknown)  # revealed: dict[T@MyDict, U@MyDict]
+    # TODO: Should be `type[Unknown]`
+    reveal_type(subclass_of_unknown)  # revealed: type[T@MyType]
+    # TODO: Should be `tuple[int, Unknown]`
+    reveal_type(int_and_unknown)  # revealed: tuple[int, T@IntAndType]
+    # TODO: Should be `tuple[Unknown, Unknown]`
+    reveal_type(pair_of_unknown)  # revealed: tuple[T@Pair, T@Pair]
+    # TODO: Should be `tuple[Unknown, Unknown]`
+    reveal_type(unknown_and_unknown)  # revealed: tuple[T@Sum, U@Sum]
+    # TODO: Should be `list[Unknown] | tuple[Unknown, ...]`
+    reveal_type(list_or_tuple)  # revealed: list[T@ListOrTuple] | tuple[T@ListOrTuple, ...]
+    # TODO: Should be `list[Unknown] | tuple[Unknown, ...]`
+    reveal_type(list_or_tuple_legacy)  # revealed: list[T@ListOrTupleLegacy] | tuple[T@ListOrTupleLegacy, ...]
     # TODO: Should be `(...) -> Unknown`
-    reveal_type(my_callable)  # revealed: (...) -> typing.TypeVar
+    reveal_type(my_callable)  # revealed: @Todo(Callable[..] specialized with ParamSpec)
+    # TODO: Should be `Unknown`
+    reveal_type(annotated_unknown)  # revealed: T@AnnotatedType
+    # TODO: Should be `Unknown | None`
+    reveal_type(optional_unknown)  # revealed: T@MyOptional | None
+```
+
+For a type variable with a default, we use the default type:
+
+```py
+T_default = TypeVar("T_default", default=int)
+
+MyListWithDefault = list[T_default]
+
+def _(
+    list_of_str: MyListWithDefault[str],
+    list_of_int: MyListWithDefault,
+):
+    reveal_type(list_of_str)  # revealed: list[str]
+    # TODO: this should be `list[int]`
+    reveal_type(list_of_int)  # revealed: list[T_default@MyListWithDefault]
 ```
 
 (Generic) implicit type aliases can be used as base classes:
@@ -522,37 +588,209 @@ reveal_mro(Derived1)
 
 GenericBaseAlias = GenericBase[T]
 
-# TODO: No error here
-# error: [non-subscriptable] "Cannot subscript object of type `<class 'GenericBase[typing.TypeVar]'>` with no `__class_getitem__` method"
 class Derived2(GenericBaseAlias[int]):
     pass
 ```
+
+### Imported aliases
+
+Generic implicit type aliases can be imported from other modules and specialized:
+
+`my_types.py`:
+
+```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+
+MyList = list[T]
+```
+
+`main.py`:
+
+```py
+from my_types import MyList
+import my_types as mt
+
+def _(
+    list_of_ints1: MyList[int],
+    list_of_ints2: mt.MyList[int],
+):
+    reveal_type(list_of_ints1)  # revealed: list[int]
+    reveal_type(list_of_ints2)  # revealed: list[int]
+```
+
+### In stringified annotations
+
+Generic implicit type aliases can be specialized in stringified annotations:
+
+```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+
+MyList = list[T]
+
+def _(
+    list_of_ints: "MyList[int]",
+):
+    reveal_type(list_of_ints)  # revealed: list[int]
+```
+
+### Tuple unpacking
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+
+X = tuple[T, *tuple[U, ...], V]
+Y = X[T, tuple[int, str, U], bytes]
+
+def g(obj: Y[bool, range]):
+    reveal_type(obj)  # revealed: tuple[bool, *tuple[tuple[int, str, range], ...], bytes]
+```
+
+### Error cases
 
 A generic alias that is already fully specialized cannot be specialized again:
 
 ```py
 ListOfInts = list[int]
 
-# TODO: this should be an error
+# error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
 def _(doubly_specialized: ListOfInts[int]):
-    # TODO: this should be `Unknown`
-    reveal_type(doubly_specialized)  # revealed: @Todo(specialized generic alias in type expression)
+    # TODO: This should ideally be `list[Unknown]` or `Unknown`
+    reveal_type(doubly_specialized)  # revealed: list[int]
 ```
 
 Specializing a generic implicit type alias with an incorrect number of type arguments also results
 in an error:
 
 ```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+MyList = list[T]
+MyDict = dict[T, U]
+
 def _(
-    # TODO: this should be an error
+    # error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
     list_too_many_args: MyList[int, str],
-    # TODO: this should be an error
+    # error: [invalid-type-arguments] "No type argument provided for required type variable `U`"
     dict_too_few_args: MyDict[int],
 ):
-    # TODO: this should be `Unknown`
-    reveal_type(list_too_many_args)  # revealed: @Todo(specialized generic alias in type expression)
-    # TODO: this should be `Unknown`
-    reveal_type(dict_too_few_args)  # revealed: @Todo(specialized generic alias in type expression)
+    reveal_type(list_too_many_args)  # revealed: list[Unknown]
+    reveal_type(dict_too_few_args)  # revealed: dict[Unknown, Unknown]
+```
+
+Trying to specialize a non-name node results in an error:
+
+```py
+from ty_extensions import TypeOf
+
+IntOrStr = int | str
+
+def this_does_not_work() -> TypeOf[IntOrStr]:
+    raise NotImplementedError()
+
+def _(
+    # TODO: Better error message (of kind `invalid-type-form`)?
+    # error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
+    specialized: this_does_not_work()[int],
+):
+    reveal_type(specialized)  # revealed: int | str
+```
+
+Similarly, if you try to specialize a union type without a binding context, we emit an error:
+
+```py
+# TODO: Better error message (of kind `invalid-type-form`)?
+# error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
+x: (list[T] | set[T])[int]
+
+def _():
+    # TODO: `list[Unknown] | set[Unknown]` might be better
+    reveal_type(x)  # revealed: list[typing.TypeVar] | set[typing.TypeVar]
+```
+
+### Multiple definitions
+
+#### Shadowed definitions
+
+When a generic type alias shadows a definition from an outer scope, the inner definition is used:
+
+```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+
+MyAlias = list[T]
+
+def outer():
+    MyAlias = set[T]
+
+    def _(x: MyAlias[int]):
+        reveal_type(x)  # revealed: set[int]
+```
+
+#### Statically known conditions
+
+```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+
+if True:
+    MyAlias1 = list[T]
+else:
+    MyAlias1 = set[T]
+
+if False:
+    MyAlias2 = list[T]
+else:
+    MyAlias2 = set[T]
+
+def _(
+    x1: MyAlias1[int],
+    x2: MyAlias2[int],
+):
+    reveal_type(x1)  # revealed: list[int]
+    reveal_type(x2)  # revealed: set[int]
+```
+
+#### Statically unknown conditions
+
+If several definitions are visible, we emit an error:
+
+```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+
+def flag() -> bool:
+    return True
+
+if flag():
+    MyAlias = list[T]
+else:
+    MyAlias = set[T]
+
+# It is questionable whether this should be supported or not. It might also be reasonable to
+# emit an error here (e.g. "Invalid subscript of object of type `<class 'list[T@MyAlias]'> |
+# <class 'set[T@MyAlias]'>` in type expression"). If we ever choose to do so, the revealed
+# type should probably be `Unknown`.
+def _(x: MyAlias[int]):
+    reveal_type(x)  # revealed: list[int] | set[int]
 ```
 
 ## `Literal`s
@@ -642,8 +880,7 @@ Deprecated = Annotated[T, "deprecated attribute"]
 class C:
     old: Deprecated[int]
 
-# TODO: Should be `int`
-reveal_type(C().old)  # revealed: @Todo(Generic specialization of typing.Annotated)
+reveal_type(C().old)  # revealed: int
 ```
 
 If the metadata argument is missing, we emit an error (because this code fails at runtime), but
@@ -1297,4 +1534,22 @@ def _(
     reveal_type(recursive_dict2)  # revealed: dict[str, Divergent]
     reveal_type(recursive_dict3)  # revealed: dict[Divergent, int]
     reveal_type(recursive_dict4)  # revealed: dict[Divergent, int]
+```
+
+### Self-referential generic implicit type aliases
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+NestedDict = dict[str, "NestedDict[T] | T"]
+NestedList = list["NestedList[T] | None"]
+
+def _(
+    nested_dict_int: NestedDict[int],
+    nested_list_str: NestedList[str],
+):
+    reveal_type(nested_dict_int)  # revealed: dict[str, Divergent]
+    reveal_type(nested_list_str)  # revealed: list[Divergent]
 ```

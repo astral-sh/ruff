@@ -171,6 +171,10 @@ impl ClassInfoConstraintFunction {
                 // e.g. `isinstance(x, list[int])` fails at runtime.
                 SubclassOfInner::Class(ClassType::Generic(_)) => None,
                 SubclassOfInner::Dynamic(dynamic) => Some(Type::Dynamic(dynamic)),
+                SubclassOfInner::TypeVar(bound_typevar) => match self {
+                    ClassInfoConstraintFunction::IsSubclass => Some(classinfo),
+                    ClassInfoConstraintFunction::IsInstance => Some(Type::TypeVar(bound_typevar)),
+                },
             },
             Type::Dynamic(_) => Some(classinfo),
             Type::Intersection(intersection) => {
@@ -234,7 +238,7 @@ impl ClassInfoConstraintFunction {
             Type::SpecialForm(SpecialFormType::Callable)
                 if self == ClassInfoConstraintFunction::IsInstance =>
             {
-                Some(CallableType::unknown(db).top_materialization(db))
+                Some(Type::Callable(CallableType::unknown(db)).top_materialization(db))
             }
 
             Type::SpecialForm(special_form) => special_form

@@ -27,6 +27,9 @@ def which_tool(name: str, path: Path | None = None) -> Path:
 
 
 class Tool(abc.ABC):
+    @abc.abstractmethod
+    def name(self) -> str: ...
+
     def write_config(self, project: Project, venv: Venv) -> None:
         """Write the tool's configuration file."""
 
@@ -48,13 +51,17 @@ class Tool(abc.ABC):
     def command(self, project: Project, venv: Venv, single_threaded: bool) -> Command:
         """Generate a command to benchmark a given tool."""
 
+    @abc.abstractmethod
+    def lsp_command(self, project: Project, venv: Venv) -> list[str] | None:
+        """Generate command to start LSP server, or None if not supported."""
+
 
 class Ty(Tool):
     path: Path
-    name: str
+    _name: str
 
     def __init__(self, *, path: Path | None = None):
-        self.name = str(path) if path else "ty"
+        self._name = str(path) if path else "ty"
         executable = "ty.exe" if sys.platform == "win32" else "ty"
         self.path = (
             path or (Path(__file__) / "../../../../../target/release" / executable)
@@ -63,6 +70,10 @@ class Ty(Tool):
         assert self.path.is_file(), (
             f"ty not found at '{self.path}'. Run `cargo build --release --bin ty`."
         )
+
+    @override
+    def name(self) -> str:
+        return self._name
 
     @override
     def config(self, project: Project, venv: Venv):
@@ -91,7 +102,11 @@ class Ty(Tool):
         for exclude in project.exclude:
             command.extend(["--exclude", exclude])
 
-        return Command(name=self.name, command=command)
+        return Command(name=self._name, command=command)
+
+    @override
+    def lsp_command(self, project: Project, venv: Venv) -> list[str] | None:
+        return [str(self.path), "server"]
 
 
 class Mypy(Tool):
@@ -101,6 +116,10 @@ class Mypy(Tool):
     def __init__(self, *, warm: bool, path: Path | None = None):
         self.path = path
         self.warm = warm
+
+    @override
+    def name(self) -> str:
+        return "mypy"
 
     @override
     def command(self, project: Project, venv: Venv, single_threaded: bool) -> Command:
@@ -142,23 +161,36 @@ class Mypy(Tool):
             command=command,
         )
 
+    @override
+    def lsp_command(self, project: Project, venv: Venv) -> list[str] | None:
+        # Mypy doesn't have official LSP support.
+        return None
+
 
 class Pyright(Tool):
     path: Path
+    lsp_path: Path
 
     def __init__(self, *, path: Path | None = None):
         if path:
             self.path = path
-        else:
+            # Assume langserver is in the same directory.
             if sys.platform == "win32":
-                self.path = Path("./node_modules/.bin/pyright.cmd").resolve()
+                self.lsp_path = path.with_name("pyright-langserver.cmd")
             else:
-                self.path = Path("./node_modules/.bin/pyright").resolve()
+                self.lsp_path = path.with_name("pyright-langserver")
+        else:
+            self.path = npm_bin_path("pyright")
+            self.lsp_path = npm_bin_path("pyright-langserver")
 
             if not self.path.exists():
                 print(
-                    "Pyright executable not found. Did you ran `npm install` in the `ty_benchmark` directory?"
+                    "Pyright executable not found. Did you run `npm ci` in the `ty_benchmark` directory?"
                 )
+
+    @override
+    def name(self) -> str:
+        return "pyright"
 
     @override
     def config(self, project: Project, venv: Venv):
@@ -197,12 +229,21 @@ class Pyright(Tool):
             command=command,
         )
 
+    @override
+    def lsp_command(self, project: Project, venv: Venv) -> list[str] | None:
+        # Pyright LSP server is a separate executable.
+        return [str(self.lsp_path), "--stdio"]
+
 
 class Pyrefly(Tool):
     path: Path
 
     def __init__(self, *, path: Path | None = None):
         self.path = path or which_tool("pyrefly")
+
+    @override
+    def name(self) -> str:
+        return "pyrefly"
 
     @override
     def config(self, project: Project, venv: Venv):
@@ -234,3 +275,18 @@ class Pyrefly(Tool):
             name="Pyrefly",
             command=command,
         )
+
+    @override
+    def lsp_command(self, project: Project, venv: Venv) -> list[str] | None:
+        # Pyrefly LSP server.
+        # Turn-off pyrefly's indexing mode as it results in significant load after opening the first file,
+        # skewing benchmark results and we don't use any of the features that require indexing.
+        return [str(self.path), "lsp", "--indexing-mode", "none"]
+
+
+def npm_bin_path(name: str) -> Path:
+    if sys.platform == "win32":
+        return Path(f"./node_modules/.bin/{name}.cmd").resolve()
+
+    else:
+        return (Path("./node_modules/.bin") / name).resolve()

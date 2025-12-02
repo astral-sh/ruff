@@ -232,6 +232,32 @@ class C:
 reveal_type(not_a_method)  # revealed: def not_a_method(self) -> Unknown
 ```
 
+## Different occurrences of `Self` represent different types
+
+Here, both `Foo.foo` and `Bar.bar` use `Self`. When accessing a bound method, we replace any
+occurrences of `Self` with the bound `self` type. In this example, when we access `x.foo`, we only
+want to substitute the occurrences of `Self` in `Foo.foo` — that is, occurrences of `Self@foo`. The
+fact that `x` is an instance of `Foo[Self@bar]` (a completely different `Self` type) should not
+affect that subtitution. If we blindly substitute all occurrences of `Self`, we would get
+`Foo[Self@bar]` as the return type of the bound method.
+
+```py
+from typing import Self
+
+class Foo[T]:
+    def foo(self: Self) -> T:
+        raise NotImplementedError
+
+class Bar:
+    def bar(self: Self, x: Foo[Self]):
+        # revealed: bound method Foo[Self@bar].foo() -> Self@bar
+        reveal_type(x.foo)
+
+def f[U: Bar](x: Foo[U]):
+    # revealed: bound method Foo[U@f].foo() -> U@f
+    reveal_type(x.foo)
+```
+
 ## typing_extensions
 
 ```toml
@@ -260,15 +286,13 @@ class Shape:
 
     @classmethod
     def bar(cls: type[Self]) -> Self:
-        # TODO: type[Shape]
-        reveal_type(cls)  # revealed: @Todo(unsupported type[X] special form)
+        reveal_type(cls)  # revealed: type[Self@bar]
         return cls()
 
 class Circle(Shape): ...
 
 reveal_type(Shape().foo())  # revealed: Shape
-# TODO: Shape
-reveal_type(Shape.bar())  # revealed: Unknown
+reveal_type(Shape.bar())  # revealed: Shape
 ```
 
 ## Attributes

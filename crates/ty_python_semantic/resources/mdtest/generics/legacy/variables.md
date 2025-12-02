@@ -383,8 +383,7 @@ def constrained(f: T):
 
 ## Meta-type
 
-The meta-type of a typevar is the same as the meta-type of the upper bound, or the union of the
-meta-types of the constraints:
+The meta-type of a typevar is `type[T]`.
 
 ```py
 from typing import TypeVar
@@ -392,22 +391,22 @@ from typing import TypeVar
 T_normal = TypeVar("T_normal")
 
 def normal(x: T_normal):
-    reveal_type(type(x))  # revealed: type
+    reveal_type(type(x))  # revealed: type[T_normal@normal]
 
 T_bound_object = TypeVar("T_bound_object", bound=object)
 
 def bound_object(x: T_bound_object):
-    reveal_type(type(x))  # revealed: type
+    reveal_type(type(x))  # revealed: type[T_bound_object@bound_object]
 
 T_bound_int = TypeVar("T_bound_int", bound=int)
 
 def bound_int(x: T_bound_int):
-    reveal_type(type(x))  # revealed: type[int]
+    reveal_type(type(x))  # revealed: type[T_bound_int@bound_int]
 
 T_constrained = TypeVar("T_constrained", int, str)
 
 def constrained(x: T_constrained):
-    reveal_type(type(x))  # revealed: type[int] | type[str]
+    reveal_type(type(x))  # revealed: type[T_constrained@constrained]
 ```
 
 ## Cycles
@@ -442,6 +441,22 @@ class G(Generic[T]):
     x: T
 
 reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
+```
+
+An invalid specialization in a recursive bound doesn't cause a panic:
+
+```py
+from typing import TypeVar, Generic
+
+# error: [invalid-type-arguments]
+T = TypeVar("T", bound="Node[int]")
+
+class Node(Generic[T]):
+    pass
+
+# error: [invalid-type-arguments]
+def _(n: Node[str]):
+    reveal_type(n)  # revealed: Node[Unknown]
 ```
 
 ### Defaults

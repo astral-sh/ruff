@@ -23,11 +23,12 @@ use crate::completion::CompletionKind;
 pub struct QueryPattern {
     re: Option<Regex>,
     original: String,
+    original_is_exact: bool,
 }
 
 impl QueryPattern {
     /// Create a new query pattern from a literal search string given.
-    pub fn new(literal_query_string: &str) -> QueryPattern {
+    pub fn fuzzy(literal_query_string: &str) -> QueryPattern {
         let mut pattern = "(?i)".to_string();
         for ch in literal_query_string.chars() {
             pattern.push_str(&regex::escape(ch.encode_utf8(&mut [0; 4])));
@@ -41,6 +42,16 @@ impl QueryPattern {
         QueryPattern {
             re: Regex::new(&pattern).ok(),
             original: literal_query_string.to_string(),
+            original_is_exact: false,
+        }
+    }
+
+    /// Create a new query
+    pub fn exactly(symbol: &str) -> QueryPattern {
+        QueryPattern {
+            re: None,
+            original: symbol.to_string(),
+            original_is_exact: true,
         }
     }
 
@@ -49,6 +60,7 @@ impl QueryPattern {
         QueryPattern {
             re: None,
             original: String::new(),
+            original_is_exact: false,
         }
     }
 
@@ -59,6 +71,8 @@ impl QueryPattern {
     pub fn is_match_symbol_name(&self, symbol_name: &str) -> bool {
         if let Some(ref re) = self.re {
             re.is_match(symbol_name)
+        } else if self.original_is_exact {
+            symbol_name == self.original
         } else {
             // This is a degenerate case. The only way
             // we should get here is if the query string
@@ -75,13 +89,13 @@ impl QueryPattern {
     /// incorrectly. That is, it's possible that this query will match all
     /// inputs but this still returns `false`.
     pub fn will_match_everything(&self) -> bool {
-        self.re.is_none()
+        self.re.is_none() && self.original.is_empty()
     }
 }
 
 impl From<&str> for QueryPattern {
     fn from(literal_query_string: &str) -> QueryPattern {
-        QueryPattern::new(literal_query_string)
+        QueryPattern::fuzzy(literal_query_string)
     }
 }
 
@@ -565,7 +579,7 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
 #[cfg(test)]
 mod tests {
     fn matches(query: &str, symbol: &str) -> bool {
-        super::QueryPattern::new(query).is_match_symbol_name(symbol)
+        super::QueryPattern::fuzzy(query).is_match_symbol_name(symbol)
     }
 
     #[test]

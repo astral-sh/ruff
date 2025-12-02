@@ -18,7 +18,5 @@ src/jinja2/runtime.py:144:2: error[unresolved-attribute] Class `Mapping` has no 
 src/jinja2/runtime.py:690:38: error[invalid-assignment] Object of type `(Unknown & ~(() -> object)) | bool | (((str | None, /) -> bool) & ~(() -> object))` is not assignable to `bool | None`
 src/jinja2/runtime.py:770:40: error[invalid-argument-type] Argument to bound method `_invoke` is incorrect: Expected `bool`, found `@Todo | bool | None`
 src/jinja2/runtime.py:948:14: error[invalid-return-type] Function always implicitly returns `None`, which is not assignable to return type `Never`
-src/jinja2/utils.py:100:23: error[unresolved-attribute] Object of type `F@internalcode` has no attribute `__code__`
 src/jinja2/utils.py:431:2: error[unresolved-attribute] Class `MutableMapping` has no attribute `register`
-src/jinja2/utils.py:472:16: error[invalid-return-type] Return type does not match returned value: expected `Self@copy`, found `LRUCache`
-Found 23 diagnostics
+Found 21 diagnostics

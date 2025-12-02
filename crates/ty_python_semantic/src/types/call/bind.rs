@@ -39,7 +39,7 @@ use crate::types::{
     DataclassParams, FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType,
     MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType,
     TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, ide_support, todo_type,
+    WrapperDescriptorKind, enums, list_members, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
@@ -888,7 +888,7 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty)] = overload.parameter_types() {
                                 overload.set_return_type(Type::heterogeneous_tuple(
                                     db,
-                                    ide_support::all_members(db, *ty)
+                                    list_members::all_members(db, *ty)
                                         .into_iter()
                                         .sorted()
                                         .map(|member| Type::string_literal(db, &member.name)),
@@ -1116,6 +1116,11 @@ impl<'db> Bindings<'db> {
 
                                 overload.set_return_type(Type::DataclassTransformer(params));
                             }
+                        }
+
+                        Some(KnownFunction::NamedTuple) => {
+                            overload
+                                .set_return_type(todo_type!("Support for functional `namedtuple`"));
                         }
 
                         _ => {
@@ -1350,7 +1355,7 @@ impl<'db> Bindings<'db> {
                     },
 
                     Type::SpecialForm(SpecialFormType::TypedDict) => {
-                        overload.set_return_type(todo_type!("Support for `TypedDict`"));
+                        overload.set_return_type(todo_type!("Support for functional `TypedDict`"));
                     }
 
                     // Not a special case
@@ -3586,12 +3591,15 @@ impl CallableBindingSnapshotter {
 /// Describes a callable for the purposes of diagnostics.
 #[derive(Debug)]
 pub(crate) struct CallableDescription<'a> {
-    name: &'a str,
-    kind: &'a str,
+    pub(crate) name: &'a str,
+    pub(crate) kind: &'a str,
 }
 
 impl<'db> CallableDescription<'db> {
-    fn new(db: &'db dyn Db, callable_type: Type<'db>) -> Option<CallableDescription<'db>> {
+    pub(crate) fn new(
+        db: &'db dyn Db,
+        callable_type: Type<'db>,
+    ) -> Option<CallableDescription<'db>> {
         match callable_type {
             Type::FunctionLiteral(function) => Some(CallableDescription {
                 kind: "function",

@@ -29,6 +29,7 @@ pub mod statement_visitor;
 pub mod stmt_if;
 pub mod str;
 pub mod str_prefix;
+pub mod token;
 pub mod traversal;
 pub mod types;
 pub mod visitor;

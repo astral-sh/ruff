@@ -422,6 +422,7 @@ impl<'db> ConstraintSet<'db> {
         Self::constrain_typevar(db, typevar, lower, upper, TypeRelation::Assignability)
     }
 
+    #[expect(dead_code)] // Keep this around for debugging purposes
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         self.node.simplify_for_display(db).display(db)
     }
