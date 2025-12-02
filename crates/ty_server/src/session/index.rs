@@ -22,6 +22,7 @@ impl Index {
         }
     }
 
+    /// Returns an unstable iterator over all text document keys and their associated documents.
     pub(super) fn text_documents(
         &self,
     ) -> impl Iterator<Item = (&DocumentKey, &TextDocument)> + '_ {
@@ -43,6 +44,7 @@ impl Index {
         Ok(DocumentHandle::from_document(document))
     }
 
+    /// Returns an unstable iterator over all notebook document keys.
     #[expect(dead_code)]
     pub(super) fn notebook_document_keys(&self) -> impl Iterator<Item = &DocumentKey> + '_ {
         self.documents

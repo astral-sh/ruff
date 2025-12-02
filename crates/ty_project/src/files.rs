@@ -1,9 +1,9 @@
+use std::collections::BTreeSet;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::Arc;
 
 use salsa::Setter;
-use ty_python_semantic::FxIndexSet;
 
 use ruff_db::files::File;
 
@@ -127,7 +127,7 @@ impl<'db> LazyFiles<'db> {
     /// Sets the indexed files of a package to `files`.
     pub(super) fn set(
         mut self,
-        files: FxIndexSet<File>,
+        files: BTreeSet<File>,
         diagnostics: Vec<IOErrorDiagnostic>,
     ) -> Indexed<'db> {
         let files = Indexed {
@@ -152,7 +152,7 @@ pub struct Indexed<'db> {
 
 #[derive(Debug, get_size2::GetSize)]
 struct IndexedInner {
-    files: FxIndexSet<File>,
+    files: BTreeSet<File>,
     diagnostics: Vec<IOErrorDiagnostic>,
 }
 
@@ -167,14 +167,14 @@ impl Indexed<'_> {
 }
 
 impl Deref for Indexed<'_> {
-    type Target = FxIndexSet<File>;
+    type Target = BTreeSet<File>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner.files
     }
 }
 
-pub(super) type IndexedIter<'a> = std::iter::Copied<indexmap::set::Iter<'a, File>>;
+pub(super) type IndexedIter<'a> = std::iter::Copied<std::collections::btree_set::Iter<'a, File>>;
 
 impl<'a> IntoIterator for &'a Indexed<'_> {
     type Item = File;
@@ -207,7 +207,7 @@ impl IndexedMut<'_> {
     }
 
     pub(super) fn remove(&mut self, file: File) -> bool {
-        if self.inner_mut().files.swap_remove(&file) {
+        if self.inner_mut().files.remove(&file) {
             self.did_change = true;
             true
         } else {
@@ -251,7 +251,7 @@ impl Drop for IndexedMut<'_> {
 
 #[cfg(test)]
 mod tests {
-    use ty_python_semantic::FxIndexSet;
+    use std::collections::BTreeSet;
 
     use crate::ProjectMetadata;
     use crate::db::Db;
@@ -273,7 +273,7 @@ mod tests {
         let file = system_path_to_file(&db, "test.py").unwrap();
 
         let files = match project.file_set(&db).get() {
-            Index::Lazy(lazy) => lazy.set(FxIndexSet::from_iter([file]), Vec::new()),
+            Index::Lazy(lazy) => lazy.set(BTreeSet::from_iter([file]), Vec::new()),
             Index::Indexed(files) => files,
         };
 

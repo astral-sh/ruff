@@ -404,7 +404,7 @@ impl LintRegistry {
         &self.lints
     }
 
-    /// Returns an iterator over all known aliases and to their target lints.
+    /// Returns an unstable iterator over all known aliases and to their target lints.
     ///
     /// This iterator includes aliases that point to removed lints.
     pub fn aliases(&self) -> impl Iterator<Item = (LintName, LintId)> + '_ {
@@ -417,7 +417,7 @@ impl LintRegistry {
         })
     }
 
-    /// Iterates over all removed lints.
+    /// Iterates over all removed lints (unstable order).
     pub fn removed(&self) -> impl Iterator<Item = LintId> + '_ {
         self.by_name.unstable_iter().filter_map(|(_, value)| {
             if let LintEntry::Removed(metadata) = value {
@@ -536,12 +536,12 @@ impl RuleSelection {
         RuleSelection { lints }
     }
 
-    /// Returns an iterator over all enabled lints.
+    /// Returns an unstable iterator over all enabled lints.
     pub fn enabled(&self) -> impl Iterator<Item = LintId> + '_ {
         self.lints.unstable_keys().copied()
     }
 
-    /// Returns an iterator over all enabled lints and their severity.
+    /// Returns an unstable iterator over all enabled lints and their severity.
     pub fn iter(&self) -> impl ExactSizeIterator<Item = (LintId, Severity)> + '_ {
         self.lints
             .unstable_iter()

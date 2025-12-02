@@ -68,33 +68,35 @@ impl<V: Eq + Hash> FxHashSet<V> {
     #[track_caller]
     #[allow(clippy::iter_without_into_iter)]
     #[deprecated(
-        note = "FxHashSet does not guarantee stable iteration order; use FxIndexSet or unstable_iter() instead"
+        note = "FxHashSet does not guarantee stable iteration order; use BTreeSet or unstable_iter() instead"
     )]
     pub fn iter(&self) -> std::collections::hash_set::Iter<'_, V> {
         panic!(
-            "FxHashSet does not guarantee stable iteration order; use FxIndexSet or unstable_iter() instead"
+            "FxHashSet does not guarantee stable iteration order; use BTreeSet or unstable_iter() instead"
         );
     }
 
     #[track_caller]
     #[allow(clippy::should_implement_trait)]
     #[deprecated(
-        note = "FxHashSet does not guarantee stable iteration order; use FxIndexSet or unstable_into_iter() instead"
+        note = "FxHashSet does not guarantee stable iteration order; use BTreeSet or unstable_into_iter() instead"
     )]
     pub fn into_iter(self) -> std::collections::hash_set::IntoIter<V> {
         panic!(
-            "FxHashSet does not guarantee stable iteration order; use FxIndexSet or unstable_into_iter() instead"
+            "FxHashSet does not guarantee stable iteration order; use BTreeSet or unstable_into_iter() instead"
         );
     }
 }
 
 impl<V: Ord> FxHashSet<V> {
+    /// If you use this often, consider using `BTreeMap` instead of `FxHashMap`.
     pub fn sorted_ref_vec(&self) -> Vec<&V> {
         let mut vec: Vec<&V> = self.0.iter().collect();
         vec.sort();
         vec
     }
 
+    /// If you use this often, consider using `BTreeMap` instead of `FxHashMap`.
     pub fn into_sorted_vec(self) -> Vec<V> {
         let mut vec: Vec<V> = self.0.into_iter().collect();
         vec.sort();
@@ -199,83 +201,113 @@ impl<K: Eq + Hash, V> FxHashMap<K, V> {
     #[track_caller]
     #[allow(clippy::iter_without_into_iter)]
     #[deprecated(
-        note = "FxHashMap does not guarantee stable iteration order; use FxIndexMap or unstable_iter() instead"
+        note = "FxHashMap does not guarantee stable iteration order; use BTreeMap or unstable_iter() instead"
     )]
     pub fn iter(&self) -> std::collections::hash_map::Iter<'_, K, V> {
         panic!(
-            "FxHashMap does not guarantee stable iteration order; use FxIndexMap or unstable_iter() instead"
+            "FxHashMap does not guarantee stable iteration order; use BTreeMap or unstable_iter() instead"
         );
     }
 
     #[track_caller]
     #[deprecated(
-        note = "FxHashMap does not guarantee stable iteration order; use FxIndexMap or unstable_keys() instead"
+        note = "FxHashMap does not guarantee stable iteration order; use BTreeMap or unstable_keys() instead"
     )]
     pub fn keys(&self) -> std::collections::hash_map::Keys<'_, K, V> {
         panic!(
-            "FxHashMap does not guarantee stable iteration order; use FxIndexMap or unstable_keys() instead"
+            "FxHashMap does not guarantee stable iteration order; use BTreeMap or unstable_keys() instead"
         );
     }
 
     #[track_caller]
     #[deprecated(
-        note = "FxHashMap does not guarantee stable iteration order; use FxIndexMap or unstable_values() instead"
+        note = "FxHashMap does not guarantee stable iteration order; use BTreeMap or unstable_values() instead"
     )]
     pub fn values(&self) -> std::collections::hash_map::Values<'_, K, V> {
         panic!(
-            "FxHashMap does not guarantee stable iteration order; use FxIndexMap or unstable_values() instead"
+            "FxHashMap does not guarantee stable iteration order; use BTreeMap or unstable_values() instead"
         );
     }
 
     #[track_caller]
     #[allow(clippy::iter_without_into_iter)]
     #[deprecated(
-        note = "FxHashMap does not guarantee stable iteration order; use FxIndexMap or unstable_iter_mut() instead"
+        note = "FxHashMap does not guarantee stable iteration order; use BTreeMap or unstable_iter_mut() instead"
     )]
     pub fn iter_mut(&mut self) -> std::collections::hash_map::IterMut<'_, K, V> {
         panic!(
-            "FxHashMap does not guarantee stable iteration order; use FxIndexMap or unstable_iter_mut() instead"
+            "FxHashMap does not guarantee stable iteration order; use FxIndexMap/BTreeMap or unstable_iter_mut() instead"
         );
     }
 
     #[track_caller]
     #[deprecated(
-        note = "FxHashMap does not guarantee stable iteration order; use FxIndexMap or unstable_values_mut() instead"
+        note = "FxHashMap does not guarantee stable iteration order; use BTreeMap or unstable_values_mut() instead"
     )]
     pub fn values_mut(&mut self) -> std::collections::hash_map::ValuesMut<'_, K, V> {
         panic!(
-            "FxHashMap does not guarantee stable iteration order; use FxIndexMap or unstable_values_mut() instead"
+            "FxHashMap does not guarantee stable iteration order; use BTreeMap or unstable_values_mut() instead"
         );
     }
 
     #[track_caller]
     #[allow(clippy::should_implement_trait)]
     #[deprecated(
-        note = "FxHashMap does not guarantee stable iteration order; use FxIndexMap or unstable_into_iter() instead"
+        note = "FxHashMap does not guarantee stable iteration order; use BTreeMap or unstable_into_iter() instead"
     )]
     pub fn into_iter(self) -> std::collections::hash_map::IntoIter<K, V> {
         panic!(
-            "FxHashMap does not guarantee stable iteration order; use FxIndexMap or unstable_into_iter() instead"
+            "FxHashMap does not guarantee stable iteration order; use BTreeMap or unstable_into_iter() instead"
         );
     }
 
     #[track_caller]
     #[deprecated(
-        note = "FxHashMap does not guarantee stable iteration order; use FxIndexMap or unstable_into_keys() instead"
+        note = "FxHashMap does not guarantee stable iteration order; use BTreeMap or unstable_into_keys() instead"
     )]
     pub fn into_keys(self) -> std::collections::hash_map::IntoKeys<K, V> {
         panic!(
-            "FxHashMap does not guarantee stable iteration order; use FxIndexMap or unstable_into_keys() instead"
+            "FxHashMap does not guarantee stable iteration order; use BTreeMap or unstable_into_keys() instead"
         );
     }
 
     #[track_caller]
     #[deprecated(
-        note = "FxHashMap does not guarantee stable iteration order; use FxIndexMap or unstable_into_values() instead"
+        note = "FxHashMap does not guarantee stable iteration order; use BTreeMap or unstable_into_values() instead"
     )]
     pub fn into_values(self) -> std::collections::hash_map::IntoValues<K, V> {
         panic!(
-            "FxHashMap does not guarantee stable iteration order; use FxIndexMap or unstable_into_values() instead"
+            "FxHashMap does not guarantee stable iteration order; use BTreeMap or unstable_into_values() instead"
         );
+    }
+}
+
+impl<K: Ord, V> FxHashMap<K, V> {
+    /// If you use this often, consider using `BTreeMap` instead of `FxHashMap`.
+    pub fn sorted_key_ref_vec(&self) -> Vec<&K> {
+        let mut vec: Vec<&K> = self.0.keys().collect();
+        vec.sort();
+        vec
+    }
+
+    /// If you use this often, consider using `BTreeMap` instead of `FxHashMap`.
+    pub fn into_sorted_key_vec(self) -> Vec<K> {
+        let mut vec: Vec<K> = self.0.into_keys().collect();
+        vec.sort();
+        vec
+    }
+
+    /// If you use this often, consider using `BTreeMap` instead of `FxHashMap`.
+    pub fn sorted_ref_vec(&self) -> Vec<(&K, &V)> {
+        let mut vec: Vec<(&K, &V)> = self.0.iter().collect();
+        vec.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
+        vec
+    }
+
+    /// If you use this often, consider using `BTreeMap` instead of `FxHashMap`.
+    pub fn into_sorted_vec(self) -> Vec<(K, V)> {
+        let mut vec: Vec<(K, V)> = self.0.into_iter().collect();
+        vec.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
+        vec
     }
 }

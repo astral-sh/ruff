@@ -52,7 +52,7 @@ impl ProjectDatabase {
             custom_stdlib_changed: false,
         };
         // Paths that were added
-        let mut added_paths = FxHashSet::default();
+        let mut added_paths = BTreeSet::default();
 
         // Deduplicate the `sync` calls. Many file watchers emit multiple events for the same path.
         let mut synced_files = FxHashSet::default();
@@ -317,20 +317,19 @@ impl ProjectDatabase {
             }
         }
 
-        let diagnostics = if let Some(walker) =
-            ProjectFilesWalker::incremental(self, added_paths.unstable_iter())
-        {
-            // Use directory walking to discover newly added files.
-            let (files, diagnostics) = walker.collect_vec(self);
+        let diagnostics =
+            if let Some(walker) = ProjectFilesWalker::incremental(self, added_paths.into_iter()) {
+                // Use directory walking to discover newly added files.
+                let (files, diagnostics) = walker.collect_vec(self);
 
-            for file in files {
-                project.add_file(self, file);
-            }
+                for file in files {
+                    project.add_file(self, file);
+                }
 
-            diagnostics
-        } else {
-            Vec::new()
-        };
+                diagnostics
+            } else {
+                Vec::new()
+            };
 
         // Note: We simply replace all IO related diagnostics here. This isn't ideal, because
         // it removes IO errors that may still be relevant. However, tracking IO errors correctly

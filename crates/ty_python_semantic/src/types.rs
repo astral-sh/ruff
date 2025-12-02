@@ -12555,6 +12555,7 @@ impl<'db> ModuleLiteralType<'db> {
     }
 
     /// Get the submodule attributes we believe to be defined on this module.
+    /// This is an unstable iterator.
     ///
     /// Note that `ModuleLiteralType` is per-importing-file, so this analysis
     /// includes "imports the importing file has performed".
