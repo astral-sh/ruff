@@ -7103,12 +7103,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     #[track_caller]
     fn store_expression_type(&mut self, expression: &ast::Expr, ty: Type<'db>) {
-        if self.deferred_state.in_string_annotation() {
-            // Avoid storing the type of expressions that are part of a string annotation because
-            // the expression ids don't exists in the semantic index. Instead, we'll store the type
-            // on the string expression itself that represents the annotation.
-            return;
-        }
+        let expression_key = if let Some(node) = self.deferred_state.active_string_annotation() {
+            ExpressionNodeKey::from((node, expression))
+        } else {
+            ExpressionNodeKey::from(expression)
+        };
 
         let db = self.db();
 
@@ -7116,17 +7115,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             MultiInferenceState::Ignore => {}
 
             MultiInferenceState::Panic => {
-                let previous = self.expressions.insert(expression.into(), ty);
-                assert_eq!(previous, None);
+                let previous = self.expressions.insert(expression_key, ty);
+                assert_eq!(
+                    previous, None,
+                    "duplicate key {expression_key:?} for {expression:?}"
+                );
             }
 
             MultiInferenceState::Overwrite => {
-                self.expressions.insert(expression.into(), ty);
+                self.expressions.insert(expression_key, ty);
             }
 
             MultiInferenceState::Intersect => {
                 self.expressions
-                    .entry(expression.into())
+                    .entry(expression_key)
                     .and_modify(|current| {
                         *current = IntersectionType::from_elements(db, [*current, ty]);
                     })
@@ -12305,6 +12307,14 @@ impl DeferredExpressionState {
 
     const fn in_string_annotation(self) -> bool {
         matches!(self, DeferredExpressionState::InStringAnnotation(_))
+    }
+
+    const fn active_string_annotation(self) -> Option<NodeKey> {
+        match self {
+            DeferredExpressionState::None => None,
+            DeferredExpressionState::Deferred => None,
+            DeferredExpressionState::InStringAnnotation(node_key) => Some(node_key),
+        }
     }
 }
 

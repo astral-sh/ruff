@@ -3,8 +3,10 @@ use std::sync::Arc;
 
 use arc_swap::ArcSwapOption;
 use get_size2::GetSize;
-use ruff_python_ast::{AnyRootNodeRef, ModModule, NodeIndex};
-use ruff_python_parser::{ParseOptions, Parsed, parse_unchecked};
+use ruff_python_ast::{AnyRootNodeRef, ModExpression, ModModule, NodeIndex, StringLiteral};
+use ruff_python_parser::{
+    ParseError, ParseOptions, Parsed, parse_string_annotation, parse_unchecked,
+};
 
 use crate::Db;
 use crate::files::File;
@@ -39,6 +41,18 @@ pub fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
     parse_unchecked(&source, options)
         .try_into_module()
         .expect("PySourceType always parses into a module")
+}
+
+pub fn parsed_string_annotation(
+    source: &str,
+    string: &StringLiteral,
+) -> Result<Parsed<ModExpression>, ParseError> {
+    let expr = parse_string_annotation(source, string)?;
+
+    // We need the sub-ast of the string annotation to be indexed
+    indexed::ensure_indexed(&expr);
+
+    Ok(expr)
 }
 
 /// A wrapper around a parsed module.
@@ -170,12 +184,21 @@ mod indexed {
         pub parsed: Parsed<ModModule>,
     }
 
+    pub fn ensure_indexed(parsed: &Parsed<ModExpression>) {
+        let mut visitor = Visitor {
+            nodes: Some(Vec::new()),
+            index: 0,
+        };
+
+        AnyNodeRef::from(parsed.syntax()).visit_source_order(&mut visitor);
+    }
+
     impl IndexedModule {
         /// Create a new [`IndexedModule`] from the given AST.
         #[allow(clippy::unnecessary_cast)]
         pub fn new(parsed: Parsed<ModModule>) -> Arc<Self> {
             let mut visitor = Visitor {
-                nodes: Vec::new(),
+                nodes: Some(Vec::new()),
                 index: 0,
             };
 
@@ -186,7 +209,7 @@ mod indexed {
 
             AnyNodeRef::from(inner.parsed.syntax()).visit_source_order(&mut visitor);
 
-            let index: Box<[AnyRootNodeRef<'_>]> = visitor.nodes.into_boxed_slice();
+            let index: Box<[AnyRootNodeRef<'_>]> = visitor.nodes.unwrap().into_boxed_slice();
 
             // SAFETY: We cast from `Box<[AnyRootNodeRef<'_>]>` to `Box<[AnyRootNodeRef<'static>]>`,
             // faking the 'static lifetime to create the self-referential struct. The node references
@@ -215,7 +238,7 @@ mod indexed {
     /// A visitor that collects nodes in source order.
     pub struct Visitor<'a> {
         pub index: u32,
-        pub nodes: Vec<AnyRootNodeRef<'a>>,
+        pub nodes: Option<Vec<AnyRootNodeRef<'a>>>,
     }
 
     impl<'a> Visitor<'a> {
@@ -225,7 +248,9 @@ mod indexed {
             AnyRootNodeRef<'a>: From<&'a T>,
         {
             node.node_index().set(NodeIndex::from(self.index));
-            self.nodes.push(AnyRootNodeRef::from(node));
+            if let Some(nodes) = &mut self.nodes {
+                nodes.push(AnyRootNodeRef::from(node));
+            }
             self.index += 1;
         }
     }

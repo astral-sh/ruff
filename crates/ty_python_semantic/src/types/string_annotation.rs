@@ -1,3 +1,4 @@
+use ruff_db::parsed::parsed_string_annotation;
 use ruff_db::source::source_text;
 use ruff_python_ast::{self as ast, ModExpression};
 use ruff_python_parser::Parsed;
@@ -149,7 +150,7 @@ pub(crate) fn parse_string_annotation(
         // Compare the raw contents (without quotes) of the expression with the parsed contents
         // contained in the string literal.
         } else if &source[string_literal.content_range()] == string_literal.as_str() {
-            match ruff_python_parser::parse_string_annotation(source.as_str(), string_literal) {
+            match parsed_string_annotation(source.as_str(), string_literal) {
                 Ok(parsed) => return Some(parsed),
                 Err(parse_error) => {
                     if let Some(builder) =
