@@ -88,40 +88,6 @@ impl Tokens {
     ///
     /// Returns [`TokenAt::Between`] if `offset` points directly inbetween two tokens
     /// (the left token ends at `offset` and the right token starts at `offset`).
-    ///
-    ///
-    /// ## Examples
-    ///
-    /// [Playground](https://play.ruff.rs/f3ad0a55-5931-4a13-96c7-b2b8bfdc9a2e?secondary=Tokens)
-    ///
-    /// ```
-    /// # use ruff_python_ast::PySourceType;
-    /// # use ruff_python_parser::{Token, TokenAt, TokenKind};
-    /// # use ruff_text_size::{Ranged, TextSize};
-    ///
-    /// let source = r#"
-    /// def test(arg):
-    ///     arg.call()
-    ///     if True:
-    ///         pass
-    ///     print("true")
-    /// "#.trim();
-    ///
-    /// let parsed = ruff_python_parser::parse_unchecked_source(source, PySourceType::Python);
-    /// let tokens = parsed.tokens();
-    ///
-    /// let collect_tokens = |offset: TextSize| {
-    ///     tokens.at_offset(offset).into_iter().map(|t| (t.kind(), &source[t.range()])).collect::<Vec<_>>()
-    /// };
-    ///
-    /// assert_eq!(collect_tokens(TextSize::new(4)), vec! [(TokenKind::Name, "test")]);
-    /// assert_eq!(collect_tokens(TextSize::new(6)), vec! [(TokenKind::Name, "test")]);
-    /// // between `arg` and `.`
-    /// assert_eq!(collect_tokens(TextSize::new(22)), vec! [(TokenKind::Name, "arg"), (TokenKind::Dot, ".")]);
-    /// assert_eq!(collect_tokens(TextSize::new(36)), vec! [(TokenKind::If, "if")]);
-    /// // Before the dedent token
-    /// assert_eq!(collect_tokens(TextSize::new(57)), vec! []);
-    /// ```
     pub fn at_offset(&self, offset: TextSize) -> TokenAt {
         match self.binary_search_by_start(offset) {
             // The token at `index` starts exactly at `offset.
@@ -349,3 +315,206 @@ impl<'a> Iterator for TokenIterWithContext<'a> {
 }
 
 impl FusedIterator for TokenIterWithContext<'_> {}
+
+#[cfg(test)]
+mod tests {
+    use std::ops::Range;
+
+    use ruff_text_size::TextSize;
+
+    use crate::token::{Token, TokenFlags, TokenKind};
+
+    use super::*;
+
+    /// Test case containing a "gap" between two tokens.
+    ///
+    /// Code: <https://play.ruff.rs/a3658340-6df8-42c5-be80-178744bf1193>
+    const TEST_CASE_WITH_GAP: [(TokenKind, Range<u32>); 10] = [
+        (TokenKind::Def, 0..3),
+        (TokenKind::Name, 4..7),
+        (TokenKind::Lpar, 7..8),
+        (TokenKind::Rpar, 8..9),
+        (TokenKind::Colon, 9..10),
+        (TokenKind::Newline, 10..11),
+        // Gap               ||..||
+        (TokenKind::Comment, 15..24),
+        (TokenKind::NonLogicalNewline, 24..25),
+        (TokenKind::Indent, 25..29),
+        (TokenKind::Pass, 29..33),
+        // No newline at the end to keep the token set full of unique tokens
+    ];
+
+    /// Helper function to create [`Tokens`] from an iterator of (kind, range).
+    fn new_tokens(tokens: impl Iterator<Item = (TokenKind, Range<u32>)>) -> Tokens {
+        Tokens::new(
+            tokens
+                .map(|(kind, range)| {
+                    Token::new(
+                        kind,
+                        TextRange::new(TextSize::new(range.start), TextSize::new(range.end)),
+                        TokenFlags::empty(),
+                    )
+                })
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn tokens_after_offset_at_token_start() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let after = tokens.after(TextSize::new(8));
+        assert_eq!(after.len(), 7);
+        assert_eq!(after.first().unwrap().kind(), TokenKind::Rpar);
+    }
+
+    #[test]
+    fn tokens_after_offset_at_token_end() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let after = tokens.after(TextSize::new(11));
+        assert_eq!(after.len(), 4);
+        assert_eq!(after.first().unwrap().kind(), TokenKind::Comment);
+    }
+
+    #[test]
+    fn tokens_after_offset_between_tokens() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let after = tokens.after(TextSize::new(13));
+        assert_eq!(after.len(), 4);
+        assert_eq!(after.first().unwrap().kind(), TokenKind::Comment);
+    }
+
+    #[test]
+    fn tokens_after_offset_at_last_token_end() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let after = tokens.after(TextSize::new(33));
+        assert_eq!(after.len(), 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Offset 5 is inside a token range 4..7")]
+    fn tokens_after_offset_inside_token() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        tokens.after(TextSize::new(5));
+    }
+
+    #[test]
+    fn tokens_before_offset_at_first_token_start() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let before = tokens.before(TextSize::new(0));
+        assert_eq!(before.len(), 0);
+    }
+
+    #[test]
+    fn tokens_before_offset_after_first_token_gap() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let before = tokens.before(TextSize::new(3));
+        assert_eq!(before.len(), 1);
+        assert_eq!(before.last().unwrap().kind(), TokenKind::Def);
+    }
+
+    #[test]
+    fn tokens_before_offset_at_second_token_start() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let before = tokens.before(TextSize::new(4));
+        assert_eq!(before.len(), 1);
+        assert_eq!(before.last().unwrap().kind(), TokenKind::Def);
+    }
+
+    #[test]
+    fn tokens_before_offset_at_token_start() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let before = tokens.before(TextSize::new(8));
+        assert_eq!(before.len(), 3);
+        assert_eq!(before.last().unwrap().kind(), TokenKind::Lpar);
+    }
+
+    #[test]
+    fn tokens_before_offset_at_token_end() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let before = tokens.before(TextSize::new(11));
+        assert_eq!(before.len(), 6);
+        assert_eq!(before.last().unwrap().kind(), TokenKind::Newline);
+    }
+
+    #[test]
+    fn tokens_before_offset_between_tokens() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let before = tokens.before(TextSize::new(13));
+        assert_eq!(before.len(), 6);
+        assert_eq!(before.last().unwrap().kind(), TokenKind::Newline);
+    }
+
+    #[test]
+    fn tokens_before_offset_at_last_token_end() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let before = tokens.before(TextSize::new(33));
+        assert_eq!(before.len(), 10);
+        assert_eq!(before.last().unwrap().kind(), TokenKind::Pass);
+    }
+
+    #[test]
+    #[should_panic(expected = "Offset 5 is inside a token range 4..7")]
+    fn tokens_before_offset_inside_token() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        tokens.before(TextSize::new(5));
+    }
+
+    #[test]
+    fn tokens_in_range_at_token_offset() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let in_range = tokens.in_range(TextRange::new(4.into(), 10.into()));
+        assert_eq!(in_range.len(), 4);
+        assert_eq!(in_range.first().unwrap().kind(), TokenKind::Name);
+        assert_eq!(in_range.last().unwrap().kind(), TokenKind::Colon);
+    }
+
+    #[test]
+    fn tokens_in_range_start_offset_at_token_end() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let in_range = tokens.in_range(TextRange::new(11.into(), 29.into()));
+        assert_eq!(in_range.len(), 3);
+        assert_eq!(in_range.first().unwrap().kind(), TokenKind::Comment);
+        assert_eq!(in_range.last().unwrap().kind(), TokenKind::Indent);
+    }
+
+    #[test]
+    fn tokens_in_range_end_offset_at_token_start() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let in_range = tokens.in_range(TextRange::new(8.into(), 15.into()));
+        assert_eq!(in_range.len(), 3);
+        assert_eq!(in_range.first().unwrap().kind(), TokenKind::Rpar);
+        assert_eq!(in_range.last().unwrap().kind(), TokenKind::Newline);
+    }
+
+    #[test]
+    fn tokens_in_range_start_offset_between_tokens() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let in_range = tokens.in_range(TextRange::new(13.into(), 29.into()));
+        assert_eq!(in_range.len(), 3);
+        assert_eq!(in_range.first().unwrap().kind(), TokenKind::Comment);
+        assert_eq!(in_range.last().unwrap().kind(), TokenKind::Indent);
+    }
+
+    #[test]
+    fn tokens_in_range_end_offset_between_tokens() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        let in_range = tokens.in_range(TextRange::new(9.into(), 13.into()));
+        assert_eq!(in_range.len(), 2);
+        assert_eq!(in_range.first().unwrap().kind(), TokenKind::Colon);
+        assert_eq!(in_range.last().unwrap().kind(), TokenKind::Newline);
+    }
+
+    #[test]
+    #[should_panic(expected = "Offset 5 is inside a token range 4..7")]
+    fn tokens_in_range_start_offset_inside_token() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        tokens.in_range(TextRange::new(5.into(), 10.into()));
+    }
+
+    #[test]
+    #[should_panic(expected = "Offset 6 is inside a token range 4..7")]
+    fn tokens_in_range_end_offset_inside_token() {
+        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
+        tokens.in_range(TextRange::new(0.into(), 6.into()));
+    }
+}

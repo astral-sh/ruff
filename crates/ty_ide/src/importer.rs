@@ -28,7 +28,6 @@ use ruff_python_ast::token::Tokens;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_importer::Insertion;
-use ruff_python_parser::Parsed;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_project::Db;
 use ty_python_semantic::semantic_index::definition::DefinitionKind;
@@ -77,7 +76,7 @@ impl<'a> Importer<'a> {
         source: &'a str,
         parsed: &'a ParsedModuleRef,
     ) -> Self {
-        let imports = TopLevelImports::find(parsed);
+        let imports = TopLevelImports::find(parsed.syntax());
 
         Self {
             db,
@@ -750,9 +749,9 @@ struct TopLevelImports<'ast> {
 
 impl<'ast> TopLevelImports<'ast> {
     /// Find all top-level imports from the given AST of a Python module.
-    fn find(parsed: &'ast Parsed<ast::ModModule>) -> Vec<AstImport<'ast>> {
+    fn find(module: &'ast ast::ModModule) -> Vec<AstImport<'ast>> {
         let mut visitor = TopLevelImports::default();
-        visitor.visit_body(parsed.suite());
+        visitor.visit_body(&module.body);
         visitor.imports
     }
 }
