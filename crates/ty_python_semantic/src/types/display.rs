@@ -1629,8 +1629,12 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
         // For `ParamSpec` kind, the parameters still contain `*args` and `**kwargs`, but we
         // display them as `**P` instead, so avoid multiline in that case.
         // TODO: This might change once we support `Concatenate`
-        let multiline =
-            self.settings.multiline && self.parameters.len() > 1 && !self.parameters.is_paramspec();
+        let multiline = self.settings.multiline
+            && self.parameters.len() > 1
+            && !matches!(
+                self.parameters.kind(),
+                ParametersKind::Gradual | ParametersKind::ParamSpec(_)
+            );
         // Opening parenthesis
         f.write_char('(')?;
         if multiline {

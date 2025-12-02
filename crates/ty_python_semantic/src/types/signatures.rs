@@ -1476,10 +1476,6 @@ impl<'db> Parameters<'db> {
         matches!(self.kind, ParametersKind::Gradual)
     }
 
-    pub(crate) const fn is_paramspec(&self) -> bool {
-        matches!(self.kind, ParametersKind::ParamSpec(_))
-    }
-
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
     pub(crate) fn todo() -> Self {
         Self {
