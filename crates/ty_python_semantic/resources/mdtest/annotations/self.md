@@ -249,9 +249,8 @@ class Foo[T]:
         raise NotImplementedError
 
 class Bar:
-    def _(self: Self, x: Foo[Self]):
-        # TODO: revealed: bound method Foo[Self@_].foo() -> Self@_
-        # revealed: bound method Foo[Self@_].foo() -> Foo[Self@_]
+    def bar(self: Self, x: Foo[Self]):
+        # revealed: bound method Foo[Self@bar].foo() -> Self@_
         reveal_type(x.foo)
 
 def f[T: Bar](x: Foo[T]):
