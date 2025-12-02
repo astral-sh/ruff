@@ -84,7 +84,6 @@ Settings: Settings {
         "non-subscriptable": Error (Default),
         "not-iterable": Error (Default),
         "override-of-final-method": Error (Default),
-        "override-of-prohibited-named-tuple-attribute": Error (Default),
         "parameter-already-assigned": Error (Default),
         "positional-only-parameter-as-kwarg": Error (Default),
         "possibly-missing-attribute": Warning (Default),

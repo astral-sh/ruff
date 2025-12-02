@@ -20,8 +20,8 @@ use crate::{
         class::CodeGeneratorKind,
         context::InferContext,
         diagnostic::{
-            INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, OVERRIDE_OF_FINAL_METHOD,
-            OVERRIDE_OF_PROHIBITED_NAMED_TUPLE_ATTRIBUTE, report_invalid_method_override,
+            INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE,
+            OVERRIDE_OF_FINAL_METHOD, report_invalid_method_override,
             report_overridden_final_method,
         },
         function::{FunctionDecorators, FunctionType, KnownFunction},
@@ -55,12 +55,6 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: ClassLite
     let class_specialized = class.identity_specialization(db);
     let own_class_members: FxHashSet<_> =
         all_declarations_and_bindings(db, class.body_scope(db)).collect();
-
-    if configuration.check_prohibited_named_tuple_attrs()
-        && CodeGeneratorKind::NamedTuple.matches(db, class, None)
-    {
-        check_prohibited_namedtuple_attrs(context, &own_class_members);
-    }
 
     for member in own_class_members {
         check_class_declaration(context, configuration, class_specialized, &member);
@@ -151,6 +145,27 @@ fn check_class_declaration<'db>(
 
     let (literal, specialization) = class.class_literal(db);
     let class_kind = CodeGeneratorKind::from_class(db, literal, specialization);
+
+    // Check for prohibited `NamedTuple` attribute overrides.
+    //
+    // `NamedTuple` classes have certain synthesized attributes (like `_asdict`, `_make`, etc.)
+    // that cannot be overwritten. Attempting to assign to these attributes (without type
+    // annotations) or define methods with these names will raise an `AttributeError` at runtime.
+    if class_kind == Some(CodeGeneratorKind::NamedTuple)
+        && configuration.check_prohibited_named_tuple_attrs()
+        && PROHIBITED_NAMEDTUPLE_ATTRS.contains(&member.name.as_str())
+        && !matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
+        && let Some(builder) = context.report_lint(
+            &INVALID_NAMED_TUPLE,
+            definition.focus_range(db, context.module()),
+        )
+    {
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Cannot overwrite NamedTuple attribute `{}`",
+            &member.name
+        ));
+        diagnostic.info("This will cause the class creation to fail at runtime");
+    }
 
     let mut subclass_overrides_superclass_declaration = false;
     let mut has_dynamic_superclass = false;
@@ -361,43 +376,6 @@ fn check_class_declaration<'db>(
     }
 }
 
-/// Check for prohibited `NamedTuple` attribute overrides.
-///
-/// `NamedTuple` classes have certain synthesized attributes (like `_asdict`, `_make`, etc.)
-/// that cannot be overwritten. Attempting to assign to these attributes (without type
-/// annotations) or define methods with these names will raise an `AttributeError` at runtime.
-fn check_prohibited_namedtuple_attrs<'db>(
-    context: &InferContext<'db, '_>,
-    own_class_members: &FxHashSet<MemberWithDefinition<'db>>,
-) {
-    let db = context.db();
-    let module = context.module();
-
-    for member in own_class_members {
-        if !PROHIBITED_NAMEDTUPLE_ATTRS.contains(&member.member.name.as_str()) {
-            continue;
-        }
-
-        let Some(definition) = member.definition else {
-            continue;
-        };
-
-        // Only annotated assignments are allowed (they become fields).
-        // Everything else (assignments, method definitions, etc.) is an error.
-        if !matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_)) {
-            if let Some(builder) = context.report_lint(
-                &OVERRIDE_OF_PROHIBITED_NAMED_TUPLE_ATTRIBUTE,
-                definition.full_range(db, module),
-            ) {
-                builder.into_diagnostic(format_args!(
-                    "Cannot overwrite NamedTuple attribute `{}`",
-                    member.member.name
-                ));
-            }
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(super) enum MethodKind<'db> {
     Synthesized(CodeGeneratorKind<'db>),
@@ -432,7 +410,7 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
         if rule_selection.is_enabled(LintId::of(&OVERRIDE_OF_FINAL_METHOD)) {
             config |= OverrideRulesConfig::FINAL_METHOD_OVERRIDDEN;
         }
-        if rule_selection.is_enabled(LintId::of(&OVERRIDE_OF_PROHIBITED_NAMED_TUPLE_ATTRIBUTE)) {
+        if rule_selection.is_enabled(LintId::of(&INVALID_NAMED_TUPLE)) {
             config |= OverrideRulesConfig::PROHIBITED_NAMED_TUPLE_ATTR;
         }
 

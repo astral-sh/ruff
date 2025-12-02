@@ -512,28 +512,28 @@ from typing import NamedTuple
 class F(NamedTuple):
     x: int
 
-    # error: [override-of-prohibited-named-tuple-attribute] "Cannot overwrite NamedTuple attribute `_asdict`"
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
     _asdict = 42
 
-    # error: [override-of-prohibited-named-tuple-attribute] "Cannot overwrite NamedTuple attribute `_make`"
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_make`"
     _make = "foo"
 
-    # error: [override-of-prohibited-named-tuple-attribute] "Cannot overwrite NamedTuple attribute `_replace`"
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_replace`"
     _replace = lambda self: self
 
-    # error: [override-of-prohibited-named-tuple-attribute] "Cannot overwrite NamedTuple attribute `_fields`"
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_fields`"
     _fields = ()
 
-    # error: [override-of-prohibited-named-tuple-attribute] "Cannot overwrite NamedTuple attribute `_field_defaults`"
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_field_defaults`"
     _field_defaults = {}
 
-    # error: [override-of-prohibited-named-tuple-attribute] "Cannot overwrite NamedTuple attribute `__new__`"
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `__new__`"
     __new__ = None
 
-    # error: [override-of-prohibited-named-tuple-attribute] "Cannot overwrite NamedTuple attribute `__init__`"
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `__init__`"
     __init__ = None
 
-    # error: [override-of-prohibited-named-tuple-attribute] "Cannot overwrite NamedTuple attribute `__getnewargs__`"
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `__getnewargs__`"
     __getnewargs__ = None
 ```
 
@@ -551,17 +551,18 @@ class G(NamedTuple):
     regular_attr = "value"
 ```
 
-Note that type-annotated attributes become NamedTuple fields, not attribute overrides. This check
-does not flag them (though field names starting with `_` would be caught by a separate check for
-invalid field names):
+Note that type-annotated attributes become NamedTuple fields, not attribute overrides. They are not
+flagged as prohibited attribute overrides (though field names starting with `_` are caught by the
+underscore field name check):
 
 ```py
 from typing import NamedTuple
 
 class H(NamedTuple):
     x: int
-    # This is a field declaration, not an override. It's not flagged by this rule,
-    # but would be flagged by the `invalid-named-tuple` rule for underscore-prefixed fields.
+    # This is a field declaration, not an override. It's not flagged as an override,
+    # but is flagged because field names cannot start with underscores.
+    # error: [invalid-named-tuple] "NamedTuple field `_asdict` cannot start with an underscore"
     _asdict: int = 0
 ```
 
@@ -574,7 +575,7 @@ class I(NamedTuple):
     x: int
 
     if True:
-        # error: [override-of-prohibited-named-tuple-attribute] "Cannot overwrite NamedTuple attribute `_asdict`"
+        # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
         _asdict = 42
 ```
 
@@ -586,11 +587,12 @@ from typing import NamedTuple
 class J(NamedTuple):
     x: int
 
-    # error: [override-of-prohibited-named-tuple-attribute] "Cannot overwrite NamedTuple attribute `_asdict`"
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
     def _asdict(self):
         return {}
-    # error: [override-of-prohibited-named-tuple-attribute] "Cannot overwrite NamedTuple attribute `_make`"
+
     @classmethod
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_make`"
     def _make(cls, iterable):
         return cls(*iterable)
 ```

@@ -282,8 +282,8 @@ class Child(ParentDataclass):
 class MyNamedTuple(NamedTuple):
     x: int
 
-    # error: [override-of-prohibited-named-tuple-attribute] "Cannot overwrite NamedTuple attribute `_asdict`"
     @override
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
     def _asdict(self, /) -> dict[str, Any]: ...
 
 class MyNamedTupleParent(NamedTuple):

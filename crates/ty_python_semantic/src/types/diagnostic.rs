@@ -122,7 +122,6 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
-    registry.register_lint(&OVERRIDE_OF_PROHIBITED_NAMED_TUPLE_ATTRIBUTE);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -546,7 +545,8 @@ declare_lint! {
     ///
     /// ## Why is this bad?
     /// An invalidly defined `NamedTuple` class may lead to the type checker
-    /// drawing incorrect conclusions. It may also lead to `TypeError`s at runtime.
+    /// drawing incorrect conclusions. It may also lead to `TypeError`s or
+    /// `AttributeError`s at runtime.
     ///
     /// ## Examples
     /// A class definition cannot combine `NamedTuple` with other base classes
@@ -558,6 +558,27 @@ declare_lint! {
     /// >>> from typing import NamedTuple
     /// >>> class Foo(NamedTuple, object): ...
     /// TypeError: can only inherit from a NamedTuple type and Generic
+    /// ```
+    ///
+    /// Further, `NamedTuple` field names cannot start with an underscore:
+    ///
+    /// ```pycon
+    /// >>> from typing import NamedTuple
+    /// >>> class Foo(NamedTuple):
+    /// ...     _bar: int
+    /// ValueError: Field names cannot start with an underscore: '_bar'
+    /// ```
+    ///
+    /// `NamedTuple` classes also have certain synthesized attributes (like `_asdict`, `_make`,
+    /// `_replace`, etc.) that cannot be overwritten. Attempting to assign to these attributes
+    /// without a type annotation will raise an `AttributeError` at runtime.
+    ///
+    /// ```pycon
+    /// >>> from typing import NamedTuple
+    /// >>> class Foo(NamedTuple):
+    /// ...     x: int
+    /// ...     _asdict = 42
+    /// AttributeError: Cannot overwrite NamedTuple attribute _asdict
     /// ```
     pub(crate) static INVALID_NAMED_TUPLE = {
         summary: "detects invalid `NamedTuple` class definitions",
@@ -1784,33 +1805,6 @@ declare_lint! {
     /// - [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)
     pub(crate) static SUPER_CALL_IN_NAMED_TUPLE_METHOD = {
         summary: "detects `super()` calls in methods of `NamedTuple` classes",
-        status: LintStatus::preview("0.0.1-alpha.30"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
-    /// ## What it does
-    /// Checks for attempts to override prohibited attributes in `NamedTuple` classes.
-    ///
-    /// ## Why is this bad?
-    /// `NamedTuple` classes have certain synthesized attributes (like `_asdict`, `_make`,
-    /// `_replace`, etc.) that cannot be overwritten. Attempting to assign to these attributes
-    /// without a type annotation will raise an `AttributeError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing import NamedTuple
-    ///
-    /// class F(NamedTuple):
-    ///     x: int
-    ///     _asdict = 42  # error: Cannot overwrite NamedTuple attribute _asdict
-    /// ```
-    ///
-    /// ## References
-    /// - [Python documentation: NamedTuple](https://docs.python.org/3/library/typing.html#typing.NamedTuple)
-    pub(crate) static OVERRIDE_OF_PROHIBITED_NAMED_TUPLE_ATTRIBUTE = {
-        summary: "detects attempts to override prohibited `NamedTuple` attributes",
         status: LintStatus::preview("0.0.1-alpha.30"),
         default_level: Level::Error,
     }
