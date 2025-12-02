@@ -1,6 +1,5 @@
 use ruff_formatter::{FormatRuleWithOptions, RemoveSoftLinesBuffer, write};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::ExprLambda;
+use ruff_python_ast::{AnyNodeRef, Expr, ExprLambda};
 use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
@@ -84,9 +83,16 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             }
         }
 
-        // Avoid parenthesizing lists, dictionaries, etc.
+        // Avoid parenthesizing lists, dictionaries, etc. that have their own parentheses, but still
+        // wrap calls and subscripts, which can have long expressions before the parentheses:
+        // ```py
+        // lambda arg1, arg2, arg3, *args, **kwargs: a_loooooooooooong_call_expression.with_an_attr(inner, args)
+        // ```
+        let needs_parentheses = has_own_parentheses(body, f.context()).is_none()
+            || matches!(&**body, Expr::Call(_) | Expr::Subscript(_));
+
         if is_parenthesize_lambda_bodies_enabled(f.context())
-            && has_own_parentheses(body, f.context()).is_none()
+            && needs_parentheses
             && !is_expression_parenthesized(body.into(), comments.ranges(), f.context().source())
         {
             match self.layout {

@@ -362,6 +362,10 @@ class C:
                 ),
             )
 
+            transaction_count = self._query_txs_for_range(
+                get_count_fn=lambda from_ts, to_ts, _chain_id=chain_id: db_evmtx.count_transactions_in_range[_chain_id, from_ts, to_ts],
+            )
+
 def ddb():
     sql = (
         lambda var, table, n=N: f"""

@@ -368,6 +368,10 @@ class C:
                 ),
             )
 
+            transaction_count = self._query_txs_for_range(
+                get_count_fn=lambda from_ts, to_ts, _chain_id=chain_id: db_evmtx.count_transactions_in_range[_chain_id, from_ts, to_ts],
+            )
+
 def ddb():
     sql = (
         lambda var, table, n=N: f"""
@@ -762,6 +766,14 @@ class C:
                 ),
             )
 
+            transaction_count = self._query_txs_for_range(
+                get_count_fn=lambda from_ts,
+                to_ts,
+                _chain_id=chain_id: db_evmtx.count_transactions_in_range[
+                    _chain_id, from_ts, to_ts
+                ],
+            )
+
 
 def ddb():
     sql = (
@@ -974,8 +986,8 @@ def ddb():
 -        f=lambda self,
 -        *args,
 -        **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs),
-+        f=lambda self, *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
-+            *args, **kwargs
++        f=lambda self, *args, **kwargs: (
++            aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs)
 +        ),
      )
  
@@ -1025,7 +1037,7 @@ def ddb():
      }
  
  
-@@ -352,24 +336,22 @@
+@@ -352,42 +336,40 @@
  def foo():
      if True:
          if True:
@@ -1052,11 +1064,28 @@ def ddb():
 -                get_count_fn=lambda from_ts,
 -                to_ts,
 -                _chain_id=chain_id: db_evmtx.count_transactions_in_range(
-+                get_count_fn=lambda from_ts, to_ts, _chain_id=chain_id: db_evmtx.count_transactions_in_range(
-                     chain_id=_chain_id,
-                     from_ts=from_ts,
-                     to_ts=to_ts,
-@@ -378,8 +360,8 @@
+-                    chain_id=_chain_id,
+-                    from_ts=from_ts,
+-                    to_ts=to_ts,
++                get_count_fn=lambda from_ts, to_ts, _chain_id=chain_id: (
++                    db_evmtx.count_transactions_in_range(
++                        chain_id=_chain_id,
++                        from_ts=from_ts,
++                        to_ts=to_ts,
++                    )
+                 ),
+             )
+ 
+             transaction_count = self._query_txs_for_range(
+-                get_count_fn=lambda from_ts,
+-                to_ts,
+-                _chain_id=chain_id: db_evmtx.count_transactions_in_range[
+-                    _chain_id, from_ts, to_ts
+-                ],
++                get_count_fn=lambda from_ts, to_ts, _chain_id=chain_id: (
++                    db_evmtx.count_transactions_in_range[_chain_id, from_ts, to_ts]
++                ),
+             )
  
  
  def ddb():

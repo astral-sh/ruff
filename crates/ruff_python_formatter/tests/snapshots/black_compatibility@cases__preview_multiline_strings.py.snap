@@ -392,8 +392,8 @@ a = b if """
  foo
  """.replace("\n", "")
 -generated_readme = lambda project_name: """
-+generated_readme = (
-+    lambda project_name: """
++generated_readme = lambda project_name: (
++    """
  {}
  
  <Add content here!>
@@ -597,8 +597,8 @@ data = yaml.load(
 MULTILINE = """
 foo
 """.replace("\n", "")
-generated_readme = (
-    lambda project_name: """
+generated_readme = lambda project_name: (
+    """
 {}
 
 <Add content here!>
