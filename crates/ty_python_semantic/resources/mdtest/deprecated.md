@@ -329,6 +329,7 @@ from typing_extensions import overload
 def f(x: str): ...
 @overload
 def f(x: int): ...
+
 # TODO: no error
 # (This is caused by a salsa cycle and how we union type inference results to avoid oscillations
 # during cycle handling.)
