@@ -10,10 +10,7 @@ const fn is_trivia(kind: TokenKind) -> bool {
     matches!(
         kind,
         TokenKind::Comment
-            | TokenKind::Newline
             | TokenKind::NonLogicalNewline
-            | TokenKind::Indent
-            | TokenKind::Dedent
     )
 }
 
