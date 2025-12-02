@@ -5,6 +5,8 @@
   extends: ["config:recommended"],
   labels: ["internal"],
   schedule: ["before 4am on Monday"],
+  "minimumReleaseAge": "7 days",
+  "minimumReleaseAgeBehaviour": "timestamp-required",
   semanticCommits: "disabled",
   separateMajorMinor: false,
   prHourlyLimit: 10,
