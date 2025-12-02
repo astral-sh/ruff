@@ -108,9 +108,12 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     label_details,
                     insert_text: comp.insert.map(String::from),
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
-                    documentation: comp
-                        .documentation
-                        .map(|docstring| Documentation::String(docstring.render_plaintext())),
+                    documentation: comp.documentation.map(|docstring| {
+                        Documentation::MarkupContent(lsp_types::MarkupContent {
+                            kind: lsp_types::MarkupKind::Markdown,
+                            value: docstring.render_markdown(),
+                        })
+                    }),
                     ..Default::default()
                 }
             })

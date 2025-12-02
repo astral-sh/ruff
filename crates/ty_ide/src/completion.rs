@@ -561,7 +561,10 @@ fn add_unimported_completions<'db>(
             // TODO: `is_type_check_only` requires inferring the type of the symbol
             is_type_check_only: false,
             is_definitively_raisable: false,
-            documentation: None,
+            documentation: symbol
+                .symbol
+                .documentation
+                .map(|documentation| Docstring::new(documentation.to_string())),
         });
     }
 }
