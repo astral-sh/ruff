@@ -2571,17 +2571,39 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         }
 
         let variadic_type = match argument_type {
+            Some(argument_type @ Type::Union(union)) => {
+                // When accessing an instance attribute that is a `P.args`, the type we infer is
+                // `Unknown | P.args`. This needs to be special cased here to avoid calling
+                // `iterate` on it which will lose the `ParamSpec` information as it will return
+                // `object` that comes from the upper bound of `P.args`. What we want is to always
+                // use the `P.args` type to perform type checking against the parameter type. This
+                // will allow us to error when `*args: P.args` is matched against, for example,
+                // `n: int` and correctly type check when `*args: P.args` is matched against
+                // `*args: P.args`.
+                match union.elements(db) {
+                    [paramspec @ Type::TypeVar(typevar), other]
+                    | [other, paramspec @ Type::TypeVar(typevar)]
+                        if typevar.is_paramspec(db) && other.is_unknown() =>
+                    {
+                        VariadicArgumentType::ParamSpec(*paramspec)
+                    }
+                    _ => {
+                        // TODO: Same todo comment as in the non-paramspec case below
+                        VariadicArgumentType::Other(argument_type.iterate(db))
+                    }
+                }
+            }
             Some(paramspec @ Type::TypeVar(typevar)) if typevar.is_paramspec(db) => {
                 VariadicArgumentType::ParamSpec(paramspec)
             }
-            Some(ty) => {
+            Some(argument_type) => {
                 // TODO: `Type::iterate` internally handles unions, but in a lossy way.
                 // It might be superior here to manually map over the union and call `try_iterate`
                 // on each element, similar to the way that `unpacker.rs` does in the `unpack_inner` method.
                 // It might be a bit of a refactor, though.
                 // See <https://github.com/astral-sh/ruff/pull/20377#issuecomment-3401380305>
                 // for more details. --Alex
-                VariadicArgumentType::Other(ty.iterate(db))
+                VariadicArgumentType::Other(argument_type.iterate(db))
             }
             None => VariadicArgumentType::None,
         };
@@ -2672,24 +2694,36 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 );
             }
         } else {
+            let dunder_getitem_return_type = |ty: Type<'db>| match ty
+                .member_lookup_with_policy(
+                    db,
+                    Name::new_static("__getitem__"),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place
+            {
+                Place::Defined(getitem_method, _, Definedness::AlwaysDefined) => getitem_method
+                    .try_call(db, &CallArguments::positional([Type::unknown()]))
+                    .ok()
+                    .map_or_else(Type::unknown, |bindings| bindings.return_type(db)),
+                _ => Type::unknown(),
+            };
+
             let value_type = match argument_type {
-                Some(paramspec @ Type::TypeVar(typevar)) if typevar.is_paramspec(db) => paramspec,
-                Some(ty) => {
-                    match ty
-                        .member_lookup_with_policy(
-                            db,
-                            Name::new_static("__getitem__"),
-                            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                        )
-                        .place
-                    {
-                        Place::Defined(keys_method, _, Definedness::AlwaysDefined) => keys_method
-                            .try_call(db, &CallArguments::positional([Type::unknown()]))
-                            .ok()
-                            .map_or_else(Type::unknown, |bindings| bindings.return_type(db)),
-                        _ => Type::unknown(),
+                Some(argument_type @ Type::Union(union)) => {
+                    // See the comment in `match_variadic` for why we special case this situation.
+                    match union.elements(db) {
+                        [paramspec @ Type::TypeVar(typevar), other]
+                        | [other, paramspec @ Type::TypeVar(typevar)]
+                            if typevar.is_paramspec(db) && other.is_unknown() =>
+                        {
+                            *paramspec
+                        }
+                        _ => dunder_getitem_return_type(argument_type),
                     }
                 }
+                Some(paramspec @ Type::TypeVar(typevar)) if typevar.is_paramspec(db) => paramspec,
+                Some(argument_type) => dunder_getitem_return_type(argument_type),
                 None => Type::unknown(),
             };
 
@@ -3206,11 +3240,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 );
             }
         } else {
-            let value_type = if let Type::TypeVar(typevar) = argument_type
-                && typevar.is_paramspec(self.db)
-            {
-                argument_type
-            } else {
+            let mut value_type_fallback = |argument_type: Type<'db>| {
                 // TODO: Instead of calling the `keys` and `__getitem__` methods, we should
                 // instead get the constraints which satisfies the `SupportsKeysAndGetItem`
                 // protocol i.e., the key and value type.
@@ -3242,7 +3272,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         argument_index: adjusted_argument_index,
                         provided_ty: argument_type,
                     });
-                    return;
+                    return None;
                 };
 
                 if !key_type
@@ -3259,20 +3289,43 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     });
                 }
 
-                match argument_type
-                    .member_lookup_with_policy(
-                        self.db,
-                        Name::new_static("__getitem__"),
-                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                    )
-                    .place
-                {
-                    Place::Defined(keys_method, _, Definedness::AlwaysDefined) => keys_method
-                        .try_call(self.db, &CallArguments::positional([Type::unknown()]))
-                        .ok()
-                        .map_or_else(Type::unknown, |bindings| bindings.return_type(self.db)),
-                    _ => Type::unknown(),
+                Some(
+                    match argument_type
+                        .member_lookup_with_policy(
+                            self.db,
+                            Name::new_static("__getitem__"),
+                            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        )
+                        .place
+                    {
+                        Place::Defined(keys_method, _, Definedness::AlwaysDefined) => keys_method
+                            .try_call(self.db, &CallArguments::positional([Type::unknown()]))
+                            .ok()
+                            .map_or_else(Type::unknown, |bindings| bindings.return_type(self.db)),
+                        _ => Type::unknown(),
+                    },
+                )
+            };
+
+            let value_type = match argument_type {
+                Type::Union(union) => {
+                    // See the comment in `match_variadic` for why we special case this situation.
+                    match union.elements(self.db) {
+                        [paramspec @ Type::TypeVar(typevar), other]
+                        | [other, paramspec @ Type::TypeVar(typevar)]
+                            if typevar.is_paramspec(self.db) && other.is_unknown() =>
+                        {
+                            Some(*paramspec)
+                        }
+                        _ => value_type_fallback(argument_type),
+                    }
                 }
+                Type::TypeVar(typevar) if typevar.is_paramspec(self.db) => Some(argument_type),
+                _ => value_type_fallback(argument_type),
+            };
+
+            let Some(value_type) = value_type else {
+                return;
             };
 
             for (argument_type, parameter_index) in

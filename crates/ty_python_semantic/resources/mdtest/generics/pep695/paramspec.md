@@ -456,8 +456,19 @@ class Foo[**P]:
         self.kwargs = kwargs
 
 def bar[**P](foo: Foo[P]) -> None:
+    reveal_type(foo)  # revealed: Foo[P@bar]
     reveal_type(foo.args)  # revealed: Unknown | P@bar.args
     reveal_type(foo.kwargs)  # revealed: Unknown | P@bar.kwargs
+```
+
+ty will check whether the argument after `**` is a mapping type but as instance attribute are
+unioned with `Unknown`, it shouldn't error here.
+
+```py
+from typing import Callable
+
+def baz[**P](fn: Callable[P, None], foo: Foo[P]) -> None:
+    fn(*foo.args, **foo.kwargs)
 ```
 
 ### Specializing `Self` when `ParamSpec` is involved

@@ -2378,33 +2378,6 @@ impl<'db> Type<'db> {
             (_, Type::TypeVar(bound_typevar)) if bound_typevar.is_inferable(db, inferable) => {
                 ConstraintSet::from(false)
             }
-            (Type::TypeVar(bound_typevar), _)
-                if bound_typevar.paramspec_attr(db) == Some(ParamSpecAttrKind::Args) =>
-            {
-                Type::homogeneous_tuple(db, Type::object()).has_relation_to_impl(
-                    db,
-                    target,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            }
-            (Type::TypeVar(bound_typevar), _)
-                if bound_typevar.paramspec_attr(db) == Some(ParamSpecAttrKind::Kwargs) =>
-            {
-                KnownClass::Dict
-                    .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::any()])
-                    .top_materialization(db)
-                    .has_relation_to_impl(
-                        db,
-                        target,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
-            }
             (Type::TypeVar(bound_typevar), _) => {
                 // All inferable cases should have been handled above
                 assert!(!bound_typevar.is_inferable(db, inferable));
@@ -5015,7 +4988,7 @@ impl<'db> Type<'db> {
             Type::TypeVar(typevar)
                 if typevar.is_paramspec(db) && matches!(name_str, "args" | "kwargs") =>
             {
-                Place::bound(Type::TypeVar(match name_str {
+                Place::declared(Type::TypeVar(match name_str {
                     "args" => typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
                     "kwargs" => typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs),
                     _ => unreachable!(),
@@ -7888,8 +7861,8 @@ impl<'db> Type<'db> {
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
-        let matching_typevar =
-            |bound_typevar: &BoundTypeVarInstance<'db>| match bound_typevar.typevar(db).kind(db) {
+        let matching_typevar = |bound_typevar: &BoundTypeVarInstance<'db>| {
+            match bound_typevar.typevar(db).kind(db) {
                 TypeVarKind::Legacy | TypeVarKind::TypingSelf
                     if binding_context.is_none_or(|binding_context| {
                         bound_typevar.binding_context(db)
@@ -7904,7 +7877,8 @@ impl<'db> Type<'db> {
                     Some(bound_typevar.without_paramspec_attr(db))
                 }
                 _ => None,
-            };
+            }
+        };
 
         match self {
             Type::TypeVar(bound_typevar) => {
@@ -9941,13 +9915,57 @@ impl<'db> BoundTypeVarInstance<'db> {
         self.kind(db).is_paramspec()
     }
 
+    /// Returns a new bound typevar instance with the given `ParamSpec` attribute set.
+    ///
+    /// This method will also set an appropriate upper bound on the typevar, based on the
+    /// attribute kind. For `P.args`, the upper bound will be `tuple[object, ...]`, and for
+    /// `P.kwargs`, the upper bound will be `Top[dict[str, Any]]`.
+    ///
+    /// It's the caller's responsibility to ensure that this method is only called on a `ParamSpec`
+    /// type variable.
     pub(crate) fn with_paramspec_attr(self, db: &'db dyn Db, kind: ParamSpecAttrKind) -> Self {
         debug_assert!(self.is_paramspec(db));
-        Self::new(db, self.typevar(db), self.binding_context(db), Some(kind))
+
+        let upper_bound = TypeVarBoundOrConstraints::UpperBound(match kind {
+            ParamSpecAttrKind::Args => Type::homogeneous_tuple(db, Type::object()),
+            ParamSpecAttrKind::Kwargs => KnownClass::Dict
+                .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::any()])
+                .top_materialization(db),
+        });
+
+        let typevar = TypeVarInstance::new(
+            db,
+            self.typevar(db).identity(db),
+            Some(TypeVarBoundOrConstraintsEvaluation::Eager(upper_bound)),
+            None, // explicit_variance
+            None, // _default
+        );
+
+        Self::new(db, typevar, self.binding_context(db), Some(kind))
     }
 
+    /// Returns a new bound typevar instance without any `ParamSpec` attribute set.
+    ///
+    /// This method will also remove any upper bound that was set by `with_paramspec_attr`. This
+    /// means that the returned typevar will have no upper bound or constraints.
+    ///
+    /// It's the caller's responsibility to ensure that this method is only called on a `ParamSpec`
+    /// type variable.
     pub(crate) fn without_paramspec_attr(self, db: &'db dyn Db) -> Self {
-        Self::new(db, self.typevar(db), self.binding_context(db), None)
+        debug_assert!(self.is_paramspec(db));
+
+        Self::new(
+            db,
+            TypeVarInstance::new(
+                db,
+                self.typevar(db).identity(db),
+                None, // Remove the upper bound set by `with_paramspec_attr`
+                None, // explicit_variance
+                None, // _default
+            ),
+            self.binding_context(db),
+            None,
+        )
     }
 
     /// Returns whether two bound typevars represent the same logical typevar, regardless of e.g.
@@ -10053,30 +10071,44 @@ impl<'db> BoundTypeVarInstance<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
         match type_mapping {
-            TypeMapping::Specialization(specialization) => specialization
-                .get(db, self.without_paramspec_attr(db))
-                .map(|ty| {
-                    if let Some(attr) = self.paramspec_attr(db)
-                        && let Type::TypeVar(typevar) = ty
-                        && typevar.is_paramspec(db)
-                    {
-                        return Type::TypeVar(typevar.with_paramspec_attr(db, attr));
-                    }
-                    ty
-                })
-                .unwrap_or(Type::TypeVar(self)),
-            TypeMapping::PartialSpecialization(partial) => partial
-                .get(db, self.without_paramspec_attr(db))
-                .map(|ty| {
-                    if let Some(attr) = self.paramspec_attr(db)
-                        && let Type::TypeVar(typevar) = ty
-                        && typevar.is_paramspec(db)
-                    {
-                        return Type::TypeVar(typevar.with_paramspec_attr(db, attr));
-                    }
-                    ty
-                })
-                .unwrap_or(Type::TypeVar(self)),
+            TypeMapping::Specialization(specialization) => {
+                let typevar = if self.is_paramspec(db) {
+                    self.without_paramspec_attr(db)
+                } else {
+                    self
+                };
+                specialization
+                    .get(db, typevar)
+                    .map(|ty| {
+                        if let Some(attr) = self.paramspec_attr(db)
+                            && let Type::TypeVar(typevar) = ty
+                            && typevar.is_paramspec(db)
+                        {
+                            return Type::TypeVar(typevar.with_paramspec_attr(db, attr));
+                        }
+                        ty
+                    })
+                    .unwrap_or(Type::TypeVar(self))
+            }
+            TypeMapping::PartialSpecialization(partial) => {
+                let typevar = if self.is_paramspec(db) {
+                    self.without_paramspec_attr(db)
+                } else {
+                    self
+                };
+                partial
+                    .get(db, typevar)
+                    .map(|ty| {
+                        if let Some(attr) = self.paramspec_attr(db)
+                            && let Type::TypeVar(typevar) = ty
+                            && typevar.is_paramspec(db)
+                        {
+                            return Type::TypeVar(typevar.with_paramspec_attr(db, attr));
+                        }
+                        ty
+                    })
+                    .unwrap_or(Type::TypeVar(self))
+            }
             TypeMapping::BindSelf {
                 self_type,
                 binding_context,
