@@ -340,9 +340,18 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
     }
 }
 
+fn variance_of_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: GenericAlias<'db>,
+    _typevar: BoundTypeVarInstance<'db>,
+) -> TypeVarVariance {
+    TypeVarVariance::Bivariant
+}
+
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_initial=variance_of_cycle_initial)]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         let origin = self.origin(db);
 
