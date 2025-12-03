@@ -2,7 +2,7 @@
 This module principally provides several routines for resolving a particular module
 name to a `Module`:
 
-* [`file_to_module`][]: resolves the module name `.` (often to make it an absolute module name)
+* [`file_to_module`][]: resolves the module `.<self>` (often to make it an absolute module name)
 * [`resolve_module`][]: resolves an absolute module name
 
 You may notice that we actually provide `resolve_(real)_(shadowable)_module_(confident)`.
@@ -313,34 +313,38 @@ pub(crate) fn path_to_module<'db>(db: &'db dyn Db, path: &FilePath) -> Option<Mo
 ///
 /// Returns `None` if the file is not a module locatable via any of the known search paths.
 ///
-/// This function can be understood as essentially resolving `import .` in the file itself,
-/// and indeed, one of its primary jobs is resolving `.` in `from .x.y import ...`. This
-/// intuition is particularly useful for understanding why it's correct that we pass
-/// the file itself as `importing_file` to various `resolve*` calls.
+/// This function can be understood as essentially resolving `import .<self>` in the file itself,
+/// and indeed, one of its primary jobs is resolving `.<self>` to derive the module name of `.`.
+/// This intuition is particularly useful for understanding why it's correct that we pass
+/// the file itself as `importing_file` to various subroutines calls.
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
     let path = SystemOrVendoredPathRef::try_from_file(db, file)?;
 
-    let try_candidate = |candidate: &SearchPath| {
+    file_to_module_impl(
+        db,
+        file,
+        path,
+        search_paths(db, ModuleResolveMode::StubsAllowed),
+    )
+    .or_else(|| file_to_module_impl(db, file, path, desperate_search_paths(db, file).iter()))
+}
+
+fn file_to_module_impl<'db, 'a>(
+    db: &'db dyn Db,
+    file: File,
+    path: SystemOrVendoredPathRef<'a>,
+    mut search_paths: impl Iterator<Item = &'a SearchPath>,
+) -> Option<Module<'db>> {
+    let module_name = search_paths.find_map(|candidate: &SearchPath| {
         let relative_path = match path {
             SystemOrVendoredPathRef::System(path) => candidate.relativize_system_path(path),
             SystemOrVendoredPathRef::Vendored(path) => candidate.relativize_vendored_path(path),
         }?;
         relative_path.to_module_name()
-    };
-
-    let module_name = search_paths(db, ModuleResolveMode::StubsAllowed)
-        .find_map(try_candidate)
-        .or_else(|| {
-            // Resolve `.` in cases where the file exists only in a desperate search path.
-            // Probably because this directory was implicitly masked out by a parent directory
-            // not being a valid module name (i.e. `/my-proj/tests/thisfile.py`).
-            desperate_search_paths(db, file)
-                .iter()
-                .find_map(try_candidate)
-        })?;
+    })?;
 
     // Resolve the module name to see if Python would resolve the name to the same path.
     // If it doesn't, then that means that multiple modules have the same name in different

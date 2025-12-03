@@ -462,36 +462,25 @@ The same situation as the previous test but instead of using editables we use `e
 have higher priority than the first-party search-path. Thus, `/a/src/a/` is always seen before
 `/a/`.
 
-In this case we fail to resolve `.` or `.setup` which is unfortunate but consistent.
-
-In this case I believe the failure is fully in `file_to_module` as we find that `a/tests/test1.py`
-matches on the first-party path as `a.tests.test1` and is syntactically valid. However when we try
-to resolve `a.tests.test1` we immediately find the regular package `a` (`/a/src/a/`) and conclude
-`a.tests` doesn't exist.
-
-Since `file_to_module` fails we fail to expand `.` at all and give up completely.
+In this case everything works well because the namespace package `a.tests` (`a/tests/`) is
+completely hidden by the regular package `a` (`a/src/a/`) and so we immediately enter desperate
+resolution and use the now-unambiguous namespace package `tests`.
 
 ```toml
 [environment]
-# Evil
 extra-paths = ["a/src/", "b/src/"]
 ```
 
 `a/tests/test1.py`:
 
 ```py
-# TODO: there should be no errors in this file.
-
-# error: [unresolved-import]
 from .setup import x
-
-# error: [unresolved-import]
 from . import setup
 from a import y
 import a
 
-reveal_type(x)  # revealed: Unknown
-reveal_type(setup.x)  # revealed: Unknown
+reveal_type(x)  # revealed: int
+reveal_type(setup.x)  # revealed: int
 reveal_type(y)  # revealed: int
 reveal_type(a.y)  # revealed: int
 ```
@@ -518,18 +507,13 @@ y: int = 10
 `b/tests/test1.py`:
 
 ```py
-# TODO: there should be no errors in this file
-
-# error: [unresolved-import]
 from .setup import x
-
-# error: [unresolved-import]
 from . import setup
 from b import y
 import b
 
-reveal_type(x)  # revealed: Unknown
-reveal_type(setup.x)  # revealed: Unknown
+reveal_type(x)  # revealed: str
+reveal_type(setup.x)  # revealed: str
 reveal_type(y)  # revealed: str
 reveal_type(b.y)  # revealed: str
 ```
