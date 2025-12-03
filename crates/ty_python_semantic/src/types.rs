@@ -11966,6 +11966,10 @@ impl<'db> CallableTypes<'db> {
         }
     }
 
+    fn as_slice(&self) -> &SmallVec<[CallableType<'db>; 1]> {
+        &self.0
+    }
+
     fn into_inner(self) -> SmallVec<[CallableType<'db>; 1]> {
         self.0
     }

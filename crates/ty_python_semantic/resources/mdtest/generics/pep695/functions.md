@@ -624,8 +624,7 @@ class ClassWithNewAndInit:
 
     def __init__(self, x: int) -> None: ...
 
-# TODO: revealed: ClassWithNewAndInit
-# revealed: Unknown
+# revealed: ClassWithNewAndInit
 reveal_type(accepts_callable(ClassWithNewAndInit)())
 
 class Meta(type):
@@ -660,10 +659,10 @@ class ClassWithOverloadedInit[T]:
     def __init__(self, x: int | str) -> None: ...
 
 # TODO: revealed: ClassWithOverloadedInit[int]
-# revealed: Unknown
+# revealed: Top[ClassWithOverloadedInit[Unknown]]
 reveal_type(accepts_callable(ClassWithOverloadedInit)(0))
 # TODO: revealed: ClassWithOverloadedInit[str]
-# revealed: Unknown
+# revealed: Top[ClassWithOverloadedInit[Unknown]]
 reveal_type(accepts_callable(ClassWithOverloadedInit)(""))
 
 class GenericClass[T]:

@@ -17,12 +17,11 @@ use crate::types::signatures::Parameters;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableTypes,
-    ClassLiteral, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
-    IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
-    Type, TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, declaration_type,
-    walk_bound_type_var_type,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral,
+    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
+    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeContext,
+    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance,
+    TypeVarKind, TypeVarVariance, UnionType, declaration_type, walk_bound_type_var_type,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -1650,27 +1649,26 @@ impl<'db> SpecializationBuilder<'db> {
             }
 
             (Type::Callable(formal_callable), _) => {
-                let Some(actual_callable) = actual
-                    .try_upcast_to_callable(self.db)
-                    .and_then(CallableTypes::exactly_one)
-                else {
+                let Some(actual_callables) = actual.try_upcast_to_callable(self.db) else {
                     return Ok(());
                 };
 
-                let [formal_signature] = formal_callable.signatures(self.db).overloads.as_slice()
-                else {
-                    return Ok(());
-                };
-                let [actual_signature] = actual_callable.signatures(self.db).overloads.as_slice()
-                else {
-                    return Ok(());
-                };
+                let mut when = ConstraintSet::from(false);
+                for formal_signature in &formal_callable.signatures(self.db).overloads {
+                    for actual_callable in actual_callables.as_slice() {
+                        for actual_signature in &actual_callable.signatures(self.db).overloads {
+                            when.union(
+                                self.db,
+                                formal_signature.when_constraint_set_assignable_to(
+                                    self.db,
+                                    actual_signature,
+                                    self.inferable,
+                                ),
+                            );
+                        }
+                    }
+                }
 
-                let when = formal_signature.when_constraint_set_assignable_to(
-                    self.db,
-                    actual_signature,
-                    self.inferable,
-                );
                 when.for_each_path(self.db, |path| {
                     for constraint in path.positive_constraints() {
                         let typevar = constraint.typevar(self.db);
