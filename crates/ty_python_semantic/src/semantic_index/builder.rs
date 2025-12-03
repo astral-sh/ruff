@@ -1616,9 +1616,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                             let star_import_predicate = self.add_predicate(star_import.into());
 
+                            let associated_member_ids = self.place_tables[self.current_scope()]
+                                .associated_place_ids(ScopedPlaceId::Symbol(symbol_id));
                             let pre_definition = self
                                 .current_use_def_map()
-                                .single_symbol_place_snapshot(symbol_id);
+                                .single_symbol_snapshot(symbol_id, associated_member_ids);
+
                             let pre_definition_reachability =
                                 self.current_use_def_map().reachability;
 
