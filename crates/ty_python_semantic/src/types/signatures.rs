@@ -975,19 +975,33 @@ impl<'db> Signature<'db> {
         let mut check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
             let type1 = type1.unwrap_or(Type::unknown());
             let type2 = type2.unwrap_or(Type::unknown());
-            !result
-                .intersect(
-                    db,
-                    type1.has_relation_to_impl(
+            eprintln!("    ~> {} ≤ {}", type1.display(db), type2.display(db));
+            eprintln!(
+                "    ~> when {}",
+                type1
+                    .has_relation_to_impl(
                         db,
                         type2,
                         inferable,
                         relation,
                         relation_visitor,
                         disjointness_visitor,
-                    ),
-                )
-                .is_never_satisfied(db)
+                    )
+                    .display(db)
+            );
+            result.intersect(
+                db,
+                type1.has_relation_to_impl(
+                    db,
+                    type2,
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                ),
+            );
+            eprintln!("    ~> inter {}", result.display(db));
+            !result.is_never_satisfied(db)
         };
 
         // Return types are covariant.

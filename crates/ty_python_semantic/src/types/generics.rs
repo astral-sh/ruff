@@ -1651,7 +1651,10 @@ impl<'db> SpecializationBuilder<'db> {
             }
 
             (Type::Callable(formal_callable), _) => {
+                eprintln!("==> {}", formal.display(self.db));
+                eprintln!("    {}", actual.display(self.db));
                 let Some(actual_callables) = actual.try_upcast_to_callable(self.db) else {
+                    eprintln!(" -> NOPE");
                     return Ok(());
                 };
 
@@ -1659,19 +1662,31 @@ impl<'db> SpecializationBuilder<'db> {
                 for formal_signature in &formal_callable.signatures(self.db).overloads {
                     for actual_callable in actual_callables.as_slice() {
                         for actual_signature in &actual_callable.signatures(self.db).overloads {
-                            when.union(
+                            eprintln!(" -> pair");
+                            eprintln!("    {}", formal_signature.display(self.db));
+                            eprintln!("    {}", actual_signature.display(self.db));
+                            let x = formal_signature.when_constraint_set_assignable_to(
                                 self.db,
-                                formal_signature.when_constraint_set_assignable_to(
-                                    self.db,
-                                    actual_signature,
-                                    self.inferable,
-                                ),
+                                actual_signature,
+                                self.inferable,
                             );
+                            eprintln!("    {}", x.display(self.db));
+                            eprintln!("    {}", x.display_graph(self.db, &"    "));
+                            when.union(self.db, x);
                         }
                     }
                 }
+                eprintln!("--> combined");
+                eprintln!("    {}", when.display(self.db));
+                eprintln!("    {}", when.display_graph(self.db, &"    "));
 
                 when.for_each_path(self.db, |path| {
+                    eprintln!(
+                        "--> path [{}]",
+                        path.positive_constraints()
+                            .map(|c| c.display(self.db))
+                            .format(", ")
+                    );
                     for constraint in path.positive_constraints() {
                         let typevar = constraint.typevar(self.db);
                         let lower = constraint.lower(self.db);

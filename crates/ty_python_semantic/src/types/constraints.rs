@@ -439,6 +439,10 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         self.node.simplify_for_display(db).display(db)
     }
+
+    pub(crate) fn display_graph(self, db: &'db dyn Db, prefix: &dyn Display) -> impl Display {
+        self.node.display_graph(db, prefix)
+    }
 }
 
 impl From<bool> for ConstraintSet<'_> {
