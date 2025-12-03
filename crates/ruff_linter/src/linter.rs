@@ -434,7 +434,7 @@ pub fn add_noqa_to_path(
         &directives.noqa_line_for,
         stylist.line_ending(),
         reason,
-        &suppressions,
+        &mut suppressions,
     )
 }
 

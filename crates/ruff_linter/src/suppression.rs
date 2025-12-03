@@ -79,6 +79,9 @@ pub(crate) struct Suppression {
 
     /// Any comments associated with the suppression
     comments: SmallVec<[SuppressionComment; 2]>,
+
+    /// Whether this suppression actually suppressed a diagnostic
+    used: bool,
 }
 
 #[allow(unused)]
@@ -130,7 +133,7 @@ impl Suppressions {
     }
 
     /// Check if a diagnostic is suppressed by any known range suppressions
-    pub(crate) fn check_diagnostic(&self, diagnostic: &Diagnostic) -> bool {
+    pub(crate) fn check_diagnostic(&mut self, diagnostic: &Diagnostic) -> bool {
         if self.valid.is_empty() {
             return false;
         }
@@ -145,8 +148,9 @@ impl Suppressions {
             return false;
         };
 
-        for suppression in &self.valid {
+        for suppression in &mut self.valid {
             if *code == suppression.code.as_str() && suppression.range.contains_range(range) {
+                suppression.used = true;
                 return true;
             }
         }
@@ -276,6 +280,7 @@ impl<'a> SuppressionsBuilder<'a> {
                         code: code.into(),
                         range: combined_range,
                         comments: smallvec![comment.comment.clone(), other.comment.clone()],
+                        used: false,
                     });
                 }
 
@@ -292,6 +297,7 @@ impl<'a> SuppressionsBuilder<'a> {
                         code: code.into(),
                         range: implicit_range,
                         comments: smallvec![comment.comment.clone()],
+                        used: false,
                     });
                 }
                 self.pending.remove(comment_index);
