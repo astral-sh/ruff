@@ -1,14 +1,11 @@
-use ruff_formatter::{FormatRuleWithOptions, RemoveSoftLinesBuffer, write};
+use ruff_formatter::{FormatRuleWithOptions, RemoveSoftLinesBuffer, format_args, write};
 use ruff_python_ast::{AnyNodeRef, Expr, ExprLambda};
 use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::dangling_comments;
 use crate::expression::has_own_parentheses;
-use crate::expression::maybe_parenthesize_expression;
-use crate::expression::parentheses::{
-    NeedsParentheses, OptionalParentheses, Parenthesize, is_expression_parenthesized,
-};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
 use crate::preview::is_force_single_line_lambda_parameters_enabled;
@@ -83,28 +80,32 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             }
         }
 
-        // Avoid parenthesizing lists, dictionaries, etc. that have their own parentheses, but still
-        // wrap calls and subscripts, which can have long expressions before the parentheses:
-        // ```py
-        // lambda arg1, arg2, arg3, *args, **kwargs: a_loooooooooooong_call_expression.with_an_attr(inner, args)
-        // ```
-        let needs_parentheses = has_own_parentheses(body, f.context()).is_none()
-            || matches!(&**body, Expr::Call(_) | Expr::Subscript(_));
+        if is_parenthesize_lambda_bodies_enabled(f.context()) {
+            let fmt_body = format_with(|f| {
+                if matches!(&**body, Expr::Call(_) | Expr::Subscript(_)) {
+                    let body = body.format().with_options(Parentheses::Never).memoized();
 
-        if is_parenthesize_lambda_bodies_enabled(f.context())
-            && needs_parentheses
-            && !is_expression_parenthesized(body.into(), comments.ranges(), f.context().source())
-        {
-            match self.layout {
-                ExprLambdaLayout::Default => maybe_parenthesize_expression(
-                    body,
-                    item,
-                    Parenthesize::IfBreaksParenthesizedNested,
-                )
-                .fmt(f),
-                ExprLambdaLayout::Assignment => {
-                    fits_expanded(&parenthesize_if_expands(&body.format())).fmt(f)
+                    best_fitting![
+                        // body all flat
+                        body,
+                        // body expanded
+                        body,
+                        // parenthesized
+                        format_args![token("("), block_indent(&body), token(")")]
+                    ]
+                    .fmt(f)
+                } else if has_own_parentheses(body, f.context()).is_some() {
+                    // We probably need to be more careful here and preserve parentheses if there are comments?
+                    body.format().fmt(f)
+                } else {
+                    parenthesize_if_expands(&body.format().with_options(Parentheses::Never)).fmt(f)
                 }
+            });
+
+            match self.layout {
+                // Can we move the `fits_expanded` into the assignment formatting?
+                ExprLambdaLayout::Assignment => fits_expanded(&fmt_body).fmt(f),
+                ExprLambdaLayout::Default => fmt_body.fmt(f),
             }
         } else {
             body.format().fmt(f)

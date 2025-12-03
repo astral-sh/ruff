@@ -913,7 +913,27 @@ if 1:
  ):
      pass
  
-@@ -218,71 +200,79 @@
+@@ -156,7 +138,8 @@
+     *x: x
+ )
+ 
+-lambda: (  # comment
++lambda: (
++    # comment
+     x
+ )
+ 
+@@ -184,7 +167,8 @@
+ 
+ (
+     lambda:  # comment
+-    (  # comment
++    (
++        # comment
+         x
+     )
+ )
+@@ -218,71 +202,79 @@
  
  # Leading
  lambda x: (
@@ -1052,7 +1072,7 @@ if 1:
  
  
  # Regression tests for https://github.com/astral-sh/ruff/issues/8179
-@@ -291,9 +281,9 @@
+@@ -291,9 +283,9 @@
          c,
          d,
          e,
@@ -1065,7 +1085,7 @@ if 1:
      )
  
  
-@@ -302,15 +292,9 @@
+@@ -302,15 +294,9 @@
          c,
          d,
          e,
@@ -1084,7 +1104,7 @@ if 1:
          g=10,
      )
  
-@@ -320,9 +304,9 @@
+@@ -320,9 +306,9 @@
          c,
          d,
          e,
@@ -1097,7 +1117,7 @@ if 1:
      )
  
  
-@@ -338,9 +322,9 @@
+@@ -338,9 +324,9 @@
  
  class C:
      function_dict: Dict[Text, Callable[[CRFToken], Any]] = {
@@ -1110,7 +1130,7 @@ if 1:
      }
  
  
-@@ -352,42 +336,40 @@
+@@ -352,42 +338,40 @@
  def foo():
      if True:
          if True:
@@ -1169,7 +1189,7 @@ if 1:
          CREATE TABLE {table} AS
          SELECT ROW_NUMBER() OVER () AS id, {var}
          FROM (
-@@ -408,12 +390,12 @@
+@@ -408,12 +392,12 @@
      # 6
  )
  
@@ -1186,7 +1206,7 @@ if 1:
  )
  
  very_long_variable_name_x, very_long_variable_name_y = (
-@@ -421,8 +403,8 @@
+@@ -421,8 +405,8 @@
      lambda b: b * another_very_long_expression_here,
  )
  
@@ -1197,19 +1217,4 @@ if 1:
          x, more_args, additional_parameters
      )
  )
-@@ -433,9 +415,11 @@
-         if 3:
-             if self.location in EVM_EVMLIKE_LOCATIONS and database is not None:
-                 exported_dict["notes"] = EVM_ADDRESS_REGEX.sub(
--                    repl=lambda matched_address: self._maybe_add_label_with_address(
--                        database=database,
--                        matched_address=matched_address,
-+                    repl=lambda matched_address: (
-+                        self._maybe_add_label_with_address(
-+                            database=database,
-+                            matched_address=matched_address,
-+                        )
-                     ),
-                     string=exported_dict["notes"],
-                 )
 ```
