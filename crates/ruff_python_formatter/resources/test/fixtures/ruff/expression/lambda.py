@@ -409,3 +409,14 @@ if 1:
                     ),
                     string=exported_dict["notes"],
                 )
+
+class C:
+    def f():
+        return dict(
+            filter(
+                lambda intent_response: self.is_retrieval_intent_response(
+                    intent_response
+                ),
+                self.responses.items(),
+            )
+        )

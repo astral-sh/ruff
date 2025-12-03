@@ -89,7 +89,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                         // body all flat
                         body,
                         // body expanded
-                        body,
+                        group(&body).should_expand(true),
                         // parenthesized
                         format_args![token("("), block_indent(&body), token(")")]
                     ]
