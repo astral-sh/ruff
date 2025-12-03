@@ -265,6 +265,9 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
         (DynamicType::Unknown, _) => Ordering::Less,
         (_, DynamicType::Unknown) => Ordering::Greater,
 
+        (DynamicType::UnknownGeneric(_), _) => Ordering::Less,
+        (_, DynamicType::UnknownGeneric(_)) => Ordering::Greater,
+
         #[cfg(debug_assertions)]
         (DynamicType::Todo(TodoType(left)), DynamicType::Todo(TodoType(right))) => left.cmp(right),
 
