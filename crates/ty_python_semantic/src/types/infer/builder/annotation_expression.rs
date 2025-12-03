@@ -144,18 +144,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     )
                 }
                 _ => TypeAndQualifiers::declared(
-                    ty.in_type_expression(
-                        builder.db(),
-                        builder.scope(),
-                        builder.typevar_binding_context,
-                    )
-                    .unwrap_or_else(|error| {
-                        error.into_fallback_type(
-                            &builder.context,
-                            annotation,
-                            builder.is_reachable(annotation),
+                    ty.default_specialize(builder.db())
+                        .in_type_expression(
+                            builder.db(),
+                            builder.scope(),
+                            builder.typevar_binding_context,
                         )
-                    }),
+                        .unwrap_or_else(|error| {
+                            error.into_fallback_type(
+                                &builder.context,
+                                annotation,
+                                builder.is_reachable(annotation),
+                            )
+                        }),
                 ),
             }
         }
