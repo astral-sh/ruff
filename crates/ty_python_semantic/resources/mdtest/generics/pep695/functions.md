@@ -582,3 +582,98 @@ def f[T](x: T, y: Not[T]) -> T:
     y = x  # error: [invalid-assignment]
     return x
 ```
+
+## `Callable` parameters
+
+We can recurse into the parameters and return values of `Callable` parameters to infer
+specializations of a generic function.
+
+```py
+from typing import Any, Callable, NoReturn, overload, Self
+
+def accepts_callable[**P, R](callable: Callable[P, R]) -> Callable[P, R]:
+    return callable
+
+def returns_int() -> int:
+    raise NotImplementedError
+
+# revealed: int
+reveal_type(accepts_callable(returns_int)())
+
+class ClassWithoutConstructor: ...
+
+# revealed: ClassWithoutConstructor
+reveal_type(accepts_callable(ClassWithoutConstructor)())
+
+class ClassWithNew:
+    def __new__(cls, *args, **kwargs) -> Self:
+        raise NotImplementedError
+
+# revealed: ClassWithNew
+reveal_type(accepts_callable(ClassWithNew)())
+
+class ClassWithInit:
+    def __init__(self) -> None: ...
+
+# revealed: ClassWithInit
+reveal_type(accepts_callable(ClassWithInit)())
+
+class ClassWithNewAndInit:
+    def __new__(cls, *args, **kwargs) -> Self:
+        raise NotImplementedError
+
+    def __init__(self, x: int) -> None: ...
+
+# TODO: revealed: ClassWithNewAndInit
+# revealed: Unknown
+reveal_type(accepts_callable(ClassWithNewAndInit)())
+
+class Meta(type):
+    def __call__(cls, *args: Any, **kwargs: Any) -> NoReturn:
+        raise NotImplementedError
+
+class ClassWithNoReturnMetatype(metaclass=Meta):
+    def __new__(cls, *args: Any, **kwargs: Any) -> Self:
+        raise NotImplementedError
+
+# revealed: Never
+reveal_type(accepts_callable(ClassWithNoReturnMetatype)())
+
+class Proxy: ...
+
+class ClassWithIgnoredInit:
+    def __new__(cls) -> Proxy:
+        return Proxy()
+
+    def __init__(self, x: int) -> None: ...
+
+# revealed: Proxy
+reveal_type(accepts_callable(ClassWithIgnoredInit)())
+
+class ClassWithOverloadedInit[T]:
+    t: T  # invariant
+
+    @overload
+    def __init__(self: "ClassWithOverloadedInit[int]", x: int) -> None: ...
+    @overload
+    def __init__(self: "ClassWithOverloadedInit[str]", x: str) -> None: ...
+    def __init__(self, x: int | str) -> None: ...
+
+# TODO: revealed: ClassWithOverloadedInit[int]
+# revealed: Unknown
+reveal_type(accepts_callable(ClassWithOverloadedInit)(0))
+# TODO: revealed: ClassWithOverloadedInit[str]
+# revealed: Unknown
+reveal_type(accepts_callable(ClassWithOverloadedInit)(""))
+
+class GenericClass[T]:
+    t: T  # invariant
+
+    def __new__(cls, x: list[T], y: list[T]) -> Self:
+        raise NotImplementedError
+
+def _(x: list[str]):
+    # TODO: revealed: GenericClass[str]
+    # revealed: Top[GenericClass[Unknown]]
+    reveal_type(accepts_callable(GenericClass)(x, x))
+```
