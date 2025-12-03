@@ -41,6 +41,7 @@ def unbounded[T]():
     # revealed: None
     reveal_type(generic_context(unbounded).specialize_constrained(ConstraintSet.range(bool, T, bool) & ConstraintSet.range(Never, T, str)))
 
+    # TODO: revealed: ty_extensions.Specialization[T@unbounded = int]
     # revealed: ty_extensions.Specialization[T@unbounded = bool]
     reveal_type(generic_context(unbounded).specialize_constrained(ConstraintSet.range(Never, T, int) | ConstraintSet.range(Never, T, bool)))
     # revealed: ty_extensions.Specialization[T@unbounded = Never]
