@@ -15,7 +15,9 @@ use crate::types::constraints::ConstraintSet;
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::Parameters;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::visitor::{
+    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
@@ -1674,10 +1676,22 @@ impl<'db> SpecializationBuilder<'db> {
                         let typevar = constraint.typevar(self.db);
                         let lower = constraint.lower(self.db);
                         let upper = constraint.upper(self.db);
-                        if !upper.is_object() {
+                        let upper_has_noninferable_typevar = any_over_type(
+                            self.db,
+                            upper,
+                            &|ty| {
+                                ty.as_typevar().is_some_and(|bound_typevar| {
+                                    !bound_typevar.is_inferable(self.db, self.inferable)
+                                })
+                            },
+                            false,
+                        );
+                        if !upper.is_object() && !upper_has_noninferable_typevar {
                             self.add_type_mapping(typevar, upper, polarity, &mut f);
                         }
-                        if let Type::TypeVar(lower_bound_typevar) = lower {
+                        if typevar.is_inferable(self.db, self.inferable)
+                            && let Type::TypeVar(lower_bound_typevar) = lower
+                        {
                             self.add_type_mapping(
                                 lower_bound_typevar,
                                 Type::TypeVar(typevar),
