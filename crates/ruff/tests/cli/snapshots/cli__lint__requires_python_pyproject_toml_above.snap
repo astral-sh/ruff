@@ -11,6 +11,7 @@ info:
     - "--select"
     - UP007
     - foo/test.py
+snapshot_kind: text
 ---
 success: true
 exit_code: 0

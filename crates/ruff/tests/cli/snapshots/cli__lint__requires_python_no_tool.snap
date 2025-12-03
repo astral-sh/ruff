@@ -12,6 +12,7 @@ info:
     - UP007
     - test.py
     - "-"
+snapshot_kind: text
 ---
 success: true
 exit_code: 0

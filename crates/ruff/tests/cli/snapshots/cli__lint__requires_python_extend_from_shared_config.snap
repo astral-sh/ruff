@@ -9,6 +9,7 @@ info:
     - concise
     - "--show-settings"
     - test.py
+snapshot_kind: text
 ---
 success: true
 exit_code: 0
