@@ -271,8 +271,7 @@ reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(itera
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
 reveal_type(Person._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
 
-# TODO: should be `Person` once we support implicit type of `self`
-reveal_type(Person._make(("Alice", 42)))  # revealed: Unknown
+reveal_type(Person._make(("Alice", 42)))  # revealed: Person
 
 person = Person("Alice", 42)
 

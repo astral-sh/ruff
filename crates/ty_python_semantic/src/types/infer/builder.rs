@@ -2689,7 +2689,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .inner_type()
             .as_class_literal()?;
 
-        typing_self(db, self.scope(), Some(method_definition), class_literal)
+        typing_self(db, self.scope(), Some(method_definition), class_literal).map(Type::TypeVar)
     }
 
     /// Set initial declared/inferred types for a `*args` variadic positional parameter.
