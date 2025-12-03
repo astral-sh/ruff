@@ -2,7 +2,7 @@
 This module principally provides several routines for resolving a particular module
 name to a `Module`:
 
-* [`file_to_module`][]: resolves the module `.<self>` (often to make it an absolute module name)
+* [`file_to_module`][]: resolves the module `.<self>` (often as the first step in resolving `.`)
 * [`resolve_module`][]: resolves an absolute module name
 
 You may notice that we actually provide `resolve_(real)_(shadowable)_module_(confident)`.
@@ -316,7 +316,7 @@ pub(crate) fn path_to_module<'db>(db: &'db dyn Db, path: &FilePath) -> Option<Mo
 /// This function can be understood as essentially resolving `import .<self>` in the file itself,
 /// and indeed, one of its primary jobs is resolving `.<self>` to derive the module name of `.`.
 /// This intuition is particularly useful for understanding why it's correct that we pass
-/// the file itself as `importing_file` to various subroutines calls.
+/// the file itself as `importing_file` to various subroutines.
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
@@ -397,10 +397,28 @@ pub(crate) fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> Sear
 fn desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<SearchPath> {
     let system = db.system();
     let importing_path = importing_file.path(db).as_system_path()?;
-    for dir in importing_path.ancestors() {
-        let pyproject = dir.join("pyproject.toml");
+
+    // Only allow this if the importing_file is under the first-party search path
+    let (base_path, rel_path) = Program::get(db)
+        .search_paths(db)
+        .static_paths
+        .iter()
+        .find_map(|search_path| {
+            if !search_path.is_first_party() {
+                return None;
+            }
+            Some((
+                search_path.as_system_path()?,
+                search_path.relativize_system_path_only(importing_path)?,
+            ))
+        })?;
+
+    // Only allow searching up to the first-party path's root
+    for rel_dir in rel_path.ancestors() {
+        let candidate_path = base_path.join(rel_dir);
+        let pyproject = candidate_path.join("pyproject.toml");
         if system.path_exists(&pyproject) {
-            let search_path = SearchPath::extra(system, dir.to_owned()).ok()?;
+            let search_path = SearchPath::first_party(system, candidate_path).ok()?;
             return Some(search_path);
         }
     }
