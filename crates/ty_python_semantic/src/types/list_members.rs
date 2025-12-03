@@ -12,7 +12,9 @@ use rustc_hash::FxHashSet;
 
 use crate::{
     Db, NameKind,
-    place::{Place, imported_symbol, place_from_bindings, place_from_declarations},
+    place::{
+        Place, PlaceWithDefinition, imported_symbol, place_from_bindings, place_from_declarations,
+    },
     semantic_index::{
         attribute_scopes, definition::Definition, global_scope, place_table, scope::ScopeId,
         semantic_index, use_def_map,
@@ -35,48 +37,40 @@ pub(crate) fn all_members_of_scope<'db>(
         .all_end_of_scope_symbol_declarations()
         .filter_map(move |(symbol_id, declarations)| {
             let place_result = place_from_declarations(db, declarations);
-            let definition = place_result.single_declaration;
-            place_result
+            let first_reachable_definition = place_result.first_declaration?;
+            let ty = place_result
                 .ignore_conflicting_declarations()
                 .place
-                .ignore_possibly_undefined()
-                .map(|ty| {
-                    let symbol = table.symbol(symbol_id);
-                    let member = Member {
-                        name: symbol.name().clone(),
-                        ty,
-                    };
-                    MemberWithDefinition { member, definition }
-                })
+                .ignore_possibly_undefined()?;
+            let symbol = table.symbol(symbol_id);
+            let member = Member {
+                name: symbol.name().clone(),
+                ty,
+            };
+            Some(MemberWithDefinition {
+                member,
+                first_reachable_definition,
+            })
         })
         .chain(use_def_map.all_end_of_scope_symbol_bindings().filter_map(
             move |(symbol_id, bindings)| {
-                // It's not clear to AG how to using a bindings
-                // iterator here to get the correct definition for
-                // this binding. Below, we look through all bindings
-                // with a definition and only take one if there is
-                // exactly one. I don't think this can be wrong, but
-                // it's probably omitting definitions in some cases.
-                let mut definition = None;
-                for binding in bindings.clone() {
-                    if let Some(def) = binding.binding.definition() {
-                        if definition.is_some() {
-                            definition = None;
-                            break;
-                        }
-                        definition = Some(def);
-                    }
-                }
-                place_from_bindings(db, bindings)
-                    .ignore_possibly_undefined()
-                    .map(|ty| {
-                        let symbol = table.symbol(symbol_id);
-                        let member = Member {
-                            name: symbol.name().clone(),
-                            ty,
-                        };
-                        MemberWithDefinition { member, definition }
-                    })
+                let PlaceWithDefinition {
+                    place,
+                    first_definition,
+                } = place_from_bindings(db, bindings);
+
+                let first_reachable_definition = first_definition?;
+                let ty = place.ignore_possibly_undefined()?;
+
+                let symbol = table.symbol(symbol_id);
+                let member = Member {
+                    name: symbol.name().clone(),
+                    ty,
+                };
+                Some(MemberWithDefinition {
+                    member,
+                    first_reachable_definition,
+                })
             },
         ))
 }
@@ -457,11 +451,11 @@ impl<'db> AllMembers<'db> {
     }
 }
 
-/// A member of a type or scope, with an optional definition.
+/// A member of a type or scope, with the first reachable definition of that member.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct MemberWithDefinition<'db> {
     pub member: Member<'db>,
-    pub definition: Option<Definition<'db>>,
+    pub first_reachable_definition: Definition<'db>,
 }
 
 /// A member of a type or scope.
