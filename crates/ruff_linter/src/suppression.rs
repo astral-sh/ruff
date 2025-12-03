@@ -118,6 +118,10 @@ impl Suppressions {
         builder.load_from_tokens(tokens)
     }
 
+    pub(crate) fn is_empty(&self) -> bool {
+        self.valid.is_empty()
+    }
+
     /// Check if a diagnostic is suppressed by any known range suppressions
     pub(crate) fn check_diagnostic(&self, diagnostic: &Diagnostic) -> bool {
         if self.valid.is_empty() {
