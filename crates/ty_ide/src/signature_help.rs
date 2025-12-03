@@ -17,6 +17,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::SemanticModel;
 use ty_python_semantic::semantic_index::definition::Definition;
+use ty_python_semantic::types::ParameterKind;
 use ty_python_semantic::types::ide_support::{
     CallSignatureDetails, call_signature_details, find_active_signature_from_details,
 };
@@ -35,6 +36,8 @@ pub struct ParameterDetails {
     /// Documentation specific to the parameter, typically extracted from the
     /// function's docstring
     pub documentation: Option<String>,
+    /// True if the parameter is positional-only.
+    pub is_positional_only: bool,
 }
 
 /// Information about a function signature
@@ -200,6 +203,7 @@ fn create_signature_details_from_call_signature_details(
         &signature_label,
         documentation.as_ref(),
         &details.parameter_names,
+        &details.parameter_kinds,
     );
     SignatureDetails {
         label: signature_label,
@@ -223,6 +227,7 @@ fn create_parameters_from_offsets(
     signature_label: &str,
     docstring: Option<&Docstring>,
     parameter_names: &[String],
+    parameter_kinds: &[ParameterKind],
 ) -> Vec<ParameterDetails> {
     // Extract parameter documentation from the function's docstring if available.
     let param_docs = if let Some(docstring) = docstring {
@@ -245,11 +250,16 @@ fn create_parameters_from_offsets(
 
             // Get the parameter name for documentation lookup.
             let param_name = parameter_names.get(i).map(String::as_str).unwrap_or("");
+            let is_positional_only = matches!(
+                parameter_kinds.get(i),
+                Some(ParameterKind::PositionalOnly { .. })
+            );
 
             ParameterDetails {
                 name: param_name.to_string(),
                 label,
                 documentation: param_docs.get(param_name).cloned(),
+                is_positional_only,
             }
         })
         .collect()
