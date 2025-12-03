@@ -6226,11 +6226,25 @@ impl<'db> Type<'db> {
             ),
 
             Type::Intersection(_) => {
-                Binding::single(self, Signature::todo("Type::Intersection.call()")).into()
+                Binding::single(self, Signature::todo("Type::Intersection.call")).into()
             }
 
-            // TODO: this is actually callable
-            Type::DataclassDecorator(_) => CallableBinding::not_callable(self).into(),
+            Type::DataclassDecorator(_) => {
+                let typevar = BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Invariant);
+                let typevar_meta = SubclassOfType::from(db, typevar);
+                let context = GenericContext::from_typevar_instances(db, [typevar]);
+                let parameters = [Parameter::positional_only(Some(Name::new_static("cls")))
+                    .with_annotated_type(typevar_meta)];
+                // Intersect with `Any` for the return type to reflect the fact that the `dataclass()`
+                // decorator adds methods to the class
+                let returns = IntersectionType::from_elements(db, [typevar_meta, Type::any()]);
+                let signature = Signature::new_generic(
+                    Some(context),
+                    Parameters::new(db, parameters),
+                    Some(returns),
+                );
+                Binding::single(self, signature).into()
+            }
 
             // TODO: some `SpecialForm`s are callable (e.g. TypedDicts)
             Type::SpecialForm(_) => CallableBinding::not_callable(self).into(),
