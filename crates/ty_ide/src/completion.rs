@@ -9,6 +9,7 @@ use ruff_python_ast::token::{Token, TokenAt, TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use rustc_hash::FxHashSet;
 use ty_python_semantic::types::UnionType;
 use ty_python_semantic::{
     Completion as SemanticCompletion, KnownModule, ModuleName, NameKind, SemanticModel,
@@ -20,7 +21,7 @@ use crate::find_node::covering_node;
 use crate::goto::Definitions;
 use crate::importer::{ImportRequest, Importer};
 use crate::symbols::QueryPattern;
-use crate::{Db, all_symbols};
+use crate::{Db, all_symbols, signature_help};
 
 /// A collection of completions built up from various sources.
 #[derive(Clone)]
@@ -436,6 +437,10 @@ pub fn completion<'db>(
                 );
             }
         }
+
+        if let Some(arg_completions) = detect_function_arg_completions(db, file, &parsed, offset) {
+            completions.extend(arg_completions);
+        }
     }
 
     if is_raising_exception(tokens) {
@@ -451,8 +456,87 @@ pub fn completion<'db>(
             !ty.is_notimplemented(db)
         });
     }
-
     completions.into_completions()
+}
+
+/// Detect and construct completions for unset function arguments.
+///
+/// Suggestions are only provided if the cursor is currently inside a
+/// function call and the function arguments have not 1) already been
+/// set and 2) been defined as positional-only.
+fn detect_function_arg_completions<'db>(
+    db: &'db dyn Db,
+    file: File,
+    parsed: &ParsedModuleRef,
+    offset: TextSize,
+) -> Option<Vec<Completion<'db>>> {
+    let sig_help = signature_help(db, file, offset)?;
+    let set_function_args = detect_set_function_args(parsed, offset);
+
+    let completions = sig_help
+        .signatures
+        .iter()
+        .flat_map(|sig| &sig.parameters)
+        .filter(|p| !p.is_positional_only && !set_function_args.contains(&p.name.as_str()))
+        .map(|p| {
+            let name = Name::new(&p.name);
+            let documentation = p
+                .documentation
+                .as_ref()
+                .map(|d| Docstring::new(d.to_owned()));
+            let insert = Some(format!("{name}=").into_boxed_str());
+            Completion {
+                name,
+                qualified: None,
+                insert,
+                ty: None,
+                kind: Some(CompletionKind::Variable),
+                module_name: None,
+                import: None,
+                builtin: false,
+                is_type_check_only: false,
+                is_definitively_raisable: false,
+                documentation,
+            }
+        })
+        .collect();
+    Some(completions)
+}
+
+/// Returns function arguments that have already been set.
+///
+/// If `offset` is inside an arguments node, this returns
+/// the list of argument names that are already set.
+///
+/// For example, given:
+///
+/// ```python
+/// def abc(foo, bar, baz): ...
+/// abc(foo=1, bar=2, b<CURSOR>)
+/// ```
+///
+/// the resulting value is `["foo", "bar"]`
+///
+/// This is useful to be able to exclude autocomplete suggestions
+/// for arguments that have already been set to some value.
+///
+/// If the parent node is not an arguments node, the return value
+/// is an empty Vec.
+fn detect_set_function_args(parsed: &ParsedModuleRef, offset: TextSize) -> FxHashSet<&str> {
+    let range = TextRange::empty(offset);
+    covering_node(parsed.syntax().into(), range)
+        .parent()
+        .and_then(|node| match node {
+            ast::AnyNodeRef::Arguments(args) => Some(args),
+            _ => None,
+        })
+        .map(|args| {
+            args.keywords
+                .iter()
+                .filter_map(|kw| kw.arg.as_ref().map(|ident| ident.id.as_str()))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 pub(crate) struct ImportEdit {
@@ -2386,10 +2470,11 @@ def frob(): ...
 ",
         );
 
-        // FIXME: Should include `foo`.
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().build().snapshot(),
-            @"<No completions found after filtering out completions>",
+            @r"
+            foo
+            ",
         );
     }
 
@@ -2401,10 +2486,11 @@ def frob(): ...
 ",
         );
 
-        // FIXME: Should include `foo`.
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().build().snapshot(),
-            @"<No completions found after filtering out completions>",
+            @r"
+            foo
+            ",
         );
     }
 
@@ -3039,7 +3125,6 @@ quux.<CURSOR>
         ");
     }
 
-    // We don't yet take function parameters into account.
     #[test]
     fn call_prefix1() {
         let builder = completion_test_builder(
@@ -3052,7 +3137,159 @@ bar(o<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @r"
+        foo
+        okay
+        "
+        );
+    }
+
+    #[test]
+    fn call_keyword_only_argument() {
+        let builder = completion_test_builder(
+            "\
+def bar(*, okay): ...
+
+foo = 1
+
+bar(o<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @r"
+        foo
+        okay
+        "
+        );
+    }
+
+    #[test]
+    fn call_multiple_keyword_arguments() {
+        let builder = completion_test_builder(
+            "\
+def foo(bar, baz, barbaz): ...
+
+foo(b<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @r"
+        bar
+        barbaz
+        baz
+        "
+        );
+    }
+
+    #[test]
+    fn call_multiple_keyword_arguments_some_set() {
+        let builder = completion_test_builder(
+            "\
+def foo(bar, baz): ...
+
+foo(bar=1, b<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @r"
+        baz
+        "
+        );
+    }
+
+    #[test]
+    fn call_arguments_multi_def() {
+        let builder = completion_test_builder(
+            "\
+def abc(okay, x): ...
+def bar(not_okay, y): ...
+def baz(foobarbaz, z): ...
+
+abc(o<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @r"
+        okay
+        "
+        );
+    }
+
+    #[test]
+    fn call_arguments_cursor_middle() {
+        let builder = completion_test_builder(
+            "\
+def abc(okay, foo, bar, baz): ...
+
+abc(okay=1, ba<CURSOR> baz=5
+",
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @r"
+        bar
+        "
+        );
+    }
+
+
+
+    #[test]
+    fn call_positional_only_argument() {
+        // If the parameter is positional only we don't
+        // want to suggest it as specifying by name
+        // is not valid.
+        let builder = completion_test_builder(
+            "\
+def bar(okay, /): ...
+
+foo = 1
+
+bar(o<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @"foo"
+        );
+    }
+
+    #[test]
+    fn call_positional_only_keyword_only_argument_mix() {
+        // If the parameter is positional only we don't
+        // want to suggest it as specifying by name
+        // is not valid.
+        let builder = completion_test_builder(
+            "\
+def bar(not_okay, no, /, okay, *, okay_abc, okay_okay): ...
+
+foo = 1
+
+bar(o<CURSOR>
+",
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().build().snapshot(),
+            @r"
+        foo
+        okay
+        okay_abc
+        okay_okay
+        "
+        );
     }
 
     #[test]
@@ -3070,6 +3307,7 @@ bar(<CURSOR>
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         bar
         foo
+        okay
         ");
     }
 
