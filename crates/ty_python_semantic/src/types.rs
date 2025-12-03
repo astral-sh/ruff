@@ -2724,6 +2724,17 @@ impl<'db> Type<'db> {
                 )
             }
 
+            (Type::GenericAlias(self_alias), Type::GenericAlias(target_alias)) => {
+                ClassType::from(self_alias).has_relation_to_impl(
+                    db,
+                    ClassType::from(target_alias),
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+            }
+
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
             // `Literal[abc.ABC]` is a subtype of `abc.ABCMeta` because the `abc.ABC` class object
             // is an instance of its metaclass `abc.ABCMeta`.
@@ -3307,7 +3318,6 @@ impl<'db> Type<'db> {
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
-                | Type::GenericAlias(..)
                 | Type::SpecialForm(..)
                 | Type::KnownInstance(..)),
                 right @ (Type::BooleanLiteral(..)
@@ -3321,7 +3331,6 @@ impl<'db> Type<'db> {
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
-                | Type::GenericAlias(..)
                 | Type::SpecialForm(..)
                 | Type::KnownInstance(..)),
             ) => ConstraintSet::from(left != right),
@@ -3504,13 +3513,25 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(true)
             }
 
+            (Type::GenericAlias(left_alias), Type::GenericAlias(right_alias)) => {
+                ConstraintSet::from(left_alias.origin(db) != right_alias.origin(db)).or(db, || {
+                    left_alias.specialization(db).is_disjoint_from_impl(
+                        db,
+                        right_alias.specialization(db),
+                        inferable,
+                        disjointness_visitor,
+                        relation_visitor,
+                    )
+                })
+            }
+
             (Type::SubclassOf(subclass_of_ty), Type::ClassLiteral(class_b))
             | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
                     SubclassOfInner::Dynamic(_) => ConstraintSet::from(false),
-                    SubclassOfInner::Class(class_a) => {
-                        class_b.when_subclass_of(db, None, class_a).negate(db)
-                    }
+                    SubclassOfInner::Class(class_a) => ConstraintSet::from(
+                        !class_a.could_exist_in_mro_of(db, ClassType::NonGeneric(class_b)),
+                    ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),
                 }
             }
@@ -3519,9 +3540,9 @@ impl<'db> Type<'db> {
             | (Type::GenericAlias(alias_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
                     SubclassOfInner::Dynamic(_) => ConstraintSet::from(false),
-                    SubclassOfInner::Class(class_a) => ClassType::from(alias_b)
-                        .when_subclass_of(db, class_a, inferable)
-                        .negate(db),
+                    SubclassOfInner::Class(class_a) => ConstraintSet::from(
+                        !class_a.could_exist_in_mro_of(db, ClassType::Generic(alias_b)),
+                    ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),
                 }
             }
@@ -3815,6 +3836,8 @@ impl<'db> Type<'db> {
                     relation_visitor,
                 )
             }
+
+            (Type::GenericAlias(_), _) | (_, Type::GenericAlias(_)) => ConstraintSet::from(true),
         }
     }
 
