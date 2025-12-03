@@ -458,14 +458,10 @@ class C:
     def f2(cls: type[C], x: int) -> str:
         return "a"
 
-# TODO: revealed: str
-reveal_type(C.f1(1))  # revealed: str | Divergent
-# TODO: revealed: str
-reveal_type(C().f1(1))  # revealed: str | Divergent
-# TODO: revealed: str
-reveal_type(C.f2(1))  # revealed: str | Divergent
-# TODO: revealed: str
-reveal_type(C().f2(1))  # revealed: str | Divergent
+reveal_type(C.f1(1))  # revealed: str
+reveal_type(C().f1(1))  # revealed: str
+reveal_type(C.f2(1))  # revealed: str
+reveal_type(C().f2(1))  # revealed: str
 ```
 
 ### `__init_subclass__`
@@ -586,14 +582,10 @@ class C:
     def f2(x: int) -> str:
         return "a"
 
-# TODO: revealed: str
-reveal_type(C.f1(1))  # revealed: str | Divergent
-# TODO: revealed: str
-reveal_type(C().f1(1))  # revealed: str | Divergent
-# TODO: revealed: str
-reveal_type(C.f2(1))  # revealed: str | Divergent
-# TODO: revealed: str
-reveal_type(C().f2(1))  # revealed: str | Divergent
+reveal_type(C.f1(1))  # revealed: str
+reveal_type(C().f1(1))  # revealed: str
+reveal_type(C.f2(1))  # revealed: str
+reveal_type(C().f2(1))  # revealed: str
 ```
 
 ### `__new__`
