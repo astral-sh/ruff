@@ -8263,6 +8263,16 @@ impl<'db> Type<'db> {
             _ => None,
         }
     }
+
+    /// Default-specialize all legacy typevars in this type.
+    ///
+    /// This is used when an implicit type alias is referenced without explicitly specializing it.
+    pub(crate) fn default_specialize(self, db: &'db dyn Db) -> Type<'db> {
+        let mut variables = FxOrderSet::default();
+        self.find_legacy_typevars(db, None, &mut variables);
+        let generic_context = GenericContext::from_typevar_instances(db, variables);
+        self.apply_specialization(db, generic_context.default_specialization(db, None))
+    }
 }
 
 impl<'db> From<&Type<'db>> for Type<'db> {
