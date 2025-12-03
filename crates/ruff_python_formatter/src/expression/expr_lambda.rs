@@ -94,8 +94,9 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                         format_args![token("("), block_indent(&body), token(")")]
                     ]
                     .fmt(f)
-                } else if has_own_parentheses(body, f.context()).is_some() {
-                    // We probably need to be more careful here and preserve parentheses if there are comments?
+                } else if has_own_parentheses(body, f.context()).is_some()
+                    || comments.contains_comments(body.as_ref().into())
+                {
                     body.format().fmt(f)
                 } else {
                     parenthesize_if_expands(&body.format().with_options(Parentheses::Never)).fmt(f)
