@@ -48,7 +48,13 @@ pub(crate) fn all_members_of_scope<'db>(
                         name: symbol.name().clone(),
                         ty,
                     };
-                    MemberWithDefinition { member, definition }
+                    let first_reachable_definition = definition.expect(
+                        "A (possibly) defined place must always have >=1 reachable definitions",
+                    );
+                    MemberWithDefinition {
+                        member,
+                        first_reachable_definition,
+                    }
                 })
         })
         .chain(use_def_map.all_end_of_scope_symbol_bindings().filter_map(
@@ -64,9 +70,12 @@ pub(crate) fn all_members_of_scope<'db>(
                         name: symbol.name().clone(),
                         ty,
                     };
+                    let first_definition = first_definition.expect(
+                        "A (possibly) defined place must always have >=1 reachable definitions",
+                    );
                     MemberWithDefinition {
                         member,
-                        definition: first_definition,
+                        first_reachable_definition: first_definition,
                     }
                 })
             },
@@ -449,11 +458,11 @@ impl<'db> AllMembers<'db> {
     }
 }
 
-/// A member of a type or scope, with an optional definition.
+/// A member of a type or scope, with the first reachable definition of that member.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct MemberWithDefinition<'db> {
     pub member: Member<'db>,
-    pub definition: Option<Definition<'db>>,
+    pub first_reachable_definition: Definition<'db>,
 }
 
 /// A member of a type or scope.

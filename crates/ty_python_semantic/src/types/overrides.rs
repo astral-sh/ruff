@@ -12,8 +12,8 @@ use crate::{
     lint::LintId,
     place::Place,
     semantic_index::{
-        definition::DefinitionKind, place_table, scope::ScopeId, symbol::ScopedSymbolId,
-        use_def_map,
+        definition::DefinitionKind, place::ScopedPlaceId, place_table, scope::ScopeId,
+        symbol::ScopedSymbolId, use_def_map,
     },
     types::{
         ClassBase, ClassLiteral, ClassType, KnownClass, Type,
@@ -53,10 +53,11 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: ClassLite
     }
 
     let class_specialized = class.identity_specialization(db);
-    let own_class_members: FxHashSet<_> = all_members_of_scope(db, class.body_scope(db)).collect();
+    let scope = class.body_scope(db);
+    let own_class_members: FxHashSet<_> = all_members_of_scope(db, scope).collect();
 
     for member in own_class_members {
-        check_class_declaration(context, configuration, class_specialized, &member);
+        check_class_declaration(context, configuration, class_specialized, scope, &member);
     }
 }
 
@@ -64,6 +65,7 @@ fn check_class_declaration<'db>(
     context: &InferContext<'db, '_>,
     configuration: OverrideRulesConfig,
     class: ClassType<'db>,
+    class_scope: ScopeId<'db>,
     member: &MemberWithDefinition<'db>,
 ) {
     /// Salsa-tracked query to check whether any of the definitions of a symbol
@@ -103,11 +105,10 @@ fn check_class_declaration<'db>(
 
     let db = context.db();
 
-    let MemberWithDefinition { member, definition } = member;
-
-    let Some(definition) = definition else {
-        return;
-    };
+    let MemberWithDefinition {
+        member,
+        first_reachable_definition,
+    } = member;
 
     let Place::Defined(type_on_subclass_instance, _, _) =
         Type::instance(db, class).member(db, &member.name).place
@@ -126,12 +127,14 @@ fn check_class_declaration<'db>(
     if class_kind == Some(CodeGeneratorKind::NamedTuple)
         && configuration.check_prohibited_named_tuple_attrs()
         && PROHIBITED_NAMEDTUPLE_ATTRS.contains(&member.name.as_str())
-        // accessing `.kind()` here is fine as `definition`
-        // will always be a definition in the file currently being checked
-        && !matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
+        && let Some(symbol_id) = place_table(db, class_scope).symbol_id(&member.name)
+        && let Some(bad_definition) = use_def_map(db, class_scope)
+            .all_reachable_bindings(ScopedPlaceId::Symbol(symbol_id))
+            .filter_map(|binding| binding.binding.definition())
+            .find(|def| !matches!(def.kind(db), DefinitionKind::AnnotatedAssignment(_)))
         && let Some(builder) = context.report_lint(
             &INVALID_NAMED_TUPLE,
-            definition.focus_range(db, context.module()),
+            bad_definition.focus_range(db, context.module()),
         )
     {
         let mut diagnostic = builder.into_diagnostic(format_args!(
@@ -272,7 +275,7 @@ fn check_class_declaration<'db>(
             context,
             &member.name,
             class,
-            *definition,
+            *first_reachable_definition,
             subclass_function,
             superclass,
             superclass_type,
@@ -308,7 +311,7 @@ fn check_class_declaration<'db>(
         && !has_dynamic_superclass
         // accessing `.kind()` here is fine as `definition`
         // will always be a definition in the file currently being checked
-        && definition.kind(db).is_function_def()
+        && first_reachable_definition.kind(db).is_function_def()
     {
         check_explicit_overrides(context, member, class);
     }
@@ -317,7 +320,7 @@ fn check_class_declaration<'db>(
         report_overridden_final_method(
             context,
             &member.name,
-            *definition,
+            *first_reachable_definition,
             member.ty,
             superclass,
             class,

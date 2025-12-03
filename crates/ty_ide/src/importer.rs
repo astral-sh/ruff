@@ -327,9 +327,7 @@ impl<'ast> MembersInScope<'ast> {
             .members_in_scope_at(node)
             .into_iter()
             .map(|(name, memberdef)| {
-                let Some(def) = memberdef.definition else {
-                    return (name, MemberInScope::other(memberdef.ty));
-                };
+                let def = memberdef.first_reachable_definition;
                 let kind = match *def.kind(db) {
                     DefinitionKind::Import(ref kind) => {
                         MemberImportKind::Imported(AstImportKind::Import(kind.import(parsed)))
