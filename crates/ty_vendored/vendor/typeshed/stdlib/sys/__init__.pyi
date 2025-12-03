@@ -77,7 +77,7 @@ from builtins import object as _object
 from collections.abc import AsyncGenerator, Callable, Sequence
 from io import TextIOWrapper
 from types import FrameType, ModuleType, TracebackType
-from typing import Any, Final, Literal, NoReturn, Protocol, TextIO, TypeVar, final, type_check_only
+from typing import Any, Final, Literal, NoReturn, Protocol, TextIO, TypeVar, final, overload, type_check_only
 from typing_extensions import LiteralString, TypeAlias, deprecated
 
 _T = TypeVar("_T")
@@ -648,7 +648,7 @@ if sys.platform == "android":  # noqa: Y008
 def getallocatedblocks() -> int:
     """Return the number of memory blocks currently allocated."""
 
-def getdefaultencoding() -> str:
+def getdefaultencoding() -> Literal["utf-8"]:
     """Return the current default encoding used by the Unicode implementation."""
 
 if sys.platform != "win32":
@@ -658,10 +658,10 @@ if sys.platform != "win32":
         The flag constants are defined in the os module.
         """
 
-def getfilesystemencoding() -> str:
+def getfilesystemencoding() -> LiteralString:
     """Return the encoding used to convert Unicode filenames to OS filenames."""
 
-def getfilesystemencodeerrors() -> str:
+def getfilesystemencodeerrors() -> LiteralString:
     """Return the error mode used Unicode to OS filename conversion."""
 
 def getrefcount(object: Any, /) -> int:
@@ -755,13 +755,17 @@ if sys.platform == "win32":
         intended for identifying the OS rather than feature detection.
         """
 
-def intern(string: str, /) -> str:
+@overload
+def intern(string: LiteralString, /) -> LiteralString:
     """``Intern'' the given string.
 
     This enters the string in the (global) table of interned strings whose
     purpose is to speed up dictionary lookups. Return the string itself or
     the previously interned string object with the same value.
     """
+
+@overload
+def intern(string: str, /) -> str: ...  # type: ignore[misc]
 
 __interactivehook__: Callable[[], object]
 

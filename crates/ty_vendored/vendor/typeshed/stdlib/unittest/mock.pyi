@@ -322,6 +322,7 @@ class NonCallableMock(Base, Any):
     call_count: int
     call_args: _Call | MaybeNone
     call_args_list: _CallList
+    method_calls: _CallList
     mock_calls: _CallList
     def _format_mock_call_signature(self, args: Any, kwargs: Any) -> str: ...
     def _call_matcher(self, _call: tuple[_Call, ...]) -> _Call:
