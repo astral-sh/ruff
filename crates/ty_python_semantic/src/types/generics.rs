@@ -503,7 +503,7 @@ impl<'db> GenericContext<'db> {
         loop {
             let mut any_changed = false;
             for i in 0..len {
-                let partial = PartialSpecialization {
+                let partial = PartialSpecialization::FromGenericContext {
                     generic_context: self,
                     types: &types,
                 };
@@ -565,7 +565,7 @@ impl<'db> GenericContext<'db> {
             // Typevars are only allowed to refer to _earlier_ typevars in their defaults. (This is
             // statically enforced for PEP-695 contexts, and is explicitly called out as a
             // requirement for legacy contexts.)
-            let partial = PartialSpecialization {
+            let partial = PartialSpecialization::FromGenericContext {
                 generic_context: self,
                 types: &expanded[0..idx],
             };
@@ -1299,9 +1299,11 @@ impl<'db> Specialization<'db> {
 /// You will usually use [`Specialization`] instead of this type. This type is used when we need to
 /// substitute types for type variables before we have fully constructed a [`Specialization`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
-pub struct PartialSpecialization<'a, 'db> {
-    generic_context: GenericContext<'db>,
-    types: &'a [Type<'db>],
+pub enum PartialSpecialization<'a, 'db> {
+    FromGenericContext {
+        generic_context: GenericContext<'db>,
+        types: &'a [Type<'db>],
+    },
 }
 
 impl<'db> PartialSpecialization<'_, 'db> {
@@ -1312,11 +1314,17 @@ impl<'db> PartialSpecialization<'_, 'db> {
         db: &'db dyn Db,
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<Type<'db>> {
-        let index = self
-            .generic_context
-            .variables_inner(db)
-            .get_index_of(&bound_typevar.identity(db))?;
-        self.types.get(index).copied()
+        match self {
+            PartialSpecialization::FromGenericContext {
+                generic_context,
+                types,
+            } => {
+                let index = generic_context
+                    .variables_inner(db)
+                    .get_index_of(&bound_typevar.identity(db))?;
+                types.get(index).copied()
+            }
+        }
     }
 }
 
