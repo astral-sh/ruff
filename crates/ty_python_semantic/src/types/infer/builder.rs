@@ -9183,7 +9183,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         let mut maybe_submodule_name = module_name.clone();
                         maybe_submodule_name.extend(&relative_submodule);
-                        if resolve_module(db, &maybe_submodule_name).is_some() {
+                        if let Some(submodule) = resolve_module(db, &maybe_submodule_name) {
                             if let Some(builder) = self
                                 .context
                                 .report_lint(&POSSIBLY_MISSING_ATTRIBUTE, attribute)
@@ -9196,7 +9196,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     "Consider explicitly importing `{maybe_submodule_name}`"
                                 ));
                             }
-                            return fallback();
+                            return TypeAndQualifiers::new(
+                                Type::module_literal(db, self.file(), submodule),
+                                TypeOrigin::Inferred,
+                                TypeQualifiers::empty(),
+                            );
                         }
                     }
                 }

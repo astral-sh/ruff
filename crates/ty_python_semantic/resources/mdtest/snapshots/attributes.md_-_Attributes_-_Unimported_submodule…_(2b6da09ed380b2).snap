@@ -31,9 +31,9 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/attributes.md
 2 | import baz
 3 | 
 4 | # error: [possibly-missing-attribute]
-5 | reveal_type(foo.bar)  # revealed: Unknown
+5 | reveal_type(foo.bar)  # revealed: <module 'foo.bar'>
 6 | # error: [possibly-missing-attribute]
-7 | reveal_type(baz.bar)  # revealed: Unknown
+7 | reveal_type(baz.bar)  # revealed: <module 'baz.bar'>
 ```
 
 # Diagnostics
@@ -43,10 +43,10 @@ warning[possibly-missing-attribute]: Submodule `bar` may not be available as an 
  --> src/main.py:5:13
   |
 4 | # error: [possibly-missing-attribute]
-5 | reveal_type(foo.bar)  # revealed: Unknown
+5 | reveal_type(foo.bar)  # revealed: <module 'foo.bar'>
   |             ^^^^^^^
 6 | # error: [possibly-missing-attribute]
-7 | reveal_type(baz.bar)  # revealed: Unknown
+7 | reveal_type(baz.bar)  # revealed: <module 'baz.bar'>
   |
 help: Consider explicitly importing `foo.bar`
 info: rule `possibly-missing-attribute` is enabled by default
@@ -57,9 +57,9 @@ info: rule `possibly-missing-attribute` is enabled by default
 warning[possibly-missing-attribute]: Submodule `bar` may not be available as an attribute on module `baz`
  --> src/main.py:7:13
   |
-5 | reveal_type(foo.bar)  # revealed: Unknown
+5 | reveal_type(foo.bar)  # revealed: <module 'foo.bar'>
 6 | # error: [possibly-missing-attribute]
-7 | reveal_type(baz.bar)  # revealed: Unknown
+7 | reveal_type(baz.bar)  # revealed: <module 'baz.bar'>
   |             ^^^^^^^
   |
 help: Consider explicitly importing `baz.bar`
