@@ -9769,6 +9769,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
 
+            (unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _, _)
+            | (_, unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _) => Some(unknown),
+
             (
                 todo @ Type::Dynamic(
                     DynamicType::Todo(_)
@@ -11167,6 +11170,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
             }
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(
+                _,
+            ))) => {
+                let slice_ty = self.infer_expression(slice, TypeContext::default());
+                let mut variables = FxOrderSet::default();
+                slice_ty.bind_and_find_all_legacy_typevars(
+                    self.db(),
+                    self.typevar_binding_context,
+                    &mut variables,
+                );
+                let generic_context = GenericContext::from_typevar_instances(self.db(), variables);
+                return Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
+            }
             Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
                 if let Some(generic_context) = type_alias.generic_context(self.db()) {
                     return self.infer_explicit_type_alias_type_specialization(
@@ -11305,6 +11321,56 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ));
             }
             Type::SpecialForm(SpecialFormType::Callable) => {
+                let arguments = if let ast::Expr::Tuple(tuple) = &*subscript.slice {
+                    &*tuple.elts
+                } else {
+                    std::slice::from_ref(&*subscript.slice)
+                };
+
+                // TODO: Remove this once we support Concatenate properly. This is necessary
+                // to avoid a lot of false positives downstream, because we can't represent the typevar-
+                // specialized `Callable` types yet.
+                let num_arguments = arguments.len();
+                if num_arguments == 2 {
+                    let first_arg = &arguments[0];
+                    let second_arg = &arguments[1];
+
+                    if first_arg.is_subscript_expr() {
+                        let first_arg_ty = self.infer_expression(first_arg, TypeContext::default());
+                        if let Type::Dynamic(DynamicType::UnknownGeneric(generic_context)) =
+                            first_arg_ty
+                        {
+                            let mut variables = generic_context
+                                .variables(self.db())
+                                .collect::<FxOrderSet<_>>();
+
+                            let return_ty =
+                                self.infer_expression(second_arg, TypeContext::default());
+                            return_ty.bind_and_find_all_legacy_typevars(
+                                self.db(),
+                                self.typevar_binding_context,
+                                &mut variables,
+                            );
+
+                            let generic_context =
+                                GenericContext::from_typevar_instances(self.db(), variables);
+                            return Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
+                        }
+
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "The first argument to `Callable` must be either a list of types, \
+                                     ParamSpec, Concatenate, or `...`",
+                            ));
+                        }
+                        return Type::KnownInstance(KnownInstanceType::Callable(
+                            CallableType::unknown(self.db()),
+                        ));
+                    }
+                }
+
                 let callable = self
                     .infer_callable_type(subscript)
                     .as_callable()
@@ -11408,6 +11474,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | KnownInstanceType::TypeGenericAlias(_),
             ) => {
                 return self.infer_explicit_type_alias_specialization(subscript, value_ty, false);
+            }
+            Type::Dynamic(DynamicType::Unknown) => {
+                let slice_ty = self.infer_expression(slice, TypeContext::default());
+                let mut variables = FxOrderSet::default();
+                slice_ty.bind_and_find_all_legacy_typevars(
+                    self.db(),
+                    self.typevar_binding_context,
+                    &mut variables,
+                );
+                let generic_context = GenericContext::from_typevar_instances(self.db(), variables);
+                return Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
             }
             _ => {}
         }
@@ -11893,6 +11970,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (Type::SpecialForm(SpecialFormType::Unpack), _) => {
                 Some(Type::Dynamic(DynamicType::TodoUnpack))
+            }
+
+            (Type::SpecialForm(SpecialFormType::Concatenate), _) => {
+                // TODO: Add proper support for `Concatenate`
+                let mut variables = FxOrderSet::default();
+                slice_ty.bind_and_find_all_legacy_typevars(
+                    db,
+                    self.typevar_binding_context,
+                    &mut variables,
+                );
+                let generic_context = GenericContext::from_typevar_instances(self.db(), variables);
+                Some(Type::Dynamic(DynamicType::UnknownGeneric(generic_context)))
             }
 
             (Type::SpecialForm(special_form), _) if special_form.class().is_special_form() => {
