@@ -547,3 +547,51 @@ class Child(Parent):
         def spam(self) -> None: ...
         def baaaaar(self) -> None: ...
 ```
+
+## Overloads in statically-known branches in stub files
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```pyi
+import sys
+from typing_extensions import overload, final
+
+class Foo:
+    if sys.version_info >= (3, 10):
+        @overload
+        @final
+        def method(self, x: int) -> int: ...
+    else:
+        @overload
+        def method(self, x: int) -> int: ...
+    @overload
+    def method(self, x: str) -> str: ...
+
+    if sys.version_info >= (3, 10):
+        @overload
+        def method2(self, x: int) -> int: ...
+    else:
+        @overload
+        @final
+        def method2(self, x: int) -> int: ...
+    @overload
+    def method2(self, x: str) -> str: ...
+
+class Bar(Foo):
+    @overload
+    def method(self, x: int) -> int: ...
+    @overload
+    def method(self, x: str) -> str: ...  # error: [override-of-final-method]
+
+    # This is fine: the only overload that is marked `@final`
+    # is in a statically-unreachable branch
+    @overload
+    def method2(self, x: int) -> int: ...
+    @overload
+    def method2(self, x: str) -> str: ...
+```

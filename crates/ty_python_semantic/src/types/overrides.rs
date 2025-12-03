@@ -396,16 +396,16 @@ fn check_explicit_overrides<'db>(
     let Some(functions) = underlying_functions else {
         return;
     };
-    if !functions
+    let Some(decorated_function) = functions
         .iter()
-        .any(|function| function.has_known_decorator(db, FunctionDecorators::OVERRIDE))
-    {
+        .find(|function| function.has_known_decorator(db, FunctionDecorators::OVERRIDE))
+    else {
         return;
-    }
+    };
     let function_literal = if context.in_stub() {
-        functions[0].first_overload_or_implementation(db)
+        decorated_function.first_overload_or_implementation(db)
     } else {
-        functions[0].literal(db).last_definition(db)
+        decorated_function.literal(db).last_definition(db)
     };
 
     let Some(builder) = context.report_lint(
