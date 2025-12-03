@@ -1206,39 +1206,45 @@ impl<'db> ClassType<'db> {
         // If the class defines an `__init__` method, then we synthesize a callable type with the
         // same parameters as the `__init__` method after it is bound, and with the return type of
         // the concrete type of `Self`.
-        let synthesized_dunder_init_callable =
-            if let Place::Defined(ty, _, _) = dunder_init_function_symbol {
-                let signature = match ty {
-                    Type::FunctionLiteral(dunder_init_function) => {
-                        Some(dunder_init_function.signature(db))
-                    }
-                    Type::Callable(callable) => Some(callable.signatures(db)),
-                    _ => None,
+        let synthesized_dunder_init_callable = if let Place::Defined(ty, _, _) =
+            dunder_init_function_symbol
+        {
+            let signature = match ty {
+                Type::FunctionLiteral(dunder_init_function) => {
+                    Some(dunder_init_function.signature(db))
+                }
+                Type::Callable(callable) => Some(callable.signatures(db)),
+                _ => None,
+            };
+
+            if let Some(signature) = signature {
+                let synthesized_signature = |signature: &Signature<'db>| {
+                    let self_annotation = signature
+                        .parameters()
+                        .get_positional(0)
+                        .and_then(Parameter::annotated_type);
+                    let return_type = self_annotation.unwrap_or(correct_return_type);
+                    let instance_ty = self_annotation.unwrap_or_else(|| Type::instance(db, self));
+                    Signature::new(signature.parameters().clone(), Some(return_type))
+                        .with_definition(signature.definition())
+                        .bind_self(db, Some(instance_ty))
                 };
 
-                if let Some(signature) = signature {
-                    let synthesized_signature = |signature: &Signature<'db>| {
-                        let instance_ty = Type::instance(db, self);
-                        Signature::new(signature.parameters().clone(), Some(correct_return_type))
-                            .with_definition(signature.definition())
-                            .bind_self(db, Some(instance_ty))
-                    };
+                let synthesized_dunder_init_signature = CallableSignature::from_overloads(
+                    signature.overloads.iter().map(synthesized_signature),
+                );
 
-                    let synthesized_dunder_init_signature = CallableSignature::from_overloads(
-                        signature.overloads.iter().map(synthesized_signature),
-                    );
-
-                    Some(CallableType::new(
-                        db,
-                        synthesized_dunder_init_signature,
-                        true,
-                    ))
-                } else {
-                    None
-                }
+                Some(CallableType::new(
+                    db,
+                    synthesized_dunder_init_signature,
+                    true,
+                ))
             } else {
                 None
-            };
+            }
+        } else {
+            None
+        };
 
         match (dunder_new_function, synthesized_dunder_init_callable) {
             (Some(dunder_new_function), Some(synthesized_dunder_init_callable)) => {
