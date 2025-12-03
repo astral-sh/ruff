@@ -9870,6 +9870,7 @@ impl<'db> BoundTypeVarInstance<'db> {
     }
 
     pub(crate) fn with_paramspec_attr(self, db: &'db dyn Db, kind: ParamSpecAttrKind) -> Self {
+        debug_assert!(self.is_paramspec(db));
         Self::new(db, self.typevar(db), self.binding_context(db), Some(kind))
     }
 

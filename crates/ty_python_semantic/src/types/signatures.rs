@@ -212,14 +212,20 @@ impl<'db> CallableSignature<'db> {
                 .map(|param| param.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
                 .collect::<Vec<_>>();
 
+            let generic_context = self_signature
+                .generic_context
+                .map(|context| type_mapping.update_signature_generic_context(db, context));
+
             let return_ty = self_signature
                 .return_ty
                 .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
 
             match specialization.get(db, typevar) {
                 Some(Type::TypeVar(typevar)) if typevar.is_paramspec(db) => {
-                    return Self::single(Signature::new(
-                        Parameters::new(
+                    return Self::single(Signature {
+                        generic_context,
+                        definition: self_signature.definition,
+                        parameters: Parameters::new(
                             db,
                             prefix_parameters.into_iter().chain([
                                 Parameter::variadic(Name::new_static("args")).with_annotated_type(
@@ -234,14 +240,16 @@ impl<'db> CallableSignature<'db> {
                             ]),
                         ),
                         return_ty,
-                    ));
+                    });
                 }
                 Some(Type::Callable(callable))
                     if matches!(callable.kind(db), CallableTypeKind::ParamSpecValue) =>
                 {
                     return Self::from_overloads(callable.signatures(db).iter().map(|signature| {
-                        Signature::new(
-                            Parameters::new(
+                        Signature {
+                            generic_context,
+                            definition: signature.definition,
+                            parameters: Parameters::new(
                                 db,
                                 prefix_parameters
                                     .iter()
@@ -249,7 +257,7 @@ impl<'db> CallableSignature<'db> {
                                     .chain(signature.parameters().iter().cloned()),
                             ),
                             return_ty,
-                        )
+                        }
                     }));
                 }
                 _ => {}

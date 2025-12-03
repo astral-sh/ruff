@@ -459,3 +459,17 @@ def bar[**P](foo: Foo[P]) -> None:
     reveal_type(foo.args)  # revealed: Unknown | P@bar.args
     reveal_type(foo.kwargs)  # revealed: Unknown | P@bar.kwargs
 ```
+
+### Specializing `Self` when `ParamSpec` is involved
+
+```py
+class Foo[**P]:
+    def method(self, *args: P.args, **kwargs: P.kwargs) -> str:
+        return "hello"
+
+foo = Foo[int, str]()
+
+reveal_type(foo)  # revealed: Foo[(int, str, /)]
+reveal_type(foo.method)  # revealed: bound method Foo[(int, str, /)].method(int, str, /) -> str
+reveal_type(foo.method(1, "a"))  # revealed: str
+```
