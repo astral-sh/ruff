@@ -245,6 +245,7 @@ But, they cannot be omitted when there are multiple type variables.
 reveal_type(TypeVarAndParamSpec[int, [int, str]]().attr)  # revealed: (int, str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, [str]]().attr)  # revealed: (str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, ...]().attr)  # revealed: (...) -> int
+reveal_type(TypeVarAndParamSpec[int, Any]().attr)  # revealed: (...) -> int
 
 # TODO: We could still specialize for `T1` as the type is valid which would reveal `(...) -> int`
 # TODO: error: paramspec is unbound

@@ -3563,7 +3563,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
 
-                    _ => {
+                    _ if exactly_one_paramspec => {
                         // Square brackets are optional when `ParamSpec` is the only type variable
                         // being specialized. This means that a single name expression represents a
                         // parameter list with a single parameter. For example,
@@ -3573,8 +3573,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         //
                         // OnlyParamSpec[int]  # P: (int, /)
                         // ```
-                        if exactly_one_paramspec {
-                            let parameters = if param_type.is_todo() {
+                        let parameters =
+                            if param_type.is_todo() {
                                 Parameters::todo()
                             } else {
                                 Parameters::new(
@@ -3583,9 +3583,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         .with_annotated_type(param_type)],
                                 )
                             };
-                            return Ok(Type::paramspec_value_callable(db, parameters));
-                        }
+                        return Ok(Type::paramspec_value_callable(db, parameters));
                     }
+
+                    Type::Dynamic(DynamicType::Any) => {
+                        return Ok(Type::paramspec_value_callable(
+                            db,
+                            Parameters::gradual_form(),
+                        ));
+                    }
+
+                    _ => {}
                 }
             }
 
