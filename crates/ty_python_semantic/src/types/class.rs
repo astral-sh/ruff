@@ -1911,15 +1911,6 @@ impl<'db> ClassLiteral<'db> {
             .contains(&ClassBase::Class(other))
     }
 
-    pub(super) fn when_subclass_of(
-        self,
-        db: &'db dyn Db,
-        specialization: Option<Specialization<'db>>,
-        other: ClassType<'db>,
-    ) -> ConstraintSet<'db> {
-        ConstraintSet::from(self.is_subclass_of(db, specialization, other))
-    }
-
     /// Return `true` if this class constitutes a typed dict specification (inherits from
     /// `typing.TypedDict`, either directly or indirectly).
     #[salsa::tracked(cycle_initial=is_typed_dict_cycle_initial,
