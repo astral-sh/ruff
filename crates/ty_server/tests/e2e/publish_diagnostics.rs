@@ -22,7 +22,7 @@ def foo() -> str:
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content, 1);
+    server.open_text_document(foo, foo_content, 1);
     let diagnostics = server.await_notification::<PublishDiagnostics>();
 
     insta::assert_debug_snapshot!(diagnostics);

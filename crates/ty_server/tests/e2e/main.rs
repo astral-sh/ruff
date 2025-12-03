@@ -753,7 +753,7 @@ impl TestServer {
     pub(crate) fn open_text_document(
         &mut self,
         path: impl AsRef<SystemPath>,
-        content: impl ToString,
+        content: impl AsRef<str>,
         version: i32,
     ) {
         let params = DidOpenTextDocumentParams {
@@ -761,7 +761,7 @@ impl TestServer {
                 uri: self.file_uri(path),
                 language_id: "python".to_string(),
                 version,
-                text: content.to_string(),
+                text: content.as_ref().to_string(),
             },
         };
         self.send_notification::<DidOpenTextDocument>(params);
