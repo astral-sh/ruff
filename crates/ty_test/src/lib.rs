@@ -259,7 +259,10 @@ fn run_test(
             }
 
             assert!(
-                matches!(embedded.lang, "py" | "pyi" | "python" | "text" | "cfg"),
+                matches!(
+                    embedded.lang,
+                    "py" | "pyi" | "python" | "text" | "cfg" | "pth"
+                ),
                 "Supported file types are: py (or python), pyi, text, cfg and ignore"
             );
 
@@ -296,7 +299,16 @@ fn run_test(
                 full_path = new_path;
             }
 
-            db.write_file(&full_path, &embedded.code).unwrap();
+            let temp_string;
+            let to_write = if embedded.lang == "pth" && !embedded.code.starts_with('/') {
+                // Make any relative .pths be relative to src_path
+                temp_string = format!("{src_path}/{}", embedded.code);
+                &*temp_string
+            } else {
+                &*embedded.code
+            };
+
+            db.write_file(&full_path, to_write).unwrap();
 
             if !(full_path.starts_with(&src_path)
                 && matches!(embedded.lang, "py" | "python" | "pyi"))
