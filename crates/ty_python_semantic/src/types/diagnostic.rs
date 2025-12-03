@@ -40,8 +40,8 @@ use ruff_db::{
 };
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::name::Name;
+use ruff_python_ast::token::parentheses_iterator;
 use ruff_python_ast::{self as ast, AnyNodeRef, StringFlags};
-use ruff_python_parser::parenthesize::parentheses_iterator;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::{self, Formatter};
