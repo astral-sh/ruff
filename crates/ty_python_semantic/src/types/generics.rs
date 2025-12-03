@@ -11,7 +11,7 @@ use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, ScopeId};
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
-use crate::types::constraints::ConstraintSet;
+use crate::types::constraints::{ConstraintSet, ConstraintSolution};
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::Parameters;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
@@ -1304,6 +1304,7 @@ pub enum PartialSpecialization<'a, 'db> {
         generic_context: GenericContext<'db>,
         types: &'a [Type<'db>],
     },
+    FromConstraintSolution(&'a ConstraintSolution<'db>),
 }
 
 impl<'db> PartialSpecialization<'_, 'db> {
@@ -1323,6 +1324,9 @@ impl<'db> PartialSpecialization<'_, 'db> {
                     .variables_inner(db)
                     .get_index_of(&bound_typevar.identity(db))?;
                 types.get(index).copied()
+            }
+            PartialSpecialization::FromConstraintSolution(solution) => {
+                solution.get_upper_bound(bound_typevar)
             }
         }
     }
@@ -1661,6 +1665,7 @@ impl<'db> SpecializationBuilder<'db> {
             (Type::Callable(formal_callable), _) => {
                 eprintln!("==> {}", formal.display(self.db));
                 eprintln!("    {}", actual.display(self.db));
+                eprintln!("    {}", self.inferable.display(self.db));
                 let Some(actual_callables) = actual.try_upcast_to_callable(self.db) else {
                     eprintln!(" -> NOPE");
                     return Ok(());
@@ -1688,42 +1693,13 @@ impl<'db> SpecializationBuilder<'db> {
                 eprintln!("    {}", when.display(self.db));
                 eprintln!("    {}", when.display_graph(self.db, &"    "));
 
-                when.for_each_path(self.db, |path| {
-                    eprintln!(
-                        "--> path [{}]",
-                        path.positive_constraints()
-                            .map(|c| c.display(self.db))
-                            .format(", ")
-                    );
-                    for constraint in path.positive_constraints() {
-                        let typevar = constraint.typevar(self.db);
-                        let lower = constraint.lower(self.db);
-                        let upper = constraint.upper(self.db);
-                        let upper_has_noninferable_typevar = any_over_type(
-                            self.db,
-                            upper,
-                            &|ty| {
-                                ty.as_typevar().is_some_and(|bound_typevar| {
-                                    !bound_typevar.is_inferable(self.db, self.inferable)
-                                })
-                            },
-                            false,
-                        );
-                        if !upper.is_object() && !upper_has_noninferable_typevar {
-                            self.add_type_mapping(typevar, upper, polarity, &mut f);
-                        }
-                        if typevar.is_inferable(self.db, self.inferable)
-                            && let Type::TypeVar(lower_bound_typevar) = lower
-                        {
-                            self.add_type_mapping(
-                                lower_bound_typevar,
-                                Type::TypeVar(typevar),
-                                polarity,
-                                &mut f,
-                            );
-                        }
+                let solutions = when.solve_for(self.db, self.inferable);
+                for solution in &solutions {
+                    eprintln!("--> solution [{}]", solution.display(self.db));
+                    for (bound_typevar, (_, ty)) in solution {
+                        self.add_type_mapping(*bound_typevar, *ty, polarity, &mut f);
                     }
-                });
+                }
             }
 
             // TODO: Add more forms that we can structurally induct into: type[C], callables
