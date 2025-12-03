@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -9,6 +8,7 @@ use ruff_db::files::File;
 
 use crate::db::Db;
 use crate::{IOErrorDiagnostic, Project};
+use ty_python_semantic::FxHashSet;
 
 /// The indexed files of a project.
 ///
@@ -127,7 +127,7 @@ impl<'db> LazyFiles<'db> {
     /// Sets the indexed files of a package to `files`.
     pub(super) fn set(
         mut self,
-        files: BTreeSet<File>,
+        files: FxHashSet<File>,
         diagnostics: Vec<IOErrorDiagnostic>,
     ) -> Indexed<'db> {
         let files = Indexed {
@@ -152,7 +152,7 @@ pub struct Indexed<'db> {
 
 #[derive(Debug, get_size2::GetSize)]
 struct IndexedInner {
-    files: BTreeSet<File>,
+    files: FxHashSet<File>,
     diagnostics: Vec<IOErrorDiagnostic>,
 }
 
@@ -167,21 +167,21 @@ impl Indexed<'_> {
 }
 
 impl Deref for Indexed<'_> {
-    type Target = BTreeSet<File>;
+    type Target = FxHashSet<File>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner.files
     }
 }
 
-pub(super) type IndexedIter<'a> = std::iter::Copied<std::collections::btree_set::Iter<'a, File>>;
+pub(super) type IndexedIter<'a> = std::iter::Copied<std::collections::hash_set::Iter<'a, File>>;
 
 impl<'a> IntoIterator for &'a Indexed<'_> {
     type Item = File;
     type IntoIter = IndexedIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.inner.files.iter().copied()
+        self.inner.files.unstable_iter().copied()
     }
 }
 
@@ -251,12 +251,10 @@ impl Drop for IndexedMut<'_> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
-
-    use crate::ProjectMetadata;
     use crate::db::Db;
     use crate::db::tests::TestDb;
     use crate::files::Index;
+    use crate::{FxHashSet, ProjectMetadata};
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
     use ruff_python_ast::name::Name;
@@ -273,7 +271,7 @@ mod tests {
         let file = system_path_to_file(&db, "test.py").unwrap();
 
         let files = match project.file_set(&db).get() {
-            Index::Lazy(lazy) => lazy.set(BTreeSet::from_iter([file]), Vec::new()),
+            Index::Lazy(lazy) => lazy.set(FxHashSet::from_iter([file]), Vec::new()),
             Index::Indexed(files) => files,
         };
 
@@ -288,8 +286,8 @@ mod tests {
             }
             Index::Indexed(files_2) => {
                 assert_eq!(
-                    files_2.iter().collect::<Vec<_>>(),
-                    files.iter().collect::<Vec<_>>()
+                    files_2.unstable_iter().collect::<Vec<_>>(),
+                    files.unstable_iter().collect::<Vec<_>>()
                 );
             }
         }

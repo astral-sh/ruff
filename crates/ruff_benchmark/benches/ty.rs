@@ -2,7 +2,6 @@
 use ruff_benchmark::criterion;
 use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject};
 
-use std::collections::BTreeSet;
 use std::fmt::Write;
 use std::ops::Range;
 
@@ -18,7 +17,7 @@ use ruff_python_ast::PythonVersion;
 use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ChangedKind};
-use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
+use ty_project::{CheckMode, Db, FxHashSet, ProjectDatabase, ProjectMetadata};
 
 struct Case {
     db: ProjectDatabase,
@@ -89,7 +88,7 @@ fn setup_tomllib_case() -> Case {
     });
 
     let mut db = ProjectDatabase::new(metadata, system).unwrap();
-    let mut tomllib_files = BTreeSet::default();
+    let mut tomllib_files = FxHashSet::default();
     let mut re: Option<File> = None;
 
     for test_file in &TOMLLIB_FILES {
@@ -240,7 +239,7 @@ fn setup_micro_case(code: &str) -> Case {
 
     db.set_check_mode(CheckMode::OpenFiles);
     db.project()
-        .set_open_files(&mut db, BTreeSet::from_iter([file]));
+        .set_open_files(&mut db, FxHashSet::from_iter([file]));
 
     let file_path = file.path(&db).as_system_path().unwrap().to_owned();
 
