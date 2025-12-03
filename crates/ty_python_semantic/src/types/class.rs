@@ -1215,7 +1215,11 @@ impl<'db> ClassType<'db> {
                     let self_annotation = signature
                         .parameters()
                         .get_positional(0)
-                        .and_then(Parameter::annotated_type);
+                        .and_then(Parameter::annotated_type)
+                        .filter(|ty| {
+                            ty.as_typevar()
+                                .is_none_or(|bound_typevar| !bound_typevar.typevar(db).is_self(db))
+                        });
                     let return_type = self_annotation.unwrap_or(correct_return_type);
                     let instance_ty = self_annotation.unwrap_or_else(|| Type::instance(db, self));
                     Signature::new(signature.parameters().clone(), Some(return_type))
