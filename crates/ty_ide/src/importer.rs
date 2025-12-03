@@ -327,9 +327,7 @@ impl<'ast> MembersInScope<'ast> {
             .members_in_scope_at(node)
             .into_iter()
             .map(|(name, memberdef)| {
-                let Some(def) = memberdef.definition else {
-                    return (name, MemberInScope::other(memberdef.ty));
-                };
+                let def = memberdef.first_reachable_definition;
                 let kind = match *def.kind(db) {
                     DefinitionKind::Import(ref kind) => {
                         MemberImportKind::Imported(AstImportKind::Import(kind.import(parsed)))
@@ -1891,13 +1889,13 @@ else:
         "#);
         assert_snapshot!(
             test.import_from("foo", "MAGIC"), @r#"
-        import foo
+        from foo import MAGIC
         if os.getenv("WHATEVER"):
             from foo import MAGIC
         else:
             from bar import MAGIC
 
-        (foo.MAGIC)
+        (MAGIC)
         "#);
     }
 
@@ -2108,13 +2106,13 @@ except ImportError:
         ");
         assert_snapshot!(
             test.import_from("foo", "MAGIC"), @r"
-        import foo
+        from foo import MAGIC
         try:
             from foo import MAGIC
         except ImportError:
             from bar import MAGIC
 
-        (foo.MAGIC)
+        (MAGIC)
         ");
     }
 

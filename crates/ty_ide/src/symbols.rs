@@ -379,6 +379,16 @@ pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: File) -> FlatSymbo
         global_only: true,
     };
     visitor.visit_body(&module.syntax().body);
+
+    if file
+        .path(db)
+        .as_system_path()
+        .is_none_or(|path| !db.project().is_file_included(db, path))
+    {
+        // Eagerly clear ASTs of third party files.
+        parsed.clear();
+    }
+
     FlatSymbols {
         symbols: visitor.symbols,
     }

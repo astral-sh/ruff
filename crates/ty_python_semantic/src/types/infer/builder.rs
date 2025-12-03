@@ -634,7 +634,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             &self.context,
                             class,
                             &field_name,
-                            field.single_declaration,
+                            field.first_declaration,
                         );
                     }
 
@@ -645,13 +645,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     ) {
                         field_with_default_encountered =
-                            Some((field_name, field.single_declaration));
+                            Some((field_name, field.first_declaration));
                     } else if let Some(field_with_default) = field_with_default_encountered.as_ref()
                     {
                         report_namedtuple_field_without_default_after_field_with_default(
                             &self.context,
                             class,
-                            (&field_name, field.single_declaration),
+                            (&field_name, field.first_declaration),
                             field_with_default,
                         );
                     }
@@ -1034,6 +1034,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.db(),
                     use_def.end_of_scope_symbol_bindings(place.as_symbol().unwrap()),
                 )
+                .place
             {
                 if function.file(self.db()) != self.file() {
                     // If the function is not in this file, we don't need to check it.
@@ -1727,6 +1728,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let prior_bindings = use_def.bindings_at_definition(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
         let inferred_ty = place_from_bindings(self.db(), prior_bindings)
+            .place
             .with_qualifiers(TypeQualifiers::empty())
             .or_fall_back_to(self.db(), || {
                 // Fallback to bindings declared on `types.ModuleType` if it's a global symbol
@@ -8673,7 +8675,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If we're inferring types of deferred expressions, look them up from end-of-scope.
         if self.is_deferred() {
             let place = if let Some(place_id) = place_table.place_id(expr) {
-                place_from_bindings(db, use_def.all_reachable_bindings(place_id))
+                place_from_bindings(db, use_def.all_reachable_bindings(place_id)).place
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
@@ -8691,7 +8693,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let use_id = expr_ref.scoped_use_id(db, scope);
-            let place = place_from_bindings(db, use_def.bindings_at_use(use_id));
+            let place = place_from_bindings(db, use_def.bindings_at_use(use_id)).place;
 
             (place, Some(use_id))
         }
@@ -8832,7 +8834,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                         EnclosingSnapshotResult::FoundBindings(bindings) => {
-                            let place = place_from_bindings(db, bindings).map_type(|ty| {
+                            let place = place_from_bindings(db, bindings).place.map_type(|ty| {
                                 self.narrow_place_with_applicable_constraints(
                                     place_expr,
                                     ty,
@@ -8952,13 +8954,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 return Place::Undefined.into();
                             }
                             EnclosingSnapshotResult::FoundBindings(bindings) => {
-                                let place = place_from_bindings(db, bindings).map_type(|ty| {
-                                    self.narrow_place_with_applicable_constraints(
-                                        place_expr,
-                                        ty,
-                                        &constraint_keys,
-                                    )
-                                });
+                                let place =
+                                    place_from_bindings(db, bindings).place.map_type(|ty| {
+                                        self.narrow_place_with_applicable_constraints(
+                                            place_expr,
+                                            ty,
+                                            &constraint_keys,
+                                        )
+                                    });
                                 constraint_keys.push((
                                     FileScopeId::global(),
                                     ConstraintKey::NestedScope(file_scope_id),
@@ -9570,6 +9573,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
+
+            (unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _, _)
+            | (_, unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _) => Some(unknown),
 
             (
                 todo @ Type::Dynamic(
@@ -10969,6 +10975,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
             }
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(
+                _,
+            ))) => {
+                let slice_ty = self.infer_expression(slice, TypeContext::default());
+                let mut variables = FxOrderSet::default();
+                slice_ty.bind_and_find_all_legacy_typevars(
+                    self.db(),
+                    self.typevar_binding_context,
+                    &mut variables,
+                );
+                let generic_context = GenericContext::from_typevar_instances(self.db(), variables);
+                return Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
+            }
             Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
                 if let Some(generic_context) = type_alias.generic_context(self.db()) {
                     return self.infer_explicit_type_alias_type_specialization(
@@ -11107,33 +11126,74 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ));
             }
             Type::SpecialForm(SpecialFormType::Callable) => {
-                // TODO: Remove this once we support ParamSpec properly. This is necessary to avoid
-                // a lot of false positives downstream, because we can't represent the specialized
-                // `Callable[P, _]` type yet.
-                if let Some(first_arg) = subscript
-                    .slice
-                    .as_ref()
-                    .as_tuple_expr()
-                    .and_then(|args| args.elts.first())
-                    && first_arg.is_name_expr()
-                {
-                    let first_arg_ty = self.infer_expression(first_arg, TypeContext::default());
+                let arguments = if let ast::Expr::Tuple(tuple) = &*subscript.slice {
+                    &*tuple.elts
+                } else {
+                    std::slice::from_ref(&*subscript.slice)
+                };
 
-                    if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = first_arg_ty
-                        && typevar.kind(self.db()).is_paramspec()
-                    {
-                        return todo_type!("Callable[..] specialized with ParamSpec");
-                    }
+                // TODO: Remove this once we support ParamSpec and Concatenate properly. This is necessary
+                // to avoid a lot of false positives downstream, because we can't represent the typevar-
+                // specialized `Callable` types yet.
+                let num_arguments = arguments.len();
+                if num_arguments == 2 {
+                    let first_arg = &arguments[0];
+                    let second_arg = &arguments[1];
 
-                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                        builder.into_diagnostic(format_args!(
-                            "The first argument to `Callable` must be either a list of types, \
-                                 ParamSpec, Concatenate, or `...`",
+                    if first_arg.is_name_expr() {
+                        let first_arg_ty = self.infer_expression(first_arg, TypeContext::default());
+                        if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
+                            first_arg_ty
+                            && typevar.kind(self.db()).is_paramspec()
+                        {
+                            return todo_type!("Callable[..] specialized with ParamSpec");
+                        }
+
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "The first argument to `Callable` must be either a list of types, \
+                                     ParamSpec, Concatenate, or `...`",
+                            ));
+                        }
+                        return Type::KnownInstance(KnownInstanceType::Callable(
+                            CallableType::unknown(self.db()),
+                        ));
+                    } else if first_arg.is_subscript_expr() {
+                        let first_arg_ty = self.infer_expression(first_arg, TypeContext::default());
+                        if let Type::Dynamic(DynamicType::UnknownGeneric(generic_context)) =
+                            first_arg_ty
+                        {
+                            let mut variables = generic_context
+                                .variables(self.db())
+                                .collect::<FxOrderSet<_>>();
+
+                            let return_ty =
+                                self.infer_expression(second_arg, TypeContext::default());
+                            return_ty.bind_and_find_all_legacy_typevars(
+                                self.db(),
+                                self.typevar_binding_context,
+                                &mut variables,
+                            );
+
+                            let generic_context =
+                                GenericContext::from_typevar_instances(self.db(), variables);
+                            return Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
+                        }
+
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "The first argument to `Callable` must be either a list of types, \
+                                     ParamSpec, Concatenate, or `...`",
+                            ));
+                        }
+                        return Type::KnownInstance(KnownInstanceType::Callable(
+                            CallableType::unknown(self.db()),
                         ));
                     }
-                    return Type::KnownInstance(KnownInstanceType::Callable(
-                        CallableType::unknown(self.db()),
-                    ));
                 }
 
                 let callable = self
@@ -11239,6 +11299,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | KnownInstanceType::TypeGenericAlias(_),
             ) => {
                 return self.infer_explicit_type_alias_specialization(subscript, value_ty, false);
+            }
+            Type::Dynamic(DynamicType::Unknown) => {
+                let slice_ty = self.infer_expression(slice, TypeContext::default());
+                let mut variables = FxOrderSet::default();
+                slice_ty.bind_and_find_all_legacy_typevars(
+                    self.db(),
+                    self.typevar_binding_context,
+                    &mut variables,
+                );
+                let generic_context = GenericContext::from_typevar_instances(self.db(), variables);
+                return Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
             }
             _ => {}
         }
@@ -11694,6 +11765,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (Type::SpecialForm(SpecialFormType::Unpack), _) => {
                 Some(Type::Dynamic(DynamicType::TodoUnpack))
+            }
+
+            (Type::SpecialForm(SpecialFormType::Concatenate), _) => {
+                // TODO: Add proper support for `Concatenate`
+                let mut variables = FxOrderSet::default();
+                slice_ty.bind_and_find_all_legacy_typevars(
+                    db,
+                    self.typevar_binding_context,
+                    &mut variables,
+                );
+                let generic_context = GenericContext::from_typevar_instances(self.db(), variables);
+                Some(Type::Dynamic(DynamicType::UnknownGeneric(generic_context)))
             }
 
             (Type::SpecialForm(special_form), _) if special_form.class().is_special_form() => {

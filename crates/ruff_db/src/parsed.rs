@@ -21,7 +21,11 @@ use crate::source::source_text;
 /// reflected in the changed AST offsets.
 /// The other reason is that Ruff's AST doesn't implement `Eq` which Salsa requires
 /// for determining if a query result is unchanged.
-#[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size)]
+///
+/// The LRU capacity of 200 was picked without any empirical evidence that it's optimal,
+/// instead it's a wild guess that it should be unlikely that incremental changes involve
+/// more than 200 modules. Parsed ASTs within the same revision are never evicted by Salsa.
+#[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size, lru=200)]
 pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
     let _span = tracing::trace_span!("parsed_module", ?file).entered();
 
@@ -92,14 +96,9 @@ impl ParsedModule {
         self.inner.store(None);
     }
 
-    /// Returns the pointer address of this [`ParsedModule`].
-    ///
-    /// The pointer uniquely identifies the module within the current Salsa revision,
-    /// regardless of whether particular [`ParsedModuleRef`] instances are garbage collected.
-    pub fn addr(&self) -> usize {
-        // Note that the outer `Arc` in `inner` is stable across garbage collection, while the inner
-        // `Arc` within the `ArcSwap` may change.
-        Arc::as_ptr(&self.inner).addr()
+    /// Returns the file to which this module belongs.
+    pub fn file(&self) -> File {
+        self.file
     }
 }
 

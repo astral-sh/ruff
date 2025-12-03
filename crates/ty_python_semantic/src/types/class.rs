@@ -1377,9 +1377,9 @@ pub(crate) struct Field<'db> {
     pub(crate) declared_ty: Type<'db>,
     /// Kind-specific metadata for this field
     pub(crate) kind: FieldKind<'db>,
-    /// The original declaration of this field, if there is exactly one.
+    /// The first declaration of this field.
     /// This field is used for backreferences in diagnostics.
-    pub(crate) single_declaration: Option<Definition<'db>>,
+    pub(crate) first_declaration: Option<Definition<'db>>,
 }
 
 impl Field<'_> {
@@ -3041,7 +3041,7 @@ impl<'db> ClassLiteral<'db> {
             let symbol = table.symbol(symbol_id);
 
             let result = place_from_declarations(db, declarations.clone());
-            let single_declaration = result.single_declaration;
+            let first_declaration = result.first_declaration;
             let attr = result.ignore_conflicting_declarations();
             if attr.is_class_var() {
                 continue;
@@ -3049,7 +3049,9 @@ impl<'db> ClassLiteral<'db> {
 
             if let Some(attr_ty) = attr.place.ignore_possibly_undefined() {
                 let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                let mut default_ty = place_from_bindings(db, bindings).ignore_possibly_undefined();
+                let mut default_ty = place_from_bindings(db, bindings)
+                    .place
+                    .ignore_possibly_undefined();
 
                 default_ty =
                     default_ty.map(|ty| ty.apply_optional_specialization(db, specialization));
@@ -3107,7 +3109,7 @@ impl<'db> ClassLiteral<'db> {
                 let mut field = Field {
                     declared_ty: attr_ty.apply_optional_specialization(db, specialization),
                     kind,
-                    single_declaration,
+                    first_declaration,
                 };
 
                 // Check if this is a KW_ONLY sentinel and mark subsequent fields as keyword-only
@@ -3590,7 +3592,7 @@ impl<'db> ClassLiteral<'db> {
                     // The attribute is declared in the class body.
 
                     let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                    let inferred = place_from_bindings(db, bindings);
+                    let inferred = place_from_bindings(db, bindings).place;
                     let has_binding = !inferred.is_undefined();
 
                     if has_binding {
@@ -3833,7 +3835,9 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
                     (symbol_id, place_and_qual)
                 })
                 .chain(use_def_map.all_end_of_scope_symbol_bindings().map(
-                    |(symbol_id, bindings)| (symbol_id, place_from_bindings(db, bindings).into()),
+                    |(symbol_id, bindings)| {
+                        (symbol_id, place_from_bindings(db, bindings).place.into())
+                    },
                 ))
                 .filter_map(|(symbol_id, place_and_qual)| {
                     if let Some(name) = table.place(symbol_id).as_symbol().map(Symbol::name) {
