@@ -120,7 +120,7 @@ impl std::fmt::Debug for Module<'_> {
 }
 
 #[allow(clippy::ref_option)]
-#[salsa::tracked(returns(ref))]
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 fn all_submodule_names_for_package<'db>(
     db: &'db dyn Db,
     module: Module<'db>,
