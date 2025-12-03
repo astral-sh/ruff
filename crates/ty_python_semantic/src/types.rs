@@ -12684,7 +12684,7 @@ impl<'db> ModuleLiteralType<'db> {
         let relative_submodule_name = ModuleName::new(name)?;
         let mut absolute_submodule_name = self.module(db).name(db).clone();
         absolute_submodule_name.extend(&relative_submodule_name);
-        let submodule = resolve_module(db, &absolute_submodule_name)?;
+        let submodule = resolve_module(db, importing_file, &absolute_submodule_name)?;
         Some(Type::module_literal(db, importing_file, submodule))
     }
 

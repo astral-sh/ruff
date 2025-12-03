@@ -1,7 +1,7 @@
 use ruff_db::files::File;
 
 use crate::dunder_all::dunder_all_names;
-use crate::module_resolver::{KnownModule, file_to_module};
+use crate::module_resolver::{KnownModule, file_to_module, resolve_module_confident};
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::scope::ScopeId;
@@ -14,7 +14,7 @@ use crate::types::{
     Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type,
     declaration_type, todo_type,
 };
-use crate::{Db, FxOrderSet, Program, resolve_module};
+use crate::{Db, FxOrderSet, Program};
 
 pub(crate) use implicit_globals::{
     module_type_implicit_global_declaration, module_type_implicit_global_symbol,
@@ -379,7 +379,7 @@ pub(crate) fn imported_symbol<'db>(
 /// and should not be used when a symbol is being explicitly imported from the `builtins` module
 /// (e.g. `from builtins import int`).
 pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> PlaceAndQualifiers<'db> {
-    resolve_module(db, &KnownModule::Builtins.name())
+    resolve_module_confident(db, &KnownModule::Builtins.name())
         .and_then(|module| {
             let file = module.file(db)?;
             Some(
@@ -409,7 +409,7 @@ pub(crate) fn known_module_symbol<'db>(
     known_module: KnownModule,
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
-    resolve_module(db, &known_module.name())
+    resolve_module_confident(db, &known_module.name())
         .and_then(|module| {
             let file = module.file(db)?;
             Some(imported_symbol(db, file, symbol, None))
@@ -448,7 +448,7 @@ pub(crate) fn builtins_module_scope(db: &dyn Db) -> Option<ScopeId<'_>> {
 ///
 /// Can return `None` if a custom typeshed is used that is missing the core module in question.
 fn core_module_scope(db: &dyn Db, core_module: KnownModule) -> Option<ScopeId<'_>> {
-    let module = resolve_module(db, &core_module.name())?;
+    let module = resolve_module_confident(db, &core_module.name())?;
     Some(global_scope(db, module.file(db)?))
 }
 
