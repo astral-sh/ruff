@@ -37,25 +37,20 @@ pub(crate) fn all_members_of_scope<'db>(
         .all_end_of_scope_symbol_declarations()
         .filter_map(move |(symbol_id, declarations)| {
             let place_result = place_from_declarations(db, declarations);
-            let definition = place_result.first_declaration;
-            place_result
+            let first_reachable_definition = place_result.first_declaration?;
+            let ty = place_result
                 .ignore_conflicting_declarations()
                 .place
-                .ignore_possibly_undefined()
-                .map(|ty| {
-                    let symbol = table.symbol(symbol_id);
-                    let member = Member {
-                        name: symbol.name().clone(),
-                        ty,
-                    };
-                    let first_reachable_definition = definition.expect(
-                        "A (possibly) defined place must always have >=1 reachable definitions",
-                    );
-                    MemberWithDefinition {
-                        member,
-                        first_reachable_definition,
-                    }
-                })
+                .ignore_possibly_undefined()?;
+            let symbol = table.symbol(symbol_id);
+            let member = Member {
+                name: symbol.name().clone(),
+                ty,
+            };
+            Some(MemberWithDefinition {
+                member,
+                first_reachable_definition,
+            })
         })
         .chain(use_def_map.all_end_of_scope_symbol_bindings().filter_map(
             move |(symbol_id, bindings)| {
@@ -64,19 +59,17 @@ pub(crate) fn all_members_of_scope<'db>(
                     first_definition,
                 } = place_from_bindings(db, bindings);
 
-                place.ignore_possibly_undefined().map(|ty| {
-                    let symbol = table.symbol(symbol_id);
-                    let member = Member {
-                        name: symbol.name().clone(),
-                        ty,
-                    };
-                    let first_definition = first_definition.expect(
-                        "A (possibly) defined place must always have >=1 reachable definitions",
-                    );
-                    MemberWithDefinition {
-                        member,
-                        first_reachable_definition: first_definition,
-                    }
+                let first_reachable_definition = first_definition?;
+                let ty = place.ignore_possibly_undefined()?;
+
+                let symbol = table.symbol(symbol_id);
+                let member = Member {
+                    name: symbol.name().clone(),
+                    ty,
+                };
+                Some(MemberWithDefinition {
+                    member,
+                    first_reachable_definition,
                 })
             },
         ))
