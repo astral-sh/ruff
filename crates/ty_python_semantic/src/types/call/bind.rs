@@ -821,6 +821,23 @@ impl<'db> Bindings<'db> {
                                         function_generic_context(bound_method.function(db))
                                     }
 
+                                    Type::Callable(callable) => {
+                                        let union = UnionType::from_elements(
+                                            db,
+                                            callable
+                                                .signatures(db)
+                                                .overloads
+                                                .iter()
+                                                .filter_map(|signature| signature.generic_context)
+                                                .map(wrap_generic_context),
+                                        );
+                                        if union.is_never() {
+                                            Type::none(db)
+                                        } else {
+                                            union
+                                        }
+                                    }
+
                                     Type::KnownInstance(KnownInstanceType::TypeAliasType(
                                         TypeAliasType::PEP695(alias),
                                     )) => alias
