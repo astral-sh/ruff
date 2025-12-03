@@ -675,6 +675,8 @@ class GenericClass[T]:
         raise NotImplementedError
 
 def _(x: list[str]):
+    # TODO: This fails because we are not propagating GenericClass's generic context into the
+    # Callable that we create for it.
     # TODO: revealed: GenericClass[str]
     # revealed: Top[GenericClass[Unknown]]
     reveal_type(accepts_callable(GenericClass)(x, x))
