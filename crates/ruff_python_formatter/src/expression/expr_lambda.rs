@@ -117,7 +117,6 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             });
 
             match self.layout {
-                // Can we move the `fits_expanded` into the assignment formatting?
                 ExprLambdaLayout::Assignment => fits_expanded(&fmt_body).fmt(f),
                 ExprLambdaLayout::Default => fmt_body.fmt(f),
             }
