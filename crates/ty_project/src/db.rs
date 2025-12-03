@@ -129,8 +129,6 @@ impl ProjectDatabase {
 
     /// Returns a [`SalsaMemoryDump`] that can be use to dump Salsa memory usage information
     /// to the CLI after a typechecker run.
-    ///
-    /// This method depends on global state. Make sure to
     pub fn salsa_memory_dump(&self) -> SalsaMemoryDump {
         let memory_usage = ruff_memory_usage::attach_tracker(StandardTracker::new(), || {
             <dyn salsa::Database>::memory_usage(self)
