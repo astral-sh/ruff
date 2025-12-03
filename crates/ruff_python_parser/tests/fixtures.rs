@@ -5,13 +5,14 @@ use std::fs;
 use std::path::Path;
 
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
+use ruff_python_ast::token::Token;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_module};
 use ruff_python_ast::{self as ast, AnyNodeRef, Mod, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
 };
-use ruff_python_parser::{Mode, ParseErrorType, ParseOptions, Token, parse_unchecked};
+use ruff_python_parser::{Mode, ParseErrorType, ParseOptions, parse_unchecked};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -572,7 +573,7 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
         true
     }
 
-    fn in_generator_scope(&self) -> bool {
+    fn in_generator_context(&self) -> bool {
         true
     }
 

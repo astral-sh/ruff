@@ -190,14 +190,10 @@ def _(
     reveal_type(type_of_str_or_int)  # revealed: type[str] | int
     reveal_type(int_or_callable)  # revealed: int | ((str, /) -> bytes)
     reveal_type(callable_or_int)  # revealed: ((str, /) -> bytes) | int
-    # TODO should be Unknown | int
-    reveal_type(type_var_or_int)  # revealed: T@TypeVarOrInt | int
-    # TODO should be int | Unknown
-    reveal_type(int_or_type_var)  # revealed: int | T@IntOrTypeVar
-    # TODO should be Unknown | None
-    reveal_type(type_var_or_none)  # revealed: T@TypeVarOrNone | None
-    # TODO should be None | Unknown
-    reveal_type(none_or_type_var)  # revealed: None | T@NoneOrTypeVar
+    reveal_type(type_var_or_int)  # revealed: Unknown | int
+    reveal_type(int_or_type_var)  # revealed: int | Unknown
+    reveal_type(type_var_or_none)  # revealed: Unknown | None
+    reveal_type(none_or_type_var)  # revealed: None | Unknown
 ```
 
 If a type is unioned with itself in a value expression, the result is just that type. No
@@ -529,28 +525,18 @@ def _(
     annotated_unknown: AnnotatedType,
     optional_unknown: MyOptional,
 ):
-    # TODO: This should be `list[Unknown]`
-    reveal_type(list_unknown)  # revealed: list[T@MyList]
-    # TODO: This should be `dict[Unknown, Unknown]`
-    reveal_type(dict_unknown)  # revealed: dict[T@MyDict, U@MyDict]
-    # TODO: Should be `type[Unknown]`
-    reveal_type(subclass_of_unknown)  # revealed: type[T@MyType]
-    # TODO: Should be `tuple[int, Unknown]`
-    reveal_type(int_and_unknown)  # revealed: tuple[int, T@IntAndType]
-    # TODO: Should be `tuple[Unknown, Unknown]`
-    reveal_type(pair_of_unknown)  # revealed: tuple[T@Pair, T@Pair]
-    # TODO: Should be `tuple[Unknown, Unknown]`
-    reveal_type(unknown_and_unknown)  # revealed: tuple[T@Sum, U@Sum]
-    # TODO: Should be `list[Unknown] | tuple[Unknown, ...]`
-    reveal_type(list_or_tuple)  # revealed: list[T@ListOrTuple] | tuple[T@ListOrTuple, ...]
-    # TODO: Should be `list[Unknown] | tuple[Unknown, ...]`
-    reveal_type(list_or_tuple_legacy)  # revealed: list[T@ListOrTupleLegacy] | tuple[T@ListOrTupleLegacy, ...]
-    # TODO: Should be `(...) -> Unknown`
+    reveal_type(list_unknown)  # revealed: list[Unknown]
+    reveal_type(dict_unknown)  # revealed: dict[Unknown, Unknown]
+    reveal_type(subclass_of_unknown)  # revealed: type[Unknown]
+    reveal_type(int_and_unknown)  # revealed: tuple[int, Unknown]
+    reveal_type(pair_of_unknown)  # revealed: tuple[Unknown, Unknown]
+    reveal_type(unknown_and_unknown)  # revealed: tuple[Unknown, Unknown]
+    reveal_type(list_or_tuple)  # revealed: list[Unknown] | tuple[Unknown, ...]
+    reveal_type(list_or_tuple_legacy)  # revealed: list[Unknown] | tuple[Unknown, ...]
+    # TODO: should be (...) -> Unknown
     reveal_type(my_callable)  # revealed: @Todo(Callable[..] specialized with ParamSpec)
-    # TODO: Should be `Unknown`
-    reveal_type(annotated_unknown)  # revealed: T@AnnotatedType
-    # TODO: Should be `Unknown | None`
-    reveal_type(optional_unknown)  # revealed: T@MyOptional | None
+    reveal_type(annotated_unknown)  # revealed: Unknown
+    reveal_type(optional_unknown)  # revealed: Unknown | None
 ```
 
 For a type variable with a default, we use the default type:
@@ -563,10 +549,13 @@ MyListWithDefault = list[T_default]
 def _(
     list_of_str: MyListWithDefault[str],
     list_of_int: MyListWithDefault,
+    list_of_str_or_none: MyListWithDefault[str] | None,
+    list_of_int_or_none: MyListWithDefault | None,
 ):
     reveal_type(list_of_str)  # revealed: list[str]
-    # TODO: this should be `list[int]`
-    reveal_type(list_of_int)  # revealed: list[T_default@MyListWithDefault]
+    reveal_type(list_of_int)  # revealed: list[int]
+    reveal_type(list_of_str_or_none)  # revealed: list[str] | None
+    reveal_type(list_of_int_or_none)  # revealed: list[int] | None
 ```
 
 (Generic) implicit type aliases can be used as base classes:
@@ -601,7 +590,7 @@ Generic implicit type aliases can be imported from other modules and specialized
 ```py
 from typing_extensions import TypeVar
 
-T = TypeVar("T")
+T = TypeVar("T", default=str)
 
 MyList = list[T]
 ```
@@ -615,9 +604,13 @@ import my_types as mt
 def _(
     list_of_ints1: MyList[int],
     list_of_ints2: mt.MyList[int],
+    list_of_str: mt.MyList,
+    list_of_str_or_none: mt.MyList | None,
 ):
     reveal_type(list_of_ints1)  # revealed: list[int]
     reveal_type(list_of_ints2)  # revealed: list[int]
+    reveal_type(list_of_str)  # revealed: list[str]
+    reveal_type(list_of_str_or_none)  # revealed: list[str] | None
 ```
 
 ### In stringified annotations

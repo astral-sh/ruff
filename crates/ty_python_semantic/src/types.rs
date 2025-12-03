@@ -96,6 +96,7 @@ mod generics;
 pub mod ide_support;
 mod infer;
 mod instance;
+pub mod list_members;
 mod member;
 mod mro;
 mod narrow;
@@ -762,7 +763,7 @@ impl<'db> DataclassParams<'db> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum Type<'db> {
     /// The dynamic type: a statically unknown set of values
-    Dynamic(DynamicType),
+    Dynamic(DynamicType<'db>),
     /// The empty set of values
     Never,
     /// A specific function object
@@ -888,7 +889,10 @@ impl<'db> Type<'db> {
     }
 
     pub const fn is_unknown(&self) -> bool {
-        matches!(self, Type::Dynamic(DynamicType::Unknown))
+        matches!(
+            self,
+            Type::Dynamic(DynamicType::Unknown | DynamicType::UnknownGeneric(_))
+        )
     }
 
     pub(crate) const fn is_never(&self) -> bool {
@@ -958,7 +962,10 @@ impl<'db> Type<'db> {
 
     pub(crate) fn is_todo(&self) -> bool {
         self.as_dynamic().is_some_and(|dynamic| match dynamic {
-            DynamicType::Any | DynamicType::Unknown | DynamicType::Divergent(_) => false,
+            DynamicType::Any
+            | DynamicType::Unknown
+            | DynamicType::UnknownGeneric(_)
+            | DynamicType::Divergent(_) => false,
             DynamicType::Todo(_) | DynamicType::TodoStarredExpression | DynamicType::TodoUnpack => {
                 true
             }
@@ -1145,7 +1152,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) const fn as_dynamic(self) -> Option<DynamicType> {
+    pub(crate) const fn as_dynamic(self) -> Option<DynamicType<'db>> {
         match self {
             Type::Dynamic(dynamic_type) => Some(dynamic_type),
             _ => None,
@@ -1159,7 +1166,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) const fn expect_dynamic(self) -> DynamicType {
+    pub(crate) const fn expect_dynamic(self) -> DynamicType<'db> {
         self.as_dynamic().expect("Expected a Type::Dynamic variant")
     }
 
@@ -2104,33 +2111,52 @@ impl<'db> Type<'db> {
                     })
                     .is_never_satisfied(db) =>
             {
-                // TODO: The repetition here isn't great, but we really need the fallthrough logic,
-                // where this arm only engages if it returns true.
-                let this_instance = Type::TypeVar(subclass_of.into_type_var().unwrap());
-                target.to_instance(db).when_some_and(|other_instance| {
-                    this_instance.has_relation_to_impl(
-                        db,
-                        other_instance,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
-                })
+                // TODO: The repetition here isn't great, but we need the fallthrough logic.
+                subclass_of
+                    .into_type_var()
+                    .zip(target.to_instance(db))
+                    .when_some_and(|(this_instance, other_instance)| {
+                        Type::TypeVar(this_instance).has_relation_to_impl(
+                            db,
+                            other_instance,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
             }
 
-            (_, Type::SubclassOf(subclass_of)) if subclass_of.is_type_var() => {
-                let other_instance = Type::TypeVar(subclass_of.into_type_var().unwrap());
-                self.to_instance(db).when_some_and(|this_instance| {
-                    this_instance.has_relation_to_impl(
-                        db,
-                        other_instance,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
-                })
+            (_, Type::SubclassOf(subclass_of))
+                if !subclass_of
+                    .into_type_var()
+                    .zip(self.to_instance(db))
+                    .when_some_and(|(other_instance, this_instance)| {
+                        this_instance.has_relation_to_impl(
+                            db,
+                            Type::TypeVar(other_instance),
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
+                    .is_never_satisfied(db) =>
+            {
+                // TODO: The repetition here isn't great, but we need the fallthrough logic.
+                subclass_of
+                    .into_type_var()
+                    .zip(self.to_instance(db))
+                    .when_some_and(|(other_instance, this_instance)| {
+                        this_instance.has_relation_to_impl(
+                            db,
+                            Type::TypeVar(other_instance),
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
             }
 
             // A fully static typevar is a subtype of its upper bound, and to something similar to
@@ -2655,7 +2681,9 @@ impl<'db> Type<'db> {
                 disjointness_visitor,
             ),
 
-            (Type::SubclassOf(subclass_of), _) if subclass_of.is_type_var() => {
+            (Type::SubclassOf(subclass_of), _) | (_, Type::SubclassOf(subclass_of))
+                if subclass_of.is_type_var() =>
+            {
                 ConstraintSet::from(false)
             }
 
@@ -3115,33 +3143,33 @@ impl<'db> Type<'db> {
 
             // `type[T]` is disjoint from a class object `A` if every instance of `T` is disjoint from an instance of `A`.
             (Type::SubclassOf(subclass_of), other) | (other, Type::SubclassOf(subclass_of))
-                if subclass_of.is_type_var()
-                    && (other.to_instance(db).is_some()
-                        || other.as_typevar().is_some_and(|type_var| {
-                            type_var.typevar(db).bound_or_constraints(db).is_none()
-                        })) =>
+                if !subclass_of
+                    .into_type_var()
+                    .zip(other.to_instance(db))
+                    .when_none_or(|(this_instance, other_instance)| {
+                        Type::TypeVar(this_instance).is_disjoint_from_impl(
+                            db,
+                            other_instance,
+                            inferable,
+                            disjointness_visitor,
+                            relation_visitor,
+                        )
+                    })
+                    .is_always_satisfied(db) =>
             {
-                let this_instance = Type::TypeVar(subclass_of.into_type_var().unwrap());
-                let other_instance = match other {
-                    // An unbounded typevar `U` may have instances of type `object` if specialized to
-                    // an instance of `type`.
-                    Type::TypeVar(typevar)
-                        if typevar.typevar(db).bound_or_constraints(db).is_none() =>
-                    {
-                        Some(Type::object())
-                    }
-                    _ => other.to_instance(db),
-                };
-
-                other_instance.when_none_or(|other_instance| {
-                    this_instance.is_disjoint_from_impl(
-                        db,
-                        other_instance,
-                        inferable,
-                        disjointness_visitor,
-                        relation_visitor,
-                    )
-                })
+                // TODO: The repetition here isn't great, but we need the fallthrough logic.
+                subclass_of
+                    .into_type_var()
+                    .zip(other.to_instance(db))
+                    .when_none_or(|(this_instance, other_instance)| {
+                        Type::TypeVar(this_instance).is_disjoint_from_impl(
+                            db,
+                            other_instance,
+                            inferable,
+                            disjointness_visitor,
+                            relation_visitor,
+                        )
+                    })
             }
 
             // A typevar is never disjoint from itself, since all occurrences of the typevar must
@@ -6204,11 +6232,25 @@ impl<'db> Type<'db> {
             ),
 
             Type::Intersection(_) => {
-                Binding::single(self, Signature::todo("Type::Intersection.call()")).into()
+                Binding::single(self, Signature::todo("Type::Intersection.call")).into()
             }
 
-            // TODO: this is actually callable
-            Type::DataclassDecorator(_) => CallableBinding::not_callable(self).into(),
+            Type::DataclassDecorator(_) => {
+                let typevar = BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Invariant);
+                let typevar_meta = SubclassOfType::from(db, typevar);
+                let context = GenericContext::from_typevar_instances(db, [typevar]);
+                let parameters = [Parameter::positional_only(Some(Name::new_static("cls")))
+                    .with_annotated_type(typevar_meta)];
+                // Intersect with `Any` for the return type to reflect the fact that the `dataclass()`
+                // decorator adds methods to the class
+                let returns = IntersectionType::from_elements(db, [typevar_meta, Type::any()]);
+                let signature = Signature::new_generic(
+                    Some(context),
+                    Parameters::new(db, parameters),
+                    Some(returns),
+                );
+                Binding::single(self, signature).into()
+            }
 
             // TODO: some `SpecialForm`s are callable (e.g. TypedDicts)
             Type::SpecialForm(_) => CallableBinding::not_callable(self).into(),
@@ -7549,10 +7591,9 @@ impl<'db> Type<'db> {
         // If we are binding `typing.Self`, and this type is what we are binding `Self` to, return
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
-        if let TypeMapping::BindSelf(self_type) = type_mapping
-            && self == *self_type
-        {
-            return self;
+        match type_mapping {
+            TypeMapping::BindSelf { self_type, .. } if self == *self_type => return self,
+            _ => {}
         }
 
         match self {
@@ -7567,7 +7608,7 @@ impl<'db> Type<'db> {
                         TypeMapping::Specialization(_) |
                         TypeMapping::PartialSpecialization(_) |
                         TypeMapping::PromoteLiterals(_) |
-                        TypeMapping::BindSelf(_) |
+                        TypeMapping::BindSelf { .. } |
                         TypeMapping::ReplaceSelf { .. } |
                         TypeMapping::Materialize(_) |
                         TypeMapping::ReplaceParameterDefaults |
@@ -7743,7 +7784,7 @@ impl<'db> Type<'db> {
                 TypeMapping::Specialization(_) |
                 TypeMapping::PartialSpecialization(_) |
                 TypeMapping::BindLegacyTypevars(_) |
-                TypeMapping::BindSelf(_) |
+                TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Materialize(_) |
                 TypeMapping::ReplaceParameterDefaults |
@@ -7756,7 +7797,7 @@ impl<'db> Type<'db> {
                 TypeMapping::Specialization(_) |
                 TypeMapping::PartialSpecialization(_) |
                 TypeMapping::BindLegacyTypevars(_) |
-                TypeMapping::BindSelf(_) |
+                TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::PromoteLiterals(_) |
                 TypeMapping::ReplaceParameterDefaults |
@@ -7816,14 +7857,18 @@ impl<'db> Type<'db> {
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
+        let is_matching_typevar = |bound_typevar: &BoundTypeVarInstance<'db>| {
+            matches!(
+                bound_typevar.typevar(db).kind(db),
+                TypeVarKind::Legacy | TypeVarKind::TypingSelf | TypeVarKind::ParamSpec
+            ) && binding_context.is_none_or(|binding_context| {
+                bound_typevar.binding_context(db) == BindingContext::Definition(binding_context)
+            })
+        };
+
         match self {
             Type::TypeVar(bound_typevar) => {
-                if matches!(
-                    bound_typevar.typevar(db).kind(db),
-                    TypeVarKind::Legacy | TypeVarKind::TypingSelf | TypeVarKind::ParamSpec
-                ) && binding_context.is_none_or(|binding_context| {
-                    bound_typevar.binding_context(db) == BindingContext::Definition(binding_context)
-                }) {
+                if is_matching_typevar(&bound_typevar) {
                     typevars.insert(bound_typevar);
                 }
             }
@@ -7963,6 +8008,14 @@ impl<'db> Type<'db> {
                 }
             },
 
+            Type::Dynamic(DynamicType::UnknownGeneric(generic_context)) => {
+                for variable in generic_context.variables(db) {
+                    if is_matching_typevar(&variable) {
+                        typevars.insert(variable);
+                    }
+                }
+            }
+
             Type::Dynamic(_)
             | Type::Never
             | Type::AlwaysTruthy
@@ -7992,6 +8045,26 @@ impl<'db> Type<'db> {
             | Type::SpecialForm(_)
             | Type::TypedDict(_) => {}
         }
+    }
+
+    /// Bind all unbound legacy type variables to the given context and then
+    /// add all legacy typevars to the provided set.
+    pub(crate) fn bind_and_find_all_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        binding_context: Option<Definition<'db>>,
+        variables: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+    ) {
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::BindLegacyTypevars(
+                binding_context
+                    .map(BindingContext::Definition)
+                    .unwrap_or(BindingContext::Synthetic),
+            ),
+            TypeContext::default(),
+        )
+        .find_legacy_typevars(db, None, variables);
     }
 
     /// Replace default types in parameters of callables with `Unknown`.
@@ -8142,7 +8215,7 @@ impl<'db> Type<'db> {
             Self::SpecialForm(special_form) => special_form.definition(db),
             Self::Never => Type::SpecialForm(SpecialFormType::Never).definition(db),
             Self::Dynamic(DynamicType::Any) => Type::SpecialForm(SpecialFormType::Any).definition(db),
-            Self::Dynamic(DynamicType::Unknown) => Type::SpecialForm(SpecialFormType::Unknown).definition(db),
+            Self::Dynamic(DynamicType::Unknown | DynamicType::UnknownGeneric(_)) => Type::SpecialForm(SpecialFormType::Unknown).definition(db),
             Self::AlwaysTruthy => Type::SpecialForm(SpecialFormType::AlwaysTruthy).definition(db),
             Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
 
@@ -8227,6 +8300,16 @@ impl<'db> Type<'db> {
             }
             _ => None,
         }
+    }
+
+    /// Default-specialize all legacy typevars in this type.
+    ///
+    /// This is used when an implicit type alias is referenced without explicitly specializing it.
+    pub(crate) fn default_specialize(self, db: &'db dyn Db) -> Type<'db> {
+        let mut variables = FxOrderSet::default();
+        self.find_legacy_typevars(db, None, &mut variables);
+        let generic_context = GenericContext::from_typevar_instances(db, variables);
+        self.apply_specialization(db, generic_context.default_specialization(db, None))
     }
 }
 
@@ -8420,7 +8503,10 @@ pub enum TypeMapping<'a, 'db> {
     /// being used in.
     BindLegacyTypevars(BindingContext<'db>),
     /// Binds any `typing.Self` typevar with a particular `self` class.
-    BindSelf(Type<'db>),
+    BindSelf {
+        self_type: Type<'db>,
+        binding_context: Option<BindingContext<'db>>,
+    },
     /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
     ReplaceSelf { new_upper_bound: Type<'db> },
     /// Create the top or bottom materialization of a type.
@@ -8448,7 +8534,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion => context,
-            TypeMapping::BindSelf(_) => GenericContext::from_typevar_instances(
+            TypeMapping::BindSelf { .. } => GenericContext::from_typevar_instances(
                 db,
                 context
                     .variables(db)
@@ -8481,7 +8567,7 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::Specialization(_)
             | TypeMapping::PartialSpecialization(_)
             | TypeMapping::BindLegacyTypevars(_)
-            | TypeMapping::BindSelf(_)
+            | TypeMapping::BindSelf { .. }
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion => self.clone(),
@@ -8791,11 +8877,18 @@ pub struct DivergentType {
 impl get_size2::GetSize for DivergentType {}
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
-pub enum DynamicType {
+pub enum DynamicType<'db> {
     /// An explicitly annotated `typing.Any`
     Any,
     /// An unannotated value, or a dynamic type resulting from an error
     Unknown,
+    /// Similar to `Unknown`, this represents a dynamic type that has been explicitly specialized
+    /// with legacy typevars, e.g. `UnknownClass[T]`, where `T` is a legacy typevar. We keep track
+    /// of the type variables in the generic context in case this type is later specialized again.
+    ///
+    /// TODO: Once we implement <https://github.com/astral-sh/ty/issues/1711>, this variant might
+    /// not be needed anymore.
+    UnknownGeneric(GenericContext<'db>),
     /// Temporary type for symbols that can't be inferred yet because of missing implementations.
     ///
     /// This variant should eventually be removed once ty is spec-compliant.
@@ -8814,7 +8907,7 @@ pub enum DynamicType {
     Divergent(DivergentType),
 }
 
-impl DynamicType {
+impl DynamicType<'_> {
     fn normalized(self) -> Self {
         if matches!(self, Self::Divergent(_)) {
             self
@@ -8832,11 +8925,11 @@ impl DynamicType {
     }
 }
 
-impl std::fmt::Display for DynamicType {
+impl std::fmt::Display for DynamicType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DynamicType::Any => f.write_str("Any"),
-            DynamicType::Unknown => f.write_str("Unknown"),
+            DynamicType::Unknown | DynamicType::UnknownGeneric(_) => f.write_str("Unknown"),
             // `DynamicType::Todo`'s display should be explicit that is not a valid display of
             // any other type
             DynamicType::Todo(todo) => write!(f, "@Todo{todo}"),
@@ -9836,8 +9929,13 @@ impl<'db> BoundTypeVarInstance<'db> {
             TypeMapping::PartialSpecialization(partial) => {
                 partial.get(db, self).unwrap_or(Type::TypeVar(self))
             }
-            TypeMapping::BindSelf(self_type) => {
-                if self.typevar(db).is_self(db) {
+            TypeMapping::BindSelf {
+                self_type,
+                binding_context,
+            } => {
+                if self.typevar(db).is_self(db)
+                    && binding_context.is_none_or(|context| self.binding_context(db) == context)
+                {
                     *self_type
                 } else {
                     Type::TypeVar(self)

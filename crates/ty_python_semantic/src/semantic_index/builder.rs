@@ -2846,6 +2846,11 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
                 ScopeKind::Class => return false,
                 ScopeKind::Function | ScopeKind::Lambda => return true,
                 ScopeKind::Comprehension
+                    if matches!(scope.node(), NodeWithScopeKind::GeneratorExpression(_)) =>
+                {
+                    return true;
+                }
+                ScopeKind::Comprehension
                 | ScopeKind::Module
                 | ScopeKind::TypeAlias
                 | ScopeKind::TypeParams => {}
@@ -2894,11 +2899,14 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
         matches!(kind, ScopeKind::Function | ScopeKind::Lambda)
     }
 
-    fn in_generator_scope(&self) -> bool {
-        matches!(
-            self.scopes[self.current_scope()].node(),
-            NodeWithScopeKind::GeneratorExpression(_)
-        )
+    fn in_generator_context(&self) -> bool {
+        for scope_info in &self.scope_stack {
+            let scope = &self.scopes[scope_info.file_scope_id];
+            if matches!(scope.node(), NodeWithScopeKind::GeneratorExpression(_)) {
+                return true;
+            }
+        }
+        false
     }
 
     fn in_notebook(&self) -> bool {

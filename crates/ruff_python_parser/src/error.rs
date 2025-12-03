@@ -1,9 +1,10 @@
 use std::fmt::{self, Display};
 
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::token::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::{TokenKind, string::InterpolatedStringKind};
+use crate::string::InterpolatedStringKind;
 
 /// Represents represent errors that occur during parsing and are
 /// returned by the `parse_*` functions.
