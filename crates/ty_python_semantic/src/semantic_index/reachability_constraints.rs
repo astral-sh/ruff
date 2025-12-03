@@ -3,7 +3,7 @@
 //! During semantic index building, we record so-called reachability constraints that keep track
 //! of a set of conditions that need to apply in order for a certain statement or expression to
 //! be reachable from the start of the scope. As an example, consider the following situation where
-//! we have just processed two `if`-statements:
+//! we have just processed an `if`-statement:
 //! ```py
 //! if test:
 //!     <is this reachable?>
@@ -101,13 +101,13 @@
 //!     <is this reachable?>
 //! ```
 //! If we would not record any constraints at the branching point, we would have an `always-true`
-//! reachability for the no-loop branch, and a `always-false` reachability for the branch which enters
-//! the loop. Merging those would lead to a reachability of `always-true OR always-false = always-true`,
+//! reachability for the no-loop branch, and a `always-true` reachability for the branch which enters
+//! the loop. Merging those would lead to a reachability of `always-true OR always-true = always-true`,
 //! i.e. we would consider the end of the scope to be unconditionally reachable, which is not correct.
 //!
 //! Recording an ambiguous constraint at the branching point modifies the constraints in both branches to
-//! `always-true AND ambiguous = ambiguous` and `always-false AND ambiguous = always-false`, respectively.
-//! Merging these two using OR correctly leads to `ambiguous` for the end-of-scope reachability.
+//! `always-true AND ambiguous = ambiguous`. Merging these two using OR correctly leads to `ambiguous` for
+//! the end-of-scope reachability.
 //!
 //!
 //! ## Reachability constraints and bindings
