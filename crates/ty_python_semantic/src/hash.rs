@@ -35,25 +35,19 @@ impl<V: Eq + Hash> FromIterator<V> for FxHashSet<V> {
     }
 }
 
-impl<V> std::ops::Deref for FxHashSet<V> {
-    type Target = rustc_hash::FxHashSet<V>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
+impl<V: Eq + Hash> Extend<V> for FxHashSet<V> {
+    fn extend<T: IntoIterator<Item = V>>(&mut self, iter: T) {
+        self.0.extend(iter);
     }
 }
 
-impl<V: Eq + Hash> FxHashSet<V> {
-    pub fn with_capacity_and_hasher(capacity: usize, hasher: FxBuildHasher) -> Self {
-        Self(rustc_hash::FxHashSet::with_capacity_and_hasher(
-            capacity, hasher,
-        ))
+impl<'a, V: Eq + Hash + Copy> Extend<&'a V> for FxHashSet<V> {
+    fn extend<T: IntoIterator<Item = &'a V>>(&mut self, iter: T) {
+        self.0.extend(iter);
     }
+}
 
-    pub fn shrink_to_fit(&mut self) {
-        self.0.shrink_to_fit();
-    }
-
+impl<V> FxHashSet<V> {
     pub fn clear(&mut self) {
         self.0.clear();
     }
@@ -66,8 +60,26 @@ impl<V: Eq + Hash> FxHashSet<V> {
         self.0.is_empty()
     }
 
-    pub fn extend<I: IntoIterator<Item = V>>(&mut self, iter: I) {
-        self.0.extend(iter);
+    /// Unstable iterator: ordering may be inconsistent across environments and versions. Use this only if you are sure this instability will not be a problem for your use case.
+    pub fn unstable_iter(&self) -> std::collections::hash_set::Iter<'_, V> {
+        self.0.iter()
+    }
+
+    /// Unstable iterator: ordering may be inconsistent across environments and versions. Use this only if you are sure this instability will not be a problem for your use case.
+    pub fn unstable_into_iter(self) -> std::collections::hash_set::IntoIter<V> {
+        self.0.into_iter()
+    }
+}
+
+impl<V: Eq + Hash> FxHashSet<V> {
+    pub fn with_capacity_and_hasher(capacity: usize, hasher: FxBuildHasher) -> Self {
+        Self(rustc_hash::FxHashSet::with_capacity_and_hasher(
+            capacity, hasher,
+        ))
+    }
+
+    pub fn shrink_to_fit(&mut self) {
+        self.0.shrink_to_fit();
     }
 
     pub fn insert(&mut self, value: V) -> bool {
@@ -86,16 +98,6 @@ impl<V: Eq + Hash> FxHashSet<V> {
         V: Borrow<Q>,
     {
         self.0.contains(value)
-    }
-
-    /// Unstable iterator: ordering may be inconsistent across environments and versions. Use this only if you are sure this instability will not be a problem for your use case.
-    pub fn unstable_iter(&self) -> std::collections::hash_set::Iter<'_, V> {
-        self.0.iter()
-    }
-
-    /// Unstable iterator: ordering may be inconsistent across environments and versions. Use this only if you are sure this instability will not be a problem for your use case.
-    pub fn unstable_into_iter(self) -> std::collections::hash_set::IntoIter<V> {
-        self.0.into_iter()
     }
 }
 
@@ -135,11 +137,11 @@ impl<K, V> Default for FxHashMap<K, V> {
     }
 }
 
-impl<K: Eq + Hash, V> std::ops::Index<&K> for FxHashMap<K, V> {
+impl<K: Eq + Hash + Borrow<Q>, Q: ?Sized + Eq + Hash, V> std::ops::Index<&Q> for FxHashMap<K, V> {
     type Output = V;
 
-    fn index(&self, index: &K) -> &Self::Output {
-        &self.0[index]
+    fn index(&self, key: &Q) -> &V {
+        &self.0[key]
     }
 }
 
@@ -156,15 +158,23 @@ impl<K: Eq + Hash, V> FromIterator<(K, V)> for FxHashMap<K, V> {
     }
 }
 
-impl<K: Eq + Hash, V> FxHashMap<K, V> {
+impl<K: Eq + Hash, V> Extend<(K, V)> for FxHashMap<K, V> {
+    fn extend<T: IntoIterator<Item = (K, V)>>(&mut self, iter: T) {
+        self.0.extend(iter);
+    }
+}
+
+impl<'a, K: Eq + Hash + Copy, V: Copy> Extend<(&'a K, &'a V)> for FxHashMap<K, V> {
+    fn extend<T: IntoIterator<Item = (&'a K, &'a V)>>(&mut self, iter: T) {
+        self.0.extend(iter);
+    }
+}
+
+impl<K, V> FxHashMap<K, V> {
     pub fn with_capacity_and_hasher(capacity: usize, hasher: FxBuildHasher) -> Self {
         Self(rustc_hash::FxHashMap::with_capacity_and_hasher(
             capacity, hasher,
         ))
-    }
-
-    pub fn shrink_to_fit(&mut self) {
-        self.0.shrink_to_fit();
     }
 
     pub fn clear(&mut self) {
@@ -179,64 +189,9 @@ impl<K: Eq + Hash, V> FxHashMap<K, V> {
         self.0.is_empty()
     }
 
-    pub fn get<Q: ?Sized + Hash + Eq>(&self, k: &Q) -> Option<&V>
-    where
-        K: Borrow<Q>,
-    {
-        self.0.get(k)
-    }
-
-    pub fn get_mut<Q: ?Sized + Hash + Eq>(&mut self, k: &Q) -> Option<&mut V>
-    where
-        K: Borrow<Q>,
-    {
-        self.0.get_mut(k)
-    }
-
-    pub fn entry(&mut self, k: K) -> std::collections::hash_map::Entry<'_, K, V> {
-        self.0.entry(k)
-    }
-
-    pub fn insert(&mut self, k: K, v: V) -> Option<V> {
-        self.0.insert(k, v)
-    }
-
-    pub fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
-        self.0.extend(iter);
-    }
-
-    pub fn remove<Q: ?Sized + Hash + Eq>(&mut self, k: &Q) -> Option<V>
-    where
-        K: Borrow<Q>,
-    {
-        self.0.remove(k)
-    }
-
-    pub fn contains_key<Q: ?Sized + Hash + Eq>(&self, k: &Q) -> bool
-    where
-        K: Borrow<Q>,
-    {
-        self.0.contains_key(k)
-    }
-
-    pub fn retain<F>(&mut self, f: F)
-    where
-        F: FnMut(&K, &mut V) -> bool,
-    {
-        self.0.retain(f);
-    }
-
     /// Unstable iterator: ordering may be inconsistent across environments and versions. Use this only if you are sure this instability will not be a problem for your use case.
     pub fn unstable_iter(&self) -> std::collections::hash_map::Iter<'_, K, V> {
         self.0.iter()
-    }
-
-    pub fn unstable_iter_copied(&self) -> impl Iterator<Item = (K, V)>
-    where
-        K: Copy,
-        V: Copy,
-    {
-        self.0.iter().map(|(k, v)| (*k, *v))
     }
 
     /// Unstable iterator: ordering may be inconsistent across environments and versions. Use this only if you are sure this instability will not be a problem for your use case.
@@ -272,6 +227,55 @@ impl<K: Eq + Hash, V> FxHashMap<K, V> {
     /// Unstable iterator: ordering may be inconsistent across environments and versions. Use this only if you are sure this instability will not be a problem for your use case.
     pub fn unstable_into_values(self) -> std::collections::hash_map::IntoValues<K, V> {
         self.0.into_values()
+    }
+}
+
+impl<K: Eq + Hash, V> FxHashMap<K, V> {
+    pub fn shrink_to_fit(&mut self) {
+        self.0.shrink_to_fit();
+    }
+
+    pub fn get<Q: ?Sized + Hash + Eq>(&self, k: &Q) -> Option<&V>
+    where
+        K: Borrow<Q>,
+    {
+        self.0.get(k)
+    }
+
+    pub fn get_mut<Q: ?Sized + Hash + Eq>(&mut self, k: &Q) -> Option<&mut V>
+    where
+        K: Borrow<Q>,
+    {
+        self.0.get_mut(k)
+    }
+
+    pub fn entry(&mut self, k: K) -> std::collections::hash_map::Entry<'_, K, V> {
+        self.0.entry(k)
+    }
+
+    pub fn insert(&mut self, k: K, v: V) -> Option<V> {
+        self.0.insert(k, v)
+    }
+
+    pub fn remove<Q: ?Sized + Hash + Eq>(&mut self, k: &Q) -> Option<V>
+    where
+        K: Borrow<Q>,
+    {
+        self.0.remove(k)
+    }
+
+    pub fn contains_key<Q: ?Sized + Hash + Eq>(&self, k: &Q) -> bool
+    where
+        K: Borrow<Q>,
+    {
+        self.0.contains_key(k)
+    }
+
+    pub fn retain<F>(&mut self, f: F)
+    where
+        F: FnMut(&K, &mut V) -> bool,
+    {
+        self.0.retain(f);
     }
 }
 

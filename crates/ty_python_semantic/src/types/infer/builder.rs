@@ -370,7 +370,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assert_eq!(self.scope, inference.scope);
 
         self.expressions
-            .extend(inference.expressions.unstable_iter_copied());
+            .extend(inference.expressions.unstable_iter());
         self.declarations
             .extend(inference.declarations(), self.multi_inference_state);
 
@@ -385,7 +385,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred
                 .extend(extra.deferred.iter().copied(), self.multi_inference_state);
             self.string_annotations
-                .extend(extra.string_annotations.unstable_iter().copied());
+                .extend(extra.string_annotations.unstable_iter());
         }
     }
 
@@ -398,13 +398,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn extend_expression_unchecked(&mut self, inference: &ExpressionInference<'db>) {
         self.expressions
-            .extend(inference.expressions.unstable_iter_copied());
+            .extend(inference.expressions.unstable_iter());
 
         if let Some(extra) = &inference.extra {
             self.context.extend(&extra.diagnostics);
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.string_annotations
-                .extend(extra.string_annotations.unstable_iter().copied());
+                .extend(extra.string_annotations.unstable_iter());
 
             if !matches!(self.region, InferenceRegion::Scope(..)) {
                 self.bindings

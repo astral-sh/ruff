@@ -344,9 +344,9 @@ impl LintRegistryBuilder {
             ),
         };
 
-        let entry = LintEntry::Alias(*target);
         assert_eq!(
-            self.by_name.insert(from.as_str(), entry),
+            self.by_name
+                .insert(from.as_str(), LintEntry::Alias(*target)),
             None,
             "duplicate lint registration for '{from}'",
         );
