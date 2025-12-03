@@ -16,8 +16,10 @@ use crate::str_prefix::{
 use crate::{AnyStringFlags, BoolOp, Operator, StringFlags, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
+mod parentheses;
 mod tokens;
 
+pub use parentheses::{parentheses_iterator, parenthesized_range};
 pub use tokens::{TokenAt, TokenIterWithContext, Tokens};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
