@@ -21,6 +21,7 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 use salsa::Durability;
 use salsa::Setter;
 use std::backtrace::BacktraceStatus;
+use std::collections::hash_set;
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
@@ -621,7 +622,7 @@ impl<'a> ProjectFiles<'a> {
 }
 
 enum ProjectFilesIter<'db> {
-    OpenFiles(std::collections::hash_set::Iter<'db, File>),
+    OpenFiles(hash_set::Iter<'db, File>),
     Indexed(files::IndexedIter<'db>),
 }
 

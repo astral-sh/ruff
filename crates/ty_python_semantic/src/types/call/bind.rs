@@ -39,7 +39,7 @@ use crate::types::{
     TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
     WrapperDescriptorKind, enums, ide_support, todo_type,
 };
-use crate::{FxHashMap, FxIndexSet, Program};
+use crate::{FxHashMap, FxHashSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
 
@@ -887,7 +887,7 @@ impl<'db> Bindings<'db> {
                                 overload.set_return_type(Type::heterogeneous_tuple(
                                     db,
                                     ide_support::all_members(db, *ty)
-                                        .into_iter()
+                                        .unstable_into_iter()
                                         .sorted()
                                         .map(|member| Type::string_literal(db, &member.name)),
                                 ));
@@ -1247,7 +1247,7 @@ impl<'db> Bindings<'db> {
                         let extract_inferable = |instance: &NominalInstanceType<'db>| {
                             if instance.has_known_class(db, KnownClass::NoneType) {
                                 // Caller explicitly passed None, so no typevars are inferable.
-                                return Some(FxIndexSet::default());
+                                return Some(FxHashSet::default());
                             }
                             instance
                                 .tuple_spec(db)?
@@ -1261,7 +1261,7 @@ impl<'db> Bindings<'db> {
 
                         let inferable = match overload.parameter_types() {
                             // Caller did not provide argument, so no typevars are inferable.
-                            [None] => FxIndexSet::default(),
+                            [None] => FxHashSet::default(),
                             [Some(Type::NominalInstance(instance))] => {
                                 match extract_inferable(instance) {
                                     Some(inferable) => inferable,

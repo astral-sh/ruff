@@ -1463,7 +1463,9 @@ impl KnownFunction {
                 };
                 let ty_members = all_members(db, *ty);
                 overload.set_return_type(Type::BooleanLiteral(
-                    ty_members.iter().any(|m| m.name == member.value(db)),
+                    ty_members
+                        .unstable_iter()
+                        .any(|m| m.name == member.value(db)),
                 ));
             }
 

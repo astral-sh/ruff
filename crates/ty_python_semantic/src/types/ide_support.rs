@@ -18,7 +18,7 @@ use crate::types::{
     CallableTypes, ClassBase, ClassLiteral, KnownClass, KnownInstanceType, Type, TypeContext,
     TypeVarBoundOrConstraints, class::CodeGeneratorKind,
 };
-use crate::{Db, DisplaySettings, FxHashSet, FxIndexSet, HasType, NameKind, SemanticModel};
+use crate::{Db, DisplaySettings, FxHashSet, HasType, NameKind, SemanticModel};
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
@@ -103,13 +103,13 @@ pub(crate) fn all_declarations_and_bindings<'db>(
 }
 
 struct AllMembers<'db> {
-    members: FxIndexSet<Member<'db>>,
+    members: FxHashSet<Member<'db>>,
 }
 
 impl<'db> AllMembers<'db> {
     fn of(db: &'db dyn Db, ty: Type<'db>) -> Self {
         let mut all_members = Self {
-            members: FxIndexSet::default(),
+            members: FxHashSet::default(),
         };
         all_members.extend_with_type(db, ty);
         all_members
@@ -123,7 +123,8 @@ impl<'db> AllMembers<'db> {
                     .iter()
                     .map(|ty| AllMembers::of(db, *ty).members)
                     .reduce(|acc, members| acc.intersection(&members).cloned().collect())
-                    .unwrap_or_default(),
+                    .unwrap_or_default()
+                    .unstable_into_iter(),
             ),
 
             Type::Intersection(intersection) => self.members.extend(
@@ -132,7 +133,8 @@ impl<'db> AllMembers<'db> {
                     .iter()
                     .map(|ty| AllMembers::of(db, *ty).members)
                     .reduce(|acc, members| acc.union(&members).cloned().collect())
-                    .unwrap_or_default(),
+                    .unwrap_or_default()
+                    .unstable_into_iter(),
             ),
 
             Type::NominalInstance(instance) => {
@@ -213,7 +215,8 @@ impl<'db> AllMembers<'db> {
                                 .reduce(|acc, members| {
                                     acc.intersection(&members).cloned().collect()
                                 })
-                                .unwrap_or_default(),
+                                .unwrap_or_default()
+                                .unstable_into_iter(),
                         );
                     }
                 }
@@ -515,7 +518,7 @@ impl<'db> PartialOrd for Member<'db> {
 
 /// List all members of a given type: anything that would be valid when accessed
 /// as an attribute on an object of the given type.
-pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxIndexSet<Member<'db>> {
+pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Member<'db>> {
     AllMembers::of(db, ty).members
 }
 

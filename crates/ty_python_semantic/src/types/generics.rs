@@ -22,7 +22,7 @@ use crate::types::{
     TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance,
     TypeVarKind, TypeVarVariance, UnionType, declaration_type, walk_bound_type_var_type,
 };
-use crate::{Db, FxHashMap, FxIndexSet, FxOrderMap, FxOrderSet};
+use crate::{Db, FxHashMap, FxHashSet, FxOrderMap, FxOrderSet};
 
 /// Returns an iterator of any generic context introduced by the given scope or any enclosing
 /// scope.
@@ -120,7 +120,7 @@ pub(crate) fn typing_self<'db>(
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum InferableTypeVars<'a, 'db> {
     None,
-    One(&'a FxIndexSet<BoundTypeVarIdentity<'db>>),
+    One(&'a FxHashSet<BoundTypeVarIdentity<'db>>),
     Two(
         &'a InferableTypeVars<'a, 'db>,
         &'a InferableTypeVars<'a, 'db>,
@@ -156,7 +156,7 @@ impl<'a, 'db> InferableTypeVars<'a, 'db> {
     pub(crate) fn iter(self) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> {
         match self {
             InferableTypeVars::None => Either::Left(Either::Left(std::iter::empty())),
-            InferableTypeVars::One(typevars) => Either::Right(typevars.iter().copied()),
+            InferableTypeVars::One(typevars) => Either::Right(typevars.unstable_iter().copied()),
             InferableTypeVars::Two(left, right) => {
                 let chained: Box<dyn Iterator<Item = BoundTypeVarIdentity<'db>>> =
                     Box::new(left.iter().chain(right.iter()));
@@ -169,13 +169,13 @@ impl<'a, 'db> InferableTypeVars<'a, 'db> {
     #[expect(dead_code)]
     pub(crate) fn display(&self, db: &'db dyn Db) -> impl Display {
         fn find_typevars<'db>(
-            result: &mut FxIndexSet<BoundTypeVarIdentity<'db>>,
+            result: &mut FxHashSet<BoundTypeVarIdentity<'db>>,
             inferable: &InferableTypeVars<'_, 'db>,
         ) {
             match inferable {
                 InferableTypeVars::None => {}
                 InferableTypeVars::One(typevars) => {
-                    result.extend(typevars.iter().copied());
+                    result.extend(typevars.unstable_iter().copied());
                 }
                 InferableTypeVars::Two(left, right) => {
                     find_typevars(result, left);
@@ -184,12 +184,12 @@ impl<'a, 'db> InferableTypeVars<'a, 'db> {
             }
         }
 
-        let mut typevars = FxIndexSet::default();
+        let mut typevars = FxHashSet::default();
         find_typevars(&mut typevars, self);
         format!(
             "[{}]",
             typevars
-                .into_iter()
+                .unstable_into_iter()
                 .map(|identity| identity.display(db))
                 .format(", ")
         )
@@ -265,7 +265,7 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> InferableTypeVars<'db, 'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
-            typevars: RefCell<FxIndexSet<BoundTypeVarIdentity<'db>>>,
+            typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
             recursion_guard: TypeCollector<'db>,
         }
 
@@ -298,7 +298,7 @@ impl<'db> GenericContext<'db> {
         fn inferable_typevars_inner<'db>(
             db: &'db dyn Db,
             generic_context: GenericContext<'db>,
-        ) -> FxIndexSet<BoundTypeVarIdentity<'db>> {
+        ) -> FxHashSet<BoundTypeVarIdentity<'db>> {
             let visitor = CollectTypeVars::default();
             for bound_typevar in generic_context.variables(db) {
                 visitor.visit_bound_type_var_type(db, bound_typevar);
@@ -609,8 +609,8 @@ fn inferable_typevars_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,
     _self: GenericContext<'db>,
-) -> FxIndexSet<BoundTypeVarIdentity<'db>> {
-    FxIndexSet::default()
+) -> FxHashSet<BoundTypeVarIdentity<'db>> {
+    FxHashSet::default()
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

@@ -67,7 +67,7 @@ use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation,
     TypeVarBoundOrConstraints, UnionType, walk_bound_type_var_type,
 };
-use crate::{Db, FxHashMap, FxHashSet, FxIndexSet, FxOrderSet};
+use crate::{Db, FxHashMap, FxHashSet, FxOrderSet};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -1036,8 +1036,7 @@ impl<'db> Node<'db> {
             Node::Interior(_) => {}
         }
 
-        // We should use `FxIndexSet` here since `BoundTypeVarInstance::{valid, required}_specializations` is query-dependent.
-        let mut typevars = FxIndexSet::default();
+        let mut typevars = FxHashSet::default();
         self.for_each_constraint(db, &mut |constraint| {
             typevars.insert(constraint.typevar(db));
         });
@@ -1056,7 +1055,7 @@ impl<'db> Node<'db> {
                 .is_always_satisfied(db)
         };
 
-        for typevar in typevars {
+        for typevar in typevars.unstable_iter() {
             if typevar.is_inferable(db, inferable) {
                 // If the typevar is in inferable position, we need to verify that some valid
                 // specialization satisfies the constraint set.
@@ -1848,11 +1847,11 @@ impl<'db> InteriorNode<'db> {
         // Seed the seen set with all of the constraints that are present in the input BDD, and the
         // visit queue with all pairs of those constraints. (We use "combinations" because we don't
         // need to compare a constraint against itself, and because ordering doesn't matter.)
-        let mut seen_constraints = FxIndexSet::default();
+        let mut seen_constraints = FxHashSet::default();
         Node::Interior(self).for_each_constraint(db, &mut |constraint| {
             seen_constraints.insert(constraint);
         });
-        let mut to_visit: Vec<(_, _)> = (seen_constraints.iter().copied())
+        let mut to_visit: Vec<(_, _)> = (seen_constraints.unstable_iter().copied())
             .tuple_combinations()
             .collect();
 
@@ -2011,7 +2010,7 @@ impl<'db> InteriorNode<'db> {
                     // seen set and (if we haven't already seen it) to the to-visit queue.
                     if seen_constraints.insert(intersection_constraint) {
                         to_visit.extend(
-                            (seen_constraints.iter().copied())
+                            (seen_constraints.unstable_iter().copied())
                                 .filter(|seen| *seen != intersection_constraint)
                                 .map(|seen| (seen, intersection_constraint)),
                         );

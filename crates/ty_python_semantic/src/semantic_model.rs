@@ -163,7 +163,7 @@ impl<'db> SemanticModel<'db> {
         let builtin = module.is_known(self.db, KnownModule::Builtins);
 
         let mut completions = vec![];
-        for Member { name, ty } in all_members(self.db, ty) {
+        for Member { name, ty } in all_members(self.db, ty).unstable_into_iter() {
             completions.push(Completion {
                 name,
                 ty: Some(ty),
@@ -197,7 +197,7 @@ impl<'db> SemanticModel<'db> {
     pub fn attribute_completions(&self, node: &ast::ExprAttribute) -> Vec<Completion<'db>> {
         let ty = node.value.inferred_type(self);
         all_members(self.db, ty)
-            .into_iter()
+            .unstable_into_iter()
             .map(|member| Completion {
                 name: member.name,
                 ty: Some(member.ty),

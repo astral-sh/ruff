@@ -7,7 +7,7 @@ use bitflags::bitflags;
 use ruff_db::diagnostic::Annotation;
 
 use crate::{
-    Db, FxIndexSet,
+    Db, FxHashSet,
     lint::LintId,
     place::Place,
     semantic_index::{
@@ -52,11 +52,11 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: ClassLite
     }
 
     let class_specialized = class.identity_specialization(db);
-    let own_class_members: FxIndexSet<_> =
+    let own_class_members: FxHashSet<_> =
         all_declarations_and_bindings(db, class.body_scope(db)).collect();
 
-    for member in own_class_members {
-        check_class_declaration(context, configuration, class_specialized, &member);
+    for member in own_class_members.unstable_iter() {
+        check_class_declaration(context, configuration, class_specialized, member);
     }
 }
 

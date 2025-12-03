@@ -2,6 +2,10 @@ use rustc_hash::FxBuildHasher;
 use std::borrow::Borrow;
 use std::hash::Hash;
 
+pub(crate) type Union<'a, V> = std::collections::hash_set::Union<'a, V, FxBuildHasher>;
+pub(crate) type Intersection<'a, V> =
+    std::collections::hash_set::Intersection<'a, V, FxBuildHasher>;
+
 /// Always use this instead of [`rustc_hash::FxHashSet`].
 /// This struct intentionally does not implement `(Into)Iterator` because the iterator's output order will be unstable if the set depends on salsa's non-deterministic IDs or execution order.
 /// Only use `unstable_iter()`, etc. if you are sure the iterator is safe to use despite that.
@@ -98,6 +102,14 @@ impl<V: Eq + Hash> FxHashSet<V> {
         V: Borrow<Q>,
     {
         self.0.contains(value)
+    }
+
+    pub fn union<'a>(&'a self, other: &'a FxHashSet<V>) -> Union<'a, V> {
+        self.0.union(&other.0)
+    }
+
+    pub fn intersection<'a>(&'a self, other: &'a FxHashSet<V>) -> Intersection<'a, V> {
+        self.0.intersection(&other.0)
     }
 }
 
