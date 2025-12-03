@@ -75,14 +75,15 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn from_possibly_ambiguous_type_pair(
+    pub fn from_possibly_ambiguous_types(
         db: &'db dyn Db,
-        type_1: Type<'db>,
-        type_2: Type<'db>,
+        types: impl IntoIterator<Item = Type<'db>>,
     ) -> Self {
         let collector = AmbiguousClassCollector::default();
-        collector.visit_type(db, type_1);
-        collector.visit_type(db, type_2);
+
+        for ty in types {
+            collector.visit_type(db, ty);
+        }
 
         Self {
             qualified: Rc::new(

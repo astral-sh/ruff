@@ -227,6 +227,17 @@ def _[T: (int | str, int)](_: T):
     static_assert(not is_disjoint_from(type[int], type[T]))
 ```
 
+```py
+class X[T]:
+    value: T
+
+    def get(self) -> T:
+        return self.value
+
+def _[T](x: X[type[T]]):
+    reveal_type(x.get())  # revealed: type[T@_]
+```
+
 ## Generic Type Inference
 
 ```py

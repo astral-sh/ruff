@@ -35,6 +35,7 @@ use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::visitor::{Visitor, walk_except_handler, walk_pattern};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
@@ -48,7 +49,7 @@ use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
 use ruff_python_parser::typing::{AnnotationKind, ParsedAnnotation, parse_type_annotation};
-use ruff_python_parser::{ParseError, Parsed, Tokens};
+use ruff_python_parser::{ParseError, Parsed};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
 use ruff_python_semantic::analyze::{imports, typing};
 use ruff_python_semantic::{
@@ -779,6 +780,10 @@ impl SemanticSyntaxContext for Checker<'_> {
             match scope.kind {
                 ScopeKind::Class(_) => return false,
                 ScopeKind::Function(_) | ScopeKind::Lambda(_) => return true,
+                ScopeKind::Generator {
+                    kind: GeneratorKind::Generator,
+                    ..
+                } => return true,
                 ScopeKind::Generator { .. }
                 | ScopeKind::Module
                 | ScopeKind::Type
@@ -828,14 +833,19 @@ impl SemanticSyntaxContext for Checker<'_> {
         self.source_type.is_ipynb()
     }
 
-    fn in_generator_scope(&self) -> bool {
-        matches!(
-            &self.semantic.current_scope().kind,
-            ScopeKind::Generator {
-                kind: GeneratorKind::Generator,
-                ..
+    fn in_generator_context(&self) -> bool {
+        for scope in self.semantic.current_scopes() {
+            if matches!(
+                scope.kind,
+                ScopeKind::Generator {
+                    kind: GeneratorKind::Generator,
+                    ..
+                }
+            ) {
+                return true;
             }
-        )
+        }
+        false
     }
 
     fn in_loop_context(&self) -> bool {

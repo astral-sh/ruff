@@ -29,7 +29,7 @@ use crate::types::generics::{
 };
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableTypeKind, ClassLiteral,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableTypeKind, ClassLiteral,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
     KnownClass, MaterializationKind, NormalizedVisitor, ParamSpecAttrKind, TypeContext,
     TypeMapping, TypeRelation, VarianceInferable, todo_type,
@@ -727,19 +727,18 @@ impl<'db> Signature<'db> {
         let mut parameters = Parameters::new(db, parameters);
         let mut return_ty = self.return_ty;
         if let Some(self_type) = self_type {
+            let self_mapping = TypeMapping::BindSelf {
+                self_type,
+                binding_context: self.definition.map(BindingContext::Definition),
+            };
             parameters = parameters.apply_type_mapping_impl(
                 db,
-                &TypeMapping::BindSelf(self_type),
+                &self_mapping,
                 TypeContext::default(),
                 &ApplyTypeMappingVisitor::default(),
             );
-            return_ty = return_ty.map(|ty| {
-                ty.apply_type_mapping(
-                    db,
-                    &TypeMapping::BindSelf(self_type),
-                    TypeContext::default(),
-                )
-            });
+            return_ty = return_ty
+                .map(|ty| ty.apply_type_mapping(db, &self_mapping, TypeContext::default()));
         }
         Self {
             generic_context: self.generic_context,
@@ -750,19 +749,19 @@ impl<'db> Signature<'db> {
     }
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
+        let self_mapping = TypeMapping::BindSelf {
+            self_type,
+            binding_context: self.definition.map(BindingContext::Definition),
+        };
         let parameters = self.parameters.apply_type_mapping_impl(
             db,
-            &TypeMapping::BindSelf(self_type),
+            &self_mapping,
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
         );
-        let return_ty = self.return_ty.map(|ty| {
-            ty.apply_type_mapping(
-                db,
-                &TypeMapping::BindSelf(self_type),
-                TypeContext::default(),
-            )
-        });
+        let return_ty = self
+            .return_ty
+            .map(|ty| ty.apply_type_mapping(db, &self_mapping, TypeContext::default()));
         Self {
             generic_context: self.generic_context,
             definition: self.definition,

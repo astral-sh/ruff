@@ -40,7 +40,7 @@ use crate::types::{
     DATACLASS_FLAGS, DataclassFlags, DataclassParams, FieldInstance, KnownBoundMethodType,
     KnownClass, KnownInstanceType, MemberLookupPolicy, NominalInstanceType, PropertyInstanceType,
     SpecialFormType, TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance,
-    UnionBuilder, UnionType, WrapperDescriptorKind, enums, ide_support, todo_type,
+    UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
@@ -889,7 +889,7 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty)] = overload.parameter_types() {
                                 overload.set_return_type(Type::heterogeneous_tuple(
                                     db,
-                                    ide_support::all_members(db, *ty)
+                                    list_members::all_members(db, *ty)
                                         .into_iter()
                                         .sorted()
                                         .map(|member| Type::string_literal(db, &member.name)),

@@ -3,7 +3,7 @@ use std::ops::{Deref, DerefMut};
 
 use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
 use ruff_python_ast::str::Quote;
-use ruff_python_parser::Tokens;
+use ruff_python_ast::token::Tokens;
 
 use crate::PyFormatOptions;
 use crate::comments::Comments;
