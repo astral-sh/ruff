@@ -331,6 +331,13 @@ impl Deref for ModuleName {
     }
 }
 
+impl AsRef<str> for ModuleName {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
 impl PartialEq<str> for ModuleName {
     fn eq(&self, other: &str) -> bool {
         self.as_str() == other
