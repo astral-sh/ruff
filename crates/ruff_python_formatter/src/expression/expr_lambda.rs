@@ -4,8 +4,8 @@ use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::dangling_comments;
-use crate::expression::has_own_parentheses;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
+use crate::expression::{CallChainLayout, has_own_parentheses};
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
 use crate::preview::is_force_single_line_lambda_parameters_enabled;
@@ -81,19 +81,27 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
         }
 
         if is_parenthesize_lambda_bodies_enabled(f.context()) {
-            let fmt_body = format_with(|f| {
+            let fmt_body = format_with(|f: &mut PyFormatter| {
                 if matches!(&**body, Expr::Call(_) | Expr::Subscript(_)) {
-                    let body = body.format().with_options(Parentheses::Never).memoized();
-
-                    best_fitting![
-                        // body all flat
-                        body,
-                        // body expanded
-                        group(&body).should_expand(true),
-                        // parenthesized
-                        format_args![token("("), block_indent(&body), token(")")]
-                    ]
-                    .fmt(f)
+                    let unparenthesized = body.format().with_options(Parentheses::Never).memoized();
+                    if CallChainLayout::from_expression(
+                        body.into(),
+                        comments.ranges(),
+                        f.context().source(),
+                    ) == CallChainLayout::Fluent
+                    {
+                        parenthesize_if_expands(&unparenthesized).fmt(f)
+                    } else {
+                        best_fitting![
+                            // body all flat
+                            unparenthesized,
+                            // body expanded
+                            group(&unparenthesized).should_expand(true),
+                            // parenthesized
+                            format_args![token("("), block_indent(&unparenthesized), token(")")]
+                        ]
+                        .fmt(f)
+                    }
                 } else if has_own_parentheses(body, f.context()).is_some()
                     || comments.contains_comments(body.as_ref().into())
                 {

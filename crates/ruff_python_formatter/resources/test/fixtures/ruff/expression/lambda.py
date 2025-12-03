@@ -420,3 +420,37 @@ class C:
                 self.responses.items(),
             )
         )
+
+@pytest.mark.parametrize(
+    "op",
+    [
+        # Not fluent
+        param(
+            lambda left, right: (
+                ibis.timestamp("2017-04-01")
+            ),
+        ),
+        # These four are fluent and fit on one line inside the parenthesized
+        # lambda body
+        param(
+            lambda left, right: (
+                ibis.timestamp("2017-04-01").cast(dt.date)
+            ),
+        ),
+        param(
+            lambda left, right: (
+                ibis.timestamp("2017-04-01").cast(dt.date).between(left, right)
+            ),
+        ),
+        param(lambda left, right: ibis.timestamp("2017-04-01").cast(dt.date)),
+        param(lambda left, right: ibis.timestamp("2017-04-01").cast(dt.date).between(left, right)),
+        # This is too long on one line in the lambda body and gets wrapped
+        # inside the body.
+        param(
+            lambda left, right: (
+                ibis.timestamp("2017-04-01").cast(dt.date).between(left, right).between(left, right)
+            ),
+        ),
+    ],
+)
+def test_string_temporal_compare_between(con, op, left, right): ...
