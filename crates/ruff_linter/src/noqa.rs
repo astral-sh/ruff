@@ -39,7 +39,8 @@ pub fn generate_noqa_edits(
     let file_directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&file_directives);
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, external, path, locator);
-    let suppressions = Suppressions::default(); // TODO: pipe in tokens or parse from comment ranges
+    // This is called by ruff_server, which already filtered diagnostics via check_path
+    let suppressions = Suppressions::default();
     let comments = find_noqa_comments(
         diagnostics,
         locator,
