@@ -1339,17 +1339,4 @@ def test_string_temporal_compare_between(con, op, left, right): ...
          ),
          # This is too long on one line in the lambda body and gets wrapped
          # inside the body.
-@@ -492,10 +474,8 @@
- 
- 
- [
--    (
--        lambda eval_df, _: MetricValue(
-+    (lambda eval_df, _: MetricValue(
-             scores=eval_df["prediction"].tolist(),
-             aggregate_results={"prediction_sum": sum(eval_df["prediction"])},
--        )
--    ),
-+        )),
- ]
 ```

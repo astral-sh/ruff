@@ -83,7 +83,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
         if is_parenthesize_lambda_bodies_enabled(f.context()) {
             let fmt_body = format_with(|f: &mut PyFormatter| {
                 if matches!(&**body, Expr::Call(_) | Expr::Subscript(_)) {
-                    let unparenthesized = body.format().with_options(Parentheses::Never).memoized();
+                    let unparenthesized = body.format().with_options(Parentheses::Never);
                     if CallChainLayout::from_expression(
                         body.into(),
                         comments.ranges(),
@@ -92,6 +92,11 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                     {
                         parenthesize_if_expands(&unparenthesized).fmt(f)
                     } else {
+                        let unparenthesized = unparenthesized.memoized();
+                        if unparenthesized.inspect(f)?.will_break() {
+                            expand_parent().fmt(f)?;
+                        }
+
                         best_fitting![
                             // body all flat
                             unparenthesized,
