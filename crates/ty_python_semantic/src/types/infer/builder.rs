@@ -4,6 +4,7 @@ use itertools::{Either, EitherOrBoth, Itertools};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::source::source_text;
 use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ExprContext, HasNodeIndex, NodeIndex, PythonVersion,
@@ -9111,6 +9112,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
     fn infer_attribute_load(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
+        fn is_dotted_name(attribute: &ast::Expr) -> bool {
+            match attribute {
+                ast::Expr::Name(_) => true,
+                ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => is_dotted_name(value),
+                _ => false,
+            }
+        }
+
         let ast::ExprAttribute { value, attr, .. } = attribute;
 
         let value_type = self.infer_maybe_standalone_expression(value, TypeContext::default());
@@ -9202,6 +9211,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             return fallback();
                         }
                     }
+                }
+
+                if let Type::SpecialForm(special_form) = value_type {
+                    if let Some(builder) =
+                        self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
+                    {
+                        let mut diag = builder.into_diagnostic(format_args!(
+                            "Special form `{special_form}` has no attribute `{attr_name}`",
+                        ));
+                        if let Ok(defined_type) = value_type.in_type_expression(
+                            db,
+                            self.scope(),
+                            self.typevar_binding_context,
+                        ) && !defined_type.member(db, attr_name).place.is_undefined()
+                        {
+                            diag.help(format_args!(
+                                "Objects with type `{ty}` have a{maybe_n} `{attr_name}` attribute, but the symbol \
+                                `{special_form}` does not itself inhabit the type `{ty}`",
+                                maybe_n = if attr_name.starts_with(['a', 'e', 'i', 'o', 'u']) {
+                                    "n"
+                                } else {
+                                    ""
+                                },
+                                ty = defined_type.display(self.db())
+                            ));
+                            if is_dotted_name(value) {
+                                let source = &source_text(self.db(), self.file())[value.range()];
+                                diag.help(format_args!(
+                                    "This error may indicate that `{source}` was defined as \
+                                    `{source} = {special_form}` when `{source}: {special_form}` \
+                                    was intended"
+                                ));
+                            }
+                        }
+                    }
+                    return fallback();
                 }
 
                 let Some(builder) = self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
