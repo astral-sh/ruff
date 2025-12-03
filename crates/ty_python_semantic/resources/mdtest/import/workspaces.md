@@ -240,10 +240,10 @@ python = "/.venv"
 `/.venv/pyvenv.cfg`:
 
 ```cfg
-home = /doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin
+home = /do/re/mi//cpython-3.13.2-macos-aarch64-none/bin
 ```
 
-`/doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin/python`:
+`/do/re/mi//cpython-3.13.2-macos-aarch64-none/bin/python`:
 
 ```text
 ```
@@ -362,10 +362,10 @@ python = "/.venv"
 `/.venv/pyvenv.cfg`:
 
 ```cfg
-home = /doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin
+home = /do/re/mi//cpython-3.13.2-macos-aarch64-none/bin
 ```
 
-`/doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin/python`:
+`/do/re/mi//cpython-3.13.2-macos-aarch64-none/bin/python`:
 
 ```text
 ```
