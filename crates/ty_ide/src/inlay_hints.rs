@@ -6431,7 +6431,7 @@ mod tests {
         assert_snapshot!(test.inlay_hints(), @r#"
         from typing import Literal
 
-        a[: <typing.Literal special form (`Literal["a", "b", "c"]`)>] = Literal['a', 'b', 'c']
+        a[: <special form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
         "#);
     }
 

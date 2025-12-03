@@ -13,7 +13,7 @@ python-version = "3.10"
 class A: ...
 class B: ...
 
-reveal_type(A | B)  # revealed: <types.UnionType special form (`A | B`)>
+reveal_type(A | B)  # revealed: <types.UnionType special form 'A | B'>
 ```
 
 ## Union of two classes (prior to 3.10)
@@ -50,7 +50,7 @@ def _(sub_a: type[A], sub_b: type[B]):
 class C[T]: ...
 class D[T]: ...
 
-reveal_type(C | D)  # revealed: <types.UnionType special form (`C[Unknown] | D[Unknown]`)>
+reveal_type(C | D)  # revealed: <types.UnionType special form 'C[Unknown] | D[Unknown]'>
 
-reveal_type(C[int] | D[str])  # revealed: <types.UnionType special form (`C[int] | D[str]`)>
+reveal_type(C[int] | D[str])  # revealed: <types.UnionType special form 'C[int] | D[str]'>
 ```

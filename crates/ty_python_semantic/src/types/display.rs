@@ -697,7 +697,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             },
             Type::SpecialForm(special_form) => {
                 f.set_invalid_syntax();
-                write!(f.with_type(self.ty), "<special form {special_form}>")
+                write!(f.with_type(self.ty), "<special form '{special_form}'>")
             }
             Type::KnownInstance(known_instance) => known_instance
                 .display_with(self.db, self.settings.clone())
@@ -2175,22 +2175,22 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
         match self.known_instance {
             KnownInstanceType::SubscriptedProtocol(generic_context) => {
                 f.set_invalid_syntax();
-                f.write_char('<')?;
+                f.write_str("<special form '")?;
                 f.with_type(ty).write_str("typing.Protocol")?;
                 f.write_str(&generic_context.display(self.db).to_string())?;
-                f.write_str(" special form>")
+                f.write_str("'>")
             }
             KnownInstanceType::SubscriptedGeneric(generic_context) => {
                 f.set_invalid_syntax();
-                f.write_char('<')?;
+                f.write_str("<special form '")?;
                 f.with_type(ty).write_str("typing.Generic")?;
                 f.write_str(&generic_context.display(self.db).to_string())?;
-                f.write_str(" special form>")
+                f.write_str("'>")
             }
             KnownInstanceType::TypeAliasType(alias) => {
                 if let Some(specialization) = alias.specialization(self.db) {
                     f.set_invalid_syntax();
-                    f.write_str("<type alias ")?;
+                    f.write_str("<type alias '")?;
                     f.with_type(ty).write_str(alias.name(self.db))?;
                     f.write_str(
                         &specialization
@@ -2201,7 +2201,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                             )
                             .to_string(),
                     )?;
-                    f.write_str(">")
+                    f.write_str("'>")
                 } else {
                     f.with_type(ty).write_str("typing.TypeAliasType")
                 }
@@ -2242,43 +2242,43 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.with_type(ty).write_str("types.UnionType")?;
                 f.write_str(" special form")?;
                 if let Ok(ty) = union.union_type(self.db) {
-                    write!(f, " (`{}`)", ty.display(self.db))?;
+                    write!(f, " '{}'", ty.display(self.db))?;
                 }
                 f.write_char('>')
             }
             KnownInstanceType::Literal(inner) => {
                 f.set_invalid_syntax();
-                f.write_char('<')?;
-                f.with_type(ty).write_str("typing.Literal")?;
                 write!(
                     f,
-                    " special form (`{}`)>",
+                    "<special form '{}'>",
                     inner.inner(self.db).display(self.db)
                 )
             }
             KnownInstanceType::Annotated(inner) => {
                 f.set_invalid_syntax();
-                f.write_char('<')?;
+                f.write_str("<special form '")?;
                 f.with_type(ty).write_str("typing.Annotated")?;
                 write!(
                     f,
-                    " special form (`{}`)>",
+                    "[{}, <metadata>]'>",
                     inner.inner(self.db).display(self.db)
                 )
             }
             KnownInstanceType::Callable(callable) => {
+                f.set_invalid_syntax();
                 f.write_char('<')?;
                 f.with_type(ty).write_str("typing.Callable")?;
-                write!(f, " special form (`{}`)>", callable.display(self.db))
+                write!(f, " special form '{}'>", callable.display(self.db))
             }
             KnownInstanceType::TypeGenericAlias(inner) => {
-                f.write_str("<special form `")?;
+                f.set_invalid_syntax();
+                f.write_str("<special form '")?;
                 write!(
                     f.with_type(ty),
                     "type[{}]",
                     inner.inner(self.db).display(self.db)
                 )?;
-                f.write_str("`>")
+                f.write_str("'>")
             }
             KnownInstanceType::LiteralStringAlias(_) => f.write_str("str"),
             KnownInstanceType::NewType(declaration) => {

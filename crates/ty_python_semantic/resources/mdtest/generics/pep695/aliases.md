@@ -62,7 +62,7 @@ The specialization must match the generic types:
 
 ```py
 # error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
-reveal_type(C[int, int])  # revealed: <type alias C[Unknown]>
+reveal_type(C[int, int])  # revealed: <type alias 'C[Unknown]'>
 ```
 
 And non-generic types cannot be specialized:
@@ -85,19 +85,19 @@ type BoundedByUnion[T: int | str] = ...
 
 class IntSubclass(int): ...
 
-reveal_type(Bounded[int])  # revealed: <type alias Bounded[int]>
-reveal_type(Bounded[IntSubclass])  # revealed: <type alias Bounded[IntSubclass]>
+reveal_type(Bounded[int])  # revealed: <type alias 'Bounded[int]'>
+reveal_type(Bounded[IntSubclass])  # revealed: <type alias 'Bounded[IntSubclass]'>
 
 # error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `T@Bounded`"
-reveal_type(Bounded[str])  # revealed: <type alias Bounded[Unknown]>
+reveal_type(Bounded[str])  # revealed: <type alias 'Bounded[Unknown]'>
 
 # error: [invalid-type-arguments] "Type `int | str` is not assignable to upper bound `int` of type variable `T@Bounded`"
-reveal_type(Bounded[int | str])  # revealed: <type alias Bounded[Unknown]>
+reveal_type(Bounded[int | str])  # revealed: <type alias 'Bounded[Unknown]'>
 
-reveal_type(BoundedByUnion[int])  # revealed: <type alias BoundedByUnion[int]>
-reveal_type(BoundedByUnion[IntSubclass])  # revealed: <type alias BoundedByUnion[IntSubclass]>
-reveal_type(BoundedByUnion[str])  # revealed: <type alias BoundedByUnion[str]>
-reveal_type(BoundedByUnion[int | str])  # revealed: <type alias BoundedByUnion[int | str]>
+reveal_type(BoundedByUnion[int])  # revealed: <type alias 'BoundedByUnion[int]'>
+reveal_type(BoundedByUnion[IntSubclass])  # revealed: <type alias 'BoundedByUnion[IntSubclass]'>
+reveal_type(BoundedByUnion[str])  # revealed: <type alias 'BoundedByUnion[str]'>
+reveal_type(BoundedByUnion[int | str])  # revealed: <type alias 'BoundedByUnion[int | str]'>
 ```
 
 If the type variable is constrained, the specialized type must satisfy those constraints:
@@ -105,20 +105,20 @@ If the type variable is constrained, the specialized type must satisfy those con
 ```py
 type Constrained[T: (int, str)] = ...
 
-reveal_type(Constrained[int])  # revealed: <type alias Constrained[int]>
+reveal_type(Constrained[int])  # revealed: <type alias 'Constrained[int]'>
 
 # TODO: error: [invalid-argument-type]
 # TODO: revealed: Constrained[Unknown]
-reveal_type(Constrained[IntSubclass])  # revealed: <type alias Constrained[IntSubclass]>
+reveal_type(Constrained[IntSubclass])  # revealed: <type alias 'Constrained[IntSubclass]'>
 
-reveal_type(Constrained[str])  # revealed: <type alias Constrained[str]>
+reveal_type(Constrained[str])  # revealed: <type alias 'Constrained[str]'>
 
 # TODO: error: [invalid-argument-type]
 # TODO: revealed: Unknown
-reveal_type(Constrained[int | str])  # revealed: <type alias Constrained[int | str]>
+reveal_type(Constrained[int | str])  # revealed: <type alias 'Constrained[int | str]'>
 
 # error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `T@Constrained`"
-reveal_type(Constrained[object])  # revealed: <type alias Constrained[Unknown]>
+reveal_type(Constrained[object])  # revealed: <type alias 'Constrained[Unknown]'>
 ```
 
 If the type variable has a default, it can be omitted:
@@ -126,8 +126,8 @@ If the type variable has a default, it can be omitted:
 ```py
 type WithDefault[T, U = int] = ...
 
-reveal_type(WithDefault[str, str])  # revealed: <type alias WithDefault[str, str]>
-reveal_type(WithDefault[str])  # revealed: <type alias WithDefault[str, int]>
+reveal_type(WithDefault[str, str])  # revealed: <type alias 'WithDefault[str, str]'>
+reveal_type(WithDefault[str])  # revealed: <type alias 'WithDefault[str, int]'>
 ```
 
 If the type alias is not specialized explicitly, it is implicitly specialized to `Unknown`:
