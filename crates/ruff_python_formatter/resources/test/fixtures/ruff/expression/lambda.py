@@ -454,3 +454,12 @@ class C:
     ],
 )
 def test_string_temporal_compare_between(con, op, left, right): ...
+
+[
+    (
+        lambda eval_df, _: MetricValue(
+            scores=eval_df["prediction"].tolist(),
+            aggregate_results={"prediction_sum": sum(eval_df["prediction"])},
+        )
+    ),
+]
