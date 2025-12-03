@@ -285,7 +285,7 @@ impl Project {
             let project_span = &project_span;
 
             rayon::scope(move |scope| {
-                for file in &files {
+                for file in files.unstable_iter() {
                     let db = db.clone();
                     let reporter = &*reporter;
                     scope.spawn(move |_| {
@@ -611,16 +611,11 @@ impl<'a> ProjectFiles<'a> {
             ProjectFiles::Indexed(files) => files.len(),
         }
     }
-}
 
-impl<'a> IntoIterator for &'a ProjectFiles<'a> {
-    type Item = File;
-    type IntoIter = ProjectFilesIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
+    fn unstable_iter(&self) -> ProjectFilesIter<'_> {
         match self {
             ProjectFiles::OpenFiles(files) => ProjectFilesIter::OpenFiles(files.unstable_iter()),
-            ProjectFiles::Indexed(files) => ProjectFilesIter::Indexed(files.into_iter()),
+            ProjectFiles::Indexed(files) => ProjectFilesIter::Indexed(files.unstable_iter()),
         }
     }
 }

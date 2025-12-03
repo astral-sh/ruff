@@ -23,7 +23,7 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
 
         rayon::scope(move |s| {
             // For each file, extract symbols and add them to results
-            for file in files {
+            for file in files.unstable_iter() {
                 let db = db.dyn_clone();
                 s.spawn(move |_| {
                     for (_, symbol) in symbols_for_file_global_only(&*db, file).search(query) {

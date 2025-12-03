@@ -164,6 +164,10 @@ impl Indexed<'_> {
     pub(super) fn len(&self) -> usize {
         self.inner.files.len()
     }
+
+    pub fn unstable_iter(&self) -> IndexedIter<'_> {
+        self.inner.files.unstable_iter().copied()
+    }
 }
 
 impl Deref for Indexed<'_> {
@@ -175,15 +179,6 @@ impl Deref for Indexed<'_> {
 }
 
 pub(super) type IndexedIter<'a> = std::iter::Copied<std::collections::hash_set::Iter<'a, File>>;
-
-impl<'a> IntoIterator for &'a Indexed<'_> {
-    type Item = File;
-    type IntoIter = IndexedIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.inner.files.unstable_iter().copied()
-    }
-}
 
 /// A Mutable view of a project's indexed files.
 ///
