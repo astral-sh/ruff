@@ -11,7 +11,7 @@ use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, ScopeId};
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
-use crate::types::constraints::ConstraintSet;
+use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::Parameters;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
@@ -1166,18 +1166,20 @@ impl<'db> Specialization<'db> {
         let self_materialization_kind = self.materialization_kind(db);
         let other_materialization_kind = other.materialization_kind(db);
 
-        let mut result = ConstraintSet::from(true);
-        for ((bound_typevar, self_type), other_type) in (generic_context.variables(db))
-            .zip(self.types(db))
-            .zip(other.types(db))
-        {
+        let types = itertools::izip!(
+            generic_context.variables(db),
+            self.types(db),
+            other.types(db)
+        );
+
+        types.when_all(db, |(bound_typevar, self_type, other_type)| {
             // Subtyping/assignability of each type in the specialization depends on the variance
             // of the corresponding typevar:
             //   - covariant: verify that self_type <: other_type
             //   - contravariant: verify that other_type <: self_type
             //   - invariant: verify that self_type <: other_type AND other_type <: self_type
             //   - bivariant: skip, can't make subtyping/assignability false
-            let compatible = match bound_typevar.variance(db) {
+            match bound_typevar.variance(db) {
                 TypeVarVariance::Invariant => has_relation_in_invariant_position(
                     db,
                     self_type,
@@ -1206,13 +1208,82 @@ impl<'db> Specialization<'db> {
                     disjointness_visitor,
                 ),
                 TypeVarVariance::Bivariant => ConstraintSet::from(true),
-            };
-            if result.intersect(db, compatible).is_never_satisfied(db) {
-                return result;
             }
+        })
+    }
+
+    pub(crate) fn is_disjoint_from(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> ConstraintSet<'db> {
+        self.is_disjoint_from_impl(
+            db,
+            other,
+            inferable,
+            &IsDisjointVisitor::default(),
+            &HasRelationToVisitor::default(),
+        )
+    }
+
+    pub(crate) fn is_disjoint_from_impl(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        inferable: InferableTypeVars<'_, 'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        let generic_context = self.generic_context(db);
+        if generic_context != other.generic_context(db) {
+            return ConstraintSet::from(true);
         }
 
-        result
+        if let (Some(self_tuple), Some(other_tuple)) = (self.tuple_inner(db), other.tuple_inner(db))
+        {
+            return self_tuple.is_disjoint_from_impl(
+                db,
+                other_tuple,
+                inferable,
+                disjointness_visitor,
+                relation_visitor,
+            );
+        }
+
+        let types = itertools::izip!(
+            generic_context.variables(db),
+            self.types(db),
+            other.types(db)
+        );
+
+        types.when_all(
+            db,
+            |(bound_typevar, self_type, other_type)| match bound_typevar.variance(db) {
+                // TODO: This check can lead to false negatives.
+                //
+                // For example, `Foo[int]` and `Foo[bool]` are disjoint, even though `bool` is a subtype
+                // of `int`. However, given two non-inferable type variables `T` and `U`, `Foo[T]` and
+                // `Foo[U]` should not be considered disjoint, as `T` and `U` could be specialized to the
+                // same type. We don't currently have a good typing relationship to represent this.
+                TypeVarVariance::Invariant => self_type.is_disjoint_from_impl(
+                    db,
+                    *other_type,
+                    inferable,
+                    disjointness_visitor,
+                    relation_visitor,
+                ),
+
+                // If `Foo[T]` is covariant in `T`, `Foo[Never]` is a subtype of `Foo[A]` and `Foo[B]`
+                TypeVarVariance::Covariant => ConstraintSet::from(false),
+
+                // If `Foo[T]` is contravariant in `T`, `Foo[A | B]` is a subtype of `Foo[A]` and `Foo[B]`
+                TypeVarVariance::Contravariant => ConstraintSet::from(false),
+
+                // If `Foo[T]` is bivariant in `T`, `Foo[A]` and `Foo[B]` are mutual subtypes.
+                TypeVarVariance::Bivariant => ConstraintSet::from(false),
+            },
+        )
     }
 
     pub(crate) fn is_equivalent_to_impl(

@@ -706,6 +706,31 @@ impl<'db> ClassType<'db> {
             .find_map(|base| base.as_disjoint_base(db))
     }
 
+    /// Return `true` if this class could exist in the MRO of `other`.
+    pub(super) fn could_exist_in_mro_of(self, db: &'db dyn Db, other: Self) -> bool {
+        other
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .any(|class| match (self, class) {
+                (ClassType::NonGeneric(this_class), ClassType::NonGeneric(other_class)) => {
+                    this_class == other_class
+                }
+                (ClassType::Generic(this_alias), ClassType::Generic(other_alias)) => {
+                    this_alias.origin(db) == other_alias.origin(db)
+                        && !this_alias
+                            .specialization(db)
+                            .is_disjoint_from(
+                                db,
+                                other_alias.specialization(db),
+                                InferableTypeVars::None,
+                            )
+                            .is_always_satisfied(db)
+                }
+                (ClassType::NonGeneric(_), ClassType::Generic(_))
+                | (ClassType::Generic(_), ClassType::NonGeneric(_)) => false,
+            })
+    }
+
     /// Return `true` if this class could coexist in an MRO with `other`.
     ///
     /// For two given classes `A` and `B`, it is often possible to say for sure
@@ -717,16 +742,11 @@ impl<'db> ClassType<'db> {
         }
 
         if self.is_final(db) {
-            return self
-                .iter_mro(db)
-                .filter_map(ClassBase::into_class)
-                .any(|class| class.class_literal(db).0 == other.class_literal(db).0);
+            return other.could_exist_in_mro_of(db, self);
         }
+
         if other.is_final(db) {
-            return other
-                .iter_mro(db)
-                .filter_map(ClassBase::into_class)
-                .any(|class| class.class_literal(db).0 == self.class_literal(db).0);
+            return self.could_exist_in_mro_of(db, other);
         }
 
         // Two disjoint bases can only coexist in an MRO if one is a subclass of the other.
