@@ -6428,11 +6428,11 @@ mod tests {
                         a = Literal['a', 'b', 'c']",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @r#"
         from typing import Literal
 
-        a[: <typing.Literal special form>] = Literal['a', 'b', 'c']
-        ");
+        a[: <typing.Literal special form (`Literal["a", "b", "c"]`)>] = Literal['a', 'b', 'c']
+        "#);
     }
 
     struct InlayHintLocationDiagnostic {
