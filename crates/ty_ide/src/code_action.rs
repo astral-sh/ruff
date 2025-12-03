@@ -4,7 +4,7 @@ use ruff_db::{files::File, parsed::parsed_module};
 use ruff_diagnostics::Edit;
 use ruff_text_size::TextRange;
 use ty_project::Db;
-use ty_python_semantic::create_suppression_fix;
+use ty_python_semantic::suppress_single;
 use ty_python_semantic::types::UNRESOLVED_REFERENCE;
 
 /// A `QuickFix` Code Action
@@ -36,7 +36,7 @@ pub fn code_actions(
 
     actions.push(QuickFix {
         title: format!("Ignore '{}' for this line", lint_id.name()),
-        edits: create_suppression_fix(db, file, lint_id, diagnostic_range).into_edits(),
+        edits: suppress_single(db, file, lint_id, diagnostic_range).into_edits(),
         preferred: false,
     });
 

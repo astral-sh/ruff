@@ -5,9 +5,14 @@ mod python_version;
 mod version;
 
 pub use args::Cli;
+use ruff_db::source::source_text;
+use ruff_diagnostics::{Fix, SourceMap};
+use ruff_text_size::{Ranged as _, TextLen, TextRange, TextSize};
 use ty_project::metadata::settings::TerminalSettings;
+use ty_python_semantic::suppress_all;
 use ty_static::EnvVars;
 
+use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::process::{ExitCode, Termination};
 
@@ -22,16 +27,17 @@ use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
+use ruff_db::Db as _;
 use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
 };
-use ruff_db::files::File;
+use ruff_db::files::{File, FilePath};
 use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use salsa::Database;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::watch::ProjectWatcher;
-use ty_project::{CollectReporter, Db, watch};
+use ty_project::{CollectReporter, Db, suppress_all_diagnostics, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_server::run_server;
 
@@ -111,6 +117,12 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .map(|path| SystemPath::absolute(path, &cwd))
         .collect();
 
+    let mode = if args.add_ignore {
+        MainLoopMode::AddIgnore
+    } else {
+        MainLoopMode::Check
+    };
+
     let system = OsSystem::new(&cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
@@ -138,7 +150,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     }
 
     let (main_loop, main_loop_cancellation_token) =
-        MainLoop::new(project_options_overrides, printer);
+        MainLoop::new(mode, project_options_overrides, printer);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -209,6 +221,8 @@ impl Termination for ExitStatus {
 }
 
 struct MainLoop {
+    mode: MainLoopMode,
+
     /// Sender that can be used to send messages to the main loop.
     sender: crossbeam_channel::Sender<MainLoopMessage>,
 
@@ -226,6 +240,7 @@ struct MainLoop {
 
 impl MainLoop {
     fn new(
+        mode: MainLoopMode,
         project_options_overrides: ProjectOptionsOverrides,
         printer: Printer,
     ) -> (Self, MainLoopCancellationToken) {
@@ -233,6 +248,7 @@ impl MainLoop {
 
         (
             Self {
+                mode,
                 sender: sender.clone(),
                 receiver,
                 watcher: None,
@@ -310,77 +326,103 @@ impl MainLoop {
                     result,
                     revision: check_revision,
                 } => {
+                    if check_revision != revision {
+                        tracing::debug!(
+                            "Discarding check result for outdated revision: current: {revision}, result revision: {check_revision}"
+                        );
+                        continue;
+                    }
+
+                    if db.project().files(db).is_empty() {
+                        tracing::warn!("No python files found under the given path(s)");
+                    }
+
+                    // TODO: We should have an official flag to silence workspace diagnostics.
+                    if std::env::var("TY_MEMORY_REPORT").as_deref() == Ok("mypy_primer") {
+                        return Ok(ExitStatus::Success);
+                    }
+
                     let terminal_settings = db.project().settings(db).terminal();
-                    let display_config = DisplayDiagnosticConfig::default()
-                        .format(terminal_settings.output_format.into())
-                        .color(colored::control::SHOULD_COLORIZE.should_colorize())
-                        .show_fix_diff(true);
+                    let is_human_readable = terminal_settings.output_format.is_human_readable();
 
-                    if check_revision == revision {
-                        if db.project().files(db).is_empty() {
-                            tracing::warn!("No python files found under the given path(s)");
+                    let diagnostics = match self.mode {
+                        MainLoopMode::Check => {
+                            let display_config = DisplayDiagnosticConfig::default()
+                                .format(terminal_settings.output_format.into())
+                                .color(colored::control::SHOULD_COLORIZE.should_colorize())
+                                .show_fix_diff(true);
+
+                            if result.is_empty() {
+                                if is_human_readable {
+                                    writeln!(
+                                        self.printer.stream_for_success_summary(),
+                                        "{}",
+                                        "All checks passed!".green().bold()
+                                    )?;
+                                }
+                            } else {
+                                let diagnostics_count = result.len();
+
+                                let mut stdout = self.printer.stream_for_details().lock();
+
+                                // Only render diagnostics if they're going to be displayed, since doing
+                                // so is expensive.
+                                if stdout.is_enabled() {
+                                    write!(
+                                        stdout,
+                                        "{}",
+                                        DisplayDiagnostics::new(db, &display_config, &result)
+                                    )?;
+                                }
+
+                                if is_human_readable {
+                                    writeln!(
+                                        self.printer.stream_for_failure_summary(),
+                                        "Found {} diagnostic{}",
+                                        diagnostics_count,
+                                        if diagnostics_count > 1 { "s" } else { "" }
+                                    )?;
+                                }
+                            }
+
+                            result
                         }
-
-                        // TODO: We should have an official flag to silence workspace diagnostics.
-                        if std::env::var("TY_MEMORY_REPORT").as_deref() == Ok("mypy_primer") {
-                            return Ok(ExitStatus::Success);
-                        }
-
-                        let is_human_readable = terminal_settings.output_format.is_human_readable();
-
-                        if result.is_empty() {
-                            if is_human_readable {
-                                writeln!(
-                                    self.printer.stream_for_success_summary(),
-                                    "{}",
-                                    "All checks passed!".green().bold()
-                                )?;
-                            }
-
-                            if self.watcher.is_none() {
-                                return Ok(ExitStatus::Success);
-                            }
-                        } else {
-                            let diagnostics_count = result.len();
-
-                            let mut stdout = self.printer.stream_for_details().lock();
-                            let exit_status =
-                                exit_status_from_diagnostics(&result, terminal_settings);
-
-                            // Only render diagnostics if they're going to be displayed, since doing
-                            // so is expensive.
-                            if stdout.is_enabled() {
-                                write!(
-                                    stdout,
-                                    "{}",
-                                    DisplayDiagnostics::new(db, &display_config, &result)
-                                )?;
-                            }
+                        MainLoopMode::AddIgnore => {
+                            let result = suppress_all_diagnostics(db, result);
 
                             if is_human_readable {
                                 writeln!(
                                     self.printer.stream_for_failure_summary(),
-                                    "Found {} diagnostic{}",
-                                    diagnostics_count,
-                                    if diagnostics_count > 1 { "s" } else { "" }
+                                    "Ignored {} diagnostic{}",
+                                    result.count,
+                                    if result.count > 1 { "s" } else { "" }
                                 )?;
                             }
 
-                            if exit_status.is_internal_error() {
-                                tracing::warn!(
-                                    "A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details."
-                                );
-                            }
-
-                            if self.watcher.is_none() {
-                                return Ok(exit_status);
-                            }
+                            result.diagnostics
                         }
+                    };
+
+                    if self.watcher.is_some() {
+                        continue;
+                    }
+
+                    let exit_status = if diagnostics.is_empty() {
+                        ExitStatus::Success
                     } else {
-                        tracing::debug!(
-                            "Discarding check result for outdated revision: current: {revision}, result revision: {check_revision}"
+                        let exit_status =
+                            exit_status_from_diagnostics(&diagnostics, terminal_settings);
+
+                        exit_status
+                    };
+
+                    if exit_status.is_internal_error() {
+                        tracing::warn!(
+                            "A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details."
                         );
                     }
+
+                    return Ok(exit_status);
                 }
 
                 MainLoopMessage::ApplyChanges(changes) => {
@@ -404,6 +446,12 @@ impl MainLoop {
 
         Ok(ExitStatus::Success)
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+enum MainLoopMode {
+    Check,
+    AddIgnore,
 }
 
 fn exit_status_from_diagnostics(
