@@ -1336,6 +1336,69 @@ reveal_type(g)  # revealed: Unknown
 reveal_type(h)  # revealed: Unknown
 ```
 
+## Star-imports can affect member states
+
+If a star-import pulls in a symbol that was previously defined in the importing module (e.g. `obj`),
+it can affect the state of associated member expressions (e.g. `obj.attr` or `obj[0]`). In the test
+below, note how the types of the corresponding attribute expressions change after the star import
+affects the object:
+
+`common.py`:
+
+```py
+class C:
+    attr: int | None
+```
+
+`exporter.py`:
+
+```py
+from common import C
+
+def flag() -> bool:
+    return True
+
+should_be_imported: C = C()
+
+if flag():
+    might_be_imported: C = C()
+
+if False:
+    should_not_be_imported: C = C()
+```
+
+`main.py`:
+
+```py
+from common import C
+
+should_be_imported = C()
+might_be_imported = C()
+should_not_be_imported = C()
+
+# We start with the plain attribute types:
+reveal_type(should_be_imported.attr)  # revealed: int | None
+reveal_type(might_be_imported.attr)  # revealed: int | None
+reveal_type(should_not_be_imported.attr)  # revealed: int | None
+
+# Now we narrow the types by assignment:
+should_be_imported.attr = 1
+might_be_imported.attr = 1
+should_not_be_imported.attr = 1
+
+reveal_type(should_be_imported.attr)  # revealed: Literal[1]
+reveal_type(might_be_imported.attr)  # revealed: Literal[1]
+reveal_type(should_not_be_imported.attr)  # revealed: Literal[1]
+
+# This star import adds bindings for `should_be_imported` and `might_be_imported`:
+from exporter import *
+
+# As expected, narrowing is "reset" for the first two variables, but not for the third:
+reveal_type(should_be_imported.attr)  # revealed: int | None
+reveal_type(might_be_imported.attr)  # revealed: int | None
+reveal_type(should_not_be_imported.attr)  # revealed: Literal[1]
+```
+
 ## Cyclic star imports
 
 Believe it or not, this code does *not* raise an exception at runtime!
