@@ -34,7 +34,7 @@ pub(crate) fn check_noqa(
     noqa_line_for: &NoqaMapping,
     analyze_directives: bool,
     settings: &LinterSettings,
-    suppressions: &Suppressions,
+    suppressions: &mut Suppressions,
 ) -> Vec<usize> {
     // Identify any codes that are globally exempted (within the current file).
     let file_noqa_directives =
