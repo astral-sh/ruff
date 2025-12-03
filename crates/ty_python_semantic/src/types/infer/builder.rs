@@ -11765,6 +11765,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             (Type::SpecialForm(SpecialFormType::Concatenate), _) => {
+                // TODO: Add proper support for `Concatenate`
                 let mut variables = FxOrderSet::default();
                 slice_ty.bind_and_find_all_legacy_typevars(
                     db,
