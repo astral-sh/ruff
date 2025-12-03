@@ -277,33 +277,3 @@ help: Alias `networkx` to `nx`
 24 | 
 25 | def conventional_aliases():
 note: This is an unsafe fix and may change runtime behavior
-
-ICN001 `plotly.graph_objects` should be imported as `go`
-  --> defaults.py:36:8
-   |
-35 | # ICN001: plotly.graph_objects should be imported as go
-36 | import plotly.graph_objects  # should require alias
-   |        ^^^^^^^^^^^^^^^^^^^^
-37 | import plotly.graph_objects as go  # ok
-   |
-help: Alias `plotly.graph_objects` to `go`
-
-ICN001 `statsmodels.api` should be imported as `sm`
-  --> defaults.py:40:8
-   |
-39 | # ICN001: statsmodels.api should be imported as sm
-40 | import statsmodels.api  # should require alias
-   |        ^^^^^^^^^^^^^^^
-41 | import statsmodels.api as sm  # ok
-   |
-help: Alias `statsmodels.api` to `sm`
-
-ICN002 `geopandas` should not be imported as `gpd`
-  --> defaults.py:44:1
-   |
-43 | # ICN002: geopandas should not be imported as gpd
-44 | import geopandas as gpd  # banned
-   | ^^^^^^^^^^^^^^^^^^^^^^^
-45 | import geopandas  # ok
-46 | import geopandas as gdf  # ok
-   |

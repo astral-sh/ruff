@@ -9,24 +9,41 @@ mod tests {
     use anyhow::Result;
     use rustc_hash::{FxHashMap, FxHashSet};
 
-    use crate::assert_diagnostics;
     use crate::registry::Rule;
     use crate::rules::flake8_import_conventions::settings::{BannedAliases, default_aliases};
     use crate::settings::{LinterSettings, types::PreviewMode};
     use crate::test::test_path;
+    use crate::{assert_diagnostics, assert_diagnostics_diff};
 
     #[test]
     fn defaults() -> Result<()> {
-        let settings = LinterSettings {
-            flake8_import_conventions: super::settings::Settings::new(PreviewMode::Enabled),
-            preview: PreviewMode::Enabled,
-            ..LinterSettings::for_rules([Rule::UnconventionalImportAlias, Rule::BannedImportAlias])
-        };
         let diagnostics = test_path(
             Path::new("flake8_import_conventions/defaults.py"),
-            &settings,
+            &LinterSettings::for_rule(Rule::UnconventionalImportAlias),
         )?;
         assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn defaults_preview() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("flake8_import_conventions/defaults.py"),
+            &LinterSettings {
+                flake8_import_conventions: super::settings::Settings::new(PreviewMode::Disabled),
+                ..LinterSettings::for_rules([
+                    Rule::UnconventionalImportAlias,
+                    Rule::BannedImportAlias
+                ])
+            },
+            &LinterSettings {
+                flake8_import_conventions: super::settings::Settings::new(PreviewMode::Enabled),
+                ..LinterSettings::for_rules([
+                    Rule::UnconventionalImportAlias,
+                    Rule::BannedImportAlias
+                ])
+            },
+        );
         Ok(())
     }
 
