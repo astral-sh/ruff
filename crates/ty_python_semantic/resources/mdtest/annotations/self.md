@@ -139,7 +139,7 @@ The first parameter of instance methods always has type `Self`, if it is not exp
 The name `self` is not special in any way.
 
 ```py
-def some_decorator(f: Callable) -> Callable:
+def some_decorator[**P, R](f: Callable[P, R]) -> Callable[P, R]:
     return f
 
 class B:
@@ -188,10 +188,10 @@ class B:
 reveal_type(B().name_does_not_matter())  # revealed: B
 reveal_type(B().positional_only(1))  # revealed: B
 reveal_type(B().keyword_only(x=1))  # revealed: B
+# TODO: This should deally be `B`
 reveal_type(B().decorated_method())  # revealed: Unknown
 
-# TODO: this should be B
-reveal_type(B().a_property)  # revealed: Unknown
+reveal_type(B().a_property)  # revealed: B
 
 async def _():
     reveal_type(await B().async_method())  # revealed: B
@@ -232,6 +232,32 @@ class C:
 reveal_type(not_a_method)  # revealed: def not_a_method(self) -> Unknown
 ```
 
+## Different occurrences of `Self` represent different types
+
+Here, both `Foo.foo` and `Bar.bar` use `Self`. When accessing a bound method, we replace any
+occurrences of `Self` with the bound `self` type. In this example, when we access `x.foo`, we only
+want to substitute the occurrences of `Self` in `Foo.foo` — that is, occurrences of `Self@foo`. The
+fact that `x` is an instance of `Foo[Self@bar]` (a completely different `Self` type) should not
+affect that subtitution. If we blindly substitute all occurrences of `Self`, we would get
+`Foo[Self@bar]` as the return type of the bound method.
+
+```py
+from typing import Self
+
+class Foo[T]:
+    def foo(self: Self) -> T:
+        raise NotImplementedError
+
+class Bar:
+    def bar(self: Self, x: Foo[Self]):
+        # revealed: bound method Foo[Self@bar].foo() -> Self@bar
+        reveal_type(x.foo)
+
+def f[U: Bar](x: Foo[U]):
+    # revealed: bound method Foo[U@f].foo() -> U@f
+    reveal_type(x.foo)
+```
+
 ## typing_extensions
 
 ```toml
@@ -260,15 +286,13 @@ class Shape:
 
     @classmethod
     def bar(cls: type[Self]) -> Self:
-        # TODO: type[Shape]
-        reveal_type(cls)  # revealed: @Todo(unsupported type[X] special form)
+        reveal_type(cls)  # revealed: type[Self@bar]
         return cls()
 
 class Circle(Shape): ...
 
 reveal_type(Shape().foo())  # revealed: Shape
-# TODO: Shape
-reveal_type(Shape.bar())  # revealed: Unknown
+reveal_type(Shape.bar())  # revealed: Shape
 ```
 
 ## Attributes
@@ -503,9 +527,11 @@ class C[T]():
     def f(self: Self):
         def b(x: Self):
             reveal_type(x)  # revealed: Self@f
-        reveal_type(generic_context(b))  # revealed: None
+        # revealed: None
+        reveal_type(generic_context(b))
 
-reveal_type(generic_context(C.f))  # revealed: tuple[Self@f]
+# revealed: ty_extensions.GenericContext[Self@f]
+reveal_type(generic_context(C.f))
 ```
 
 Even if the `Self` annotation appears first in the nested function, it is the method that binds
@@ -519,9 +545,11 @@ class C:
     def f(self: "C"):
         def b(x: Self):
             reveal_type(x)  # revealed: Self@f
-        reveal_type(generic_context(b))  # revealed: None
+        # revealed: None
+        reveal_type(generic_context(b))
 
-reveal_type(generic_context(C.f))  # revealed: None
+# revealed: None
+reveal_type(generic_context(C.f))
 ```
 
 ## Non-positional first parameters

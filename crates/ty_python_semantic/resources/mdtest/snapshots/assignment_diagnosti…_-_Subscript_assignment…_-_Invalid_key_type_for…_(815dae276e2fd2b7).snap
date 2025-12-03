@@ -1,0 +1,36 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: assignment_diagnostics.md - Subscript assignment diagnostics - Invalid key type for `TypedDict`
+mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_diagnostics.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing import TypedDict
+2 | 
+3 | class Config(TypedDict):
+4 |     retries: int
+5 | 
+6 | def _(config: Config) -> None:
+7 |     config[0] = 3  # error: [invalid-key]
+```
+
+# Diagnostics
+
+```
+error[invalid-key]: TypedDict `Config` can only be subscripted with a string literal key, got key of type `Literal[0]`.
+ --> src/mdtest_snippet.py:7:12
+  |
+6 | def _(config: Config) -> None:
+7 |     config[0] = 3  # error: [invalid-key]
+  |            ^
+  |
+info: rule `invalid-key` is enabled by default
+
+```

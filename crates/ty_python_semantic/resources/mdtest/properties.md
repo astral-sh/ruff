@@ -49,6 +49,40 @@ c.my_property = 2
 c.my_property = "a"
 ```
 
+## Properties returning `Self`
+
+A property that returns `Self` refers to an instance of the class:
+
+```py
+from typing_extensions import Self
+
+class Path:
+    @property
+    def parent(self) -> Self:
+        raise NotImplementedError
+
+reveal_type(Path().parent)  # revealed: Path
+```
+
+This also works when a setter is defined:
+
+```py
+class Node:
+    @property
+    def parent(self) -> Self:
+        raise NotImplementedError
+
+    @parent.setter
+    def parent(self, value: Self) -> None:
+        pass
+
+root = Node()
+child = Node()
+child.parent = root
+
+reveal_type(child.parent)  # revealed: Node
+```
+
 ## `property.getter`
 
 `property.getter` can be used to overwrite the getter method of a property. This does not overwrite
@@ -133,10 +167,9 @@ class C:
 c = C()
 c.attr = 1
 
-# TODO: An error should be emitted here, and the type should be `Unknown`
-# or `Never`. See https://github.com/astral-sh/ruff/issues/16298 for more
-# details.
-reveal_type(c.attr)  # revealed: Unknown | property
+# TODO: An error should be emitted here.
+# See https://github.com/astral-sh/ruff/issues/16298 for more details.
+reveal_type(c.attr)  # revealed: Unknown
 ```
 
 ### Wrong setter signature

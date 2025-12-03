@@ -1,0 +1,43 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: assignment_diagnostics.md - Subscript assignment diagnostics - Unknown key for one element of a union
+mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_diagnostics.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import TypedDict
+ 2 | 
+ 3 | class Person(TypedDict):
+ 4 |     name: str
+ 5 |     phone_number: str
+ 6 | 
+ 7 | class Animal(TypedDict):
+ 8 |     name: str
+ 9 |     legs: int
+10 | 
+11 | def _(being: Person | Animal) -> None:
+12 |     being["legs"] = 4  # error: [invalid-key]
+```
+
+# Diagnostics
+
+```
+error[invalid-key]: Unknown key "legs" for TypedDict `Person`
+  --> src/mdtest_snippet.py:12:5
+   |
+11 | def _(being: Person | Animal) -> None:
+12 |     being["legs"] = 4  # error: [invalid-key]
+   |     ----- ^^^^^^ Unknown key "legs"
+   |     |
+   |     TypedDict `Person` in union type `Person | Animal`
+   |
+info: rule `invalid-key` is enabled by default
+
+```

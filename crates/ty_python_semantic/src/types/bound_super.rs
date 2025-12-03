@@ -192,6 +192,25 @@ impl<'db> SuperOwnerKind<'db> {
         }
     }
 
+    fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            SuperOwnerKind::Dynamic(dynamic) => {
+                Some(SuperOwnerKind::Dynamic(dynamic.recursive_type_normalized()))
+            }
+            SuperOwnerKind::Class(class) => Some(SuperOwnerKind::Class(
+                class.recursive_type_normalized_impl(db, div, nested)?,
+            )),
+            SuperOwnerKind::Instance(instance) => Some(SuperOwnerKind::Instance(
+                instance.recursive_type_normalized_impl(db, div, nested)?,
+            )),
+        }
+    }
+
     fn iter_mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
         match self {
             SuperOwnerKind::Dynamic(dynamic) => {
@@ -290,10 +309,15 @@ impl<'db> BoundSuperType<'db> {
             Type::Never => SuperOwnerKind::Dynamic(DynamicType::Unknown),
             Type::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
             Type::ClassLiteral(class) => SuperOwnerKind::Class(ClassType::NonGeneric(class)),
-            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                SubclassOfInner::Class(class) => SuperOwnerKind::Class(class),
-                SubclassOfInner::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
-            },
+            Type::SubclassOf(subclass_of_type) => {
+                match subclass_of_type.subclass_of().with_transposed_type_var(db) {
+                    SubclassOfInner::Class(class) => SuperOwnerKind::Class(class),
+                    SubclassOfInner::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
+                    SubclassOfInner::TypeVar(bound_typevar) => {
+                        return delegate_to(Type::TypeVar(bound_typevar));
+                    }
+                }
+            }
             Type::NominalInstance(instance) => SuperOwnerKind::Instance(instance),
 
             Type::ProtocolInstance(protocol) => {
@@ -396,13 +420,16 @@ impl<'db> BoundSuperType<'db> {
                 let mut key_builder = UnionBuilder::new(db);
                 let mut value_builder = UnionBuilder::new(db);
                 for (name, field) in td.items(db) {
-                    key_builder = key_builder.add(Type::string_literal(db, &name));
+                    key_builder = key_builder.add(Type::string_literal(db, name));
                     value_builder = value_builder.add(field.declared_ty);
                 }
                 return delegate_to(
                     KnownClass::Dict
                         .to_specialized_instance(db, [key_builder.build(), value_builder.build()]),
                 );
+            }
+            Type::NewTypeInstance(newtype) => {
+                return delegate_to(Type::instance(db, newtype.base_class_type(db)));
             }
             Type::Callable(callable) if callable.is_function_like(db) => {
                 return delegate_to(KnownClass::FunctionType.to_instance(db));
@@ -427,8 +454,15 @@ impl<'db> BoundSuperType<'db> {
         let pivot_class = match pivot_class_type {
             Type::ClassLiteral(class) => ClassBase::Class(ClassType::NonGeneric(class)),
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
-                SubclassOfInner::Class(class) => ClassBase::Class(class),
                 SubclassOfInner::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
+                _ => match subclass_of.subclass_of().into_class(db) {
+                    Some(class) => ClassBase::Class(class),
+                    None => {
+                        return Err(BoundSuperError::InvalidPivotClassType {
+                            pivot_class: pivot_class_type,
+                        });
+                    }
+                },
             },
             Type::SpecialForm(SpecialFormType::Protocol) => ClassBase::Protocol,
             Type::SpecialForm(SpecialFormType::Generic) => ClassBase::Generic,
@@ -578,5 +612,20 @@ impl<'db> BoundSuperType<'db> {
             self.pivot_class(db).normalized_impl(db, visitor),
             self.owner(db).normalized_impl(db, visitor),
         )
+    }
+
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        Some(Self::new(
+            db,
+            self.pivot_class(db)
+                .recursive_type_normalized_impl(db, div, nested)?,
+            self.owner(db)
+                .recursive_type_normalized_impl(db, div, nested)?,
+        ))
     }
 }

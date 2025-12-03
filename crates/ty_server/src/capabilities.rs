@@ -1,11 +1,12 @@
 use lsp_types::{
-    ClientCapabilities, CompletionOptions, DeclarationCapability, DiagnosticOptions,
-    DiagnosticServerCapabilities, HoverProviderCapability, InlayHintOptions,
-    InlayHintServerCapabilities, MarkupKind, OneOf, RenameOptions,
-    SelectionRangeProviderCapability, SemanticTokensFullOptions, SemanticTokensLegend,
-    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
-    SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TypeDefinitionProviderCapability, WorkDoneProgressOptions,
+    ClientCapabilities, CodeActionKind, CodeActionOptions, CompletionOptions,
+    DeclarationCapability, DiagnosticOptions, DiagnosticServerCapabilities,
+    HoverProviderCapability, InlayHintOptions, InlayHintServerCapabilities, MarkupKind,
+    NotebookCellSelector, NotebookSelector, OneOf, RenameOptions, SelectionRangeProviderCapability,
+    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
+    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TypeDefinitionProviderCapability, WorkDoneProgressOptions,
 };
 
 use crate::PositionEncoding;
@@ -37,6 +38,16 @@ bitflags::bitflags! {
         const WORKSPACE_CONFIGURATION = 1 << 15;
         const RENAME_DYNAMIC_REGISTRATION = 1 << 16;
         const COMPLETION_ITEM_LABEL_DETAILS_SUPPORT = 1 << 17;
+    }
+}
+
+impl std::fmt::Display for ResolvedClientCapabilities {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut f = f.debug_list();
+        for (name, _) in self.iter_names() {
+            f.entry(&name);
+        }
+        f.finish()
     }
 }
 
@@ -366,6 +377,13 @@ pub(crate) fn server_capabilities(
 
     ServerCapabilities {
         position_encoding: Some(position_encoding.into()),
+        code_action_provider: Some(types::CodeActionProviderCapability::Options(
+            CodeActionOptions {
+                code_action_kinds: Some(vec![CodeActionKind::QUICKFIX]),
+                ..CodeActionOptions::default()
+            },
+        )),
+
         execute_command_provider: Some(types::ExecuteCommandOptions {
             commands: SupportedCommand::all()
                 .map(|command| command.identifier().to_string())
@@ -422,6 +440,16 @@ pub(crate) fn server_capabilities(
         selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
         document_symbol_provider: Some(OneOf::Left(true)),
         workspace_symbol_provider: Some(OneOf::Left(true)),
+        notebook_document_sync: Some(OneOf::Left(lsp_types::NotebookDocumentSyncOptions {
+            save: Some(false),
+            notebook_selector: [NotebookSelector::ByCells {
+                notebook: None,
+                cells: vec![NotebookCellSelector {
+                    language: "python".to_string(),
+                }],
+            }]
+            .to_vec(),
+        })),
         ..Default::default()
     }
 }

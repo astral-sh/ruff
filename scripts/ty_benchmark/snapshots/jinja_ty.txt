@@ -1,0 +1,22 @@
+src/jinja2/async_utils.py:68:22: warning[redundant-cast] Value is already of type `Awaitable[V@auto_await]`
+src/jinja2/async_utils.py:91:16: error[call-non-callable] Object of type `object` is not callable
+src/jinja2/debug.py:78:6: error[invalid-return-type] Function can implicitly return `None`, which is not assignable to return type `TracebackType`
+src/jinja2/defaults.py:24:19: error[escape-character-in-forward-annotation] Type expressions cannot contain escape characters
+src/jinja2/environment.py:307:27: error[escape-character-in-forward-annotation] Type expressions cannot contain escape characters
+src/jinja2/environment.py:399:27: error[escape-character-in-forward-annotation] Type expressions cannot contain escape characters
+src/jinja2/environment.py:1177:27: error[escape-character-in-forward-annotation] Type expressions cannot contain escape characters
+src/jinja2/environment.py:1617:17: error[no-matching-overload] No overload of bound method `writelines` matches arguments
+src/jinja2/exceptions.py:43:23: error[invalid-assignment] Object of type `str | Undefined | None` is not assignable to `str | None`
+src/jinja2/filters.py:169:48: error[invalid-assignment] Object of type `dict_items[object, object]` is not assignable to `Iterable[tuple[str, Any]]`
+src/jinja2/filters.py:1352:9: error[unsupported-operator] Operator `+=` is unsupported between objects of type `V@do_sum` and `Any | V@do_sum`
+src/jinja2/lexer.py:667:40: error[invalid-argument-type] Argument is incorrect: Expected `str`, found `str | int | Any`
+src/jinja2/loaders.py:190:28: error[no-matching-overload] No overload of function `fspath` matches arguments
+src/jinja2/loaders.py:639:25: error[no-matching-overload] No overload of function `fspath` matches arguments
+src/jinja2/parser.py:429:9: error[invalid-assignment] Object of type `Expr` is not assignable to attribute `call` of type `Call`
+src/jinja2/parser.py:1024:37: error[invalid-argument-type] Argument to bound method `extend` is incorrect: Expected `Iterable[Node]`, found `(Node & Top[list[Unknown]]) | list[Node]`
+src/jinja2/runtime.py:144:2: error[unresolved-attribute] Class `Mapping` has no attribute `register`
+src/jinja2/runtime.py:690:38: error[invalid-assignment] Object of type `(Unknown & ~(() -> object)) | bool | (((str | None, /) -> bool) & ~(() -> object))` is not assignable to `bool | None`
+src/jinja2/runtime.py:770:40: error[invalid-argument-type] Argument to bound method `_invoke` is incorrect: Expected `bool`, found `@Todo | bool | None`
+src/jinja2/runtime.py:948:14: error[invalid-return-type] Function always implicitly returns `None`, which is not assignable to return type `Never`
+src/jinja2/utils.py:431:2: error[unresolved-attribute] Class `MutableMapping` has no attribute `register`
+Found 21 diagnostics

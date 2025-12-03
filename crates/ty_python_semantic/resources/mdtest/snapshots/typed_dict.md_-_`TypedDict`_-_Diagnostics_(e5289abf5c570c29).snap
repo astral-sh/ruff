@@ -52,28 +52,40 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
 38 | 
 39 | def write_to_readonly_key(employee: Employee):
 40 |     employee["id"] = 42  # error: [invalid-assignment]
+41 | def write_to_non_existing_key_single_quotes(person: Person):
+42 |     # error: [invalid-key]
+43 |     person['naem'] = "Alice"  # fmt: skip
 ```
 
 # Diagnostics
 
 ```
-error[invalid-key]: Invalid key for TypedDict `Person`
+error[invalid-key]: Unknown key "naem" for TypedDict `Person`
   --> src/mdtest_snippet.py:8:5
    |
  7 | def access_invalid_literal_string_key(person: Person):
  8 |     person["naem"]  # error: [invalid-key]
-   |     ------ ^^^^^^ Unknown key "naem" - did you mean "name"?
+   |     ------ ^^^^^^ Did you mean "name"?
    |     |
    |     TypedDict `Person`
  9 |
 10 | NAME_KEY: Final = "naem"
    |
 info: rule `invalid-key` is enabled by default
+5  |     age: int | None
+6  | 
+7  | def access_invalid_literal_string_key(person: Person):
+   -     person["naem"]  # error: [invalid-key]
+8  +     person["name"]  # error: [invalid-key]
+9  | 
+10 | NAME_KEY: Final = "naem"
+11 | 
+note: This is an unsafe fix and may change runtime behavior
 
 ```
 
 ```
-error[invalid-key]: Invalid key for TypedDict `Person`
+error[invalid-key]: Unknown key "naem" for TypedDict `Person`
   --> src/mdtest_snippet.py:13:5
    |
 12 | def access_invalid_key(person: Person):
@@ -89,7 +101,7 @@ info: rule `invalid-key` is enabled by default
 ```
 
 ```
-error[invalid-key]: Invalid key for TypedDict `Person` of type `str`
+error[invalid-key]: TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`
   --> src/mdtest_snippet.py:16:12
    |
 15 | def access_with_str_key(person: Person, str_key: str):
@@ -130,23 +142,32 @@ info: rule `invalid-assignment` is enabled by default
 ```
 
 ```
-error[invalid-key]: Invalid key for TypedDict `Person`
+error[invalid-key]: Unknown key "naem" for TypedDict `Person`
   --> src/mdtest_snippet.py:22:5
    |
 21 | def write_to_non_existing_key(person: Person):
 22 |     person["naem"] = "Alice"  # error: [invalid-key]
-   |     ------ ^^^^^^ Unknown key "naem" - did you mean "name"?
+   |     ------ ^^^^^^ Did you mean "name"?
    |     |
    |     TypedDict `Person`
 23 |
 24 | def write_to_non_literal_string_key(person: Person, str_key: str):
    |
 info: rule `invalid-key` is enabled by default
+19 |     person["age"] = "42"  # error: [invalid-assignment]
+20 | 
+21 | def write_to_non_existing_key(person: Person):
+   -     person["naem"] = "Alice"  # error: [invalid-key]
+22 +     person["name"] = "Alice"  # error: [invalid-key]
+23 | 
+24 | def write_to_non_literal_string_key(person: Person, str_key: str):
+25 |     person[str_key] = "Alice"  # error: [invalid-key]
+note: This is an unsafe fix and may change runtime behavior
 
 ```
 
 ```
-error[invalid-key]: Cannot access `Person` with a key of type `str`. Only string literals are allowed as keys on TypedDicts.
+error[invalid-key]: TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`.
   --> src/mdtest_snippet.py:25:12
    |
 24 | def write_to_non_literal_string_key(person: Person, str_key: str):
@@ -160,7 +181,7 @@ info: rule `invalid-key` is enabled by default
 ```
 
 ```
-error[invalid-key]: Invalid key for TypedDict `Person`
+error[invalid-key]: Unknown key "unknown" for TypedDict `Person`
   --> src/mdtest_snippet.py:29:21
    |
 27 | def create_with_invalid_string_key():
@@ -178,7 +199,7 @@ info: rule `invalid-key` is enabled by default
 ```
 
 ```
-error[invalid-key]: Invalid key for TypedDict `Person`
+error[invalid-key]: Unknown key "unknown" for TypedDict `Person`
   --> src/mdtest_snippet.py:32:11
    |
 31 |     # error: [invalid-key]
@@ -199,6 +220,8 @@ error[invalid-assignment]: Cannot assign to key "id" on TypedDict `Employee`
    |     -------- ^^^^ key is marked read-only
    |     |
    |     TypedDict `Employee`
+41 | def write_to_non_existing_key_single_quotes(person: Person):
+42 |     # error: [invalid-key]
    |
 info: Item declaration
   --> src/mdtest_snippet.py:36:5
@@ -209,5 +232,26 @@ info: Item declaration
 37 |     name: str
    |
 info: rule `invalid-assignment` is enabled by default
+
+```
+
+```
+error[invalid-key]: Unknown key "naem" for TypedDict `Person`
+  --> src/mdtest_snippet.py:43:5
+   |
+41 | def write_to_non_existing_key_single_quotes(person: Person):
+42 |     # error: [invalid-key]
+43 |     person['naem'] = "Alice"  # fmt: skip
+   |     ------ ^^^^^^ Did you mean 'name'?
+   |     |
+   |     TypedDict `Person`
+   |
+info: rule `invalid-key` is enabled by default
+40 |     employee["id"] = 42  # error: [invalid-assignment]
+41 | def write_to_non_existing_key_single_quotes(person: Person):
+42 |     # error: [invalid-key]
+   -     person['naem'] = "Alice"  # fmt: skip
+43 +     person['name'] = "Alice"  # fmt: skip
+note: This is an unsafe fix and may change runtime behavior
 
 ```

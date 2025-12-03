@@ -12,8 +12,9 @@ pub use db::Db;
 pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 pub use module_name::{ModuleName, ModuleNameResolutionError};
 pub use module_resolver::{
-    Module, SearchPath, SearchPathValidationError, SearchPaths, all_modules, list_modules,
-    resolve_module, resolve_real_module, system_module_search_paths,
+    KnownModule, Module, SearchPath, SearchPathValidationError, SearchPaths, all_modules,
+    list_modules, resolve_module, resolve_real_module, resolve_real_shadowable_module,
+    system_module_search_paths,
 };
 pub use program::{
     Program, ProgramSettings, PythonVersionFileSource, PythonVersionSource,
@@ -25,6 +26,7 @@ pub use semantic_model::{
     Completion, HasDefinition, HasType, MemberDefinition, NameKind, SemanticModel,
 };
 pub use site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
+pub use suppression::create_suppression_fix;
 pub use types::DisplaySettings;
 pub use types::ide_support::{
     ImportAliasResolution, ResolvedDefinition, definitions_for_attribute, definitions_for_bin_op,

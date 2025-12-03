@@ -1,6 +1,6 @@
 use ruff_db::files::File;
 use ty_project::Db;
-use ty_python_semantic::{Module, all_modules};
+use ty_python_semantic::{Module, ModuleName, all_modules, resolve_real_shadowable_module};
 
 use crate::symbols::{QueryPattern, SymbolInfo, symbols_for_file_global_only};
 
@@ -8,13 +8,20 @@ use crate::symbols::{QueryPattern, SymbolInfo, symbols_for_file_global_only};
 ///
 /// Returns symbols from all files in the workspace and dependencies, filtered
 /// by the query.
-pub fn all_symbols<'db>(db: &'db dyn Db, query: &str) -> Vec<AllSymbolInfo<'db>> {
+pub fn all_symbols<'db>(
+    db: &'db dyn Db,
+    importing_from: File,
+    query: &QueryPattern,
+) -> Vec<AllSymbolInfo<'db>> {
     // If the query is empty, return immediately to avoid expensive file scanning
-    if query.is_empty() {
+    if query.will_match_everything() {
         return Vec::new();
     }
 
-    let query = QueryPattern::new(query);
+    let typing_extensions = ModuleName::new("typing_extensions").unwrap();
+    let is_typing_extensions_available = importing_from.is_stub(db)
+        || resolve_real_shadowable_module(db, &typing_extensions).is_some();
+
     let results = std::sync::Mutex::new(Vec::new());
     {
         let modules = all_modules(db);
@@ -29,6 +36,11 @@ pub fn all_symbols<'db>(db: &'db dyn Db, query: &str) -> Vec<AllSymbolInfo<'db>>
                 let Some(file) = module.file(&*db) else {
                     continue;
                 };
+                // TODO: also make it available in `TYPE_CHECKING` blocks
+                // (we'd need https://github.com/astral-sh/ty/issues/1553 to do this well)
+                if !is_typing_extensions_available && module.name(&*db) == &typing_extensions {
+                    continue;
+                }
                 s.spawn(move |_| {
                     for (_, symbol) in symbols_for_file_global_only(&*db, file).search(query) {
                         // It seems like we could do better here than
@@ -144,7 +156,7 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
 
     impl CursorTest {
         fn all_symbols(&self, query: &str) -> String {
-            let symbols = all_symbols(&self.db, query);
+            let symbols = all_symbols(&self.db, self.cursor.file, &QueryPattern::fuzzy(query));
 
             if symbols.is_empty() {
                 return "No symbols found".to_string();

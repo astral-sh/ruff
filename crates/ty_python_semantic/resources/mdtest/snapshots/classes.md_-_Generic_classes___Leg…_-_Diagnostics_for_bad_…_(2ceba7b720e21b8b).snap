@@ -1,0 +1,78 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: classes.md - Generic classes: Legacy syntax - Diagnostics for bad specializations
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.md
+---
+
+# Python source files
+
+## library.py
+
+```
+ 1 | from typing import TypeVar, Generic
+ 2 | 
+ 3 | T = TypeVar("T", bound=str)
+ 4 | U = TypeVar("U", int, bytes)
+ 5 | 
+ 6 | class Bounded(Generic[T]):
+ 7 |     x: T
+ 8 | 
+ 9 | class Constrained(Generic[U]):
+10 |     x: U
+```
+
+## main.py
+
+```
+1 | from library import Bounded, Constrained
+2 | 
+3 | x: Bounded[int]  # error: [invalid-type-arguments]
+4 | y: Constrained[str]  # error: [invalid-type-arguments]
+```
+
+# Diagnostics
+
+```
+error[invalid-type-arguments]: Type `int` is not assignable to upper bound `str` of type variable `T@Bounded`
+ --> src/main.py:3:12
+  |
+1 | from library import Bounded, Constrained
+2 |
+3 | x: Bounded[int]  # error: [invalid-type-arguments]
+  |            ^^^
+4 | y: Constrained[str]  # error: [invalid-type-arguments]
+  |
+ ::: src/library.py:3:1
+  |
+1 | from typing import TypeVar, Generic
+2 |
+3 | T = TypeVar("T", bound=str)
+  | - Type variable defined here
+4 | U = TypeVar("U", int, bytes)
+  |
+info: rule `invalid-type-arguments` is enabled by default
+
+```
+
+```
+error[invalid-type-arguments]: Type `str` does not satisfy constraints `int`, `bytes` of type variable `U@Constrained`
+ --> src/main.py:4:16
+  |
+3 | x: Bounded[int]  # error: [invalid-type-arguments]
+4 | y: Constrained[str]  # error: [invalid-type-arguments]
+  |                ^^^
+  |
+ ::: src/library.py:4:1
+  |
+3 | T = TypeVar("T", bound=str)
+4 | U = TypeVar("U", int, bytes)
+  | - Type variable defined here
+5 |
+6 | class Bounded(Generic[T]):
+  |
+info: rule `invalid-type-arguments` is enabled by default
+
+```

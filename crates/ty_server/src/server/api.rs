@@ -32,6 +32,9 @@ pub(super) fn request(req: server::Request) -> Task {
 
     match req.method.as_str() {
         requests::ExecuteCommand::METHOD => sync_request_task::<requests::ExecuteCommand>(req),
+        requests::CodeActionRequestHandler::METHOD => background_document_request_task::<
+            requests::CodeActionRequestHandler,
+        >(req, BackgroundSchedule::Worker),
         requests::DocumentDiagnosticRequestHandler::METHOD => background_document_request_task::<
             requests::DocumentDiagnosticRequestHandler,
         >(
@@ -146,6 +149,9 @@ pub(super) fn notification(notif: server::Notification) -> Task {
         }
         notifications::DidOpenNotebookHandler::METHOD => {
             sync_notification_task::<notifications::DidOpenNotebookHandler>(notif)
+        }
+        notifications::DidChangeNotebookHandler::METHOD => {
+            sync_notification_task::<notifications::DidChangeNotebookHandler>(notif)
         }
         notifications::DidCloseNotebookHandler::METHOD => {
             sync_notification_task::<notifications::DidCloseNotebookHandler>(notif)
@@ -273,8 +279,8 @@ where
             });
         };
 
-        let path = document.to_file_path();
-        let db = session.project_db(&path).clone();
+        let path = document.notebook_or_file_path();
+        let db = session.project_db(path).clone();
 
         Box::new(move |client| {
             let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
@@ -433,7 +439,7 @@ where
         .with_failure_code(server::ErrorCode::InternalError)
 }
 
-/// Sends back a response to the server, but only if the request wasn't cancelled.
+/// Sends back a response to the client, but only if the request wasn't cancelled.
 fn respond<Req>(
     id: &RequestId,
     result: Result<<<Req as RequestHandler>::RequestType as Request>::Result>,

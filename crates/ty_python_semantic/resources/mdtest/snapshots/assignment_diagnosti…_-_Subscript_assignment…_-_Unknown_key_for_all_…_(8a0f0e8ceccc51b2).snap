@@ -1,0 +1,73 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: assignment_diagnostics.md - Subscript assignment diagnostics - Unknown key for all elements of a union
+mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_diagnostics.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import TypedDict
+ 2 | 
+ 3 | class Person(TypedDict):
+ 4 |     name: str
+ 5 |     phone_number: str
+ 6 | 
+ 7 | class Animal(TypedDict):
+ 8 |     name: str
+ 9 |     legs: int
+10 | 
+11 | def _(being: Person | Animal) -> None:
+12 |     # error: [invalid-key]
+13 |     # error: [invalid-key]
+14 |     being["surname"] = "unknown"
+```
+
+# Diagnostics
+
+```
+error[invalid-key]: Unknown key "surname" for TypedDict `Person`
+  --> src/mdtest_snippet.py:14:5
+   |
+12 |     # error: [invalid-key]
+13 |     # error: [invalid-key]
+14 |     being["surname"] = "unknown"
+   |     ----- ^^^^^^^^^ Did you mean "name"?
+   |     |
+   |     TypedDict `Person` in union type `Person | Animal`
+   |
+info: rule `invalid-key` is enabled by default
+11 | def _(being: Person | Animal) -> None:
+12 |     # error: [invalid-key]
+13 |     # error: [invalid-key]
+   -     being["surname"] = "unknown"
+14 +     being["name"] = "unknown"
+note: This is an unsafe fix and may change runtime behavior
+
+```
+
+```
+error[invalid-key]: Unknown key "surname" for TypedDict `Animal`
+  --> src/mdtest_snippet.py:14:5
+   |
+12 |     # error: [invalid-key]
+13 |     # error: [invalid-key]
+14 |     being["surname"] = "unknown"
+   |     ----- ^^^^^^^^^ Did you mean "name"?
+   |     |
+   |     TypedDict `Animal` in union type `Person | Animal`
+   |
+info: rule `invalid-key` is enabled by default
+11 | def _(being: Person | Animal) -> None:
+12 |     # error: [invalid-key]
+13 |     # error: [invalid-key]
+   -     being["surname"] = "unknown"
+14 +     being["name"] = "unknown"
+note: This is an unsafe fix and may change runtime behavior
+
+```

@@ -303,15 +303,24 @@ info: rule `duplicate-base` is enabled by default
 ```
 
 ```
-info[unused-ignore-comment]
+info[unused-ignore-comment]: Unused blanket `type: ignore` directive
   --> src/mdtest_snippet.py:72:9
    |
 70 |     A,
 71 |     # error: [unused-ignore-comment]
 72 |     A,  # type: ignore[duplicate-base]
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Unused blanket `type: ignore` directive
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 73 | ): ...
    |
+help: Remove the unused suppression comment
+69 | class D(
+70 |     A,
+71 |     # error: [unused-ignore-comment]
+   -     A,  # type: ignore[duplicate-base]
+72 +     A,
+73 | ): ...
+74 | 
+75 | # error: [duplicate-base]
 
 ```
 
@@ -346,15 +355,23 @@ info: rule `duplicate-base` is enabled by default
 ```
 
 ```
-info[unused-ignore-comment]
+info[unused-ignore-comment]: Unused blanket `type: ignore` directive
   --> src/mdtest_snippet.py:81:13
    |
 79 | ):
 80 |     # error: [unused-ignore-comment]
 81 |     x: int  # type: ignore[duplicate-base]
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Unused blanket `type: ignore` directive
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 82 |
 83 | # fmt: on
    |
+help: Remove the unused suppression comment
+78 |     A
+79 | ):
+80 |     # error: [unused-ignore-comment]
+   -     x: int  # type: ignore[duplicate-base]
+81 +     x: int
+82 | 
+83 | # fmt: on
 
 ```

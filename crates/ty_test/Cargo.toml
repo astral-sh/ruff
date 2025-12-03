@@ -12,6 +12,7 @@ license.workspace = true
 
 [dependencies]
 ruff_db = { workspace = true, features = ["os", "testing"] }
+ruff_diagnostics = { workspace = true }
 ruff_index = { workspace = true }
 ruff_notebook = { workspace = true }
 ruff_python_trivia = { workspace = true }

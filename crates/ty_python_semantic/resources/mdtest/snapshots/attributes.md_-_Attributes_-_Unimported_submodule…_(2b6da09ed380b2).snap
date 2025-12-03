@@ -1,0 +1,68 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: attributes.md - Attributes - Unimported submodule incorrectly accessed as attribute
+mdtest path: crates/ty_python_semantic/resources/mdtest/attributes.md
+---
+
+# Python source files
+
+## foo/__init__.py
+
+```
+```
+
+## foo/bar.py
+
+```
+```
+
+## baz/bar.py
+
+```
+```
+
+## main.py
+
+```
+1 | import foo
+2 | import baz
+3 | 
+4 | # error: [possibly-missing-attribute]
+5 | reveal_type(foo.bar)  # revealed: Unknown
+6 | # error: [possibly-missing-attribute]
+7 | reveal_type(baz.bar)  # revealed: Unknown
+```
+
+# Diagnostics
+
+```
+warning[possibly-missing-attribute]: Submodule `bar` may not be available as an attribute on module `foo`
+ --> src/main.py:5:13
+  |
+4 | # error: [possibly-missing-attribute]
+5 | reveal_type(foo.bar)  # revealed: Unknown
+  |             ^^^^^^^
+6 | # error: [possibly-missing-attribute]
+7 | reveal_type(baz.bar)  # revealed: Unknown
+  |
+help: Consider explicitly importing `foo.bar`
+info: rule `possibly-missing-attribute` is enabled by default
+
+```
+
+```
+warning[possibly-missing-attribute]: Submodule `bar` may not be available as an attribute on module `baz`
+ --> src/main.py:7:13
+  |
+5 | reveal_type(foo.bar)  # revealed: Unknown
+6 | # error: [possibly-missing-attribute]
+7 | reveal_type(baz.bar)  # revealed: Unknown
+  |             ^^^^^^^
+  |
+help: Consider explicitly importing `baz.bar`
+info: rule `possibly-missing-attribute` is enabled by default
+
+```

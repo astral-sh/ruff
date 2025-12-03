@@ -1318,9 +1318,27 @@ impl Truthiness {
                         if arguments.is_empty() {
                             // Ex) `list()`
                             Self::Falsey
-                        } else if arguments.args.len() == 1 && arguments.keywords.is_empty() {
+                        } else if let [argument] = &*arguments.args
+                            && arguments.keywords.is_empty()
+                        {
                             // Ex) `list([1, 2, 3])`
-                            Self::from_expr(&arguments.args[0], is_builtin)
+                            match argument {
+                                // Return Unknown for types with definite truthiness that might
+                                // result in empty iterables (t-strings and generators) or will
+                                // raise a type error (non-iterable types like numbers, booleans,
+                                // None, etc.).
+                                Expr::NumberLiteral(_)
+                                | Expr::BooleanLiteral(_)
+                                | Expr::NoneLiteral(_)
+                                | Expr::EllipsisLiteral(_)
+                                | Expr::TString(_)
+                                | Expr::Lambda(_)
+                                | Expr::Generator(_) => Self::Unknown,
+                                // Recurse for all other types - collections, comprehensions, variables, etc.
+                                // StringLiteral, FString, and BytesLiteral recurse because Self::from_expr
+                                // correctly handles their truthiness (checking if empty or not).
+                                _ => Self::from_expr(argument, is_builtin),
+                            }
                         } else {
                             Self::Unknown
                         }

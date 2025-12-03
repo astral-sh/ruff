@@ -361,6 +361,22 @@ and [LSP-ruff](https://github.com/sublimelsp/LSP-ruff) package.
 
 ## PyCharm
 
+Starting with version 2025.3, PyCharm supports Ruff out of the box:
+
+1. Go to **Python | Tools | Ruff** in the Settings dialog.
+
+1. Select the **Enable** checkbox.
+
+1. In the Execution mode setting, select how PyCharm should search for the executable:
+
+    **Interpreter** mode: PyCharm searches for an executable installed in your interpreter. To install the Ruff package for the selected interpreter, click _Install Ruff_.
+
+    **Path** mode: PyCharm searches for an executable in `$PATH`. If the executable is not found, you can specify the path by clicking the Browse... icon.
+
+1. Select which options should be enabled.
+
+For more information, refer to [PyCharm documentation](https://www.jetbrains.com/help/pycharm/2025.3/lsp-tools.html#ruff).
+
 ### Via External Tool
 
 Ruff can be installed as an [External Tool](https://www.jetbrains.com/help/pycharm/configuring-third-party-tools.html)
@@ -384,11 +400,13 @@ Ruff can be utilized as a language server via [`Eglot`](https://github.com/joaot
 To enable Ruff with automatic formatting on save, use the following configuration:
 
 ```elisp
-(add-hook 'python-mode-hook 'eglot-ensure)
 (with-eval-after-load 'eglot
   (add-to-list 'eglot-server-programs
-               '(python-mode . ("ruff" "server")))
-  (add-hook 'after-save-hook 'eglot-format))
+               '(python-base-mode . ("ruff" "server"))))
+(add-hook 'python-base-mode-hook
+          (lambda ()
+            (eglot-ensure)
+            (add-hook 'after-save-hook 'eglot-format nil t)))
 ```
 
 Ruff is available as [`flymake-ruff`](https://melpa.org/#/flymake-ruff) on MELPA:

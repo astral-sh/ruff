@@ -26,6 +26,9 @@ pub(crate) fn convert_symbol_kind(kind: ty_ide::SymbolKind) -> SymbolKind {
 }
 
 /// Convert a `ty_ide` `SymbolInfo` to LSP `SymbolInformation`
+///
+/// Returns `None` if the symbol's range cannot be converted to a location
+/// (e.g., if the file cannot be converted to a URL).
 pub(crate) fn convert_to_lsp_symbol_information(
     db: &dyn Db,
     file: ruff_db::files::File,
@@ -33,12 +36,10 @@ pub(crate) fn convert_to_lsp_symbol_information(
     encoding: PositionEncoding,
 ) -> Option<SymbolInformation> {
     let symbol_kind = convert_symbol_kind(symbol.kind);
-
     let location = symbol
         .full_range
-        .as_lsp_range(db, file, encoding)
+        .to_lsp_range(db, file, encoding)?
         .to_location()?;
-
     Some(SymbolInformation {
         name: symbol.name.into_owned(),
         kind: symbol_kind,

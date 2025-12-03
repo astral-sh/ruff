@@ -1,0 +1,331 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: liskov.md - The Liskov Substitution Principle - Method parameters
+mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
+---
+
+# Python source files
+
+## mdtest_snippet.pyi
+
+```
+ 1 | class Super:
+ 2 |     def method(self, x: int, /): ...
+ 3 | 
+ 4 | class Sub1(Super):
+ 5 |     def method(self, x: int, /): ...  # fine
+ 6 | 
+ 7 | class Sub2(Super):
+ 8 |     def method(self, x: object, /): ...  # fine: `method` still accepts any argument of type `int`
+ 9 | 
+10 | class Sub4(Super):
+11 |     def method(self, x: int | str, /): ...  # fine
+12 | 
+13 | class Sub5(Super):
+14 |     def method(self, x: int): ...  # fine: `x` can still be passed positionally
+15 | 
+16 | class Sub6(Super):
+17 |     # fine: `method()` can still be called with just a single argument
+18 |     def method(self, x: int, *args): ...
+19 | 
+20 | class Sub7(Super):
+21 |     def method(self, x: int, **kwargs): ...  # fine
+22 | 
+23 | class Sub8(Super):
+24 |     def method(self, x: int, *args, **kwargs): ...  # fine
+25 | 
+26 | class Sub9(Super):
+27 |     def method(self, x: int, extra_positional_arg=42, /): ... # fine
+28 | 
+29 | class Sub10(Super):
+30 |     def method(self, x: int, extra_pos_or_kw_arg=42): ...  # fine
+31 | 
+32 | class Sub11(Super):
+33 |     def method(self, x: int, *, extra_kw_only_arg=42): ...  # fine
+34 | 
+35 | class Sub12(Super):
+36 |     # Some calls permitted by the superclass are now no longer allowed
+37 |     # (the method can no longer be passed any arguments!)
+38 |     def method(self, /): ...  # error: [invalid-method-override]
+39 | 
+40 | class Sub13(Super):
+41 |     # Some calls permitted by the superclass are now no longer allowed
+42 |     # (the method can no longer be passed exactly one argument!)
+43 |     def method(self, x, y, /): ...  # error: [invalid-method-override]
+44 | 
+45 | class Sub14(Super):
+46 |     # Some calls permitted by the superclass are now no longer allowed
+47 |     # (x can no longer be passed positionally!)
+48 |     def method(self, /, *, x): ...  # error: [invalid-method-override]
+49 | 
+50 | class Sub15(Super):
+51 |     # Some calls permitted by the superclass are now no longer allowed
+52 |     # (x can no longer be passed any integer -- it now requires a bool!)
+53 |     def method(self, x: bool, /): ...  # error: [invalid-method-override]
+54 | 
+55 | class Super2:
+56 |     def method2(self, x): ...
+57 | 
+58 | class Sub16(Super2):
+59 |     def method2(self, x, /): ...  # error: [invalid-method-override]
+60 | 
+61 | class Sub17(Super2):
+62 |     def method2(self, *, x): ...  # error: [invalid-method-override]
+63 | 
+64 | class Super3:
+65 |     def method3(self, *, x): ...
+66 | 
+67 | class Sub18(Super3):
+68 |     def method3(self, x): ...  # fine: `x` can still be used as a keyword argument
+69 | 
+70 | class Sub19(Super3):
+71 |     def method3(self, x, /): ...  # error: [invalid-method-override]
+72 | 
+73 | class Super4:
+74 |     def method(self, *args: int, **kwargs: str): ...
+75 | 
+76 | class Sub20(Super4):
+77 |     def method(self, *args: object, **kwargs: object): ...  # fine
+78 | 
+79 | class Sub21(Super4):
+80 |     def method(self, *args): ...  # error: [invalid-method-override]
+81 | 
+82 | class Sub22(Super4):
+83 |     def method(self, **kwargs): ...  # error: [invalid-method-override]
+84 | 
+85 | class Sub23(Super4):
+86 |     def method(self, x, *args, y, **kwargs): ...  # error: [invalid-method-override]
+```
+
+# Diagnostics
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:38:9
+   |
+36 |     # Some calls permitted by the superclass are now no longer allowed
+37 |     # (the method can no longer be passed any arguments!)
+38 |     def method(self, /): ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
+39 |
+40 | class Sub13(Super):
+   |
+  ::: src/mdtest_snippet.pyi:2:9
+   |
+ 1 | class Super:
+ 2 |     def method(self, x: int, /): ...
+   |         ----------------------- `Super.method` defined here
+ 3 |
+ 4 | class Sub1(Super):
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:43:9
+   |
+41 |     # Some calls permitted by the superclass are now no longer allowed
+42 |     # (the method can no longer be passed exactly one argument!)
+43 |     def method(self, x, y, /): ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
+44 |
+45 | class Sub14(Super):
+   |
+  ::: src/mdtest_snippet.pyi:2:9
+   |
+ 1 | class Super:
+ 2 |     def method(self, x: int, /): ...
+   |         ----------------------- `Super.method` defined here
+ 3 |
+ 4 | class Sub1(Super):
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:48:9
+   |
+46 |     # Some calls permitted by the superclass are now no longer allowed
+47 |     # (x can no longer be passed positionally!)
+48 |     def method(self, /, *, x): ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
+49 |
+50 | class Sub15(Super):
+   |
+  ::: src/mdtest_snippet.pyi:2:9
+   |
+ 1 | class Super:
+ 2 |     def method(self, x: int, /): ...
+   |         ----------------------- `Super.method` defined here
+ 3 |
+ 4 | class Sub1(Super):
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:53:9
+   |
+51 |     # Some calls permitted by the superclass are now no longer allowed
+52 |     # (x can no longer be passed any integer -- it now requires a bool!)
+53 |     def method(self, x: bool, /): ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
+54 |
+55 | class Super2:
+   |
+  ::: src/mdtest_snippet.pyi:2:9
+   |
+ 1 | class Super:
+ 2 |     def method(self, x: int, /): ...
+   |         ----------------------- `Super.method` defined here
+ 3 |
+ 4 | class Sub1(Super):
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method2`
+  --> src/mdtest_snippet.pyi:56:9
+   |
+55 | class Super2:
+56 |     def method2(self, x): ...
+   |         ---------------- `Super2.method2` defined here
+57 |
+58 | class Sub16(Super2):
+59 |     def method2(self, x, /): ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super2.method2`
+60 |
+61 | class Sub17(Super2):
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method2`
+  --> src/mdtest_snippet.pyi:62:9
+   |
+61 | class Sub17(Super2):
+62 |     def method2(self, *, x): ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super2.method2`
+63 |
+64 | class Super3:
+   |
+  ::: src/mdtest_snippet.pyi:56:9
+   |
+55 | class Super2:
+56 |     def method2(self, x): ...
+   |         ---------------- `Super2.method2` defined here
+57 |
+58 | class Sub16(Super2):
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method3`
+  --> src/mdtest_snippet.pyi:71:9
+   |
+70 | class Sub19(Super3):
+71 |     def method3(self, x, /): ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super3.method3`
+72 |
+73 | class Super4:
+   |
+  ::: src/mdtest_snippet.pyi:65:9
+   |
+64 | class Super3:
+65 |     def method3(self, *, x): ...
+   |         ------------------- `Super3.method3` defined here
+66 |
+67 | class Sub18(Super3):
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:80:9
+   |
+79 | class Sub21(Super4):
+80 |     def method(self, *args): ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super4.method`
+81 |
+82 | class Sub22(Super4):
+   |
+  ::: src/mdtest_snippet.pyi:74:9
+   |
+73 | class Super4:
+74 |     def method(self, *args: int, **kwargs: str): ...
+   |         --------------------------------------- `Super4.method` defined here
+75 |
+76 | class Sub20(Super4):
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:83:9
+   |
+82 | class Sub22(Super4):
+83 |     def method(self, **kwargs): ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super4.method`
+84 |
+85 | class Sub23(Super4):
+   |
+  ::: src/mdtest_snippet.pyi:74:9
+   |
+73 | class Super4:
+74 |     def method(self, *args: int, **kwargs: str): ...
+   |         --------------------------------------- `Super4.method` defined here
+75 |
+76 | class Sub20(Super4):
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:86:9
+   |
+85 | class Sub23(Super4):
+86 |     def method(self, x, *args, y, **kwargs): ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super4.method`
+   |
+  ::: src/mdtest_snippet.pyi:74:9
+   |
+73 | class Super4:
+74 |     def method(self, *args: int, **kwargs: str): ...
+   |         --------------------------------------- `Super4.method` defined here
+75 |
+76 | class Sub20(Super4):
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```

@@ -32,6 +32,43 @@ reveal_type(p.x)  # revealed: Unknown | int
 reveal_type(p.y)  # revealed: Unknown | int
 ```
 
+## Self-referential bare type alias
+
+```toml
+[environment]
+python-version = "3.12"  # typing.TypeAliasType
+```
+
+```py
+from typing import Union, TypeAliasType, Sequence, Mapping
+
+A = list["A" | None]
+
+def f(x: A):
+    # TODO: should be `list[A | None]`?
+    reveal_type(x)  # revealed: list[Divergent]
+    # TODO: should be `A | None`?
+    reveal_type(x[0])  # revealed: Divergent
+
+JSONPrimitive = Union[str, int, float, bool, None]
+JSONValue = TypeAliasType("JSONValue", 'Union[JSONPrimitive, Sequence["JSONValue"], Mapping[str, "JSONValue"]]')
+
+def _(x: JSONValue):
+    # TODO: should be `JSONValue`
+    reveal_type(x)  # revealed: Divergent
+```
+
+## Self-referential legacy type variables
+
+```py
+from typing import Generic, TypeVar
+
+B = TypeVar("B", bound="Base")
+
+class Base(Generic[B]):
+    pass
+```
+
 ## Parameter default values
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/1402>. When a parameter has a

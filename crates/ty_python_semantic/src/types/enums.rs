@@ -6,7 +6,7 @@ use crate::{
     place::{Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
-        ClassLiteral, DynamicType, EnumLiteralType, KnownClass, MemberLookupPolicy,
+        ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, MemberLookupPolicy,
         StringLiteralType, Type, TypeQualifiers,
     },
 };
@@ -68,9 +68,6 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
-    let is_str_enum =
-        Type::ClassLiteral(class).is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db));
-
     let scope_id = class.body_scope(db);
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
@@ -80,7 +77,7 @@ pub(crate) fn enum_metadata<'db>(
 
     let ignored_names: Option<Vec<&str>> = if let Some(ignore) = table.symbol_id("_ignore_") {
         let ignore_bindings = use_def_map.all_reachable_symbol_bindings(ignore);
-        let ignore_place = place_from_bindings(db, ignore_bindings);
+        let ignore_place = place_from_bindings(db, ignore_bindings).place;
 
         match ignore_place {
             Place::Defined(Type::StringLiteral(ignored_names), _, _) => {
@@ -114,7 +111,7 @@ pub(crate) fn enum_metadata<'db>(
                 return None;
             }
 
-            let inferred = place_from_bindings(db, bindings);
+            let inferred = place_from_bindings(db, bindings).place;
 
             let value_ty = match inferred {
                 Place::Undefined => {
@@ -141,14 +138,48 @@ pub(crate) fn enum_metadata<'db>(
                             // enum.auto
                             Some(KnownClass::Auto) => {
                                 auto_counter += 1;
-                                Some(if is_str_enum {
+
+                                // `StrEnum`s have different `auto()` behaviour to enums inheriting from `(str, Enum)`
+                                let auto_value_ty = if Type::ClassLiteral(class)
+                                    .is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db))
+                                {
                                     Type::StringLiteral(StringLiteralType::new(
                                         db,
                                         name.to_lowercase().as_str(),
                                     ))
                                 } else {
-                                    Type::IntLiteral(auto_counter)
-                                })
+                                    let custom_mixins: smallvec::SmallVec<[Option<KnownClass>; 1]> =
+                                        class
+                                            .iter_mro(db, None)
+                                            .skip(1)
+                                            .filter_map(ClassBase::into_class)
+                                            .filter(|class| {
+                                                !Type::from(*class).is_subtype_of(
+                                                    db,
+                                                    KnownClass::Enum.to_subclass_of(db),
+                                                )
+                                            })
+                                            .map(|class| class.known(db))
+                                            .filter(|class| {
+                                                !matches!(class, Some(KnownClass::Object))
+                                            })
+                                            .collect();
+
+                                    // `IntEnum`s have the same `auto()` behaviour to enums inheriting from `(int, Enum)`,
+                                    // and `IntEnum`s also have `int` in their MROs, so both cases are handled here.
+                                    //
+                                    // In general, the `auto()` behaviour for enums with non-`int` mixins is hard to predict,
+                                    // so we fall back to `Any` in those cases.
+                                    if matches!(
+                                        custom_mixins.as_slice(),
+                                        [] | [Some(KnownClass::Int)]
+                                    ) {
+                                        Type::IntLiteral(auto_counter)
+                                    } else {
+                                        Type::any()
+                                    }
+                                };
+                                Some(auto_value_ty)
                             }
 
                             _ => None,

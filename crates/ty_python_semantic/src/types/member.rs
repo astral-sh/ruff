@@ -8,7 +8,7 @@ use crate::types::Type;
 
 /// The return type of certain member-lookup operations. Contains information
 /// about the type, type qualifiers, boundness/declaredness.
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize, Default)]
 pub(super) struct Member<'db> {
     /// Type, qualifiers, and boundness information of this member
     pub(super) inner: PlaceAndQualifiers<'db>,
@@ -75,7 +75,7 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
                 // Otherwise, we need to check if the symbol has bindings
                 let use_def = use_def_map(db, scope);
                 let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                let inferred = place_from_bindings(db, bindings);
+                let inferred = place_from_bindings(db, bindings).place;
 
                 // TODO: we should not need to calculate inferred type second time. This is a temporary
                 // solution until the notion of Boundness and Declaredness is split. See #16036, #16264

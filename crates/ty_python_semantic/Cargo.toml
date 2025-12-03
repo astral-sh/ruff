@@ -13,6 +13,7 @@ license = { workspace = true }
 [dependencies]
 ruff_db = { workspace = true }
 ruff_annotate_snippets = { workspace = true }
+ruff_diagnostics = { workspace = true }
 ruff_index = { workspace = true, features = ["salsa"] }
 ruff_macros = { workspace = true }
 ruff_memory_usage = { workspace = true }
@@ -32,7 +33,7 @@ camino = { workspace = true }
 colored = { workspace = true }
 compact_str = { workspace = true }
 drop_bomb = { workspace = true }
-get-size2 = { workspace = true }
+get-size2 = { workspace = true, features = ["indexmap"]}
 indexmap = { workspace = true }
 itertools = { workspace = true }
 ordermap = { workspace = true }

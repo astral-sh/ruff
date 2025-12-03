@@ -66,7 +66,7 @@ synthesized `Protocol`s that cannot be upcast to, or interpreted as, a non-`obje
 
 ```py
 import types
-from typing_extensions import Callable, TypeIs, Literal, TypedDict
+from typing_extensions import Callable, TypeIs, Literal, NewType, TypedDict
 
 def f(): ...
 
@@ -80,6 +80,8 @@ type Alias = int
 class SomeTypedDict(TypedDict):
     x: int
     y: bytes
+
+N = NewType("N", int)
 
 # revealed: <super: <class 'object'>, FunctionType>
 reveal_type(super(object, f))
@@ -95,6 +97,8 @@ reveal_type(super(object, Alias))
 reveal_type(super(object, Foo().method))
 # revealed: <super: <class 'object'>, property>
 reveal_type(super(object, Foo.some_property))
+# revealed: <super: <class 'object'>, int>
+reveal_type(super(object, N(42)))
 
 def g(x: object) -> TypeIs[list[object]]:
     return isinstance(x, list)
@@ -206,9 +210,7 @@ class BuilderMeta2(type):
     ) -> BuilderMeta2:
         # revealed: <super: <class 'BuilderMeta2'>, <class 'BuilderMeta2'>>
         s = reveal_type(super())
-        # TODO: should be `BuilderMeta2` (needs https://github.com/astral-sh/ty/issues/501)
-        # revealed:  Unknown
-        return reveal_type(s.__new__(cls, name, bases, dct))
+        return reveal_type(s.__new__(cls, name, bases, dct))  # revealed: BuilderMeta2
 
 class Foo[T]:
     x: T
@@ -391,6 +393,14 @@ class E(Enum):
 reveal_type(super(E, E.X))  # revealed: <super: <class 'E'>, E>
 ```
 
+## `type[Self]`
+
+```py
+class Foo:
+    def method(self):
+        super(self.__class__, self)
+```
+
 ## Descriptor Behavior with Super
 
 Accessing attributes through `super` still invokes descriptor protocol. However, the behavior can
@@ -497,8 +507,8 @@ class A[T]:
         return a
 
 class B[T](A[T]):
-    def f(self, b: T) -> T:
-        return super().f(b)
+    def f(self, a: T) -> T:
+        return super().f(a)
 ```
 
 ## Invalid Usages

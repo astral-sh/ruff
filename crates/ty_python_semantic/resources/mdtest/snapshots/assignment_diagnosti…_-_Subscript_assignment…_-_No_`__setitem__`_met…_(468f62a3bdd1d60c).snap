@@ -1,0 +1,36 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: assignment_diagnostics.md - Subscript assignment diagnostics - No `__setitem__` method
+mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_diagnostics.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class ReadOnlyDict:
+2 |     def __getitem__(self, key: str) -> int:
+3 |         return 42
+4 | 
+5 | config = ReadOnlyDict()
+6 | config["retries"] = 3  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Cannot assign to a subscript on an object of type `ReadOnlyDict`
+ --> src/mdtest_snippet.py:6:1
+  |
+5 | config = ReadOnlyDict()
+6 | config["retries"] = 3  # error: [invalid-assignment]
+  | ^^^^^^^^^^^^^^^^^
+  |
+help: Consider adding a `__setitem__` method to `ReadOnlyDict`.
+info: rule `invalid-assignment` is enabled by default
+
+```

@@ -20,13 +20,14 @@ use rustc_hash::FxHashMap;
 
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
+use ruff_db::source::source_text;
 use ruff_diagnostics::Edit;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_importer::Insertion;
-use ruff_python_parser::{Parsed, Tokens};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_project::Db;
 use ty_python_semantic::semantic_index::definition::DefinitionKind;
@@ -75,7 +76,8 @@ impl<'a> Importer<'a> {
         source: &'a str,
         parsed: &'a ParsedModuleRef,
     ) -> Self {
-        let imports = TopLevelImports::find(parsed);
+        let imports = TopLevelImports::find(parsed.syntax());
+
         Self {
             db,
             file,
@@ -145,10 +147,14 @@ impl<'a> Importer<'a> {
         let request = request.avoid_conflicts(self.db, self.file, members);
         let mut symbol_text: Box<str> = request.member.into();
         let Some(response) = self.find(&request, members.at) else {
-            let insertion = if let Some(future) = self.find_last_future_import() {
+            let insertion = if let Some(future) = self.find_last_future_import(members.at) {
                 Insertion::end_of_statement(future.stmt, self.source, self.stylist)
             } else {
-                Insertion::start_of_file(self.parsed.suite(), self.source, self.stylist)
+                let range = source_text(self.db, self.file)
+                    .as_notebook()
+                    .and_then(|notebook| notebook.cell_offsets().containing_range(members.at));
+
+                Insertion::start_of_file(self.parsed.suite(), self.source, self.stylist, range)
             };
             let import = insertion.into_edit(&request.to_string());
             if matches!(request.style, ImportStyle::Import) {
@@ -209,6 +215,9 @@ impl<'a> Importer<'a> {
         available_at: TextSize,
     ) -> Option<ImportResponse<'importer, 'a>> {
         let mut choice = None;
+        let source = source_text(self.db, self.file);
+        let notebook = source.as_notebook();
+
         for import in &self.imports {
             // If the import statement comes after the spot where we
             // need the symbol, then we conservatively assume that
@@ -226,7 +235,22 @@ impl<'a> Importer<'a> {
             if import.stmt.start() >= available_at {
                 return choice;
             }
+
             if let Some(response) = import.satisfies(self.db, self.file, request) {
+                let partial = matches!(response.kind, ImportResponseKind::Partial { .. });
+
+                // The LSP doesn't support edits across cell boundaries.
+                // Skip over imports that only partially satisfy the import
+                // because they would require changes to the import (across cell boundaries).
+                if partial
+                    && let Some(notebook) = notebook
+                    && notebook
+                        .cell_offsets()
+                        .has_cell_boundary(TextRange::new(import.stmt.start(), available_at))
+                {
+                    continue;
+                }
+
                 if choice
                     .as_ref()
                     .is_none_or(|c| !c.kind.is_prioritized_over(&response.kind))
@@ -247,9 +271,21 @@ impl<'a> Importer<'a> {
     }
 
     /// Find the last `from __future__` import statement in the AST.
-    fn find_last_future_import(&self) -> Option<&'a AstImport> {
+    fn find_last_future_import(&self, at: TextSize) -> Option<&'a AstImport> {
+        let source = source_text(self.db, self.file);
+        let notebook = source.as_notebook();
+
         self.imports
             .iter()
+            .take_while(|import| import.stmt.start() <= at)
+            // Skip over imports from other cells.
+            .skip_while(|import| {
+                notebook.is_some_and(|notebook| {
+                    notebook
+                        .cell_offsets()
+                        .has_cell_boundary(TextRange::new(import.stmt.start(), at))
+                })
+            })
             .take_while(|import| {
                 import
                     .stmt
@@ -291,9 +327,7 @@ impl<'ast> MembersInScope<'ast> {
             .members_in_scope_at(node)
             .into_iter()
             .map(|(name, memberdef)| {
-                let Some(def) = memberdef.definition else {
-                    return (name, MemberInScope::other(memberdef.ty));
-                };
+                let def = memberdef.first_reachable_definition;
                 let kind = match *def.kind(db) {
                     DefinitionKind::Import(ref kind) => {
                         MemberImportKind::Imported(AstImportKind::Import(kind.import(parsed)))
@@ -517,6 +551,16 @@ impl<'a> ImportRequest<'a> {
         }
     }
 
+    /// Causes this request to become a command. This will force the
+    /// requested import style, even if another style would be more
+    /// appropriate generally.
+    pub(crate) fn force(mut self) -> Self {
+        Self {
+            force_style: true,
+            ..self
+        }
+    }
+
     /// Attempts to change the import request style so that the chances
     /// of an import conflict are minimized (although not always reduced
     /// to zero).
@@ -703,9 +747,9 @@ struct TopLevelImports<'ast> {
 
 impl<'ast> TopLevelImports<'ast> {
     /// Find all top-level imports from the given AST of a Python module.
-    fn find(parsed: &'ast Parsed<ast::ModModule>) -> Vec<AstImport<'ast>> {
+    fn find(module: &'ast ast::ModModule) -> Vec<AstImport<'ast>> {
         let mut visitor = TopLevelImports::default();
-        visitor.visit_body(parsed.suite());
+        visitor.visit_body(&module.body);
         visitor.imports
     }
 }
@@ -1845,13 +1889,13 @@ else:
         "#);
         assert_snapshot!(
             test.import_from("foo", "MAGIC"), @r#"
-        import foo
+        from foo import MAGIC
         if os.getenv("WHATEVER"):
             from foo import MAGIC
         else:
             from bar import MAGIC
 
-        (foo.MAGIC)
+        (MAGIC)
         "#);
     }
 
@@ -2062,13 +2106,13 @@ except ImportError:
         ");
         assert_snapshot!(
             test.import_from("foo", "MAGIC"), @r"
-        import foo
+        from foo import MAGIC
         try:
             from foo import MAGIC
         except ImportError:
             from bar import MAGIC
 
-        (foo.MAGIC)
+        (MAGIC)
         ");
     }
 

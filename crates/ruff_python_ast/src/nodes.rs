@@ -773,10 +773,14 @@ pub trait StringFlags: Copy {
     }
 
     /// The total length of the string's closer.
-    /// This is always equal to `self.quote_len()`,
-    /// but is provided here for symmetry with the `opener_len()` method.
+    /// This is always equal to `self.quote_len()`, except when the string is unclosed,
+    /// in which case the length is zero.
     fn closer_len(self) -> TextSize {
-        self.quote_len()
+        if self.is_unclosed() {
+            TextSize::default()
+        } else {
+            self.quote_len()
+        }
     }
 
     fn as_any_string_flags(self) -> AnyStringFlags {
@@ -3267,6 +3271,13 @@ impl<'a> ArgOrKeyword<'a> {
         match self {
             ArgOrKeyword::Arg(argument) => argument,
             ArgOrKeyword::Keyword(keyword) => &keyword.value,
+        }
+    }
+
+    pub const fn is_variadic(self) -> bool {
+        match self {
+            ArgOrKeyword::Arg(expr) => expr.is_starred_expr(),
+            ArgOrKeyword::Keyword(keyword) => keyword.arg.is_none(),
         }
     }
 }

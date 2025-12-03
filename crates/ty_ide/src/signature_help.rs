@@ -7,12 +7,12 @@
 //! and overloads.
 
 use crate::docstring::Docstring;
-use crate::goto::DefinitionsOrTargets;
+use crate::goto::Definitions;
 use crate::{Db, find_node::covering_node};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::SemanticModel;
@@ -74,7 +74,7 @@ pub fn signature_help(db: &dyn Db, file: File, offset: TextSize) -> Option<Signa
 
     // Get signature details from the semantic analyzer.
     let signature_details: Vec<CallSignatureDetails<'_>> =
-        call_signature_details(db, &model, call_expr);
+        call_signature_details(&model, call_expr);
 
     if signature_details.is_empty() {
         return None;
@@ -214,8 +214,7 @@ fn get_callable_documentation(
     db: &dyn crate::Db,
     definition: Option<Definition>,
 ) -> Option<Docstring> {
-    DefinitionsOrTargets::Definitions(vec![ResolvedDefinition::Definition(definition?)])
-        .docstring(db)
+    Definitions(vec![ResolvedDefinition::Definition(definition?)]).docstring(db)
 }
 
 /// Create `ParameterDetails` objects from parameter label offsets.
@@ -382,7 +381,7 @@ mod tests {
             f = func_a
         else:
             f = func_b
-        
+
         f(<CURSOR>
         "#,
         );
@@ -427,10 +426,10 @@ mod tests {
 
         @overload
         def process(value: int) -> str: ...
-        
+
         @overload
         def process(value: str) -> int: ...
-        
+
         def process(value):
             if isinstance(value, int):
                 return str(value)
@@ -827,10 +826,10 @@ def ab(a: int, *, c: int):
             r#"
         class Point:
             """A simple point class representing a 2D coordinate."""
-            
+
             def __init__(self, x: int, y: int):
                 """Initialize a point with x and y coordinates.
-                
+
                 Args:
                     x: The x-coordinate
                     y: The y-coordinate
@@ -962,12 +961,12 @@ def ab(a: int, *, c: int):
             r#"
         from typing import overload
 
-        @overload  
+        @overload
         def process(value: int) -> str: ...
-        
+
         @overload
         def process(value: str, flag: bool) -> int: ...
-        
+
         def process(value, flag=None):
             if isinstance(value, int):
                 return str(value)

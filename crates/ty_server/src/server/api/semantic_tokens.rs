@@ -24,10 +24,14 @@ pub(crate) fn generate_semantic_tokens(
     let mut prev_start = 0u32;
 
     for token in &*semantic_token_data {
-        let lsp_range = token
+        let Some(lsp_range) = token
             .range()
-            .as_lsp_range(db, file, encoding)
-            .to_local_range();
+            .to_lsp_range(db, file, encoding)
+            .map(|lsp_range| lsp_range.local_range())
+        else {
+            continue;
+        };
+
         let line = lsp_range.start.line;
         let character = lsp_range.start.character;
 

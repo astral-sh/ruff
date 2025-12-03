@@ -125,3 +125,18 @@ with open(*filename, mode="r") as f:
 # `buffering`.
 with open(*filename, file="file.txt", mode="r") as f:
     x = f.read()
+
+# FURB101
+with open("file.txt", encoding="utf-8") as f:
+    contents: str = f.read()
+
+# FURB101 but no fix because it would remove the assignment to `x`
+with open("file.txt", encoding="utf-8") as f:
+    contents, x = f.read(), 2
+
+# FURB101 but no fix because it would remove the `process_contents` call
+with open("file.txt", encoding="utf-8") as f:
+    contents = process_contents(f.read())
+
+with open("file.txt", encoding="utf-8") as f:
+    contents: str = process_contents(f.read())

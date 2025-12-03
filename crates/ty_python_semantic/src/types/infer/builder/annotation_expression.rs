@@ -10,6 +10,12 @@ use crate::types::{
     KnownClass, SpecialFormType, Type, TypeAndQualifiers, TypeContext, TypeQualifiers, todo_type,
 };
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum PEP613Policy {
+    Allowed,
+    Disallowed,
+}
+
 /// Annotation expressions.
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer the type of an annotation expression with the given [`DeferredExpressionState`].
@@ -18,10 +24,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         annotation: &ast::Expr,
         deferred_state: DeferredExpressionState,
     ) -> TypeAndQualifiers<'db> {
-        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, deferred_state);
-        let annotation_ty = self.infer_annotation_expression_impl(annotation);
-        self.deferred_state = previous_deferred_state;
-        annotation_ty
+        self.infer_annotation_expression_inner(annotation, deferred_state, PEP613Policy::Disallowed)
+    }
+
+    /// Infer the type of an annotation expression with the given [`DeferredExpressionState`],
+    /// allowing a PEP 613 `typing.TypeAlias` annotation.
+    pub(super) fn infer_annotation_expression_allow_pep_613(
+        &mut self,
+        annotation: &ast::Expr,
+        deferred_state: DeferredExpressionState,
+    ) -> TypeAndQualifiers<'db> {
+        self.infer_annotation_expression_inner(annotation, deferred_state, PEP613Policy::Allowed)
     }
 
     /// Similar to [`infer_annotation_expression`], but accepts an optional annotation expression
@@ -36,17 +49,42 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         annotation.map(|expr| self.infer_annotation_expression(expr, deferred_state))
     }
 
+    fn infer_annotation_expression_inner(
+        &mut self,
+        annotation: &ast::Expr,
+        deferred_state: DeferredExpressionState,
+        pep_613_policy: PEP613Policy,
+    ) -> TypeAndQualifiers<'db> {
+        // `DeferredExpressionState::InStringAnnotation` takes precedence over other deferred states.
+        // However, if it's not a stringified annotation, we must still ensure that annotation expressions
+        // are always deferred in stub files.
+        let state = if deferred_state.in_string_annotation() {
+            deferred_state
+        } else if self.in_stub() {
+            DeferredExpressionState::Deferred
+        } else {
+            deferred_state
+        };
+
+        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, state);
+        let annotation_ty = self.infer_annotation_expression_impl(annotation, pep_613_policy);
+        self.deferred_state = previous_deferred_state;
+        annotation_ty
+    }
+
     /// Implementation of [`infer_annotation_expression`].
     ///
     /// [`infer_annotation_expression`]: TypeInferenceBuilder::infer_annotation_expression
     fn infer_annotation_expression_impl(
         &mut self,
         annotation: &ast::Expr,
+        pep_613_policy: PEP613Policy,
     ) -> TypeAndQualifiers<'db> {
         fn infer_name_or_attribute<'db>(
             ty: Type<'db>,
             annotation: &ast::Expr,
             builder: &TypeInferenceBuilder<'db, '_>,
+            pep_613_policy: PEP613Policy,
         ) -> TypeAndQualifiers<'db> {
             match ty {
                 Type::SpecialForm(SpecialFormType::ClassVar) => TypeAndQualifiers::new(
@@ -74,6 +112,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     TypeOrigin::Declared,
                     TypeQualifiers::READ_ONLY,
                 ),
+                Type::SpecialForm(SpecialFormType::TypeAlias)
+                    if pep_613_policy == PEP613Policy::Allowed =>
+                {
+                    TypeAndQualifiers::declared(ty)
+                }
+                // Conditional import of `typing.TypeAlias` or `typing_extensions.TypeAlias` on a
+                // Python version where the former doesn't exist.
+                Type::Union(union)
+                    if pep_613_policy == PEP613Policy::Allowed
+                        && union.elements(builder.db()).iter().all(|ty| {
+                            matches!(
+                                ty,
+                                Type::SpecialForm(SpecialFormType::TypeAlias) | Type::Dynamic(_)
+                            )
+                        }) =>
+                {
+                    TypeAndQualifiers::declared(Type::SpecialForm(SpecialFormType::TypeAlias))
+                }
                 Type::ClassLiteral(class) if class.is_known(builder.db(), KnownClass::InitVar) => {
                     if let Some(builder) =
                         builder.context.report_lint(&INVALID_TYPE_FORM, annotation)
@@ -88,18 +144,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     )
                 }
                 _ => TypeAndQualifiers::declared(
-                    ty.in_type_expression(
-                        builder.db(),
-                        builder.scope(),
-                        builder.typevar_binding_context,
-                    )
-                    .unwrap_or_else(|error| {
-                        error.into_fallback_type(
-                            &builder.context,
-                            annotation,
-                            builder.is_reachable(annotation),
+                    ty.default_specialize(builder.db())
+                        .in_type_expression(
+                            builder.db(),
+                            builder.scope(),
+                            builder.typevar_binding_context,
                         )
-                    }),
+                        .unwrap_or_else(|error| {
+                            error.into_fallback_type(
+                                &builder.context,
+                                annotation,
+                                builder.is_reachable(annotation),
+                            )
+                        }),
                 ),
             }
         }
@@ -137,6 +194,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_attribute_expression(attribute),
                     annotation,
                     self,
+                    pep_613_policy,
                 ),
                 ast::ExprContext::Invalid => TypeAndQualifiers::declared(Type::unknown()),
                 ast::ExprContext::Store | ast::ExprContext::Del => TypeAndQualifiers::declared(
@@ -145,9 +203,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             },
 
             ast::Expr::Name(name) => match name.ctx {
-                ast::ExprContext::Load => {
-                    infer_name_or_attribute(self.infer_name_expression(name), annotation, self)
-                }
+                ast::ExprContext::Load => infer_name_or_attribute(
+                    self.infer_name_expression(name),
+                    annotation,
+                    self,
+                    pep_613_policy,
+                ),
                 ast::ExprContext::Invalid => TypeAndQualifiers::declared(Type::unknown()),
                 ast::ExprContext::Store | ast::ExprContext::Del => TypeAndQualifiers::declared(
                     todo_type!("Name expression annotation in Store/Del context"),
@@ -177,8 +238,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     self.infer_expression(element, TypeContext::default());
                                 }
 
-                                let inner_annotation_ty =
-                                    self.infer_annotation_expression_impl(inner_annotation);
+                                let inner_annotation_ty = self.infer_annotation_expression_impl(
+                                    inner_annotation,
+                                    PEP613Policy::Disallowed,
+                                );
 
                                 self.store_expression_type(slice, inner_annotation_ty.inner_type());
                                 inner_annotation_ty
@@ -191,7 +254,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             }
                         } else {
                             report_invalid_arguments_to_annotated(&self.context, subscript);
-                            self.infer_annotation_expression_impl(slice)
+                            self.infer_annotation_expression_impl(slice, PEP613Policy::Disallowed)
                         }
                     }
                     Type::SpecialForm(
@@ -208,8 +271,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         };
                         let num_arguments = arguments.len();
                         let type_and_qualifiers = if num_arguments == 1 {
-                            let mut type_and_qualifiers =
-                                self.infer_annotation_expression_impl(slice);
+                            let mut type_and_qualifiers = self
+                                .infer_annotation_expression_impl(slice, PEP613Policy::Disallowed);
 
                             match type_qualifier {
                                 SpecialFormType::ClassVar => {
@@ -232,7 +295,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             type_and_qualifiers
                         } else {
                             for element in arguments {
-                                self.infer_annotation_expression_impl(element);
+                                self.infer_annotation_expression_impl(
+                                    element,
+                                    PEP613Policy::Disallowed,
+                                );
                             }
                             if let Some(builder) =
                                 self.context.report_lint(&INVALID_TYPE_FORM, subscript)
@@ -257,13 +323,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         };
                         let num_arguments = arguments.len();
                         let type_and_qualifiers = if num_arguments == 1 {
-                            let mut type_and_qualifiers =
-                                self.infer_annotation_expression_impl(slice);
+                            let mut type_and_qualifiers = self
+                                .infer_annotation_expression_impl(slice, PEP613Policy::Disallowed);
                             type_and_qualifiers.add_qualifier(TypeQualifiers::INIT_VAR);
                             type_and_qualifiers
                         } else {
                             for element in arguments {
-                                self.infer_annotation_expression_impl(element);
+                                self.infer_annotation_expression_impl(
+                                    element,
+                                    PEP613Policy::Disallowed,
+                                );
                             }
                             if let Some(builder) =
                                 self.context.report_lint(&INVALID_TYPE_FORM, subscript)
@@ -305,6 +374,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> TypeAndQualifiers<'db> {
         match parse_string_annotation(&self.context, string) {
             Some(parsed) => {
+                self.string_annotations
+                    .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
                 // String annotations are always evaluated in the deferred context.
                 self.infer_annotation_expression(
                     parsed.expr(),

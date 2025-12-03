@@ -3,8 +3,8 @@ use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::{self as ast, Stmt};
-use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_semantic::Binding;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 

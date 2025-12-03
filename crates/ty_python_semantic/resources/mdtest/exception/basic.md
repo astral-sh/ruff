@@ -116,17 +116,18 @@ def silence2[T: (
 
 ## Invalid exception handlers
 
+<!-- snapshot-diagnostics -->
+
 ```py
 try:
     pass
-# error: [invalid-exception-caught] "Cannot catch object of type `Literal[3]` in an exception handler (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)"
+# error: [invalid-exception-caught]
 except 3 as e:
     reveal_type(e)  # revealed: Unknown
 
 try:
     pass
-# error: [invalid-exception-caught] "Cannot catch object of type `Literal["foo"]` in an exception handler (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)"
-# error: [invalid-exception-caught] "Cannot catch object of type `Literal[b"bar"]` in an exception handler (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)"
+# error: [invalid-exception-caught]
 except (ValueError, OSError, "foo", b"bar") as e:
     reveal_type(e)  # revealed: ValueError | OSError | Unknown
 
@@ -277,4 +278,21 @@ def f(x: type[Exception]):
         pass
     # error: [possibly-unresolved-reference]
     reveal_type(e)  # revealed: None
+```
+
+## Special-cased diagnostics for `NotImplemented`
+
+<!-- snapshot-diagnostics -->
+
+```py
+try:
+    # error: [invalid-raise]
+    # error: [invalid-raise]
+    raise NotImplemented from NotImplemented
+# error: [invalid-exception-caught]
+except NotImplemented:
+    pass
+# error: [invalid-exception-caught]
+except (TypeError, NotImplemented):
+    pass
 ```

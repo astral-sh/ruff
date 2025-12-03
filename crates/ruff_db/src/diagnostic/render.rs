@@ -205,6 +205,7 @@ impl<'a> Resolved<'a> {
 struct ResolvedDiagnostic<'a> {
     level: AnnotateLevel,
     id: Option<String>,
+    documentation_url: Option<String>,
     message: String,
     annotations: Vec<ResolvedAnnotation<'a>>,
     is_fixable: bool,
@@ -240,12 +241,12 @@ impl<'a> ResolvedDiagnostic<'a> {
             // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve
             // the formatting of syntax errors for now. This should also be kept consistent with the
             // concise formatting.
-            Some(diag.secondary_code().map_or_else(
+            diag.secondary_code().map_or_else(
                 || format!("{id}:", id = diag.inner.id),
                 |code| code.to_string(),
-            ))
+            )
         } else {
-            Some(diag.inner.id.to_string())
+            diag.inner.id.to_string()
         };
 
         let level = if config.hide_severity {
@@ -256,7 +257,8 @@ impl<'a> ResolvedDiagnostic<'a> {
 
         ResolvedDiagnostic {
             level,
-            id,
+            id: Some(id),
+            documentation_url: diag.documentation_url().map(ToString::to_string),
             message: diag.inner.message.as_str().to_string(),
             annotations,
             is_fixable: config.show_fix_status && diag.has_applicable_fix(config),
@@ -287,6 +289,7 @@ impl<'a> ResolvedDiagnostic<'a> {
         ResolvedDiagnostic {
             level: diag.inner.severity.to_annotate(),
             id: None,
+            documentation_url: None,
             message: diag.inner.message.as_str().to_string(),
             annotations,
             is_fixable: false,
@@ -385,6 +388,7 @@ impl<'a> ResolvedDiagnostic<'a> {
         RenderableDiagnostic {
             level: self.level,
             id: self.id.as_deref(),
+            documentation_url: self.documentation_url.as_deref(),
             message: &self.message,
             snippets_by_input,
             is_fixable: self.is_fixable,
@@ -485,6 +489,7 @@ struct RenderableDiagnostic<'r> {
     /// An ID is always present for top-level diagnostics and always absent for
     /// sub-diagnostics.
     id: Option<&'r str>,
+    documentation_url: Option<&'r str>,
     /// The message emitted with the diagnostic, before any snippets are
     /// rendered.
     message: &'r str,
@@ -519,7 +524,7 @@ impl RenderableDiagnostic<'_> {
             .is_fixable(self.is_fixable)
             .lineno_offset(self.header_offset);
         if let Some(id) = self.id {
-            message = message.id(id);
+            message = message.id_with_url(id, self.documentation_url);
         }
         message.snippets(snippets)
     }
@@ -2876,6 +2881,12 @@ watermelon
             self.diag.help(message);
             self
         }
+
+        /// Set the documentation URL for the diagnostic.
+        pub(super) fn documentation_url(mut self, url: impl Into<String>) -> DiagnosticBuilder<'e> {
+            self.diag.set_documentation_url(Some(url.into()));
+            self
+        }
     }
 
     /// A helper builder for tersely populating a `SubDiagnostic`.
@@ -2990,6 +3001,7 @@ def fibonacci(n):
                     TextSize::from(10),
                 ))))
                 .noqa_offset(TextSize::from(7))
+                .documentation_url("https://docs.astral.sh/ruff/rules/unused-import")
                 .build(),
             env.builder(
                 "unused-variable",
@@ -3004,11 +3016,13 @@ def fibonacci(n):
                 TextSize::from(99),
             )))
             .noqa_offset(TextSize::from(94))
+            .documentation_url("https://docs.astral.sh/ruff/rules/unused-variable")
             .build(),
             env.builder("undefined-name", Severity::Error, "Undefined name `a`")
                 .primary("undef.py", "1:3", "1:4", "")
                 .secondary_code("F821")
                 .noqa_offset(TextSize::from(3))
+                .documentation_url("https://docs.astral.sh/ruff/rules/undefined-name")
                 .build(),
         ];
 
@@ -3123,6 +3137,7 @@ if call(foo
                     TextSize::from(19),
                 ))))
                 .noqa_offset(TextSize::from(16))
+                .documentation_url("https://docs.astral.sh/ruff/rules/unused-import")
                 .build(),
             env.builder(
                 "unused-import",
@@ -3137,6 +3152,7 @@ if call(foo
                 TextSize::from(40),
             ))))
             .noqa_offset(TextSize::from(35))
+            .documentation_url("https://docs.astral.sh/ruff/rules/unused-import")
             .build(),
             env.builder(
                 "unused-variable",
@@ -3151,6 +3167,7 @@ if call(foo
                 TextSize::from(104),
             ))))
             .noqa_offset(TextSize::from(98))
+            .documentation_url("https://docs.astral.sh/ruff/rules/unused-variable")
             .build(),
         ];
 

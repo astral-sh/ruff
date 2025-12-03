@@ -295,7 +295,8 @@ impl ModuleName {
         Self::from_identifier_parts(db, importing_file, module.as_deref(), *level)
     }
 
-    pub(crate) fn from_identifier_parts(
+    /// Computes the absolute module name from the LHS components of `from LHS import RHS`
+    pub fn from_identifier_parts(
         db: &dyn Db,
         importing_file: File,
         module: Option<&str>,
@@ -308,6 +309,16 @@ impl ModuleName {
                 .and_then(Self::new)
                 .ok_or(ModuleNameResolutionError::InvalidSyntax)
         }
+    }
+
+    /// Computes the absolute module name for the package this file belongs to.
+    ///
+    /// i.e. this resolves `.`
+    pub(crate) fn package_for_file(
+        db: &dyn Db,
+        importing_file: File,
+    ) -> Result<Self, ModuleNameResolutionError> {
+        Self::from_identifier_parts(db, importing_file, None, 1)
     }
 }
 

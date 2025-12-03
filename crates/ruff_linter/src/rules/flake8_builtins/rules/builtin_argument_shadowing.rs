@@ -17,6 +17,8 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// non-obvious errors, as readers may mistake the argument for the
 /// builtin and vice versa.
 ///
+/// Function definitions decorated with [`@override`][override] or
+/// [`@overload`][overload] are exempt from this rule by default.
 /// Builtins can be marked as exceptions to this rule via the
 /// [`lint.flake8-builtins.ignorelist`] configuration option.
 ///
@@ -48,6 +50,9 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// ## References
 /// - [_Is it bad practice to use a built-in function name as an attribute or method identifier?_](https://stackoverflow.com/questions/9109333/is-it-bad-practice-to-use-a-built-in-function-name-as-an-attribute-or-method-ide)
 /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
+///
+/// [override]: https://docs.python.org/3/library/typing.html#typing.override
+/// [overload]: https://docs.python.org/3/library/typing.html#typing.overload
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.48")]
 pub(crate) struct BuiltinArgumentShadowing {

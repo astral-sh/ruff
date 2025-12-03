@@ -20,17 +20,21 @@ type TypeVarAndParamSpec[T, **P] = ...
 type SingleTypeVarTuple[*Ts] = ...
 type TypeVarAndTypeVarTuple[T, *Ts] = ...
 
-# revealed: tuple[T@SingleTypevar]
+# revealed: ty_extensions.GenericContext[T@SingleTypevar]
 reveal_type(generic_context(SingleTypevar))
-# revealed: tuple[T@MultipleTypevars, S@MultipleTypevars]
+# revealed: ty_extensions.GenericContext[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
 
 # TODO: support `ParamSpec`/`TypeVarTuple` properly
 # (these should include the `ParamSpec`s and `TypeVarTuple`s in their generic contexts)
-reveal_type(generic_context(SingleParamSpec))  # revealed: tuple[()]
-reveal_type(generic_context(TypeVarAndParamSpec))  # revealed: tuple[T@TypeVarAndParamSpec]
-reveal_type(generic_context(SingleTypeVarTuple))  # revealed: tuple[()]
-reveal_type(generic_context(TypeVarAndTypeVarTuple))  # revealed: tuple[T@TypeVarAndTypeVarTuple]
+# revealed: ty_extensions.GenericContext[]
+reveal_type(generic_context(SingleParamSpec))
+# revealed: ty_extensions.GenericContext[T@TypeVarAndParamSpec]
+reveal_type(generic_context(TypeVarAndParamSpec))
+# revealed: ty_extensions.GenericContext[]
+reveal_type(generic_context(SingleTypeVarTuple))
+# revealed: ty_extensions.GenericContext[T@TypeVarAndTypeVarTuple]
+reveal_type(generic_context(TypeVarAndTypeVarTuple))
 ```
 
 You cannot use the same typevar more than once.
@@ -57,8 +61,8 @@ def _(a: C[int], b: C[Literal[5]]):
 The specialization must match the generic types:
 
 ```py
-# error: [too-many-positional-arguments] "Too many positional arguments: expected 1, got 2"
-reveal_type(C[int, int])  # revealed: Unknown
+# error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
+reveal_type(C[int, int])  # revealed: C[Unknown]
 ```
 
 And non-generic types cannot be specialized:
@@ -84,13 +88,11 @@ class IntSubclass(int): ...
 reveal_type(Bounded[int])  # revealed: Bounded[int]
 reveal_type(Bounded[IntSubclass])  # revealed: Bounded[IntSubclass]
 
-# TODO: update this diagnostic to talk about type parameters and specializations
-# error: [invalid-argument-type] "Argument is incorrect: Expected `int`, found `str`"
-reveal_type(Bounded[str])  # revealed: Unknown
+# error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `T@Bounded`"
+reveal_type(Bounded[str])  # revealed: Bounded[Unknown]
 
-# TODO: update this diagnostic to talk about type parameters and specializations
-# error: [invalid-argument-type] "Argument is incorrect: Expected `int`, found `int | str`"
-reveal_type(Bounded[int | str])  # revealed: Unknown
+# error: [invalid-type-arguments] "Type `int | str` is not assignable to upper bound `int` of type variable `T@Bounded`"
+reveal_type(Bounded[int | str])  # revealed: Bounded[Unknown]
 
 reveal_type(BoundedByUnion[int])  # revealed: BoundedByUnion[int]
 reveal_type(BoundedByUnion[IntSubclass])  # revealed: BoundedByUnion[IntSubclass]
@@ -115,9 +117,8 @@ reveal_type(Constrained[str])  # revealed: Constrained[str]
 # TODO: revealed: Unknown
 reveal_type(Constrained[int | str])  # revealed: Constrained[int | str]
 
-# TODO: update this diagnostic to talk about type parameters and specializations
-# error: [invalid-argument-type] "Argument is incorrect: Expected `int | str`, found `object`"
-reveal_type(Constrained[object])  # revealed: Unknown
+# error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `T@Constrained`"
+reveal_type(Constrained[object])  # revealed: Constrained[Unknown]
 ```
 
 If the type variable has a default, it can be omitted:

@@ -59,8 +59,6 @@ divan = { workspace = true, optional = true }
 anyhow = { workspace = true }
 codspeed-criterion-compat = { workspace = true, default-features = false, optional = true }
 criterion = { workspace = true, default-features = false, optional = true }
-rayon = { workspace = true }
-rustc-hash = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
@@ -88,3 +86,7 @@ mimalloc = { workspace = true }
 
 [target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64", target_arch = "riscv64")))'.dev-dependencies]
 tikv-jemallocator = { workspace = true }
+
+[dev-dependencies]
+rustc-hash = { workspace = true }
+rayon = { workspace = true }

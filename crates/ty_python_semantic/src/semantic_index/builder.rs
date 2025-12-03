@@ -26,8 +26,8 @@ use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
     DefinitionNodeRef, Definitions, ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef,
-    ImportDefinitionNodeRef, ImportFromDefinitionNodeRef, MatchPatternDefinitionNodeRef,
-    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    ImportDefinitionNodeRef, ImportFromDefinitionNodeRef, ImportFromSubmoduleDefinitionNodeRef,
+    MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::place::{PlaceExpr, PlaceTableBuilder, ScopedPlaceId};
@@ -47,9 +47,7 @@ use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
-use crate::semantic_index::{
-    ExpressionsScopeMap, MaybeModuleImport, SemanticIndex, VisibleAncestorsIter,
-};
+use crate::semantic_index::{ExpressionsScopeMap, SemanticIndex, VisibleAncestorsIter};
 use crate::semantic_model::HasTrackedScope;
 use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
@@ -113,7 +111,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
-    maybe_imported_modules: FxHashSet<MaybeModuleImport>,
+    seen_submodule_imports: FxHashSet<String>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
@@ -151,7 +149,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
 
-            maybe_imported_modules: FxHashSet::default(),
+            seen_submodule_imports: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
 
@@ -188,35 +186,66 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_scope_info().file_scope_id
     }
 
-    /// Returns the scope ID of the surrounding class body scope if the current scope
-    /// is a method inside a class body. Returns `None` otherwise, e.g. if the current
-    /// scope is a function body outside of a class, or if the current scope is not a
+    /// Returns the scope ID of the current scope if the current scope
+    /// is a method inside a class body or an eagerly executed scope inside a method.
+    /// Returns `None` otherwise, e.g. if the current scope is a function body outside of a class, or if the current scope is not a
     /// function body.
-    fn is_method_of_class(&self) -> Option<FileScopeId> {
-        let mut scopes_rev = self.scope_stack.iter().rev();
+    fn is_method_or_eagerly_executed_in_method(&self) -> Option<FileScopeId> {
+        let mut scopes_rev = self
+            .scope_stack
+            .iter()
+            .rev()
+            .skip_while(|scope| self.scopes[scope.file_scope_id].is_eager());
         let current = scopes_rev.next()?;
 
         if self.scopes[current.file_scope_id].kind() != ScopeKind::Function {
             return None;
         }
 
+        let maybe_method = current.file_scope_id;
         let parent = scopes_rev.next()?;
 
         match self.scopes[parent.file_scope_id].kind() {
-            ScopeKind::Class => Some(parent.file_scope_id),
+            ScopeKind::Class => Some(maybe_method),
             ScopeKind::TypeParams => {
                 // If the function is generic, the parent scope is an annotation scope.
                 // In this case, we need to go up one level higher to find the class scope.
                 let grandparent = scopes_rev.next()?;
 
                 if self.scopes[grandparent.file_scope_id].kind() == ScopeKind::Class {
-                    Some(grandparent.file_scope_id)
+                    Some(maybe_method)
                 } else {
                     None
                 }
             }
             _ => None,
         }
+    }
+
+    /// Checks if a symbol name is bound in any intermediate eager scopes
+    /// between the current scope and the specified method scope.
+    ///
+    fn is_symbol_bound_in_intermediate_eager_scopes(
+        &self,
+        symbol_name: &str,
+        method_scope_id: FileScopeId,
+    ) -> bool {
+        for scope_info in self.scope_stack.iter().rev() {
+            let scope_id = scope_info.file_scope_id;
+
+            if scope_id == method_scope_id {
+                break;
+            }
+
+            if let Some(symbol_id) = self.place_tables[scope_id].symbol_id(symbol_name) {
+                let symbol = self.place_tables[scope_id].symbol(symbol_id);
+                if symbol.is_bound() {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 
     /// Push a new loop, returning the outer loop, if any.
@@ -285,6 +314,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     // Records snapshots of the place states visible from the current eager scope.
     fn record_eager_snapshots(&mut self, popped_scope_id: FileScopeId) {
+        let popped_scope = &self.scopes[popped_scope_id];
+        let popped_scope_is_annotation_scope = popped_scope.kind().is_annotation();
+
         // If the scope that we just popped off is an eager scope, we need to "lock" our view of
         // which bindings reach each of the uses in the scope. Loop through each enclosing scope,
         // looking for any that bind each place.
@@ -299,6 +331,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // ```
         for enclosing_scope_info in self.scope_stack.iter().rev() {
             let enclosing_scope_id = enclosing_scope_info.file_scope_id;
+            let is_immediately_enclosing_scope = popped_scope.parent() == Some(enclosing_scope_id);
             let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();
             let enclosing_place_table = &self.place_tables[enclosing_scope_id];
 
@@ -326,6 +359,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         enclosing_place_id,
                         enclosing_scope_kind,
                         enclosing_place,
+                        popped_scope_is_annotation_scope && is_immediately_enclosing_scope,
                     );
                 self.enclosing_snapshots.insert(key, eager_snapshot);
             }
@@ -400,6 +434,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     enclosed_symbol_id.into(),
                     enclosing_scope_kind,
                     enclosing_place.into(),
+                    false,
                 );
                 self.enclosing_snapshots.insert(key, lazy_snapshot);
             }
@@ -1029,6 +1064,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         ..
                     }) => (name, &None, default),
                 };
+                self.scopes_by_expression
+                    .record_expression(name, self.current_scope());
                 let symbol = self.add_symbol(name.id.clone());
                 // TODO create Definition for PEP 695 typevars
                 // note that the "bound" on the typevar is a totally different thing than whether
@@ -1130,6 +1167,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
         if let Some(vararg) = parameters.vararg.as_ref() {
             let symbol = self.add_symbol(vararg.name.id().clone());
+            self.current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_parameter();
             self.add_definition(
                 symbol.into(),
                 DefinitionNodeRef::VariadicPositionalParameter(vararg),
@@ -1137,6 +1177,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
         if let Some(kwarg) = parameters.kwarg.as_ref() {
             let symbol = self.add_symbol(kwarg.name.id().clone());
+            self.current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_parameter();
             self.add_definition(
                 symbol.into(),
                 DefinitionNodeRef::VariadicKeywordParameter(kwarg),
@@ -1148,6 +1191,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let symbol = self.add_symbol(parameter.name().id().clone());
 
         let definition = self.add_definition(symbol.into(), parameter);
+
+        self.current_place_table_mut()
+            .symbol_mut(symbol)
+            .mark_parameter();
 
         // Insert a mapping from the inner Parameter node to the same definition. This
         // ensures that calling `HasType::inferred_type` on the inner parameter returns
@@ -1266,7 +1313,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scopes_by_node.shrink_to_fit();
         self.generator_functions.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
-        self.maybe_imported_modules.shrink_to_fit();
 
         SemanticIndex {
             place_tables,
@@ -1279,7 +1325,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes_by_node: self.scopes_by_node,
             use_def_maps,
             imported_modules: Arc::new(self.imported_modules),
-            maybe_imported_modules: self.maybe_imported_modules,
             has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: self.enclosing_snapshots,
             semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
@@ -1433,6 +1478,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     }
 
                     let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
+                        self.scopes_by_expression
+                            .record_expression(asname, self.current_scope());
                         (asname.id.clone(), asname.id == alias.name.id)
                     } else {
                         (Name::new(alias.name.id.split('.').next().unwrap()), false)
@@ -1452,6 +1499,53 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Stmt::ImportFrom(node) => {
                 self.current_use_def_map_mut()
                     .record_node_reachability(NodeKey::from_node(node));
+
+                // If we see:
+                //
+                // * `from .x.y import z` (or `from whatever.thispackage.x.y`)
+                // * And we are in an `__init__.py(i)` (hereafter `thispackage`)
+                // * And this is the first time we've seen `from .x` in this module
+                // * And we're in the global scope
+                //
+                // We introduce a local definition `x = <module 'thispackage.x'>` that occurs
+                // before the `z = ...` declaration the import introduces. This models the fact
+                // that the *first* time that you import 'thispackage.x' the python runtime creates
+                // `x` as a variable in the global scope of `thispackage`.
+                //
+                // This is not a perfect simulation of actual runtime behaviour for *various*
+                // reasons but it works well for most practical purposes. In particular it's nice
+                // that `x` can be freely overwritten, and that we don't assume that an import
+                // in one function is visible in another function.
+                let mut is_self_import = false;
+                if self.file.is_package(self.db)
+                    && let Ok(module_name) = ModuleName::from_identifier_parts(
+                        self.db,
+                        self.file,
+                        node.module.as_deref(),
+                        node.level,
+                    )
+                    && let Ok(thispackage) = ModuleName::package_for_file(self.db, self.file)
+                {
+                    // Record whether this is equivalent to `from . import ...`
+                    is_self_import = module_name == thispackage;
+
+                    if node.module.is_some()
+                        && let Some(relative_submodule) = module_name.relative_to(&thispackage)
+                        && let Some(direct_submodule) = relative_submodule.components().next()
+                        && !self.seen_submodule_imports.contains(direct_submodule)
+                        && self.current_scope().is_global()
+                    {
+                        self.seen_submodule_imports
+                            .insert(direct_submodule.to_owned());
+
+                        let direct_submodule_name = Name::new(direct_submodule);
+                        let symbol = self.add_symbol(direct_submodule_name);
+                        self.add_definition(
+                            symbol.into(),
+                            ImportFromSubmoduleDefinitionNodeRef { node },
+                        );
+                    }
+                }
 
                 let mut found_star = false;
                 for (alias_index, alias) in node.names.iter().enumerate() {
@@ -1559,19 +1653,16 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     }
 
                     let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
+                        self.scopes_by_expression
+                            .record_expression(asname, self.current_scope());
+                        // It's re-exported if it's `from ... import x as x`
                         (&asname.id, asname.id == alias.name.id)
                     } else {
-                        (&alias.name.id, false)
+                        // As a non-standard rule to handle stubs in the wild, we consider
+                        // `from . import x` and `from whatever.thispackage import x` in an
+                        // `__init__.pyi` to re-export `x` (as long as it wasn't renamed)
+                        (&alias.name.id, is_self_import)
                     };
-
-                    // If there's no alias or a redundant alias, record this as a potential import of a submodule
-                    if alias.asname.is_none() || is_reexported {
-                        self.maybe_imported_modules.insert(MaybeModuleImport {
-                            level: node.level,
-                            from_module: node.module.clone().map(Into::into),
-                            submodule: alias.name.clone().into(),
-                        });
-                    }
 
                     // Look for imports `from __future__ import annotations`, ignore `as ...`
                     // We intentionally don't enforce the rules about location of `__future__`
@@ -1662,7 +1753,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
-                    if self.is_method_of_class().is_some() {
+                    if self.is_method_or_eagerly_executed_in_method().is_some() {
                         // Record the right-hand side of the assignment as a standalone expression
                         // if we're inside a method. This allows type inference to infer the type
                         // of the value for annotated assignments like `self.CONSTANT: Final = 1`,
@@ -2170,10 +2261,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 names,
             }) => {
                 for name in names {
+                    self.scopes_by_expression
+                        .record_expression(name, self.current_scope());
                     let symbol_id = self.add_symbol(name.id.clone());
                     let symbol = self.current_place_table().symbol(symbol_id);
                     // Check whether the variable has already been accessed in this scope.
-                    if symbol.is_bound() || symbol.is_declared() || symbol.is_used() {
+                    if (symbol.is_bound() || symbol.is_declared() || symbol.is_used())
+                        && !symbol.is_parameter()
+                    {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
                                 name: name.to_string(),
@@ -2203,6 +2298,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 names,
             }) => {
                 for name in names {
+                    self.scopes_by_expression
+                        .record_expression(name, self.current_scope());
                     let symbol_id = self.add_symbol(name.id.clone());
                     let symbol = self.current_place_table().symbol(symbol_id);
                     // Check whether the variable has already been accessed in this scope.
@@ -2334,14 +2431,21 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
             | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
                 if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
-                    if self.is_method_of_class().is_some() {
+                    if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method() {
                         if let PlaceExpr::Member(member) = &mut place_expr {
                             if member.is_instance_attribute_candidate() {
                                 // We specifically mark attribute assignments to the first parameter of a method,
                                 // i.e. typically `self` or `cls`.
-                                let accessed_object_refers_to_first_parameter = self
-                                    .current_first_parameter_name
-                                    .is_some_and(|first| member.symbol_name() == first);
+                                // However, we must check that the symbol hasn't been shadowed by an intermediate
+                                // scope (e.g., a comprehension variable: `for self in [...]`).
+                                let accessed_object_refers_to_first_parameter =
+                                    self.current_first_parameter_name.is_some_and(|first| {
+                                        member.symbol_name() == first
+                                            && !self.is_symbol_bound_in_intermediate_eager_scopes(
+                                                first,
+                                                method_scope_id,
+                                            )
+                                    });
 
                                 if accessed_object_refers_to_first_parameter {
                                     member.mark_instance_attribute();
@@ -2742,6 +2846,11 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
                 ScopeKind::Class => return false,
                 ScopeKind::Function | ScopeKind::Lambda => return true,
                 ScopeKind::Comprehension
+                    if matches!(scope.node(), NodeWithScopeKind::GeneratorExpression(_)) =>
+                {
+                    return true;
+                }
+                ScopeKind::Comprehension
                 | ScopeKind::Module
                 | ScopeKind::TypeAlias
                 | ScopeKind::TypeParams => {}
@@ -2790,11 +2899,14 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
         matches!(kind, ScopeKind::Function | ScopeKind::Lambda)
     }
 
-    fn in_generator_scope(&self) -> bool {
-        matches!(
-            self.scopes[self.current_scope()].node(),
-            NodeWithScopeKind::GeneratorExpression(_)
-        )
+    fn in_generator_context(&self) -> bool {
+        for scope_info in &self.scope_stack {
+            let scope = &self.scopes[scope_info.file_scope_id];
+            if matches!(scope.node(), NodeWithScopeKind::GeneratorExpression(_)) {
+                return true;
+            }
+        }
+        false
     }
 
     fn in_notebook(&self) -> bool {
@@ -2810,8 +2922,12 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     fn in_loop_context(&self) -> bool {
         self.current_scope_info().current_loop.is_some()
     }
-    fn is_bound_parameter(&self, _name: &str) -> bool {
-        false
+
+    fn is_bound_parameter(&self, name: &str) -> bool {
+        self.scopes[self.current_scope()]
+            .node()
+            .as_function()
+            .is_some_and(|func| func.node(self.module).parameters.includes(name))
     }
 }
 
@@ -3049,15 +3165,31 @@ impl ExpressionsScopeMapBuilder {
 
 /// Returns if the expression is a `TYPE_CHECKING` expression.
 fn is_if_type_checking(expr: &ast::Expr) -> bool {
-    matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING")
+    fn is_dotted_name(expr: &ast::Expr) -> bool {
+        match expr {
+            ast::Expr::Name(_) => true,
+            ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => is_dotted_name(value),
+            _ => false,
+        }
+    }
+
+    match expr {
+        ast::Expr::Name(ast::ExprName { id, .. }) => id == "TYPE_CHECKING",
+        ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+            attr == "TYPE_CHECKING" && is_dotted_name(value)
+        }
+        _ => false,
+    }
 }
 
 /// Returns if the expression is a `not TYPE_CHECKING` expression.
 fn is_if_not_type_checking(expr: &ast::Expr) -> bool {
-    matches!(expr, ast::Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) if *op == ruff_python_ast::UnaryOp::Not
-        && matches!(
-            &**operand,
-            ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING"
-        )
+    matches!(
+        expr,
+        ast::Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::Not,
+            operand,
+            ..
+        }) if is_if_type_checking(operand)
     )
 }

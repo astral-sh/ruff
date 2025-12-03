@@ -18,7 +18,7 @@ a = 4 + test  # ty: ignore[unresolved-reference]
 
 ```py
 test = 10
-# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'possibly-unresolved-reference'"
+# error: [unused-ignore-comment] "Unused `ty: ignore` directive"
 a = test + 3  # ty: ignore[possibly-unresolved-reference]
 ```
 
@@ -26,7 +26,7 @@ a = test + 3  # ty: ignore[possibly-unresolved-reference]
 
 ```py
 # error: [unresolved-reference]
-# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'possibly-unresolved-reference'"
+# error: [unused-ignore-comment] "Unused `ty: ignore` directive"
 a = test + 3  # ty: ignore[possibly-unresolved-reference]
 ```
 
@@ -50,17 +50,20 @@ a = 10 / 0  # ty: ignore[division-by-zero, unused-ignore-comment]
 
 ## Multiple unused comments
 
-Today, ty emits a diagnostic for every unused code. We might want to group the codes by comment at
-some point in the future.
+ty groups unused codes that are next to each other.
+
+<!-- snapshot-diagnostics -->
 
 ```py
-# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'division-by-zero'"
-# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-reference'"
+# error: [unused-ignore-comment] "Unused `ty: ignore` directive"
 a = 10 / 2  # ty: ignore[division-by-zero, unresolved-reference]
 
 # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment'"
 # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-reference'"
 a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
+
+# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment', 'unresolved-reference'"
+a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-zero]
 ```
 
 ## Multiple suppressions
@@ -188,4 +191,41 @@ a = 10 + 4  # ty: ignore[division-by-zer]
 # error:[ignore-comment-unknown-rule] "Unknown rule `lint:division-by-zero`. Did you mean `division-by-zero`?"
 # error: [division-by-zero]
 a = 10 / 0  # ty: ignore[lint:division-by-zero]
+```
+
+## Suppression of specific diagnostics
+
+In this section, we make sure that specific diagnostics can be suppressed in various forms that
+users might expect to work.
+
+### Invalid assignment
+
+An invalid assignment can be suppressed in the following ways:
+
+```py
+# fmt: off
+
+x1: str = 1 + 2 + 3  # ty: ignore
+
+x2: str = (  # ty: ignore
+    1 + 2 + 3
+)
+
+x4: str = (
+    1 + 2 + 3
+)  # ty: ignore
+```
+
+It can *not* be suppressed by putting the `# ty: ignore` on the inner expression. The range targeted
+by the suppression comment needs to overlap with one of the boundaries of the value range (the outer
+parentheses in this case):
+
+```py
+# fmt: off
+
+# error: [invalid-assignment]
+x4: str = (
+    # error: [unused-ignore-comment]
+    1 + 2 + 3  # ty: ignore
+)
 ```

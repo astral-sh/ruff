@@ -1,5 +1,10 @@
 # Assignable-to relation
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 The `is_assignable_to(S, T)` relation below checks if type `S` is assignable to type `T` (target).
 This allows us to check if a type `S` can be used in a context where a type `T` is expected
 (function arguments, variable assignments). See the [typing documentation] for a precise definition
@@ -238,13 +243,13 @@ static_assert(is_assignable_to(TypeOf[Bar[int]], type[Foo[int]]))
 static_assert(is_assignable_to(TypeOf[Bar[bool]], type[Foo[int]]))
 static_assert(is_assignable_to(TypeOf[Bar], type[Foo[int]]))
 static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[int]]))
+static_assert(is_assignable_to(TypeOf[Bar[Unknown]], type[Foo[int]]))
 static_assert(is_assignable_to(TypeOf[Bar], type[Foo]))
 static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[Any]]))
 static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[int]]))
 
-# TODO: these should pass (all subscripts inside `type[]` type expressions are currently TODO types)
-static_assert(not is_assignable_to(TypeOf[Bar[int]], type[Foo[bool]]))  # error: [static-assert-error]
-static_assert(not is_assignable_to(TypeOf[Foo[bool]], type[Bar[int]]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(TypeOf[Bar[int]], type[Foo[bool]]))
+static_assert(not is_assignable_to(TypeOf[Foo[bool]], type[Bar[int]]))
 ```
 
 ## `type[]` is not assignable to types disjoint from `builtins.type`
@@ -1225,6 +1230,46 @@ from typing import Callable, Any
 from ty_extensions import static_assert, is_assignable_to
 
 static_assert(is_assignable_to(type, Callable[..., Any]))
+```
+
+### Generic callables
+
+A generic callable can be considered equivalent to an intersection of all of its possible
+specializations. That means that a generic callable is assignable to any particular specialization.
+(If someone expects a function that works with a particular specialization, it's fine to hand them
+the generic callable.)
+
+```py
+from typing import Callable
+from ty_extensions import CallableTypeOf, TypeOf, is_assignable_to, static_assert
+
+def identity[T](t: T) -> T:
+    return t
+
+static_assert(is_assignable_to(TypeOf[identity], Callable[[int], int]))
+static_assert(is_assignable_to(TypeOf[identity], Callable[[str], str]))
+# TODO: no error
+# error: [static-assert-error]
+static_assert(not is_assignable_to(TypeOf[identity], Callable[[str], int]))
+
+static_assert(is_assignable_to(CallableTypeOf[identity], Callable[[int], int]))
+static_assert(is_assignable_to(CallableTypeOf[identity], Callable[[str], str]))
+# TODO: no error
+# error: [static-assert-error]
+static_assert(not is_assignable_to(CallableTypeOf[identity], Callable[[str], int]))
+```
+
+The reverse is not true — if someone expects a generic function that can be called with any
+specialization, we cannot hand them a function that only works with one specialization.
+
+```py
+static_assert(not is_assignable_to(Callable[[int], int], TypeOf[identity]))
+static_assert(not is_assignable_to(Callable[[str], str], TypeOf[identity]))
+static_assert(not is_assignable_to(Callable[[str], int], TypeOf[identity]))
+
+static_assert(not is_assignable_to(Callable[[int], int], CallableTypeOf[identity]))
+static_assert(not is_assignable_to(Callable[[str], str], CallableTypeOf[identity]))
+static_assert(not is_assignable_to(Callable[[str], int], CallableTypeOf[identity]))
 ```
 
 ## Generics

@@ -149,8 +149,7 @@ from ty_extensions import reveal_mro
 
 class Foo(type[int]): ...
 
-# TODO: should be `tuple[<class 'Foo'>, <class 'type'>, <class 'object'>]
-reveal_mro(Foo)  # revealed: (<class 'Foo'>, @Todo(GenericAlias instance), <class 'object'>)
+reveal_mro(Foo)  # revealed: (<class 'Foo'>, <class 'type'>, <class 'object'>)
 ```
 
 ## Display of generic `type[]` types
@@ -173,6 +172,39 @@ def _(x: Foo[int], y: Bar[str], z: list[bytes]):
     reveal_type(type(x))  # revealed: type[Foo[int]]
     reveal_type(type(y))  # revealed: type[Bar[str]]
     reveal_type(type(z))  # revealed: type[list[bytes]]
+```
+
+## Checking generic `type[]` types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C[T]:
+    pass
+
+class D[T]:
+    pass
+
+var: type[C[int]] = C[int]
+var: type[C[int]] = D[int]  # error: [invalid-assignment] "Object of type `<class 'D[int]'>` is not assignable to `type[C[int]]`"
+```
+
+However, generic `Protocol` classes are still TODO:
+
+```py
+from typing import Protocol
+
+class Proto[U](Protocol):
+    def some_method(self): ...
+
+# TODO: should be error: [invalid-assignment]
+var: type[Proto[int]] = C[int]
+
+def _(p: type[Proto[int]]):
+    reveal_type(p)  # revealed: type[@Todo(type[T] for protocols)]
 ```
 
 ## `@final` classes

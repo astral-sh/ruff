@@ -717,3 +717,17 @@ class F[T](F(), F): ...  # error: [cyclic-class-definition]
 reveal_type(F.__class__)  # revealed: type[Unknown]
 reveal_mro(F)  # revealed: (<class 'F[Unknown]'>, Unknown, <class 'object'>)
 ```
+
+## `builtins.NotImplemented`
+
+Typeshed tells us that `NotImplementedType` inherits from `Any`, but that causes more problems for
+us than it fixes. We override typeshed here so that we understand `NotImplementedType` as inheriting
+directly from `object` (as it does at runtime).
+
+```py
+import types
+from ty_extensions import reveal_mro
+
+reveal_mro(types.NotImplementedType)  # revealed: (<class 'NotImplementedType'>, <class 'object'>)
+reveal_mro(type(NotImplemented))  # revealed: (<class 'NotImplementedType'>, <class 'object'>)
+```

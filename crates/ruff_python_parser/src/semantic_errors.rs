@@ -145,11 +145,16 @@ impl SemanticSyntaxChecker {
                     }
                 }
             }
-            Stmt::ClassDef(ast::StmtClassDef { type_params, .. })
-            | Stmt::TypeAlias(ast::StmtTypeAlias { type_params, .. }) => {
-                if let Some(type_params) = type_params {
-                    Self::duplicate_type_parameter_name(type_params, ctx);
-                }
+            Stmt::ClassDef(ast::StmtClassDef {
+                type_params: Some(type_params),
+                ..
+            })
+            | Stmt::TypeAlias(ast::StmtTypeAlias {
+                type_params: Some(type_params),
+                ..
+            }) => {
+                Self::duplicate_type_parameter_name(type_params, ctx);
+                Self::type_parameter_default_order(type_params, ctx);
             }
             Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
                 if let [Expr::Starred(ast::ExprStarred { range, .. })] = targets.as_slice() {
@@ -612,6 +617,39 @@ impl SemanticSyntaxChecker {
         }
     }
 
+    fn type_parameter_default_order<Ctx: SemanticSyntaxContext>(
+        type_params: &ast::TypeParams,
+        ctx: &Ctx,
+    ) {
+        let mut seen_default = false;
+        for type_param in type_params.iter() {
+            let has_default = match type_param {
+                ast::TypeParam::TypeVar(ast::TypeParamTypeVar { default, .. })
+                | ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { default, .. })
+                | ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { default, .. }) => {
+                    default.is_some()
+                }
+            };
+
+            if seen_default && !has_default {
+                // test_err type_parameter_default_order
+                // class C[T = int, U]: ...
+                // class C[T1, T2 = int, T3, T4]: ...
+                // type Alias[T = int, U] = ...
+                Self::add_error(
+                    ctx,
+                    SemanticSyntaxErrorKind::TypeParameterDefaultOrder(
+                        type_param.name().id.to_string(),
+                    ),
+                    type_param.range(),
+                );
+            }
+            if has_default {
+                seen_default = true;
+            }
+        }
+    }
+
     fn duplicate_parameter_name<Ctx: SemanticSyntaxContext>(
         parameters: &ast::Parameters,
         ctx: &Ctx,
@@ -911,7 +949,7 @@ impl SemanticSyntaxChecker {
         // This check is required in addition to avoiding calling this function in `visit_expr`
         // because the generator scope applies to nested parts of the `Expr::Generator` that are
         // visited separately.
-        if ctx.in_generator_scope() {
+        if ctx.in_generator_context() {
             return;
         }
         Self::add_error(
@@ -1080,6 +1118,12 @@ impl Display for SemanticSyntaxError {
             }
             SemanticSyntaxErrorKind::DuplicateTypeParameter => {
                 f.write_str("duplicate type parameter")
+            }
+            SemanticSyntaxErrorKind::TypeParameterDefaultOrder(name) => {
+                write!(
+                    f,
+                    "non default type parameter `{name}` follows default type parameter"
+                )
             }
             SemanticSyntaxErrorKind::MultipleCaseAssignment(name) => {
                 write!(f, "multiple assignments to name `{name}` in pattern")
@@ -1591,6 +1635,9 @@ pub enum SemanticSyntaxErrorKind {
     /// Represents a nonlocal statement for a name that has no binding in an enclosing scope.
     NonlocalWithoutBinding(String),
 
+    /// Represents a default type parameter followed by a non-default type parameter.
+    TypeParameterDefaultOrder(String),
+
     /// Represents a `return` statement with a value in an asynchronous generator.
     ReturnInGenerator,
 }
@@ -1923,6 +1970,8 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         //     case [[x] | [x]] | x: ...
                         // match 42:
                         //     case [[x | x] | [x]] | x: ...
+                        // match 42:
+                        //     case ast.Subscript(n, ast.Constant() | ast.Slice()) | ast.Attribute(n): ...
                         SemanticSyntaxChecker::add_error(
                             self.ctx,
                             SemanticSyntaxErrorKind::DifferentMatchPatternBindings,
@@ -1930,7 +1979,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         );
                         break;
                     }
-                    self.names = visitor.names;
+                    self.names.extend(visitor.names);
                 }
             }
         }
@@ -2149,19 +2198,21 @@ pub trait SemanticSyntaxContext {
     /// Returns `true` if the visitor is in a function scope.
     fn in_function_scope(&self) -> bool;
 
-    /// Returns `true` if the visitor is in a generator scope.
+    /// Returns `true` if the visitor is within a generator scope.
     ///
     /// Note that this refers to an `Expr::Generator` precisely, not to comprehensions more
     /// generally.
-    fn in_generator_scope(&self) -> bool;
+    fn in_generator_context(&self) -> bool;
 
     /// Returns `true` if the source file is a Jupyter notebook.
     fn in_notebook(&self) -> bool;
 
     fn report_semantic_error(&self, error: SemanticSyntaxError);
 
+    /// Returns `true` if the visitor is inside a `for` or `while` loop.
     fn in_loop_context(&self) -> bool;
 
+    /// Returns `true` if `name` is a bound parameter in the current function or lambda scope.
     fn is_bound_parameter(&self, name: &str) -> bool;
 }
 

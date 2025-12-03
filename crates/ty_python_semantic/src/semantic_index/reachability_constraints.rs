@@ -208,7 +208,7 @@ use crate::semantic_index::predicate::{
     Predicates, ScopedPredicateId,
 };
 use crate::types::{
-    IntersectionBuilder, Truthiness, Type, TypeContext, UnionBuilder, UnionType,
+    CallableTypes, IntersectionBuilder, Truthiness, Type, TypeContext, UnionBuilder, UnionType,
     infer_expression_type, static_expression_truthiness,
 };
 
@@ -336,6 +336,7 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
                 infer_expression_type(db, *class_expr, TypeContext::default())
                     .to_instance(db)
                     .unwrap_or(Type::Never)
+                    .top_materialization(db)
             } else {
                 Type::Never
             }
@@ -871,12 +872,14 @@ impl ReachabilityConstraints {
                     return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
                 }
 
-                let overloads_iterator =
-                    if let Some(Type::Callable(callable)) = ty.try_upcast_to_callable(db) {
-                        callable.signatures(db).overloads.iter()
-                    } else {
-                        return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
-                    };
+                let overloads_iterator = if let Some(callable) = ty
+                    .try_upcast_to_callable(db)
+                    .and_then(CallableTypes::exactly_one)
+                {
+                    callable.signatures(db).overloads.iter()
+                } else {
+                    return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
+                };
 
                 let (no_overloads_return_never, all_overloads_return_never) = overloads_iterator
                     .fold((true, true), |(none, all), overload| {

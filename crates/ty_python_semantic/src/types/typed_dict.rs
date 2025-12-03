@@ -12,8 +12,10 @@ use super::diagnostic::{
     report_missing_typed_dict_key,
 };
 use super::{ApplyTypeMappingVisitor, Type, TypeMapping, visitor};
-use crate::types::TypeContext;
-use crate::{Db, FxOrderMap};
+use crate::types::constraints::ConstraintSet;
+use crate::types::generics::InferableTypeVars;
+use crate::types::{HasRelationToVisitor, IsDisjointVisitor, TypeContext, TypeRelation};
+use crate::{Db, FxIndexMap};
 
 use ordermap::OrderSet;
 
@@ -54,7 +56,7 @@ impl<'db> TypedDictType<'db> {
         self.defining_class
     }
 
-    pub(crate) fn items(self, db: &'db dyn Db) -> FxOrderMap<Name, Field<'db>> {
+    pub(crate) fn items(self, db: &'db dyn Db) -> &'db FxIndexMap<Name, Field<'db>> {
         let (class_literal, specialization) = self.defining_class.class_literal(db);
         class_literal.fields(db, specialization, CodeGeneratorKind::TypedDict)
     }
@@ -75,6 +77,174 @@ impl<'db> TypedDictType<'db> {
                 visitor,
             ),
         }
+    }
+
+    // Subtyping between `TypedDict`s follows the algorithm described at:
+    // https://typing.python.org/en/latest/spec/typeddict.html#subtyping-between-typeddict-types
+    pub(super) fn has_relation_to_impl(
+        self,
+        db: &'db dyn Db,
+        target: TypedDictType<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        relation: TypeRelation<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        // First do a quick nominal check that (if it succeeds) means that we can avoid
+        // materializing the full `TypedDict` schema for either `self` or `target`.
+        // This should be cheaper in many cases, and also helps us avoid some cycles.
+        if self
+            .defining_class
+            .is_subclass_of(db, target.defining_class)
+        {
+            return ConstraintSet::from(true);
+        }
+
+        let self_items = self.items(db);
+        let target_items = target.items(db);
+        // Many rules violations short-circuit with "never", but asking whether one field is
+        // [relation] to/of another can produce more complicated constraints, and we collect those.
+        let mut constraints = ConstraintSet::from(true);
+        for (target_item_name, target_item_field) in target_items {
+            let field_constraints = if target_item_field.is_required() {
+                // required target fields
+                let Some(self_item_field) = self_items.get(target_item_name) else {
+                    // Self is missing a required field.
+                    return ConstraintSet::from(false);
+                };
+                if !self_item_field.is_required() {
+                    // A required field is not required in self.
+                    return ConstraintSet::from(false);
+                }
+                if target_item_field.is_read_only() {
+                    // For `ReadOnly[]` fields in the target, the corresponding fields in
+                    // self need to have the same assignability/subtyping/etc relation
+                    // individually that we're looking for overall between the
+                    // `TypedDict`s.
+                    self_item_field.declared_ty.has_relation_to_impl(
+                        db,
+                        target_item_field.declared_ty,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                } else {
+                    if self_item_field.is_read_only() {
+                        // A read-only field can't be assigned to a mutable target.
+                        return ConstraintSet::from(false);
+                    }
+                    // For mutable fields in the target, the relation needs to apply both
+                    // ways, or else mutating the target could violate the structural
+                    // invariants of self. For fully-static types, this is "equivalence".
+                    // For gradual types, it depends on the relation, but mutual
+                    // assignability is "consistency".
+                    self_item_field
+                        .declared_ty
+                        .has_relation_to_impl(
+                            db,
+                            target_item_field.declared_ty,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                        .and(db, || {
+                            target_item_field.declared_ty.has_relation_to_impl(
+                                db,
+                                self_item_field.declared_ty,
+                                inferable,
+                                relation,
+                                relation_visitor,
+                                disjointness_visitor,
+                            )
+                        })
+                }
+            } else {
+                // `NotRequired[]` target fields
+                if target_item_field.is_read_only() {
+                    // As above, for `NotRequired[]` + `ReadOnly[]` fields in the target. It's
+                    // tempting to refactor things and unify some of these calls to
+                    // `has_relation_to_impl`, but this branch will get more complicated when we
+                    // add support for `closed` and `extra_items` (which is why the rules in the
+                    // spec are structured like they are), and following the structure of the spec
+                    // makes it easier to check the logic here.
+                    if let Some(self_item_field) = self_items.get(target_item_name) {
+                        self_item_field.declared_ty.has_relation_to_impl(
+                            db,
+                            target_item_field.declared_ty,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    } else {
+                        // Self is missing this not-required, read-only item. However, since all
+                        // `TypedDict`s by default are allowed to have "extra items" of any type
+                        // (until we support `closed` and explicit `extra_items`), this key could
+                        // actually turn out to have a value. To make sure this is type-safe, the
+                        // not-required field in the target needs to be assignable from `object`.
+                        // TODO: `closed` and `extra_items` support will go here.
+                        Type::object().when_assignable_to(
+                            db,
+                            target_item_field.declared_ty,
+                            inferable,
+                        )
+                    }
+                } else {
+                    // As above, for `NotRequired[]` mutable fields in the target. Again the logic
+                    // is largely the same for now, but it will get more complicated with `closed`
+                    // and `extra_items`.
+                    if let Some(self_item_field) = self_items.get(target_item_name) {
+                        if self_item_field.is_read_only() {
+                            // A read-only field can't be assigned to a mutable target.
+                            return ConstraintSet::from(false);
+                        }
+                        if self_item_field.is_required() {
+                            // A required field can't be assigned to a not-required, mutable field
+                            // in the target, because `del` is allowed on the target field.
+                            return ConstraintSet::from(false);
+                        }
+
+                        // As above, for mutable fields in the target, the relation needs
+                        // to apply both ways.
+                        self_item_field
+                            .declared_ty
+                            .has_relation_to_impl(
+                                db,
+                                target_item_field.declared_ty,
+                                inferable,
+                                relation,
+                                relation_visitor,
+                                disjointness_visitor,
+                            )
+                            .and(db, || {
+                                target_item_field.declared_ty.has_relation_to_impl(
+                                    db,
+                                    self_item_field.declared_ty,
+                                    inferable,
+                                    relation,
+                                    relation_visitor,
+                                    disjointness_visitor,
+                                )
+                            })
+                    } else {
+                        // Self is missing this not-required, mutable field. This isn't ok if self
+                        // has read-only extra items, which all `TypedDict`s effectively do until
+                        // we support `closed` and explicit `extra_items`. See "A subtle
+                        // interaction between two structural assignability rules prevents
+                        // unsoundness" in `typed_dict.md`.
+                        // TODO: `closed` and `extra_items` support will go here.
+                        ConstraintSet::from(false)
+                    }
+                }
+            };
+            constraints.intersect(db, field_constraints);
+            if constraints.is_never_satisfied(db) {
+                return constraints;
+            }
+        }
+        constraints
     }
 }
 
@@ -143,32 +313,59 @@ impl TypedDictAssignmentKind {
 pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
+    full_object_ty: Option<Type<'db>>,
     key: &str,
     value_ty: Type<'db>,
-    typed_dict_node: impl Into<AnyNodeRef<'ast>>,
+    typed_dict_node: impl Into<AnyNodeRef<'ast>> + Copy,
     key_node: impl Into<AnyNodeRef<'ast>>,
     value_node: impl Into<AnyNodeRef<'ast>>,
     assignment_kind: TypedDictAssignmentKind,
+    emit_diagnostic: bool,
 ) -> bool {
     let db = context.db();
     let items = typed_dict.items(db);
 
     // Check if key exists in `TypedDict`
     let Some((_, item)) = items.iter().find(|(name, _)| *name == key) else {
-        report_invalid_key_on_typed_dict(
-            context,
-            typed_dict_node.into(),
-            key_node.into(),
-            Type::TypedDict(typed_dict),
-            Type::string_literal(db, key),
-            &items,
-        );
+        if emit_diagnostic {
+            report_invalid_key_on_typed_dict(
+                context,
+                typed_dict_node.into(),
+                key_node.into(),
+                Type::TypedDict(typed_dict),
+                full_object_ty,
+                Type::string_literal(db, key),
+                items,
+            );
+        }
 
         return false;
     };
 
+    let add_object_type_annotation =
+        |diagnostic: &mut Diagnostic| {
+            if let Some(full_object_ty) = full_object_ty {
+                diagnostic.annotate(context.secondary(typed_dict_node.into()).message(
+                    format_args!(
+                        "TypedDict `{}` in {kind} type `{}`",
+                        Type::TypedDict(typed_dict).display(db),
+                        full_object_ty.display(db),
+                        kind = if full_object_ty.is_union() {
+                            "union"
+                        } else {
+                            "intersection"
+                        },
+                    ),
+                ));
+            } else {
+                diagnostic.annotate(context.secondary(typed_dict_node.into()).message(
+                    format_args!("TypedDict `{}`", Type::TypedDict(typed_dict).display(db)),
+                ));
+            }
+        };
+
     let add_item_definition_subdiagnostic = |diagnostic: &mut Diagnostic, message| {
-        if let Some(declaration) = item.single_declaration {
+        if let Some(declaration) = item.first_declaration {
             let file = declaration.file(db);
             let module = parsed_module(db, file).load(db);
 
@@ -184,8 +381,9 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
     };
 
     if assignment_kind.is_subscript() && item.is_read_only() {
-        if let Some(builder) =
-            context.report_lint(assignment_kind.diagnostic_type(), key_node.into())
+        if emit_diagnostic
+            && let Some(builder) =
+                context.report_lint(assignment_kind.diagnostic_type(), key_node.into())
         {
             let typed_dict_ty = Type::TypedDict(typed_dict);
             let typed_dict_d = typed_dict_ty.display(db);
@@ -195,13 +393,7 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
             ));
 
             diagnostic.set_primary_message(format_args!("key is marked read-only"));
-
-            diagnostic.annotate(
-                context
-                    .secondary(typed_dict_node.into())
-                    .message(format_args!("TypedDict `{typed_dict_d}`")),
-            );
-
+            add_object_type_annotation(&mut diagnostic);
             add_item_definition_subdiagnostic(&mut diagnostic, "Read-only item declared here");
         }
 
@@ -219,7 +411,9 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
     }
 
     // Invalid assignment - emit diagnostic
-    if let Some(builder) = context.report_lint(assignment_kind.diagnostic_type(), value_node) {
+    if emit_diagnostic
+        && let Some(builder) = context.report_lint(assignment_kind.diagnostic_type(), value_node)
+    {
         let typed_dict_ty = Type::TypedDict(typed_dict);
         let typed_dict_d = typed_dict_ty.display(db);
         let value_d = value_ty.display(db);
@@ -234,17 +428,12 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
 
         diagnostic.annotate(
             context
-                .secondary(typed_dict_node.into())
-                .message(format_args!("TypedDict `{typed_dict_d}`")),
-        );
-
-        diagnostic.annotate(
-            context
                 .secondary(key_node.into())
                 .message(format_args!("key has declared type `{item_type_d}`")),
         );
 
         add_item_definition_subdiagnostic(&mut diagnostic, "Item declared here");
+        add_object_type_annotation(&mut diagnostic);
     }
 
     false
@@ -343,12 +532,14 @@ fn validate_from_dict_literal<'db, 'ast>(
                 validate_typed_dict_key_assignment(
                     context,
                     typed_dict,
+                    None,
                     key_str,
                     value_type,
                     error_node,
                     key_expr,
                     &dict_item.value,
                     TypedDictAssignmentKind::Constructor,
+                    true,
                 );
             }
         }
@@ -380,12 +571,14 @@ fn validate_from_keywords<'db, 'ast>(
             validate_typed_dict_key_assignment(
                 context,
                 typed_dict,
+                None,
                 arg_name.as_str(),
                 arg_type,
                 error_node,
                 keyword,
                 &keyword.value,
                 TypedDictAssignmentKind::Constructor,
+                true,
             );
         }
     }
@@ -418,12 +611,14 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
             valid &= validate_typed_dict_key_assignment(
                 context,
                 typed_dict,
+                None,
                 key_str,
                 value_type,
                 error_node,
                 key_expr,
                 &item.value,
                 TypedDictAssignmentKind::Constructor,
+                true,
             );
         }
     }

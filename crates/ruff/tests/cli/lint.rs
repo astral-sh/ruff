@@ -1760,6 +1760,64 @@ from foo import (  # noqa: F401
     Ok(())
 }
 
+#[test]
+fn add_noqa_with_reason() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "test.py",
+        r#"import os
+
+def foo():
+    x = 1
+"#,
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .arg("--add-noqa=TODO: fix")
+        .arg("--select=F401,F841")
+        .arg("test.py"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 2 noqa directives.
+    ");
+
+    let content = fs::read_to_string(fixture.root().join("test.py"))?;
+    insta::assert_snapshot!(content, @r"
+import os  # noqa: F401 TODO: fix
+
+def foo():
+    x = 1  # noqa: F841 TODO: fix
+");
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_with_newline_in_reason() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file("test.py", "import os\n")?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .arg("--add-noqa=line1\nline2")
+        .arg("--select=F401")
+        .arg("test.py"), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: --add-noqa <reason> cannot contain newline characters
+    "###);
+
+    Ok(())
+}
+
 /// Infer `3.11` from `requires-python` in `pyproject.toml`.
 #[test]
 fn requires_python() -> Result<()> {

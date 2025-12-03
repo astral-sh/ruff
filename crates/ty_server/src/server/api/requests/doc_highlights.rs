@@ -36,16 +36,18 @@ impl BackgroundDocumentRequestHandler for DocumentHighlightRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_file(db) else {
+        let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
 
-        let offset = params.text_document_position_params.position.to_text_size(
+        let Some(offset) = params.text_document_position_params.position.to_text_size(
             db,
             file,
             snapshot.url(),
             snapshot.encoding(),
-        );
+        ) else {
+            return Ok(None);
+        };
 
         let Some(highlights_result) = document_highlights(db, file, offset) else {
             return Ok(None);
@@ -53,11 +55,11 @@ impl BackgroundDocumentRequestHandler for DocumentHighlightRequestHandler {
 
         let highlights: Vec<_> = highlights_result
             .into_iter()
-            .map(|target| {
+            .filter_map(|target| {
                 let range = target
                     .range()
-                    .as_lsp_range(db, file, snapshot.encoding())
-                    .to_local_range();
+                    .to_lsp_range(db, file, snapshot.encoding())?
+                    .local_range();
 
                 let kind = match target.kind() {
                     ReferenceKind::Read => Some(DocumentHighlightKind::READ),
@@ -65,7 +67,7 @@ impl BackgroundDocumentRequestHandler for DocumentHighlightRequestHandler {
                     ReferenceKind::Other => Some(DocumentHighlightKind::TEXT),
                 };
 
-                DocumentHighlight { range, kind }
+                Some(DocumentHighlight { range, kind })
             })
             .collect();
 

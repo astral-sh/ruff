@@ -1186,6 +1186,16 @@ impl From<OutputFormat> for DiagnosticFormat {
     }
 }
 
+impl Combine for OutputFormat {
+    #[inline(always)]
+    fn combine_with(&mut self, _other: Self) {}
+
+    #[inline]
+    fn combine(self, _other: Self) -> Self {
+        self
+    }
+}
+
 #[derive(
     Debug,
     Default,

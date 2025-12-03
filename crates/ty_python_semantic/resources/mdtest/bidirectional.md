@@ -16,28 +16,19 @@ python-version = "3.12"
 ```
 
 ```py
+from typing import Literal
+
 def list1[T](x: T) -> list[T]:
     return [x]
 
-l1 = list1(1)
+l1: list[Literal[1]] = list1(1)
 reveal_type(l1)  # revealed: list[Literal[1]]
-l2: list[int] = list1(1)
+
+l2 = list1(1)
 reveal_type(l2)  # revealed: list[int]
 
-# `list[Literal[1]]` and `list[int]` are incompatible, since `list[T]` is invariant in `T`.
-# error: [invalid-assignment] "Object of type `list[Literal[1]]` is not assignable to `list[int]`"
-l2 = l1
-
-intermediate = list1(1)
-# TODO: the error will not occur if we can infer the type of `intermediate` to be `list[int]`
-# error: [invalid-assignment] "Object of type `list[Literal[1]]` is not assignable to `list[int]`"
-l3: list[int] = intermediate
-# TODO: it would be nice if this were `list[int]`
-reveal_type(intermediate)  # revealed: list[Literal[1]]
-reveal_type(l3)  # revealed: list[int]
-
-l4: list[int | str] | None = list1(1)
-reveal_type(l4)  # revealed: list[int | str]
+l3: list[int | str] | None = list1(1)
+reveal_type(l3)  # revealed: list[int | str]
 
 def _(l: list[int] | None = None):
     l1 = l or list()
@@ -50,8 +41,6 @@ def _(l: list[int] | None = None):
 def f[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
 
-# TODO: no error
-# error: [invalid-assignment] "Object of type `Literal[1] | list[Literal[1]]` is not assignable to `int | list[int]`"
 l5: int | list[int] = f(1, True)
 ```
 
@@ -233,6 +222,9 @@ def _(flag: bool):
 
     def _(c: C):
         c.x = lst(1)
+
+        # TODO: Use the parameter type of `__set__` as type context to avoid this error.
+        # error: [invalid-assignment]
         C.x = lst(1)
 ```
 
@@ -276,9 +268,30 @@ class A:
 
 A(f(1))
 
-# error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `list[int | str]`, found `list[list[Unknown]]`"
-# error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `list[int | None]`, found `list[list[Unknown]]`"
+# error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `list[int | str]`, found `list[int | None | list[Unknown]] & list[int | str | list[Unknown]] & list[list[Unknown]]`"
+# error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `list[int | None]`, found `list[int | None | list[Unknown]] & list[int | str | list[Unknown]] & list[list[Unknown]]`"
 A(f([]))
+```
+
+## Conditional expressions
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+The type context is propagated through both branches of conditional expressions:
+
+```py
+def f[T](x: T) -> list[T]:
+    raise NotImplementedError
+
+def _(flag: bool):
+    x1 = f(1) if flag else f(2)
+    reveal_type(x1)  # revealed: list[int]
+
+    x2: list[int | None] = f(1) if flag else f(2)
+    reveal_type(x2)  # revealed: list[int | None]
 ```
 
 ## Multi-inference diagnostics
@@ -327,7 +340,7 @@ def _(a: object, b: object, flag: bool):
     else:
         x = g
 
-    # error: [unsupported-operator] "Operator `>` is not supported for types `object` and `object`"
+    # error: [unsupported-operator] "Operator `>` is not supported between two objects of type `object`"
     x(f"{'a' if a > b else 'b'}")
 ```
 

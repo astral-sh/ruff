@@ -97,7 +97,8 @@ mod tests {
     #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048_1.py"))]
     #[test_case(Rule::DataclassEnum, Path::new("RUF049.py"))]
     #[test_case(Rule::IfKeyInDictDel, Path::new("RUF051.py"))]
-    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"))]
+    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052_0.py"))]
+    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052_1.py"))]
     #[test_case(Rule::ClassWithMixedTypeVars, Path::new("RUF053.py"))]
     #[test_case(Rule::FalsyDictGetFallback, Path::new("RUF056.py"))]
     #[test_case(Rule::UnnecessaryRound, Path::new("RUF057.py"))]
@@ -112,7 +113,9 @@ mod tests {
     #[test_case(Rule::LegacyFormPytestRaises, Path::new("RUF061_warns.py"))]
     #[test_case(Rule::LegacyFormPytestRaises, Path::new("RUF061_deprecated_call.py"))]
     #[test_case(Rule::NonOctalPermissions, Path::new("RUF064.py"))]
-    #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065.py"))]
+    #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065_0.py"))]
+    #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065_1.py"))]
+    #[test_case(Rule::PropertyWithoutReturn, Path::new("RUF066.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
@@ -620,8 +623,8 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"), r"^_+", 1)]
-    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"), r"", 2)]
+    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052_0.py"), r"^_+", 1)]
+    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052_0.py"), r"", 2)]
     fn custom_regexp_preset(
         rule_code: Rule,
         path: &Path,

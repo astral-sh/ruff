@@ -24,10 +24,10 @@ class GtReturnType: ...
 class GeReturnType: ...
 
 class A:
-    def __eq__(self, other: A) -> EqReturnType:
+    def __eq__(self, other: A) -> EqReturnType:  # error: [invalid-method-override]
         return EqReturnType()
 
-    def __ne__(self, other: A) -> NeReturnType:
+    def __ne__(self, other: A) -> NeReturnType:  # error: [invalid-method-override]
         return NeReturnType()
 
     def __lt__(self, other: A) -> LtReturnType:
@@ -66,10 +66,10 @@ class GtReturnType: ...
 class GeReturnType: ...
 
 class A:
-    def __eq__(self, other: B) -> EqReturnType:
+    def __eq__(self, other: B) -> EqReturnType:  # error: [invalid-method-override]
         return EqReturnType()
 
-    def __ne__(self, other: B) -> NeReturnType:
+    def __ne__(self, other: B) -> NeReturnType:  # error: [invalid-method-override]
         return NeReturnType()
 
     def __lt__(self, other: B) -> LtReturnType:
@@ -111,10 +111,10 @@ class GtReturnType: ...
 class GeReturnType: ...
 
 class A:
-    def __eq__(self, other: B) -> EqReturnType:
+    def __eq__(self, other: B) -> EqReturnType:  # error: [invalid-method-override]
         return EqReturnType()
 
-    def __ne__(self, other: B) -> NeReturnType:
+    def __ne__(self, other: B) -> NeReturnType:  # error: [invalid-method-override]
         return NeReturnType()
 
     def __lt__(self, other: B) -> LtReturnType:
@@ -132,12 +132,10 @@ class A:
 class Unrelated: ...
 
 class B:
-    # To override builtins.object.__eq__ and builtins.object.__ne__
-    # TODO these should emit an invalid override diagnostic
-    def __eq__(self, other: Unrelated) -> B:
+    def __eq__(self, other: Unrelated) -> B:  # error: [invalid-method-override]
         return B()
 
-    def __ne__(self, other: Unrelated) -> B:
+    def __ne__(self, other: Unrelated) -> B:  # error: [invalid-method-override]
         return B()
 
 # Because `object.__eq__` and `object.__ne__` accept `object` in typeshed,
@@ -180,10 +178,10 @@ class GtReturnType: ...
 class GeReturnType: ...
 
 class A:
-    def __eq__(self, other: A) -> A:
+    def __eq__(self, other: A) -> A:  # error: [invalid-method-override]
         return A()
 
-    def __ne__(self, other: A) -> A:
+    def __ne__(self, other: A) -> A:  # error: [invalid-method-override]
         return A()
 
     def __lt__(self, other: A) -> A:
@@ -199,22 +197,22 @@ class A:
         return A()
 
 class B(A):
-    def __eq__(self, other: A) -> EqReturnType:
+    def __eq__(self, other: A) -> EqReturnType:  # error: [invalid-method-override]
         return EqReturnType()
 
-    def __ne__(self, other: A) -> NeReturnType:
+    def __ne__(self, other: A) -> NeReturnType:  # error: [invalid-method-override]
         return NeReturnType()
 
-    def __lt__(self, other: A) -> LtReturnType:
+    def __lt__(self, other: A) -> LtReturnType:  # error: [invalid-method-override]
         return LtReturnType()
 
-    def __le__(self, other: A) -> LeReturnType:
+    def __le__(self, other: A) -> LeReturnType:  # error: [invalid-method-override]
         return LeReturnType()
 
-    def __gt__(self, other: A) -> GtReturnType:
+    def __gt__(self, other: A) -> GtReturnType:  # error: [invalid-method-override]
         return GtReturnType()
 
-    def __ge__(self, other: A) -> GeReturnType:
+    def __ge__(self, other: A) -> GeReturnType:  # error: [invalid-method-override]
         return GeReturnType()
 
 reveal_type(A() == B())  # revealed: EqReturnType
@@ -243,10 +241,10 @@ class A:
         return A()
 
 class B(A):
-    def __lt__(self, other: int) -> B:
+    def __lt__(self, other: int) -> B:  # error: [invalid-method-override]
         return B()
 
-    def __gt__(self, other: int) -> B:
+    def __gt__(self, other: int) -> B:  # error: [invalid-method-override]
         return B()
 
 reveal_type(A() < B())  # revealed: A
@@ -291,11 +289,10 @@ Please refer to the [docs](https://docs.python.org/3/reference/datamodel.html#ob
 from __future__ import annotations
 
 class A:
-    # TODO both these overrides should emit invalid-override diagnostic
-    def __eq__(self, other: int) -> A:
+    def __eq__(self, other: int) -> A:  # error: [invalid-method-override]
         return A()
 
-    def __ne__(self, other: int) -> A:
+    def __ne__(self, other: int) -> A:  # error: [invalid-method-override]
         return A()
 
 reveal_type(A() == A())  # revealed: bool
@@ -312,7 +309,7 @@ reveal_type(A() != object())  # revealed: bool
 reveal_type(object() == A())  # revealed: bool
 reveal_type(object() != A())  # revealed: bool
 
-# error: [unsupported-operator] "Operator `<` is not supported for types `A` and `object`"
+# error: [unsupported-operator] "Operator `<` is not supported between objects of type `A` and `object`"
 # revealed: Unknown
 reveal_type(A() < object())
 ```
@@ -330,13 +327,13 @@ reveal_type(1 >= 1.0)  # revealed: bool
 reveal_type(1 == 2j)  # revealed: bool
 reveal_type(1 != 2j)  # revealed: bool
 
-# error: [unsupported-operator] "Operator `<` is not supported for types `int` and `complex`, in comparing `Literal[1]` with `complex`"
+# error: [unsupported-operator] "Operator `<` is not supported between objects of type `Literal[1]` and `complex`"
 reveal_type(1 < 2j)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `<=` is not supported for types `int` and `complex`, in comparing `Literal[1]` with `complex`"
+# error: [unsupported-operator] "Operator `<=` is not supported between objects of type `Literal[1]` and `complex`"
 reveal_type(1 <= 2j)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `>` is not supported for types `int` and `complex`, in comparing `Literal[1]` with `complex`"
+# error: [unsupported-operator] "Operator `>` is not supported between objects of type `Literal[1]` and `complex`"
 reveal_type(1 > 2j)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `>=` is not supported for types `int` and `complex`, in comparing `Literal[1]` with `complex`"
+# error: [unsupported-operator] "Operator `>=` is not supported between objects of type `Literal[1]` and `complex`"
 reveal_type(1 >= 2j)  # revealed: Unknown
 
 def f(x: bool, y: int):
@@ -388,4 +385,30 @@ class A:
 reveal_type(A() == A())  # revealed: Literal[True]
 reveal_type(A() < A())  # revealed: Literal[True]
 reveal_type(A() > A())  # revealed: Literal[True]
+```
+
+## Diagnostics where classes have the same name
+
+We use the fully qualified names of classes to disambiguate them where necessary:
+
+`a.py`:
+
+```py
+class Foo: ...
+```
+
+`b.py`:
+
+```py
+class Foo: ...
+```
+
+`main.py`:
+
+```py
+import a
+import b
+
+# error: [unsupported-operator] "Operator `<` is not supported between objects of type `a.Foo` and `b.Foo`"
+a.Foo() < b.Foo()
 ```

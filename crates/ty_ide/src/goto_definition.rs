@@ -3,7 +3,7 @@ use crate::{Db, NavigationTargets, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
-use ty_python_semantic::ImportAliasResolution;
+use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 
 /// Navigate to the definition of a symbol.
 ///
@@ -17,10 +17,10 @@ pub fn goto_definition(
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
     let module = parsed_module(db, file).load(db);
-    let goto_target = find_goto_target(&module, offset)?;
-
+    let model = SemanticModel::new(db, file);
+    let goto_target = find_goto_target(&model, &module, offset)?;
     let definition_targets = goto_target
-        .get_definition_targets(file, db, ImportAliasResolution::ResolveAliases)?
+        .get_definition_targets(&model, ImportAliasResolution::ResolveAliases)?
         .definition_targets(db)?;
 
     Some(RangedValue {
@@ -1590,6 +1590,111 @@ a = Test()
           | ^^^
           |
         ");
+    }
+
+    #[test]
+    fn float_annotation() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+a: float<CURSOR> = 3.14
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: float = 3.14
+          |    ^^^^^
+          |
+
+        info[goto-definition]: Definition
+           --> stdlib/builtins.pyi:661:7
+            |
+        660 | @disjoint_base
+        661 | class float:
+            |       ^^^^^
+        662 |     """Convert a string or number to a floating-point number, if possible."""
+            |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: float = 3.14
+          |    ^^^^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn complex_annotation() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+a: complex<CURSOR> = 3.14
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: complex = 3.14
+          |    ^^^^^^^
+          |
+
+        info[goto-definition]: Definition
+           --> stdlib/builtins.pyi:661:7
+            |
+        660 | @disjoint_base
+        661 | class float:
+            |       ^^^^^
+        662 |     """Convert a string or number to a floating-point number, if possible."""
+            |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: complex = 3.14
+          |    ^^^^^^^
+          |
+
+        info[goto-definition]: Definition
+           --> stdlib/builtins.pyi:822:7
+            |
+        821 | @disjoint_base
+        822 | class complex:
+            |       ^^^^^^^
+        823 |     """Create a complex number from a string or numbers.
+            |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: complex = 3.14
+          |    ^^^^^^^
+          |
+        "#);
     }
 
     /// Regression test for <https://github.com/astral-sh/ty/issues/1451>.

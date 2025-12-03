@@ -238,7 +238,7 @@ if sys.platform == "win32":
         tree.
         """
 
-    def OpenKey(key: _KeyType, sub_key: str, reserved: int = 0, access: int = 131097) -> HKEYType:
+    def OpenKey(key: _KeyType, sub_key: str | None, reserved: int = 0, access: int = 131097) -> HKEYType:
         """Opens the specified key.
 
           key
@@ -255,7 +255,7 @@ if sys.platform == "win32":
         If the function fails, an OSError exception is raised.
         """
 
-    def OpenKeyEx(key: _KeyType, sub_key: str, reserved: int = 0, access: int = 131097) -> HKEYType:
+    def OpenKeyEx(key: _KeyType, sub_key: str | None, reserved: int = 0, access: int = 131097) -> HKEYType:
         """Opens the specified key.
 
           key
@@ -336,7 +336,7 @@ if sys.platform == "win32":
         to the API.
         """
 
-    def SetValue(key: _KeyType, sub_key: str, type: int, value: str, /) -> None:
+    def SetValue(key: _KeyType, sub_key: str | None, type: int, value: str, /) -> None:
         """Associates a value with a specified key.
 
           key

@@ -11,9 +11,9 @@ pub fn goto_type_definition(
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
     let module = parsed_module(db, file).load(db);
-    let goto_target = find_goto_target(&module, offset)?;
-
     let model = SemanticModel::new(db, file);
+    let goto_target = find_goto_target(&model, &module, offset)?;
+
     let ty = goto_target.inferred_type(&model)?;
 
     tracing::debug!("Inferred type of covering node is {}", ty.display(db));
@@ -63,6 +63,134 @@ mod tests {
         2 | class Test: ...
         3 |
         4 | ab = Test()
+          | ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_typing_dot_literal() {
+        let test = cursor_test(
+            r#"
+            from typing import Literal
+
+            a<CURSOR>b = Literal
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+           --> stdlib/typing.pyi:351:1
+            |
+        349 | Final: _SpecialForm
+        350 |
+        351 | Literal: _SpecialForm
+            | ^^^^^^^
+        352 | TypedDict: _SpecialForm
+            |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from typing import Literal
+        3 |
+        4 | ab = Literal
+          | ^^
+          |
+        ");
+    }
+
+    // this is a slightly different case to the one above,
+    // since `Any` is a class in typeshed rather than a variable
+    #[test]
+    fn goto_type_of_typing_dot_any() {
+        let test = cursor_test(
+            r#"
+            from typing import Any
+
+            a<CURSOR>b = Any
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+           --> stdlib/typing.pyi:166:7
+            |
+        164 | # from _typeshed import AnnotationForm
+        165 |
+        166 | class Any:
+            |       ^^^
+        167 |     """Special type indicating an unconstrained type.
+            |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from typing import Any
+        3 |
+        4 | ab = Any
+          | ^^
+          |
+        "#);
+    }
+
+    // Similarly, `Generic` is a `type[]` type in typeshed
+    #[test]
+    fn goto_type_of_typing_dot_generic() {
+        let test = cursor_test(
+            r#"
+            from typing import Generic
+
+            a<CURSOR>b = Generic
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+           --> stdlib/typing.pyi:770:1
+            |
+        768 |         def __class_getitem__(cls, args: TypeVar | tuple[TypeVar, ...]) -> _Final: ...
+        769 |
+        770 | Generic: type[_Generic]
+            | ^^^^^^^
+        771 |
+        772 | class _ProtocolMeta(ABCMeta):
+            |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from typing import Generic
+        3 |
+        4 | ab = Generic
+          | ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_ty_extensions_special_form() {
+        let test = cursor_test(
+            r#"
+            from ty_extensions import AlwaysTruthy
+
+            a<CURSOR>b = AlwaysTruthy
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+          --> stdlib/ty_extensions.pyi:21:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+        21 | AlwaysTruthy = object()
+           | ^^^^^^^^^^^^
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from ty_extensions import AlwaysTruthy
+        3 |
+        4 | ab = AlwaysTruthy
           | ^^
           |
         ");
@@ -158,6 +286,300 @@ mod tests {
     }
 
     #[test]
+    fn goto_type_of_import_module() {
+        let mut test = cursor_test(
+            r#"
+            import l<CURSOR>ib
+            "#,
+        );
+
+        test.write_file("lib.py", "a = 10").unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> lib.py:1:1
+          |
+        1 | a = 10
+          | ^^^^^^
+          |
+        info: Source
+         --> main.py:2:8
+          |
+        2 | import lib
+          |        ^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_import_module_multi1() {
+        let mut test = cursor_test(
+            r#"
+            import li<CURSOR>b.submod
+            "#,
+        );
+
+        test.write_file("lib/__init__.py", "b = 7").unwrap();
+        test.write_file("lib/submod.py", "a = 10").unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> lib/__init__.py:1:1
+          |
+        1 | b = 7
+          | ^^^^^
+          |
+        info: Source
+         --> main.py:2:8
+          |
+        2 | import lib.submod
+          |        ^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_import_module_multi2() {
+        let mut test = cursor_test(
+            r#"
+            import lib.subm<CURSOR>od
+            "#,
+        );
+
+        test.write_file("lib/__init__.py", "b = 7").unwrap();
+        test.write_file("lib/submod.py", "a = 10").unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> lib/submod.py:1:1
+          |
+        1 | a = 10
+          | ^^^^^^
+          |
+        info: Source
+         --> main.py:2:12
+          |
+        2 | import lib.submod
+          |            ^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_from_import_module() {
+        let mut test = cursor_test(
+            r#"
+            from l<CURSOR>ib import a
+            "#,
+        );
+
+        test.write_file("lib.py", "a = 10").unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> lib.py:1:1
+          |
+        1 | a = 10
+          | ^^^^^^
+          |
+        info: Source
+         --> main.py:2:6
+          |
+        2 | from lib import a
+          |      ^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_from_import_module_multi1() {
+        let mut test = cursor_test(
+            r#"
+            from li<CURSOR>b.submod import a
+            "#,
+        );
+
+        test.write_file("lib/__init__.py", "b = 7").unwrap();
+        test.write_file("lib/submod.py", "a = 10").unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> lib/__init__.py:1:1
+          |
+        1 | b = 7
+          | ^^^^^
+          |
+        info: Source
+         --> main.py:2:6
+          |
+        2 | from lib.submod import a
+          |      ^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_from_import_module_multi2() {
+        let mut test = cursor_test(
+            r#"
+            from lib.subm<CURSOR>od import a
+            "#,
+        );
+
+        test.write_file("lib/__init__.py", "b = 7").unwrap();
+        test.write_file("lib/submod.py", "a = 10").unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> lib/submod.py:1:1
+          |
+        1 | a = 10
+          | ^^^^^^
+          |
+        info: Source
+         --> main.py:2:10
+          |
+        2 | from lib.submod import a
+          |          ^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_from_import_rel1() {
+        let mut test = CursorTest::builder()
+            .source(
+                "lib/sub/__init__.py",
+                r#"
+            from .bot.bot<CURSOR>mod import *
+            sub = 2
+            "#,
+            )
+            .build();
+
+        test.write_file("lib/__init__.py", "lib = 1").unwrap();
+        // test.write_file("lib/sub/__init__.py", "sub = 2").unwrap();
+        test.write_file("lib/sub/bot/__init__.py", "bot = 3")
+            .unwrap();
+        test.write_file("lib/sub/submod.py", "submod = 21").unwrap();
+        test.write_file("lib/sub/bot/botmod.py", "botmod = 31")
+            .unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> lib/sub/bot/botmod.py:1:1
+          |
+        1 | botmod = 31
+          | ^^^^^^^^^^^
+          |
+        info: Source
+         --> lib/sub/__init__.py:2:11
+          |
+        2 | from .bot.botmod import *
+          |           ^^^^^^
+        3 | sub = 2
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_from_import_rel2() {
+        let mut test = CursorTest::builder()
+            .source(
+                "lib/sub/__init__.py",
+                r#"
+            from .bo<CURSOR>t.botmod import *
+            sub = 2
+            "#,
+            )
+            .build();
+
+        test.write_file("lib/__init__.py", "lib = 1").unwrap();
+        // test.write_file("lib/sub/__init__.py", "sub = 2").unwrap();
+        test.write_file("lib/sub/bot/__init__.py", "bot = 3")
+            .unwrap();
+        test.write_file("lib/sub/submod.py", "submod = 21").unwrap();
+        test.write_file("lib/sub/bot/botmod.py", "botmod = 31")
+            .unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> lib/sub/bot/__init__.py:1:1
+          |
+        1 | bot = 3
+          | ^^^^^^^
+          |
+        info: Source
+         --> lib/sub/__init__.py:2:7
+          |
+        2 | from .bot.botmod import *
+          |       ^^^
+        3 | sub = 2
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_from_import_rel3() {
+        let mut test = CursorTest::builder()
+            .source(
+                "lib/sub/__init__.py",
+                r#"
+            from .<CURSOR>bot.botmod import *
+            sub = 2
+            "#,
+            )
+            .build();
+
+        test.write_file("lib/__init__.py", "lib = 1").unwrap();
+        // test.write_file("lib/sub/__init__.py", "sub = 2").unwrap();
+        test.write_file("lib/sub/bot/__init__.py", "bot = 3")
+            .unwrap();
+        test.write_file("lib/sub/submod.py", "submod = 21").unwrap();
+        test.write_file("lib/sub/bot/botmod.py", "botmod = 31")
+            .unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> lib/sub/bot/__init__.py:1:1
+          |
+        1 | bot = 3
+          | ^^^^^^^
+          |
+        info: Source
+         --> lib/sub/__init__.py:2:7
+          |
+        2 | from .bot.botmod import *
+          |       ^^^
+        3 | sub = 2
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_from_import_rel4() {
+        let mut test = CursorTest::builder()
+            .source(
+                "lib/sub/__init__.py",
+                r#"
+            from .<CURSOR> import submod
+            sub = 2
+            "#,
+            )
+            .build();
+
+        test.write_file("lib/__init__.py", "lib = 1").unwrap();
+        // test.write_file("lib/sub/__init__.py", "sub = 2").unwrap();
+        test.write_file("lib/sub/bot/__init__.py", "bot = 3")
+            .unwrap();
+        test.write_file("lib/sub/submod.py", "submod = 21").unwrap();
+        test.write_file("lib/sub/bot/botmod.py", "botmod = 31")
+            .unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
     fn goto_type_of_expression_with_module() {
         let mut test = cursor_test(
             r#"
@@ -199,13 +621,13 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:913:7
+           --> stdlib/builtins.pyi:915:7
             |
-        912 | @disjoint_base
-        913 | class str(Sequence[str]):
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
             |       ^^^
-        914 |     """str(object='') -> str
-        915 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:4:1
@@ -227,13 +649,13 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:913:7
+           --> stdlib/builtins.pyi:915:7
             |
-        912 | @disjoint_base
-        913 | class str(Sequence[str]):
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
             |       ^^^
-        914 |     """str(object='') -> str
-        915 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:2:10
@@ -323,6 +745,502 @@ mod tests {
     }
 
     #[test]
+    fn goto_type_string_annotation1() {
+        let test = cursor_test(
+            r#"
+        a: "MyCla<CURSOR>ss" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+         --> main.py:4:7
+          |
+        2 | a: "MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       ^^^^^^^
+        5 |     """some docs"""
+          |
+        info: Source
+         --> main.py:2:5
+          |
+        2 | a: "MyClass" = 1
+          |     ^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation2() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyCl<CURSOR>ass" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_type_string_annotation3() {
+        let test = cursor_test(
+            r#"
+        a: "None |<CURSOR> MyClass" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+         --> main.py:4:7
+          |
+        2 | a: "None | MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       ^^^^^^^
+        5 |     """some docs"""
+          |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: "None | MyClass" = 1
+          |    ^^^^^^^^^^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+
+        info[goto-type-definition]: Type definition
+           --> stdlib/types.pyi:950:11
+            |
+        948 | if sys.version_info >= (3, 10):
+        949 |     @final
+        950 |     class NoneType:
+            |           ^^^^^^^^
+        951 |         """The type of the None singleton."""
+            |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: "None | MyClass" = 1
+          |    ^^^^^^^^^^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation4() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyClass<CURSOR>" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_type_string_annotation5() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyClass"<CURSOR> = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+         --> main.py:4:7
+          |
+        2 | a: "None | MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       ^^^^^^^
+        5 |     """some docs"""
+          |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: "None | MyClass" = 1
+          |    ^^^^^^^^^^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+
+        info[goto-type-definition]: Type definition
+           --> stdlib/types.pyi:950:11
+            |
+        948 | if sys.version_info >= (3, 10):
+        949 |     @final
+        950 |     class NoneType:
+            |           ^^^^^^^^
+        951 |         """The type of the None singleton."""
+            |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: "None | MyClass" = 1
+          |    ^^^^^^^^^^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_dangling1() {
+        let test = cursor_test(
+            r#"
+        a: "MyCl<CURSOR>ass |" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+          --> stdlib/ty_extensions.pyi:20:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+           | ^^^^^^^
+        21 | AlwaysTruthy = object()
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main.py:2:4
+          |
+        2 | a: "MyClass |" = 1
+          |    ^^^^^^^^^^^
+        3 |
+        4 | class MyClass:
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_dangling2() {
+        let test = cursor_test(
+            r#"
+        a: "MyCl<CURSOR>ass | No" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_type_string_annotation_dangling3() {
+        let test = cursor_test(
+            r#"
+        a: "MyClass | N<CURSOR>o" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_type_match_name_stmt() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", a<CURSOR>b]:
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_type_match_name_binding() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", ab]:
+                        x = a<CURSOR>b
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+    }
+
+    #[test]
+    fn goto_type_match_rest_stmt() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", *a<CURSOR>b]:
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_type_match_rest_binding() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", *ab]:
+                        x = a<CURSOR>b
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+    }
+
+    #[test]
+    fn goto_type_match_as_stmt() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", ("a" | "b") as a<CURSOR>b]:
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_type_match_as_binding() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", ("a" | "b") as ab]:
+                        x = a<CURSOR>b
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+    }
+
+    #[test]
+    fn goto_type_match_keyword_stmt() {
+        let test = cursor_test(
+            r#"
+            class Click:
+                __match_args__ = ("position", "button")
+                def __init__(self, pos, btn):
+                    self.position: int = pos
+                    self.button: str = btn
+            
+            def my_func(event: Click):
+                match event:
+                    case Click(x, button=a<CURSOR>b):
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_type_match_keyword_binding() {
+        let test = cursor_test(
+            r#"
+            class Click:
+                __match_args__ = ("position", "button")
+                def __init__(self, pos, btn):
+                    self.position: int = pos
+                    self.button: str = btn
+            
+            def my_func(event: Click):
+                match event:
+                    case Click(x, button=ab):
+                        x = a<CURSOR>b
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+    }
+
+    #[test]
+    fn goto_type_match_class_name() {
+        let test = cursor_test(
+            r#"
+            class Click:
+                __match_args__ = ("position", "button")
+                def __init__(self, pos, btn):
+                    self.position: int = pos
+                    self.button: str = btn
+            
+            def my_func(event: Click):
+                match event:
+                    case Cl<CURSOR>ick(x, button=ab):
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+         --> main.py:2:7
+          |
+        2 | class Click:
+          |       ^^^^^
+        3 |     __match_args__ = ("position", "button")
+        4 |     def __init__(self, pos, btn):
+          |
+        info: Source
+          --> main.py:10:14
+           |
+         8 | def my_func(event: Click):
+         9 |     match event:
+        10 |         case Click(x, button=ab):
+           |              ^^^^^
+        11 |             x = ab
+           |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_match_class_field_name() {
+        let test = cursor_test(
+            r#"
+            class Click:
+                __match_args__ = ("position", "button")
+                def __init__(self, pos, btn):
+                    self.position: int = pos
+                    self.button: str = btn
+            
+            def my_func(event: Click):
+                match event:
+                    case Click(x, but<CURSOR>ton=ab):
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_type_typevar_name_stmt() {
+        let test = cursor_test(
+            r#"
+            type Alias1[A<CURSOR>B: int = bool] = tuple[AB, list[AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> main.py:2:13
+          |
+        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
+          |             ^^
+          |
+        info: Source
+         --> main.py:2:13
+          |
+        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
+          |             ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_typevar_name_binding() {
+        let test = cursor_test(
+            r#"
+            type Alias1[AB: int = bool] = tuple[A<CURSOR>B, list[AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> main.py:2:13
+          |
+        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
+          |             ^^
+          |
+        info: Source
+         --> main.py:2:37
+          |
+        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
+          |                                     ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_typevar_spec_stmt() {
+        let test = cursor_test(
+            r#"
+            from typing import Callable
+            type Alias2[**A<CURSOR>B = [int, str]] = Callable[AB, tuple[AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_type_typevar_spec_binding() {
+        let test = cursor_test(
+            r#"
+            from typing import Callable
+            type Alias2[**AB = [int, str]] = Callable[A<CURSOR>B, tuple[AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+    }
+
+    #[test]
+    fn goto_type_typevar_tuple_stmt() {
+        let test = cursor_test(
+            r#"
+            type Alias3[*A<CURSOR>B = ()] = tuple[tuple[*AB], tuple[*AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_type_typevar_tuple_binding() {
+        let test = cursor_test(
+            r#"
+            type Alias3[*AB = ()] = tuple[tuple[*A<CURSOR>B], tuple[*AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+    }
+
+    #[test]
     fn goto_type_on_keyword_argument() {
         let test = cursor_test(
             r#"
@@ -334,13 +1252,13 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:913:7
+           --> stdlib/builtins.pyi:915:7
             |
-        912 | @disjoint_base
-        913 | class str(Sequence[str]):
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
             |       ^^^
-        914 |     """str(object='') -> str
-        915 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:4:6
@@ -368,13 +1286,13 @@ mod tests {
         //   is an int. Navigating to `str` would match pyright's behavior.
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:346:7
+           --> stdlib/builtins.pyi:348:7
             |
-        345 | @disjoint_base
-        346 | class int:
+        347 | @disjoint_base
+        348 | class int:
             |       ^^^
-        347 |     """int([x]) -> integer
-        348 |     int(x, base=10) -> integer
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
             |
         info: Source
          --> main.py:4:6
@@ -401,13 +1319,13 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-            --> stdlib/builtins.pyi:2918:7
+            --> stdlib/builtins.pyi:2920:7
              |
-        2917 | @disjoint_base
-        2918 | class dict(MutableMapping[_KT, _VT]):
+        2919 | @disjoint_base
+        2920 | class dict(MutableMapping[_KT, _VT]):
              |       ^^^^
-        2919 |     """dict() -> new empty dictionary
-        2920 |     dict(mapping) -> new dictionary initialized from a mapping object's
+        2921 |     """dict() -> new empty dictionary
+        2922 |     dict(mapping) -> new dictionary initialized from a mapping object's
              |
         info: Source
          --> main.py:6:5
@@ -421,6 +1339,118 @@ f(**kwargs<CURSOR>)
     }
 
     #[test]
+    fn goto_type_nonlocal_binding() {
+        let test = cursor_test(
+            r#"
+def outer():
+    x = "outer_value"
+    
+    def inner():
+        nonlocal x
+        x = "modified"
+        return x<CURSOR>  # Should find the nonlocal x declaration in outer scope
+    
+    return inner
+"#,
+        );
+
+        // Should find the variable declaration in the outer scope, not the nonlocal statement
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+          --> main.py:8:16
+           |
+         6 |         nonlocal x
+         7 |         x = "modified"
+         8 |         return x  # Should find the nonlocal x declaration in outer scope
+           |                ^
+         9 |
+        10 |     return inner
+           |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_nonlocal_stmt() {
+        let test = cursor_test(
+            r#"
+def outer():
+    xy = "outer_value"
+    
+    def inner():
+        nonlocal x<CURSOR>y
+        xy = "modified"
+        return x  # Should find the nonlocal x declaration in outer scope
+    
+    return inner
+"#,
+        );
+
+        // Should find the variable declaration in the outer scope, not the nonlocal statement
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_type_global_binding() {
+        let test = cursor_test(
+            r#"
+global_var = "global_value"
+
+def function():
+    global global_var
+    global_var = "modified"
+    return global_<CURSOR>var  # Should find the global variable declaration
+"#,
+        );
+
+        // Should find the global variable declaration, not the global statement
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+         --> main.py:7:12
+          |
+        5 |     global global_var
+        6 |     global_var = "modified"
+        7 |     return global_var  # Should find the global variable declaration
+          |            ^^^^^^^^^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_global_stmt() {
+        let test = cursor_test(
+            r#"
+global_var = "global_value"
+
+def function():
+    global global_<CURSOR>var
+    global_var = "modified"
+    return global_var  # Should find the global variable declaration
+"#,
+        );
+
+        // Should find the global variable declaration, not the global statement
+        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
     fn goto_type_of_expression_with_builtin() {
         let test = cursor_test(
             r#"
@@ -431,13 +1461,13 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:913:7
+           --> stdlib/builtins.pyi:915:7
             |
-        912 | @disjoint_base
-        913 | class str(Sequence[str]):
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
             |       ^^^
-        914 |     """str(object='') -> str
-        915 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:3:5
@@ -523,13 +1553,13 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:913:7
+           --> stdlib/builtins.pyi:915:7
             |
-        912 | @disjoint_base
-        913 | class str(Sequence[str]):
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
             |       ^^^
-        914 |     """str(object='') -> str
-        915 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:4:15
@@ -570,13 +1600,13 @@ f(**kwargs<CURSOR>)
           |
 
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:913:7
+           --> stdlib/builtins.pyi:915:7
             |
-        912 | @disjoint_base
-        913 | class str(Sequence[str]):
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
             |       ^^^
-        914 |     """str(object='') -> str
-        915 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:3:5
