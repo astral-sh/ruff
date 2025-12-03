@@ -424,6 +424,12 @@ pub fn add_noqa_to_path(
         target_version,
     );
 
+    let suppressions = if is_range_suppressions_enabled(settings) {
+        Suppressions::from_tokens(locator.contents(), parsed.tokens())
+    } else {
+        Suppressions::default()
+    };
+
     // Add any missing `# noqa` pragmas.
     // TODO(dhruvmanila): Add support for Jupyter Notebooks
     add_noqa(
@@ -435,6 +441,7 @@ pub fn add_noqa_to_path(
         &directives.noqa_line_for,
         stylist.line_ending(),
         reason,
+        &suppressions,
     )
 }
 

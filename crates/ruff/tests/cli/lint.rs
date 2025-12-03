@@ -1705,6 +1705,53 @@ def unused(x):  # noqa: ANN001, ARG001, D103
 }
 
 #[test]
+fn add_noqa_existing_file_level_noqa() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+select = ["F401"]
+"#,
+    )?;
+
+    fixture.write_file(
+        "noqa.py",
+        r#"
+# ruff: noqa F401
+import os
+"#,
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--config", "ruff.toml"])
+        .arg("noqa.py")
+        .arg("--preview")
+        .args(["--add-noqa"])
+        .arg("-")
+        .pass_stdin(r#"
+
+"#), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+
+    let test_code =
+        fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
+
+    insta::assert_snapshot!(test_code, @r"
+    # ruff: noqa F401
+    import os
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn add_noqa_existing_range_suppression() -> Result<()> {
     let fixture = CliTest::new()?;
     fixture.write_file(
