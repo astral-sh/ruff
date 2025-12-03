@@ -71,14 +71,15 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn from_possibly_ambiguous_type_pair(
+    pub fn from_possibly_ambiguous_types(
         db: &'db dyn Db,
-        type_1: Type<'db>,
-        type_2: Type<'db>,
+        types: impl IntoIterator<Item = Type<'db>>,
     ) -> Self {
         let collector = AmbiguousClassCollector::default();
-        collector.visit_type(db, type_1);
-        collector.visit_type(db, type_2);
+
+        for ty in types {
+            collector.visit_type(db, ty);
+        }
 
         Self {
             qualified: Rc::new(
@@ -2212,10 +2213,8 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 }
                 Ok(())
             }
-            KnownInstanceType::ConstraintSet(tracked_set) => {
-                let constraints = tracked_set.constraints(self.db);
-                f.with_type(ty).write_str("ty_extensions.ConstraintSet")?;
-                write!(f, "[{}]", constraints.display(self.db))
+            KnownInstanceType::ConstraintSet(_) => {
+                f.with_type(ty).write_str("ty_extensions.ConstraintSet")
             }
             KnownInstanceType::GenericContext(generic_context) => {
                 f.with_type(ty).write_str("ty_extensions.GenericContext")?;

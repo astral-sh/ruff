@@ -37,7 +37,7 @@ use crate::types::{
     DataclassParams, FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType,
     MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType,
     TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, ide_support, todo_type,
+    WrapperDescriptorKind, enums, list_members, todo_type,
 };
 use crate::{FxHashMap, FxHashSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
@@ -886,7 +886,7 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty)] = overload.parameter_types() {
                                 overload.set_return_type(Type::heterogeneous_tuple(
                                     db,
-                                    ide_support::all_members(db, *ty)
+                                    list_members::all_members(db, *ty)
                                         .unstable_into_iter()
                                         .sorted()
                                         .map(|member| Type::string_literal(db, &member.name)),

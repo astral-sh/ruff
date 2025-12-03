@@ -74,7 +74,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::display::DisplaySettings;
 use crate::types::generics::{GenericContext, InferableTypeVars};
-use crate::types::ide_support::all_members;
+use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
@@ -373,7 +373,7 @@ impl<'db> OverloadLiteral<'db> {
             .scoped_use_id(db, scope);
 
         let Place::Defined(Type::FunctionLiteral(previous_type), _, Definedness::AlwaysDefined) =
-            place_from_bindings(db, use_def.bindings_at_use(use_id))
+            place_from_bindings(db, use_def.bindings_at_use(use_id)).place
         else {
             return None;
         };

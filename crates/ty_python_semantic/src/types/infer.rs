@@ -56,6 +56,7 @@ use crate::types::{
 use crate::unpack::Unpack;
 use crate::{Db, FxHashMap, FxHashSet};
 use builder::TypeInferenceBuilder;
+pub(super) use builder::UnsupportedComparisonError;
 
 mod builder;
 #[cfg(test)]

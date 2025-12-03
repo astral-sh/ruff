@@ -1477,6 +1477,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     }
 
                     let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
+                        self.scopes_by_expression
+                            .record_expression(asname, self.current_scope());
                         (asname.id.clone(), asname.id == alias.name.id)
                     } else {
                         (Name::new(alias.name.id.split('.').next().unwrap()), false)
@@ -1613,9 +1615,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                             let star_import_predicate = self.add_predicate(star_import.into());
 
+                            let associated_member_ids = self.place_tables[self.current_scope()]
+                                .associated_place_ids(ScopedPlaceId::Symbol(symbol_id));
                             let pre_definition = self
                                 .current_use_def_map()
-                                .single_symbol_place_snapshot(symbol_id);
+                                .single_symbol_snapshot(symbol_id, associated_member_ids);
+
                             let pre_definition_reachability =
                                 self.current_use_def_map().reachability;
 
@@ -1650,6 +1655,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     }
 
                     let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
+                        self.scopes_by_expression
+                            .record_expression(asname, self.current_scope());
                         // It's re-exported if it's `from ... import x as x`
                         (&asname.id, asname.id == alias.name.id)
                     } else {
@@ -2841,6 +2848,11 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
                 ScopeKind::Class => return false,
                 ScopeKind::Function | ScopeKind::Lambda => return true,
                 ScopeKind::Comprehension
+                    if matches!(scope.node(), NodeWithScopeKind::GeneratorExpression(_)) =>
+                {
+                    return true;
+                }
+                ScopeKind::Comprehension
                 | ScopeKind::Module
                 | ScopeKind::TypeAlias
                 | ScopeKind::TypeParams => {}
@@ -2889,11 +2901,14 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
         matches!(kind, ScopeKind::Function | ScopeKind::Lambda)
     }
 
-    fn in_generator_scope(&self) -> bool {
-        matches!(
-            self.scopes[self.current_scope()].node(),
-            NodeWithScopeKind::GeneratorExpression(_)
-        )
+    fn in_generator_context(&self) -> bool {
+        for scope_info in &self.scope_stack {
+            let scope = &self.scopes[scope_info.file_scope_id];
+            if matches!(scope.node(), NodeWithScopeKind::GeneratorExpression(_)) {
+                return true;
+            }
+        }
+        false
     }
 
     fn in_notebook(&self) -> bool {

@@ -610,3 +610,24 @@ class Child(Base):
     # This is fine - Child is not directly a NamedTuple
     _asdict = 42
 ```
+
+## Edge case: multiple reachable definitions with distinct issues
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import NamedTuple
+
+def coinflip() -> bool:
+    return True
+
+class Foo(NamedTuple):
+    if coinflip():
+        _asdict: bool  # error: [invalid-named-tuple] "NamedTuple field `_asdict` cannot start with an underscore"
+    else:
+        # TODO: there should only be one diagnostic here...
+        #
+        # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
+        # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
+        _asdict = True
+```

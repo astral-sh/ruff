@@ -9,8 +9,8 @@ use std::cmp::Ordering;
 use itertools::Itertools;
 
 use ruff_python_ast as ast;
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_stdlib::str::is_cased_uppercase;
 use ruff_python_trivia::{SimpleTokenKind, first_non_trivia_token, leading_indentation};
 use ruff_source_file::LineRanges;

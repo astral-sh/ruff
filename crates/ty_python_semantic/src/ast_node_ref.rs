@@ -1,6 +1,8 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
+#[cfg(debug_assertions)]
+use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast::{AnyNodeRef, NodeIndex};
 use ruff_python_ast::{AnyRootNodeRef, HasNodeIndex};
@@ -44,7 +46,7 @@ pub struct AstNodeRef<T> {
     // cannot implement `Eq`, as indices are only unique within a given instance of the
     // AST.
     #[cfg(debug_assertions)]
-    module_addr: usize,
+    file: File,
 
     _node: PhantomData<T>,
 }
@@ -72,7 +74,7 @@ where
         Self {
             index,
             #[cfg(debug_assertions)]
-            module_addr: module_ref.module().addr(),
+            file: module_ref.module().file(),
             #[cfg(debug_assertions)]
             kind: AnyNodeRef::from(node).kind(),
             #[cfg(debug_assertions)]
@@ -88,8 +90,7 @@ where
     #[track_caller]
     pub fn node<'ast>(&self, module_ref: &'ast ParsedModuleRef) -> &'ast T {
         #[cfg(debug_assertions)]
-        assert_eq!(module_ref.module().addr(), self.module_addr);
-
+        assert_eq!(module_ref.module().file(), self.file);
         // The user guarantees that the module is from the same file and Salsa
         // revision, so the file contents cannot have changed.
         module_ref

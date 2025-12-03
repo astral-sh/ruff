@@ -10,7 +10,7 @@ use crate::module_resolver::{KnownModule, Module, list_modules, resolve_module};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
-use crate::types::ide_support::{Member, all_declarations_and_bindings, all_members};
+use crate::types::list_members::{Member, all_members, all_members_of_scope};
 use crate::types::{Type, binding_type, infer_scope_types};
 use crate::{Db, FxHashMap, resolve_real_shadowable_module};
 
@@ -75,13 +75,13 @@ impl<'db> SemanticModel<'db> {
 
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
             for memberdef in
-                all_declarations_and_bindings(self.db, file_scope.to_scope_id(self.db, self.file))
+                all_members_of_scope(self.db, file_scope.to_scope_id(self.db, self.file))
             {
                 members.insert(
                     memberdef.member.name,
                     MemberDefinition {
                         ty: memberdef.member.ty,
-                        definition: memberdef.definition,
+                        first_reachable_definition: memberdef.first_reachable_definition,
                     },
                 );
             }
@@ -220,12 +220,13 @@ impl<'db> SemanticModel<'db> {
         let mut completions = vec![];
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
             completions.extend(
-                all_declarations_and_bindings(self.db, file_scope.to_scope_id(self.db, self.file))
-                    .map(|memberdef| Completion {
+                all_members_of_scope(self.db, file_scope.to_scope_id(self.db, self.file)).map(
+                    |memberdef| Completion {
                         name: memberdef.member.name,
                         ty: Some(memberdef.member.ty),
                         builtin: false,
-                    }),
+                    },
+                ),
             );
         }
         // Builtins are available in all scopes.
@@ -326,11 +327,11 @@ impl<'db> SemanticModel<'db> {
     }
 }
 
-/// The type and definition (if available) of a symbol.
+/// The type and definition of a symbol.
 #[derive(Clone, Debug)]
 pub struct MemberDefinition<'db> {
     pub ty: Type<'db>,
-    pub definition: Option<Definition<'db>>,
+    pub first_reachable_definition: Definition<'db>,
 }
 
 /// A classification of symbol names.

@@ -15,7 +15,7 @@ use ruff_db::diagnostic::{
 };
 use ruff_db::{files::File, parsed::parsed_module, source::source_text};
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_parser::TokenKind;
+use ruff_python_ast::token::TokenKind;
 use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
