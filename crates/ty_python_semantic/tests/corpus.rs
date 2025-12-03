@@ -80,7 +80,7 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
 
     let mut db = CorpusDb::new();
     db.memory_file_system()
-        .create_directory_all(root.as_ref())?;
+        .create_directory_all(&root)?;
 
     let workspace_root = get_cargo_workspace_root()?;
     let workspace_root = workspace_root.to_string();
