@@ -5979,6 +5979,94 @@ ZQ<CURSOR>
         ");
     }
 
+    // This test confirms current behavior (as of 2025-12-04), but
+    // it's not consistent with auto-import. That is, it doesn't
+    // strictly respect `__all__` on `bar`, but perhaps it should.
+    //
+    // See: https://github.com/astral-sh/ty/issues/1757
+    #[test]
+    fn object_attr_ignores_all() {
+        let snapshot = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+import bar
+bar.ZQ<CURSOR>
+"#,
+            )
+            .source(
+                "bar.py",
+                r#"
+                ZQZQ1 = 1
+                ZQZQ2 = 1
+                __all__ = ['ZQZQ1']
+            "#,
+            )
+            .completion_test_builder()
+            .auto_import()
+            .module_names()
+            .build()
+            .snapshot();
+        // We specifically do not want `ZQZQ2` here, since
+        // it is not part of `__all__`.
+        assert_snapshot!(snapshot, @r"
+        ZQZQ1 :: <no import required>
+        ZQZQ2 :: <no import required>
+        ");
+    }
+
+    #[test]
+    fn auto_import_ignores_modules_with_leading_underscore() {
+        let snapshot = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+Quitter<CURSOR>
+"#,
+            )
+            .completion_test_builder()
+            .auto_import()
+            .module_names()
+            .build()
+            .snapshot();
+        // There is a `Quitter` in `_sitebuiltins` in the standard
+        // library. But this is skipped by auto-import because it's
+        // 1) not first party and 2) starts with an `_`.
+        assert_snapshot!(snapshot, @"<No completions found>");
+    }
+
+    #[test]
+    fn auto_import_includes_modules_with_leading_underscore_in_first_party() {
+        let snapshot = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+ZQ<CURSOR>
+"#,
+            )
+            .source(
+                "bar.py",
+                r#"
+                ZQZQ1 = 1
+            "#,
+            )
+            .source(
+                "_foo.py",
+                r#"
+                ZQZQ1 = 1
+            "#,
+            )
+            .completion_test_builder()
+            .auto_import()
+            .module_names()
+            .build()
+            .snapshot();
+        assert_snapshot!(snapshot, @r"
+        ZQZQ1 :: _foo
+        ZQZQ1 :: bar
+        ");
+    }
+
     /// A way to create a simple single-file (named `main.py`) completion test
     /// builder.
     ///
