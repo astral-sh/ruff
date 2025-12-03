@@ -594,7 +594,7 @@ impl SearchPath {
         )
     }
 
-    pub(crate) fn is_first_party(&self) -> bool {
+    pub fn is_first_party(&self) -> bool {
         matches!(&*self.0, SearchPathInner::FirstParty(_))
     }
 

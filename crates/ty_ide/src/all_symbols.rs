@@ -36,6 +36,20 @@ pub fn all_symbols<'db>(
                 let Some(file) = module.file(&*db) else {
                     continue;
                 };
+                // By convention, modules starting with an underscore
+                // are generally considered unexported. However, we
+                // should consider first party modules fair game.
+                //
+                // Note that we apply this recursively. e.g.,
+                // `numpy._core.multiarray` is considered private
+                // because it's a child of `_core`.
+                if module.name(&*db).components().any(|c| c.starts_with('_'))
+                    && module
+                        .search_path(&*db)
+                        .is_none_or(|sp| !sp.is_first_party())
+                {
+                    continue;
+                }
                 // TODO: also make it available in `TYPE_CHECKING` blocks
                 // (we'd need https://github.com/astral-sh/ty/issues/1553 to do this well)
                 if !is_typing_extensions_available && module.name(&*db) == &typing_extensions {
