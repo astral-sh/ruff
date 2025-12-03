@@ -1772,7 +1772,7 @@ impl<'db> Type<'db> {
                 }
             }
             Type::ClassLiteral(class_literal) => {
-                Some(class_literal.default_specialization(db).into_callable(db))
+                Some(class_literal.identity_specialization(db).into_callable(db))
             }
 
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
