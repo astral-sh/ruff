@@ -51,11 +51,7 @@ pub(crate) use self::use_def::{
 /// Returns the semantic index for `file`.
 ///
 /// Prefer using [`symbol_table`] when working with symbols from a single scope.
-///
-/// The LRU capacity of 200 was picked without any empirical evidence that it's optimal,
-/// instead it's a wild guess that it should be unlikely that incremental changes involve
-/// more than 200 modules. Semantic indices within the same revision are never evicted by Salsa.
-#[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size, lru=200)]
+#[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
     let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
@@ -69,11 +65,7 @@ pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
 /// Using [`place_table`] over [`semantic_index`] has the advantage that
 /// Salsa can avoid invalidating dependent queries if this scope's place table
 /// is unchanged.
-///
-/// The LRU capacity of 200 was picked without any empirical evidence that it's optimal,
-/// instead it's a wild guess that it should be unlikely that incremental changes involve
-/// more than 200 modules. Place tables within the same revision are never evicted by Salsa.
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size, lru=200)]
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<PlaceTable> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("place_table", scope=?scope.as_id(), ?file).entered();
@@ -96,11 +88,7 @@ pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSe
 /// Using [`use_def_map`] over [`semantic_index`] has the advantage that
 /// Salsa can avoid invalidating dependent queries if this scope's use-def map
 /// is unchanged.
-///
-/// The LRU capacity of 200 was picked without any empirical evidence that it's optimal,
-/// instead it's a wild guess that it should be unlikely that incremental changes involve
-/// more than 200 modules. Use def maps within the same revision are never evicted by Salsa.
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size, lru=200)]
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'db>> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?file).entered();
