@@ -1,6 +1,7 @@
 use compact_str::CompactString;
 use core::fmt;
 use ruff_db::diagnostic::Diagnostic;
+use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::whitespace::indentation;
 use std::{error::Error, fmt::Formatter};
@@ -10,7 +11,12 @@ use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize, TextSlice};
 use smallvec::{SmallVec, smallvec};
 
+use crate::Locator;
+use crate::checkers::ast::LintContext;
+use crate::codes::Rule;
+use crate::fix::edits::delete_comment;
 use crate::preview::is_range_suppressions_enabled;
+use crate::rules::ruff::rules::UnusedSuppression;
 use crate::settings::LinterSettings;
 
 #[allow(unused)]
@@ -155,6 +161,39 @@ impl Suppressions {
             }
         }
         false
+    }
+
+    pub(crate) fn generate_diagnostics(&self, context: &LintContext, locator: &Locator) {
+        if context.is_rule_enabled(Rule::UnusedSuppression) {
+            for suppression in &self.valid {
+                if !suppression.used {
+                    for comment in &suppression.comments {
+                        let edit = if comment.codes.len() == 1 {
+                            delete_comment(suppression.range, locator)
+                        } else {
+                            let code_index = comment
+                                .codes
+                                .iter()
+                                .position(|range| locator.slice(range) == suppression.code)
+                                .unwrap();
+                            let code_range = if code_index < (comment.codes.len() - 1) {
+                                TextRange::new(
+                                    comment.codes[code_index].start(),
+                                    comment.codes[code_index + 1].start(),
+                                )
+                            } else {
+                                comment.codes[code_index]
+                            };
+                            Edit::range_deletion(code_range)
+                        };
+
+                        let mut diagnostic = context
+                            .report_diagnostic(UnusedSuppression, suppression.comments[0].range);
+                        diagnostic.set_fix(Fix::safe_edit(edit));
+                    }
+                }
+            }
+        }
     }
 }
 

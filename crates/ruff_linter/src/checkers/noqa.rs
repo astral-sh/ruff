@@ -119,6 +119,8 @@ pub(crate) fn check_noqa(
         }
     }
 
+    suppressions.generate_diagnostics(context, locator);
+
     // Enforce that the noqa directive was actually used (RUF100), unless RUF100 was itself
     // suppressed.
     if context.is_rule_enabled(Rule::UnusedNOQA)
