@@ -394,16 +394,14 @@ pub(crate) fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> Sear
 /// Being so strict minimizes concerns about this going off a lot and doing random
 /// chaotic things. In particular, all files under a given pyproject.toml will currently
 /// agree on this being their desperate search-path, which is really nice.
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
 fn desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<SearchPath> {
     let system = db.system();
     let importing_path = importing_file.path(db).as_system_path()?;
 
     // Only allow this if the importing_file is under the first-party search path
-    let (base_path, rel_path) = Program::get(db)
-        .search_paths(db)
-        .static_paths
-        .iter()
-        .find_map(|search_path| {
+    let (base_path, rel_path) =
+        search_paths(db, ModuleResolveMode::StubsAllowed).find_map(|search_path| {
             if !search_path.is_first_party() {
                 return None;
             }
@@ -413,11 +411,22 @@ fn desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<SearchPat
             ))
         })?;
 
+    // Read the revision on the corresponding file root to
+    // register an explicit dependency on this directory. When
+    // the revision gets bumped, the cache that Salsa creates
+    // for this routine will be invalidated.
+    //
+    // (This is conditional because ruff uses this code too and doesn't set roots)
+    if let Some(root) = db.files().root(db, base_path) {
+        let _ = root.revision(db);
+    }
+
     // Only allow searching up to the first-party path's root
     for rel_dir in rel_path.ancestors() {
         let candidate_path = base_path.join(rel_dir);
-        let pyproject = candidate_path.join("pyproject.toml");
-        if system.path_exists(&pyproject) {
+        if system.path_exists(&candidate_path.join("pyproject.toml"))
+            || system.path_exists(&candidate_path.join("ty.toml"))
+        {
             let search_path = SearchPath::first_party(system, candidate_path).ok()?;
             return Some(search_path);
         }
