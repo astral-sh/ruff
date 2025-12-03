@@ -907,8 +907,22 @@ impl<'db> Type<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        // Note: other parts of this crate assume that this union will be ordered with the types
-        // from later cycle iterations appearing first.
+        // When we encounter a salsa cycle, we want to avoid oscillating between two or more types
+        // without converging on a fixed-point result. Most of the time, we union together the
+        // types from each cycle iteration to ensure that our result is monotonic, even if we
+        // encounter oscillation.
+        //
+        // However, there are several parts of our type inference machinery that assume that we
+        // infer a single Type::FunctionLiteral type for each overload of each function definition.
+        // So we avoid the union behavior for those cases, and instead return the inferred type of
+        // the last cycle iteration.
+        //
+        // TODO: If this reintroduces "too many cycle iterations" panics, then we will need to
+        // consider a different union-like behavior for combining function signatures to ensure
+        // monotonicity.
+        if self.is_function_literal() && previous.is_function_literal() {
+            return self;
+        }
         UnionType::from_elements_cycle_recovery(db, [self, previous])
             .recursive_type_normalized(db, cycle)
     }
